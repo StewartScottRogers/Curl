@@ -28,9 +28,10 @@ public sealed partial class TcpConnectorTests
         var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = first }, CancellationToken.None);
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = first });
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("first.Info", string.Join(" | ", new[] { TryingLoopback }), string.Join(" | ", first.Info));
         CollectionAssert.AreEqual(new[] { TryingLoopback }, first.Info);
         CollectionAssert.AreEqual(new[] { "Hostname 127.0.0.1 was found in DNS cache", TryingLoopback }, second.Info);
         CollectionAssert.AreEqual(new[] { "127.0.0.1" }, resolver.ResolvedHosts);
@@ -48,10 +49,11 @@ public sealed partial class TcpConnectorTests
         var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("localhost", 47181, UseTls: false) { Events = first }, CancellationToken.None);
-        await connector.ConnectAsync(new ConnectTarget("localhost", 47181, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 47181, UseTls: false) { Events = first });
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 47181, UseTls: false) { Events = second });
 
         string[] resolvedLines = ["Host localhost:47181 was resolved.", "IPv6: ::1", "IPv4: 127.0.0.1", "  Trying [::1]:47181..."];
+        Diagnostics.Assert("first.Info", string.Join(" | ", resolvedLines), string.Join(" | ", first.Info));
         CollectionAssert.AreEqual(resolvedLines, first.Info);
         CollectionAssert.AreEqual(new[] { "Hostname localhost was found in DNS cache" }.Concat(resolvedLines).ToArray(), second.Info);
         CollectionAssert.AreEqual(new[] { "localhost" }, resolver.ResolvedHosts);
@@ -67,10 +69,11 @@ public sealed partial class TcpConnectorTests
         var otherHost = new RecordingTransferEvents();
         var otherPort = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false), CancellationToken.None);
-        await connector.ConnectAsync(new ConnectTarget("localhost", 47181, UseTls: false) { Events = otherHost }, CancellationToken.None);
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = otherPort }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false));
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 47181, UseTls: false) { Events = otherHost });
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = otherPort });
 
+        Diagnostics.Assert("otherHost.Info", string.Join(" | ", new[] { "Host localhost:47181 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", TryingLoopback }), string.Join(" | ", otherHost.Info));
         CollectionAssert.AreEqual(new[] { "Host localhost:47181 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", TryingLoopback }, otherHost.Info);
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:1..." }, otherPort.Info);
         CollectionAssert.AreEqual(new[] { "127.0.0.1", "localhost", "127.0.0.1" }, resolver.ResolvedHosts);
@@ -85,9 +88,10 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false), CancellationToken.None);
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false));
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("second.Info[0]", "Hostname 127.0.0.1 was found in DNS cache", second.Info[0]);
         Assert.AreEqual("Hostname 127.0.0.1 was found in DNS cache", second.Info[0]);
         Assert.AreEqual("  Trying 127.0.0.1:1...", second.Info[1]);
     }
@@ -102,9 +106,10 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider());
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("nonexistent.invalid", 47181, UseTls: false), CancellationToken.None);
-        var result = await connector.ConnectAsync(new ConnectTarget("nonexistent.invalid", 47181, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("nonexistent.invalid", 47181, UseTls: false));
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("nonexistent.invalid", 47181, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "Could not resolve host: nonexistent.invalid", "Could not resolve host: nonexistent.invalid", "Could not resolve: nonexistent.invalid:47181" },
@@ -123,9 +128,9 @@ public sealed partial class TcpConnectorTests
         var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = first }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("foo.example", 47181, UseTls: false) { Events = first });
         connector.LoadResolveEntries(second);
-        await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("foo.example", 47181, UseTls: false) { Events = second });
 
         string[] resolved =
         [
@@ -136,6 +141,7 @@ public sealed partial class TcpConnectorTests
             "IPv4: 127.0.0.1",
             TryingLoopback,
         ];
+        Diagnostics.Assert("first.Info", string.Join(" | ", resolved), string.Join(" | ", first.Info));
         CollectionAssert.AreEqual(resolved, first.Info);
         CollectionAssert.AreEqual(new[] { "RESOLVE foo.example:47181 - old addresses discarded" }.Concat(resolved).ToArray(), second.Info);
     }
@@ -150,10 +156,11 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var target = new ConnectTarget("foo.example", 47181, UseTls: false) { Events = events };
 
-        await connector.ConnectAsync(target, CancellationToken.None);
-        await connector.ConnectAsync(target with { Events = new RecordingTransferEvents() }, CancellationToken.None);
-        await connector.ConnectAsync(target, CancellationToken.None);
+        await ConnectLoggedAsync(connector, target);
+        await ConnectLoggedAsync(connector, target with { Events = new RecordingTransferEvents() });
+        await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("events.Info.Count(line => line.StartsWith('Added ', StringComparison.Ordinal))", 1, events.Info.Count(line => line.StartsWith("Added ", StringComparison.Ordinal)));
         Assert.AreEqual(1, events.Info.Count(line => line.StartsWith("Added ", StringComparison.Ordinal)));
         Assert.AreEqual(2, events.Info.Count(line => line == "Hostname foo.example was found in DNS cache"));
     }
@@ -166,9 +173,10 @@ public sealed partial class TcpConnectorTests
         var connect = new RecordingTransferEvents();
 
         connector.LoadResolveEntries(transferStart);
-        await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = connect }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("foo.example", 47181, UseTls: false) { Events = connect });
 
         CollectionAssert.AreEqual(new[] { "Added foo.example:47181:127.0.0.1 to DNS cache" }, transferStart.Info);
+        Diagnostics.Assert("connect.Info[0]", "Hostname foo.example was found in DNS cache", connect.Info[0]);
         Assert.AreEqual("Hostname foo.example was found in DNS cache", connect.Info[0]);
     }
 
@@ -177,7 +185,12 @@ public sealed partial class TcpConnectorTests
     {
         var connector = CreateConnectorWithResolveEntries();
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => connector.LoadResolveEntries(null!));
+        Diagnostics.Arrange("events", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => connector.LoadResolveEntries(null!));
+
+        Diagnostics.Act("parameter name", exception.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -188,8 +201,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnectorWithResolveEntries("foo.example:47181:127.0.0.1,127.0.0.2,[::1]");
         var events = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("foo.example", 47181, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("events.Info.Take(5).ToArray()", string.Join(" | ", new[] { "Added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to DNS cache", "Hostname foo.example was found in DNS cache", "Host foo.example:47181 was resolved.", "IPv6: ::1", "IPv4: 127.0.0.1, 127.0.0.2", }), string.Join(" | ", events.Info.Take(5).ToArray()));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -211,8 +225,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnectorWithResolveEntries("+*:47181:127.0.0.1");
         var events = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("events.Info", string.Join(" | ", new[] { "Added *:47181:127.0.0.1 to DNS cache (non-permanent)", "RESOLVE *:47181 using wildcard", "Hostname 127.0.0.1 was found in DNS cache", "Host *:47181 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", TryingLoopback, }), string.Join(" | ", events.Info));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -237,10 +252,11 @@ public sealed partial class TcpConnectorTests
         var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = first }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = first });
         connector.LoadResolveEntries(second);
-        await connector.ConnectAsync(new ConnectTarget("Bar.Example", 47181, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("Bar.Example", 47181, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("first.Info", string.Join(" | ", new[] { "Added FOO.example:47181:127.0.0.1 to DNS cache", "Added bar.example:47181:127.0.0.1 to DNS cache", TryingLoopback }), string.Join(" | ", first.Info));
         CollectionAssert.AreEqual(
             new[] { "Added FOO.example:47181:127.0.0.1 to DNS cache", "Added bar.example:47181:127.0.0.1 to DNS cache", TryingLoopback },
             first.Info);
@@ -267,8 +283,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnectorWithResolveEntries("Foo.Example:47181:127.0.0.1", "bad");
         var events = new RecordingTransferEvents();
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "Added Foo.Example:47181:127.0.0.1 to DNS cache" }, events.Info);
     }
@@ -290,9 +307,10 @@ public sealed partial class TcpConnectorTests
         var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = first }, CancellationToken.None);
-        await connector.ConnectAsync(new ConnectTarget("foo.example", 47181, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = first });
+        await ConnectLoggedAsync(connector, new ConnectTarget("foo.example", 47181, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("first.Info", string.Join(" | ", new[] { TryingLoopback }), string.Join(" | ", first.Info));
         CollectionAssert.AreEqual(new[] { TryingLoopback }, first.Info);
         CollectionAssert.AreEqual(new[] { "Hostname 127.0.0.1 was found in DNS cache", TryingLoopback }, second.Info);
     }
@@ -307,9 +325,10 @@ public sealed partial class TcpConnectorTests
         var target = new ConnectTarget("foo.example", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null) };
         var second = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(target, CancellationToken.None);
-        await connector.ConnectAsync(target with { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, target);
+        await ConnectLoggedAsync(connector, target with { Events = second });
 
+        Diagnostics.Assert("second.Info[0]", "Hostname proxy.example was found in DNS cache", second.Info[0]);
         Assert.AreEqual("Hostname proxy.example was found in DNS cache", second.Info[0]);
     }
 }

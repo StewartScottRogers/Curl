@@ -22,6 +22,7 @@ public sealed partial class TcpConnectorTests
     {
         var lines = await DeviceBindLinesAsync(new LocalBinding(interfaceName, hostName, null, 0, 1), deviceBinds: true, connects: true);
 
+        Diagnostics.Assert("lines.Take(2).ToArray()", string.Join(" | ", new[] { "  Trying 127.0.0.1:47599...", DeviceBoundLine }), string.Join(" | ", lines.Take(2).ToArray()));
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:47599...", DeviceBoundLine }, lines.Take(2).ToArray());
     }
 
@@ -32,6 +33,7 @@ public sealed partial class TcpConnectorTests
         // "connect to 127.0.0.1 port 1 from 127.0.0.1 port N failed: Connection refused".
         var lines = await DeviceBindLinesAsync(new LocalBinding("lo", "lo", null, 0, 1), deviceBinds: true, connects: false);
 
+        Diagnostics.Assert("lines.Take(2).ToArray()", string.Join(" | ", new[] { "  Trying 127.0.0.1:47599...", DeviceBoundLine }), string.Join(" | ", lines.Take(2).ToArray()));
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:47599...", DeviceBoundLine }, lines.Take(2).ToArray());
         StringAssert.StartsWith(lines[2], "connect to 127.0.0.1 port 47599 from ");
     }
@@ -43,6 +45,7 @@ public sealed partial class TcpConnectorTests
     {
         var lines = await DeviceBindLinesAsync(new LocalBinding(null, "127.0.0.1", "lo", 0, 1), deviceBinds, connects: true);
 
+        Diagnostics.Assert("lines[0]", "  Trying 127.0.0.1:47599...", lines[0]);
         Assert.AreEqual("  Trying 127.0.0.1:47599...", lines[0]);
         CollectionAssert.DoesNotContain(lines, DeviceBoundLine);
     }
@@ -52,11 +55,12 @@ public sealed partial class TcpConnectorTests
     {
         var lines = await DeviceBindLinesAsync(new LocalBinding("lo", "lo", null, 0, 1), deviceBinds: false, connects: true);
 
+        Diagnostics.Assert("lines[0]", "  Trying 127.0.0.1:47599...", lines[0]);
         Assert.AreEqual("  Trying 127.0.0.1:47599...", lines[0]);
         CollectionAssert.DoesNotContain(lines, DeviceBoundLine);
     }
 
-    private static async Task<string[]> DeviceBindLinesAsync(LocalBinding binding, bool deviceBinds, bool connects)
+    private async Task<string[]> DeviceBindLinesAsync(LocalBinding binding, bool deviceBinds, bool connects)
     {
         var events = new RecordingTransferEvents();
         var inner = connects ? new FakeTcpDialer { DialOutcome = _ => new FakeConnection() } : new FakeTcpDialer();
@@ -65,7 +69,7 @@ public sealed partial class TcpConnectorTests
             binding,
             Interfaces(("lo", [IPAddress.Loopback])));
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events });
 
         return LinesFromTheFirstTrying(events).ToArray();
     }

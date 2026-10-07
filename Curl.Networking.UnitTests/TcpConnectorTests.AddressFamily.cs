@@ -22,8 +22,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(new FakeDnsResolver(IPAddress.IPv6Loopback, Loopback), dialer, AddressFamily.InterNetwork);
         var events = new RecordingTransferEvents();
 
-        var result = await connector.ConnectAsync(new ConnectTarget("dual.example", 47500, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("dual.example", 47500, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 47500) }, dialer.DialedEndPoints);
         CollectionAssert.AreEqual(
@@ -43,8 +44,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(new FakeDnsResolver(IPAddress.IPv6Loopback, Loopback), dialer, family);
         var events = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget(host, 47500, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget(host, 47500, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("dialer.DialedEndPoints count", 1, dialer.DialedEndPoints.Count);
         Assert.HasCount(1, dialer.DialedEndPoints);
         Assert.AreEqual(family, dialer.DialedEndPoints[0].AddressFamily);
         CollectionAssert.AreEqual(
@@ -61,9 +63,10 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(resolver, dialer, AddressFamily.InterNetworkV6);
         var events = new RecordingTransferEvents();
 
-        var first = await connector.ConnectAsync(new ConnectTarget("github.com", 47500, UseTls: false) { Events = events }, CancellationToken.None);
-        await connector.ConnectAsync(new ConnectTarget("github.com", 47500, UseTls: false), CancellationToken.None);
+        var first = await ConnectLoggedAsync(connector, new ConnectTarget("github.com", 47500, UseTls: false) { Events = events });
+        await ConnectLoggedAsync(connector, new ConnectTarget("github.com", 47500, UseTls: false));
 
+        Diagnostics.Assert("first.ExitCode", CurlExitCode.CouldntResolveHost, first.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, first.ExitCode);
         Assert.AreEqual("Could not resolve host: github.com", first.ErrorMessage);
         Assert.IsEmpty(dialer.DialedEndPoints);
@@ -85,8 +88,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = CreateConnector(new FakeDnsResolver(literal), dialer, family);
 
-        var result = await connector.ConnectAsync(new ConnectTarget(host, 47500, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, 47500, UseTls: false));
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(literal, 47500) }, dialer.DialedEndPoints);
     }
@@ -104,8 +108,9 @@ public sealed partial class TcpConnectorTests
             addressFamily: AddressFamily.InterNetworkV6);
         var events = new RecordingTransferEvents();
 
-        var result = await connector.ConnectAsync(new ConnectTarget("foo", 47500, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("foo", 47500, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Could not resolve host: foo", result.ErrorMessage);
         Assert.IsEmpty(dialer.DialedEndPoints);
@@ -133,8 +138,9 @@ public sealed partial class TcpConnectorTests
             addressFamily: AddressFamily.InterNetworkV6);
         var events = new RecordingTransferEvents();
 
-        await connector.ConnectAsync(new ConnectTarget("foo", 47500, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("foo", 47500, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("dialer.DialedEndPoints", string.Join(" | ", new[] { new IPEndPoint(IPAddress.IPv6Loopback, 47500) }), string.Join(" | ", dialer.DialedEndPoints));
         CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.IPv6Loopback, 47500) }, dialer.DialedEndPoints);
         CollectionAssert.AreEqual(
             new[]
@@ -154,8 +160,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, AddressFamily.InterNetworkV6);
         var target = new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "bar", 47500, null) };
 
-        var result = await connector.ConnectAsync(target, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveProxy, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveProxy, result.ExitCode);
         Assert.AreEqual("Could not resolve proxy: bar", result.ErrorMessage);
         Assert.IsEmpty(dialer.DialedEndPoints);
@@ -169,8 +176,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, AddressFamily.InterNetworkV6);
         var target = new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 47500, null) };
 
-        await connector.ConnectAsync(target, CancellationToken.None);
+        await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("dialer.DialedEndPoints", string.Join(" | ", new[] { new IPEndPoint(Loopback, 47500) }), string.Join(" | ", dialer.DialedEndPoints));
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 47500) }, dialer.DialedEndPoints);
     }
 
