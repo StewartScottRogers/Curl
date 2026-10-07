@@ -1,5 +1,5 @@
 ---
-id: BL-1654
+id: BL-1656
 title: Speed up the constant-time FFDHE exponentiation for ffdhe6144 and ffdhe8192
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1654 — Speed up the constant-time FFDHE exponentiation for ffdhe6144 and ffdhe8192
+# BL-1656 — Speed up the constant-time FFDHE exponentiation for ffdhe6144 and ffdhe8192
 
 ## Goal
 
