@@ -8,7 +8,7 @@ depends-on: [BL-1457, BL-1559, BL-1560, BL-1561, BL-1562, BL-1563, BL-1564, BL-1
 touches: [Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1459 — Make every test in Curl.Cli.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,21 @@ Every test in `Curl.Cli.UnitTests` writes, through BL-1457's shared `TestDiagnos
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Cli.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Cli.UnitTests -warnaserror` is clean and `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Cli.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Cli.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Cli.UnitTests -warnaserror` is clean and `dotnet test Curl.Cli.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Cli.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Large: 1536 test methods in 110 files is probably more than one `/task-run` can finish. Stewart asked for one task per project, so it is filed whole. If the runner judges it too big, it splits it before changing any test: it files tasks that each cover a range of the project's files by name (each `-Pipeline direct -DependsOn BL-1457 -Touches Curl.Cli.UnitTests`, with these criteria limited to its files' classes through `--filter "FullyQualifiedName~<class>"`), adds them to this task's `depends-on`, and moves this task back to `Backlog`; this task then only runs the whole-project checks above.
 - 2026-10-07 (lane 1): split before changing any test, as BL-1463 and BL-1464 were. 1536 test methods in 110 files is far more than one run's two hours and token budget. Eighteen tasks cover every test file, in alphabetical groups of at most 100 tests (64 to 100): BL-1559 (AccountHomeDirectoryTests to CommandLineContinueAtNoClobberTests), BL-1560 (CommandLineContinueAtWithBodyTests to CommandLineDnsOptionTests), BL-1561 (CommandLineDohOptionTests to CommandLineFormEscapeTests), BL-1562 (CommandLineFormOptionTests to CommandLineGlobOffOptionTests), BL-1563 (CommandLineGssApiOptionTests to CommandLineHttpRequestOptionTests), BL-1564 (CommandLineInterfaceAndLocalPortOptionTests to CommandLineMailOptionTests), BL-1565 (CommandLineNegationTests to CommandLineNoFunctionOptionTests), BL-1566 (CommandLineNumberTests to CommandLineParallelOptionTests), BL-1567 (CommandLineParserTests to CommandLineProgressOptionTests), BL-1568 (CommandLineProtocolOptionTests to CommandLineRangeOptionTests), BL-1569 (CommandLineRateOptionTests to CommandLineRefusalTests), BL-1570 (CommandLineRemoteNameOptionTests to CommandLineSkipExistingTests), BL-1571 (CommandLineSshOptionTests to CommandLineTlsHandshakeOptionTests), BL-1572 (CommandLineTlsOptionTests to CommandLineTraceConfigTests), BL-1573 (CommandLineTraceOptionTests to CommandLineUploadFileOptionTests), BL-1574 (CommandLineVariableOptionTests to CurlVersionTextTests), BL-1575 (DefaultConfigFileSearchTests to LibcurlSourceCodeTransferFileTests), BL-1576 (LibcurlSourceCodeTransferOptionTests to UrlEncodedContentTests). Their filters use namespace `Curl.Cli`; every class is named after its file. Once they are Done, this task runs only the whole-project checks.
 - Before counts (2026-10-07, `Select-String -AllMatches` over `Curl.Cli.UnitTests` excluding `obj` and `bin`): `Assert.` 3162, `[TestMethod`/`[DataTestMethod` 1536, `[DataRow(` 2782.
+- After counts (2026-10-07, lane 8, same method): `Assert.` 3160, `[TestMethod`/`[DataTestMethod` 1534, `[DataRow(` 2782. The 2 test methods and their asserts left with BL-1599 (commit 79a40fe91), which moved the two real-path `--cacert` Integration tests into `Curl.Cli.IntegrationTests`; both carried `TestCategory("Integration")`, so the fast run never ran them and its count is unchanged by that move, and no test lost an assertion in this task's split (BL-1559..BL-1576).
+- Whole-project check (2026-10-07, lane 8): `dotnet build Curl.Cli.UnitTests -warnaserror` clean; the detailed fast run reports 3786 tests, 3770 passed, 16 skipped (skipped tests do not execute, so they print nothing) and prints 3770 `END` lines, one per executed test; the `(arrange 0,|, act 0,|, assert 0)` pattern matches nothing.
+- SLOW: no test printed a `SLOW:` line, so no follow-up task.
+- This run changed no file under `Curl.Cli.UnitTests/`; only this task file.
 
 ## Log
 
@@ -45,3 +49,4 @@ Every test in `Curl.Cli.UnitTests` writes, through BL-1457's shared `TestDiagnos
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1559..BL-1576 (one per range of test files); waits on them, then runs only the whole-project checks
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every executed Curl.Cli.UnitTests test writes ARRANGE, ACT and ASSERT diagnostics (3770 END lines, none with a zero count, no SLOW)
