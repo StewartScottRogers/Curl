@@ -1,6 +1,6 @@
 # ADR-0083 — The thin socket adapters are measured by the Integration run
 
-- **Status:** Accepted
+- **Status:** Accepted. Superseded in part by ADR-0421 (where Integration tests live; which socket tests are unit tests).
 - **Date:** 2026-09-27
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-357.

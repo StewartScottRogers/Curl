@@ -153,7 +153,8 @@ FtpProtocolHandler(IConnector, TimeProvider)
         │
         ├─ unit test  → a fake IConnector handing back a FakeConnection that
         │               replays recorded bytes, or a Failed result (exit 6, 7).
-        │               No network. No server. No [TestCategory("Integration")].
+        │               No network. No server. No [TestCategory("Integration")]:
+        │               those live only in Curl.<Area>.IntegrationTests projects.
         │
         └─ production → the connector in Curl.Networking.UnitLibrary: DNS, a
                         socket, wrapped by SslStream when the scheme is secure.
@@ -242,7 +243,10 @@ Checkable by someone outside the project, in priority order:
    returned in the same circumstances as upstream.
 4. **Unit tests need no network.** `dotnet test --filter "TestCategory!=Integration"`
    passes with networking disabled. If a protocol needs a live server to test, the
-   seam is in the wrong place.
+   seam is in the wrong place. The few tests that must touch something real - a
+   socket, the disk, the OS, a native API, a system agent - are Integration tests and
+   live only in `Curl.<Area>.IntegrationTests` projects, never in a `*.UnitTests`
+   project (ADR-0421).
 5. **Drops onto PATH.** A published `curl.exe` can replace the system binary and
    existing scripts keep working unchanged.
 

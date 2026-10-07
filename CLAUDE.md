@@ -18,7 +18,19 @@ injected interfaces so it can be unit tested without a network. See
 ## Build and test commands
 - Build: `dotnet build`
 - Test (fast, default): `dotnet test --filter "TestCategory!=Integration"`
+- Test (Integration only): `dotnet test --filter "TestCategory=Integration"`
+- Test (long-running only): `dotnet test --filter "TestCategory=LongRunning"` with
+  `CURL_RUN_LONG_RUNNING_TESTS=1` set; without it they show as skipped
 - Test (everything): `dotnet test`
+
+An Integration test touches something real outside the process - a socket, the disk, the
+OS, a native API, a system agent - and carries `[TestCategory("Integration")]`. It lives
+only in a `Curl.<Area>.IntegrationTests` project, never in a `*.UnitTests` project, and
+every test in an `*.IntegrationTests` project carries the category, so the fast command
+skips them all. A test whose only real resources are files in a temporary directory it
+creates and deletes, or a loopback socket it opens and closes without sending a byte, is a
+unit test. A slow test that is pure computation is not an Integration test: it stays in its
+`*.UnitTests` project as a `LongRunning` test. See ADR-0421.
 - Format: `dotnet format`
 - Measure quality: `powershell -NoProfile -File Measure-CodeQuality.ps1`
 
@@ -33,6 +45,9 @@ for any of it. Complexity is enforced at build time: the threshold lives in
 `CodeMetricsConfig.txt` and warnings are errors, so a method at 11 breaks the build. The
 `coverage-auditor` agent measures the rest and files the gaps as tasks. Thresholds in
 `CodeMetricsConfig.txt` are Stewart's to change; never raise one to make code pass.
+Coverage is measured from the fast tests only (`TestCategory!=Integration`), so moving a
+test into an `*.IntegrationTests` project never changes a library's measured coverage, and
+a line only an Integration test reaches counts as uncovered (ADR-0421).
 
 ## Git and GitHub
 Reversible git and gh work is delegated to github-operator: status, commits, rebases,
@@ -197,9 +212,10 @@ Curl/
 ├── Curl.slnx
 ├── Curl.Core.UnitLibrary/        ← production library
 ├── Curl.Core.UnitTests/          ← its tests, immediately beside it
-├── Curl.Protocol.Http.UnitLibrary/
-├── Curl.Protocol.Http.UnitTests/
-├── ...                           ← 66 projects, one flat alphabetical run
+├── Curl.Networking.IntegrationTests/ ← its Integration tests, just before the library
+├── Curl.Networking.UnitLibrary/
+├── Curl.Networking.UnitTests/
+├── ...                           ← 71 projects, one flat alphabetical run
 ├── Documentation/                ← shared project (docs and planning)
 ├── Tasks/                        ← shared project (task board)
 ├── Audit/                        ← shared project (the audit office; never written by the factory)
@@ -210,10 +226,13 @@ Curl/
 ### Project naming
 - Production library: `Curl.<Area>.UnitLibrary`, protocols `Curl.Protocol.<Name>.UnitLibrary`.
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
+- Integration tests, once an area has any: the same name with `.IntegrationTests`
+  instead of `.UnitLibrary` (ADR-0421).
 - The executable is `Curl.Console` — no `.UnitLibrary` suffix, because it is not a
   library. It is the only exception.
-- Names sort so each `.UnitTests` lands directly after the library it tests. Keep it
-  that way.
+- Names sort so each `.UnitTests` lands directly after the library it tests, and each
+  `.IntegrationTests` directly before it (for `Curl.Console`, directly before
+  `Curl.Console.UnitTests`). Keep it that way.
 
 In `Curl.slnx`, projects are listed as one flat run with no solution folders around
 them. The `Solution Items` and `Scripts` solution folders hold loose files only.
