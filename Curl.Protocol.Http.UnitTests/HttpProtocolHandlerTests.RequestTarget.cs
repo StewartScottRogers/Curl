@@ -65,13 +65,23 @@ public sealed partial class HttpProtocolHandlerTests
             Http = new HttpRequestOptions { RequestTarget = "/x/../y?z" },
         };
 
-        await new HttpProtocolHandler(QueueConnector.For(new TurnTakingConnection(65536, TargetResponse)), authenticator).ExecuteAsync(context);
+        Diagnostics.Arrange("url", context.Url);
+        Diagnostics.Arrange("request target", "/x/../y?z");
+        Diagnostics.Arrange("scripted response", OneLine(TargetResponse));
 
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new TurnTakingConnection(65536, TargetResponse)), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("authenticator request target", "/x/../y?z", authenticator.Calls[0].Request.RequestTarget);
         Assert.AreEqual("/x/../y?z", authenticator.Calls[0].Request.RequestTarget);
     }
 
-    private static async Task AssertRequestAsync(string expected, CurlUrl url, HttpRequestOptions? options)
+    private async Task AssertRequestAsync(string expected, CurlUrl url, HttpRequestOptions? options)
     {
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("method", options?.CustomMethod ?? "(default)");
+        Diagnostics.Arrange("request target", options?.RequestTarget ?? "(from url)");
+        Diagnostics.Arrange("scripted response", OneLine(TargetResponse));
         foreach (int chunkSize in ChunkSizes)
         {
             TurnTakingConnection connection = new(chunkSize, TargetResponse);
@@ -79,7 +89,11 @@ public sealed partial class HttpProtocolHandlerTests
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()).ExecuteAsync(context);
 
+            Diagnostics.Act("chunk size", chunkSize);
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
         }
     }

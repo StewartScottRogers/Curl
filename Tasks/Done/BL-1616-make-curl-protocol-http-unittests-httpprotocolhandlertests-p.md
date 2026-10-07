@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1616 — Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.Progress to HttpProtocolHandlerTests.RequestTarget tests write descriptive diagnostic output
 
@@ -23,15 +23,22 @@ Every test in these `Curl.Protocol.Http.UnitTests` files (9 files, 98 test metho
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
-- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
-- [ ] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
 
 ## Notes
+
+- Counts (`Assert.` / `[TestMethod` / `[DataRow(`), before = after in every file: Progress 30/15/0, Proxy 40/13/13, ProxyAuthentication 60/15/0, ProxyConnectionAnd417Lines 18/7/8, ProxyNtlmAndNegotiate 22/4/0, ReadTrace 13/7/0, RefusedHeader 45/18/52, RemainingInfoLines 17/15/6, RequestTarget 3/4/0 (total 248/98/79).
+- The class filter ran 798 tests on Windows (785 passed, 13 skipped by `OSCondition`), 785 `END` lines; none of the 98 methods in these files printed a zero count. The three `...SocketErrorsOwnWords...` tests are Windows-excluded and skip here; they share the instrumented helpers `AssertReusedConnectionResetReportsAsync` and `AssertFreshConnectionFailureReportsAsync` with their Windows twins, which do print all three counts.
+- Shared helpers in these files (`AssertRequestAsync`, `AssertRunningTotals`, `PostWithDataAsync`, `AssertAcceptedHeadAsync`, `AssertRefusedHeaderAsync`, the two socket-failure helpers) became instance methods so they can write through `Diagnostics`; nothing else about them changed.
+- The socket-failure helpers print the `SocketError` code and compare the error text as a boolean rather than printing it, since off Windows that text is the platform's own words.
+- No test printed a `SLOW:` line.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. All 98 test methods in the nine files write ARRANGE, ACT and ASSERT lines; build clean, fast tests green.

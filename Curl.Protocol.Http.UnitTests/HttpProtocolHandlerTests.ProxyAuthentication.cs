@@ -59,10 +59,18 @@ public sealed partial class HttpProtocolHandlerTests
         {
             TurnTakingConnection connection = new(chunkSize, ProxyBasicChallengeHead + "PPP");
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", OneLine(ProxyBasicChallengeHead + "PPP"));
+            Diagnostics.Arrange("proxy schemes", HttpAuthSchemes.Basic);
 
             TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Basic)
                 .ExecuteAsync(ProxyChallengeContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("request written", OneLine(ProxyRequestStart + ProxyBasic + ProxyRequestEnd), OneLine(connection.Written));
+            Diagnostics.Assert("output", "PPP", Latin1(output.ToArray()));
+            Diagnostics.Assert("response code", 407, result.Report!.ResponseCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ProxyRequestStart + ProxyBasic + ProxyRequestEnd, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("PPP", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -79,10 +87,17 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, ProxyBasicChallengeHead + "PPP");
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted response", OneLine(ProxyBasicChallengeHead + "PPP"));
+        Diagnostics.Arrange("options", "--proxy-basic -f");
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Basic)
             .ExecuteAsync(ProxyChallengeContext(output, fail: true));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
+        Diagnostics.Assert("error message", "The requested URL returned error: 407", result.ErrorMessage);
+        Diagnostics.Diff("request written", OneLine(ProxyRequestStart + ProxyBasic + ProxyRequestEnd), OneLine(connection.Written));
+        Diagnostics.Assert("output length", 0, output.Length);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual("The requested URL returned error: 407", result.ErrorMessage);
         Assert.AreEqual(ProxyRequestStart + ProxyBasic + ProxyRequestEnd, connection.Written);
@@ -106,10 +121,18 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(first, second);
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "407 Digest with Connection: close, then 200 ok on a new connection");
 
             TransferResult result = await ProxyChallengeHandler(connector, HttpAuthSchemes.Digest, "8c2728ea340ca45e0fc1411a44d914b4")
                 .ExecuteAsync(ProxyChallengeContext(output, headerOutput: headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("first request", OneLine(ProxyRequestStart + ProxyRequestEnd), OneLine(first.Written));
+            Diagnostics.Diff("second request", OneLine(ProxyRequestStart + digest + ProxyRequestEnd), OneLine(second.Written));
+            Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
+            Diagnostics.Assert("connections", 2, connector.Targets.Count);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(ProxyRequestStart + digest + ProxyRequestEnd, second.Written, $"Chunk size {chunkSize}");
@@ -134,10 +157,17 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, KeepAliveProxyDigestChallengeHead + "PPP", ProxyOkHead + "ok");
             QueueConnector connector = QueueConnector.For(connection);
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "407 Digest kept alive, then 200 ok");
 
             TransferResult result = await ProxyChallengeHandler(connector, HttpAuthSchemes.Digest, "e395f7bf9cdabe6947113bd005a4ce2a")
                 .ExecuteAsync(ProxyChallengeContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("requests written", OneLine(ProxyRequestStart + ProxyRequestEnd + ProxyRequestStart + digest + ProxyRequestEnd), OneLine(connection.Written));
+            Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
+            Diagnostics.Assert("connections", 1, connector.Targets.Count);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd + ProxyRequestStart + digest + ProxyRequestEnd, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -160,10 +190,17 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection second = new(65536, ProxyDigestChallengeHead + "PPP");
             QueueConnector connector = QueueConnector.For(first, second);
             MemoryStream output = new();
+            Diagnostics.Arrange("fail", fail);
+            Diagnostics.Arrange("scripted responses", "407 Digest, 407 Digest again");
 
             TransferResult result = await ProxyChallengeHandler(connector, HttpAuthSchemes.Digest, "95f7476d91514799667a1c895ce15714")
                 .ExecuteAsync(ProxyChallengeContext(output, fail: fail));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", fail ? CurlExitCode.HttpReturnedError : CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("second request", OneLine(ProxyRequestStart + digest + ProxyRequestEnd), OneLine(second.Written));
+            Diagnostics.Assert("output", fail ? string.Empty : "PPP", Latin1(output.ToArray()));
+            Diagnostics.Assert("connections", 2, connector.Targets.Count);
             Assert.AreEqual(fail ? CurlExitCode.HttpReturnedError : CurlExitCode.Ok, result.ExitCode, $"Fail {fail}");
             Assert.AreEqual(ProxyRequestStart + digest + ProxyRequestEnd, second.Written, $"Fail {fail}");
             Assert.AreEqual(fail ? string.Empty : "PPP", Latin1(output.ToArray()), $"Fail {fail}");
@@ -180,10 +217,16 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, ProxyBasicChallengeHead + "PPP");
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted response", OneLine(ProxyBasicChallengeHead + "PPP"));
+        Diagnostics.Arrange("proxy schemes", HttpAuthSchemes.Digest);
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Digest)
             .ExecuteAsync(ProxyChallengeContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("request written", OneLine(ProxyRequestStart + ProxyRequestEnd), OneLine(connection.Written));
+        Diagnostics.Assert("output", "PPP", Latin1(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, connection.Written);
         Assert.AreEqual("PPP", Latin1(output.ToArray()));
@@ -201,10 +244,16 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection first = new(65536, ProxyBasicChallengeHead + "PPP");
             TurnTakingConnection second = new(65536, last);
             MemoryStream output = new();
+            Diagnostics.Arrange("scripted responses", "407 Basic, then " + OneLine(last));
 
             TransferResult result = await ProxyChallengeHandler(QueueConnector.For(first, second), HttpAuthSchemes.Any)
                 .ExecuteAsync(ProxyChallengeContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("first request", OneLine(ProxyRequestStart + ProxyRequestEnd), OneLine(first.Written));
+            Diagnostics.Diff("second request", OneLine(ProxyRequestStart + ProxyBasic + ProxyRequestEnd), OneLine(second.Written));
+            Diagnostics.Assert("output", last.EndsWith("ok", StringComparison.Ordinal) ? "ok" : "PPP", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written);
             Assert.AreEqual(ProxyRequestStart + ProxyBasic + ProxyRequestEnd, second.Written);
@@ -223,10 +272,16 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection first = new(65536, ProxyDigestChallengeHead + "PPP");
         TurnTakingConnection second = new(65536, ClosingOkHead + "ok");
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "407 Digest, then 200 ok");
+        Diagnostics.Arrange("proxy schemes", HttpAuthSchemes.Any);
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(first, second), HttpAuthSchemes.Any, "ac9d38277a649bc7d1b93233b9bcf15c")
             .ExecuteAsync(ProxyChallengeContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("second request", OneLine(ProxyRequestStart + digest + ProxyRequestEnd), OneLine(second.Written));
+        Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written);
         Assert.AreEqual(ProxyRequestStart + digest + ProxyRequestEnd, second.Written);
@@ -242,10 +297,16 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, ProxyBasicChallengeHead + "PPP");
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted response", OneLine(ProxyBasicChallengeHead + "PPP"));
+        Diagnostics.Arrange("credentials", "proxy u:p, origin a:b, both Basic");
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Basic)
             .ExecuteAsync(ProxyChallengeContext(output, originCredential: new NetworkCredential("a", "b")));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("request written", OneLine(ProxyRequestStart + ProxyBasic + OriginBasic + ProxyRequestEnd), OneLine(connection.Written));
+        Diagnostics.Assert("output", "PPP", Latin1(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyBasic + OriginBasic + ProxyRequestEnd, connection.Written);
         Assert.AreEqual("PPP", Latin1(output.ToArray()));
@@ -263,10 +324,17 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection second = new(65536, OriginBasicChallengeHead + "UUU");
         QueueConnector connector = QueueConnector.For(first, second);
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "407 Basic, then 401 Basic");
+        Diagnostics.Arrange("credentials", "proxy u:p any, origin a:b Basic");
 
         TransferResult result = await ProxyChallengeHandler(connector, HttpAuthSchemes.Any)
             .ExecuteAsync(ProxyChallengeContext(output, originCredential: new NetworkCredential("a", "b")));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("second request", OneLine(ProxyRequestStart + ProxyBasic + OriginBasic + ProxyRequestEnd), OneLine(second.Written));
+        Diagnostics.Assert("output", "UUU", Latin1(output.ToArray()));
+        Diagnostics.Assert("response code", 401, result.Report!.ResponseCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + OriginBasic + ProxyRequestEnd, first.Written);
         Assert.AreEqual(ProxyRequestStart + ProxyBasic + OriginBasic + ProxyRequestEnd, second.Written);
@@ -294,10 +362,17 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection third = new(65536, ClosingOkHead + "ok");
         QueueConnector connector = QueueConnector.For(first, second, third);
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "407 Digest, 401 Digest, 200 ok");
+        Diagnostics.Arrange("credentials", "proxy u:p Digest, origin a:b Digest");
 
         TransferResult result = await ProxyChallengeHandler(connector, HttpAuthSchemes.Digest, "063231b54c58aa830f9917b0665bdaf8", "582287d88c3c0940fe2e132942e332bc")
             .ExecuteAsync(ProxyChallengeContext(output, originCredential: new NetworkCredential("a", "b"), originSchemes: HttpAuthSchemes.Digest));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("second request", OneLine(ProxyRequestStart + proxyDigest + ProxyRequestEnd), OneLine(second.Written));
+        Diagnostics.Diff("third request", OneLine(ProxyRequestStart + keptProxyDigest + originDigest + ProxyRequestEnd), OneLine(third.Written));
+        Diagnostics.Assert("connection count", 3, result.Report!.ConnectionCount);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written);
         Assert.AreEqual(ProxyRequestStart + proxyDigest + ProxyRequestEnd, second.Written);
@@ -324,10 +399,17 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection second = new(65536, ProxyDigestChallengeHead + "PPP");
         TurnTakingConnection third = new(65536, ClosingOkHead + "ok");
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "401 Digest, 407 Digest, 200 ok");
+        Diagnostics.Arrange("credentials", "proxy u:p any, origin a:b Digest");
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(first, second, third), HttpAuthSchemes.Any, "f7604464c2453c62e1f5077435011686", "c06ed45dc85f0a3e7b4671f765ef1672")
             .ExecuteAsync(ProxyChallengeContext(output, originCredential: new NetworkCredential("a", "b"), originSchemes: HttpAuthSchemes.Digest));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("second request", OneLine(ProxyRequestStart + originDigest + ProxyRequestEnd), OneLine(second.Written));
+        Diagnostics.Diff("third request", OneLine(ProxyRequestStart + proxyDigest + keptOriginDigest + ProxyRequestEnd), OneLine(third.Written));
+        Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, first.Written);
         Assert.AreEqual(ProxyRequestStart + originDigest + ProxyRequestEnd, second.Written);
@@ -345,9 +427,15 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, ProxyBasicChallengeHead + "PPP");
         MemoryStream output = new();
         TransferContext context = new() { Url = CurlUrl.Parse(ProxyAuthUrl), Output = output };
+        Diagnostics.Arrange("scripted response", OneLine(ProxyBasicChallengeHead + "PPP"));
+        Diagnostics.Arrange("forward proxy", "(none)");
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Any).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("output", "PPP", Latin1(output.ToArray()));
+        Diagnostics.Act("request written", OneLine(connection.Written));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("PPP", Latin1(output.ToArray()));
         Assert.DoesNotContain("Proxy-Authorization", connection.Written);
@@ -368,9 +456,14 @@ public sealed partial class HttpProtocolHandlerTests
             Output = output,
             Http = new HttpRequestOptions { ForwardProxy = ChallengingProxy, Body = new StreamBody(new MemoryStream("hi"u8.ToArray()), 2, "application/octet-stream") },
         };
+        Diagnostics.Arrange("scripted response", OneLine(ProxyBasicChallengeHead + "PPP"));
+        Diagnostics.Arrange("request body", "stream, 2 bytes");
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Any).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("output", "PPP", Latin1(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("PPP", Latin1(output.ToArray()));
     }
@@ -382,7 +475,13 @@ public sealed partial class HttpProtocolHandlerTests
     public void ProxyAuthSchemes_IsWhatTheHandlerWasGivenOrBasic()
     {
         SilentAuthenticator authenticator = new();
+        Diagnostics.Arrange("proxy schemes given", "none, then Digest");
 
+        HttpAuthSchemes withNone = new HttpProtocolHandler(QueueConnector.For(), authenticator).ProxyAuthSchemes;
+        HttpAuthSchemes withDigest = new HttpProtocolHandler(QueueConnector.For(), authenticator, null, HttpAuthSchemes.Digest).ProxyAuthSchemes;
+
+        Diagnostics.Act("proxy schemes kept", $"{withNone}, {withDigest}");
+        Diagnostics.Assert("proxy schemes kept", $"{HttpAuthSchemes.Basic}, {HttpAuthSchemes.Digest}", $"{withNone}, {withDigest}");
         Assert.AreEqual(HttpAuthSchemes.Basic, new HttpProtocolHandler(QueueConnector.For(), authenticator).ProxyAuthSchemes);
         Assert.AreEqual(HttpAuthSchemes.Digest, new HttpProtocolHandler(QueueConnector.For(), authenticator, null, HttpAuthSchemes.Digest).ProxyAuthSchemes);
     }

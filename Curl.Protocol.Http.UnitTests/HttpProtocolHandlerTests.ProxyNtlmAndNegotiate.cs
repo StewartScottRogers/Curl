@@ -46,9 +46,16 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(connection);
             ScriptedTokenSource tokens = NtlmTokens();
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "407 NTLM type 2, then 200 ok");
 
             TransferResult result = await ProxyTokenHandler(connector, tokens, HttpAuthSchemes.Ntlm).ExecuteAsync(ProxyChallengeContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("requests written", OneLine(ProxyNtlmRequest(ProxyNtlmType1) + ProxyNtlmRequest(ProxyNtlmType3)), OneLine(connection.Written));
+            Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
+            Diagnostics.Assert("connections", 1, connector.Targets.Count);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ProxyNtlmRequest(ProxyNtlmType1) + ProxyNtlmRequest(ProxyNtlmType3), connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -67,9 +74,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, ProxyNtlmChallengeHead, ProxyNtlmRejectedHead);
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "407 NTLM type 2, then 407 NTLM rejecting type 3");
 
         TransferResult result = await ProxyTokenHandler(QueueConnector.For(connection), NtlmTokens(), HttpAuthSchemes.Ntlm).ExecuteAsync(ProxyChallengeContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("requests written", OneLine(ProxyNtlmRequest(ProxyNtlmType1) + ProxyNtlmRequest(ProxyNtlmType3)), OneLine(connection.Written));
+        Diagnostics.Assert("response code", 407, result.Report!.ResponseCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyNtlmRequest(ProxyNtlmType1) + ProxyNtlmRequest(ProxyNtlmType3), connection.Written);
         Assert.AreEqual(407, result.Report!.ResponseCode);
@@ -94,9 +106,16 @@ public sealed partial class HttpProtocolHandlerTests
                 new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [1, 2, 3]),
                 new SecurityContextStep(SecurityContextStatus.Completed, [7, 8, 9]));
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "407 Negotiate BAUG, then 200 ok; context tokens AQID, BwgJ");
 
             TransferResult result = await ProxyTokenHandler(connector, tokens, HttpAuthSchemes.Negotiate).ExecuteAsync(ProxyChallengeContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Act("requests written", OneLine(connection.Written));
+            Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
+            Diagnostics.Assert("contexts disposed", 1, tokens.ContextsDisposed);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(
                 ProxyRequestStart + "Proxy-Authorization: Negotiate AQID\r\n" + ProxyRequestEnd + ProxyRequestStart + "Proxy-Authorization: Negotiate BwgJ\r\n" + ProxyRequestEnd,
@@ -132,9 +151,17 @@ public sealed partial class HttpProtocolHandlerTests
             Events = events,
             Http = new HttpRequestOptions { ForwardProxy = ChallengingProxy with { Credential = new NetworkCredential(string.Empty, string.Empty) } },
         };
+        Diagnostics.Arrange("scripted response", "407 Negotiate, body deny");
+        Diagnostics.Arrange("security context", "no credentials, twice");
 
         TransferResult result = await ProxyTokenHandler(QueueConnector.For(connection), tokens, HttpAuthSchemes.Negotiate).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("request written", OneLine(ProxyRequestStart + ProxyRequestEnd), OneLine(connection.Written));
+        Diagnostics.Assert("output", "deny", Latin1(output.ToArray()));
+        Diagnostics.Assert("contexts made", 2, tokens.ContextsMade);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(ProxyRequestStart + ProxyRequestEnd, connection.Written);
         Assert.AreEqual("deny", Latin1(output.ToArray()));

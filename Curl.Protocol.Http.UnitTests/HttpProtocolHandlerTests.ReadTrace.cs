@@ -21,6 +21,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = await PostWithDataAsync(tracesReaders: true);
 
+        Diagnostics.Assert("read lines", 3, events.Info.Count(line => line.StartsWith("[READ]", StringComparison.Ordinal)));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -41,6 +42,8 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = await PostWithDataAsync(tracesReaders: false);
 
+        Diagnostics.Assert("read lines", 0, events.Info.Count(line => line.StartsWith("[READ]", StringComparison.Ordinal)));
+        Diagnostics.Assert("traces readers by default", false, Handler(QueueConnector.For()).TracesClientReaders);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("[READ]", StringComparison.Ordinal)), string.Join('\n', events.Events));
         Assert.IsFalse(Handler(QueueConnector.For()).TracesClientReaders);
     }
@@ -58,10 +61,16 @@ public sealed partial class HttpProtocolHandlerTests
             Upload = new MemoryStream("abc"u8.ToArray()),
             Events = events,
         };
+        Diagnostics.Arrange("upload", "-T file, abc (3 bytes)");
+        Diagnostics.Arrange("traces readers", true);
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()) { TracesClientReaders = true }
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("read lines", 3, events.Info.Count(line => line.StartsWith("[READ]", StringComparison.Ordinal)));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -95,6 +104,8 @@ public sealed partial class HttpProtocolHandlerTests
             TimeProvider = time,
             Events = events,
         };
+        Diagnostics.Arrange("upload", "-T - from standard input, abc, chunked, Expect: 100-continue");
+        Diagnostics.Arrange("traces readers", true);
 
         Task<TransferResult> transfer = new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()) { TracesClientReaders = true }
             .ExecuteAsync(context).AsTask();
@@ -102,6 +113,10 @@ public sealed partial class HttpProtocolHandlerTests
         time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("upload sent line", true, events.Info.Contains("upload completely sent off: 13 bytes"));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -137,10 +152,16 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi", 65536);
         RecordingTransferEvents events = new();
         HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream(form), form.Length, contentType) };
+        Diagnostics.Arrange("request body", $"multipart stream, {form.Length} bytes");
+        Diagnostics.Arrange("traces readers", true);
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()) { TracesClientReaders = true }
             .ExecuteAsync(EventsContext("http://127.0.0.1:47811/", events, options));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("first mime read line", "* [READ] cr_mime_read(len=149), mime_read() -> 149", events.Events.ElementAtOrDefault(1));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -167,9 +188,15 @@ public sealed partial class HttpProtocolHandlerTests
             Http = new HttpRequestOptions { Headers = ["Expect:"] },
             Events = events,
         };
+        Diagnostics.Arrange("upload", "-T - from standard input, abc, Expect: removed");
+        Diagnostics.Arrange("traces readers", false);
 
         TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", 65536))).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("read lines", 0, events.Info.Count(line => line.StartsWith("[READ]", StringComparison.Ordinal)));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("[READ]", StringComparison.Ordinal)), string.Join('\n', events.Events));
     }
@@ -186,22 +213,32 @@ public sealed partial class HttpProtocolHandlerTests
             Events = events,
             TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
         };
+        Diagnostics.Arrange("request", "HTTP/2 prior knowledge, POST ab");
+        Diagnostics.Arrange("traces readers", true);
 
-        await new HttpProtocolHandler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536)), new SilentAuthenticator()) { TracesClientReaders = true }
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536)), new SilentAuthenticator()) { TracesClientReaders = true }
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("read lines", 0, events.Info.Count(line => line.StartsWith("[READ]", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("[READ]", StringComparison.Ordinal)), string.Join('\n', events.Events));
     }
 
-    private static async Task<RecordingTransferEvents> PostWithDataAsync(bool tracesReaders)
+    private async Task<RecordingTransferEvents> PostWithDataAsync(bool tracesReaders)
     {
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi", 65536, ReadTracePostHead + "ab");
         RecordingTransferEvents events = new();
         HttpRequestOptions options = new() { Body = new BytesBody("ab"u8.ToArray(), "application/x-www-form-urlencoded") };
+        Diagnostics.Arrange("request", "POST -d ab");
+        Diagnostics.Arrange("traces readers", tracesReaders);
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator()) { TracesClientReaders = tracesReaders }
             .ExecuteAsync(EventsContext("http://127.0.0.1:47811/", events, options));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         return events;
     }

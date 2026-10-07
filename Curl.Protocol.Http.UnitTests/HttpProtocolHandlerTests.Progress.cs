@@ -21,12 +21,19 @@ public sealed partial class HttpProtocolHandlerTests
         {
             RecordingTransferProgress progress = new();
             ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789", chunkSize);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, Content-Length: 10, body 0123456789");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(ProgressContext("http://example.com/", progress));
 
+            WriteResult(result);
+            WriteReports(progress);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("first report", "started", progress.Reports[0]);
             Assert.AreEqual("started", progress.Reports[0], $"Chunk size {chunkSize}");
             AssertRunningTotals(progress.Downloads, 10, "10", chunkSize);
+            Diagnostics.Assert("upload reports", 0, progress.Uploads.Count);
             Assert.IsEmpty(progress.Uploads, $"Chunk size {chunkSize}");
         }
     }
@@ -36,9 +43,12 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferProgress progress = new();
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123456789", 65536);
+        Diagnostics.Arrange("scripted response", "200, Content-Length: 10, body 0123456789, one read");
 
         await Handler(QueueConnector.For(connection)).ExecuteAsync(ProgressContext("http://example.com/", progress));
 
+        WriteReports(progress);
+        Diagnostics.Assert("progress reports", "started, down 0/10, down 10/10, done", string.Join(", ", progress.Reports));
         CollectionAssert.AreEqual(new[] { "started", "down 0/10", "down 10/10", "done" }, progress.Reports.ToArray());
     }
 
@@ -49,9 +59,14 @@ public sealed partial class HttpProtocolHandlerTests
         {
             RecordingTransferProgress progress = new();
             ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nabcd\r\n3\r\nefg\r\n0\r\n\r\n", chunkSize);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, chunked body abcd + efg");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(ProgressContext("http://example.com/", progress));
 
+            WriteResult(result);
+            WriteReports(progress);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             AssertRunningTotals(progress.Downloads, 7, "?", chunkSize);
         }
@@ -64,9 +79,14 @@ public sealed partial class HttpProtocolHandlerTests
         {
             RecordingTransferProgress progress = new();
             ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\n\r\nhello", chunkSize);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, body hello to close");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(ProgressContext("http://example.com/", progress));
 
+            WriteResult(result);
+            WriteReports(progress);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             AssertRunningTotals(progress.Downloads, 5, "?", chunkSize);
         }
@@ -79,10 +99,16 @@ public sealed partial class HttpProtocolHandlerTests
         {
             RecordingTransferProgress progress = new();
             ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n0123", chunkSize);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, Content-Length: 10, only 0123 arrives");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(ProgressContext("http://example.com/", progress));
 
+            WriteResult(result);
+            WriteReports(progress);
+            Diagnostics.Assert("exit code", CurlExitCode.PartialFile, result.ExitCode);
             Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("first report", "started", progress.Reports[0]);
             Assert.AreEqual("started", progress.Reports[0], $"Chunk size {chunkSize}");
             AssertRunningTotals(progress.Downloads, 4, "10", chunkSize);
         }
@@ -95,9 +121,13 @@ public sealed partial class HttpProtocolHandlerTests
         {
             RecordingTransferProgress progress = new();
             ScriptedConnection connection = Connection("HTTP/1.1 204 No Content\r\n\r\n", chunkSize);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "204 No Content");
 
             await Handler(QueueConnector.For(connection)).ExecuteAsync(ProgressContext("http://example.com/", progress));
 
+            WriteReports(progress);
+            Diagnostics.Assert("progress reports", "started, done", string.Join(", ", progress.Reports));
             CollectionAssert.AreEqual(new[] { "started", "done" }, progress.Reports.ToArray(), $"Chunk size {chunkSize}");
         }
     }
@@ -107,10 +137,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferProgress progress = new();
         QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect to example.com port 80 after 0 ms: Could not connect to server"));
+        Diagnostics.Arrange("connect result", "failed, CouldntConnect");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ProgressContext("http://example.com/", progress));
 
+        WriteResult(result);
+        WriteReports(progress);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("progress reports", 0, progress.Reports.Count);
         Assert.IsEmpty(progress.Reports);
     }
 
@@ -122,9 +157,13 @@ public sealed partial class HttpProtocolHandlerTests
             RecordingTransferProgress progress = new();
             ScriptedConnection connection = Connection("HTTP/1.1 302 Found\r\nLocation: /b\r\nContent-Length: 5\r\n\r\nmoved", chunkSize);
             TransferContext context = ProgressContext("http://example.com/", progress, new HttpRequestOptions { FollowRedirects = true });
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "302 Found, Location: /b, body moved, following");
 
             await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+            WriteReports(progress);
+            Diagnostics.Assert("progress reports", "started, done", string.Join(", ", progress.Reports));
             CollectionAssert.AreEqual(new[] { "started", "done" }, progress.Reports.ToArray(), $"Chunk size {chunkSize}");
         }
     }
@@ -137,9 +176,13 @@ public sealed partial class HttpProtocolHandlerTests
             RecordingTransferProgress progress = new();
             ScriptedConnection connection = Connection(EmptyOk, chunkSize);
             TransferContext context = ProgressContext("http://example.com/", progress, new HttpRequestOptions { Body = FormHello() });
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("request body", "hello (5 bytes, form)");
 
             await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+            WriteReports(progress);
+            Diagnostics.Assert("progress reports", "started, up 0/5, up 5/5, down 0/0, done", string.Join(", ", progress.Reports));
             CollectionAssert.AreEqual(new[] { "started", "up 0/5", "up 5/5", "down 0/0", "done" }, progress.Reports.ToArray(), $"Chunk size {chunkSize}");
         }
     }
@@ -157,9 +200,12 @@ public sealed partial class HttpProtocolHandlerTests
             Http = new HttpRequestOptions { Headers = ["Expect:"] },
             Progress = progress,
         };
+        Diagnostics.Arrange("upload", "standard input, 200000 letters, Expect: removed");
 
         await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+        WriteReports(progress);
+        Diagnostics.Assert("upload reports", "up 0/?, up 65416/?, up 130940/?, up 196464/?, up 200000/?", string.Join(", ", progress.Uploads));
         // The measured chunk sizes 65416, 65524, 65524, 3536 (BL-184 Notes), as running totals.
         CollectionAssert.AreEqual(new[] { "up 0/?", "up 65416/?", "up 130940/?", "up 196464/?", "up 200000/?" }, progress.Uploads.ToArray());
     }
@@ -173,10 +219,16 @@ public sealed partial class HttpProtocolHandlerTests
             RecordingTransferProgress progress = new();
             TurnTakingConnection connection = new(chunkSize, basicChallenge + "nope", OkHead + "ok");
             TransferContext context = ProgressContext(AuthUrl, progress, new HttpRequestOptions { Body = FormHello() });
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "401 Basic challenge, 200 ok; request body hello");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic dTpw")).ExecuteAsync(context);
 
+            WriteResult(result);
+            WriteReports(progress);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("non-download reports", "started, up 0/5, up 5/5, up 5/5, done", string.Join(", ", progress.Reports.Where(IsNotDownload)));
             CollectionAssert.AreEqual(new[] { "started", "up 0/5", "up 5/5", "up 5/5", "done" }, progress.Reports.Where(IsNotDownload).ToArray(), $"Chunk size {chunkSize}");
             AssertRunningTotals(progress.Downloads, 2, "2", chunkSize);
         }
@@ -188,10 +240,13 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection first = new(65536, ClosingChallengeHead + "nope");
         TurnTakingConnection second = new(65536, OkHead + "ok");
         RecordingTransferProgress progress = new();
+        Diagnostics.Arrange("scripted responses", "401 challenge with Connection: close, then 200 ok on a second connection");
 
         await new HttpProtocolHandler(QueueConnector.For(first, second), new ScriptedAuthenticator(null, DigestValue))
             .ExecuteAsync(ProgressContext(AuthUrl, progress));
 
+        WriteReports(progress);
+        Diagnostics.Assert("progress reports", "started, down 0/2, down 2/2, done", string.Join(", ", progress.Reports));
         CollectionAssert.AreEqual(new[] { "started", "down 0/2", "down 2/2", "done" }, progress.Reports.ToArray());
     }
 
@@ -204,11 +259,16 @@ public sealed partial class HttpProtocolHandlerTests
             RecordingTransferProgress progress = new(events.Events);
             ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", chunkSize);
             TransferContext context = new() { Url = CurlUrl.Parse("http://127.0.0.1:18421/"), Output = new MemoryStream(), Progress = progress, Events = events };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, Content-Length: 2, body ok, kept alive");
 
             await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
             string[] tail = [.. events.Events.TakeLast(3)];
+            WriteEvents("events", events.Events);
+            WriteExpectedLines("last three events", ["progress down 2/2", "progress done", "* Connection #0 to host 127.0.0.1:18421 left intact"], tail);
             CollectionAssert.AreEqual(new[] { "progress down 2/2", "progress done", "* Connection #0 to host 127.0.0.1:18421 left intact" }, tail, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("done reports", 1, progress.Reports.Count(report => report == "done"));
             Assert.AreEqual(1, progress.Reports.Count(report => report == "done"), $"Chunk size {chunkSize}");
         }
     }
@@ -221,11 +281,17 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferProgress progress = new(events.Events);
         TurnTakingConnection connection = new(65536, basicChallenge + "nope", OkHead + "ok");
         TransferContext context = new() { Url = CurlUrl.Parse(AuthUrl), Output = new MemoryStream(), Progress = progress, Events = events };
+        Diagnostics.Arrange("scripted responses", "401 Basic challenge, 200 ok on the same connection");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic dTpw")).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteReports(progress);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("progress reports", "started, down 0/2, down 2/2, done", string.Join(", ", progress.Reports));
         CollectionAssert.AreEqual(new[] { "started", "down 0/2", "down 2/2", "done" }, progress.Reports.ToArray());
+        WriteExpectedLines("last two events", ["progress done", "* Connection #0 to host 127.0.0.1:18183 left intact"], events.Events.TakeLast(2));
         CollectionAssert.AreEqual(new[] { "progress done", "* Connection #0 to host 127.0.0.1:18183 left intact" }, events.Events.TakeLast(2).ToArray());
     }
 
@@ -239,17 +305,27 @@ public sealed partial class HttpProtocolHandlerTests
             ConnectResult.Connected(dead, null, isReused: true),
             ConnectResult.Connected(Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536), null, connectionNumber: 1));
         TransferContext context = new() { Url = CurlUrl.Parse("http://127.0.0.1:18977/b"), Output = new MemoryStream(), Progress = progress, Events = events };
+        Diagnostics.Arrange("connections", "#0 reused and reset before the response, #1 answers 200 ok");
 
         TransferResult result = await Handler(connector).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("done reports", 1, progress.Reports.Count(report => report == "done"));
         Assert.AreEqual(1, progress.Reports.Count(report => report == "done"));
         int done = events.Events.IndexOf("progress done");
+        Diagnostics.Assert("progress done after shutting down #0", true, done > events.Events.IndexOf("* shutting down connection #0"));
         Assert.IsGreaterThan(events.Events.IndexOf("* shutting down connection #0"), done);
         Assert.AreEqual("* Connection #1 to host 127.0.0.1:18977 left intact", events.Events[done + 1]);
     }
 
     private static BytesBody FormHello() => new("hello"u8.ToArray(), "application/x-www-form-urlencoded");
+
+    /// <summary>Writes the ACT line for every progress report recorded, in order.</summary>
+    private void WriteReports(RecordingTransferProgress progress) =>
+        Diagnostics.Act("progress reports", string.Join(", ", progress.Reports));
 
     private static bool IsNotDownload(string report) => !report.StartsWith("down ", StringComparison.Ordinal);
 
@@ -257,9 +333,10 @@ public sealed partial class HttpProtocolHandlerTests
     /// Asserts download <paramref name="reports" /> start at zero, never go down, all carry
     /// <paramref name="total" /> as the expected total, and end at <paramref name="last" />.
     /// </summary>
-    private static void AssertRunningTotals(IReadOnlyList<string> reports, long last, string total, int chunkSize)
+    private void AssertRunningTotals(IReadOnlyList<string> reports, long last, string total, int chunkSize)
     {
         long[] counts = [.. reports.Select(report => long.Parse(report["down ".Length..report.IndexOf('/', StringComparison.Ordinal)], CultureInfo.InvariantCulture))];
+        Diagnostics.Assert("download reports", $"0 .. {last} of {total}", string.Join(", ", reports));
         Assert.AreEqual(0L, counts[0], $"Chunk size {chunkSize}");
         Assert.AreEqual(last, counts[^1], $"Chunk size {chunkSize}");
         CollectionAssert.AreEqual(counts.Order().ToArray(), counts, $"Chunk size {chunkSize}");
