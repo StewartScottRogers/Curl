@@ -3,6 +3,7 @@ using System.Net;
 using Curl.Kerberos;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -20,14 +21,22 @@ public sealed class KerberosKdcSocketTransportTests
 
     private static readonly DateTimeOffset Now = new(2026, 9, 28, 12, 0, 0, TimeSpan.Zero);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExchangeDatagramAsync_KdcAnswers_SendsToTheServerAndReturnsTheReply()
     {
         DatagramKdc kdc = new([0xAA, 0xBB]);
         KerberosKdcSocketTransport transport = new(kdc, new FakeConnector(), TimeSpan.FromSeconds(1), new ManualTimeProvider());
 
-        byte[] reply = await transport.ExchangeDatagramAsync("kdc.example.test", 88, new byte[] { 0x01, 0x02 }, CancellationToken.None);
+        byte[] reply = await ExchangeDatagramAsync(transport, "kdc.example.test", 88, new byte[] { 0x01, 0x02 }, CancellationToken.None);
 
+        Diagnostics.Diff("reply", new byte[] { 0xAA, 0xBB }, reply);
+        Diagnostics.Assert("opened", "kdc.example.test:88", string.Join(", ", kdc.Opened));
+        Diagnostics.Diff("sent", new byte[] { 0x01, 0x02 }, kdc.Channel.Sent.Single());
+        Diagnostics.Assert("channel disposed", true, kdc.Channel.IsDisposed);
         CollectionAssert.AreEqual(new byte[] { 0xAA, 0xBB }, reply);
         Assert.AreEqual("kdc.example.test:88", kdc.Opened.Single());
         CollectionAssert.AreEqual(new byte[] { 0x01, 0x02 }, kdc.Channel.Sent.Single());
@@ -41,10 +50,12 @@ public sealed class KerberosKdcSocketTransportTests
         ManualTimeProvider time = new();
         KerberosKdcSocketTransport transport = new(kdc, new FakeConnector(), TimeSpan.FromSeconds(1), time);
 
-        Task<byte[]> exchange = transport.ExchangeDatagramAsync("kdc.example.test", 88, new byte[] { 0x01 }, CancellationToken.None);
+        Task<byte[]> exchange = ExchangeDatagramAsync(transport, "kdc.example.test", 88, new byte[] { 0x01 }, CancellationToken.None);
         time.Advance(1000);
 
         IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => exchange);
+        Diagnostics.Diff("message", "The KDC kdc.example.test port 88 did not answer within 1 s.", failure.Message);
+        Diagnostics.Assert("channel disposed", true, kdc.Channel.IsDisposed);
         Assert.AreEqual("The KDC kdc.example.test port 88 did not answer within 1 s.", failure.Message);
         Assert.IsTrue(kdc.Channel.IsDisposed);
     }
@@ -56,10 +67,12 @@ public sealed class KerberosKdcSocketTransportTests
         KerberosKdcSocketTransport transport = new(kdc, new FakeConnector(), TimeSpan.FromSeconds(1), new ManualTimeProvider());
         using CancellationTokenSource cancel = new();
 
-        Task<byte[]> exchange = transport.ExchangeDatagramAsync("kdc.example.test", 88, new byte[] { 0x01 }, cancel.Token);
+        Task<byte[]> exchange = ExchangeDatagramAsync(transport, "kdc.example.test", 88, new byte[] { 0x01 }, cancel.Token);
         await cancel.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => exchange);
+        var failure = await Assert.ThrowsAsync<OperationCanceledException>(() => exchange);
+
+        Diagnostics.Assert("cancelled", true, failure is OperationCanceledException);
     }
 
     [TestMethod]
@@ -68,8 +81,9 @@ public sealed class KerberosKdcSocketTransportTests
         DatagramKdc kdc = new([]) { Failure = DatagramOpenResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: kdc.example.test") };
         KerberosKdcSocketTransport transport = new(kdc, new FakeConnector(), TimeSpan.FromSeconds(1), new ManualTimeProvider());
 
-        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.ExchangeDatagramAsync("kdc.example.test", 88, new byte[] { 0x01 }, CancellationToken.None));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => ExchangeDatagramAsync(transport, "kdc.example.test", 88, new byte[] { 0x01 }, CancellationToken.None));
 
+        Diagnostics.Diff("message", "Could not resolve host: kdc.example.test", failure.Message);
         Assert.AreEqual("Could not resolve host: kdc.example.test", failure.Message);
     }
 
@@ -79,9 +93,12 @@ public sealed class KerberosKdcSocketTransportTests
         FakeConnector connector = new();
         KerberosKdcSocketTransport transport = new(new DatagramKdc([]), connector, TimeSpan.FromSeconds(1), new ManualTimeProvider());
 
-        Stream stream = await transport.ConnectStreamAsync("kdc.example.test", 88, CancellationToken.None);
+        Stream stream = await ConnectStreamAsync(transport, "kdc.example.test", 88, CancellationToken.None);
         await stream.DisposeAsync();
 
+        Diagnostics.Act("target", connector.Targets.Single());
+        Diagnostics.Assert("target", new ConnectTarget("kdc.example.test", 88, UseTls: false), connector.Targets.Single());
+        Diagnostics.Assert("connection disposed", true, connector.Opened.Single().IsDisposed);
         Assert.AreEqual(new ConnectTarget("kdc.example.test", 88, UseTls: false), connector.Targets.Single());
         Assert.IsTrue(connector.Opened.Single().IsDisposed);
     }
@@ -92,8 +109,9 @@ public sealed class KerberosKdcSocketTransportTests
         FakeConnector connector = new() { Failure = ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect to kdc.example.test port 88") };
         KerberosKdcSocketTransport transport = new(new DatagramKdc([]), connector, TimeSpan.FromSeconds(1), new ManualTimeProvider());
 
-        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.ConnectStreamAsync("kdc.example.test", 88, CancellationToken.None));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => ConnectStreamAsync(transport, "kdc.example.test", 88, CancellationToken.None));
 
+        Diagnostics.Diff("message", "Failed to connect to kdc.example.test port 88", failure.Message);
         Assert.AreEqual("Failed to connect to kdc.example.test port 88", failure.Message);
     }
 
@@ -109,16 +127,68 @@ public sealed class KerberosKdcSocketTransportTests
         KerberosKdcSocketTransport transport = new(udp, tcp, TimeSpan.FromSeconds(1), new ManualTimeProvider());
         KerberosKdcClient client = new(Configuration(), new NoSrvRecords(), transport, new FixedTime(), new FixedRandom());
         using Curl.Kerberos.CredentialCache cache = new(null, new KerberosPrincipal(1, Realm, ["alice"]), [TicketGrantingTicket()]);
+        Diagnostics.Arrange("UDP reply", "KRB-ERROR KRB_ERR_RESPONSE_TOO_BIG");
+        Diagnostics.Bytes("TCP reply", framedReply);
+        Diagnostics.Arrange("service", "HTTP/server.example.test@EXAMPLE.TEST");
 
-        KerberosKdcException failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(
-            () => client.GetServiceTicketAsync(new KerberosPrincipal(3, Realm, ["HTTP", "server.example.test"]), cache, CancellationToken.None));
+        KerberosKdcException failure;
+        using (Diagnostics.Phase("service ticket request"))
+        {
+            failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(
+                () => client.GetServiceTicketAsync(new KerberosPrincipal(3, Realm, ["HTTP", "server.example.test"]), cache, CancellationToken.None));
+        }
 
+        Diagnostics.Act("KDC error", failure.Error);
+        Diagnostics.Assert("KDC error", KerberosKdcError.ServerPrincipalUnknown, failure.Error);
         Assert.AreEqual(KerberosKdcError.ServerPrincipalUnknown, failure.Error);
         byte[] udpRequest = udp.Channel.Sent.Single();
         byte[] tcpWritten = [.. tcp.Connection!.Written];
+        Diagnostics.Bytes("UDP request", udpRequest);
+        Diagnostics.Bytes("TCP written", tcpWritten);
+        Diagnostics.Assert("length prefix", udpRequest.Length, BinaryPrimitives.ReadInt32BigEndian(tcpWritten));
+        Diagnostics.Diff("TCP request after the prefix", udpRequest, tcpWritten.AsSpan(4));
+        Diagnostics.Assert("TCP connection disposed", true, tcp.Connection.IsDisposed);
         Assert.AreEqual(udpRequest.Length, BinaryPrimitives.ReadInt32BigEndian(tcpWritten), "RFC 4120 section 7.2.2: four big-endian length bytes first.");
         CollectionAssert.AreEqual(udpRequest, tcpWritten[4..]);
         Assert.IsTrue(tcp.Connection.IsDisposed);
+    }
+
+    private async Task<byte[]> ExchangeDatagramAsync(KerberosKdcSocketTransport transport, string host, int port, byte[] request, CancellationToken cancellationToken)
+    {
+        Diagnostics.Arrange("KDC", $"{host} port {port} over UDP");
+        Diagnostics.Bytes("request", request);
+        try
+        {
+            byte[] reply = await transport.ExchangeDatagramAsync(host, port, request, cancellationToken);
+            Diagnostics.Bytes("reply", reply);
+            Diagnostics.Act("reply length", reply.Length);
+            return reply;
+        }
+        catch (Exception exception) when (WriteFailure(exception))
+        {
+            throw;
+        }
+    }
+
+    private async Task<Stream> ConnectStreamAsync(KerberosKdcSocketTransport transport, string host, int port, CancellationToken cancellationToken)
+    {
+        Diagnostics.Arrange("KDC", $"{host} port {port} over TCP");
+        try
+        {
+            Stream stream = await transport.ConnectStreamAsync(host, port, cancellationToken);
+            Diagnostics.Act("stream", "connected");
+            return stream;
+        }
+        catch (Exception exception) when (WriteFailure(exception))
+        {
+            throw;
+        }
+    }
+
+    private bool WriteFailure(Exception exception)
+    {
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.Message}");
+        return false;
     }
 
     private static byte[] Error(int code) => new KerberosErrorMessage

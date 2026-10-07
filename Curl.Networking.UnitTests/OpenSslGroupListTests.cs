@@ -1,3 +1,4 @@
+using Curl.Testing;
 using Curl.Tls;
 
 namespace Curl.Networking;
@@ -10,6 +11,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class OpenSslGroupListTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("X25519", new ushort[] { 0x001d }, new ushort[] { 0x001d })]
     [DataRow("x25519", new ushort[] { 0x001d }, new ushort[] { 0x001d })]
@@ -43,8 +48,9 @@ public sealed class OpenSslGroupListTests
     [DataRow("brainpoolP256r1:brainpoolP256r1tls13", new ushort[] { 0x001a, 0x001f }, new ushort[] { 0x001f })]
     public void Parse_WithAnAcceptedValue_OffersTheMeasuredGroupsAndKeyShares(string value, ushort[] groups, ushort[] keyShares)
     {
-        var offered = OpenSslGroupList.Parse(value, ClientHelloProfile.OpenSsl);
+        var offered = Parse(value, ClientHelloProfile.OpenSsl, "OpenSsl");
 
+        Diagnostics.Assert("offered", "a list", offered is null ? "null" : "a list");
         Assert.IsNotNull(offered);
         CollectionAssert.AreEqual(groups, offered.Groups.ToArray());
         CollectionAssert.AreEqual(keyShares, offered.KeyShares.ToArray());
@@ -55,8 +61,9 @@ public sealed class OpenSslGroupListTests
     [DataRow("default")]
     public void Parse_WithDefault_OffersTheProfilesGroupsAndKeyShares(string value)
     {
-        var offered = OpenSslGroupList.Parse(value, ClientHelloProfile.OpenSsl);
+        var offered = Parse(value, ClientHelloProfile.OpenSsl, "OpenSsl");
 
+        Diagnostics.Assert("offered", "a list", offered is null ? "null" : "a list");
         Assert.IsNotNull(offered);
         CollectionAssert.AreEqual(new ushort[] { 0x11ec, 0x001d, 0x0017, 0x001e, 0x0018, 0x0019, 0x0100, 0x0101 }, offered.Groups.ToArray());
         CollectionAssert.AreEqual(new ushort[] { 0x11ec, 0x001d }, offered.KeyShares.ToArray());
@@ -65,8 +72,9 @@ public sealed class OpenSslGroupListTests
     [TestMethod]
     public void Parse_WithDefaultLessOneGroup_OffersTheRestAndTheRemainingKeyShare()
     {
-        var offered = OpenSslGroupList.Parse("DEFAULT:-X25519MLKEM768", ClientHelloProfile.OpenSsl);
+        var offered = Parse("DEFAULT:-X25519MLKEM768", ClientHelloProfile.OpenSsl, "OpenSsl");
 
+        Diagnostics.Assert("offered", "a list", offered is null ? "null" : "a list");
         Assert.IsNotNull(offered);
         CollectionAssert.AreEqual(new ushort[] { 0x001d, 0x0017, 0x001e, 0x0018, 0x0019, 0x0100, 0x0101 }, offered.Groups.ToArray());
         CollectionAssert.AreEqual(new ushort[] { 0x001d }, offered.KeyShares.ToArray());
@@ -75,8 +83,9 @@ public sealed class OpenSslGroupListTests
     [TestMethod]
     public void Parse_WithDefaultInTheSchannelBuild_OffersTheSchannelProfilesGroups()
     {
-        var offered = OpenSslGroupList.Parse("DEFAULT", ClientHelloProfile.Schannel);
+        var offered = Parse("DEFAULT", ClientHelloProfile.Schannel, "Schannel");
 
+        Diagnostics.Assert("offered", "a list", offered is null ? "null" : "a list");
         Assert.IsNotNull(offered);
         CollectionAssert.AreEqual(ClientHelloProfile.Schannel.SupportedGroups.ToArray(), offered.Groups.ToArray());
         CollectionAssert.AreEqual(ClientHelloProfile.Schannel.KeyShareGroups.ToArray(), offered.KeyShares.ToArray());
@@ -89,8 +98,9 @@ public sealed class OpenSslGroupListTests
     [DataRow("MLKEM768:-MLKEM768")]
     public void Parse_WithNothingTheClientCanOffer_OffersNoGroups(string value)
     {
-        var offered = OpenSslGroupList.Parse(value, ClientHelloProfile.OpenSsl);
+        var offered = Parse(value, ClientHelloProfile.OpenSsl, "OpenSsl");
 
+        Diagnostics.Assert("offered", "a list", offered is null ? "null" : "a list");
         Assert.IsNotNull(offered);
         Assert.IsEmpty(offered.Groups);
         Assert.IsEmpty(offered.KeyShares);
@@ -101,8 +111,9 @@ public sealed class OpenSslGroupListTests
     [TestMethod]
     public void Parse_WithOnlyATls12OnlyGroupStarred_LeavesNoKeyShare()
     {
-        var offered = OpenSslGroupList.Parse("*brainpoolP256r1:P-384", ClientHelloProfile.OpenSsl);
+        var offered = Parse("*brainpoolP256r1:P-384", ClientHelloProfile.OpenSsl, "OpenSsl");
 
+        Diagnostics.Assert("offered", "a list", offered is null ? "null" : "a list");
         Assert.IsNotNull(offered);
         CollectionAssert.AreEqual(new ushort[] { TlsNamedGroup.BrainpoolP256r1, TlsNamedGroup.Secp384r1 }, offered.Groups.ToArray());
         Assert.IsEmpty(offered.KeyShares);
@@ -120,8 +131,9 @@ public sealed class OpenSslGroupListTests
     [DataRow("brainpoolP512r1tls13", TlsNamedGroup.BrainpoolP512r1Tls13)]
     public void Parse_WithAnMlKemOrBrainpoolTls13Group_OffersItRatherThanDroppingIt(string value, int group)
     {
-        var offered = OpenSslGroupList.Parse($"{value}:X25519", ClientHelloProfile.OpenSsl);
+        var offered = Parse($"{value}:X25519", ClientHelloProfile.OpenSsl, "OpenSsl");
 
+        Diagnostics.Assert("offered", "a list", offered is null ? "null" : "a list");
         Assert.IsNotNull(offered);
         CollectionAssert.AreEqual(new ushort[] { (ushort)group, TlsNamedGroup.X25519 }, offered.Groups.ToArray());
         CollectionAssert.AreEqual(new ushort[] { (ushort)group }, offered.KeyShares.ToArray());
@@ -138,13 +150,38 @@ public sealed class OpenSslGroupListTests
     [DataRow("*DEFAULT")]
     [DataRow("-bogus")]
     [DataRow("")]
-    public void Parse_WithARefusedValue_ReturnsNull(string value) =>
-        Assert.IsNull(OpenSslGroupList.Parse(value, ClientHelloProfile.OpenSsl));
+    public void Parse_WithARefusedValue_ReturnsNull(string value)
+    {
+        var offered = Parse(value, ClientHelloProfile.OpenSsl, "OpenSsl");
+
+        Diagnostics.Assert("offered", "null", offered is null ? "null" : "a list");
+        Assert.IsNull(offered);
+    }
 
     [TestMethod]
     public void Parse_WithNullArguments_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => OpenSslGroupList.Parse(null!, ClientHelloProfile.OpenSsl));
-        Assert.ThrowsExactly<ArgumentNullException>(() => OpenSslGroupList.Parse("X25519", null!));
+        Diagnostics.Arrange("calls", "Parse(null, OpenSsl), Parse(\"X25519\", null)");
+
+        var nullValue = Assert.ThrowsExactly<ArgumentNullException>(() => OpenSslGroupList.Parse(null!, ClientHelloProfile.OpenSsl));
+        var nullProfile = Assert.ThrowsExactly<ArgumentNullException>(() => OpenSslGroupList.Parse("X25519", null!));
+
+        Diagnostics.Act("null value threw for parameter", nullValue.ParamName);
+        Diagnostics.Act("null profile threw for parameter", nullProfile.ParamName);
+        Diagnostics.Assert("exceptions", "ArgumentNullException, ArgumentNullException", $"{nullValue.GetType().Name}, {nullProfile.GetType().Name}");
     }
+
+    private OfferedGroups? Parse(string value, ClientHelloProfile profile, string profileName)
+    {
+        Diagnostics.Arrange("--curves", value);
+        Diagnostics.Arrange("profile", profileName);
+
+        var offered = OpenSslGroupList.Parse(value, profile);
+
+        Diagnostics.Act("groups", offered is null ? "null" : Hex(offered.Groups));
+        Diagnostics.Act("key shares", offered is null ? "null" : Hex(offered.KeyShares));
+        return offered;
+    }
+
+    private static string Hex(IEnumerable<ushort> groups) => string.Join(", ", groups.Select(group => $"0x{group:x4}"));
 }
