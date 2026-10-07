@@ -3,8 +3,8 @@ id: AF-0052
 title: BL-1458 cost 5.96 US dollars, 3.85 times the median run, and stopped at the per-task budget cap with its work stashed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-1458:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
