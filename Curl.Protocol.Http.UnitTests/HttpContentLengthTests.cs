@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -10,6 +11,10 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpContentLengthTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("5", 5L, DisplayName = "Plain number")]
     [DataRow("05", 5L, DisplayName = "Leading zero")]
@@ -19,7 +24,13 @@ public sealed class HttpContentLengthTests
     [DataRow("\t5\t", 5L, DisplayName = "Tabs around the number")]
     public void Find_ValuesCurlAccepts_GiveTheLength(string value, long length)
     {
-        Assert.AreEqual(length, HttpContentLength.Find([new HttpResponseHeader("Content-Length", value)]));
+        Diagnostics.Arrange("Content-Length", value);
+
+        long? found = HttpContentLength.Find([new HttpResponseHeader("Content-Length", value)]);
+
+        Diagnostics.Act("length", found);
+        Diagnostics.Assert("length", length, found);
+        Assert.AreEqual(length, found);
     }
 
     [TestMethod]
@@ -36,9 +47,13 @@ public sealed class HttpContentLengthTests
     [DataRow("", DisplayName = "Empty value")]
     public void Find_ValuesCurlRefuses_ThrowExit8(string value)
     {
+        Diagnostics.Arrange("Content-Length", value);
+
         HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
             () => HttpContentLength.Find([new HttpResponseHeader("Content-Length", value)]));
 
+        Diagnostics.Act("exit", $"{thrown.ExitCode}: {thrown.Message}");
+        Diagnostics.Assert("exit", CurlExitCode.WeirdServerReply, thrown.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
         Assert.AreEqual("Invalid Content-Length: value", thrown.Message);
     }
@@ -46,39 +61,67 @@ public sealed class HttpContentLengthTests
     [TestMethod]
     public void Find_TwoHeadersThatDisagree_ThrowExit8()
     {
+        Diagnostics.Arrange("Content-Length headers", "5, then 3");
+
         HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
             () => HttpContentLength.Find(
                 [new HttpResponseHeader("Content-Length", "5"), new HttpResponseHeader("Content-Length", "3")]));
 
+        Diagnostics.Act("exit", $"{thrown.ExitCode}: {thrown.Message}");
+        Diagnostics.Assert("exit", CurlExitCode.WeirdServerReply, thrown.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
     }
 
     [TestMethod]
     public void Find_TwoHeadersThatAgree_GiveTheLength()
     {
+        Diagnostics.Arrange("headers", "Content-Length: 5, content-LENGTH: 5");
+
+        long? found = HttpContentLength.Find(
+            [new HttpResponseHeader("Content-Length", "5"), new HttpResponseHeader("content-LENGTH", "5")]);
+
+        Diagnostics.Act("length", found);
+        Diagnostics.Assert("length", 5L, found);
         Assert.AreEqual(
             5L,
-            HttpContentLength.Find(
-                [new HttpResponseHeader("Content-Length", "5"), new HttpResponseHeader("content-LENGTH", "5")]));
+            found);
     }
 
     [TestMethod]
     public void Find_NameInAnyCase_IsRead()
     {
-        Assert.AreEqual(3L, HttpContentLength.Find([new HttpResponseHeader("content-LENGTH", "3")]));
+        Diagnostics.Arrange("header", "content-LENGTH: 3");
+
+        long? found = HttpContentLength.Find([new HttpResponseHeader("content-LENGTH", "3")]);
+
+        Diagnostics.Act("length", found);
+        Diagnostics.Assert("length", 3L, found);
+        Assert.AreEqual(3L, found);
     }
 
     [TestMethod]
     public void Find_NoContentLengthHeader_IsUnknown()
     {
-        Assert.IsNull(HttpContentLength.Find([new HttpResponseHeader("Content-Type", "text/plain")]));
+        Diagnostics.Arrange("header", "Content-Type: text/plain");
+
+        long? found = HttpContentLength.Find([new HttpResponseHeader("Content-Type", "text/plain")]);
+
+        Diagnostics.Act("length", found);
+        Diagnostics.Assert("length", null, found);
+        Assert.IsNull(found);
     }
 
     [TestMethod]
     public void Find_NumberTooLargeForALong_IsUnknown()
     {
+        Diagnostics.Arrange("Content-Length", "99999999999999999999");
+
         // Measured: Content-Length 99999999999999999999 wrote "hello" and exited 0.
-        Assert.IsNull(HttpContentLength.Find([new HttpResponseHeader("Content-Length", "99999999999999999999")]));
+        long? found = HttpContentLength.Find([new HttpResponseHeader("Content-Length", "99999999999999999999")]);
+
+        Diagnostics.Act("length", found);
+        Diagnostics.Assert("length", null, found);
+        Assert.IsNull(found);
     }
 
     [TestMethod]
@@ -90,7 +133,13 @@ public sealed class HttpContentLengthTests
     [DataRow("X-Length", "99999999999999999999", false, DisplayName = "Another header")]
     public void Overflows_Header_IsTrueOnlyForAContentLengthTooLargeToHold(string name, string value, bool overflows)
     {
-        Assert.AreEqual(overflows, HttpContentLength.Overflows([new HttpResponseHeader(name, value)]));
+        Diagnostics.Arrange("header", $"{name}: {value}");
+
+        bool actual = HttpContentLength.Overflows([new HttpResponseHeader(name, value)]);
+
+        Diagnostics.Act("overflows", actual);
+        Diagnostics.Assert("overflows", overflows, actual);
+        Assert.AreEqual(overflows, actual);
     }
 
     [TestMethod]
@@ -100,6 +149,12 @@ public sealed class HttpContentLengthTests
     [DataRow("Content-Length 99999999999999999999", false, DisplayName = "No colon")]
     public void OverflowsLine_HeaderLine_IsTrueOnlyForAContentLengthTooLargeToHold(string line, bool overflows)
     {
-        Assert.AreEqual(overflows, HttpContentLength.OverflowsLine(line));
+        Diagnostics.Arrange("header line", line);
+
+        bool actual = HttpContentLength.OverflowsLine(line);
+
+        Diagnostics.Act("overflows", actual);
+        Diagnostics.Assert("overflows", overflows, actual);
+        Assert.AreEqual(overflows, actual);
     }
 }

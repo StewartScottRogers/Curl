@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Http.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -10,6 +11,10 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpConnectionPersistenceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("HTTP/1.1 401 Unauthorized\r\nContent-Length: 4\r\n\r\n", false, true, DisplayName = "1.1 with a length stays open")]
     [DataRow("HTTP/1.1 401 Unauthorized\r\nTransfer-Encoding: chunked\r\n\r\n", false, true, DisplayName = "1.1 chunked stays open")]
@@ -23,10 +28,16 @@ public sealed class HttpConnectionPersistenceTests
     [DataRow("HTTP/1.0 401 Unauthorized\r\nConnection: keep-alive\r\nContent-Length: 4\r\n\r\n", false, true, DisplayName = "1.0 keep-alive stays open")]
     public async Task KeepsAlive_Head_FollowsHttp11(string response, bool noBody, bool expected)
     {
+        Diagnostics.Arrange("response", Visible(response));
+        Diagnostics.Arrange("no body", noBody);
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
 
-        Assert.AreEqual(expected, HttpConnectionPersistence.KeepsAlive(head, noBody));
+        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(head, noBody);
+
+        Diagnostics.Act("keeps alive", keepsAlive);
+        Diagnostics.Assert("keeps alive", expected, keepsAlive);
+        Assert.AreEqual(expected, keepsAlive);
     }
 
     [TestMethod]
@@ -40,10 +51,17 @@ public sealed class HttpConnectionPersistenceTests
         bool ignoresContentLength,
         bool expected)
     {
+        Diagnostics.Arrange("response", Visible(response));
+        Diagnostics.Arrange("passes transfer coding", passesTransferCoding);
+        Diagnostics.Arrange("ignores content length", ignoresContentLength);
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
 
-        Assert.AreEqual(expected, HttpConnectionPersistence.KeepsAlive(head, false, passesTransferCoding, ignoresContentLength));
+        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(head, false, passesTransferCoding, ignoresContentLength);
+
+        Diagnostics.Act("keeps alive", keepsAlive);
+        Diagnostics.Assert("keeps alive", expected, keepsAlive);
+        Assert.AreEqual(expected, keepsAlive);
     }
 
     [TestMethod]
@@ -60,10 +78,17 @@ public sealed class HttpConnectionPersistenceTests
         bool ignoresContentLength,
         bool expected)
     {
+        Diagnostics.Arrange("response", Visible(response));
+        Diagnostics.Arrange("no body", noBody);
+        Diagnostics.Arrange("ignores content length", ignoresContentLength);
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
 
-        Assert.AreEqual(expected, HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, noBody, false, ignoresContentLength, false));
+        bool keepsAlive = HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, noBody, false, ignoresContentLength, false);
+
+        Diagnostics.Act("keeps HTTP/1.0 alive until the server closes", keepsAlive);
+        Diagnostics.Assert("keeps HTTP/1.0 alive until the server closes", expected, keepsAlive);
+        Assert.AreEqual(expected, keepsAlive);
     }
 
     [TestMethod]
@@ -72,10 +97,15 @@ public sealed class HttpConnectionPersistenceTests
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n", true, DisplayName = "No Transfer-Encoding stays open")]
     public async Task KeepsAlive_TransferEncoding_ClosesWhenTheBodyIsNotChunked(string response, bool expected)
     {
+        Diagnostics.Arrange("response", Visible(response));
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
 
-        Assert.AreEqual(expected, HttpConnectionPersistence.KeepsAlive(head, false, decodesTransferCoding: true));
+        bool keepsAlive = HttpConnectionPersistence.KeepsAlive(head, false, decodesTransferCoding: true);
+
+        Diagnostics.Act("keeps alive", keepsAlive);
+        Diagnostics.Assert("keeps alive", expected, keepsAlive);
+        Assert.AreEqual(expected, keepsAlive);
     }
 
     [TestMethod]
@@ -89,8 +119,12 @@ public sealed class HttpConnectionPersistenceTests
     [DataRow("no colon", false, DisplayName = "No colon")]
     public void KeepsHttp10Alive_HeaderLine_IsTrueForAConnectionHeaderNamingKeepAliveAndNotClose(string headerLine, bool expected)
     {
+        Diagnostics.Arrange("header line", headerLine);
+
         bool keepsAlive = HttpConnectionPersistence.KeepsHttp10Alive(headerLine);
 
+        Diagnostics.Act("keeps HTTP/1.0 alive", keepsAlive);
+        Diagnostics.Assert("keeps HTTP/1.0 alive", expected, keepsAlive);
         Assert.AreEqual(expected, keepsAlive);
     }
 
@@ -110,11 +144,18 @@ public sealed class HttpConnectionPersistenceTests
         bool ignoresContentLength,
         bool expected)
     {
+        Diagnostics.Arrange("response", Visible(response));
+        Diagnostics.Arrange("no body", noBody);
+        Diagnostics.Arrange("ignores content length", ignoresContentLength);
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
         HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
 
         bool lacksIndicator = HttpConnectionPersistence.LacksEndOfMessageIndicator(head, noBody, ignoresContentLength);
 
+        Diagnostics.Act("lacks an end-of-message indicator", lacksIndicator);
+        Diagnostics.Assert("lacks an end-of-message indicator", expected, lacksIndicator);
         Assert.AreEqual(expected, lacksIndicator);
     }
+
+    private static string Visible(string text) => text.Replace("\r", "\\r").Replace("\n", "\\n");
 }
