@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Console, Curl.Console.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
+touches: [Curl.Console, Curl.Console.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-04
 completed:
@@ -30,7 +30,26 @@ A failed transfer under `--aws-sigv4` ends with curl's own error line (for a ref
 - [ ] `Measure-CodeQuality.ps1 -Library <every changed library>` in one run reports no failing member; `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-07 (lane 2): Reproduced. `curl --aws-sigv4 aws:amz:us-east-1:s3 -u a:b http://127.0.0.1:1/x`
+  prints `curl: (7) aws_sigv4: String to sign (enclosed in []) - [...]`; real curl 8.21.0
+  (mingw64) prints `curl: (7) Failed to connect to 127.0.0.1:1 after 2042 ms: Could not connect to server`.
+  With `-v` both print no SigV4 lines before the connect fails (curl signs only once connected), so
+  the `-v` output already matches.
+- Cause is not in Curl.Console or Curl.Authentication: `HttpProtocolHandler.WithFirstAuthorizationFailure`
+  (Curl.Protocol.Http.UnitLibrary, after `ConnectAndExchangeAsync`) gives any failed transfer
+  `ErrorMessage = authorizationLines[0]`, meant for a Negotiate context's failure (ADR-0344, BL-955),
+  but every line the first `Authorization` reports is recorded there, so SigV4's picked-from-host,
+  string-to-sign, signature and `Server auth using AWS_SIGV4` lines all qualify.
+- Fix: record failure lines apart from info lines - e.g. `HttpInfoLineRecorder` keeps only the
+  lines the authenticator marks as a failure (a failf, like Negotiate's and NTLM's
+  `Type3Failure`), and `WithFirstAuthorizationFailure` reads that list - or narrow it to the
+  Negotiate failure text. Pin: refused connect with `--aws-sigv4` keeps the connect message; the
+  BL-955 Negotiate test still passes.
+- Added Curl.Protocol.Http.UnitLibrary and Curl.Protocol.Http.UnitTests to `touches`; BL-1446 in
+  Doing on origin/work/dark-factory touches them, so this goes back to Backlog until it is Done.
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Fix lies in Curl.Protocol.Http.UnitLibrary (HttpProtocolHandler.WithFirstAuthorizationFailure), which BL-1446 in Doing touches; starts again once BL-1446 is Done
