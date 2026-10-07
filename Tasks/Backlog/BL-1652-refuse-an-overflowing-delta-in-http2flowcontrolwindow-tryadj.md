@@ -1,5 +1,5 @@
 ---
-id: BL-1646
+id: BL-1652
 title: Refuse an overflowing delta in Http2FlowControlWindow.TryAdjust
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1646 — Refuse an overflowing delta in Http2FlowControlWindow.TryAdjust
+# BL-1652 — Refuse an overflowing delta in Http2FlowControlWindow.TryAdjust
 
 ## Goal
 

@@ -71,12 +71,12 @@ Test count (fast run): 230 before, 358 after.
 
 **Oracle.** Everything here is below the command line, so the oracle is RFC 9113, RFC 7541 and each member's documented refusals. No curl measurement was needed.
 
-**Defects found.** One: BL-1646 (Normal). `Http2FlowControlWindow.TryAdjust(long.MaxValue)` on a window of 1 overflows the `long` sum, returns `true` and leaves `Size` at `long.MinValue`, which breaks its doc comment. The wire cannot reach it (the connection passes only 31-bit deltas), so it is Normal. No failing or ignored test is committed for it; its test lands with the fix. The filed tasks (BL-1646 and BL-1647) are the only changes outside `Curl.Http2.UnitTests/` and this task, and they are committed separately.
+**Defects found.** One: BL-1652 (Normal). `Http2FlowControlWindow.TryAdjust(long.MaxValue)` on a window of 1 overflows the `long` sum, returns `true` and leaves `Size` at `long.MinValue`, which breaks its doc comment. The wire cannot reach it (the connection passes only 31-bit deltas), so it is Normal. No failing or ignored test is committed for it; its test lands with the fix. The filed tasks (BL-1652 and BL-1653) are the only changes outside `Curl.Http2.UnitTests/` and this task, and they are committed separately.
 
-**Harness finding.** BL-1647 (High). A test helper of mine recursed into itself and overflowed the stack. `dotnet test` still printed `Passed!` each time, with 224, 277 or 312 tests instead of 358, and only the normal-verbosity console logger showed `Stack overflow.`. The helper is fixed, and three runs in a row now give 358 out of the 358 that `--list-tests` lists. BL-1647 is to make a test host crash fail the run.
+**Harness finding.** BL-1653 (High). A test helper of mine recursed into itself and overflowed the stack. `dotnet test` still printed `Passed!` each time, with 224, 277 or 312 tests instead of 358, and only the normal-verbosity console logger showed `Stack overflow.`. The helper is fixed, and three runs in a row now give 358 out of the 358 that `--list-tests` lists. BL-1653 is to make a test host crash fail the run.
 
 ## Log
 
 - 2026-10-06: Created.
 - 2026-10-07: Backlog -> Doing.
-- 2026-10-07: Doing -> Done. Curl.Http2.UnitTests attacks HPACK, frames and the connection at every boundary with 128 adversarial tests; BL-1646 and BL-1647 filed
+- 2026-10-07: Doing -> Done. Curl.Http2.UnitTests attacks HPACK, frames and the connection at every boundary with 128 adversarial tests; BL-1652 and BL-1653 filed

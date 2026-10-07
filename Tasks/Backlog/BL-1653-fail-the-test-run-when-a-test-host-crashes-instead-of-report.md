@@ -1,5 +1,5 @@
 ---
-id: BL-1647
+id: BL-1653
 title: Fail the test run when a test host crashes instead of reporting Passed
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1647 — Fail the test run when a test host crashes instead of reporting Passed
+# BL-1653 — Fail the test run when a test host crashes instead of reporting Passed
 
 ## Goal
 
