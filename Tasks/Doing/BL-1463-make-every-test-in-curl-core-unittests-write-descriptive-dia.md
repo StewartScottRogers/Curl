@@ -43,3 +43,4 @@ Every test in `Curl.Core.UnitTests` writes, through BL-1457's shared `TestDiagno
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1534..BL-1533 (one per range of test files); waits on them, then runs only the whole-project checks
+- 2026-10-07: Backlog -> Doing.
