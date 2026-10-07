@@ -34,3 +34,4 @@ Every test in these `Curl.Protocol.Http.UnitTests` files (8 files, 128 test meth
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
