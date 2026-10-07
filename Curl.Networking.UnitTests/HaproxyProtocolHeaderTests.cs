@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
 
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -10,13 +12,21 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class HaproxyProtocolHeaderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Build_OverIPv4_WritesTcp4WithTheLocalAndRemoteEnds()
     {
         // --haproxy-protocol --interface 127.0.0.1 http://127.0.0.2:48640/ -> PROXY TCP4 127.0.0.1 127.0.0.2 50276 48640
-        var line = new HaproxyProtocolHeader(null).Build(
-            new IPEndPoint(IPAddress.Parse("127.0.0.1"), 50276), new IPEndPoint(IPAddress.Parse("127.0.0.2"), 48640));
+        var local = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 50276);
+        var remote = new IPEndPoint(IPAddress.Parse("127.0.0.2"), 48640);
+        ArrangeEnds(null, local, remote);
 
+        var line = new HaproxyProtocolHeader(null).Build(local, remote);
+
+        AssertLine("PROXY TCP4 127.0.0.1 127.0.0.2 50276 48640\r\n", line);
         Assert.AreEqual("PROXY TCP4 127.0.0.1 127.0.0.2 50276 48640\r\n", Encoding.ASCII.GetString(line));
     }
 
@@ -24,9 +34,13 @@ public sealed class HaproxyProtocolHeaderTests
     public void Build_OverIPv6_WritesTcp6WithTheAddressesAsInetNtopWritesThem()
     {
         // --haproxy-protocol http://[::1]:48617/ -> PROXY TCP6 ::1 ::1 52934 48617
-        var line = new HaproxyProtocolHeader(null).Build(
-            new IPEndPoint(IPAddress.IPv6Loopback, 52934), new IPEndPoint(IPAddress.IPv6Loopback, 48617));
+        var local = new IPEndPoint(IPAddress.IPv6Loopback, 52934);
+        var remote = new IPEndPoint(IPAddress.IPv6Loopback, 48617);
+        ArrangeEnds(null, local, remote);
 
+        var line = new HaproxyProtocolHeader(null).Build(local, remote);
+
+        AssertLine("PROXY TCP6 ::1 ::1 52934 48617\r\n", line);
         Assert.AreEqual("PROXY TCP6 ::1 ::1 52934 48617\r\n", Encoding.ASCII.GetString(line));
     }
 
@@ -35,17 +49,23 @@ public sealed class HaproxyProtocolHeaderTests
     {
         var local = new IPAddress(IPAddress.Parse("fe80::1").GetAddressBytes(), 7);
         var remote = new IPAddress(IPAddress.Parse("fe80::2").GetAddressBytes(), 7);
+        ArrangeEnds(null, new IPEndPoint(local, 1000), new IPEndPoint(remote, 80));
 
         var line = new HaproxyProtocolHeader(null).Build(new IPEndPoint(local, 1000), new IPEndPoint(remote, 80));
 
+        AssertLine("PROXY TCP6 fe80::1 fe80::2 1000 80\r\n", line);
         Assert.AreEqual("PROXY TCP6 fe80::1 fe80::2 1000 80\r\n", Encoding.ASCII.GetString(line));
     }
 
     [TestMethod]
     public void Build_WithoutALocalEnd_WritesTheUnspecifiedAddressAndPortZero()
     {
-        var line = new HaproxyProtocolHeader(null).Build(null, new IPEndPoint(IPAddress.Parse("192.0.2.1"), 80));
+        var remote = new IPEndPoint(IPAddress.Parse("192.0.2.1"), 80);
+        ArrangeEnds(null, null, remote);
 
+        var line = new HaproxyProtocolHeader(null).Build(null, remote);
+
+        AssertLine("PROXY TCP4 0.0.0.0 192.0.2.1 0 80\r\n", line);
         Assert.AreEqual("PROXY TCP4 0.0.0.0 192.0.2.1 0 80\r\n", Encoding.ASCII.GetString(line));
     }
 
@@ -61,9 +81,13 @@ public sealed class HaproxyProtocolHeaderTests
     public void Build_WithAClientIp_WritesItVerbatimForBothAddresses(string clientIp, string expected)
     {
         // --haproxy-clientip <ip> http://127.0.0.1:<P>/ -> the value for source and destination, TCP4 only for a dotted quad.
-        var line = new HaproxyProtocolHeader(clientIp).Build(
-            new IPEndPoint(IPAddress.Loopback, 52946), new IPEndPoint(IPAddress.Loopback, 48618));
+        var local = new IPEndPoint(IPAddress.Loopback, 52946);
+        var remote = new IPEndPoint(IPAddress.Loopback, 48618);
+        ArrangeEnds(clientIp, local, remote);
 
+        var line = new HaproxyProtocolHeader(clientIp).Build(local, remote);
+
+        AssertLine(expected, line);
         Assert.AreEqual(expected, Encoding.ASCII.GetString(line));
     }
 
@@ -73,8 +97,11 @@ public sealed class HaproxyProtocolHeaderTests
     public void Build_OverAUnixSocket_WritesProxyUnknown(string? clientIp)
     {
         // --haproxy-protocol (or --haproxy-clientip 1.2.3.4) --unix-socket <path> http://localhost/ -> PROXY UNKNOWN
+        ArrangeEnds(clientIp, null, null);
+
         var line = new HaproxyProtocolHeader(clientIp).Build(null, null);
 
+        AssertLine("PROXY UNKNOWN\r\n", line);
         Assert.AreEqual("PROXY UNKNOWN\r\n", Encoding.ASCII.GetString(line));
     }
 
@@ -87,6 +114,28 @@ public sealed class HaproxyProtocolHeaderTests
     [DataRow("1.2.3.1234", false)]
     [DataRow("1.2.3.a", false)]
     [DataRow("1.2.3.00", false)]
-    public void IsDottedQuad_ReadsAnAddressAsInetPtonDoes(string text, bool expected) =>
-        Assert.AreEqual(expected, HaproxyProtocolHeader.IsDottedQuad(text));
+    public void IsDottedQuad_ReadsAnAddressAsInetPtonDoes(string text, bool expected)
+    {
+        Diagnostics.Arrange("text", text);
+
+        var actual = HaproxyProtocolHeader.IsDottedQuad(text);
+
+        Diagnostics.Act("is dotted quad", actual);
+        Diagnostics.Assert("is dotted quad", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    private void ArrangeEnds(string? clientIp, IPEndPoint? local, IPEndPoint? remote)
+    {
+        Diagnostics.Arrange("client IP", clientIp ?? "none");
+        Diagnostics.Arrange("local end", local?.ToString() ?? "none");
+        Diagnostics.Arrange("remote end", remote?.ToString() ?? "none");
+    }
+
+    private void AssertLine(string expected, byte[] line)
+    {
+        Diagnostics.Bytes("line", line);
+        Diagnostics.Act("line", Encoding.ASCII.GetString(line).TrimEnd('\r', '\n'));
+        Diagnostics.Diff("line", Encoding.ASCII.GetBytes(expected), line);
+    }
 }

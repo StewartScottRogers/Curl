@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using Curl.Tls;
 using CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
 
@@ -29,6 +30,10 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
     private static readonly IPEndPoint ServerEndPoint = new(IPAddress.Loopback, 990);
 
     private static X509Certificate2 s_serverCertificate = null!;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     /// <summary>What the test server does after the handshake instead of sending <c>close_notify</c>.</summary>
     public enum ServerAnswer
@@ -110,23 +115,43 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
     public Task ClearTlsAsync_OverTls13WhenTheServerSendsNoCloseNotify_ReturnsNull(ServerAnswer answer) =>
         AssertNoCloseNotifyReturnsNullAsync(SslProtocols.Tls13, answer);
 
-    private static async Task AssertActiveSendsCloseNotifyThenPlainTextAsync(SslProtocols protocol)
+    private async Task AssertActiveSendsCloseNotifyThenPlainTextAsync(SslProtocols protocol)
     {
-        var sent = await ClearAndSendPwdAsync(protocol, sendCloseNotifyFirst: true);
+        ArrangeClear(protocol, "OpenSSL", sendCloseNotifyFirst: true, "close_notify, then reads PWD and answers 257");
 
+        byte[] sent;
+        using (Diagnostics.Phase("handshake, clear TLS and PWD"))
+        {
+            sent = await ClearAndSendPwdAsync(protocol, sendCloseNotifyFirst: true);
+        }
+
+        Diagnostics.Bytes("bytes the server read after its close_notify", sent);
+        Diagnostics.Act("first record type", $"0x{sent[0]:x2}");
+        Diagnostics.Assert("first record type", $"0x{CloseNotifyRecordType(protocol):x2}", $"0x{sent[0]:x2}");
+        Diagnostics.Assert("more than 5 bytes", true, sent.Length > 5);
+        Diagnostics.Diff("trailing plaintext", "PWD\r\n", Encoding.ASCII.GetString(sent[^5..]));
         Assert.AreEqual(CloseNotifyRecordType(protocol), sent[0], "close_notify goes first.");
         Assert.IsGreaterThan(5, sent.Length);
         Assert.AreEqual("PWD\r\n", Encoding.ASCII.GetString(sent[^5..]));
     }
 
-    private static async Task AssertPassiveSendsOnlyThePlainTextAsync(SslProtocols protocol)
+    private async Task AssertPassiveSendsOnlyThePlainTextAsync(SslProtocols protocol)
     {
-        var sent = await ClearAndSendPwdAsync(protocol, sendCloseNotifyFirst: false);
+        ArrangeClear(protocol, "OpenSSL", sendCloseNotifyFirst: false, "close_notify, then reads PWD and answers 257");
 
+        byte[] sent;
+        using (Diagnostics.Phase("handshake, clear TLS and PWD"))
+        {
+            sent = await ClearAndSendPwdAsync(protocol, sendCloseNotifyFirst: false);
+        }
+
+        Diagnostics.Bytes("bytes the server read after its close_notify", sent);
+        Diagnostics.Act("bytes the server read", sent.Length);
+        Diagnostics.Diff("bytes the server read", "PWD\r\n", Encoding.ASCII.GetString(sent));
         Assert.AreEqual("PWD\r\n", Encoding.ASCII.GetString(sent));
     }
 
-    private static async Task AssertSchannelBuildSendsCloseNotifyAndReturnsNullAsync(SslProtocols protocol, bool sendCloseNotifyFirst)
+    private async Task AssertSchannelBuildSendsCloseNotifyAndReturnsNullAsync(SslProtocols protocol, bool sendCloseNotifyFirst)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -136,15 +161,31 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
             _ = await server.ReadAsync(first);
             return first[0];
         });
-        await using var connection = await ConnectAsync(client, protocol, matchesSchannelBuild: true);
+        ArrangeClear(protocol, "Schannel", sendCloseNotifyFirst, "reads the first byte the client sends");
+        IConnection connection;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            connection = await ConnectAsync(client, protocol, matchesSchannelBuild: true);
+        }
 
-        var plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst, CancellationToken.None);
+        await using var connectionScope = connection;
 
+        IConnection? plaintext;
+        using (Diagnostics.Phase("clear TLS"))
+        {
+            plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst, CancellationToken.None);
+        }
+
+        var firstByte = await serverTask;
+        Diagnostics.Act("plaintext connection is null", plaintext is null);
+        Diagnostics.Act("first byte the server read", $"0x{firstByte:x2}");
+        Diagnostics.Assert("plaintext connection is null", true, plaintext is null);
+        Diagnostics.Assert("first byte the server read", $"0x{CloseNotifyRecordType(protocol):x2}", $"0x{firstByte:x2}");
         Assert.IsNull(plaintext);
-        Assert.AreEqual(CloseNotifyRecordType(protocol), await serverTask);
+        Assert.AreEqual(CloseNotifyRecordType(protocol), firstByte);
     }
 
-    private static async Task AssertNoCloseNotifyReturnsNullAsync(SslProtocols protocol, ServerAnswer answer)
+    private async Task AssertNoCloseNotifyReturnsNullAsync(SslProtocols protocol, ServerAnswer answer)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
@@ -166,12 +207,33 @@ public sealed class HandBuiltTlsConnectionClearTlsTests
 
             await server.DisposeAsync();
         });
-        await using var connection = await ConnectAsync(client, protocol, matchesSchannelBuild: false);
+        ArrangeClear(protocol, "OpenSSL", sendCloseNotifyFirst: false, answer);
+        IConnection connection;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            connection = await ConnectAsync(client, protocol, matchesSchannelBuild: false);
+        }
 
-        var plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst: false, CancellationToken.None);
+        await using var connectionScope = connection;
 
+        IConnection? plaintext;
+        using (Diagnostics.Phase("clear TLS"))
+        {
+            plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst: false, CancellationToken.None);
+        }
+
+        Diagnostics.Act("plaintext connection is null", plaintext is null);
+        Diagnostics.Assert("plaintext connection is null", true, plaintext is null);
         Assert.IsNull(plaintext);
         await IgnoreFailureAsync(serverTask);
+    }
+
+    private void ArrangeClear(SslProtocols protocol, string build, bool sendCloseNotifyFirst, object serverAnswer)
+    {
+        Diagnostics.Arrange("protocol", protocol);
+        Diagnostics.Arrange("build", build);
+        Diagnostics.Arrange("send close_notify first", sendCloseNotifyFirst);
+        Diagnostics.Arrange("server after the handshake", serverAnswer);
     }
 
     // Clears TLS matching the OpenSSL build, sends "PWD\r\n" over the plaintext connection

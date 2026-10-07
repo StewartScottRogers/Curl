@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 
 using Curl.Cryptography;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using Curl.Tls;
 
 using CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
@@ -29,6 +30,10 @@ public sealed class HandBuiltPrivateKeyReaderTests
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "curl-handbuilt-key-" + Guid.NewGuid().ToString("N"));
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestCleanup]
     public void DeleteFiles()
     {
@@ -46,8 +51,16 @@ public sealed class HandBuiltPrivateKeyReaderTests
     [DataRow(HandBuiltPrivateKeyReader.MlDsa87Oid, true)]
     [DataRow("1.2.840.113549.1.1.1", false)]
     [DataRow(null, false)]
-    public void Reads_TakesEd25519Ed448AndMlDsaOnly(string? keyAlgorithmOid, bool expected) =>
-        Assert.AreEqual(expected, HandBuiltPrivateKeyReader.Reads(keyAlgorithmOid));
+    public void Reads_TakesEd25519Ed448AndMlDsaOnly(string? keyAlgorithmOid, bool expected)
+    {
+        Diagnostics.Arrange("key algorithm OID", keyAlgorithmOid ?? "null");
+
+        var reads = HandBuiltPrivateKeyReader.Reads(keyAlgorithmOid);
+
+        Diagnostics.Act("reads", reads);
+        Diagnostics.Assert("reads", expected, reads);
+        Assert.AreEqual(expected, reads);
+    }
 
     [TestMethod]
     [DataRow(HandBuiltPrivateKeyReader.Ed25519Oid, TlsSignatureScheme.Ed25519, false)]
@@ -61,13 +74,20 @@ public sealed class HandBuiltPrivateKeyReaderTests
     {
         var (publicKey, privateKeyInfo) = KeyPair(keyAlgorithmOid);
         using var certificate = CertificateFor(keyAlgorithmOid, publicKey);
+        Diagnostics.Arrange("key algorithm OID", keyAlgorithmOid);
+        Diagnostics.Arrange("signature scheme", $"0x{scheme:x4}");
 
         var (loaded, failure) = Load(certificate, privateKeyInfo, asDer);
 
+        Diagnostics.Assert("failure is null", true, failure is null);
         Assert.IsNull(failure);
         using (loaded)
         {
             var clientCertificate = HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!;
+            Diagnostics.Act("signing key", clientCertificate.SigningKey.GetType().Name);
+            Diagnostics.Assert("signs with the scheme", true, clientCertificate.SigningKey.CanSign((ushort)scheme));
+            Diagnostics.Assert("signs with RSA-PSS", false, clientCertificate.SigningKey.CanSign(TlsSignatureScheme.RsaPssRsaeSha256));
+            Diagnostics.Assert("chain is the certificate", true, certificate.RawData.AsSpan().SequenceEqual(clientCertificate.CertificateChain.Single()));
             Assert.IsTrue(clientCertificate.SigningKey.CanSign((ushort)scheme));
             Assert.IsFalse(clientCertificate.SigningKey.CanSign(TlsSignatureScheme.RsaPssRsaeSha256));
             CollectionAssert.AreEqual(certificate.RawData, clientCertificate.CertificateChain.Single());
@@ -90,11 +110,15 @@ public sealed class HandBuiltPrivateKeyReaderTests
             _ => MlDsaBothForm(Seed32, ExpandedKeyOf(key)),
         };
 
+        Diagnostics.Arrange("ML-DSA-44 private key form", form);
+
         var (loaded, failure) = Load(certificate, PrivateKeyInfo(HandBuiltPrivateKeyReader.MlDsa44Oid, privateKey), asDer: false);
 
+        Diagnostics.Assert("failure is null", true, failure is null);
         Assert.IsNull(failure);
         using (loaded)
         {
+            Diagnostics.Assert("signs with ML-DSA-44", true, HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!.SigningKey.CanSign(TlsSignatureScheme.MlDsa44));
             Assert.IsTrue(HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!.SigningKey.CanSign(TlsSignatureScheme.MlDsa44));
         }
     }
@@ -127,6 +151,7 @@ public sealed class HandBuiltPrivateKeyReaderTests
             "a trailing field after the key" => [.. MlDsaSeedForm(Seed32), .. Integer()],
             _ => OctetString(ExpandedKeyOf(other)),
         };
+        Diagnostics.Arrange("ML-DSA-44 key malformation", malformation);
 
         AssertUnusable(certificate, PrivateKeyInfo(HandBuiltPrivateKeyReader.MlDsa44Oid, privateKey));
     }
@@ -164,6 +189,7 @@ public sealed class HandBuiltPrivateKeyReaderTests
             "a CurvePrivateKey with a trailing field" => PrivateKeyInfo(HandBuiltPrivateKeyReader.Ed25519Oid, [.. OctetString(Seed32), .. Integer()]),
             _ => PrivateKeyInfo(HandBuiltPrivateKeyReader.Ed25519Oid, OctetString(otherSeed)),
         };
+        Diagnostics.Arrange("Ed25519 key malformation", malformation);
 
         AssertUnusable(certificate, malformed);
     }
@@ -178,9 +204,13 @@ public sealed class HandBuiltPrivateKeyReaderTests
         var keyFile = WriteFile("key.pem", contents == "no PEM at all"
             ? "not a key"
             : PemEncoding.WriteString("RSA PRIVATE KEY", privateKeyInfo));
+        Diagnostics.Arrange("key file contents", contents);
 
         var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), null, keyFile, null, null);
 
+        ActLoad(loaded, failure);
+        Diagnostics.Assert("loaded is null", true, loaded is null);
+        Diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, failure?.ExitCode);
         Assert.IsNull(loaded);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, failure!.ExitCode);
     }
@@ -191,12 +221,17 @@ public sealed class HandBuiltPrivateKeyReaderTests
         var (publicKey, privateKeyInfo) = KeyPair(HandBuiltPrivateKeyReader.Ed448Oid);
         using var certificate = CertificateFor(HandBuiltPrivateKeyReader.Ed448Oid, publicKey);
         var keyFile = WriteFile("key.pem", certificate.ExportCertificatePem() + "\n" + PemEncoding.WriteString("PRIVATE KEY", privateKeyInfo));
+        Diagnostics.Arrange("key algorithm", "Ed448");
+        Diagnostics.Arrange("--cert file", "a CERTIFICATE block, then a PRIVATE KEY block; no --key");
 
         var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(keyFile, null, null, null, null);
 
+        ActLoad(loaded, failure);
+        Diagnostics.Assert("failure is null", true, failure is null);
         Assert.IsNull(failure);
         using (loaded)
         {
+            Diagnostics.Assert("signing key", nameof(Ed448TlsSigningKey), (loaded as HandBuiltKeyCertificate)?.SigningKey.GetType().Name);
             Assert.IsInstanceOfType<Ed448TlsSigningKey>(((HandBuiltKeyCertificate)loaded!).SigningKey);
         }
     }
@@ -209,12 +244,23 @@ public sealed class HandBuiltPrivateKeyReaderTests
         var (publicKey, privateKeyInfo) = KeyPair(keyAlgorithmOid);
         using var certificate = CertificateFor(keyAlgorithmOid, publicKey);
         var keyFile = WriteEncryptedKey(privateKeyInfo);
+        Diagnostics.Arrange("key algorithm OID", keyAlgorithmOid);
+        Diagnostics.Arrange("key file", "ENCRYPTED PRIVATE KEY, AES-256-CBC, HMAC-SHA256 PBKDF2");
+        Diagnostics.Arrange("passphrase", "the right one");
 
-        var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), "pass phrase", keyFile, null, null);
+        X509Certificate2? loaded;
+        ConnectResult? failure;
+        using (Diagnostics.Phase("decrypt and load"))
+        {
+            (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), "pass phrase", keyFile, null, null);
+        }
 
+        ActLoad(loaded, failure);
+        Diagnostics.Assert("failure is null", true, failure is null);
         Assert.IsNull(failure);
         using (loaded)
         {
+            Diagnostics.Assert("signs with the scheme", true, HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!.SigningKey.CanSign((ushort)scheme));
             Assert.IsTrue(HandBuiltTlsProvider.ToTlsClientCertificate(loaded)!.SigningKey.CanSign((ushort)scheme));
         }
     }
@@ -227,9 +273,20 @@ public sealed class HandBuiltPrivateKeyReaderTests
         var (publicKey, privateKeyInfo) = KeyPair(HandBuiltPrivateKeyReader.Ed25519Oid);
         using var certificate = CertificateFor(HandBuiltPrivateKeyReader.Ed25519Oid, publicKey);
         var keyFile = WriteEncryptedKey(privateKeyInfo);
+        Diagnostics.Arrange("key algorithm", "Ed25519");
+        Diagnostics.Arrange("passphrase", passphrase ?? "none");
 
-        var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), passphrase, keyFile, null, null);
+        X509Certificate2? loaded;
+        ConnectResult? failure;
+        using (Diagnostics.Phase("decrypt and load"))
+        {
+            (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(WriteFile("cert.pem", certificate.ExportCertificatePem()), passphrase, keyFile, null, null);
+        }
 
+        ActLoad(loaded, failure);
+        Diagnostics.Assert("loaded is null", true, loaded is null);
+        Diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, failure?.ExitCode);
+        Diagnostics.Assert("error message", WithoutDirectory($"unable to set private key file: '{keyFile}' type PEM"), WithoutDirectory(failure?.ErrorMessage));
         Assert.IsNull(loaded);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, failure!.ExitCode);
         Assert.AreEqual($"unable to set private key file: '{keyFile}' type PEM", failure.ErrorMessage);
@@ -248,6 +305,9 @@ public sealed class HandBuiltPrivateKeyReaderTests
     {
         var (loaded, failure) = Load(certificate, privateKeyInfo, asDer: true);
 
+        Diagnostics.Assert("loaded is null", true, loaded is null);
+        Diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, failure?.ExitCode);
+        Diagnostics.Assert("error message starts with", "unable to set private key file: ", WithoutDirectory(failure?.ErrorMessage));
         Assert.IsNull(loaded);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, failure!.ExitCode);
         StringAssert.StartsWith(failure.ErrorMessage, "unable to set private key file: ");
@@ -259,7 +319,28 @@ public sealed class HandBuiltPrivateKeyReaderTests
         var keyFile = asDer
             ? WriteFile("key.der", privateKeyInfo)
             : WriteFile("key.pem", PemEncoding.WriteString("PRIVATE KEY", privateKeyInfo));
-        return ClientCertificateLoader.LoadAsOpenSslBuild(certificateFile, null, keyFile, null, asDer ? "DER" : null);
+        Diagnostics.Arrange("certificate", $"{certificate.Subject} issued by {certificate.Issuer}");
+        Diagnostics.Arrange("--key-type", asDer ? "DER" : "PEM");
+        Diagnostics.Bytes("PrivateKeyInfo", privateKeyInfo);
+
+        X509Certificate2? loaded;
+        ConnectResult? failure;
+        using (Diagnostics.Phase("load"))
+        {
+            (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(certificateFile, null, keyFile, null, asDer ? "DER" : null);
+        }
+
+        ActLoad(loaded, failure);
+        return (loaded, failure);
+    }
+
+    // The temporary directory differs by machine and platform, so diagnostics name it <temp>.
+    private string? WithoutDirectory(string? text) => text?.Replace(_directory, "<temp>", StringComparison.Ordinal);
+
+    private void ActLoad(X509Certificate2? loaded, ConnectResult? failure)
+    {
+        Diagnostics.Act("loaded", loaded is null ? "null" : $"{loaded.GetType().Name} {loaded.Subject}");
+        Diagnostics.Act("failure", failure is null ? "null" : $"{failure.ExitCode}: {WithoutDirectory(failure.ErrorMessage)}");
     }
 
     private string WriteFile(string name, string contents) => WriteFile(name, System.Text.Encoding.ASCII.GetBytes(contents));
