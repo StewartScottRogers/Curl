@@ -4,7 +4,7 @@ title: Make every test in Curl.Networking.UnitTests write descriptive diagnostic
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1457]
+depends-on: [BL-1457, BL-1535, BL-1536, BL-1537, BL-1538, BL-1539, BL-1540, BL-1541, BL-1542, BL-1543, BL-1544, BL-1545, BL-1546, BL-1547, BL-1548, BL-1549, BL-1550, BL-1551]
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-04
@@ -36,8 +36,10 @@ Every test in `Curl.Networking.UnitTests` writes, through BL-1457's shared `Test
 ## Notes
 
 - Large: 1887 test methods in 201 files is probably more than one `/task-run` can finish. Stewart asked for one task per project, so it is filed whole. If the runner judges it too big, it splits it before changing any test: it files tasks that each cover a range of the project's files by name (each `-Pipeline direct -DependsOn BL-1457 -Touches Curl.Networking.UnitTests`, with these criteria limited to its files' classes through `--filter "FullyQualifiedName~<class>"`), adds them to this task's `depends-on`, and moves this task back to `Backlog`; this task then only runs the whole-project checks above.
+- 2026-10-07 (lane 6): split as above. 1892 test methods in 201 files (counted 2026-10-07 by the same patterns) is far more than one run's time and token budget. All test files are flat in the project root and every class is in namespace `Curl.Networking`, so the 17 tasks cover contiguous name ranges, 42 to 138 tests each: BL-1535 (A to Di), BL-1536 (Dns), BL-1537 (Doh, E, F), BL-1538 (HandBuiltTlsProviderTests), BL-1539 (other Ha and Http), BL-1540 (K to O), BL-1541 (P), BL-1542 (Q to Sy, outside SslStreamTlsProviderTests), BL-1543 and BL-1544 (SslStreamTlsProviderTests' 19 partial files, 1544 depending on 1543), BL-1545 (TcpConnectionListener, TcpConnectorQuicTests), BL-1546 to BL-1549 (TcpConnectorTests' 47 partial files in four chained ranges), BL-1550 (TcpDialer to Tls), BL-1551 (U). The two big partial classes are split by file, and the last task of each chain checks the whole class, because a test filter can select a class but not a file. Once they are all Done, this task runs only the whole-project checks and records the before and after counts.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Split into BL-1535 to BL-1551 (one per range of test files); this task runs the whole-project checks once they are Done
