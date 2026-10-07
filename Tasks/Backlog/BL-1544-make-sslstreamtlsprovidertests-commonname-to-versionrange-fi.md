@@ -35,3 +35,4 @@ Every test declared in `Curl.Networking.UnitTests`' `SslStreamTlsProviderTests` 
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Lane 4 could not integrate: push kept being refused. The work is on branch factory/BL-1544-lane-4-20261006-200306; start with git cherry-pick --no-commit factory/BL-1544-lane-4-20261006-200306 and fix it.
