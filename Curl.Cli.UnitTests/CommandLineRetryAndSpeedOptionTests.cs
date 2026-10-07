@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -28,6 +29,34 @@ public sealed class CommandLineRetryAndSpeedOptionTests
     private const string BadlyUsed = "is badly used here";
 
     private const string CannotBeReversed = "the given option cannot be reversed with a --no- prefix";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            CommandLineOptions options = result.Options;
+            Diagnostics.Act("retry count", options.RetryCount);
+            Diagnostics.Act("retry delay", Show(options.RetryDelay?.TotalMilliseconds));
+            Diagnostics.Act("retry max time", Show(options.RetryMaxTime?.TotalMilliseconds));
+            Diagnostics.Act("retry all errors", options.RetryAllErrors);
+            Diagnostics.Act("retry connection refused", options.RetryConnectionRefused);
+            Diagnostics.Act("limit rate", Show(options.LimitRate));
+            Diagnostics.Act("speed limit", Show(options.SpeedLimit));
+            Diagnostics.Act("speed time seconds", Show(options.SpeedTimeSeconds));
+        }
+
+        return result;
+    }
+
+    private static string Show(IFormattable? value) =>
+        value?.ToString(null, System.Globalization.CultureInfo.InvariantCulture) ?? "null";
 
     [TestMethod]
     public void Parse_NoneOfTheOptions_LeavesTheirDefaults()
@@ -313,19 +342,22 @@ public sealed class CommandLineRetryAndSpeedOptionTests
         AssertRefused([spelling, Url], $"curl: option {spelling}: {CannotBeReversed}");
     }
 
-    private static CommandLineOptions Accepted(params string[] arguments)
+    private CommandLineOptions Accepted(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warnings", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
         return result.Options;
     }
 
-    private static void AssertRefused(string[] arguments, string refusalLine)
+    private void AssertRefused(string[] arguments, string refusalLine)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, [refusalLine, TryHelp]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { refusalLine, TryHelp }, result.Refusal.StandardErrorLines.ToArray());

@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -26,11 +27,38 @@ public sealed class CommandLineRemoteNameOptionTests
 
     private const string CannotBeReversed = "the given option cannot be reversed with a --no- prefix";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            foreach (UrlOutput output in result.Options.UrlOutputs)
+            {
+                Diagnostics.Act("url output", $"url {output.Url ?? "null"}, file name {output.FileName ?? "null"}, uses remote name {output.UsesRemoteName}");
+            }
+
+            Diagnostics.Act("remote name all", result.Options.RemoteNameAll);
+            Diagnostics.Act("remote header name", result.Options.RemoteHeaderName);
+            Diagnostics.Act("output directory", result.Options.OutputDirectory ?? "null");
+            Diagnostics.Act("create directories", result.Options.CreateDirectories);
+            Diagnostics.Act("warnings after transfers", CommandLineParseDiagnostics.QuoteEach(result.WarningLinesAfterTransfers));
+        }
+
+        return result;
+    }
+
     [TestMethod]
     public void Parse_NoOutputOption_SendsTheBodyToStandardOutput()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         UrlOutput output = result.Options.UrlOutputs.Single();
         Assert.AreEqual(Url, output.Url);
@@ -47,8 +75,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("--remote-name")]
     public void Parse_RemoteName_UsesTheRemoteNameForItsUrl(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         UrlOutput output = result.Options.UrlOutputs.Single();
         Assert.AreEqual(Url, output.Url);
@@ -59,8 +88,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_RemoteNameAfterItsUrl_StillPairsWithIt()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "-O"]);
+        CommandLineParseResult result = Parse([Url, "-O"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.UrlOutputs.Single().UsesRemoteName);
     }
@@ -68,8 +98,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_OutputThenRemoteName_PairsEachWithItsUrlInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-o", "x", "-O", Url, OtherUrl]);
+        CommandLineParseResult result = Parse(["-o", "x", "-O", Url, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.HasCount(2, result.Options.UrlOutputs);
         Assert.AreEqual(Url, result.Options.UrlOutputs[0].Url);
@@ -84,8 +115,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_RemoteNameThenOutput_PairsTheOutputFileWithTheSecondUrl()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-O", "-o", "x", Url, OtherUrl]);
+        CommandLineParseResult result = Parse(["-O", "-o", "x", Url, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { null, "x" }, result.Options.OutputFiles.ToArray());
     }
@@ -93,8 +125,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_OneRemoteNameForTwoUrls_SendsTheSecondToStandardOutput()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-O", Url, OtherUrl]);
+        CommandLineParseResult result = Parse(["-O", Url, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.UrlOutputs[0].UsesRemoteName);
         Assert.IsFalse(result.Options.UrlOutputs[1].UsesRemoteName);
@@ -103,8 +136,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_TwoRemoteNamesForOneUrl_WarnsAfterTheTransfers()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-O", "-O", Url]);
+        CommandLineParseResult result = Parse(["-O", "-O", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.UrlOutputs[1].Url);
         CollectionAssert.AreEqual(new[] { CommandLineWarning.MoreOutputOptionsThanUrls }, result.WarningLinesAfterTransfers.ToArray());
@@ -113,8 +147,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_OutputThenRemoteNameForOneUrl_WarnsAfterTheTransfers()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-o", "a", "-O", Url]);
+        CommandLineParseResult result = Parse(["-o", "a", "-O", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { CommandLineWarning.MoreOutputOptionsThanUrls }, result.WarningLinesAfterTransfers.ToArray());
     }
@@ -122,8 +157,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_SilentWithTwoRemoteNamesForOneUrl_DoesNotWarn()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "-O", "-O", Url]);
+        CommandLineParseResult result = Parse(["-s", "-O", "-O", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLinesAfterTransfers);
     }
@@ -131,8 +167,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_RemoteNameAll_UsesTheRemoteNameForEveryUrl()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--remote-name-all", Url, OtherUrl]);
+        CommandLineParseResult result = Parse(["--remote-name-all", Url, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.RemoteNameAll);
         Assert.IsTrue(result.Options.UrlOutputs.All(output => output.UsesRemoteName));
@@ -142,8 +179,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_RemoteNameAllBetweenUrls_AppliesOnlyToTheUrlsAfterIt()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--remote-name-all", OtherUrl]);
+        CommandLineParseResult result = Parse([Url, "--remote-name-all", OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.UrlOutputs[0].UsesRemoteName);
         Assert.IsTrue(result.Options.UrlOutputs[1].UsesRemoteName);
@@ -152,8 +190,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_RemoteNameAllWithOutput_KeepsTheOutputFileName()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--remote-name-all", Url, "-o", "x"]);
+        CommandLineParseResult result = Parse(["--remote-name-all", Url, "-o", "x"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         UrlOutput output = result.Options.UrlOutputs.Single();
         Assert.AreEqual("x", output.FileName);
@@ -163,8 +202,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_RemoteNameAllThenNoRemoteName_SendsTheUrlToStandardOutput()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--remote-name-all", "--no-remote-name", Url]);
+        CommandLineParseResult result = Parse(["--remote-name-all", "--no-remote-name", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         UrlOutput output = result.Options.UrlOutputs.Single();
         Assert.AreEqual(Url, output.Url);
@@ -175,8 +215,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_RemoteNameAllThenTwoNoRemoteNamesForOneUrl_WarnsAfterTheTransfers()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--remote-name-all", "--no-remote-name", "--no-remote-name", Url]);
+        CommandLineParseResult result = Parse(["--remote-name-all", "--no-remote-name", "--no-remote-name", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { CommandLineWarning.MoreOutputOptionsThanUrls }, result.WarningLinesAfterTransfers.ToArray());
     }
@@ -184,8 +225,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_TwoNoRemoteNamesForOneUrl_DropsThemWithoutWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-remote-name", "--no-remote-name", Url]);
+        CommandLineParseResult result = Parse(["--no-remote-name", "--no-remote-name", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.HasCount(1, result.Options.UrlOutputs);
         Assert.IsEmpty(result.WarningLinesAfterTransfers);
@@ -194,8 +236,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_OutputThenNoRemoteNameForOneUrl_DropsItWithoutWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-o", "x", "--no-remote-name", Url]);
+        CommandLineParseResult result = Parse(["-o", "x", "--no-remote-name", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("x", result.Options.UrlOutputs.Single().FileName);
         Assert.IsEmpty(result.WarningLinesAfterTransfers);
@@ -204,8 +247,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_NoRemoteNameAfterItsUrl_PairsWithIt()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--remote-name-all", Url, "--no-remote-name"]);
+        CommandLineParseResult result = Parse(["--remote-name-all", Url, "--no-remote-name"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.UrlOutputs.Single().UsesRemoteName);
         Assert.IsEmpty(result.WarningLinesAfterTransfers);
@@ -216,8 +260,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("--no-remote-name=x")]
     public void Parse_NoRemoteName_IsAccepted(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-O", Url, spelledOption, OtherUrl]);
+        CommandLineParseResult result = Parse(["-O", Url, spelledOption, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.UrlOutputs[0].UsesRemoteName);
         Assert.IsFalse(result.Options.UrlOutputs[1].UsesRemoteName);
@@ -228,8 +273,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("--no-remote-name-all=x")]
     public void Parse_NoRemoteNameAll_TurnsRemoteNameAllOff(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--remote-name-all", spelledOption, Url]);
+        CommandLineParseResult result = Parse(["--remote-name-all", spelledOption, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.RemoteNameAll);
         Assert.IsFalse(result.Options.UrlOutputs.Single().UsesRemoteName);
@@ -240,8 +286,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("--remote-header-name")]
     public void Parse_RemoteHeaderName_AsksForTheHeaderName(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.RemoteHeaderName);
     }
@@ -251,8 +298,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("--no-remote-header-name=x")]
     public void Parse_NoRemoteHeaderName_TurnsItOff(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-J", spelledOption, Url]);
+        CommandLineParseResult result = Parse(["-J", spelledOption, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.RemoteHeaderName);
     }
@@ -260,8 +308,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [TestMethod]
     public void Parse_CreateDirs_AsksForMissingDirectories()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--create-dirs", Url]);
+        CommandLineParseResult result = Parse(["--create-dirs", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.CreateDirectories);
     }
@@ -271,8 +320,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("--no-create-dirs=x")]
     public void Parse_NoCreateDirs_TurnsItOff(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--create-dirs", spelledOption, Url]);
+        CommandLineParseResult result = Parse(["--create-dirs", spelledOption, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.CreateDirectories);
     }
@@ -282,8 +332,9 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("-x")]
     public void Parse_OutputDir_KeepsTheLastDirectoryWithoutWarning(string directory)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--output-dir", "first", "--output-dir", directory, Url]);
+        CommandLineParseResult result = Parse(["--output-dir", "first", "--output-dir", directory, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(directory, result.Options.OutputDirectory);
         Assert.IsEmpty(result.WarningLines);
@@ -294,7 +345,7 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow(new[] { "--output-dir=" }, "--output-dir=")]
     public void Parse_BlankOutputDir_IsRefused(string[] arguments, string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: blank argument where content is expected");
     }
@@ -304,13 +355,14 @@ public sealed class CommandLineRemoteNameOptionTests
     [DataRow("--no-output-dir=x")]
     public void Parse_NoOutputDir_IsRefusedAsNotReversible(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: {CannotBeReversed}");
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    private void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
     {
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, [expectedFirstLine, CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
