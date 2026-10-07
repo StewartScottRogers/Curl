@@ -147,6 +147,15 @@ internal static class HttpConnectionInfoLines
     internal const string NeedToRewindUpload = "Need to rewind upload for next request";
 
     /// <summary>
+    /// Formats the line written when a request body is abandoned part-way because a response
+    /// arrived first, as after a <c>417</c> that is answered with a resend (measured, BL-1446 Notes).
+    /// </summary>
+    /// <param name="bytesSent">The body bytes sent before sending stopped.</param>
+    /// <returns>The line, such as <c>abort upload after having sent 524288 bytes</c>.</returns>
+    internal static string AbortUpload(long bytesSent) =>
+        string.Create(CultureInfo.InvariantCulture, $"abort upload after having sent {bytesSent} bytes");
+
+    /// <summary>
     /// Formats the line written once a request's whole body has been sent.
     /// </summary>
     /// <param name="bytesSent">The body bytes sent, chunk framing included.</param>
