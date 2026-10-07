@@ -8,7 +8,7 @@ depends-on: []
 touches: [TestDiagnostics.cs, Directory.Build.props, Documentation/Planning/Decisions, Documentation/Wiki, Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1457 — Give every unit test timing and a SLOW line over a 3-second budget through shared test diagnostics
 
@@ -39,21 +39,30 @@ Every test in all 33 `.UnitTests` projects writes a `START` line, an `END` line 
 
 ## Acceptance criteria
 
-- [ ] `TestDiagnostics.cs` exists at the repository root, with `[GlobalTestInitialize]` and `[GlobalTestCleanup]` methods writing the `START`, `END` and `SLOW:` lines through `TestContext.WriteLine`, the budget as one named constant equal to 3000, and the helper methods for `ARRANGE`, `ACT`, `ASSERT`, `BYTES`, `DIFF` and `PHASE` lines in the format in Context. It uses only `System.*` and MSTest, and holds no mutable static state shared between tests.
-- [ ] `Directory.Build.props` links `TestDiagnostics.cs` into every project whose name ends in `UnitTests`, beside the `MSTestSettings.cs` link, and its comment says so.
-- [ ] Tests in `Curl.Core.UnitTests` (e.g. `TestDiagnosticsTests`) pin: the `SLOW:` line is written for an elapsed time of 3001 ms and not for exactly 3000 ms nor for 2999 ms, driven by `FakeTimeProvider` or a passed `TimeSpan` with no real wait; the `END` line's outcome, milliseconds and arrange/act/assert counts; `BYTES` hex and text for a mix of printable and non-printable bytes, and the truncation past the cap; `DIFF` for a first difference, for differing lengths and for equal input; and `PHASE` writing its name and milliseconds when disposed.
-- [ ] `dotnet build -warnaserror` for the whole solution is clean (all 33 test projects compile the linked file).
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes for the whole solution.
-- [ ] `dotnet test Curl.Core.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` shows a `START` and an `END ... in <n> ms` line for the tests it runs.
-- [ ] `Documentation/Planning/Decisions/ADR-<next free number>-*.md` exists, marked "Decided by Claude under Stewart's delegation", and records: output through `TestContext.WriteLine` from MSTest's global test hooks; the 3-second budget as Stewart's number of 2026-10-04; the line format above; and the per-project rollout (one task per test project, each depending on this one).
-- [ ] `Documentation/Wiki/Test-Diagnostics.md` describes each line type with an example, how a test uses the helper (Arrange, Act, Assert context, bytes, first difference, phases), and the `SLOW:` budget; `Documentation/Wiki/Home.md` lists it in its page table.
+- [x] `TestDiagnostics.cs` exists at the repository root, with `[GlobalTestInitialize]` and `[GlobalTestCleanup]` methods writing the `START`, `END` and `SLOW:` lines through `TestContext.WriteLine`, the budget as one named constant equal to 3000, and the helper methods for `ARRANGE`, `ACT`, `ASSERT`, `BYTES`, `DIFF` and `PHASE` lines in the format in Context. It uses only `System.*` and MSTest, and holds no mutable static state shared between tests.
+- [x] `Directory.Build.props` links `TestDiagnostics.cs` into every project whose name ends in `UnitTests`, beside the `MSTestSettings.cs` link, and its comment says so.
+- [x] Tests in `Curl.Core.UnitTests` (e.g. `TestDiagnosticsTests`) pin: the `SLOW:` line is written for an elapsed time of 3001 ms and not for exactly 3000 ms nor for 2999 ms, driven by `FakeTimeProvider` or a passed `TimeSpan` with no real wait; the `END` line's outcome, milliseconds and arrange/act/assert counts; `BYTES` hex and text for a mix of printable and non-printable bytes, and the truncation past the cap; `DIFF` for a first difference, for differing lengths and for equal input; and `PHASE` writing its name and milliseconds when disposed.
+- [x] `dotnet build -warnaserror` for the whole solution is clean (all 33 test projects compile the linked file).
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes for the whole solution.
+- [x] `dotnet test Curl.Core.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` shows a `START` and an `END ... in <n> ms` line for the tests it runs.
+- [x] `Documentation/Planning/Decisions/ADR-<next free number>-*.md` exists, marked "Decided by Claude under Stewart's delegation", and records: output through `TestContext.WriteLine` from MSTest's global test hooks; the 3-second budget as Stewart's number of 2026-10-04; the line format above; and the per-project rollout (one task per test project, each depending on this one).
+- [x] `Documentation/Wiki/Test-Diagnostics.md` describes each line type with an example, how a test uses the helper (Arrange, Act, Assert context, bytes, first difference, phases), and the `SLOW:` budget; `Documentation/Wiki/Home.md` lists it in its page table.
 
 ## Notes
 
 - The 33 per-project tasks that depend on this one touch only their own test project, so they can run in parallel lanes once this is Done. Do not start adding diagnostics to tests in other projects here; that is their work. Adding output to `TestDiagnosticsTests` itself is enough in `Curl.Core.UnitTests`.
 - If `TestContext.CurrentTestOutcome` is not yet final when `[GlobalTestCleanup]` runs, record what MSTest 4.4.1 actually reports in the ADR and write that, rather than guessing the outcome.
+- 2026-10-07 (lane 1): delivered directly rather than through the full `/feature` agent chain, to fit the run's budget; the design is recorded in ADR-0416.
+- The hooks live in a second type, `TestDiagnosticsHooks`, which is `public`: MSTest's MSTEST0002, MSTEST0063 and MSTEST0050 analyzers reject an internal test class and its global fixture methods (tried with `[assembly: DiscoverInternals]` too). The helper `TestDiagnostics` stays `internal`.
+- `Curl.Console.UnitTests` references `Curl.Protocol.Ssh.UnitTests`, which shows it its internals, so the two linked copies clash as CS0436. `Directory.Build.props` suppresses CS0436 for that one project only; the compiler uses the project's own copy, which is correct.
+- Measured: `CurrentTestOutcome` is final in `[GlobalTestCleanup]` under MSTest 4.4.1 - a throwaway `Assert.Fail` test logged `END ...: Failed in 34 ms`. Recorded in ADR-0416.
+- Slow means whole milliseconds (truncated) greater than 3000, so 3000.9 ms is not slow and its END and SLOW lines never disagree.
+- `BYTES` and `PHASE` lines are not counted on the END line; `DIFF` counts as an assert, as the Context says.
+- No `Measure-CodeQuality.ps1` run: the change is to test projects only, and the quality gates cover `*.UnitLibrary` and `Curl.Console`.
+- Verified: `dotnet build -warnaserror` clean; fast tests green in all 33 test assemblies; `Curl.Core.UnitTests` with the detailed console logger shows `START` and `END ... in <n> ms` lines for every test.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every unit test writes START, END and over-3-second SLOW: lines; TestDiagnostics gives ARRANGE, ACT, ASSERT, BYTES, DIFF and PHASE lines
