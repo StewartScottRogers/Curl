@@ -4,6 +4,7 @@ using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -41,6 +42,10 @@ public sealed class CurlCommandRunnerRedirectProgressMeterTests
     private readonly MemoryStream standardError = new();
     private readonly ManualTimeProvider clock = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -48,12 +53,13 @@ public sealed class CurlCommandRunnerRedirectProgressMeterTests
     {
         int exitCode = await RunAsync([Found, Ok], "-L", "-i", Url);
 
+        string expected = HeaderLines
+            + Zero + Zero + Zero + NewLine
+            + Zero + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + NewLine;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            HeaderLines
-                + Zero + Zero + Zero + NewLine
-                + Zero + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + NewLine,
-            StandardErrorText);
+        Assert.AreEqual(expected, StandardErrorText);
     }
 
     [TestMethod]
@@ -61,10 +67,11 @@ public sealed class CurlCommandRunnerRedirectProgressMeterTests
     {
         int exitCode = await RunAsync([Found, Ok], "-L", "--max-redirs", "0", "-i", Url);
 
+        string expected = HeaderLines + Zero + Zero + Zero + NewLine + "curl: (47) Maximum (0) redirects followed" + NewLine;
+        Diagnostics.Assert("exit code", 47, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
         Assert.AreEqual(47, exitCode);
-        Assert.AreEqual(
-            HeaderLines + Zero + Zero + Zero + NewLine + "curl: (47) Maximum (0) redirects followed" + NewLine,
-            StandardErrorText);
+        Assert.AreEqual(expected, StandardErrorText);
     }
 
     [TestMethod]
@@ -74,37 +81,50 @@ public sealed class CurlCommandRunnerRedirectProgressMeterTests
 
         int exitCode = await RunAsync([Found, FoundC, Ok], "-L", "-o", "out.txt", Url);
 
+        string expected = HeaderLines
+            + Zero + Zero + Zero + NewLine
+            + Zero + Zero + Zero + NewLine
+            + Zero + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + NewLine;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            HeaderLines
-                + Zero + Zero + Zero + NewLine
-                + Zero + Zero + Zero + NewLine
-                + Zero + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + FiveOfFiveIn40Milliseconds + NewLine,
-            StandardErrorText);
+        Assert.AreEqual(expected, StandardErrorText);
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     /// <summary>
     /// Runs <paramref name="arguments" /> with <see cref="HttpProtocolHandler" /> over a
     /// <see cref="ScriptedConnector" /> serving <paramref name="responses" />, one per
     /// connection, each read advancing <see cref="clock" /> by 40 ms.
     /// </summary>
-    private Task<int> RunAsync(string[] responses, params string[] arguments)
+    private async Task<int> RunAsync(string[] responses, params string[] arguments)
     {
         ClockAdvancingConnector server = new(new ScriptedConnector(responses.Select(Encoding.Latin1.GetBytes)), clock);
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
         InMemoryFileSystem outputFiles = new();
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("scripted responses", Lf(string.Join(" | ", responses)));
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    writesProgressMeter: true,
+                    timeProvider: clock)
+                .RunAsync(arguments);
+        }
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                writesProgressMeter: true,
-                timeProvider: clock)
-            .RunAsync(arguments);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(Encoding.Latin1.GetString(standardOutput.ToArray())));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
     }
 
     /// <summary>A connector whose connections advance the clock by 40 ms on every read that returns bytes.</summary>

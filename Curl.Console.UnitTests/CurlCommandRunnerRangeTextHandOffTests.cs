@@ -1,7 +1,9 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -16,7 +18,7 @@ namespace Curl.Console;
 /// The transfers run through the production handler set over fake connectors.
 /// </summary>
 [TestClass]
-public sealed class CurlCommandRunnerRangeTextHandOffTests
+public sealed partial class CurlCommandRunnerRangeTextHandOffTests
 {
     private const string ShuttingDownLine = "* shutting down connection #0";
 
@@ -26,6 +28,8 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
     private readonly MemoryStream standardError = new();
 
     public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
@@ -38,6 +42,9 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
 
         int exitCode = await RunAsync(new RefusingConnector(), "-sv", "-r", "5-2", fileUrl);
 
+        Diagnostics.Assert("exit code", 33, exitCode);
+        Diagnostics.Diff("stderr", ShuttingDownLine + "\n", Lf(StandardErrorText));
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(33, exitCode);
         Assert.AreEqual(ShuttingDownLine + "\n", StandardErrorText);
         Assert.AreEqual(0, standardOutput.Length);
@@ -50,10 +57,14 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
 
         int exitCode = await RunAsync(new RefusingConnector(), "-v", "-r", "5-2", fileUrl, "-o", Path.Combine(Path.GetTempPath(), "curl-bl1322-" + Guid.NewGuid().ToString("N")));
 
+        Diagnostics.Assert("exit code", 33, exitCode);
         Assert.AreEqual(33, exitCode);
         int meter = StandardErrorText.IndexOf("  % Total    % Received % Xferd", StringComparison.Ordinal);
         int shutdown = StandardErrorText.IndexOf(ShuttingDownLine, StringComparison.Ordinal);
         int failure = StandardErrorText.IndexOf(NotDeliveredLine, StringComparison.Ordinal);
+        Diagnostics.Assert("meter header found", true, meter >= 0);
+        Diagnostics.Assert("shutdown line after meter", true, shutdown > meter);
+        Diagnostics.Assert("failure line after shutdown", true, failure > shutdown);
         Assert.IsGreaterThanOrEqualTo(0, meter);
         Assert.IsGreaterThan(meter, shutdown);
         Assert.IsGreaterThan(shutdown, failure);
@@ -66,6 +77,9 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
 
         int exitCode = await RunAsync(new RefusingConnector(), "-sv", "-I", "-r", "5-2", fileUrl);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout contains Content-Length: 12", true, StandardOutputText.Contains("Content-Length: 12", StringComparison.Ordinal));
+        Diagnostics.Assert("stderr contains shutdown line", true, StandardErrorText.Contains(ShuttingDownLine, StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardOutputText, "Content-Length: 12");
         StringAssert.Contains(StandardErrorText, ShuttingDownLine);
@@ -78,6 +92,8 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
 
         int exitCode = await RunAsync(new RefusingConnector(), "-v", "-r", "5-2", missingUrl);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.FileCouldntReadFile, exitCode);
+        Diagnostics.Assert("stderr contains shutting down", false, StandardErrorText.Contains("shutting down", StringComparison.Ordinal));
         Assert.AreEqual((int)CurlExitCode.FileCouldntReadFile, exitCode);
         Assert.DoesNotContain("shutting down", StandardErrorText);
     }
@@ -93,9 +109,16 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
             Encoding.ASCII.GetBytes("257 \"/\" is current directory\r\n"),
             Encoding.ASCII.GetBytes("229 Entering Extended Passive Mode (|||40001|)\r\n"),
         ]);
+        Diagnostics.Arrange("scripted replies", "220, 331, 230, 257, 229 (EPSV port 40001)");
 
         int exitCode = await RunAsync(connector, "-sv", "-r", "5-2", "ftp://127.0.0.1/f.txt");
 
+        string written = Encoding.ASCII.GetString(connector.Written);
+        Diagnostics.Act("commands sent", Lf(written));
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains curl: (33)", false, StandardErrorText.Contains("curl: (33)", StringComparison.Ordinal));
+        Diagnostics.Assert("EPSV sent", true, written.Contains("EPSV\r\n", StringComparison.Ordinal));
+        Diagnostics.Assert("RETR sent", false, written.Contains("RETR", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.DoesNotContain("curl: (33)", StandardErrorText);
         StringAssert.Contains(Encoding.ASCII.GetString(connector.Written), "EPSV\r\n");
@@ -109,6 +132,8 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
 
         int exitCode = await RunAsync(connector, "-s", "-r", "5-2", "dict://127.0.0.1:1/x");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.CouldntConnect, exitCode);
+        Diagnostics.Assert("connect attempts", 1, connector.Targets.Count);
         Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
         Assert.HasCount(1, connector.Targets);
     }
@@ -122,9 +147,13 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
                 "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: x\r\n\r\n"
                 + "\x88\x02\x03\xe8"),
         ]);
+        Diagnostics.Arrange("scripted reply", "101 Switching Protocols, then a close frame (1000)");
 
         int exitCode = await RunAsync(connector, "-s", "-r", "5-2", "ws://127.0.0.1:47901/");
 
+        Diagnostics.Bytes("request bytes", connector.Written);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("request has Range: bytes=5-2", true, Encoding.Latin1.GetString(connector.Written).Contains("\r\nRange: bytes=5-2\r\n", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         StringAssert.Contains(Encoding.Latin1.GetString(connector.Written), "\r\nRange: bytes=5-2\r\n");
     }
@@ -138,21 +167,35 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
 
         int exitCode = await RunAsync(connector, "-s", "-k", "-r", "5-2", scheme + "://127.0.0.1:1/f");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.CouldntConnect, exitCode);
+        Diagnostics.Assert("connect attempts", 1, connector.Targets.Count);
         Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
         Assert.HasCount(1, connector.Targets);
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    /// <summary>Replaces every temporary path or file URL this class makes, which differ by OS, with a fixed token.</summary>
+    private static string WithoutTemporaryPaths(string text) =>
+        TemporaryPathPattern().Replace(
+            text.Replace(Path.GetTempPath(), "<temp>/", StringComparison.Ordinal)
+                .Replace(new Uri(Path.GetTempPath()).AbsoluteUri, "<temp>/", StringComparison.Ordinal),
+            "<temporary path>");
+
+    [GeneratedRegex(@"\S*curl-bl1322-[0-9a-f]{32}\S*")]
+    private static partial Regex TemporaryPathPattern();
 
     private string CreateTemporaryFileUrl()
     {
         string directory = Path.Combine(Path.GetTempPath(), "curl-bl1322-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
-        TestContext.WriteLine(directory);
         string path = Path.Combine(directory, "f.txt");
         File.WriteAllText(path, "0123456789ab");
+        Diagnostics.Arrange("temporary file", "f.txt, 12 bytes: 0123456789ab");
         return new Uri(path).AbsoluteUri;
     }
 
-    private Task<int> RunAsync(IConnector connector, params string[] arguments)
+    private async Task<int> RunAsync(IConnector connector, params string[] arguments)
     {
         PhysicalFileSystem files = new();
         TransferDispatch dispatch = new(
@@ -161,17 +204,28 @@ public sealed class CurlCommandRunnerRangeTextHandOffTests
                 new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
                 new PassThroughTlsProvider(),
                 new LoopbackDnsResolver())));
-        return new CurlCommandRunner(
-                _ => dispatch,
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                writesProgressMeter: true,
-                timeProvider: new ManualTimeProvider())
-            .RunAsync(arguments);
+        Diagnostics.Arrange("arguments", WithoutTemporaryPaths(string.Join(' ', arguments)));
+        Diagnostics.Arrange("connector", connector.GetType().Name);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => dispatch,
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    writesProgressMeter: true,
+                    timeProvider: new ManualTimeProvider())
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", WithoutTemporaryPaths(Lf(StandardOutputText)));
+        Diagnostics.Act("stderr", WithoutTemporaryPaths(Lf(StandardErrorText)));
+        return exitCode;
     }
 
     /// <summary>A connector that refuses every connect with exit 7, recording each target.</summary>

@@ -3,6 +3,7 @@ using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -36,6 +37,10 @@ public sealed class CurlCommandRunnerRedirectTests
 
     private ScriptedConnector server = new([]);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
@@ -47,6 +52,10 @@ public sealed class CurlCommandRunnerRedirectTests
     {
         int exitCode = await RunAsync([Found, Ok], "-L", "-i", "-s", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", Lf(FoundHead + Ok), Lf(StandardOutputText));
+        Diagnostics.Diff("requests", Lf("GET /a HTTP/1.1\r\n" + Request + "GET /b HTTP/1.1\r\n" + Request), Lf(RequestsText));
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FoundHead + Ok, StandardOutputText);
         Assert.AreEqual("GET /a HTTP/1.1\r\n" + Request + "GET /b HTTP/1.1\r\n" + Request, RequestsText);
@@ -58,6 +67,10 @@ public sealed class CurlCommandRunnerRedirectTests
     {
         int exitCode = await RunAsync([Found, Ok], "-L", "-i", "-s", "-o", "out.txt", Url);
 
+        string written = Encoding.Latin1.GetString(outputFiles.Written["out.txt"].ToArray());
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("out.txt content", Lf(FoundHead + Ok), Lf(written));
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FoundHead + Ok, Encoding.Latin1.GetString(outputFiles.Written["out.txt"].ToArray()));
         Assert.AreEqual(0, standardOutput.Length);
@@ -68,6 +81,9 @@ public sealed class CurlCommandRunnerRedirectTests
     {
         int exitCode = await RunAsync([Found, Ok], "-i", "-sS", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", Lf(Found), Lf(StandardOutputText));
+        Diagnostics.Diff("requests", Lf("GET /a HTTP/1.1\r\n" + Request), Lf(RequestsText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Found, StandardOutputText);
         Assert.AreEqual("GET /a HTTP/1.1\r\n" + Request, RequestsText);
@@ -78,6 +94,10 @@ public sealed class CurlCommandRunnerRedirectTests
     {
         int exitCode = await RunAsync([Found, Ok], "-L", "--max-redirs", "0", "-i", "-sS", Url);
 
+        Diagnostics.Assert("exit code", 47, exitCode);
+        Diagnostics.Diff("stdout", Lf(FoundHead), Lf(StandardOutputText));
+        Diagnostics.Diff("stderr", "curl: (47) Maximum (0) redirects followed\n", Lf(StandardErrorText));
+        Diagnostics.Diff("requests", Lf("GET /a HTTP/1.1\r\n" + Request), Lf(RequestsText));
         Assert.AreEqual(47, exitCode);
         Assert.AreEqual(FoundHead, StandardOutputText);
         Assert.AreEqual("curl: (47) Maximum (0) redirects followed" + NewLine, StandardErrorText);
@@ -89,6 +109,10 @@ public sealed class CurlCommandRunnerRedirectTests
     {
         int exitCode = await RunAsync([Found, Found], "-L", "-sS", "--max-redirs", "1", Url);
 
+        Diagnostics.Assert("exit code", 47, exitCode);
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
+        Diagnostics.Diff("stderr", "curl: (47) Maximum (1) redirects followed\n", Lf(StandardErrorText));
+        Diagnostics.Diff("requests", Lf("GET /a HTTP/1.1\r\n" + Request + "GET /b HTTP/1.1\r\n" + Request), Lf(RequestsText));
         Assert.AreEqual(47, exitCode);
         Assert.AreEqual(0, standardOutput.Length);
         Assert.AreEqual("curl: (47) Maximum (1) redirects followed" + NewLine, StandardErrorText);
@@ -109,6 +133,9 @@ public sealed class CurlCommandRunnerRedirectTests
         // http://127.0.0.1:48523/ -> exit 1, "curl: (1) Protocol "http" is disabled", no request.
         int exitCode = await RunAsync([Ok], "-sS", "--proto", proto, Url);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Diff("stderr", "curl: (1) Protocol \"http\" is disabled\n", Lf(StandardErrorText));
+        Diagnostics.Diff("requests", string.Empty, Lf(RequestsText));
         Assert.AreEqual(1, exitCode);
         Assert.AreEqual("curl: (1) Protocol \"http\" is disabled" + NewLine, StandardErrorText);
         Assert.AreEqual(string.Empty, RequestsText);
@@ -122,6 +149,8 @@ public sealed class CurlCommandRunnerRedirectTests
         // curl -sS -L, Location: file:///dir/x -> exit 1, "curl: (1) Protocol "file" is disabled (in redirect)" (BL-523 Notes).
         int exitCode = await RunAsync([RedirectTo(target)], "-L", "-sS", Url);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Diff("stderr", $"curl: (1) Protocol \"{scheme}\" is disabled (in redirect)\n", Lf(StandardErrorText));
         Assert.AreEqual(1, exitCode);
         Assert.AreEqual($"curl: (1) Protocol \"{scheme}\" is disabled (in redirect)" + NewLine, StandardErrorText);
     }
@@ -135,6 +164,9 @@ public sealed class CurlCommandRunnerRedirectTests
         // --proto-redir =http,dict, Location: dict://... -> exit 1, "Protocol "..." is disabled (in redirect)" (BL-523 Notes).
         int exitCode = await RunAsync([RedirectTo(target)], "-L", "-sS", "--proto-redir", "=http,dict", option, value, Url);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Diff("stderr", $"curl: (1) Protocol \"{scheme}\" is disabled (in redirect)\n", Lf(StandardErrorText));
+        Diagnostics.Diff("requests", Lf("GET /a HTTP/1.1\r\n" + Request), Lf(RequestsText));
         Assert.AreEqual(1, exitCode);
         Assert.AreEqual($"curl: (1) Protocol \"{scheme}\" is disabled (in redirect)" + NewLine, StandardErrorText);
         Assert.AreEqual("GET /a HTTP/1.1\r\n" + Request, RequestsText);
@@ -147,6 +179,9 @@ public sealed class CurlCommandRunnerRedirectTests
         // http://127.0.0.1:48805/ -> exit 1, "* Protocol "http" is disabled" then the curl: (1) line.
         int exitCode = await RunAsync([Ok], "-v", "-sS", "--proto", "-http", Url);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Diff("stderr", "* Protocol \"http\" is disabled\ncurl: (1) Protocol \"http\" is disabled\n", Lf(StandardErrorText));
+        Diagnostics.Diff("requests", string.Empty, Lf(RequestsText));
         Assert.AreEqual(1, exitCode);
         Assert.AreEqual(
             "* Protocol \"http\" is disabled\n" + "curl: (1) Protocol \"http\" is disabled" + NewLine,
@@ -161,6 +196,9 @@ public sealed class CurlCommandRunnerRedirectTests
         // then the curl: (1) line (BL-805 Notes).
         int exitCode = await RunAsync([Ok], "-v", "-sS", "--proto", "=http", "bogus://127.0.0.1:18244/");
 
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Diff("stderr", "* Protocol \"bogus\" not supported\ncurl: (1) Protocol \"bogus\" not supported\n", Lf(StandardErrorText));
+        Diagnostics.Diff("requests", string.Empty, Lf(RequestsText));
         Assert.AreEqual(1, exitCode);
         Assert.AreEqual(
             "* Protocol \"bogus\" not supported\n" + "curl: (1) Protocol \"bogus\" not supported" + NewLine,
@@ -175,6 +213,11 @@ public sealed class CurlCommandRunnerRedirectTests
         // "* Protocol "file" is disabled (in redirect)", then the curl: (1) line (BL-805 Notes).
         int exitCode = await RunAsync([RedirectTo("file:///dir/x")], "-v", "-L", "-sS", Url);
 
+        const string ExpectedEnding = "* Issue another request to this URL: 'file:///dir/x'\n"
+            + "* Protocol \"file\" is disabled (in redirect)\n"
+            + "curl: (1) Protocol \"file\" is disabled (in redirect)\n";
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Assert("stderr ends with the redirect lines", true, Lf(StandardErrorText).EndsWith(ExpectedEnding, StringComparison.Ordinal));
         Assert.AreEqual(1, exitCode);
         StringAssert.EndsWith(
             StandardErrorText,
@@ -183,22 +226,35 @@ public sealed class CurlCommandRunnerRedirectTests
             + "curl: (1) Protocol \"file\" is disabled (in redirect)" + NewLine);
     }
 
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
     private static string RedirectTo(string target) =>
         $"HTTP/1.1 302 Found\r\nLocation: {target}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 
-    private Task<int> RunAsync(string[] responses, params string[] arguments)
+    private async Task<int> RunAsync(string[] responses, params string[] arguments)
     {
         server = new ScriptedConnector(responses.Select(Encoding.Latin1.GetBytes));
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("scripted responses", Lf(string.Join(" | ", responses)));
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false)
+                .RunAsync(arguments);
+        }
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false)
-            .RunAsync(arguments);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        Diagnostics.Act("requests", Lf(RequestsText));
+        return exitCode;
     }
 }
