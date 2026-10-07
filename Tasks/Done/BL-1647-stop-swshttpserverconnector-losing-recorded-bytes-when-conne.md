@@ -34,7 +34,7 @@ completed: 2026-10-07
 - Fix: `SwsServerRecording` takes one `System.Threading.Lock` in `Record`, `ArmDisconnectMonitor`, `RecordDisconnect` and `Bytes`; one `Record` call is one `WriteAsync`, so its bytes stay contiguous. The monitor flag sits under the same lock so arming and the disconnect line cannot interleave.
 - Test: `SwsHttpServerConnectorTests.ThirtyTwoConnectionsWrittenOneBytePerWriteOnThirtyTwoThreads_RecordEveryByte` (100 rounds, 32 `Task.Run` writers, one byte per write). It failed before the fix and passes after (about 90 ms). The single-threaded interleaving test's comment now points at it.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports 100% line, 100% branch, 0 failing members.
-- The full fast run once failed `Curl.Cookies.UnitTests`' `EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother` (passes alone); outside this task's touches, filed as BL-1649.
+- The full fast run once failed `Curl.Cookies.UnitTests`' `EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother` (passes alone); outside this task's touches, filed as BL-1652.
 
 
 ## Log
