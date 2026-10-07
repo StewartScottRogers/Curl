@@ -35,3 +35,4 @@ The conformance harness reports every upstream test feature Curl actually has - 
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
