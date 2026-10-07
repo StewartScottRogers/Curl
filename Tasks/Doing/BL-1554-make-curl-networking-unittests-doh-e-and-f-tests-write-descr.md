@@ -33,3 +33,4 @@ Every test in `Curl.Networking.UnitTests`' `Doh*`, `E*` and `F*` test files (`Do
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
