@@ -5,6 +5,7 @@ using Curl.Core;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -34,6 +35,10 @@ public sealed class CurlCommandRunnerWriteOutTests
     private readonly MemoryStream standardError = new();
     private readonly InMemoryFileSystem outputFiles = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
@@ -43,8 +48,11 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         int exitCode = await RunHttpAsync([Ok], runsOnWindows: true, "-w", HttpCode, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "hello200\n", StandardOutputText);
         Assert.AreEqual("hello200\n", StandardOutputText);
+        Diagnostics.Diff("stderr", string.Empty, Normalized(StandardErrorText));
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
@@ -53,8 +61,11 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         int exitCode = await RunHttpAsync([NotFound], runsOnWindows: true, "-s", "-f", "-w", HttpCode, Url);
 
+        Diagnostics.Assert("exit code", 22, exitCode);
         Assert.AreEqual(22, exitCode);
+        Diagnostics.Diff("stdout", "404\n", StandardOutputText);
         Assert.AreEqual("404\n", StandardOutputText);
+        Diagnostics.Diff("stderr", string.Empty, Normalized(StandardErrorText));
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
@@ -64,8 +75,14 @@ public sealed class CurlCommandRunnerWriteOutTests
         int exitCode = await RunHttpAsync(
             [NotFound], runsOnWindows: true, "-sS", "-f", "-w", "%{stderr}" + HttpCode, Url);
 
+        Diagnostics.Assert("exit code", 22, exitCode);
         Assert.AreEqual(22, exitCode);
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(0, standardOutput.Length);
+        Diagnostics.Diff(
+            "stderr (CRLF shown as LF)",
+            "curl: (22) The requested URL returned error: 404\n404\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual("curl: (22) The requested URL returned error: 404" + NewLine + "404\r\n", StandardErrorText);
     }
 
@@ -74,7 +91,9 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         int exitCode = await RunHttpAsync([Ok], runsOnWindows: true, "-s", "-o", "out.txt", "-w", HttpCode, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "200\r\n", StandardOutputText);
         Assert.AreEqual("200\r\n", StandardOutputText);
     }
 
@@ -83,7 +102,9 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         int exitCode = await RunHttpAsync([NotFound], runsOnWindows: true, "-s", "-f", "-o", "out.txt", "-w", HttpCode, Url);
 
+        Diagnostics.Assert("exit code", 22, exitCode);
         Assert.AreEqual(22, exitCode);
+        Diagnostics.Diff("stdout", "404\r\n", StandardOutputText);
         Assert.AreEqual("404\r\n", StandardOutputText);
     }
 
@@ -92,7 +113,9 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         int exitCode = await RunHttpAsync([Ok], runsOnWindows: false, "-s", "-o", "out.txt", "-w", HttpCode, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "200\n", StandardOutputText);
         Assert.AreEqual("200\n", StandardOutputText);
     }
 
@@ -102,7 +125,9 @@ public sealed class CurlCommandRunnerWriteOutTests
         int exitCode = await RunOkAndFailingAsync(
             runsOnWindows: true, "-s", "-o", "a", "-o", "b", "-w", ExitCode, "ok://h/x", "ok://h/y", "ok://h/z");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "0\n0\n/z0\n", StandardOutputText);
         Assert.AreEqual("0\n0\n/z0\n", StandardOutputText);
     }
 
@@ -112,7 +137,9 @@ public sealed class CurlCommandRunnerWriteOutTests
         int exitCode = await RunOkAndFailingAsync(
             runsOnWindows: true, "-s", "-o", "a", "-w", ExitCode, "fail://h/x", "ok://h/y");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "7\n/y0\n", StandardOutputText);
         Assert.AreEqual("7\n/y0\n", StandardOutputText);
     }
 
@@ -122,7 +149,9 @@ public sealed class CurlCommandRunnerWriteOutTests
         int exitCode = await RunOkAndFailingAsync(
             runsOnWindows: true, "-s", "--fail-early", "-o", "a", "-o", "b", "-w", ExitCode, "fail://h/x", "ok://h/y", "ok://h/z");
 
+        Diagnostics.Assert("exit code", 7, exitCode);
         Assert.AreEqual(7, exitCode);
+        Diagnostics.Diff("stdout", "7\r\n", StandardOutputText);
         Assert.AreEqual("7\r\n", StandardOutputText);
     }
 
@@ -133,7 +162,9 @@ public sealed class CurlCommandRunnerWriteOutTests
 
         int exitCode = await RunOkAndFailingAsync(runsOnWindows: true, "-s", "-D", "adir", "-w", ExitCode, "ok://h/x");
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stdout", "23\r\n", StandardOutputText);
         Assert.AreEqual("23\r\n", StandardOutputText);
     }
 
@@ -149,6 +180,7 @@ public sealed class CurlCommandRunnerWriteOutTests
             "dict://exa mple.com/d:x",
             "OK://h/x");
 
+        Diagnostics.Diff("stdout", "[][xyz://a/b][0]\n[][dict://exa mple.com/d:x][1]\n/x[ok][OK://h/x][2]\n", StandardOutputText);
         Assert.AreEqual("[][xyz://a/b][0]\n[][dict://exa mple.com/d:x][1]\n/x[ok][OK://h/x][2]\n", StandardOutputText);
     }
 
@@ -162,6 +194,7 @@ public sealed class CurlCommandRunnerWriteOutTests
         await RunOkAndFailingAsync(
             runsOnWindows: false, "-s", "-e", "http://ref.example/x", "-o", "out.bin", "-o", "b.bin", "-w", Template, "ok://h/x", "fail://h/y");
 
+        Diagnostics.Diff("stdout", "[http://ref.example/x][out.bin][0][0]\n[http://ref.example/x][b.bin][1][1]\n", StandardOutputText);
         Assert.AreEqual("[http://ref.example/x][out.bin][0][0]\n[http://ref.example/x][b.bin][1][1]\n", StandardOutputText);
     }
 
@@ -173,6 +206,7 @@ public sealed class CurlCommandRunnerWriteOutTests
 
         await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-w", Template, "xyz://a/b", "ok://h/x");
 
+        Diagnostics.Diff("stdout", "[][][-1][0]\n/x[][][0][1]\n", StandardOutputText);
         Assert.AreEqual("[][][-1][0]\n/x[][][0][1]\n", StandardOutputText);
     }
 
@@ -181,6 +215,7 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-G", "-d", "a=b", "-o", "a", "-w", "%{url_effective}", "ok://h/x");
 
+        Diagnostics.Diff("stdout", "ok://h/x?a=b", StandardOutputText);
         Assert.AreEqual("ok://h/x?a=b", StandardOutputText);
     }
 
@@ -190,6 +225,7 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-o", "a", "-w", "%{url_effective}", "OK://H/a/../b");
 
+        Diagnostics.Diff("stdout", "ok://H/b", StandardOutputText);
         Assert.AreEqual("ok://H/b", StandardOutputText);
     }
 
@@ -206,6 +242,7 @@ public sealed class CurlCommandRunnerWriteOutTests
             null,
             "-s", "-o", "a", "--proto-default", "dict", "-w", "%{url_effective}", "ftp.localhost:1/");
 
+        Diagnostics.Diff("stdout", "dict://ftp.localhost:1/", StandardOutputText);
         Assert.AreEqual("dict://ftp.localhost:1/", StandardOutputText);
     }
 
@@ -214,7 +251,9 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         await RunOkAndFailingAsync(runsOnWindows: true, "-s", "-o", "a", "-w", "x%{nosuch}y", "ok://h/x");
 
+        Diagnostics.Diff("stdout", "xy", StandardOutputText);
         Assert.AreEqual("xy", StandardOutputText);
+        Diagnostics.Diff("stderr", "curl: unknown --write-out variable: 'nosuch'\r\n", StandardErrorText);
         Assert.AreEqual("curl: unknown --write-out variable: 'nosuch'\r\n", StandardErrorText);
     }
 
@@ -223,6 +262,7 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         await RunOkAndFailingAsync(runsOnWindows: false, "-s", "-o", "a", "-w", "A%output{o.txt}B", "ok://h/x");
 
+        Diagnostics.Diff("stdout", "AB", StandardOutputText);
         Assert.AreEqual("AB", StandardOutputText);
     }
 
@@ -230,6 +270,7 @@ public sealed class CurlCommandRunnerWriteOutTests
     public async Task RunAsync_OutputDirectiveWithAnOpener_WritesToTheOpenedFile()
     {
         MemoryOpener opener = new();
+        Diagnostics.Arrange("%output opener", "every file opens onto one memory stream");
 
         await RunAsync(
             new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("ok")]),
@@ -237,7 +278,10 @@ public sealed class CurlCommandRunnerWriteOutTests
             opener,
             "-s", "-o", "a", "-w", "A%output{o.txt}B", "ok://h/x");
 
+        Diagnostics.Diff("stdout", "A", StandardOutputText);
         Assert.AreEqual("A", StandardOutputText);
+        Diagnostics.Bytes("%output{o.txt} file", opener.Opened.ToArray());
+        Diagnostics.Diff("%output{o.txt} file", "B", Encoding.UTF8.GetString(opener.Opened.ToArray()));
         Assert.AreEqual("B", Encoding.UTF8.GetString(opener.Opened.ToArray()));
     }
 
@@ -259,18 +303,24 @@ public sealed class CurlCommandRunnerWriteOutTests
                 return TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination");
             }
         });
+        Diagnostics.Arrange("body length", bodyLength);
+        Diagnostics.Arrange("handler behaviour", "ok writes the body to standard output, which is closed; a write failure ends with exit 23");
 
-        int exitCode = await new CurlCommandRunner(
+        int exitCode = await RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([writing])),
                 outputFiles,
                 outputFiles,
                 closed,
                 standardError,
                 new MemoryStream(),
-                runsOnWindows: false)
-            .RunAsync(["-s", "-w", "A%{exitcode}%{stderr}B%{exitcode}\\n", "ok://h/x"]);
+                runsOnWindows: false),
+            ["-s", "-w", "A%{exitcode}%{stderr}B%{exitcode}\\n", "ok://h/x"],
+            runsOnWindows: false);
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stderr", "B23\n", StandardErrorText);
         Assert.AreEqual("B23\n", StandardErrorText);
     }
 
@@ -286,12 +336,16 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         // curl -s -e <referer> [-L] -w "%{referer}", /a -> /b -> /c (measured, BL-361 Notes).
         string[] responses = [.. RedirectResponses(redirects), "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"];
+        Diagnostics.Arrange("redirects before the 200", redirects);
 
         (int exitCode, ScriptedConnector server) = await RunHttpWithServerAsync(
             responses, "-s", "-e", referer, location, "-w", "%{referer}", "http://127.0.0.1:18361/a");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", expectedReferer, StandardOutputText);
         Assert.AreEqual(expectedReferer, StandardOutputText);
+        Diagnostics.Diff("Referer header of each request, joined by |", expectedSentReferers, string.Join('|', SentReferers(server)));
         Assert.AreEqual(expectedSentReferers, string.Join('|', SentReferers(server)));
     }
 
@@ -304,8 +358,11 @@ public sealed class CurlCommandRunnerWriteOutTests
         (int exitCode, ScriptedConnector server) = await RunHttpWithServerAsync(
             responses, "-s", "-e", ";auto", "-L", "-w", "%{referer}", "http://u:p@127.0.0.1:18361/a?q=1#f");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "http://127.0.0.1:18361/a?q=1", StandardOutputText);
         Assert.AreEqual("http://127.0.0.1:18361/a?q=1", StandardOutputText);
+        Diagnostics.Diff("Referer header of each request, joined by |", "|http://127.0.0.1:18361/a?q=1", string.Join('|', SentReferers(server)));
         Assert.AreEqual("|http://127.0.0.1:18361/a?q=1", string.Join('|', SentReferers(server)));
     }
 
@@ -325,10 +382,15 @@ public sealed class CurlCommandRunnerWriteOutTests
             runsOnWindows: false,
             timeProvider: new FixedUtcClock(new DateTimeOffset(2026, 9, 27, 12, 0, 0, TimeSpan.Zero)),
             writeOutTimeDialect: dialect);
+        Diagnostics.Arrange("write-out time dialect", dialect);
+        Diagnostics.Arrange("clock", "fixed at 2026-09-27T12:00:00Z, local time zone UTC");
 
-        int exitCode = await runner.RunAsync(["-s", "-o", "out.txt", "-w", "[%time{%F}]", "ok://h/x"]);
+        int exitCode = await RunWithDiagnosticsAsync(
+            runner, ["-s", "-o", "out.txt", "-w", "[%time{%F}]", "ok://h/x"], runsOnWindows: false);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", expected, StandardOutputText);
         Assert.AreEqual(expected, StandardOutputText);
     }
 
@@ -345,6 +407,7 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         ScriptedConnector server = new(responses.Select(Encoding.Latin1.GetBytes));
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        Diagnostics.Arrange("scripted HTTP responses (CRLF shown as LF)", Normalized(string.Join(" | ", responses)));
 
         int exitCode = await RunAsync(new ProtocolDispatcher([http]), runsOnWindows: false, null, arguments);
         return (exitCode, server);
@@ -354,6 +417,7 @@ public sealed class CurlCommandRunnerWriteOutTests
     {
         ScriptedConnector server = new(responses.Select(Encoding.Latin1.GetBytes));
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        Diagnostics.Arrange("scripted HTTP responses (CRLF shown as LF)", Normalized(string.Join(" | ", responses)));
 
         return RunAsync(new ProtocolDispatcher([http]), runsOnWindows, null, arguments);
     }
@@ -362,8 +426,12 @@ public sealed class CurlCommandRunnerWriteOutTests
     /// Runs <paramref name="arguments" /> with an <c>ok</c> scheme that writes the URL's path and
     /// succeeds, and a <c>fail</c> scheme that fails with exit 7.
     /// </summary>
-    private Task<int> RunOkAndFailingAsync(bool runsOnWindows, params string[] arguments) =>
-        RunAsync(
+    private Task<int> RunOkAndFailingAsync(bool runsOnWindows, params string[] arguments)
+    {
+        Diagnostics.Arrange("handler behaviour", "ok writes the URL's path and succeeds; fail fails with exit 7, Failed to connect");
+        Diagnostics.Arrange("unwritable paths", string.Join(", ", outputFiles.UnwritablePaths));
+
+        return RunAsync(
             new ProtocolDispatcher(
             [
                 RecordingProtocolHandler.WritingPath("ok"),
@@ -372,13 +440,17 @@ public sealed class CurlCommandRunnerWriteOutTests
             runsOnWindows,
             null,
             arguments);
+    }
+
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private Task<int> RunAsync(
         ProtocolDispatcher dispatcher,
         bool runsOnWindows,
         IWriteOutFileOpener? opener,
         params string[] arguments) =>
-        new CurlCommandRunner(
+        RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(dispatcher),
                 outputFiles,
                 outputFiles,
@@ -387,8 +459,26 @@ public sealed class CurlCommandRunnerWriteOutTests
                 new MemoryStream(),
                 runsOnWindows,
                 writeOutFileOpener: opener,
-                timeProvider: TimeProvider.System)
-            .RunAsync(arguments);
+                timeProvider: TimeProvider.System),
+            arguments,
+            runsOnWindows);
+
+    private async Task<int> RunWithDiagnosticsAsync(CurlCommandRunner runner, IReadOnlyList<string> arguments, bool runsOnWindows)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("runs on Windows", runsOnWindows);
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await runner.RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Act("stderr (CRLF shown as LF)", Normalized(StandardErrorText));
+        return exitCode;
+    }
 
     /// <summary>A clock stopped at one instant, in a UTC local time zone.</summary>
     private sealed class FixedUtcClock(DateTimeOffset now) : TimeProvider

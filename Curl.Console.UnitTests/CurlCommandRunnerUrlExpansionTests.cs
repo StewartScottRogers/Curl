@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -25,6 +26,10 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     private readonly Dictionary<string, string> environment = [];
     private readonly RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());
@@ -34,8 +39,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-w", "|%{url}|%{url_effective}|%{scheme}|%{urlnum}", "localhost:1/a"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("http handler URLs", "http://localhost:1/a", HandledUrls(http));
         Assert.AreEqual("http://localhost:1/a", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
+        DiffStandardOutput("/a|localhost:1/a|http://localhost:1/a|http|0");
         Assert.AreEqual("/a|localhost:1/a|http://localhost:1/a|http|0", StandardOutputText);
     }
 
@@ -46,7 +54,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-w", "|%{url}|%{url_effective}", url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        DiffStandardOutput("/|" + url + "|http://localhost:1/");
         Assert.AreEqual("/|" + url + "|http://localhost:1/", StandardOutputText);
     }
 
@@ -55,7 +65,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-w", "|%{url_effective}", "localhost:1?q"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        DiffStandardOutput("/|http://localhost:1/?q");
         Assert.AreEqual("/|http://localhost:1/?q", StandardOutputText);
     }
 
@@ -66,8 +78,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
 
         int exitCode = await RunAsync(["-w", "|%{url}|%{url_effective}|%{scheme}", "ftp.localhost:1/x"], ftp);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("ftp handler URL schemes", "ftp", string.Join(", ", ftp.Contexts.Select(context => context.Url.Scheme)));
         Assert.AreEqual("ftp", Assert.ContainsSingle(ftp.Contexts).Url.Scheme);
+        DiffStandardOutput("/x|ftp.localhost:1/x|ftp://ftp.localhost:1/x|ftp");
         Assert.AreEqual("/x|ftp.localhost:1/x|ftp://ftp.localhost:1/x|ftp", StandardOutputText);
     }
 
@@ -77,10 +92,15 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["-o", "#1.txt", "-w", "%{url}|%{urlnum}|%{xfer_id}|%{filename_effective}\\n", "http://h/[1-3]"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("1.txt", "/1", WrittenTextOrMissing("1.txt"));
         Assert.AreEqual("/1", WrittenText("1.txt"));
+        Diagnostics.Assert("2.txt", "/2", WrittenTextOrMissing("2.txt"));
         Assert.AreEqual("/2", WrittenText("2.txt"));
+        Diagnostics.Assert("3.txt", "/3", WrittenTextOrMissing("3.txt"));
         Assert.AreEqual("/3", WrittenText("3.txt"));
+        DiffStandardOutput("http://h/1|0|0|1.txt\nhttp://h/2|0|1|2.txt\nhttp://h/3|0|2|3.txt\n");
         Assert.AreEqual(
             "http://h/1|0|0|1.txt\nhttp://h/2|0|1|2.txt\nhttp://h/3|0|2|3.txt\n",
             StandardOutputText);
@@ -92,10 +112,15 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["-w", "%{urlnum}|%{xfer_id}|%{filename_effective}\\n", "-o", "o#1", "http://h/{a,b}.txt", "http://h/a.txt", "-o", "last"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("oa", "/a.txt", WrittenTextOrMissing("oa"));
         Assert.AreEqual("/a.txt", WrittenText("oa"));
+        Diagnostics.Assert("ob", "/b.txt", WrittenTextOrMissing("ob"));
         Assert.AreEqual("/b.txt", WrittenText("ob"));
+        Diagnostics.Assert("last", "/a.txt", WrittenTextOrMissing("last"));
         Assert.AreEqual("/a.txt", WrittenText("last"));
+        DiffStandardOutput("0|0|oa\n0|1|ob\n1|2|last\n");
         Assert.AreEqual("0|0|oa\n0|1|ob\n1|2|last\n", StandardOutputText);
     }
 
@@ -104,8 +129,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-O", "http://h/{a,b}.txt"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("a.txt", "/a.txt", WrittenTextOrMissing("a.txt"));
         Assert.AreEqual("/a.txt", WrittenText("a.txt"));
+        Diagnostics.Assert("b.txt", "/b.txt", WrittenTextOrMissing("b.txt"));
         Assert.AreEqual("/b.txt", WrittenText("b.txt"));
     }
 
@@ -117,11 +145,15 @@ public sealed class CurlCommandRunnerUrlExpansionTests
             context => ValueTask.FromResult(context.Url.AbsolutePath == "/nope"
                 ? TransferResult.Failure(CurlExitCode.CouldntConnect, "refused")
                 : TransferResult.Success(0)));
+        Diagnostics.Arrange("handler behaviour", "http fails /nope with exit 7, refused; succeeds with 0 bytes otherwise");
 
         int exitCode = await RunAsync(["-sS", "-w", "%{url}|%{exitcode}\\n", "http://h/{nope,a}"], failing);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        DiffStandardError("curl: (7) refused" + NewLine);
         Assert.AreEqual("curl: (7) refused" + NewLine, StandardErrorText);
+        DiffStandardOutput("http://h/nope|7\nhttp://h/a|0\n");
         Assert.AreEqual("http://h/nope|7\nhttp://h/a|0\n", StandardOutputText);
     }
 
@@ -130,13 +162,20 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-sS", "-w", "%{url}\\n", "http://127.0.0.1:1/[3-1]", "http://127.0.0.1:1/y"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        DiffStandardError(
+            "curl: (3) bad range in position 25:" + NewLine
+            + "http://127.0.0.1:1/[3-1]" + NewLine
+            + new string(' ', 24) + "^" + NewLine);
         Assert.AreEqual(
             "curl: (3) bad range in position 25:" + NewLine
             + "http://127.0.0.1:1/[3-1]" + NewLine
             + new string(' ', 24) + "^" + NewLine,
             StandardErrorText);
+        Diagnostics.Assert("http handler call count", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
+        DiffStandardOutput(string.Empty);
         Assert.AreEqual(string.Empty, StandardOutputText);
     }
 
@@ -145,9 +184,16 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-sS", "-w", "%{url}|%{exitcode}\\n", "http://127.0.0.1:1/y", "http://127.0.0.1:1/[3-1]"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        Diagnostics.Assert("http handler call count", 1, http.Contexts.Count);
         Assert.ContainsSingle(http.Contexts);
+        DiffStandardOutput("/yhttp://127.0.0.1:1/y|0\n");
         Assert.AreEqual("/yhttp://127.0.0.1:1/y|0\n", StandardOutputText);
+        Diagnostics.Assert(
+            "stderr starts with the bad range line",
+            true,
+            StandardErrorText.StartsWith("curl: (3) bad range in position 25:", StringComparison.Ordinal));
         Assert.StartsWith("curl: (3) bad range in position 25:", StandardErrorText);
     }
 
@@ -156,7 +202,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-s", "http://127.0.0.1:1/[3-1]"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        DiffStandardError(string.Empty);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
@@ -165,8 +213,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-g", "-o", "q?x#1", "http://h/a"], runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("http handler call count", 1, http.Contexts.Count);
         Assert.ContainsSingle(http.Contexts);
+        Diagnostics.Assert("q?x#1", "/a", WrittenTextOrMissing("q?x#1"));
         Assert.AreEqual("/a", WrittenText("q?x#1"));
     }
 
@@ -175,8 +226,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["http://h/hello[<test>7-8]", "-o", "dump-#<test>"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("dump-7", "/hello7", WrittenTextOrMissing("dump-7"));
         Assert.AreEqual("/hello7", WrittenText("dump-7"));
+        Diagnostics.Assert("dump-8", "/hello8", WrittenTextOrMissing("dump-8"));
         Assert.AreEqual("/hello8", WrittenText("dump-8"));
     }
 
@@ -185,9 +239,16 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["http://h/{<test>A,B}{<moo>C,D}", "-o", "somewhere/#<foo>"]);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.BadFunctionArgument, exitCode);
         Assert.AreEqual((int)CurlExitCode.BadFunctionArgument, exitCode);
+        Diagnostics.Assert("http handler call count", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
+        Diagnostics.Assert("written files", string.Empty, string.Join(", ", fileSystem.Written.Keys));
         Assert.IsEmpty(fileSystem.Written);
+        DiffStandardError(
+            "curl: (43) no glob exists with this name in position 16:" + NewLine
+                + "somewhere/#<foo>" + NewLine
+                + "               ^" + NewLine);
         Assert.AreEqual(
             "curl: (43) no glob exists with this name in position 16:" + NewLine
                 + "somewhere/#<foo>" + NewLine
@@ -200,11 +261,15 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         fileSystem.ExistingContent["a"] = Encoding.ASCII.GetBytes("A");
         fileSystem.ExistingContent["b"] = Encoding.ASCII.GetBytes("B");
+        Diagnostics.Arrange("existing files", "a holds A, b holds B");
 
         int exitCode = await RunAsync(["-T", "{<f>a,b}", "-o", "up-#<f>", "http://h/g/"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("up-a", "/g/a", WrittenTextOrMissing("up-a"));
         Assert.AreEqual("/g/a", WrittenText("up-a"));
+        Diagnostics.Assert("up-b", "/g/b", WrittenTextOrMissing("up-b"));
         Assert.AreEqual("/g/b", WrittenText("up-b"));
     }
 
@@ -213,7 +278,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-o", "q?y", "http://h/a"], runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("q_y", "/a", WrittenTextOrMissing("q_y"));
         Assert.AreEqual("/a", WrittenText("q_y"));
     }
 
@@ -222,7 +289,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-D", "hd.txt", "http://h/{a,b}"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("write modes", "Truncate, Append", string.Join(", ", fileSystem.WriteModes));
         CollectionAssert.AreEqual(new[] { FileWriteMode.Truncate, FileWriteMode.Append }, fileSystem.WriteModes);
     }
 
@@ -232,10 +301,18 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["--ipfs-gateway", "http://127.0.0.1:1", "-w", "|%{url}|%{url_effective}|%{urlnum}\\n", "ipfs://bafy{a,b}/x"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert(
+            "http handler URLs",
+            "http://127.0.0.1:1/ipfs/bafya/x, http://127.0.0.1:1/ipfs/bafyb/x",
+            HandledUrls(http));
         CollectionAssert.AreEqual(
             new[] { "http://127.0.0.1:1/ipfs/bafya/x", "http://127.0.0.1:1/ipfs/bafyb/x" },
             http.Contexts.Select(context => context.Url.OriginalString).ToArray());
+        DiffStandardOutput(
+            "/ipfs/bafya/x|http://127.0.0.1:1/ipfs/bafya/x|http://127.0.0.1:1/ipfs/bafya/x|0\n"
+            + "/ipfs/bafyb/x|http://127.0.0.1:1/ipfs/bafyb/x|http://127.0.0.1:1/ipfs/bafyb/x|0\n");
         Assert.AreEqual(
             "/ipfs/bafya/x|http://127.0.0.1:1/ipfs/bafya/x|http://127.0.0.1:1/ipfs/bafya/x|0\n"
             + "/ipfs/bafyb/x|http://127.0.0.1:1/ipfs/bafyb/x|http://127.0.0.1:1/ipfs/bafyb/x|0\n",
@@ -247,7 +324,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["--ipfs-gateway", "127.0.0.1:1", "-w", "|%{url}", "ipfs://bafyabc"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        DiffStandardOutput("/ipfs/bafyabc|http://127.0.0.1:1/ipfs/bafyabc");
         Assert.AreEqual("/ipfs/bafyabc|http://127.0.0.1:1/ipfs/bafyabc", StandardOutputText);
     }
 
@@ -258,7 +337,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
 
         int exitCode = await RunAsync(["ipns://name/p"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("http handler URLs", "http://gw:8080/ipns/name/p", HandledUrls(http));
         Assert.AreEqual("http://gw:8080/ipns/name/p", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
     }
 
@@ -270,7 +351,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
 
         int exitCode = await RunAsync(["ipfs://cid"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("http handler URLs", "http://gw:1/ipfs/cid", HandledUrls(http));
         Assert.AreEqual("http://gw:1/ipfs/cid", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
     }
 
@@ -282,17 +365,25 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["-s", "-o", "x.out", "-w", "[%{errormsg}|%{url}|%{url_effective}|%{urlnum}|%{xfer_id}|%{conn_id}|%{scheme}|%{filename_effective}|%{exitcode}]\\n", "ipfs://bafyabc", "http://h/z"]);
 
+        Diagnostics.Assert("exit code", 37, exitCode);
         Assert.AreEqual(37, exitCode);
+        DiffStandardError("curl: IPFS automatic gateway detection failed" + NewLine + TryHelpLine);
         Assert.AreEqual("curl: IPFS automatic gateway detection failed" + NewLine + TryHelpLine, StandardErrorText);
+        DiffStandardOutput("[Could not read a file:// file|ipfs://bafyabc||0|-1|-1||x.out|37]\n");
         Assert.AreEqual("[Could not read a file:// file|ipfs://bafyabc||0|-1|-1||x.out|37]\n", StandardOutputText);
+        Diagnostics.Assert("http handler call count", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
+        Diagnostics.Assert("data file paths read", "/home/u/.ipfs/gateway", string.Join(", ", dataFiles.PathsRead));
         CollectionAssert.AreEqual(new[] { "/home/u/.ipfs/gateway" }, dataFiles.PathsRead);
     }
 
     [TestMethod]
     public async Task RunAsync_IpfsWithARunnerGivenNoEnvironment_ReadsNoVariableAndNoFile()
     {
-        int exitCode = await new CurlCommandRunner(
+        Diagnostics.Arrange("runner environment", "none given");
+
+        int exitCode = await RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([http])),
                 fileSystem,
                 fileSystem,
@@ -300,11 +391,16 @@ public sealed class CurlCommandRunnerUrlExpansionTests
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: false,
-                configFileReader: dataFiles)
-            .RunAsync(["ipfs://bafyabc"]);
+                configFileReader: dataFiles),
+            ["ipfs://bafyabc"],
+            http,
+            runsOnWindows: false);
 
+        Diagnostics.Assert("exit code", 37, exitCode);
         Assert.AreEqual(37, exitCode);
+        Diagnostics.Assert("data file paths read", string.Empty, string.Join(", ", dataFiles.PathsRead));
         Assert.IsEmpty(dataFiles.PathsRead);
+        Diagnostics.Assert("http handler call count", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
     }
 
@@ -315,7 +411,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
             ["-s", "-w", "[%{filename_effective}]\\n", "--output-dir", "sub", "-o", "x#1?.out", "ipfs://bafy{a,b}"],
             runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 37, exitCode);
         Assert.AreEqual(37, exitCode);
+        DiffStandardOutput("[sub/xa_.out]\r\n");
         Assert.AreEqual("[sub/xa_.out]\r\n", StandardOutputText);
     }
 
@@ -324,7 +422,9 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["-s", "-w", "[x]\\n", "ipfs://bafyabc"], runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 37, exitCode);
         Assert.AreEqual(37, exitCode);
+        DiffStandardOutput("[x]\n");
         Assert.AreEqual("[x]\n", StandardOutputText);
     }
 
@@ -334,8 +434,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["-sS", "--ipfs-gateway", "http://h:1/?q", "-w", "[%{url}|%{url_effective}|%{errormsg}|%{exitcode}]\\n", "ipfs://bafyabc"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        DiffStandardError("curl: malformed target URL" + NewLine + TryHelpLine);
         Assert.AreEqual("curl: malformed target URL" + NewLine + TryHelpLine, StandardErrorText);
+        DiffStandardOutput("[ipfs://bafyabc||URL using bad/illegal format or missing URL|3]\n");
         Assert.AreEqual("[ipfs://bafyabc||URL using bad/illegal format or missing URL|3]\n", StandardOutputText);
     }
 
@@ -345,8 +448,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["-s", "-w", "[%{errormsg}] [%{exitcode}]\\n", "--ipfs-gateway", ":::", "ipfs://cid/x"]);
 
+        Diagnostics.Assert("exit code", 43, exitCode);
         Assert.AreEqual(43, exitCode);
+        DiffStandardError("curl: --ipfs-gateway was given a malformed URL" + NewLine + TryHelpLine);
         Assert.AreEqual("curl: --ipfs-gateway was given a malformed URL" + NewLine + TryHelpLine, StandardErrorText);
+        DiffStandardOutput("[A libcurl function was given a bad argument] [43]\n");
         Assert.AreEqual("[A libcurl function was given a bad argument] [43]\n", StandardOutputText);
     }
 
@@ -364,14 +470,22 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             [remoteNameOption, url, "-w", "[%{filename_effective}|%{exitcode}|%{errormsg}|%{url}|%{url_effective}|%{xfer_id}|%{conn_id}|%{http_code}]\\n"]);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
         Assert.AreEqual(1, exitCode);
+        DiffStandardError(
+            "curl: Failed to extract a filename from the URL to use for storage" + NewLine
+            + "curl: (1) Unsupported protocol" + NewLine);
         Assert.AreEqual(
             "curl: Failed to extract a filename from the URL to use for storage" + NewLine
             + "curl: (1) Unsupported protocol" + NewLine,
             StandardErrorText);
+        DiffStandardOutput("[|1|Unsupported protocol|" + url + "||-1|-1|000]\n");
         Assert.AreEqual("[|1|Unsupported protocol|" + url + "||-1|-1|000]\n", StandardOutputText);
+        Diagnostics.Assert("data file paths read", string.Empty, string.Join(", ", dataFiles.PathsRead));
         Assert.IsEmpty(dataFiles.PathsRead);
+        Diagnostics.Assert("http handler call count", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
+        Diagnostics.Assert("written files", string.Empty, string.Join(", ", fileSystem.Written.Keys));
         Assert.IsEmpty(fileSystem.Written);
     }
 
@@ -381,12 +495,18 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["--ipfs-gateway", "http://127.0.0.1:9/", "-O", "ipfs://bafyabc/n.txt", "-w", "[%{url}|%{url_effective}|%{exitcode}]\\n"]);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
         Assert.AreEqual(1, exitCode);
+        DiffStandardError(
+            "curl: Failed to extract a filename from the URL to use for storage" + NewLine
+            + "curl: (1) Unsupported protocol" + NewLine);
         Assert.AreEqual(
             "curl: Failed to extract a filename from the URL to use for storage" + NewLine
             + "curl: (1) Unsupported protocol" + NewLine,
             StandardErrorText);
+        DiffStandardOutput("[ipfs://bafyabc/n.txt||1]\n");
         Assert.AreEqual("[ipfs://bafyabc/n.txt||1]\n", StandardOutputText);
+        Diagnostics.Assert("http handler call count", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
     }
 
@@ -399,8 +519,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync([silentOption, "-O", "ipfs://bafyabc/n.txt", "-w", "[%{exitcode}]"]);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
         Assert.AreEqual(1, exitCode);
+        DiffStandardError(expectedStandardError.Replace("\n", NewLine, StringComparison.Ordinal));
         Assert.AreEqual(expectedStandardError.Replace("\n", NewLine, StringComparison.Ordinal), StandardErrorText);
+        DiffStandardOutput("[1]");
         Assert.AreEqual("[1]", StandardOutputText);
     }
 
@@ -410,8 +533,11 @@ public sealed class CurlCommandRunnerUrlExpansionTests
         int exitCode = await RunAsync(
             ["-s", "-o", "y", "http://h/a", "-O", "ipfs://bafyabc/n.txt", "-o", "z", "http://h/b", "-w", "[%{filename_effective}|%{exitcode}|%{urlnum}|%{xfer_id}]\\n"]);
 
+        Diagnostics.Assert("exit code", 1, exitCode);
         Assert.AreEqual(1, exitCode);
+        Diagnostics.Assert("http handler URLs", "http://h/a", HandledUrls(http));
         Assert.AreEqual("http://h/a", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
+        DiffStandardOutput("[y|0|0|0]\n[|1|1|-1]\n");
         Assert.AreEqual("[y|0|0|0]\n[|1|1|-1]\n", StandardOutputText);
     }
 
@@ -420,14 +546,19 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     {
         int exitCode = await RunAsync(["--ipfs-gateway", "http://gw:1", "-o", "x.out", "ipfs://bafyabc/n.txt"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("http handler URLs", "http://gw:1/ipfs/bafyabc/n.txt", HandledUrls(http));
         Assert.AreEqual("http://gw:1/ipfs/bafyabc/n.txt", Assert.ContainsSingle(http.Contexts).Url.OriginalString);
     }
 
     [TestMethod]
     public async Task RunAsync_IpfsUrlOnARunnerWithoutAnEnvironment_TakesTheGatewayOption()
     {
-        int exitCode = await new CurlCommandRunner(
+        Diagnostics.Arrange("runner environment", "none given");
+
+        int exitCode = await RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([http])),
                 fileSystem,
                 fileSystem,
@@ -436,22 +567,50 @@ public sealed class CurlCommandRunnerUrlExpansionTests
                 new MemoryStream(),
                 runsOnWindows: false,
                 outputPaths: fileSystem,
-                configFileReader: dataFiles)
-            .RunAsync(["--ipfs-gateway", "http://gw:1", "ipfs://bafyabc/n.txt", "ipfs://bafydef/m.txt"]);
+                configFileReader: dataFiles),
+            ["--ipfs-gateway", "http://gw:1", "ipfs://bafyabc/n.txt", "ipfs://bafydef/m.txt"],
+            http,
+            runsOnWindows: false);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert(
+            "http handler URLs",
+            "http://gw:1/ipfs/bafyabc/n.txt, http://gw:1/ipfs/bafydef/m.txt",
+            HandledUrls(http));
         CollectionAssert.AreEqual(
             new[] { "http://gw:1/ipfs/bafyabc/n.txt", "http://gw:1/ipfs/bafydef/m.txt" },
             http.Contexts.Select(context => context.Url.OriginalString).ToArray());
     }
 
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private static string HandledUrls(RecordingProtocolHandler handler) =>
+        string.Join(", ", handler.Contexts.Select(context => context.Url.OriginalString));
+
     private string WrittenText(string path) => Encoding.ASCII.GetString(fileSystem.Written[path].ToArray());
+
+    private string WrittenTextOrMissing(string path) =>
+        fileSystem.Written.TryGetValue(path, out MemoryStream? written)
+            ? Encoding.ASCII.GetString(written.ToArray())
+            : "(not written)";
+
+    /// <summary>
+    /// Writes a byte DIFF of standard output against <paramref name="expected" />, as bytes so a
+    /// carriage return the runner writes stays visible.
+    /// </summary>
+    private void DiffStandardOutput(string expected) =>
+        Diagnostics.Diff("stdout", Encoding.ASCII.GetBytes(expected), standardOutput.ToArray());
+
+    private void DiffStandardError(string expected) =>
+        Diagnostics.Diff("stderr", Normalized(expected), Normalized(StandardErrorText));
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, bool runsOnWindows = false) =>
         RunAsync(arguments, http, runsOnWindows);
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, bool runsOnWindows = false) =>
-        new CurlCommandRunner(
+        RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([handler])),
                 fileSystem,
                 fileSystem,
@@ -461,6 +620,34 @@ public sealed class CurlCommandRunnerUrlExpansionTests
                 runsOnWindows,
                 outputPaths: fileSystem,
                 configFileReader: dataFiles,
-                readEnvironmentVariable: name => environment.GetValueOrDefault(name))
-            .RunAsync(arguments);
+                readEnvironmentVariable: name => environment.GetValueOrDefault(name)),
+            arguments,
+            handler,
+            runsOnWindows);
+
+    private async Task<int> RunWithDiagnosticsAsync(
+        CurlCommandRunner runner,
+        IReadOnlyList<string> arguments,
+        IProtocolHandler handler,
+        bool runsOnWindows)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("runs on Windows", runsOnWindows);
+        Diagnostics.Arrange("handler schemes", string.Join('/', handler.SupportedSchemes));
+        Diagnostics.Arrange(
+            "environment",
+            string.Join(", ", environment.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key + "=" + pair.Value)));
+        Diagnostics.Arrange("data files", string.Join(", ", dataFiles.Files.Keys.Order(StringComparer.Ordinal)));
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await runner.RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Act("stderr", Normalized(StandardErrorText));
+        return exitCode;
+    }
 }
