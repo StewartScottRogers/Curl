@@ -19,10 +19,13 @@
       unreliable   an auditor that ran and missed a defect planted for it, returned no parseable
                    report block, or is named in -ChangedTree (it changed the audited tree).
       counts       New Critical..Low: finding files whose scorecard is this one, by severity.
-                   Re-audited: the report's reaudits entries. Closed: findings closed-by this
-                   scorecard. Still open: that auditor's open (proposed, accepted, deferred or blocked) findings.
+                   Re-audited: the report's reaudits entries. Closed: findings whose closed-by ends
+                   with this scorecard. Still open: that auditor's open (proposed, accepted, deferred or blocked) findings.
       metrics      the performance and process tables come from those auditors' report
                    metrics; a number from an unreliable auditor is followed by " (unreliable)".
+      attention    at the top: each accepted finding still open after more than 3 audits that ran
+                   its auditor since it was accepted (stuck), and each auditor this audit did not
+                   run that has accepted findings, which went un-re-audited (ADR-0422).
       change       deltas against the newest earlier scorecard in -ScorecardsDirectory, parsed
                    back from its tables; "first scorecard" and "-" deltas when there is none.
 
@@ -175,9 +178,54 @@ function Read-Findings([string]$Directory) {
         if ($text -match '(?s)^---\r?\n(.*?)\r?\n---') {
             foreach ($line in ($Matches[1] -split '\r?\n')) { if ($line -match '^([a-z-]+):\s?(.*)$') { $fields[$Matches[1]] = $Matches[2].Trim() } }
         }
-        $all += [pscustomobject]@{ Name = $file.Name; Id = $fields['id']; Title = $fields['title']; Auditor = $fields['auditor']; Severity = $fields['severity']; Status = $fields['status']; Scorecard = $fields['scorecard']; ClosedBy = $fields['closed-by'] }
+        # closed-by names two scorecards when two consecutive re-audits closed it (ADR-0422); the
+        # last is the audit that closed it.
+        $closedBy = @("$($fields['closed-by'])" -split ',\s*')[-1]
+        $accepted = if ($text -match '(?m)^- (\d{4}-\d\d-\d\d): \S+ -> accepted\b') { $Matches[1] } else { '' }
+        $all += [pscustomobject]@{ Name = $file.Name; Id = $fields['id']; Title = $fields['title']; Auditor = $fields['auditor']; Severity = $fields['severity']; Status = $fields['status']; Scorecard = $fields['scorecard']; ClosedBy = $closedBy; Accepted = $accepted; Task = "$($fields['task'])" }
     }
     return $all
+}
+
+# ------------------------------------------------------------------ attention (ADR-0422)
+
+function Test-AuditorRanIn([string]$Path, [string]$Auditor) {
+    # Whether an earlier scorecard's auditor row shows the auditor ran (its Model cell is not "not run").
+    foreach ($line in [IO.File]::ReadAllLines($Path)) {
+        if ($line -match "^\| $Auditor \| ([^|]+) \|") { return $Matches[1].Trim() -ne 'not run' }
+    }
+    return $false
+}
+
+function Get-AuditsSinceAccepted($Finding, [string]$ScorecardName, $State) {
+    # The audits that ran the finding's auditor after it was accepted: earlier scorecards in
+    # -ScorecardsDirectory, then this one, each later than the scorecard that found it.
+    $count = 0
+    $names = @(Get-ChildItem -LiteralPath $ScorecardsDirectory -Filter '????-??-??_????.md' -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne $ScorecardName } | Sort-Object Name)
+    foreach ($s in $names) {
+        if ($s.Name -le $Finding.Scorecard -or $s.Name.Substring(0, 10) -lt $Finding.Accepted) { continue }
+        if (Test-AuditorRanIn $s.FullName $Finding.Auditor) { $count++ }
+    }
+    if ($ScorecardName -gt $Finding.Scorecard -and $ScorecardName.Substring(0, 10) -ge $Finding.Accepted -and $State.Auditors[$Finding.Auditor].Ran) { $count++ }
+    return $count
+}
+
+function Get-AttentionLines([object[]]$Findings, [string]$ScorecardName, $State) {
+    # What Stewart should look at first: accepted findings still open after more than 3 audits that
+    # ran their auditor (stuck), and auditors this audit did not run that have accepted findings
+    # left un-re-audited.
+    $lines = @()
+    foreach ($f in @($Findings | Where-Object { $_.Status -eq 'accepted' -and $_.Accepted } | Sort-Object Id)) {
+        $audits = Get-AuditsSinceAccepted $f $ScorecardName $State
+        if ($audits -gt 3) { $lines += "- Stuck: [$($f.Id)](../Findings/$($f.Name)) - $($f.Auditor) - accepted and still open after $audits audits that ran its auditor; task $($f.Task). Stewart may close it (closed-how: stewart) or have it re-fixed. $($f.Title)" }
+    }
+    foreach ($a in $Auditors) {
+        if ($State.Auditors[$a].Ran) { continue }
+        $waiting = @($Findings | Where-Object { $_.Auditor -eq $a -and $_.Status -eq 'accepted' } | Sort-Object Id | ForEach-Object { $_.Id })
+        if ($waiting.Count) { $lines += "- Not run: $a has $($waiting.Count) accepted findings this audit did not re-audit: $($waiting -join ', ')." }
+    }
+    if (-not $lines.Count) { return 'None.' }
+    return ($lines -join "`n")
 }
 
 # The counts each auditor reports in metrics to show it ran every step of its method
@@ -328,7 +376,8 @@ function Write-Scorecard($State, [string]$FingerprintValue) {
         $replace["DELTA_$k"] = $delta
     }
     $newFindings = @(Read-Findings $FindingsDirectory | Where-Object { $_.Scorecard -eq $name } | Sort-Object Id)
-    $replace['NEW_FINDING_LINKS'] = if ($newFindings.Count) { ($newFindings | ForEach-Object { "- [$($_.Id)](../Findings/$($_.Name)) - $($_.Severity) - $($_.Auditor) - $($_.Title)" }) -join "`n" } else { 'None.' }
+    $replace['ATTENTION'] = Get-AttentionLines @(Read-Findings $FindingsDirectory) $name $State
+    $replace['NEW_FINDING_LINKS'] =if ($newFindings.Count) { ($newFindings | ForEach-Object { "- [$($_.Id)](../Findings/$($_.Name)) - $($_.Severity) - $($_.Auditor) - $($_.Title)" }) -join "`n" } else { 'None.' }
 
     $text = [regex]::Replace($text, '\{\{([A-Z0-9_]+)\}\}', { param($m) $k = $m.Groups[1].Value; if ($replace.Contains($k)) { $replace[$k] } else { $m.Value } })
     $path = Join-Path $ScorecardsDirectory $name
@@ -349,6 +398,11 @@ if ($SelfTest) {
         $Branch = 'master'; $Commit = 'abc1234'; $CostUsd = 12.4
         # The previous scorecard, from the previous reports, then this audit's.
         $ScorecardsDirectory = Join-Path $work 'a'
+        # Three earlier audits after AF-0004 was accepted; the process auditor ran in two (ADR-0422).
+        New-Item -ItemType Directory -Force $ScorecardsDirectory | Out-Null
+        foreach ($early in @(@('2026-09-02_0900.md', 'sonnet'), @('2026-09-03_0900.md', 'not run'), @('2026-09-04_0900.md', 'sonnet'))) {
+            [IO.File]::WriteAllText((Join-Path $ScorecardsDirectory $early[0]), "# Audit scorecard`n`n| process | $($early[1]) | 0 |`n")
+        }
         $ReportDirectory = Join-Path $fixture 'previous'
         $Started = [datetime]'2026-10-07T09:00'; $Finished = [datetime]'2026-10-07T10:30'
         $null = Write-Scorecard (Get-AuditState) 'fp-old'
@@ -372,7 +426,7 @@ if ($SelfTest) {
         $second = Write-Scorecard (Get-AuditState) 'fp-new'
         $text = [IO.File]::ReadAllText($first)
         $sections = @([regex]::Matches($text, '(?m)^## (.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() }) -join '|'
-        Check 'sections in the template''s order' ($sections -eq 'Auditors|Performance|Process|Change since the previous scorecard|New findings') $sections
+        Check 'sections in the template''s order' ($sections -eq 'Attention|Auditors|Performance|Process|Change since the previous scorecard|New findings') $sections
         Check 'no placeholder left' ($text -notmatch '\{\{') 'none'
         Check 'the fingerprint is in the header' ($text -match '\| Auditor fingerprint \| fp-new \|') 'fp-new'
         Check 'previous scorecard and fingerprint change' ($text -match '\| Previous scorecard \| \[2026-10-07_0900\]\(2026-10-07_0900\.md\) \|' -and $text -match '\| Auditor fingerprint \| changed \|') 'linked, changed'
@@ -390,6 +444,17 @@ if ($SelfTest) {
         $report2 = [pscustomobject]@{ key = 'process:logs:BL-1289:redone-work'; title = 'BL-1289 was claimed 6 times (134 minutes) before reaching Done'; location = 'logs/BL-1289-20261002-211047-L1.jsonl:1'; evidence = 'six claims' }
         $other = [pscustomobject]@{ key = 'process:logs:BL-1300:redone-work'; title = 'BL-1300 claimed 3 times'; location = 'logs/DarkFactory-20261001-120001-L9.log'; evidence = 'three claims' }
         Check 'a process report naming a planted log defect''s catch text is a catch, whatever file it cites' ((Test-Caught $plant1 ([pscustomobject]@{ findings = @($report1) })) -and (Test-Caught $plant2 ([pscustomobject]@{ findings = @($report2) })) -and -not (Test-Caught $plant1 ([pscustomobject]@{ findings = @($other) }))) 'both PD-501 reports; not another task'
+        Check 'an accepted finding open after more than 3 audits of its auditor is listed as stuck, at the top' ($text -match '(?s)## Attention\r?\n\r?\n- Stuck: \[AF-0004\]\(\.\./Findings/AF-0004-stuck\.md\) - process - accepted and still open after 4 audits that ran its auditor; task BL-1\..*## Auditors') 'AF-0004, 4 audits'
+        $previousText = [IO.File]::ReadAllText((Join-Path $work 'b\2026-10-07_0900.md'))
+        Check 'three audits are not yet stuck' ($previousText -match '(?s)## Attention\r?\n\r?\nNone\.') 'None.'
+        $notRun = [pscustomobject]@{ Auditors = @{ quality = [pscustomobject]@{ Ran = $false }; security = [pscustomobject]@{ Ran = $true }; performance = [pscustomobject]@{ Ran = $true }; conformance = [pscustomobject]@{ Ran = $true }; truthfulness = [pscustomobject]@{ Ran = $true }; process = [pscustomobject]@{ Ran = $true } } }
+        $accepted = @([pscustomobject]@{ Id = 'AF-0009'; Auditor = 'quality'; Status = 'accepted'; Accepted = ''; Name = 'AF-0009-x.md' }, [pscustomobject]@{ Id = 'AF-0010'; Auditor = 'quality'; Status = 'proposed'; Accepted = ''; Name = 'AF-0010-x.md' })
+        $attention = Get-AttentionLines $accepted '2026-10-14_0930.md' $notRun
+        Check 'an auditor left out with accepted findings is named' ($attention -eq '- Not run: quality has 1 accepted findings this audit did not re-audit: AF-0009.') $attention
+        $consecutive = Join-Path $work 'consecutive'
+        New-Item -ItemType Directory -Force $consecutive | Out-Null
+        [IO.File]::WriteAllText((Join-Path $consecutive 'AF-0001-x.md'), "---`nid: AF-0001`nstatus: closed`nclosed-by: 2026-10-07_0844.md, 2026-10-14_0930.md`n---`n")
+        Check 'a finding closed by two consecutive re-audits counts for the last' ((@(Read-Findings $consecutive)[0].ClosedBy) -eq '2026-10-14_0930.md') 'closed-by last'
         Check 'two runs give the same bytes' ([IO.File]::ReadAllText($second) -ceq $text) (Split-Path $second -Leaf)
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue }

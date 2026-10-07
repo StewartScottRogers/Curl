@@ -10,6 +10,10 @@
 | Duration | {{DURATION_MINUTES}} minutes |
 | Token cost | {{AUDIT_COST_USD}} USD |
 
+## Attention
+
+{{ATTENTION}}
+
 ## Auditors
 
 | Auditor | Model | New Critical | New High | New Medium | New Low | Re-audited | Closed | Still open | Planted assigned | Planted caught | Catch rate | Reliable |
