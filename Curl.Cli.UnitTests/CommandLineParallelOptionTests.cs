@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -14,17 +16,24 @@ public sealed class CommandLineParallelOptionTests
 
     private const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted, result.IsAccepted ? string.Empty : result.Refusal.StandardErrorLines[0]);
         return result.Options;
     }
 
-    private static void AssertRefused(string expectedLine, params string[] arguments)
+    private void AssertRefused(string expectedLine, params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("first stderr line", expectedLine, CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines[0]);
         Assert.IsFalse(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { expectedLine, TryHelpLine }, result.Refusal.StandardErrorLines.ToArray());
     }
@@ -138,9 +147,10 @@ public sealed class CommandLineParallelOptionTests
     [TestMethod]
     public void Parse_ParallelOptionsAfterNext_ApplyToEveryGroup()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             [Url, "--next", "-Z", "--parallel-immediate", "--parallel-max", "4", "--parallel-max-host", "2", Url]);
 
+        Diagnostics.Assert("groups", 2, result.Groups.Count);
         Assert.IsTrue(result.IsAccepted);
         Assert.HasCount(2, result.Groups);
         foreach (CommandLineOptions group in result.Groups)
@@ -150,5 +160,20 @@ public sealed class CommandLineParallelOptionTests
             Assert.AreEqual(4, group.ParallelMax);
             Assert.AreEqual(2, group.ParallelMaxHost);
         }
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        foreach (CommandLineOptions group in result.Groups)
+        {
+            Diagnostics.Act(
+                "group",
+                $"parallel {group.Parallel}, parallel immediate {group.ParallelImmediate}, parallel max {group.ParallelMax}, parallel max host {group.ParallelMaxHost}, silent {group.Silent}");
+        }
+
+        return result;
     }
 }

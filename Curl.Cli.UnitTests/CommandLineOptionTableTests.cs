@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -11,22 +13,32 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class CommandLineOptionTableTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Rows_LongNames_AreUnique()
     {
+        Diagnostics.Arrange("table", "CommandLineOptionTable.Rows");
         string[] longNames = CommandLineOptionTable.Rows.Select(option => option.LongName).ToArray();
+        Diagnostics.Act("long names", longNames.Length);
 
+        Diagnostics.Assert("distinct long names", longNames.Length, longNames.Distinct(StringComparer.Ordinal).Count());
         CollectionAssert.AllItemsAreUnique(longNames);
     }
 
     [TestMethod]
     public void Rows_ShortNames_AreUnique()
     {
+        Diagnostics.Arrange("table", "CommandLineOptionTable.Rows");
         char[] shortNames = CommandLineOptionTable.Rows
             .Where(option => option.ShortName.HasValue)
             .Select(option => option.ShortName!.Value)
             .ToArray();
+        Diagnostics.Act("short names", new string(shortNames));
 
+        Diagnostics.Assert("distinct short names", shortNames.Length, shortNames.Distinct().Count());
         CollectionAssert.AllItemsAreUnique(shortNames);
     }
 
@@ -75,8 +87,13 @@ public sealed class CommandLineOptionTableTests
     [DataRow("junk-session-cookies", 'j', false)]
     public void Rows_FirstTableOption_HasItsShortNameAndArity(string longName, char? shortName, bool takesValue)
     {
+        Diagnostics.Arrange("long name", longName);
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);
+        Diagnostics.Act("short name", option.ShortName);
+        Diagnostics.Act("takes value", option.TakesValue);
 
+        Diagnostics.Assert("short name", shortName, option.ShortName);
+        Diagnostics.Assert("takes value", takesValue, option.TakesValue);
         Assert.AreEqual(shortName, option.ShortName);
         Assert.AreEqual(takesValue, option.TakesValue);
     }
@@ -89,8 +106,14 @@ public sealed class CommandLineOptionTableTests
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == longName);
         CommandLineOptions options = new();
 
+        Diagnostics.Arrange("value", CommandLineParseDiagnostics.QuoteEach([string.Empty]));
+        Diagnostics.Arrange("spelled option", CommandLineParseDiagnostics.QuoteEach([spelledOption]));
         CommandLineRefusal? refusal = option.Apply(options, string.Empty, spelledOption, _ => false, new RecordingDataFileReader());
+        ActRefusal(refusal);
+        Diagnostics.Act("urls", CommandLineParseDiagnostics.QuoteEach(options.Urls));
+        Diagnostics.Act("output files", CommandLineParseDiagnostics.QuoteEach(options.OutputFiles));
 
+        Diagnostics.Assert("refused", true, refusal is not null);
         Assert.IsNotNull(refusal);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: blank argument where content is expected", CommandLineRefusal.TryHelpLine },
@@ -102,11 +125,18 @@ public sealed class CommandLineOptionTableTests
     [TestMethod]
     public void Rows_UrlOptionGivenValue_AddsUrl()
     {
+        Diagnostics.Arrange("long name", "url");
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == "url");
         CommandLineOptions options = new();
 
+        Diagnostics.Arrange("value", CommandLineParseDiagnostics.QuoteEach(["http://example.com"]));
+        Diagnostics.Arrange("spelled option", CommandLineParseDiagnostics.QuoteEach(["--url"]));
         CommandLineRefusal? refusal = option.Apply(options, "http://example.com", "--url", _ => false, new RecordingDataFileReader());
+        ActRefusal(refusal);
+        Diagnostics.Act("urls", CommandLineParseDiagnostics.QuoteEach(options.Urls));
+        Diagnostics.Act("output files", CommandLineParseDiagnostics.QuoteEach(options.OutputFiles));
 
+        Diagnostics.Assert("refused", false, refusal is not null);
         Assert.IsNull(refusal);
         CollectionAssert.AreEqual(new[] { "http://example.com" }, options.Urls.ToArray());
     }
@@ -114,12 +144,28 @@ public sealed class CommandLineOptionTableTests
     [TestMethod]
     public void Rows_OutputOptionGivenValue_AddsOutputFile()
     {
+        Diagnostics.Arrange("long name", "output");
         CommandLineOption option = CommandLineOptionTable.Rows.Single(row => row.LongName == "output");
         CommandLineOptions options = new();
 
+        Diagnostics.Arrange("value", CommandLineParseDiagnostics.QuoteEach(["page.html"]));
+        Diagnostics.Arrange("spelled option", CommandLineParseDiagnostics.QuoteEach(["-o"]));
         CommandLineRefusal? refusal = option.Apply(options, "page.html", "-o", _ => false, new RecordingDataFileReader());
+        ActRefusal(refusal);
+        Diagnostics.Act("urls", CommandLineParseDiagnostics.QuoteEach(options.Urls));
+        Diagnostics.Act("output files", CommandLineParseDiagnostics.QuoteEach(options.OutputFiles));
 
+        Diagnostics.Assert("refused", false, refusal is not null);
         Assert.IsNull(refusal);
         CollectionAssert.AreEqual(new[] { "page.html" }, options.OutputFiles.ToArray());
+    }
+
+    private void ActRefusal(CommandLineRefusal? refusal)
+    {
+        Diagnostics.Act("refused", refusal is not null);
+        foreach (string line in refusal?.StandardErrorLines ?? [])
+        {
+            Diagnostics.Act("stderr", line);
+        }
     }
 }
