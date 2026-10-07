@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -11,6 +12,10 @@ namespace Curl.Protocol.Http;
 public sealed class HttpRedirectLocationTests
 {
     private const string RequestUrl = "http://example.com:8080/a/b/c?q=1#base";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow("/next?a=b#frag", "http://example.com:8080/next?a=b#frag", DisplayName = "absolute path")]
@@ -39,7 +44,7 @@ public sealed class HttpRedirectLocationTests
     [DataRow("mailto:x@y", "mailto:x@y", DisplayName = "mailto")]
     [DataRow("foo:bar", "foo:bar", DisplayName = "unknown scheme")]
     public void Resolve_MeasuredLocation_GivesWhatCurlReports(string location, string expected) =>
-        Assert.AreEqual(expected, HttpRedirectLocation.Resolve(CurlUrl.Parse(RequestUrl), location));
+        Assert.AreEqual(expected, Resolved(expected, RequestUrl, location));
 
     [TestMethod]
     [DataRow("/ä", "http://example.com:8080/%C3%A4", DisplayName = "non-ASCII as UTF-8")]
@@ -56,11 +61,11 @@ public sealed class HttpRedirectLocationTests
     [DataRow("http://h?q", "http://h/?q", DisplayName = "absolute with a query and no path")]
     [DataRow("urn:x?y#z", "urn:x?y#z", DisplayName = "absolute without an authority")]
     public void Resolve_OtherLocation_FollowsRfc3986(string location, string expected) =>
-        Assert.AreEqual(expected, HttpRedirectLocation.Resolve(CurlUrl.Parse(RequestUrl), location));
+        Assert.AreEqual(expected, Resolved(expected, RequestUrl, location));
 
     [TestMethod]
     public void Resolve_RequestUrlWithCredentials_KeepsThem() =>
-        Assert.AreEqual("http://u:p@example.com/x", HttpRedirectLocation.Resolve(CurlUrl.Parse("http://u:p@example.com/a"), "/x"));
+        Assert.AreEqual("http://u:p@example.com/x", Resolved("http://u:p@example.com/x", "http://u:p@example.com/a", "/x"));
 
     [TestMethod]
     [DataRow(300)]
@@ -68,24 +73,42 @@ public sealed class HttpRedirectLocationTests
     [DataRow(304)]
     [DataRow(399)]
     public void Find_3xxWithLocation_Resolves(int status) =>
-        Assert.AreEqual("http://example.com:8080/next", HttpRedirectLocation.Find(CurlUrl.Parse(RequestUrl), Head(status, ("Location", "/next"))));
+        Assert.AreEqual("http://example.com:8080/next", Found("http://example.com:8080/next", Head(status, ("Location", "/next"))));
 
     [TestMethod]
     [DataRow(200)]
     [DataRow(299)]
     [DataRow(400)]
     public void Find_Not3xx_IsNull(int status) =>
-        Assert.IsNull(HttpRedirectLocation.Find(CurlUrl.Parse(RequestUrl), Head(status, ("Location", "/next"))));
+        Assert.IsNull(Found(null, Head(status, ("Location", "/next"))));
 
     [TestMethod]
     public void Find_NoLocation_IsNull() =>
-        Assert.IsNull(HttpRedirectLocation.Find(CurlUrl.Parse(RequestUrl), Head(302, ("Content-Length", "0"))));
+        Assert.IsNull(Found(null, Head(302, ("Content-Length", "0"))));
 
     [TestMethod]
     public void Find_EmptyLocationThenAnother_TakesTheFirstWithAValue() =>
         Assert.AreEqual(
             "http://example.com:8080/second",
-            HttpRedirectLocation.Find(CurlUrl.Parse(RequestUrl), Head(302, ("location", string.Empty), ("LOCATION", "/second"), ("Location", "/third"))));
+            Found("http://example.com:8080/second", Head(302, ("location", string.Empty), ("LOCATION", "/second"), ("Location", "/third"))));
+
+    private string Resolved(string expected, string requestUrl, string location)
+    {
+        Diagnostics.Arrange("request URL, Location", $"{requestUrl}, {location}");
+        string actual = HttpRedirectLocation.Resolve(CurlUrl.Parse(requestUrl), location);
+        Diagnostics.Act("redirect URL", actual);
+        Diagnostics.Assert("redirect URL", expected, actual);
+        return actual;
+    }
+
+    private string? Found(string? expected, HttpResponseHead head)
+    {
+        Diagnostics.Arrange("request URL, status, headers", $"{RequestUrl}, {head.StatusLine.StatusCode}, {string.Join("; ", head.Headers.Select(header => $"{header.Name}: {header.Value}"))}");
+        string? actual = HttpRedirectLocation.Find(CurlUrl.Parse(RequestUrl), head);
+        Diagnostics.Act("redirect URL", actual ?? "(null)");
+        Diagnostics.Assert("redirect URL", expected ?? "(null)", actual ?? "(null)");
+        return actual;
+    }
 
     private static HttpResponseHead Head(int status, params (string Name, string Value)[] headers) =>
         new(
