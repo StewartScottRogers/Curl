@@ -33,3 +33,4 @@ Upstream cases test990, test991 and test1721 (`-w '%output{...}'`) and test1148 
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
