@@ -1,5 +1,7 @@
 using System.Net.Sockets;
 
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -10,6 +12,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class QualityOfServiceSocketOptionsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(SocketPlatform.Windows)]
     [DataRow(SocketPlatform.Linux)]
@@ -18,6 +24,13 @@ public sealed class QualityOfServiceSocketOptionsTests
     [DataRow(SocketPlatform.Other)]
     public void For_WithBothZero_SetsNothing(SocketPlatform platform)
     {
+        Diagnostics.Arrange("platform, family, type of service, VLAN priority", $"{platform}, InterNetwork, 0, 0");
+
+        var options = QualityOfServiceSocketOptions.For(new TcpSocketOptions(), AddressFamily.InterNetwork, platform);
+
+        Diagnostics.Act("options", string.Join(", ", options));
+        Diagnostics.Assert("option count", 0, options.Count);
+
         Assert.IsEmpty(QualityOfServiceSocketOptions.For(new TcpSocketOptions(), AddressFamily.InterNetwork, platform));
     }
 
@@ -32,7 +45,12 @@ public sealed class QualityOfServiceSocketOptionsTests
     [DataRow(SocketPlatform.FreeBsd, AddressFamily.InterNetworkV6, 41, 61)]
     public void For_WithTypeOfService_SetsThePlatformsTosOrTrafficClass(SocketPlatform platform, AddressFamily family, int level, int name)
     {
+        Diagnostics.Arrange("platform, family, type of service", $"{platform}, {family}, 0x20");
+
         IReadOnlyList<RawSocketOption> options = QualityOfServiceSocketOptions.For(new TcpSocketOptions(TypeOfService: 0x20), family, platform);
+
+        Diagnostics.Act("options", string.Join(", ", options));
+        Diagnostics.Assert("options", new RawSocketOption(level, name, 0x20), string.Join(", ", options));
 
         CollectionAssert.AreEqual(new[] { new RawSocketOption(level, name, 0x20) }, options.ToArray());
     }
@@ -43,13 +61,25 @@ public sealed class QualityOfServiceSocketOptionsTests
     [DataRow(SocketPlatform.Linux, AddressFamily.Unix)]
     public void For_WithTypeOfServiceWhereNoOptionExists_SetsNothing(SocketPlatform platform, AddressFamily family)
     {
+        Diagnostics.Arrange("platform, family, type of service", $"{platform}, {family}, 0x20");
+
+        var options = QualityOfServiceSocketOptions.For(new TcpSocketOptions(TypeOfService: 0x20), family, platform);
+
+        Diagnostics.Act("options", string.Join(", ", options));
+        Diagnostics.Assert("option count", 0, options.Count);
+
         Assert.IsEmpty(QualityOfServiceSocketOptions.For(new TcpSocketOptions(TypeOfService: 0x20), family, platform));
     }
 
     [TestMethod]
     public void For_WithVlanPriorityOnLinux_SetsSoPriority()
     {
+        Diagnostics.Arrange("platform, family, VLAN priority", "Linux, InterNetwork, 3");
+
         IReadOnlyList<RawSocketOption> options = QualityOfServiceSocketOptions.For(new TcpSocketOptions(VlanPriority: 3), AddressFamily.InterNetwork, SocketPlatform.Linux);
+
+        Diagnostics.Act("options", string.Join(", ", options));
+        Diagnostics.Assert("options", new RawSocketOption(1, 12, 3), string.Join(", ", options));
 
         CollectionAssert.AreEqual(new[] { new RawSocketOption(1, 12, 3) }, options.ToArray());
     }
@@ -61,14 +91,26 @@ public sealed class QualityOfServiceSocketOptionsTests
     [DataRow(SocketPlatform.Other)]
     public void For_WithVlanPriorityWhereTheSystemHasNoSoPriority_SetsNothing(SocketPlatform platform)
     {
+        Diagnostics.Arrange("platform, family, VLAN priority", $"{platform}, InterNetwork, 3");
+
+        var options = QualityOfServiceSocketOptions.For(new TcpSocketOptions(VlanPriority: 3), AddressFamily.InterNetwork, platform);
+
+        Diagnostics.Act("options", string.Join(", ", options));
+        Diagnostics.Assert("option count", 0, options.Count);
+
         Assert.IsEmpty(QualityOfServiceSocketOptions.For(new TcpSocketOptions(VlanPriority: 3), AddressFamily.InterNetwork, platform));
     }
 
     [TestMethod]
     public void For_WithBothOnLinux_SetsTosThenPriority()
     {
+        Diagnostics.Arrange("platform, family, type of service, VLAN priority", "Linux, InterNetworkV6, 0xb8, 5");
+
         IReadOnlyList<RawSocketOption> options = QualityOfServiceSocketOptions.For(
             new TcpSocketOptions(TypeOfService: 0xb8, VlanPriority: 5), AddressFamily.InterNetworkV6, SocketPlatform.Linux);
+
+        Diagnostics.Act("options", string.Join(", ", options));
+        Diagnostics.Assert("options", $"{new RawSocketOption(41, 67, 0xb8)}, {new RawSocketOption(1, 12, 5)}", string.Join(", ", options));
 
         CollectionAssert.AreEqual(new[] { new RawSocketOption(41, 67, 0xb8), new RawSocketOption(1, 12, 5) }, options.ToArray());
     }
@@ -78,8 +120,13 @@ public sealed class QualityOfServiceSocketOptionsTests
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
+        Diagnostics.Arrange("refused option", new RawSocketOption(0, 9999, 1));
+
         QualityOfServiceSocketOptions.TrySet(socket, new RawSocketOption(0, 9999, 1));
         socket.NoDelay = true;
+
+        Diagnostics.Act("NoDelay after TrySet", socket.NoDelay);
+        Diagnostics.Assert("NoDelay", true, socket.NoDelay);
 
         Assert.IsTrue(socket.NoDelay);
     }
@@ -89,7 +136,13 @@ public sealed class QualityOfServiceSocketOptionsTests
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
+        Diagnostics.Arrange("NoDelay, type of service, VLAN priority", "false, 0x20, 3");
+
         new TcpDialer(new TcpSocketOptions(NoDelay: false, TypeOfService: 0x20, VlanPriority: 3)).ApplySocketOptions(socket);
+
+        var keepAliveSet = (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)! != 0;
+        Diagnostics.Act("NoDelay, keep-alive set", $"{socket.NoDelay}, {keepAliveSet}");
+        Diagnostics.Assert("NoDelay, keep-alive set", "False, True", $"{socket.NoDelay}, {keepAliveSet}");
 
         Assert.IsFalse(socket.NoDelay);
         Assert.AreNotEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
@@ -101,7 +154,14 @@ public sealed class QualityOfServiceSocketOptionsTests
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
+        Diagnostics.Arrange("type of service, VLAN priority", "0x20, 3");
+
         new TcpDialer(new TcpSocketOptions(TypeOfService: 0x20, VlanPriority: 3)).ApplySocketOptions(socket);
+
+        var typeOfService = ReadInt(socket, 0, 1);
+        var priority = ReadInt(socket, 1, 12);
+        Diagnostics.Act("IP_TOS, SO_PRIORITY", $"{typeOfService}, {priority}");
+        Diagnostics.Assert("IP_TOS, SO_PRIORITY", "32, 3", $"{typeOfService}, {priority}");
 
         Assert.AreEqual(0x20, ReadInt(socket, 0, 1));
         Assert.AreEqual(3, ReadInt(socket, 1, 12));
@@ -113,7 +173,13 @@ public sealed class QualityOfServiceSocketOptionsTests
     {
         using var socket = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
 
+        Diagnostics.Arrange("family, type of service", "InterNetworkV6, 0x20");
+
         new TcpDialer(new TcpSocketOptions(TypeOfService: 0x20)).ApplySocketOptions(socket);
+
+        var trafficClass = ReadInt(socket, 41, OperatingSystem.IsLinux() ? 67 : 36);
+        Diagnostics.Act("IPV6_TCLASS", trafficClass);
+        Diagnostics.Assert("IPV6_TCLASS", 0x20, trafficClass);
 
         Assert.AreEqual(0x20, ReadInt(socket, 41, OperatingSystem.IsLinux() ? 67 : 36));
     }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Authentication;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 using CountingTransferEvents = Curl.Networking.HandshakeCapturingTransferEventsTests.CountingTransferEvents;
 
@@ -16,15 +17,24 @@ public sealed class SetupFilterTraceEventsTests
 {
     private static readonly IPEndPoint EndPoint = new(IPAddress.Loopback, 80);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ReportInfo_TheFirstTryingLine_IsPrecededByTheHappyEyeballingLine()
     {
         var inner = new CountingTransferEvents();
         var events = new SetupFilterTraceEvents(inner, "localhost", 47400);
 
+        Diagnostics.Arrange("origin", "localhost:47400");
+
         events.ReportInfo("Host localhost:47400 was resolved.");
         events.ReportInfo("  Trying [::1]:47400...");
         events.ReportInfo("  Trying 127.0.0.1:47400...");
+
+        Diagnostics.Act("calls passed on", string.Join(" | ", inner.Calls));
+        Diagnostics.Assert("second call", "[SETUP] happy eyeballing to origin localhost:47400", inner.Calls.ElementAtOrDefault(1));
 
         CollectionAssert.AreEqual(
             new[]
@@ -42,7 +52,12 @@ public sealed class SetupFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
 
+        Diagnostics.Arrange("origin, end point", $"h:80, {EndPoint}");
+
         new SetupFilterTraceEvents(inner, "h", 80).ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = EndPoint, LocalEndPoint = EndPoint, ConnectionNumber = 0 });
+
+        Diagnostics.Act("calls passed on", string.Join(" | ", inner.Calls));
+        Diagnostics.Assert("calls passed on", "opened | [SETUP] removing connected setup filter | [SETUP] destroy", string.Join(" | ", inner.Calls));
 
         CollectionAssert.AreEqual(new[] { "opened", "[SETUP] removing connected setup filter", "[SETUP] destroy" }, inner.Calls);
     }
@@ -52,6 +67,9 @@ public sealed class SetupFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
         var events = new SetupFilterTraceEvents(inner, "h", 80);
+
+        Diagnostics.Arrange("origin", "h:80");
+        Diagnostics.Arrange("reports", 11);
 
         events.ReportConnectionReused(new ConnectionReusedEvent { Scheme = "http", IsProxy = false, HostName = "h", Port = 80, ConnectionNumber = 0 });
         events.ReportTlsHandshake(new TlsHandshakeEvent
@@ -72,6 +90,9 @@ public sealed class SetupFilterTraceEventsTests
         events.ReportResponseHeader([4]);
         events.ReportDataSent([5]);
         events.ReportDataReceived([6]);
+
+        Diagnostics.Act("calls passed on", string.Join(" | ", inner.Calls));
+        Diagnostics.Assert("calls passed on", 11, inner.Calls.Count);
 
         CollectionAssert.AreEqual(
             new[] { "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
