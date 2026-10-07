@@ -32,3 +32,4 @@ curl 8.21.0's 5000-header limit (`curl: (100) Too many response headers, 5000 is
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
