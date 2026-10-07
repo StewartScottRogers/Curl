@@ -39,7 +39,7 @@ Every test in these `Curl.Cryptography.UnitTests` files writes, through BL-1457'
   - `DeriveKey_GoGoldenVector0_GivesThePublishedKey`: `PHASE derive: 5996 ms` (12 rounds, one block).
   - `DeriveKey_GoGoldenVector2_GivesThePublishedKey`: `PHASE derive: 11928 ms`.
   - `DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte`: `PHASE derive: 11394 ms` (1 round, 32 blocks).
-  - That is about 400 to 500 ms per bcrypt_hash, roughly a hundred times C's speed: a real performance problem, filed as BL-1541.
+  - That is about 400 to 500 ms per bcrypt_hash, roughly a hundred times C's speed: a real performance problem, filed as BL-1558.
 
 ## Log
 

@@ -1,5 +1,5 @@
 ---
-id: BL-1541
+id: BL-1558
 title: Make BcryptPbkdf's bcrypt_hash fast enough that a one-round, 1024-byte key derives in well under a second
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1541 — Make BcryptPbkdf's bcrypt_hash fast enough that a one-round, 1024-byte key derives in well under a second
+# BL-1558 — Make BcryptPbkdf's bcrypt_hash fast enough that a one-round, 1024-byte key derives in well under a second
 
 ## Goal
 
