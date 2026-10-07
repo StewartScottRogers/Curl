@@ -1,5 +1,5 @@
 ---
-id: BL-1645
+id: BL-1647
 title: Stop SwsHttpServerConnector losing recorded bytes when connections write on many threads at once
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1645 — Stop SwsHttpServerConnector losing recorded bytes when connections write on many threads at once
+# BL-1647 — Stop SwsHttpServerConnector losing recorded bytes when connections write on many threads at once
 
 ## Goal
 

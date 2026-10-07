@@ -1,5 +1,5 @@
 ---
-id: BL-1646
+id: BL-1648
 title: Stop UpstreamTestFileExpander running out of memory on a %repeat count near int.MaxValue
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1646 — Stop UpstreamTestFileExpander running out of memory on a %repeat count near int.MaxValue
+# BL-1648 — Stop UpstreamTestFileExpander running out of memory on a %repeat count near int.MaxValue
 
 ## Goal
 
