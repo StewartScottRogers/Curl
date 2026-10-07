@@ -1,5 +1,5 @@
 ---
-id: BL-1647
+id: BL-1649
 title: Refuse a des3-cbc-sha1 key TripleDES calls weak with KerberosCryptographyException, not CryptographicException
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1647 — Refuse a des3-cbc-sha1 key TripleDES calls weak with KerberosCryptographyException, not CryptographicException
+# BL-1649 — Refuse a des3-cbc-sha1 key TripleDES calls weak with KerberosCryptographyException, not CryptographicException
 
 ## Goal
 

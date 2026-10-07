@@ -43,7 +43,7 @@ Test count: 707 before, 776 after (`dotnet test Curl.Kerberos.UnitTests --filter
 - **State and concurrency** - `EveryEncryptionType_SharedAcrossThreads_RoundTripsEveryMessage` (64 tasks per type on one instance), `GssContext_PerMessageCallsBeforeTheContextIsEstablished_ThrowInvalidOperation`, `GssContext_NextTokenAfterTheContextIsEstablished_ThrowsInvalidOperation`; replayed, skipped and reflected tokens were already pinned by `KerberosGssMessageTokenTests` and `Des3CbcSha1GssMessageProtectionTests`, so not repeated.
 
 Defects found:
-- **BL-1647** (High): a des3-cbc-sha1 base key that .NET's `TripleDES` calls weak (e.g. all zeros) makes `Encrypt`/`Decrypt` throw an undocumented `CryptographicException` from `TripleDES.SetKey`. No test for it is committed here; it lands with the fix.
+- **BL-1649** (High): a des3-cbc-sha1 base key that .NET's `TripleDES` calls weak (e.g. all zeros) makes `Encrypt`/`Decrypt` throw an undocumented `CryptographicException` from `TripleDES.SetKey`. No test for it is committed here; it lands with the fix.
 
 Not defects (my first expectations were wrong): BER lengths padded with zero bytes past four length octets decode (BER permits it), and des3-cbc-sha1's `Decrypt` returns its zero padding by design (ADR-0237).
 
@@ -51,4 +51,4 @@ Not defects (my first expectations were wrong): BER lengths padded with zero byt
 
 - 2026-10-06: Created.
 - 2026-10-07: Backlog -> Doing.
-- 2026-10-07: Doing -> Done. Curl.Kerberos.UnitTests attacks the library's decoders, file readers, encryption types and GSS context with 69 adversarial tests (707 -> 776); the des3 weak-key crash is filed as BL-1647
+- 2026-10-07: Doing -> Done. Curl.Kerberos.UnitTests attacks the library's decoders, file readers, encryption types and GSS context with 69 adversarial tests (707 -> 776); the des3 weak-key crash is filed as BL-1649
