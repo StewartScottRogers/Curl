@@ -33,3 +33,4 @@ Every test in `Curl.Core.UnitTests/Multipart/` (10 files, 99 test methods, count
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
