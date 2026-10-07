@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 using Curl.Networking.Fakes;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -20,21 +21,37 @@ public sealed class AutomaticClientCertificateTests
 
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Choose_OpensTheCurrentUsersPersonalStore()
     {
         var store = new FakeClientCertificateStore();
+        Diagnostics.Arrange("store certificates", "default fake store");
 
         var chosen = AutomaticClientCertificate.Choose(store, Now);
+        Diagnostics.Act("chosen is null", chosen is null);
+        Diagnostics.Act("opened stores", string.Join(", ", store.Opened.Select(opened => $"{opened.Item1}/{opened.Item2}")));
 
+        Diagnostics.Assert("chosen is null", true, chosen is null);
         Assert.IsNull(chosen);
-        CollectionAssert.AreEqual(new[] { (ClientCertificateStoreLocation.CurrentUser, "MY") }, store.Opened);
+        var expected = new[] { (ClientCertificateStoreLocation.CurrentUser, "MY") };
+        Diagnostics.Assert("opened count", expected.Length, store.Opened.Count);
+        CollectionAssert.AreEqual(expected, store.Opened);
     }
 
     [TestMethod]
     public void Choose_WithAStoreThatCannotOpen_ReturnsNull()
     {
-        Assert.IsNull(AutomaticClientCertificate.Choose(new FakeClientCertificateStore { Certificates = null }, Now));
+        Diagnostics.Arrange("store certificates", "null (cannot open)");
+
+        var chosen = AutomaticClientCertificate.Choose(new FakeClientCertificateStore { Certificates = null }, Now);
+        Diagnostics.Act("chosen is null", chosen is null);
+
+        Diagnostics.Assert("chosen is null", true, chosen is null);
+        Assert.IsNull(chosen);
     }
 
     [TestMethod]
@@ -44,12 +61,21 @@ public sealed class AutomaticClientCertificateTests
         using var first = Certificate(ClientAuthentication);
         using var second = Certificate(null);
         var store = new FakeClientCertificateStore { Certificates = [serverOnly, first, second] };
+        Diagnostics.Arrange("server-only subject", serverOnly.Subject);
+        Diagnostics.Arrange("first subject", first.Subject);
+        Diagnostics.Arrange("second subject", second.Subject);
 
         var chosen = AutomaticClientCertificate.Choose(store, Now);
+        Diagnostics.Act("chosen is first", ReferenceEquals(first, chosen));
+        Diagnostics.Act("handles nonzero (first, serverOnly, second)", $"{first.Handle != IntPtr.Zero}, {serverOnly.Handle != IntPtr.Zero}, {second.Handle != IntPtr.Zero}");
 
+        Diagnostics.Assert("chosen is first", true, ReferenceEquals(first, chosen));
         Assert.AreSame(first, chosen);
+        Diagnostics.Assert("first handle nonzero", true, first.Handle != IntPtr.Zero);
         Assert.AreNotEqual(IntPtr.Zero, first.Handle);
+        Diagnostics.Assert("server-only handle is zero", true, serverOnly.Handle == IntPtr.Zero);
         Assert.AreEqual(IntPtr.Zero, serverOnly.Handle);
+        Diagnostics.Assert("second handle is zero", true, second.Handle == IntPtr.Zero);
         Assert.AreEqual(IntPtr.Zero, second.Handle);
     }
 
@@ -60,16 +86,26 @@ public sealed class AutomaticClientCertificateTests
     public void Qualifies_WithAPrivateKeyInItsValidityAndAClientUsage_ReturnsTrue(string? usage)
     {
         using var certificate = Certificate(usage);
+        Diagnostics.Arrange("usage", usage ?? "(none)");
 
-        Assert.IsTrue(AutomaticClientCertificate.Qualifies(certificate, Now));
+        var qualifies = AutomaticClientCertificate.Qualifies(certificate, Now);
+        Diagnostics.Act("qualifies", qualifies);
+
+        Diagnostics.Assert("qualifies", true, qualifies);
+        Assert.IsTrue(qualifies);
     }
 
     [TestMethod]
     public void Qualifies_WithOnlyServerAuthentication_ReturnsFalse()
     {
         using var certificate = Certificate(ServerAuthentication);
+        Diagnostics.Arrange("usage", ServerAuthentication);
 
-        Assert.IsFalse(AutomaticClientCertificate.Qualifies(certificate, Now));
+        var qualifies = AutomaticClientCertificate.Qualifies(certificate, Now);
+        Diagnostics.Act("qualifies", qualifies);
+
+        Diagnostics.Assert("qualifies", false, qualifies);
+        Assert.IsFalse(qualifies);
     }
 
     [TestMethod]
@@ -77,8 +113,14 @@ public sealed class AutomaticClientCertificateTests
     {
         using var withKey = Certificate(null);
         using var certificate = X509CertificateLoader.LoadCertificate(withKey.RawData);
+        Diagnostics.Arrange("has private key", certificate.HasPrivateKey);
+        Diagnostics.Arrange("subject", certificate.Subject);
 
-        Assert.IsFalse(AutomaticClientCertificate.Qualifies(certificate, Now));
+        var qualifies = AutomaticClientCertificate.Qualifies(certificate, Now);
+        Diagnostics.Act("qualifies", qualifies);
+
+        Diagnostics.Assert("qualifies", false, qualifies);
+        Assert.IsFalse(qualifies);
     }
 
     [TestMethod]
@@ -87,8 +129,13 @@ public sealed class AutomaticClientCertificateTests
     public void Qualifies_OutsideItsValidity_ReturnsFalse(int daysFromNow)
     {
         using var certificate = Certificate(null);
+        Diagnostics.Arrange("days from now", daysFromNow);
 
-        Assert.IsFalse(AutomaticClientCertificate.Qualifies(certificate, Now.AddDays(daysFromNow)));
+        var qualifies = AutomaticClientCertificate.Qualifies(certificate, Now.AddDays(daysFromNow));
+        Diagnostics.Act("qualifies", qualifies);
+
+        Diagnostics.Assert("qualifies", false, qualifies);
+        Assert.IsFalse(qualifies);
     }
 
     // Valid from a day ago to a day ahead, with the one extended key usage given, or none.

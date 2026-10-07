@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Rtsp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Rtsp;
 
@@ -13,6 +14,11 @@ namespace Curl.Protocol.Rtsp;
 [TestClass]
 public sealed class RtspReplyHeaderLineTests
 {
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-NoColon\r\n\r\n", "RTSP/1.0 200 OK\r\nCSeq: 1\r\n")]
     [DataRow("RTSP/1.0 200 OK\r\nX-NoColon\r\nCSeq: 1\r\n\r\n", "RTSP/1.0 200 OK\r\n")]
@@ -22,6 +28,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync(reply);
 
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Header without colon", result.ErrorMessage);
         Assert.AreEqual(written, headers);
@@ -38,6 +45,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync(reply);
 
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Carriage return found in header", result.ErrorMessage);
         Assert.AreEqual(written, headers);
@@ -48,6 +56,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0 abc\rx\r\nCSeq: 1\r\n\r\n");
 
+        Diagnostics.Assert("error", "Weird server reply", result.ErrorMessage);
         Assert.AreEqual("Weird server reply", result.ErrorMessage);
         Assert.AreEqual(string.Empty, headers);
     }
@@ -58,6 +67,7 @@ public sealed class RtspReplyHeaderLineTests
         (TransferResult result, string headers, List<string> transcript) =
             await RunAsync("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A: a\0b\r\nContent-Length: 0\r\n\r\n");
 
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Nul byte in header", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n", headers);
@@ -76,6 +86,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync(reply);
 
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Nul byte in header", result.ErrorMessage);
         Assert.AreEqual(written, headers);
@@ -86,6 +97,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0\0 200 OK\r\nCSeq: 1\r\n\r\n");
 
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Weird server reply", result.ErrorMessage);
         Assert.AreEqual(string.Empty, headers);
@@ -99,6 +111,7 @@ public sealed class RtspReplyHeaderLineTests
         (TransferResult result, string headers, List<string> transcript) =
             await RunAsync("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + lines + "Content-Length: 0\r\n\r\n");
 
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Multiple Location headers", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + writtenAfterCSeq, headers);
@@ -115,6 +128,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + lines + "Content-Length: 0\r\n\r\n");
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 302 Found\r\nCSeq: 1\r\n" + lines + "Content-Length: 0\r\n\r\n", headers);
     }
@@ -132,6 +146,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + lines + "\r\nab");
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + joined + "\r\n", headers);
     }
@@ -141,6 +156,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0 200 OK\r\nCSeq:\r\n 1\r\n\r\n");
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n", headers);
     }
@@ -150,6 +166,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0 200 OK\nCSeq: 1\nX-A: 1\n cont\n\n");
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\nCSeq: 1\nX-A: 1 cont\n\n", headers);
     }
@@ -159,6 +176,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (_, _, List<string> transcript) = await RunAsync("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A: 1\r\n cont\r\n\r\n");
 
+        Diagnostics.Assert("transcript holds the joined line", true, transcript.Contains("< X-A: 1 cont\r\n"));
         CollectionAssert.Contains(transcript, "< X-A: 1 cont\r\n");
     }
 
@@ -166,9 +184,11 @@ public sealed class RtspReplyHeaderLineTests
     public async Task ExecuteAsync_ContinuationArrivingInPieces_IsJoinedOnceWhole()
     {
         var server = new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A: 1\r\n"), Bytes(" co"), Bytes("nt\r\n"), Bytes("\r\n"));
+        Diagnostics.ArrangeReads([Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A: 1\r\n"), Bytes(" co"), Bytes("nt\r\n"), Bytes("\r\n")]);
 
         (TransferResult result, string headers, _) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\nX-A: 1 cont\r\n\r\n", headers);
     }
@@ -181,6 +201,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync(reply);
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(written, headers);
     }
@@ -195,6 +216,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, List<string> transcript) = await RunAsync("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + lines + "\r\nabc");
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.StartsWith("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: ", headers);
         CollectionAssert.Contains(transcript, "{ 2");
@@ -212,6 +234,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, _) = await RunAsync("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + lines + "\r\nabc");
 
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Invalid Content-Length: value", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + writtenAfterCSeq, headers);
@@ -226,6 +249,7 @@ public sealed class RtspReplyHeaderLineTests
     {
         (TransferResult result, string headers, List<string> transcript) = await RunAsync("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + lines + "\r\nab");
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + lines + "\r\n", headers);
         Assert.IsFalse(transcript.Exists(line => line.StartsWith('{')));
@@ -235,10 +259,12 @@ public sealed class RtspReplyHeaderLineTests
     public async Task ExecuteAsync_ContentLengthTooLarge_ReportsOverflowBeforeTheLineAndWritesNothing()
     {
         var output = new MemoryStream();
+        Diagnostics.ArrangeReply("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 99999999999999999999\r\n\r\nhello");
         (TransferResult result, _, List<string> transcript) = await RunAsync(
             new ScriptedConnection(Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 99999999999999999999\r\n\r\nhello")),
             output);
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(0, output.Length);
         CollectionAssert.AreEqual(
@@ -260,6 +286,7 @@ public sealed class RtspReplyHeaderLineTests
         (TransferResult result, _, List<string> transcript) = await RunAsync(
             "RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 99999999999999999999, 99999999999999999999\r\n\r\nhello");
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "< CSeq: 1\r\n", "* Overflow Content-Length: value", "< Content-Length: 99999999999999999999, 99999999999999999999\r\n", "< \r\n" },
@@ -267,21 +294,29 @@ public sealed class RtspReplyHeaderLineTests
         Assert.AreEqual(1, transcript.Count(line => line.StartsWith("* Overflow", StringComparison.Ordinal)));
     }
 
-    private static Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(string reply) =>
-        RunAsync(new ScriptedConnection(Bytes(reply)));
+    private Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(string reply)
+    {
+        Diagnostics.ArrangeReply(reply);
+        return RunAsync(new ScriptedConnection(Bytes(reply)));
+    }
 
-    private static async Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(ScriptedConnection server, Stream? output = null)
+    private async Task<(TransferResult Result, string Headers, List<string> Transcript)> RunAsync(ScriptedConnection server, Stream? output = null)
     {
         var headers = new MemoryStream();
         var events = new RecordingTransferEvents();
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
+            Output = output ?? new MemoryStream(),
+            HeaderOutput = headers,
+            Events = events,
+        };
+        Diagnostics.ArrangeContext(context);
         TransferResult result = await new RtspProtocolHandler(new RecordingConnector(ConnectResult.Connected(server)), new RecordingAuthenticator())
-            .ExecuteAsync(new TransferContext
-            {
-                Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
-                Output = output ?? new MemoryStream(),
-                HeaderOutput = headers,
-                Events = events,
-            });
+            .ExecuteAsync(context);
+        Diagnostics.ActResult(result);
+        Diagnostics.Bytes("header output", headers.ToArray());
+        Diagnostics.ActTranscript(events.Transcript);
         return (result, Encoding.Latin1.GetString(headers.ToArray()), events.Transcript);
     }
 

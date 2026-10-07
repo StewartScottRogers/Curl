@@ -8,6 +8,7 @@ using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.PacketProtection;
 using Curl.Protocol.Ssh.Transport;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Authentication;
@@ -36,6 +37,9 @@ public sealed partial class SshUserAuthenticationTests
 
     private static byte[] ClientKexInit =>
         SshKexInit.ForClient(SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33)).ToPayload();
+
+    /// <summary>Gets or sets the running test's context, which its diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     public async Task RequestServiceAsync_ServerAccepts_SendsTheServiceRequest()
@@ -75,7 +79,7 @@ public sealed partial class SshUserAuthenticationTests
     public async Task RequestServiceAsync_UnprotectedPacketLengthBroken_FailsWithLibssh2sCode(uint packetLength, string expectedCode)
     {
         SshServerScript script = new SshServerScript().RawPacket(packetLength, 4, [0, 0, 0, 0]);
-        Peer peer = Connect(new ScriptedConnection(script.Bytes), Encoding.UTF8);
+        Peer peer = Connect(script.Bytes, Encoding.UTF8);
 
         await AssertServiceRequestFailsAsync(peer, $"{expectedCode}, Failed to get response to ssh-userauth request");
     }
@@ -101,7 +105,7 @@ public sealed partial class SshUserAuthenticationTests
             .Protect(SshPacketProtections.ForServerToClient(algorithms, keys), resetSequenceNumber: true)
             .Packet([SshMessageNumber.ServiceAccept, .. Name("ssh-userauth")], sealedPacket => sealedPacket[lengthByte] ^= flippedBits)
             .Bytes;
-        Peer peer = Connect(new ScriptedConnection(serverBytes), Encoding.UTF8);
+        Peer peer = Connect(serverBytes, Encoding.UTF8);
         peer.Transport.PacketReader.ChangeProtection(SshPacketProtections.ForServerToClient(algorithms, keys));
 
         await AssertServiceRequestFailsAsync(peer, $"{expectedCode}, Failed to get response to ssh-userauth request");
@@ -124,7 +128,7 @@ public sealed partial class SshUserAuthenticationTests
             .Protect(SshPacketProtections.ForServerToClient(ctr, keys), resetSequenceNumber: true)
             .Packet([SshMessageNumber.ServiceAccept, .. Name("ssh-userauth")], sealedPacket => sealedPacket[^1] ^= 0x01)
             .Bytes;
-        Peer peer = Connect(new ScriptedConnection(serverBytes), Encoding.UTF8);
+        Peer peer = Connect(serverBytes, Encoding.UTF8);
         peer.Transport.PacketReader.ChangeProtection(SshPacketProtections.ForServerToClient(ctr, keys));
 
         await AssertServiceRequestFailsAsync(peer, "-4, Failed to get response to ssh-userauth request");
@@ -148,8 +152,11 @@ public sealed partial class SshUserAuthenticationTests
     {
         Peer peer = Script([SshMessageNumber.ServiceAccept, .. Name("ssh-userauth")]);
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+        OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await peer.Authentication.RequestServiceAsync(new CancellationToken(canceled: true)));
+
+        Diagnostics.Act("exception", cancelled.GetType().Name);
+        Diagnostics.Assert("exception", nameof(OperationCanceledException), cancelled.GetType().Name);
     }
 
     [TestMethod]
@@ -300,6 +307,8 @@ public sealed partial class SshUserAuthenticationTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await peer.Authentication.AuthenticateAsync(Tester, CancellationToken.None));
 
+        Diagnostics.ActFailure(failure);
+        Diagnostics.AssertFailure(CurlExitCode.Ssh, "Error in the SSH layer", failure);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual("Error in the SSH layer", failure.Message);
     }
@@ -328,6 +337,8 @@ public sealed partial class SshUserAuthenticationTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await peer.Authentication.AuthenticateAsync(Tester, CancellationToken.None));
 
+        Diagnostics.ActFailure(failure);
+        Diagnostics.AssertFailure(CurlExitCode.LoginDenied, keyboardInteractiveTried ? "Login denied" : "Authentication failure", failure);
         Assert.AreEqual(keyboardInteractiveTried ? "Login denied" : "Authentication failure", failure.Message);
         Assert.AreEqual(CurlExitCode.LoginDenied, failure.ExitCode);
     }
@@ -338,11 +349,13 @@ public sealed partial class SshUserAuthenticationTests
     public async Task AuthenticateAsync_AnswerToThePasswordHasABrokenLength_FailsAsAClose(uint packetLength)
     {
         byte[] serverBytes = [.. Frame(Failure("password")), .. new SshServerScript().RawPacket(packetLength, 4, [0, 0, 0, 0]).Bytes];
-        Peer peer = Connect(new ScriptedConnection(serverBytes), Encoding.UTF8);
+        Peer peer = Connect(serverBytes, Encoding.UTF8);
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await peer.Authentication.AuthenticateAsync(Tester, CancellationToken.None));
 
+        Diagnostics.ActFailure(failure);
+        Diagnostics.AssertFailure(CurlExitCode.LoginDenied, "Authentication failure", failure);
         Assert.AreEqual("Authentication failure", failure.Message);
         Assert.AreEqual(CurlExitCode.LoginDenied, failure.ExitCode);
     }
@@ -368,7 +381,7 @@ public sealed partial class SshUserAuthenticationTests
             .Packet(Failure("password"))
             .Packet(Success, sealedPacket => sealedPacket[^1] ^= 0x01)
             .Bytes;
-        Peer peer = Connect(new ScriptedConnection(serverBytes), Encoding.UTF8);
+        Peer peer = Connect(serverBytes, Encoding.UTF8);
         peer.Transport.PacketReader.ChangeProtection(SshPacketProtections.ForServerToClient(ctr, keys));
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
@@ -432,7 +445,7 @@ public sealed partial class SshUserAuthenticationTests
     [DataRow("utf-8", "74C3A973746572", "73C3A963726574", DisplayName = "UTF-8, as curl on Linux and macOS sends it")]
     public async Task AuthenticateAsync_NonAsciiCredentials_EncodesThemWithTheGivenEncoding(string encodingName, string userHex, string passwordHex)
     {
-        Peer peer = Connect(new ScriptedConnection(Frame(Failure("password"), Success)), Encoding.GetEncoding(encodingName));
+        Peer peer = Connect(Frame(Failure("password"), Success), Encoding.GetEncoding(encodingName));
 
         await peer.Authentication.AuthenticateAsync(new NetworkCredential("téster", "sécret"), CancellationToken.None);
 
@@ -443,6 +456,7 @@ public sealed partial class SshUserAuthenticationTests
             Name("password"),
             [0],
             String(Convert.FromHexString(passwordHex)));
+        Diagnostics.Diff("password request", expected, WrittenPayloads(peer)[1]);
         CollectionAssert.AreEqual(expected, ClientPayloads(peer.Connection.Written)[1]);
     }
 
@@ -451,8 +465,11 @@ public sealed partial class SshUserAuthenticationTests
     {
         Peer peer = Script(Success);
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+        OperationCanceledException cancelled = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await peer.Authentication.AuthenticateAsync(Tester, new CancellationToken(canceled: true)));
+
+        Diagnostics.Act("exception", cancelled.GetType().Name);
+        Diagnostics.Assert("exception", nameof(OperationCanceledException), cancelled.GetType().Name);
     }
 
     [TestMethod]
@@ -474,18 +491,32 @@ public sealed partial class SshUserAuthenticationTests
         script.Packet(SshMessageNumber.NewKeys)
             .Protect(SshPacketProtections.ForServerToClient(ctr, second.Keys(first.ExchangeHash)), resetSequenceNumber: false)
             .Packet(Success);
+        Diagnostics.Arrange("key exchanges", "ecdh-sha2-nistp256, then the server's re-exchange with diffie-hellman-group14-sha256");
+        Diagnostics.Bytes("server bytes", script.Bytes);
         ScriptedConnection connection = new(script.Bytes);
         SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), keys);
-        await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
+        using (Diagnostics.Phase("first key exchange"))
+        {
+            await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
+        }
+
         SshUserAuthentication authentication = new(transport, Encoding.UTF8);
 
-        await authentication.AuthenticateAsync(Tester, CancellationToken.None);
+        using (Diagnostics.Phase("authentication with re-exchange"))
+        {
+            await authentication.AuthenticateAsync(Tester, CancellationToken.None);
+        }
 
         List<byte[]> written = await SshClientTranscript.PayloadsAsync(
             connection.Written,
             false,
             SshPacketProtections.ForClientToServer(ctr, first.Keys(first.ExchangeHash)),
             SshPacketProtections.ForClientToServer(ctr, second.Keys(first.ExchangeHash)));
+        Diagnostics.ActMessages("client messages", written);
+        Diagnostics.Assert("client message count", 7, written.Count);
+        Diagnostics.Diff("client message 3", NoneRequest("tester"), written.Count > 3 ? written[3] : []);
+        Diagnostics.Diff("client message 4", ClientKexInit, written.Count > 4 ? written[4] : []);
+        Diagnostics.Diff("client message 5", second.ClientPayloads[0], written.Count > 5 ? written[5] : []);
         Assert.HasCount(7, written);
         CollectionAssert.AreEqual(NoneRequest("tester"), written[3]);
         CollectionAssert.AreEqual(ClientKexInit, written[4], "the client answers the server's KEXINIT with its own");
@@ -537,10 +568,17 @@ public sealed partial class SshUserAuthenticationTests
         return script.Bytes;
     }
 
-    private static Peer Script(params byte[][] payloads) => Connect(new ScriptedConnection(Frame(payloads)), Encoding.UTF8);
-
-    private static Peer Connect(ScriptedConnection connection, Encoding credentialEncoding)
+    private Peer Script(params byte[][] payloads)
     {
+        Diagnostics.ArrangeMessages("server messages", payloads);
+        return Connect(Frame(payloads), Encoding.UTF8);
+    }
+
+    private Peer Connect(byte[] serverBytes, Encoding credentialEncoding)
+    {
+        Diagnostics.Arrange("credential encoding", credentialEncoding.WebName);
+        Diagnostics.Bytes("server bytes", serverBytes);
+        ScriptedConnection connection = new(serverBytes);
         SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), new TestEphemeralKeys());
         return new Peer(new SshUserAuthentication(transport, credentialEncoding), transport, connection);
     }
@@ -559,9 +597,29 @@ public sealed partial class SshUserAuthenticationTests
         return payloads;
     }
 
-    private static void AssertWritten(Peer peer, params byte[][] expected)
+    // The test's ARRANGE, ACT, ASSERT and DIFF lines; shared by every partial of this class.
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    // The client's unencrypted messages, written as an ACT line.
+    private List<byte[]> WrittenPayloads(Peer peer)
     {
         List<byte[]> written = ClientPayloads(peer.Connection.Written);
+        Diagnostics.ActMessages("client messages", written);
+        return written;
+    }
+
+    // Catches the failure the act throws and writes it as ACT lines.
+    private async Task<SshTransferException> CatchFailureAsync(Func<Task> act)
+    {
+        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(act);
+        Diagnostics.ActFailure(failure);
+        return failure;
+    }
+
+    private void AssertWritten(Peer peer, params byte[][] expected)
+    {
+        List<byte[]> written = WrittenPayloads(peer);
+        Diagnostics.DiffMessages(expected, written);
         Assert.HasCount(expected.Length, written);
         for (int index = 0; index < expected.Length; index++)
         {
@@ -569,23 +627,29 @@ public sealed partial class SshUserAuthenticationTests
         }
     }
 
-    private static async Task AssertServiceRequestFailsAsync(Peer peer, string expected)
+    private async Task AssertServiceRequestFailsAsync(Peer peer, string expected)
     {
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await peer.Authentication.RequestServiceAsync(CancellationToken.None));
 
+        Diagnostics.ActFailure(failure);
+        Diagnostics.AssertFailure(CurlExitCode.FailedInit, ServiceRequestFailedPrefix + expected, failure);
         Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
         Assert.AreEqual(ServiceRequestFailedPrefix + expected, failure.Message);
     }
 
-    private static void AssertLoginDenied(SshTransferException failure)
+    private void AssertLoginDenied(SshTransferException failure)
     {
+        Diagnostics.ActFailure(failure);
+        Diagnostics.AssertFailure(CurlExitCode.LoginDenied, "Login denied", failure);
         Assert.AreEqual(CurlExitCode.LoginDenied, failure.ExitCode);
         Assert.AreEqual("Login denied", failure.Message);
     }
 
-    private static void AssertAuthenticationFailure(SshTransferException failure)
+    private void AssertAuthenticationFailure(SshTransferException failure)
     {
+        Diagnostics.ActFailure(failure);
+        Diagnostics.AssertFailure(CurlExitCode.LoginDenied, "Authentication failure", failure);
         Assert.AreEqual(CurlExitCode.LoginDenied, failure.ExitCode);
         Assert.AreEqual("Authentication failure", failure.Message);
     }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -7,14 +9,24 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class CurlErrorBufferTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(0)]
     [DataRow(254)]
     [DataRow(255)]
     public void Truncate_WithMessageOfAtMost255Characters_ReturnsItWhole(int length)
     {
+        Diagnostics.Arrange("message length", length);
         var message = new string('m', length);
 
+        var truncated = CurlErrorBuffer.Truncate(message);
+
+        Diagnostics.Act("truncated length", truncated.Length);
+        Diagnostics.Act("same instance returned", ReferenceEquals(message, truncated));
+        Diagnostics.Assert("same instance returned", true, ReferenceEquals(message, truncated));
         Assert.AreSame(message, CurlErrorBuffer.Truncate(message));
     }
 
@@ -23,8 +35,13 @@ public sealed class CurlErrorBufferTests
     [DataRow(65559)]
     public void Truncate_WithMessageLongerThan255Characters_ReturnsItsFirst255(int length)
     {
+        Diagnostics.Arrange("message length", length);
         var message = "Could not resolve host: " + new string('a', length - 24);
 
+        var truncated = CurlErrorBuffer.Truncate(message);
+
+        Diagnostics.Act("truncated length", truncated.Length);
+        Diagnostics.Diff("truncated message", message[..255], truncated);
         Assert.AreEqual(message[..255], CurlErrorBuffer.Truncate(message));
     }
 }

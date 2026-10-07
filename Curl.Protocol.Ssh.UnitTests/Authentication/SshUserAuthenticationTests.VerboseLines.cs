@@ -107,6 +107,8 @@ public sealed partial class SshUserAuthenticationTests
 
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("verbose line 2", "* SSH: publickey authentication denied: Invalid signature for supplied public key, or bad username/public key combination", peer.Events.Transcript[2]);
         Assert.AreEqual("* SSH: publickey authentication denied: Invalid signature for supplied public key, or bad username/public key combination", peer.Events.Transcript[2]);
     }
 
@@ -134,14 +136,21 @@ public sealed partial class SshUserAuthenticationTests
 
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("verbose line 2", "* SSH: publickey authentication denied: Reason unknown (-1)", peer.Events.Transcript[2]);
         Assert.AreEqual("* SSH: publickey authentication denied: Reason unknown (-1)", peer.Events.Transcript[2]);
     }
 
-    private static void AssertLines(TranscriptTransferEvents events, params string[] expected) =>
-        Assert.AreEqual(string.Join("\n", expected), string.Join("\n", events.Transcript));
-
-    private static (Peer Peer, TranscriptTransferEvents Events) ScriptRecordingLines(params byte[][] payloads)
+    private void AssertLines(TranscriptTransferEvents events, params string[] expected)
     {
+        Diagnostics.ActLines(events.Transcript);
+        Diagnostics.Diff("verbose lines", string.Join("\n", expected), string.Join("\n", events.Transcript));
+        Assert.AreEqual(string.Join("\n", expected), string.Join("\n", events.Transcript));
+    }
+
+    private (Peer Peer, TranscriptTransferEvents Events) ScriptRecordingLines(params byte[][] payloads)
+    {
+        Diagnostics.ArrangeMessages("server messages", payloads);
         ScriptedConnection connection = new(Frame(payloads));
         SshTransport transport = new(connection, SshAlgorithmPreferences.Full, EverythingImplemented, new RepeatingRandomSource(0x33), new TestEphemeralKeys());
         TranscriptTransferEvents events = new();

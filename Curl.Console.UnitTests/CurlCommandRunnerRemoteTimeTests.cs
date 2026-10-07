@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -32,6 +34,19 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     private readonly MemoryStream standardError = new();
     private InMemoryFileSystem outputFiles = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
+
+    /// <summary>Every last-write time set, as <c>path=unix seconds</c>, with <c> (while open)</c> when it was.</summary>
+    private string StampsText => string.Join(
+        ", ",
+        outputFiles.LastWriteTimesSet.Select(set => string.Create(
+            CultureInfo.InvariantCulture,
+            $"{set.Path}={set.LastWriteUnixSeconds}{(set.WhileOpen ? " (while open)" : string.Empty)}")));
+
     [TestMethod]
     [DataRow("-R")]
     [DataRow("--remote-time")]
@@ -39,6 +54,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync([option, "-o", "out.txt", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("out.txt content", "hello", Encoding.ASCII.GetString(outputFiles.Written["out.txt"].ToArray()));
+        Diagnostics.Assert("stamps", "out.txt=" + SourceLastWriteTimeUtc.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), StampsText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello", Encoding.ASCII.GetString(outputFiles.Written["out.txt"].ToArray()));
         Assert.HasCount(1, outputFiles.LastWriteTimesSet);
@@ -50,6 +68,8 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-o", "out.txt", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stamps", string.Empty, StampsText);
         Assert.AreEqual(0, exitCode);
         Assert.IsEmpty(outputFiles.LastWriteTimesSet);
     }
@@ -59,6 +79,8 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "--no-remote-time", "-o", "out.txt", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stamps", string.Empty, StampsText);
         Assert.AreEqual(0, exitCode);
         Assert.IsEmpty(outputFiles.LastWriteTimesSet);
     }
@@ -68,6 +90,8 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(null));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stamps", string.Empty, StampsText);
         Assert.AreEqual(0, exitCode);
         Assert.IsEmpty(outputFiles.LastWriteTimesSet);
     }
@@ -80,9 +104,12 @@ public sealed class CurlCommandRunnerRemoteTimeTests
             {
                 SourceLastWriteTimeUtc = SourceLastWriteTimeUtc,
             }));
+        Diagnostics.Arrange("handler", "fails with exit 37, carrying the source time");
 
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], file);
 
+        Diagnostics.Assert("exit code", 37, exitCode);
+        Diagnostics.Assert("stamps", string.Empty, StampsText);
         Assert.AreEqual(37, exitCode);
         Assert.IsEmpty(outputFiles.LastWriteTimesSet);
     }
@@ -92,6 +119,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hello", Encoding.ASCII.GetString(standardOutput.ToArray()));
+        Diagnostics.Assert("stamps", string.Empty, StampsText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello", Encoding.ASCII.GetString(standardOutput.ToArray()));
         Assert.IsEmpty(outputFiles.LastWriteTimesSet);
@@ -110,9 +140,12 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         RecordingProtocolHandler file = new("file", _ => ValueTask.FromResult(
             TransferResult.Success(0) with { SourceLastWriteTimeUtc = SourceLastWriteTimeUtc }));
+        Diagnostics.Arrange("handler", "succeeds with no body, carrying the source time");
 
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], file);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stamps", "out.txt=" + SourceLastWriteTimeUtc.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), StampsText);
         Assert.AreEqual(0, exitCode);
         Assert.HasCount(1, outputFiles.LastWriteTimesSet);
         Assert.AreEqual("out.txt", outputFiles.LastWriteTimesSet[0].Path);
@@ -125,9 +158,14 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         RecordingProtocolHandler file = new("file", _ => ValueTask.FromResult(
             TransferResult.TimeConditionNotMet(SourceLastWriteTimeUtc)));
         outputFiles.ExistingContent["out.txt"] = Encoding.ASCII.GetBytes("old");
+        Diagnostics.Arrange("handler", "time condition not met, carrying the source time");
+        Diagnostics.Arrange("existing content", "out.txt: old");
 
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], file);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("out.txt written", false, outputFiles.Written.ContainsKey("out.txt"));
+        Diagnostics.Assert("stamps", "out.txt=" + SourceLastWriteTimeUtc.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), StampsText);
         Assert.AreEqual(0, exitCode);
         Assert.IsFalse(outputFiles.Written.ContainsKey("out.txt"));
         Assert.HasCount(1, outputFiles.LastWriteTimesSet);
@@ -147,6 +185,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
 
         int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(DateTimeOffset.FromUnixTimeSeconds(1577959445)), runsOnWindows: true);
 
+        const string ExpectedEnding = "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: \nWarning: GetLastError 0x00000002\n";
+        Diagnostics.Assert("exit code", (int)CurlExitCode.Ok, exitCode);
+        Diagnostics.Assert("stderr ends with the filetime warnings", true, Lf(StandardErrorText).EndsWith(ExpectedEnding, StringComparison.Ordinal));
         Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
         Assert.EndsWith(
             "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: " + Environment.NewLine
@@ -159,9 +200,13 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 5 };
         DateTimeOffset fractional = DateTimeOffset.FromUnixTimeMilliseconds(1577959445678);
+        Diagnostics.Arrange("source time (Unix ms)", 1577959445678L);
 
         int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(fractional), runsOnWindows: true);
 
+        const string ExpectedEnding = "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: \nWarning: GetLastError 0x00000005\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr ends with the filetime warnings", true, Lf(StandardErrorText).EndsWith(ExpectedEnding, StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.EndsWith(
             "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: " + Environment.NewLine
@@ -182,6 +227,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
 
         int exitCode = await RunAsync(["-R", "-o", "o", SourceUrl], WritingBody(DateTimeOffset.FromUnixTimeSeconds(1700000000)), runsOnWindows: false);
 
+        const string ExpectedEnding = "Warning: Failed to set filetime 1700000000 on 'o': No such file or directory\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr ends with the POSIX warning", true, Lf(StandardErrorText).EndsWith(ExpectedEnding, StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.EndsWith(
             "Warning: Failed to set filetime 1700000000 on 'o': No such file or directory" + Environment.NewLine,
@@ -203,6 +251,8 @@ public sealed class CurlCommandRunnerRemoteTimeTests
 
         int exitCode = await RunAsync([.. silentOptions, "-R", "-o", "out2.txt", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(0, standardError.Length);
     }
@@ -212,6 +262,8 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(SourceLastWriteTimeUtc));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains Warning", false, StandardErrorText.Contains("Warning", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.DoesNotContain("Warning", Encoding.UTF8.GetString(standardError.ToArray()));
     }
@@ -230,9 +282,13 @@ public sealed class CurlCommandRunnerRemoteTimeTests
 
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(Year1700), runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), FirstStampSeconds());
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         string errors = Encoding.UTF8.GetString(standardError.ToArray());
+        Diagnostics.Assert("stderr starts with the capping warning", true, errors.StartsWith("Warning: Capping set filetime to minimum to avoid overflow", StringComparison.Ordinal));
+        Diagnostics.Assert("stderr has the filetime warning", true, errors.Contains("Warning: Failed to set filetime -6857222400 on outfile", StringComparison.Ordinal));
         Assert.StartsWith("Warning: Capping set filetime to minimum to avoid overflow", errors);
         Assert.Contains("Warning: Failed to set filetime -6857222400 on outfile", errors);
     }
@@ -242,6 +298,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(WindowsMinimumFileTimeUtc), runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), FirstStampSeconds());
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         Assert.AreEqual(0, standardError.Length);
@@ -255,6 +314,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
             WritingBody(WindowsMinimumFileTimeUtc.AddSeconds(-1)),
             runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), FirstStampSeconds());
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WindowsMinimumFileTimeUtc.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         Assert.AreEqual(0, standardError.Length);
@@ -265,6 +327,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBody(Year1700), runsOnWindows: false);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", Year1700.ToUnixTimeSeconds(), FirstStampSeconds());
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Year1700.ToUnixTimeSeconds(), outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         Assert.AreEqual(0, standardError.Length);
@@ -284,9 +349,13 @@ public sealed class CurlCommandRunnerRemoteTimeTests
 
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", WindowsMaximumFileTimeUnixSeconds, FirstStampSeconds());
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WindowsMaximumFileTimeUnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         string errors = Encoding.UTF8.GetString(standardError.ToArray());
+        Diagnostics.Assert("stderr starts with the capping warning", true, Lf(errors).StartsWith("Warning: Capping set filetime to max to avoid overflow\n", StringComparison.Ordinal));
+        Diagnostics.Assert("stderr has the filetime warning", true, errors.Contains("Warning: Failed to set filetime 910670515199 on outfile", StringComparison.Ordinal));
         Assert.StartsWith("Warning: Capping set filetime to max to avoid overflow" + Environment.NewLine, errors);
         Assert.Contains("Warning: Failed to set filetime 910670515199 on outfile", errors);
     }
@@ -296,6 +365,8 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", "Warning: Capping set filetime to max to avoid overflow\n", Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             "Warning: Capping set filetime to max to avoid overflow" + Environment.NewLine,
@@ -307,6 +378,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-s", "-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", WindowsMaximumFileTimeUnixSeconds, FirstStampSeconds());
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WindowsMaximumFileTimeUnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         Assert.AreEqual(0, standardError.Length);
@@ -317,6 +391,9 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(WindowsMaximumFileTimeUnixSeconds), runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", WindowsMaximumFileTimeUnixSeconds, FirstStampSeconds());
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WindowsMaximumFileTimeUnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         Assert.AreEqual(0, standardError.Length);
@@ -327,10 +404,15 @@ public sealed class CurlCommandRunnerRemoteTimeTests
     {
         int exitCode = await RunAsync(["-R", "-o", "out.txt", SourceUrl], WritingBodyAt(Year40000UnixSeconds), runsOnWindows: false);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first stamp (Unix seconds)", Year40000UnixSeconds, FirstStampSeconds());
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Year40000UnixSeconds, outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds);
         Assert.AreEqual(0, standardError.Length);
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static RecordingProtocolHandler WritingBodyAt(long sourceLastWriteUnixSeconds) =>
         new("file", async context =>
@@ -350,7 +432,26 @@ public sealed class CurlCommandRunnerRemoteTimeTests
             return TransferResult.Success(body.Length) with { SourceLastWriteTimeUtc = sourceLastWriteTimeUtc };
         });
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, bool runsOnWindows = false) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows)
-            .RunAsync(arguments);
+    /// <summary>The first last-write time set, in Unix seconds, or null when none was.</summary>
+    private long? FirstStampSeconds() =>
+        outputFiles.LastWriteTimesSet.Count == 0 ? null : outputFiles.LastWriteTimesSet[0].LastWriteUnixSeconds;
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, bool runsOnWindows = false)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("runs on Windows", runsOnWindows);
+        Diagnostics.Arrange("file time error code", outputFiles.FileTimeErrorCode);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Encoding.ASCII.GetString(standardOutput.ToArray()));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        Diagnostics.Act("stamps", StampsText);
+        return exitCode;
+    }
 }

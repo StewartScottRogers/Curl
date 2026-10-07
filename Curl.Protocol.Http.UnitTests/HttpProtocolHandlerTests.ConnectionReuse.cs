@@ -37,13 +37,21 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedConnection connection = Connection(response, chunkSize);
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{ReuseUrl}, {chunkSize}");
+            Diagnostics.Arrange("response", OneLine(response));
 
             TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
                 .ExecuteAsync(ReuseContext(events));
 
+            WriteResult(result);
+            WriteEvents("info lines", events.Info);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connection marked reusable", true, connection.IsMarkedReusable);
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(InfoLines(headInfoLines, "Connection #0 to host 127.0.0.1:18977 left intact"), events.Info, $"Chunk size {chunkSize}");
+            string[] expectedInfo = InfoLines(headInfoLines, "Connection #0 to host 127.0.0.1:18977 left intact");
+            WriteExpectedLines("info lines", expectedInfo, events.Info);
+            CollectionAssert.AreEqual(expectedInfo, events.Info, $"Chunk size {chunkSize}");
         }
     }
 
@@ -58,13 +66,21 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedConnection connection = Connection(response, chunkSize);
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{ReuseUrl}, {chunkSize}");
+            Diagnostics.Arrange("response", OneLine(response));
 
             TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 4)))
                 .ExecuteAsync(ReuseContext(events));
 
+            WriteResult(result);
+            WriteEvents("info lines", events.Info);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connection marked reusable", false, connection.IsMarkedReusable);
             Assert.IsFalse(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
-            CollectionAssert.AreEqual(InfoLines(headInfoLines, "shutting down connection #4"), events.Info, $"Chunk size {chunkSize}");
+            string[] expectedInfo = InfoLines(headInfoLines, "shutting down connection #4");
+            WriteExpectedLines("info lines", expectedInfo, events.Info);
+            CollectionAssert.AreEqual(expectedInfo, events.Info, $"Chunk size {chunkSize}");
         }
     }
 
@@ -75,14 +91,21 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\nhi", chunkSize);
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{ReuseUrl}, {chunkSize}");
 
             TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
                 .ExecuteAsync(ReuseContext(events));
 
+            WriteResult(result);
+            WriteEvents("info lines", events.Info);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connection marked reusable", true, connection.IsMarkedReusable);
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
+            string[] expectedInfo = InfoLines(AssumeClose + "|" + Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact");
+            WriteExpectedLines("info lines", expectedInfo, events.Info);
             CollectionAssert.AreEqual(
-                InfoLines(AssumeClose + "|" + Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact"),
+                expectedInfo,
                 events.Info,
                 $"Chunk size {chunkSize}");
         }
@@ -97,13 +120,20 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\n\r\nhi", chunkSize);
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{ReuseUrl}, {chunkSize}");
+            Diagnostics.Arrange("unix socket path", @"C:\Users\Public\BL794 Sock-Z.sock");
 
             TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, unixSocketPath: @"C:\Users\Public\BL794 Sock-Z.sock")))
                 .ExecuteAsync(ReuseContext(events));
 
+            WriteResult(result);
+            WriteEvents("info lines", events.Info);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            string[] expectedInfo = InfoLines(AssumeClose + "|" + Http10KeepAlive, @"Connection #0 to host c:\users\public\bl794 sock-z.sock:0 left intact");
+            WriteExpectedLines("info lines", expectedInfo, events.Info);
             CollectionAssert.AreEqual(
-                InfoLines(AssumeClose + "|" + Http10KeepAlive, @"Connection #0 to host c:\users\public\bl794 sock-z.sock:0 left intact"),
+                expectedInfo,
                 events.Info,
                 $"Chunk size {chunkSize}");
         }
@@ -126,22 +156,34 @@ public sealed partial class HttpProtocolHandlerTests
             HttpProtocolHandler handler = new(pool, new SilentAuthenticator());
             RecordingTransferEvents events = new();
             MemoryStream output = new();
+            Diagnostics.Arrange("urls, chunk size", $"http://127.0.0.1:18977/a, {ReuseUrl}, {chunkSize}");
+            Diagnostics.Arrange("response", OneLine(response));
 
             TransferResult a = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("http://127.0.0.1:18977/a"), Output = output, Events = events });
             TransferResult b = await handler.ExecuteAsync(ReuseContext(events, output));
 
+            WriteResult(a);
+            WriteResult(b);
+            WriteEvents("info lines", events.Info);
+            Diagnostics.Assert("first exit code", CurlExitCode.Ok, a.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, a.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("second exit code", CurlExitCode.Ok, b.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, b.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("output", "hihi", Latin1(output.ToArray()));
             Assert.AreEqual("hihi", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("first connection disposed", true, first.IsDisposed);
             Assert.IsTrue(first.IsDisposed, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("second connection count", 1, b.Report!.ConnectionCount);
             Assert.AreEqual(1, b.Report!.ConnectionCount, $"Chunk size {chunkSize}");
+            string[] expectedInfo =
+            [
+                UsingHttp1, RequestSent, AssumeClose, Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact",
+                "Connection 0 seems to be dead", "shutting down connection #0",
+                UsingHttp1, RequestSent, AssumeClose, Http10KeepAlive, "Connection #1 to host 127.0.0.1:18977 left intact",
+            ];
+            WriteExpectedLines("info lines", expectedInfo, events.Info);
             CollectionAssert.AreEqual(
-                new[]
-                {
-                    UsingHttp1, RequestSent, AssumeClose, Http10KeepAlive, "Connection #0 to host 127.0.0.1:18977 left intact",
-                    "Connection 0 seems to be dead", "shutting down connection #0",
-                    UsingHttp1, RequestSent, AssumeClose, Http10KeepAlive, "Connection #1 to host 127.0.0.1:18977 left intact",
-                },
+                expectedInfo,
                 events.Info,
                 $"Chunk size {chunkSize}");
         }
@@ -152,13 +194,21 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedConnection connection = Connection(KeepAliveResponse, 65536);
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url, max file size", $"{ReuseUrl}, 1");
+        Diagnostics.Arrange("response", OneLine(KeepAliveResponse));
 
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 2)))
             .ExecuteAsync(ReuseContext(events, maxFileSize: 1));
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Assert("connection marked reusable", false, connection.IsMarkedReusable);
         Assert.IsFalse(connection.IsMarkedReusable);
-        CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "closing connection #2" }, events.Info);
+        string[] expectedInfo = [UsingHttp1, RequestSent, "closing connection #2"];
+        WriteExpectedLines("info lines", expectedInfo, events.Info);
+        CollectionAssert.AreEqual(expectedInfo, events.Info);
     }
 
     [TestMethod]
@@ -166,13 +216,21 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nok", 65536);
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url", ReuseUrl);
+        Diagnostics.Arrange("response", OneLine("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nok"));
 
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 3)))
             .ExecuteAsync(ReuseContext(events));
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
+        Diagnostics.Assert("connection marked reusable", false, connection.IsMarkedReusable);
         Assert.IsFalse(connection.IsMarkedReusable);
-        CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "closing connection #3" }, events.Info);
+        string[] expectedInfo = [UsingHttp1, RequestSent, "closing connection #3"];
+        WriteExpectedLines("info lines", expectedInfo, events.Info);
+        CollectionAssert.AreEqual(expectedInfo, events.Info);
     }
 
     [TestMethod]
@@ -181,11 +239,15 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_ConnectorSaysReused_ReportsNoConnect(bool isReused, int connectionCount)
     {
         ScriptedConnection connection = Connection(KeepAliveResponse, 65536, ReuseRequest);
+        Diagnostics.Arrange("url, connector says reused", $"{ReuseUrl}, {isReused}");
 
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, isReused: isReused)))
             .ExecuteAsync(ReuseContext(new RecordingTransferEvents()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connection count", connectionCount, result.Report!.ConnectionCount);
         Assert.AreEqual(connectionCount, result.Report!.ConnectionCount);
     }
 
@@ -205,18 +267,30 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = new(
                 ConnectResult.Connected(dead, null, isReused: true, connectionNumber: 0),
                 ConnectResult.Connected(fresh, null, connectionNumber: 1));
+            Diagnostics.Arrange("url, chunk size", $"{ReuseUrl}, {chunkSize}");
 
             TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events, output));
 
+            WriteResult(result);
+            WriteEvents("info lines", events.Info);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("output", "hi", Latin1(output.ToArray()));
             Assert.AreEqual("hi", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connect targets", 2, connector.Targets.Count);
             Assert.AreEqual(2, connector.Targets.Count, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connection count", 1, result.Report!.ConnectionCount);
             Assert.AreEqual(1, result.Report!.ConnectionCount, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("request size", 2L * ReuseRequest.Length, result.Report.RequestSize);
             Assert.AreEqual(2L * ReuseRequest.Length, result.Report.RequestSize, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("dead connection disposed", true, dead.IsDisposed);
             Assert.IsTrue(dead.IsDisposed, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("dead connection marked reusable", false, dead.IsMarkedReusable);
             Assert.IsFalse(dead.IsMarkedReusable, $"Chunk size {chunkSize}");
+            string[] expectedInfo = [RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, UsingHttp1, RequestSent, "shutting down connection #1"];
+            WriteExpectedLines("info lines", expectedInfo, events.Info);
             CollectionAssert.AreEqual(
-                new[] { RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, UsingHttp1, RequestSent, "shutting down connection #1" },
+                expectedInfo,
                 events.Info,
                 $"Chunk size {chunkSize}");
         }
@@ -230,13 +304,20 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new(
             ConnectResult.Connected(dead, null, isReused: true),
             ConnectResult.Connected(Connection(KeepAliveResponse, 65536, ReuseRequest), null, connectionNumber: 1));
+        Diagnostics.Arrange("url, reused connection failure", $"{ReuseUrl}, Connection reset.");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connect targets", 2, connector.Targets.Count);
         Assert.AreEqual(2, connector.Targets.Count);
+        string[] expectedInfo = [RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, UsingHttp1, RequestSent, "Connection #1 to host 127.0.0.1:18977 left intact"];
+        WriteExpectedLines("info lines", expectedInfo, events.Info);
         CollectionAssert.AreEqual(
-            new[] { RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, UsingHttp1, RequestSent, "Connection #1 to host 127.0.0.1:18977 left intact" },
+            expectedInfo,
             events.Info);
     }
 
@@ -247,10 +328,14 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new(
             ConnectResult.Connected(dead, null, isReused: true),
             ConnectResult.Connected(Connection(KeepAliveResponse, 65536, ReuseRequest), null));
+        Diagnostics.Arrange("url, send failure", $"{ReuseUrl}, Connection reset.");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(new RecordingTransferEvents()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connect targets", 2, connector.Targets.Count);
         Assert.AreEqual(2, connector.Targets.Count);
     }
 
@@ -261,13 +346,20 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new(
             ConnectResult.Connected(Connection(string.Empty, 65536), null, isReused: true, connectionNumber: 0),
             ConnectResult.Connected(Connection(string.Empty, 65536), null, isReused: true, connectionNumber: 1));
+        Diagnostics.Arrange("url, response of both connections", $"{ReuseUrl}, (empty)");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
+        Diagnostics.Assert("connect targets", 2, connector.Targets.Count);
         Assert.AreEqual(2, connector.Targets.Count);
+        string[] expectedInfo = [RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, RequestSent, "closing connection #1"];
+        WriteExpectedLines("info lines", expectedInfo, events.Info);
         CollectionAssert.AreEqual(
-            new[] { RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, RequestSent, "closing connection #1" },
+            expectedInfo,
             events.Info);
     }
 
@@ -276,11 +368,17 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = new();
         QueueConnector connector = new(ConnectResult.Connected(Connection(string.Empty, 65536), null));
+        Diagnostics.Arrange("url, response", $"{ReuseUrl}, (empty)");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
-        CollectionAssert.AreEqual(new[] { UsingHttp1, RequestSent, "closing connection #0" }, events.Info);
+        string[] expectedInfo = [UsingHttp1, RequestSent, "closing connection #0"];
+        WriteExpectedLines("info lines", expectedInfo, events.Info);
+        CollectionAssert.AreEqual(expectedInfo, events.Info);
     }
 
     [TestMethod]
@@ -288,10 +386,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedConnection dead = new(Encoding.Latin1.GetBytes("HTTP/1.1 2"), 65536, failureAfterResponse: new IOException("Connection reset."));
         QueueConnector connector = new(ConnectResult.Connected(dead, null, isReused: true));
+        Diagnostics.Arrange("url, partial head, failure", $"{ReuseUrl}, HTTP/1.1 2, Connection reset.");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(new RecordingTransferEvents()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("connect targets", 1, connector.Targets.Count);
         Assert.AreEqual(1, connector.Targets.Count);
     }
 
@@ -301,10 +403,14 @@ public sealed partial class HttpProtocolHandlerTests
         FailingReadStream stream = new(new byte[207], 65536, new IOException("Lock violation."));
         HttpRequestOptions options = new() { Body = new StreamBody(stream, 100207, "multipart/form-data; boundary=b") };
         QueueConnector connector = new(ConnectResult.Connected(Connection(NoContent, 65536), null, isReused: true));
+        Diagnostics.Arrange("url, body length, body read failure", $"{ReuseUrl}, 100207, Lock violation.");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(new RecordingTransferEvents(), http: options));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
+        Diagnostics.Assert("connect targets", 1, connector.Targets.Count);
         Assert.AreEqual(1, connector.Targets.Count);
     }
 
@@ -313,10 +419,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         HttpRequestOptions options = new() { Body = new StreamBody(new MemoryStream(new byte[3]), 3, "application/octet-stream") };
         QueueConnector connector = new(ConnectResult.Connected(Connection(string.Empty, 65536), null, isReused: true));
+        Diagnostics.Arrange("url, stream body length", $"{ReuseUrl}, 3");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(new RecordingTransferEvents(), http: options));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
+        Diagnostics.Assert("connect targets", 1, connector.Targets.Count);
         Assert.AreEqual(1, connector.Targets.Count);
     }
 
@@ -330,10 +440,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = new();
         QueueConnector connector = new(ConnectResult.Refused("Failed to connect to 127.0.0.1:1 after 0 ms: Could not connect to server"));
+        Diagnostics.Arrange("url, connect result", $"{ReuseUrl}, refused");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("last info line", "closing connection #0", events.Info[^1]);
         Assert.AreEqual("closing connection #0", events.Info[^1]);
     }
 
@@ -342,11 +457,17 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = new();
         QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: nonexistent.invalid"));
+        Diagnostics.Arrange("url, connect result", $"{ReuseUrl}, could not resolve host");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ReuseContext(events));
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
-        CollectionAssert.AreEqual(new[] { "closing connection #0" }, events.Info);
+        string[] expectedInfo = ["closing connection #0"];
+        WriteExpectedLines("info lines", expectedInfo, events.Info);
+        CollectionAssert.AreEqual(expectedInfo, events.Info);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -9,14 +10,21 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpInfoLineRecorderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ReportInfo_SeveralLines_KeepsThemInOrder()
     {
         HttpInfoLineRecorder recorder = new();
+        Diagnostics.Arrange("info lines", "a, b");
 
         recorder.ReportInfo("a");
         recorder.ReportInfo("b");
 
+        Diagnostics.Act("kept", string.Join(", ", recorder.Lines));
+        Diagnostics.Assert("kept", "a, b", string.Join(", ", recorder.Lines));
         CollectionAssert.AreEqual(new[] { "a", "b" }, recorder.Lines.ToArray());
     }
 
@@ -24,6 +32,7 @@ public sealed class HttpInfoLineRecorderTests
     public void OtherEvents_Reported_KeepNoLine()
     {
         HttpInfoLineRecorder recorder = new();
+        Diagnostics.Arrange("events", "every event but info");
 
         recorder.ReportConnectionOpened(null!);
         recorder.ReportConnectionReused(null!);
@@ -34,6 +43,8 @@ public sealed class HttpInfoLineRecorderTests
         recorder.ReportDataSent([1]);
         recorder.ReportDataReceived([1]);
 
+        Diagnostics.Act("kept", recorder.Lines.Count);
+        Diagnostics.Assert("kept", 0, recorder.Lines.Count);
         Assert.IsEmpty(recorder.Lines);
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -7,6 +9,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class EchModesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("false", null, null, EchMode.Off)]
     [DataRow("grease", null, "AAA=", EchMode.Grease)]
@@ -18,10 +24,27 @@ public sealed class EchModesTests
     [DataRow("false", null, "AAA=", EchMode.Mandatory)]
     [DataRow("false", "pn.test", null, EchMode.Mandatory)]
     [DataRow(null, null, null, EchMode.Off)]
-    public void Of_CombinesTheModeThePublicNameAndTheList(string? mode, string? publicName, string? configList, EchMode expected) =>
-        Assert.AreEqual(expected, EchModes.Of(new TlsClientOptions(Ech: mode, EchPublicName: publicName, EchConfigList: configList)));
+    public void Of_CombinesTheModeThePublicNameAndTheList(string? mode, string? publicName, string? configList, EchMode expected)
+    {
+        Diagnostics.Arrange("--ech mode", mode ?? "(none)");
+        Diagnostics.Arrange("public name", publicName ?? "(none)");
+        Diagnostics.Arrange("config list", configList ?? "(none)");
+
+        var echMode = EchModes.Of(new TlsClientOptions(Ech: mode, EchPublicName: publicName, EchConfigList: configList));
+
+        Diagnostics.Act("ECH mode", echMode);
+        Diagnostics.Assert("ECH mode", expected, echMode);
+        Assert.AreEqual(expected, echMode);
+    }
 
     [TestMethod]
-    public void Of_WithNullOptions_ThrowsArgumentNullException() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => EchModes.Of(null!));
+    public void Of_WithNullOptions_ThrowsArgumentNullException()
+    {
+        Diagnostics.Arrange("options", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => EchModes.Of(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 }

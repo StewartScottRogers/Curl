@@ -1,6 +1,6 @@
 ---
-id: BL-1613
-title: Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.AuthenticationHandshake to HttpProtocolHandlerTests.DiagnosticLog tests write descriptive diagnostic output
+id: BL-1614
+title: Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.DigestStale to HttpProtocolHandlerTests.Http2Trace tests write descriptive diagnostic output
 priority: Normal
 assignee: Claude
 pipeline: direct
@@ -10,11 +10,11 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1613 — Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.AuthenticationHandshake to HttpProtocolHandlerTests.DiagnosticLog tests write descriptive diagnostic output
+# BL-1614 — Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.DigestStale to HttpProtocolHandlerTests.Http2Trace tests write descriptive diagnostic output
 
 ## Goal
 
-Every test in these `Curl.Protocol.Http.UnitTests` files (9 files, 96 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs, Act result and assertion context (plus `PHASE` timings where it has phases), with no test's logic or assertions changed: `HttpProtocolHandlerTests.AuthenticationHandshake.cs`, `HttpProtocolHandlerTests.AuthorizationBesideHeader.cs`, `HttpProtocolHandlerTests.AwsSigV4.cs`, `HttpProtocolHandlerTests.Conditions.cs`, `HttpProtocolHandlerTests.ConnectionReuse.cs`, `HttpProtocolHandlerTests.ContentEncodingLimit.cs`, `HttpProtocolHandlerTests.ContentLengthOverflow.cs`, `HttpProtocolHandlerTests.Cookies.cs`, `HttpProtocolHandlerTests.DiagnosticLog.cs`.
+Every test in these `Curl.Protocol.Http.UnitTests` files (12 files, 97 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs, Act result and assertion context (plus `PHASE` timings where it has phases), with no test's logic or assertions changed: `HttpProtocolHandlerTests.DigestStale.cs`, `HttpProtocolHandlerTests.ErrorWhileSending.cs`, `HttpProtocolHandlerTests.Events.cs`, `HttpProtocolHandlerTests.ExpectationFailed.cs`, `HttpProtocolHandlerTests.ExpectationFailedLoop.cs`, `HttpProtocolHandlerTests.ExpectationFailedWhileSending.cs`, `HttpProtocolHandlerTests.FrameLog.cs`, `HttpProtocolHandlerTests.H2cUpgrade.cs`, `HttpProtocolHandlerTests.HeadInfoLines.cs`, `HttpProtocolHandlerTests.Http09.cs`, `HttpProtocolHandlerTests.Http2.cs`, `HttpProtocolHandlerTests.Http2Trace.cs`.
 
 ## Context
 
@@ -34,3 +34,4 @@ Every test in these `Curl.Protocol.Http.UnitTests` files (9 files, 96 test metho
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -22,6 +23,10 @@ public sealed class CurlCommandRunnerNoFunctionOptionTests
     private readonly MemoryStream standardError = new();
     private readonly MemoryStream standardInput = new();
     private readonly InMemoryFileSystem fileSystem = new();
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
@@ -53,6 +58,10 @@ public sealed class CurlCommandRunnerNoFunctionOptionTests
 
         int exitCode = await RunAsync([.. option, Url], file);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(warning), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", "ok", StandardOutputText);
+        Diagnostics.Assert("requests made", 1, file.Contexts.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(warning, StandardErrorText);
         Assert.AreEqual("ok", StandardOutputText);
@@ -66,6 +75,8 @@ public sealed class CurlCommandRunnerNoFunctionOptionTests
     {
         int exitCode = await RunAsync(["-s", option, Url], RecordingProtocolHandler.WritingPath("file"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
@@ -75,8 +86,11 @@ public sealed class CurlCommandRunnerNoFunctionOptionTests
     {
         int exitCode = await RunAsync(["--metalink", "-s", Url], RecordingProtocolHandler.WritingPath("file"));
 
+        string expectedStandardError = "Warning: --metalink is deprecated and has no function anymore" + NewLine;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual("Warning: --metalink is deprecated and has no function anymore" + NewLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
@@ -84,14 +98,31 @@ public sealed class CurlCommandRunnerNoFunctionOptionTests
     {
         int exitCode = await RunAsync(["--bogus", Url]);
 
+        string expectedStandardError = "curl: option --bogus: is unknown" + NewLine
+            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine;
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(2, exitCode);
         Assert.AreEqual(
-            "curl: option --bogus: is unknown" + NewLine
-            + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
+            expectedStandardError,
             StandardErrorText);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
-            .RunAsync(arguments);
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
+    }
 }

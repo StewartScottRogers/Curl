@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 
 using Curl.Networking.Fakes;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -24,13 +25,24 @@ public sealed class DnsServerResolverTests
     private static readonly IPAddress Four = IPAddress.Parse("198.51.100.7");
     private static readonly IPAddress Six = IPAddress.Parse("2001:db8::7");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ResolveWithFailureReasonAsync_AnAnsweringServer_ReturnsTheAaaaAnswersThenTheAAnswers()
     {
         var opener = Opener((First, ScriptedDnsServer.Answering(Four, Six)));
+        ArrangeLookup("192.0.2.1", Host);
+        Diagnostics.Arrange("server answers", $"{Four}, {Six}");
 
         var resolution = await Resolver(opener, "192.0.2.1").ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.None, resolution.Failure);
+        Diagnostics.Assert("addresses", $"{Six}, {Four}", Join(resolution.Addresses));
+        Diagnostics.Assert("query types", "Aaaa, A", Join(opener.Sent.Select(sent => DnsTestReplies.TypeOf(sent.Query))));
         Assert.AreEqual(DnsLookupFailure.None, resolution.Failure);
         CollectionAssert.AreEqual(new[] { Six, Four }, resolution.Addresses.ToArray());
         CollectionAssert.AreEqual(new[] { DnsRecordType.Aaaa, DnsRecordType.A }, opener.Sent.Select(sent => DnsTestReplies.TypeOf(sent.Query)).ToArray());
@@ -41,9 +53,14 @@ public sealed class DnsServerResolverTests
     public async Task ResolveAsync_AnAnsweringServer_ReturnsTheAddresses()
     {
         var opener = Opener((First, ScriptedDnsServer.Answering(Four)));
+        ArrangeLookup("192.0.2.1", Host);
+        Diagnostics.Arrange("server answers", Four);
 
         var addresses = await Resolver(opener, "192.0.2.1").ResolveAsync(Host, CancellationToken.None);
 
+        Diagnostics.Act("addresses", Join(addresses));
+        WriteSent(opener);
+        Diagnostics.Assert("addresses", Four, Join(addresses));
         CollectionAssert.AreEqual(new[] { Four }, addresses.ToArray());
     }
 
@@ -53,9 +70,20 @@ public sealed class DnsServerResolverTests
         // curl -sS --dns-servers 172.26.96.1:15353 http://bl694.example:1/ (c-ares 1.34.8), dns.txt
         var opener = Opener((First, ScriptedDnsServer.Answering(Four)));
         var random = new QueuedRandom([0x66, 0x04], [0x35, 0x5C, 0x11, 0x4D, 0x1E, 0xDB, 0x1F, 0xDF], [0x9D, 0x89]);
+        ArrangeLookup("192.0.2.1", Host);
+        Diagnostics.Arrange("random fills", "6604, 355C114D1EDB1FDF, 9D89");
 
         await Resolver(opener, "192.0.2.1", fillRandom: random.Fill).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteSent(opener);
+        Diagnostics.Diff(
+            "AAAA query",
+            Convert.FromHexString("66040100000100000000000105626C363934076578616D706C6500001C000100002904D000000000000C000A0008355C114D1EDB1FDF"),
+            opener.Sent[0].Query);
+        Diagnostics.Diff(
+            "A query",
+            Convert.FromHexString("9D890100000100000000000105626C363934076578616D706C65000001000100002904D000000000000C000A0008355C114D1EDB1FDF"),
+            opener.Sent[1].Query);
         Assert.AreEqual(
             "66040100000100000000000105626C363934076578616D706C6500001C000100002904D000000000000C000A0008355C114D1EDB1FDF",
             Convert.ToHexString(opener.Sent[0].Query));
@@ -75,10 +103,20 @@ public sealed class DnsServerResolverTests
         };
         var opener = Opener((First, server));
         var random = new QueuedRandom([0x83, 0x2A], [0x42, 0x37, 0x3E, 0xA2, 0x36, 0x5E, 0x5B, 0x2B]);
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetworkV6);
+        Diagnostics.Arrange("server", $"truncated over UDP, {Four} over TCP");
 
         var resolution = await Resolver(opener, "192.0.2.1", AddressFamily.InterNetworkV6, fillRandom: random.Fill)
             .ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.NoData, resolution.Failure);
+        Diagnostics.Assert("transports", "udp, tcp", Join(opener.Sent.Select(sent => sent.Transport)));
+        Diagnostics.Diff(
+            "TCP query",
+            Convert.FromHexString("832A0100000100000000000105626C363934076578616D706C6500001C000100002904D0000000000000"),
+            opener.Sent[1].Query);
         Assert.AreEqual(DnsLookupFailure.NoData, resolution.Failure);
         CollectionAssert.AreEqual(new[] { "udp", "tcp" }, opener.Sent.Select(sent => sent.Transport).ToArray());
         Assert.AreEqual(
@@ -94,9 +132,13 @@ public sealed class DnsServerResolverTests
             AnswerOverUdp = query => DnsTestReplies.Answer(query, [], truncated: true),
             AnswerOverTcp = query => DnsTestReplies.Answer(query, [Four]),
         };
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("server", $"truncated over UDP, {Four} over TCP");
 
         var resolution = await Resolver(Opener((First, server)), "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("addresses", Four, Join(resolution.Addresses));
         CollectionAssert.AreEqual(new[] { Four }, resolution.Addresses.ToArray());
     }
 
@@ -108,9 +150,13 @@ public sealed class DnsServerResolverTests
             AnswerOverUdp = query => DnsTestReplies.Answer(query, [], truncated: true),
             AnswerOverTcp = query => DnsTestReplies.Answer([.. query.Take(1), (byte)(query[1] ^ 0xFF), .. query.Skip(2)], [Four]),
         };
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("server", "truncated over UDP, a reply with another ID over TCP");
 
         var resolution = await Resolver(Opener((First, server)), "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("failure", DnsLookupFailure.BadReply, resolution.Failure);
         Assert.AreEqual(DnsLookupFailure.BadReply, resolution.Failure);
     }
 
@@ -119,9 +165,15 @@ public sealed class DnsServerResolverTests
     {
         var server = new ScriptedDnsServer { AnswerOverUdp = query => DnsTestReplies.Answer(query, [], truncated: true) };
         var opener = Opener((First, server));
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("server", "truncated over UDP, closed unanswered over TCP");
 
         var resolution = await Resolver(opener, "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.Unreachable, resolution.Failure);
+        Diagnostics.Assert("sent count", DnsServerResolver.Rounds * 2, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.Unreachable, resolution.Failure);
         Assert.AreEqual(DnsServerResolver.Rounds * 2, opener.Sent.Count);
     }
@@ -132,9 +184,16 @@ public sealed class DnsServerResolverTests
         // The order-silent-first measurement: both queries to the first server at once, then to the second 2000 ms later.
         var time = new TimerCountingTimeProvider();
         var opener = Opener(time, (Second, ScriptedDnsServer.Answering(Four, Six)));
+        ArrangeLookup("192.0.2.1,192.0.2.2:5353", Host);
+        Diagnostics.Arrange("servers", $"{First} silent, {Second} answers {Four}, {Six}");
 
         var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1,192.0.2.2:5353", time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, opener, 2);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("addresses", $"{Six}, {Four}", Join(resolution.Addresses));
+        Diagnostics.Assert("servers asked", $"{First}, {First}, {Second}, {Second}", Join(opener.Sent.Select(sent => sent.Server)));
+        Diagnostics.Assert("sent at", "0, 0, 2000, 2000", Join(opener.Sent.Select(sent => sent.SentAt)));
         CollectionAssert.AreEqual(new[] { Six, Four }, resolution.Addresses.ToArray());
         CollectionAssert.AreEqual(new[] { First, First, Second, Second }, opener.Sent.Select(sent => sent.Server).ToArray());
         CollectionAssert.AreEqual(new long[] { 0, 0, 2000, 2000 }, opener.Sent.Select(sent => sent.SentAt).ToArray());
@@ -145,9 +204,17 @@ public sealed class DnsServerResolverTests
     {
         var time = new TimerCountingTimeProvider();
         var opener = Opener(time);
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("server", "silent");
 
         var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1", AddressFamily.InterNetwork, time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, opener, 1);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Act("clock", time.GetTimestamp());
+        Diagnostics.Assert("failure", DnsLookupFailure.Timeout, resolution.Failure);
+        Diagnostics.Assert("sent at", "0, 2000, 6000", Join(opener.Sent.Select(sent => sent.SentAt)));
+        Diagnostics.Assert("clock", 14000L, time.GetTimestamp());
         Assert.AreEqual(DnsLookupFailure.Timeout, resolution.Failure);
         CollectionAssert.AreEqual(new long[] { 0, 2000, 6000 }, opener.Sent.Select(sent => sent.SentAt).ToArray());
         Assert.AreEqual(14000, time.GetTimestamp());
@@ -159,9 +226,16 @@ public sealed class DnsServerResolverTests
         // The silent3 measurement: 0, 2000 and 4000 ms, then each server again, round after round.
         var time = new TimerCountingTimeProvider();
         var opener = Opener(time);
+        ArrangeLookup("192.0.2.1, 192.0.2.2:5353 ,192.0.2.3", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("servers", "all silent");
 
         var resolution = await RunOutTimeoutsAsync(Resolver(opener, "192.0.2.1, 192.0.2.2:5353 ,192.0.2.3", AddressFamily.InterNetwork, time: time).ResolveWithFailureReasonAsync(Host, CancellationToken.None).AsTask(), time, opener, 1);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.Timeout, resolution.Failure);
+        Diagnostics.Assert("servers asked", Join(new[] { First, Second, Third, First, Second, Third, First, Second, Third }), Join(opener.Sent.Select(sent => sent.Server)));
+        Diagnostics.Assert("sent at", "0, 2000, 4000, 6000, 10000, 14000, 18000, 26000, 34000", Join(opener.Sent.Select(sent => sent.SentAt)));
         Assert.AreEqual(DnsLookupFailure.Timeout, resolution.Failure);
         CollectionAssert.AreEqual(
             new[] { First, Second, Third, First, Second, Third, First, Second, Third },
@@ -175,9 +249,15 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_NxDomain_EndsTheQueryAsNotFound()
     {
         var opener = Opener((First, ScriptedDnsServer.AnsweringCode(3)), (Second, ScriptedDnsServer.Answering(Four)));
+        ArrangeLookup("192.0.2.1,192.0.2.2:5353", Host);
+        Diagnostics.Arrange("servers", $"{First} answers RCODE 3, {Second} answers {Four}");
 
         var resolution = await Resolver(opener, "192.0.2.1,192.0.2.2:5353").ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.NotFound, resolution.Failure);
+        Diagnostics.Assert("sent count", 2, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.NotFound, resolution.Failure);
         Assert.AreEqual(2, opener.Sent.Count);
     }
@@ -186,9 +266,15 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_NoRecordOfTheType_EndsTheQueryAsNoData()
     {
         var opener = Opener((First, ScriptedDnsServer.Answering(Six)));
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("server answers", Six);
 
         var resolution = await Resolver(opener, "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.NoData, resolution.Failure);
+        Diagnostics.Assert("sent count", 1, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.NoData, resolution.Failure);
         Assert.AreEqual(1, opener.Sent.Count);
     }
@@ -198,9 +284,15 @@ public sealed class DnsServerResolverTests
     {
         // The servfail measurement: three queries of each type, then "DNS server returned general failure".
         var opener = Opener((First, ScriptedDnsServer.AnsweringCode(2)));
+        ArrangeLookup("192.0.2.1", Host);
+        Diagnostics.Arrange("server answers", "RCODE 2");
 
         var resolution = await Resolver(opener, "192.0.2.1").ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.ServerFailure, resolution.Failure);
+        Diagnostics.Assert("sent count", 6, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.ServerFailure, resolution.Failure);
         Assert.AreEqual(6, opener.Sent.Count);
     }
@@ -209,9 +301,14 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_ServFailThenAnAnswer_ReturnsTheSecondServersAnswer()
     {
         var opener = Opener((First, ScriptedDnsServer.AnsweringCode(2)), (Second, ScriptedDnsServer.Answering(Four)));
+        ArrangeLookup("192.0.2.1,192.0.2.2:5353", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("servers", $"{First} answers RCODE 2, {Second} answers {Four}");
 
         var resolution = await Resolver(opener, "192.0.2.1,192.0.2.2:5353", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("addresses", Four, Join(resolution.Addresses));
         CollectionAssert.AreEqual(new[] { Four }, resolution.Addresses.ToArray());
     }
 
@@ -219,9 +316,13 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_ASocketThatCannotBeOpened_CouldNotContactTheServers()
     {
         var opener = Opener((First, new ScriptedDnsServer { OpenFailure = new SocketException((int)SocketError.AddressNotAvailable) }));
+        ArrangeLookup("192.0.2.1", Host);
+        Diagnostics.Arrange("open failure", SocketError.AddressNotAvailable);
 
         var resolution = await Resolver(opener, "192.0.2.1").ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("failure", DnsLookupFailure.Unreachable, resolution.Failure);
         Assert.AreEqual(DnsLookupFailure.Unreachable, resolution.Failure);
     }
 
@@ -229,9 +330,15 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_APortUnreachable_CouldNotContactTheServers()
     {
         var opener = Opener((First, new ScriptedDnsServer { ReceiveFailure = new SocketException((int)SocketError.ConnectionReset) }));
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("receive failure", SocketError.ConnectionReset);
 
         var resolution = await Resolver(opener, "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.Unreachable, resolution.Failure);
+        Diagnostics.Assert("sent count", DnsServerResolver.Rounds, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.Unreachable, resolution.Failure);
         Assert.AreEqual(DnsServerResolver.Rounds, opener.Sent.Count);
     }
@@ -247,9 +354,14 @@ public sealed class DnsServerResolverTests
             AnswerOverUdp = query => DnsTestReplies.Answer(query, [Four]),
             StrayDatagram = query => (new IPEndPoint(IPAddress.Parse(address), port), DnsTestReplies.Answer(query, [elsewhere])),
         };
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("stray reply source", $"{address}:{port}");
+        Diagnostics.Arrange("stray reply answer", elsewhere);
 
         var resolution = await Resolver(Opener((First, server)), "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("addresses", Four, Join(resolution.Addresses));
         CollectionAssert.AreEqual(new[] { Four }, resolution.Addresses.ToArray());
     }
 
@@ -261,9 +373,13 @@ public sealed class DnsServerResolverTests
             AnswerOverUdp = query => DnsTestReplies.Answer(query, [Four]),
             StrayDatagram = query => (new DnsEndPoint("elsewhere.example", 53), DnsTestReplies.Answer(query, [IPAddress.Loopback])),
         };
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("stray reply source", "elsewhere.example:53");
 
         var resolution = await Resolver(Opener((First, server)), "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("addresses", Four, Join(resolution.Addresses));
         CollectionAssert.AreEqual(new[] { Four }, resolution.Addresses.ToArray());
     }
 
@@ -276,9 +392,13 @@ public sealed class DnsServerResolverTests
             AnswerOverUdp = query => DnsTestReplies.Answer(query, [Six]),
             ReplySource = new IPEndPoint(IPAddress.Parse("fe80::53%5"), 53),
         };
+        ArrangeLookup("fe80::53", Host, AddressFamily.InterNetworkV6);
+        Diagnostics.Arrange("reply source", "[fe80::53%5]:53");
 
         var resolution = await Resolver(Opener((linkLocal, server)), "fe80::53", AddressFamily.InterNetworkV6).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("addresses", Six, Join(resolution.Addresses));
         CollectionAssert.AreEqual(new[] { Six }, resolution.Addresses.ToArray());
     }
 
@@ -290,9 +410,13 @@ public sealed class DnsServerResolverTests
             AnswerOverUdp = query => DnsTestReplies.Answer(query, [Four]),
             StrayDatagram = _ => (First, new byte[5]),
         };
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("stray reply", $"5 zero bytes from {First}");
 
         var resolution = await Resolver(Opener((First, server)), "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("addresses", Four, Join(resolution.Addresses));
         CollectionAssert.AreEqual(new[] { Four }, resolution.Addresses.ToArray());
     }
 
@@ -300,9 +424,13 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_AReplyThatDoesNotDecode_IsABadReply()
     {
         var server = new ScriptedDnsServer { AnswerOverUdp = query => [.. DnsTestReplies.Answer(query, [Four]), 0xFF] };
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("server answers", $"{Four} and a stray FF byte");
 
         var resolution = await Resolver(Opener((First, server)), "192.0.2.1", AddressFamily.InterNetwork).ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        Diagnostics.Assert("failure", DnsLookupFailure.BadReply, resolution.Failure);
         Assert.AreEqual(DnsLookupFailure.BadReply, resolution.Failure);
     }
 
@@ -315,9 +443,16 @@ public sealed class DnsServerResolverTests
     {
         var opener = Opener();
         var resolver = new DnsServerResolver(new DnsServerResolverOptions(servers, null, ipv4Address, ipv6Address), new ManualTimeProvider(), opener, () => [], _ => null, new QueuedRandom().Fill);
+        ArrangeLookup(servers, Host);
+        Diagnostics.Arrange("--dns-ipv4-addr", ipv4Address ?? "(none)");
+        Diagnostics.Arrange("--dns-ipv6-addr", ipv6Address ?? "(none)");
 
         var resolution = await resolver.ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.BadConfiguration, resolution.Failure);
+        Diagnostics.Assert("sent count", 0, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.BadConfiguration, resolution.Failure);
         Assert.AreEqual(0, opener.Sent.Count);
     }
@@ -336,9 +471,15 @@ public sealed class DnsServerResolverTests
             () => [],
             _ => null,
             new QueuedRandom().Fill);
+        ArrangeLookup("192.0.2.1,[2001:db8::53]", Host, AddressFamily.InterNetworkV6);
+        Diagnostics.Arrange("--dns-ipv4-addr", ipv4);
+        Diagnostics.Arrange("--dns-ipv6-addr", ipv6);
 
         await resolver.ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteSent(opener);
+        Diagnostics.Assert("first local address", ipv4, opener.Sent[0].LocalAddress);
+        Diagnostics.Assert("second local address", ipv6, opener.Sent[1].LocalAddress);
         Assert.AreEqual(ipv4, opener.Sent[0].LocalAddress);
         Assert.AreEqual(ipv6, opener.Sent[1].LocalAddress);
     }
@@ -355,9 +496,14 @@ public sealed class DnsServerResolverTests
             () => [],
             name => name == "eth0" ? [IPAddress.Parse("fe80::1"), eth0] : null,
             new QueuedRandom().Fill);
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("--dns-interface", "eth0");
+        Diagnostics.Arrange("eth0 addresses", $"fe80::1, {eth0}");
 
         await resolver.ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteSent(opener);
+        Diagnostics.Assert("local address", eth0, opener.Sent[0].LocalAddress);
         Assert.AreEqual(eth0, opener.Sent[0].LocalAddress);
     }
 
@@ -373,9 +519,15 @@ public sealed class DnsServerResolverTests
             () => [],
             _ => null,
             new QueuedRandom().Fill);
+        ArrangeLookup("192.0.2.1", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("--dns-interface", "nosuchif0");
 
         var resolution = await resolver.ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("addresses", Four, Join(resolution.Addresses));
+        Diagnostics.Assert("local address", IPAddress.Any, opener.Sent[0].LocalAddress);
         CollectionAssert.AreEqual(new[] { Four }, resolution.Addresses.ToArray());
         Assert.AreEqual(IPAddress.Any, opener.Sent[0].LocalAddress);
     }
@@ -391,9 +543,16 @@ public sealed class DnsServerResolverTests
             () => [Third],
             _ => null,
             new QueuedRandom().Fill);
+        ArrangeLookup("(none)", Host, AddressFamily.InterNetwork);
+        Diagnostics.Arrange("system servers", Third);
+        Diagnostics.Arrange("--dns-ipv4-addr", "10.1.2.3");
 
         var resolution = await resolver.ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("addresses", Four, Join(resolution.Addresses));
+        Diagnostics.Assert("server asked", Third, opener.Sent[0].Server);
         CollectionAssert.AreEqual(new[] { Four }, resolution.Addresses.ToArray());
         Assert.AreEqual(Third, opener.Sent[0].Server);
     }
@@ -403,9 +562,16 @@ public sealed class DnsServerResolverTests
     {
         var opener = Opener();
         var resolver = new DnsServerResolver(new DnsServerResolverOptions(null, "eth0", null, null), new ManualTimeProvider(), opener, () => [], _ => null, new QueuedRandom().Fill);
+        ArrangeLookup("(none)", Host);
+        Diagnostics.Arrange("system servers", "(none)");
+        Diagnostics.Arrange("--dns-interface", "eth0");
 
         var resolution = await resolver.ResolveWithFailureReasonAsync(Host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.Unreachable, resolution.Failure);
+        Diagnostics.Assert("sent count", 0, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.Unreachable, resolution.Failure);
         Assert.AreEqual(0, opener.Sent.Count);
     }
@@ -416,9 +582,14 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_AnAddressLiteral_ReturnsItWithoutAQuery(string literal)
     {
         var opener = Opener();
+        ArrangeLookup("192.0.2.1", literal);
 
         var resolution = await Resolver(opener, "192.0.2.1").ResolveWithFailureReasonAsync(literal, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("addresses", IPAddress.Parse(literal), Join(resolution.Addresses));
+        Diagnostics.Assert("sent count", 0, opener.Sent.Count);
         CollectionAssert.AreEqual(new[] { IPAddress.Parse(literal) }, resolution.Addresses.ToArray());
         Assert.AreEqual(0, opener.Sent.Count);
     }
@@ -430,9 +601,14 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_Localhost_ReturnsBothLoopbacksWithoutAQuery(string host)
     {
         var opener = Opener();
+        ArrangeLookup("192.0.2.1", host);
 
         var resolution = await Resolver(opener, "192.0.2.1").ResolveWithFailureReasonAsync(host, CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("addresses", $"{IPAddress.IPv6Loopback}, {IPAddress.Loopback}", Join(resolution.Addresses));
+        Diagnostics.Assert("sent count", 0, opener.Sent.Count);
         CollectionAssert.AreEqual(new[] { IPAddress.IPv6Loopback, IPAddress.Loopback }, resolution.Addresses.ToArray());
         Assert.AreEqual(0, opener.Sent.Count);
     }
@@ -441,9 +617,14 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_ANameThatCannotBeQueried_IsABadNameAndSendsNothing()
     {
         var opener = Opener();
+        ArrangeLookup("192.0.2.1", "a..b");
 
         var resolution = await Resolver(opener, "192.0.2.1").ResolveWithFailureReasonAsync("a..b", CancellationToken.None);
 
+        WriteResolution(resolution);
+        WriteSent(opener);
+        Diagnostics.Assert("failure", DnsLookupFailure.BadName, resolution.Failure);
+        Diagnostics.Assert("sent count", 0, opener.Sent.Count);
         Assert.AreEqual(DnsLookupFailure.BadName, resolution.Failure);
         Assert.AreEqual(0, opener.Sent.Count);
     }
@@ -452,11 +633,15 @@ public sealed class DnsServerResolverTests
     public async Task ResolveWithFailureReasonAsync_Cancelled_ThrowsOperationCanceledException()
     {
         using var cancellation = new CancellationTokenSource();
+        ArrangeLookup("192.0.2.1", Host);
+        Diagnostics.Arrange("server", "silent");
         var lookup = Resolver(Opener(), "192.0.2.1").ResolveWithFailureReasonAsync(Host, cancellation.Token).AsTask();
 
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => lookup);
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(() => lookup);
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception is an OperationCanceledException", true, exception is OperationCanceledException);
     }
 
     [TestMethod]
@@ -464,7 +649,12 @@ public sealed class DnsServerResolverTests
     [DataRow(" ")]
     public async Task ResolveWithFailureReasonAsync_WithoutAHost_ThrowsArgumentException(string? host)
     {
-        await Assert.ThrowsAsync<ArgumentException>(() => Resolver(Opener(), "192.0.2.1").ResolveWithFailureReasonAsync(host!, CancellationToken.None).AsTask());
+        ArrangeLookup("192.0.2.1", host is null ? "(null)" : $"\"{host}\"");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() => Resolver(Opener(), "192.0.2.1").ResolveWithFailureReasonAsync(host!, CancellationToken.None).AsTask());
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception is an ArgumentException", true, exception is ArgumentException);
     }
 
     [TestMethod]
@@ -472,10 +662,15 @@ public sealed class DnsServerResolverTests
     {
         var opener = Opener((First, ScriptedDnsServer.Answering(Four)));
         var resolver = Resolver(opener, "192.0.2.1", AddressFamily.InterNetwork, fillRandom: new QueuedRandom([0, 1], [1, 2, 3, 4, 5, 6, 7, 8], [0, 2]).Fill);
+        ArrangeLookup("192.0.2.1", $"{Host}, then other.example", AddressFamily.InterNetwork);
+        Diagnostics.Arrange("random fills", "0001, 0102030405060708, 0002");
 
         await resolver.ResolveWithFailureReasonAsync(Host, CancellationToken.None);
         await resolver.ResolveWithFailureReasonAsync("other.example", CancellationToken.None);
 
+        WriteSent(opener);
+        Diagnostics.Diff("second cookie", opener.Sent[0].Query[^8..], opener.Sent[1].Query[^8..]);
+        Diagnostics.Assert("IDs differ", true, !opener.Sent[0].Query[..2].SequenceEqual(opener.Sent[1].Query[..2]));
         CollectionAssert.AreEqual(opener.Sent[0].Query[^8..], opener.Sent[1].Query[^8..]);
         CollectionAssert.AreNotEqual(opener.Sent[0].Query[..2], opener.Sent[1].Query[..2]);
     }
@@ -488,9 +683,17 @@ public sealed class DnsServerResolverTests
             AnswerOverUdp = query => DnsTestReplies.AnswerServices(query, (0, 100, 88, "kdc1.example.com"), (10, 5, 750, "kdc2.example.com")),
         };
         var opener = Opener((First, server));
+        ArrangeLookup("192.0.2.1", "_kerberos._udp.EXAMPLE.COM");
+        Diagnostics.Arrange("server answers", "0 100 88 kdc1.example.com, 10 5 750 kdc2.example.com");
 
         var lookup = await Resolver(opener, "192.0.2.1").ResolveServiceAsync("_kerberos._udp.EXAMPLE.COM", CancellationToken.None);
 
+        WriteServiceLookup(lookup);
+        WriteSent(opener);
+        var expected = new[] { new DnsServiceRecord(0, 100, 88, "kdc1.example.com"), new DnsServiceRecord(10, 5, 750, "kdc2.example.com") };
+        Diagnostics.Assert("failure", DnsLookupFailure.None, lookup.Failure);
+        Diagnostics.Assert("records", Join(expected), Join(lookup.Records));
+        Diagnostics.Assert("query type", DnsRecordType.Srv, opener.Sent.Count == 1 ? DnsTestReplies.TypeOf(opener.Sent[0].Query) : "(not one query)");
         Assert.AreEqual(DnsLookupFailure.None, lookup.Failure);
         CollectionAssert.AreEqual(
             new[] { new DnsServiceRecord(0, 100, 88, "kdc1.example.com"), new DnsServiceRecord(10, 5, 750, "kdc2.example.com") },
@@ -501,8 +704,14 @@ public sealed class DnsServerResolverTests
     [TestMethod]
     public async Task ResolveServiceAsync_NxDomain_ReturnsNoRecordsAndNotFound()
     {
+        ArrangeLookup("192.0.2.1", "_kerberos._udp.EXAMPLE.COM");
+        Diagnostics.Arrange("server answers", "RCODE 3");
+
         var lookup = await Resolver(Opener((First, ScriptedDnsServer.AnsweringCode(3))), "192.0.2.1").ResolveServiceAsync("_kerberos._udp.EXAMPLE.COM", CancellationToken.None);
 
+        WriteServiceLookup(lookup);
+        Diagnostics.Assert("failure", DnsLookupFailure.NotFound, lookup.Failure);
+        Diagnostics.Assert("record count", 0, lookup.Records.Count);
         Assert.AreEqual(DnsLookupFailure.NotFound, lookup.Failure);
         Assert.AreEqual(0, lookup.Records.Count);
     }
@@ -510,8 +719,12 @@ public sealed class DnsServerResolverTests
     [TestMethod]
     public async Task ResolveServiceAsync_AListThatDoesNotParse_IsABadConfiguration()
     {
+        ArrangeLookup("bogus", "_kerberos._udp.EXAMPLE.COM");
+
         var lookup = await Resolver(Opener(), "bogus").ResolveServiceAsync("_kerberos._udp.EXAMPLE.COM", CancellationToken.None);
 
+        WriteServiceLookup(lookup);
+        Diagnostics.Assert("failure", DnsLookupFailure.BadConfiguration, lookup.Failure);
         Assert.AreEqual(DnsLookupFailure.BadConfiguration, lookup.Failure);
     }
 
@@ -520,7 +733,12 @@ public sealed class DnsServerResolverTests
     [DataRow("")]
     public async Task ResolveServiceAsync_WithoutAName_ThrowsArgumentException(string? name)
     {
-        await Assert.ThrowsAsync<ArgumentException>(() => Resolver(Opener(), "192.0.2.1").ResolveServiceAsync(name!, CancellationToken.None).AsTask());
+        ArrangeLookup("192.0.2.1", name is null ? "(null)" : $"\"{name}\"");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() => Resolver(Opener(), "192.0.2.1").ResolveServiceAsync(name!, CancellationToken.None).AsTask());
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception is an ArgumentException", true, exception is ArgumentException);
     }
 
     /// <summary>
@@ -568,6 +786,38 @@ public sealed class DnsServerResolverTests
             () => [],
             _ => null,
             fillRandom ?? new QueuedRandom().Fill);
+
+    private static string Join<T>(IEnumerable<T> items) => string.Join(", ", items);
+
+    private void ArrangeLookup(string servers, string host, AddressFamily family = AddressFamily.Unspecified)
+    {
+        Diagnostics.Arrange("--dns-servers", servers);
+        Diagnostics.Arrange("host", host);
+        Diagnostics.Arrange("family", family);
+    }
+
+    private void WriteResolution(DnsResolution resolution)
+    {
+        Diagnostics.Act("failure", resolution.Failure);
+        Diagnostics.Act("addresses", Join(resolution.Addresses));
+    }
+
+    private void WriteServiceLookup(DnsServiceLookup lookup)
+    {
+        Diagnostics.Act("failure", lookup.Failure);
+        Diagnostics.Act("records", Join(lookup.Records));
+    }
+
+    private void WriteSent(ScriptedDnsSocketOpener opener)
+    {
+        var sent = opener.Sent;
+        Diagnostics.Act("sent count", sent.Count);
+        for (var index = 0; index < sent.Count; index++)
+        {
+            Diagnostics.Act($"sent {index}", $"{sent[index].Transport} to {sent[index].Server} from {sent[index].LocalAddress} at {sent[index].SentAt}");
+            Diagnostics.Bytes($"query {index}", sent[index].Query);
+        }
+    }
 
     /// <summary>A <see cref="ManualTimeProvider" /> that also counts every timer created on it, fired or not.</summary>
     private sealed class TimerCountingTimeProvider : TimeProvider

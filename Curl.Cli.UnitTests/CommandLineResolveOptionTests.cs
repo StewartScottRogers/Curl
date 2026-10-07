@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -18,11 +19,30 @@ public sealed class CommandLineResolveOptionTests
 {
     private const string Url = "http://example.com/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            Diagnostics.Act("resolve entries", CommandLineParseDiagnostics.QuoteEach(result.Options.ResolveEntries));
+            Diagnostics.Act("connect-to entries", CommandLineParseDiagnostics.QuoteEach(result.Options.ConnectToEntries));
+        }
+
+        return result;
+    }
+
     [TestMethod]
     public void Parse_NoResolveOrConnectTo_RecordsNoEntries()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.Options.ResolveEntries);
         Assert.IsEmpty(result.Options.ConnectToEntries);
@@ -42,8 +62,9 @@ public sealed class CommandLineResolveOptionTests
     [DataRow("")]
     public void Parse_Resolve_RecordsTheValueVerbatimAndNeverRefuses(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--resolve", value, Url]);
+        CommandLineParseResult result = Parse(["--resolve", value, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { value }, result.Options.ResolveEntries.ToArray());
     }
@@ -57,8 +78,9 @@ public sealed class CommandLineResolveOptionTests
     [DataRow("")]
     public void Parse_ConnectTo_RecordsTheValueVerbatimAndNeverRefuses(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--connect-to", value, Url]);
+        CommandLineParseResult result = Parse(["--connect-to", value, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { value }, result.Options.ConnectToEntries.ToArray());
     }
@@ -66,7 +88,7 @@ public sealed class CommandLineResolveOptionTests
     [TestMethod]
     public void Parse_SeveralResolveAndConnectToValues_RecordsEachInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
         [
             "--resolve", "a:80:1.1.1.1",
             "--connect-to", "a:80:b:81",
@@ -76,6 +98,7 @@ public sealed class CommandLineResolveOptionTests
             Url,
         ]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "a:80:1.1.1.1", "*:443:[::1]", "-a:80" }, result.Options.ResolveEntries.ToArray());
         CollectionAssert.AreEqual(new[] { "a:80:b:81", "::c:" }, result.Options.ConnectToEntries.ToArray());
@@ -86,7 +109,7 @@ public sealed class CommandLineResolveOptionTests
     [DataRow("--connect-to")]
     public void Parse_ResolveOrConnectToWithoutAValue_RefusesAsRequiringAParameter(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, spelledOption]);
+        CommandLineParseResult result = Parse([Url, spelledOption]);
 
         AssertRefused(result, $"curl: option {spelledOption}: requires parameter");
     }
@@ -94,7 +117,7 @@ public sealed class CommandLineResolveOptionTests
     [TestMethod]
     public void Parse_NoResolve_RefusesAsNotReversible()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-resolve", Url]);
+        CommandLineParseResult result = Parse(["--no-resolve", Url]);
 
         AssertRefused(result, "curl: option --no-resolve: the given option cannot be reversed with a --no- prefix");
     }
@@ -102,13 +125,14 @@ public sealed class CommandLineResolveOptionTests
     [TestMethod]
     public void Parse_NoConnectTo_RefusesAsNotReversible()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-connect-to", Url]);
+        CommandLineParseResult result = Parse(["--no-connect-to", Url]);
 
         AssertRefused(result, "curl: option --no-connect-to: the given option cannot be reversed with a --no- prefix");
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    private void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
     {
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, [expectedFirstLine, CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(

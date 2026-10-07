@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -10,6 +11,10 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpNegotiateInfoLinesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("Negotiate YII=", false, HttpAuthSchemes.Any, true, DisplayName = "Negotiate value sent")]
     [DataRow("Basic dTpw", false, HttpAuthSchemes.Negotiate, false, DisplayName = "Another scheme's value")]
@@ -19,7 +24,13 @@ public sealed class HttpNegotiateInfoLinesTests
     [DataRow(null, true, HttpAuthSchemes.Negotiate, false, DisplayName = "No value in answer to a challenge")]
     public void PicksNegotiate_Request_DecidesAsCurl(string? authorization, bool answersChallenge, HttpAuthSchemes allowed, bool expected)
     {
-        Assert.AreEqual(expected, HttpNegotiateInfoLines.PicksNegotiate(Request(allowed), authorization, answersChallenge));
+        Diagnostics.Arrange("authorization, answers challenge, allowed", $"{authorization ?? "(none)"}, {answersChallenge}, {allowed}");
+
+        bool picks = HttpNegotiateInfoLines.PicksNegotiate(Request(allowed), authorization, answersChallenge);
+
+        Diagnostics.Act("picks Negotiate", picks);
+        Diagnostics.Assert("picks Negotiate", expected, picks);
+        Assert.AreEqual(expected, picks);
     }
 
     [TestMethod]
@@ -33,8 +44,13 @@ public sealed class HttpNegotiateInfoLinesTests
     public void IsNegotiateChallenge_Header_DecidesWhetherTheLinesGoBeforeIt(int statusCode, HttpAuthSchemes allowed, string name, string value, bool expected)
     {
         HttpStatusLine statusLine = HttpStatusLine.Parse($"HTTP/1.1 {statusCode} X");
+        Diagnostics.Arrange("status, allowed, header", $"{statusCode}, {allowed}, {name}: {value}");
 
-        Assert.AreEqual(expected, HttpNegotiateInfoLines.IsNegotiateChallenge(Request(allowed), statusLine, new HttpResponseHeader(name, value)));
+        bool isChallenge = HttpNegotiateInfoLines.IsNegotiateChallenge(Request(allowed), statusLine, new HttpResponseHeader(name, value));
+
+        Diagnostics.Act("is Negotiate challenge", isChallenge);
+        Diagnostics.Assert("is Negotiate challenge", expected, isChallenge);
+        Assert.AreEqual(expected, isChallenge);
     }
 
     private static HttpAuthRequest Request(HttpAuthSchemes allowed) =>

@@ -1,6 +1,6 @@
 ---
-id: BL-1553
-title: Make Curl.Networking.UnitTests' Dns tests write descriptive diagnostic output
+id: BL-1555
+title: Make Curl.Networking.UnitTests' HandBuiltTlsProviderTests write descriptive diagnostic output
 priority: Normal
 assignee: Claude
 pipeline: direct
@@ -10,11 +10,11 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1553 — Make Curl.Networking.UnitTests' Dns tests write descriptive diagnostic output
+# BL-1555 — Make Curl.Networking.UnitTests' HandBuiltTlsProviderTests write descriptive diagnostic output
 
 ## Goal
 
-Every test in `Curl.Networking.UnitTests`' `Dns*Tests.cs` files (`DnsAnswerDecoderTests` through `DnsSourceBindingTests`: 12 files, 134 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs (DNS queries and replies through `BYTES`), Act result and assertion context (plus `PHASE` timings where it has phases), with no test's logic or assertions changed.
+Every test in `Curl.Networking.UnitTests`' partial class `HandBuiltTlsProviderTests` (`HandBuiltTlsProviderTests.cs` and its 13 `HandBuiltTlsProviderTests.*.cs` files: 14 files, 138 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs (TLS settings, certificates by subject and thumbprint, handshake bytes through `BYTES`), Act result and assertion context (plus `PHASE` timings for the TLS handshake), with no test's logic or assertions changed.
 
 ## Context
 
@@ -22,7 +22,7 @@ Every test in `Curl.Networking.UnitTests`' `Dns*Tests.cs` files (`DnsAnswerDecod
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Networking.UnitTests --filter "FullyQualifiedName~Curl.Networking.Dns" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [ ] `dotnet test Curl.Networking.UnitTests --filter "FullyQualifiedName~Curl.Networking.HandBuiltTlsProviderTests." --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
 - [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
 - [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean and `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` passes.
 - [ ] The task's commits change only files under `Curl.Networking.UnitTests/` and this task file.
@@ -33,3 +33,4 @@ Every test in `Curl.Networking.UnitTests`' `Dns*Tests.cs` files (`DnsAnswerDecod
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.

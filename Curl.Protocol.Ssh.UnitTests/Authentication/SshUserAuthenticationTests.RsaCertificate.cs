@@ -36,8 +36,11 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", method, RsaCertificateBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", method, RsaCertificateBlob, signed: false), written[2]);
+        Diagnostics.Diff("agent.Written", ScriptedSshAgent.Frames(RequestIdentities, SignRequest(peer, RsaCertificateBlob, method, 0)), agent.Written);
         CollectionAssert.AreEqual(ScriptedSshAgent.Frames(RequestIdentities, SignRequest(peer, RsaCertificateBlob, method, 0)), agent.Written, "a certificate method asks with flag 0");
+        Diagnostics.Diff("client message 3", Join(PublicKeyRequest("tester", method, RsaCertificateBlob, signed: true), String(Join(Name(plainMethod), String(signature)))), written[3]);
         CollectionAssert.AreEqual(Join(PublicKeyRequest("tester", method, RsaCertificateBlob, signed: true), String(Join(Name(plainMethod), String(signature)))), written[3]);
     }
 
@@ -77,8 +80,11 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", RsaCertificateType, RsaCertificateBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", RsaCertificateType, RsaCertificateBlob, signed: false), written[2]);
+        Diagnostics.Diff("agent.Written", ScriptedSshAgent.Frames(RequestIdentities, SignRequest(peer, RsaCertificateBlob, RsaCertificateType, 0)), agent.Written);
         CollectionAssert.AreEqual(ScriptedSshAgent.Frames(RequestIdentities, SignRequest(peer, RsaCertificateBlob, RsaCertificateType, 0)), agent.Written);
+        Diagnostics.Diff("client message 3", Join(PublicKeyRequest("tester", RsaCertificateType, RsaCertificateBlob, signed: true), String(Join(Name("ssh-rsa"), String(signature)))), written[3]);
         CollectionAssert.AreEqual(Join(PublicKeyRequest("tester", RsaCertificateType, RsaCertificateBlob, signed: true), String(Join(Name("ssh-rsa"), String(signature)))), written[3]);
     }
 
@@ -96,6 +102,7 @@ public sealed partial class SshUserAuthenticationTests
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", "rsa-sha2-512-cert-v01@openssh.com", RsaCertificateBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-512-cert-v01@openssh.com", RsaCertificateBlob, signed: false), written[2]);
     }
 }

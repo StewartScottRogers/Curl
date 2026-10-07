@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -41,16 +42,24 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_VerboseRetrWithAuthPlain_WritesTheMeasuredLines()
     {
         int exitCode = await RunAsync(["-sv"], 18110, 64805, [Greeting, CapaReply, .. AuthPlainReplies, RetrReply, Bye]);
 
+        string expectedStandardError = Opened(18110, 64805, Greeting)
+            + Headers("< ", CapaReply)
+            + AuthPlainAndRetr(18110);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(Encoding.ASCII.GetString(standardError.ToArray())));
+        Diagnostics.Diff("stdout", Lf(Message), Lf(Encoding.ASCII.GetString(standardOutput.ToArray())));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
-            Opened(18110, 64805, Greeting)
-            + Headers("< ", CapaReply)
-            + AuthPlainAndRetr(18110),
+            expectedStandardError,
             Encoding.ASCII.GetString(standardError.ToArray()));
         Assert.AreEqual(Message, Encoding.ASCII.GetString(standardOutput.ToArray()));
     }
@@ -69,6 +78,10 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
 
         int tracedExitCode = await RunAsync(["-sv", "--trace-config", component], 18115, 64809, replies);
 
+        Diagnostics.Assert("verbose exit code", 0, verboseExitCode);
+        Diagnostics.Assert("traced exit code", 0, tracedExitCode);
+        Diagnostics.Diff("stderr", Lf(verboseLines), Lf(Encoding.ASCII.GetString(standardError.ToArray())));
+        Diagnostics.Diff("stdout", Lf(Message), Lf(Encoding.ASCII.GetString(standardOutput.ToArray())));
         Assert.AreEqual(0, verboseExitCode);
         Assert.AreEqual(0, tracedExitCode);
         Assert.AreEqual(verboseLines, Encoding.ASCII.GetString(standardError.ToArray()));
@@ -84,15 +97,18 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
         int exitCode = await RunAsync(
             ["-sv"], 18114, 52451, [greeting, capaReply, "+OK User accepted\r\n", "+OK Logged in\r\n", RetrReply, Bye]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            Opened(18114, 52451, greeting)
+        string expectedStandardError = Opened(18114, 52451, greeting)
             + Headers("< ", capaReply)
             + "> USER user" + HeaderEnd
             + "< +OK User accepted" + HeaderEnd
             + "> PASS secret" + HeaderEnd
             + "< +OK Logged in" + HeaderEnd
-            + RetrTail(18114),
+            + RetrTail(18114);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(Encoding.ASCII.GetString(standardError.ToArray())));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            expectedStandardError,
             Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
@@ -105,12 +121,15 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
 
         int exitCode = await RunAsync(["-sv"], 18411, 49971, [greeting, capaReply]);
 
-        Assert.AreEqual(67, exitCode);
-        Assert.AreEqual(
-            Opened(18411, 49971, greeting)
+        string expectedStandardError = Opened(18411, 49971, greeting)
             + Headers("< ", capaReply)
             + "* SASL: no auth mechanism was offered or recognized" + InfoEnd
-            + "* closing connection #0" + InfoEnd,
+            + "* closing connection #0" + InfoEnd;
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(Encoding.ASCII.GetString(standardError.ToArray())));
+        Assert.AreEqual(67, exitCode);
+        Assert.AreEqual(
+            expectedStandardError,
             Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
@@ -141,9 +160,7 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
             64807,
             [Greeting, CapaReply, "+OK Begin TLS negotiation\r\n", SecureCapaReply, .. AuthPlainReplies, RetrReply, Bye]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            Opened(18112, 64807, Greeting)
+        string expectedStandardError = Opened(18112, 64807, Greeting)
             + Headers("< ", CapaReply)
             + "> STLS" + HeaderEnd
             + "< +OK Begin TLS negotiation" + HeaderEnd
@@ -151,7 +168,12 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
             + "* Established connection to 127.0.0.1 (127.0.0.1 port 18112) from 127.0.0.1 port 64807 " + InfoEnd
             + "> CAPA" + HeaderEnd
             + Headers("< ", SecureCapaReply)
-            + AuthPlainAndRetr(18112),
+            + AuthPlainAndRetr(18112);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(Encoding.ASCII.GetString(standardError.ToArray())));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            expectedStandardError,
             Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
@@ -160,8 +182,7 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
     {
         int exitCode = await RunAsync(["--trace-ascii", "-"], 18113, 64808, [Greeting, CapaReply, .. AuthPlainReplies, RetrReply, Bye]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        string expectedStandardOutput =
             "*   Trying 127.0.0.1:18113...\n"
             + "* Established connection to 127.0.0.1 (127.0.0.1 port 18113) from 127.0.0.1 port 64808 \n"
             + "<= Recv header, 43 bytes (0x2b)\n0000: +OK POP3 ready <1896.697170952@localhost>\n"
@@ -190,7 +211,12 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
             + "<= Recv data, 2 bytes (0x2)\n0000: \n\r\n"
             + "<= Recv data, 31 bytes (0x1f)\n0000: .A line that starts with a dot.\n.A line that starts with a dot."
             + "<= Recv data, 2 bytes (0x2)\n0000: \n\r\n"
-            + "* Connection #0 to host 127.0.0.1:18113 left intact\n",
+            + "* Connection #0 to host 127.0.0.1:18113 left intact\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", Lf(expectedStandardOutput), Lf(Encoding.ASCII.GetString(standardOutput.ToArray())));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(
+            expectedStandardOutput,
             Encoding.ASCII.GetString(standardOutput.ToArray()));
     }
 
@@ -217,22 +243,37 @@ public sealed class CurlCommandRunnerPop3TransferEventTests
         + "{ [24 bytes data]" + InfoEnd
         + $"* Connection #0 to host 127.0.0.1:{port} left intact" + InfoEnd;
 
-    private Task<int> RunAsync(IReadOnlyList<string> options, int port, int localPort, IReadOnlyList<string> replies)
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> options, int port, int localPort, IReadOnlyList<string> replies)
     {
         var connector = new ReportingConnector(new ScriptedConnector([.. replies.Select(Encoding.ASCII.GetBytes)]), localPort);
         var files = new InMemoryFileSystem();
+        string[] arguments = [.. options, "-u", "user:secret", $"pop3://127.0.0.1:{port}/1"];
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("local port", localPort);
+        Diagnostics.Arrange("scripted replies", Lf(string.Concat(replies)).Replace("\n", "\\n", StringComparison.Ordinal));
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver()))),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync([.. options, "-u", "user:secret", $"pop3://127.0.0.1:{port}/1"]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+                            connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver()))),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(Encoding.ASCII.GetString(standardOutput.ToArray())));
+        Diagnostics.Act("stderr", Lf(Encoding.ASCII.GetString(standardError.ToArray())));
+        return exitCode;
     }
 
     /// <summary>

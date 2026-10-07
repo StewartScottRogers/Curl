@@ -30,14 +30,22 @@ public sealed partial class HttpProtocolHandlerTests
             PathAsIs = true,
             Http = new HttpRequestOptions { AwsSigV4 = "aws:amz:us-east-1:s3", Headers = headers },
         };
+        Diagnostics.Arrange("url, aws-sigv4, headers", $"{AuthUrl}, aws:amz:us-east-1:s3, X-A: 1");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff(
+            "connection written",
+            "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + SignedValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nX-A: 1\r\n\r\n",
+            connection.Written);
         Assert.AreEqual(
             "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + SignedValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nX-A: 1\r\n\r\n",
             connection.Written);
         AwsSigV4Inputs inputs = authenticator.Calls.Single().Request.AwsSigV4!;
+        Diagnostics.Assert("aws-sigv4 inputs", new AwsSigV4Inputs("aws:amz:us-east-1:s3", "127.0.0.1:18183", headers) { IsGetOrHead = true, PathAsIs = true }, inputs);
         Assert.AreEqual(new AwsSigV4Inputs("aws:amz:us-east-1:s3", "127.0.0.1:18183", headers) { IsGetOrHead = true, PathAsIs = true }, inputs);
     }
 
@@ -53,12 +61,17 @@ public sealed partial class HttpProtocolHandlerTests
             Credentials = new NetworkCredential("u", "p"),
             Http = new HttpRequestOptions { AwsSigV4 = "aws", Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded") },
         };
+        Diagnostics.Arrange("url, aws-sigv4, body", $"{AuthUrl}, aws, hello");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         AwsSigV4Inputs inputs = authenticator.Calls.Single().Request.AwsSigV4!;
+        Diagnostics.Assert("post fields", "hello", Encoding.Latin1.GetString(inputs.PostFields!.Value.Span));
         Assert.AreEqual("hello", Encoding.Latin1.GetString(inputs.PostFields!.Value.Span));
+        Diagnostics.Assert("upload size", -1, inputs.UploadSize);
         Assert.AreEqual(-1, inputs.UploadSize);
         Assert.IsFalse(inputs.IsGetOrHead);
     }
@@ -79,10 +92,13 @@ public sealed partial class HttpProtocolHandlerTests
             Upload = unseekable ? new UnseekableStream(content) : new MemoryStream(content),
             Http = new HttpRequestOptions { AwsSigV4 = "aws" },
         };
+        Diagnostics.Arrange("url, aws-sigv4, unseekable, content length", $"{AuthUrl}, aws, {unseekable}, {content.Length}");
 
-        await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+        WriteResult(result);
         AwsSigV4Inputs inputs = authenticator.Calls.Single().Request.AwsSigV4!;
+        Diagnostics.Assert("upload size", expectedSize, inputs.UploadSize);
         Assert.AreEqual(expectedSize, inputs.UploadSize);
         Assert.IsNull(inputs.PostFields);
         Assert.IsFalse(inputs.IsGetOrHead);
@@ -93,9 +109,12 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(int.MaxValue, OkHead + "ok");
         ScriptedAuthenticator authenticator = new(null, null);
+        Diagnostics.Arrange("url, aws-sigv4", $"{AuthUrl}, none");
 
-        await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(AuthContext(new MemoryStream(), new MemoryStream()));
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(AuthContext(new MemoryStream(), new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("aws-sigv4 inputs", "(null)", authenticator.Calls.Single().Request.AwsSigV4?.ToString() ?? "(null)");
         Assert.IsNull(authenticator.Calls.Single().Request.AwsSigV4);
     }
 
@@ -111,10 +130,14 @@ public sealed partial class HttpProtocolHandlerTests
             Credentials = new NetworkCredential("u", "p"),
             Http = new HttpRequestOptions { AwsSigV4 = "aws", ForwardProxy = ChallengingProxy },
         };
+        Diagnostics.Arrange("url, aws-sigv4, forward proxy", $"{AuthUrl}, aws, challenging");
 
-        await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("origin call has inputs", true, authenticator.Calls.Single(call => !call.Request.IsProxy).Request.AwsSigV4 is not null);
         Assert.IsNotNull(authenticator.Calls.Single(call => !call.Request.IsProxy).Request.AwsSigV4);
+        Diagnostics.Assert("proxy call has inputs", false, authenticator.Calls.Single(call => call.Request.IsProxy).Request.AwsSigV4 is not null);
         Assert.IsNull(authenticator.Calls.Single(call => call.Request.IsProxy).Request.AwsSigV4);
     }
 
@@ -128,12 +151,17 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(int.MaxValue, OkHead + "ok");
         QueueConnector connector = QueueConnector.For(connection);
         RefusingAuthenticator authenticator = new(CurlExitCode.UrlMalformat, "aws-sigv4: service missing in parameters and hostname");
+        Diagnostics.Arrange("url, refusal", $"{AuthUrl}, UrlMalformat");
 
         TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(AuthContext(new MemoryStream(), new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Diagnostics.Assert("error message", "aws-sigv4: service missing in parameters and hostname", result.ErrorMessage ?? "(none)");
         Assert.AreEqual("aws-sigv4: service missing in parameters and hostname", result.ErrorMessage);
         Assert.HasCount(1, connector.Targets);
+        Diagnostics.Diff("connection written", string.Empty, connection.Written);
         Assert.AreEqual(string.Empty, connection.Written);
         Assert.AreEqual(1, authenticator.Calls);
     }
@@ -150,10 +178,14 @@ public sealed partial class HttpProtocolHandlerTests
             Credentials = new NetworkCredential("u", "p"),
             Http = new HttpRequestOptions { AwsSigV4 = "aws:amz:us-east-1:s3" },
         };
+        Diagnostics.Arrange("url, connect failure", $"{AuthUrl}, {connectFailure}");
 
         TransferResult result = await new HttpProtocolHandler(connector, SigV4LineReporter()).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("error message", connectFailure, result.ErrorMessage ?? "(none)");
         Assert.AreEqual(connectFailure, result.ErrorMessage);
     }
 
@@ -168,10 +200,14 @@ public sealed partial class HttpProtocolHandlerTests
             Credentials = new NetworkCredential("u", "p"),
             Http = new HttpRequestOptions { AwsSigV4 = "aws:amz:us-east-1:s3", Fail = HttpFailMode.Fail },
         };
+        Diagnostics.Arrange("url, fail mode", $"{AuthUrl}, Fail");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), SigV4LineReporter()).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Diagnostics.Assert("error message", "The requested URL returned error: 401", result.ErrorMessage ?? "(none)");
         Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage);
     }
 

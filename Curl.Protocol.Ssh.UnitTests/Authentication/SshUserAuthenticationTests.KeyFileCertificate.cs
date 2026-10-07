@@ -36,8 +36,10 @@ public sealed partial class SshUserAuthenticationTests
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         Assert.HasCount(3, written);
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", method, certificateBlob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", method, certificateBlob, signed: false), written[1]);
         byte[] signedPart = PublicKeyRequest("tester", method, certificateBlob, signed: true);
+        Diagnostics.Diff("client message 2[..signedPart.Length]", signedPart, written[2][..signedPart.Length]);
         CollectionAssert.AreEqual(signedPart, written[2][..signedPart.Length]);
         SshWireReader signatureBlob = new(new SshWireReader(written[2].AsMemory(signedPart.Length)).ReadString());
         Assert.AreEqual(plainMethod, signatureBlob.ReadName());
@@ -62,6 +64,8 @@ public sealed partial class SshUserAuthenticationTests
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
         AssertMethods(await AuthenticationMessagesAsync(peer), "none", "publickey", "publickey", "password");
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("verbose line 3", "* SSH: publickey authentication denied: Invalid signature for supplied public key, or bad username/public key combination", peer.Events.Transcript[3]);
         Assert.AreEqual("* SSH: publickey authentication denied: Invalid signature for supplied public key, or bad username/public key combination", peer.Events.Transcript[3]);
     }
 
@@ -80,6 +84,8 @@ public sealed partial class SshUserAuthenticationTests
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
         AssertMethods(await AuthenticationMessagesAsync(peer), "none", "publickey", "password");
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("verbose line 3", "* SSH: publickey authentication denied: Callback returned error", peer.Events.Transcript[3]);
         Assert.AreEqual("* SSH: publickey authentication denied: Callback returned error", peer.Events.Transcript[3]);
     }
 

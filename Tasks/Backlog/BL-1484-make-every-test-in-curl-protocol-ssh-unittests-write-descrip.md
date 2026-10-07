@@ -4,7 +4,7 @@ title: Make every test in Curl.Protocol.Ssh.UnitTests write descriptive diagnost
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1457]
+depends-on: [BL-1457, BL-1622, BL-1623, BL-1624, BL-1625, BL-1626, BL-1627, BL-1628, BL-1629, BL-1630]
 touches: [Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-04
@@ -36,7 +36,10 @@ Every test in `Curl.Protocol.Ssh.UnitTests` writes, through BL-1457's shared `Te
 ## Notes
 
 - Large: 811 test methods in 94 files is probably more than one `/task-run` can finish. Stewart asked for one task per project, so it is filed whole. If the runner judges it too big, it splits it before changing any test: it files tasks that each cover a range of the project's files by name (each `-Pipeline direct -DependsOn BL-1457 -Touches Curl.Protocol.Ssh.UnitTests`, with these criteria limited to its files' classes through `--filter "FullyQualifiedName~<class>"`), adds them to this task's `depends-on`, and moves this task back to `Backlog`; this task then only runs the whole-project checks above.
+- 2026-10-07 (lane 5): Split before changing any test, as the note above allows: 811 test methods in 94 files cannot be finished in one 120-minute run. Filed BL-1622 (SshUserAuthenticationTests*, 103), BL-1623 (other Authentication, Compression, Connection, 66), BL-1624 (HostKeys, KeyExchange, Negotiation, 80), BL-1625 (Keys, 85), BL-1626 (PacketProtection and root helper tests, 67), BL-1627 (Scp, SFTP download and listing, 104), BL-1628 (SFTP upload, quote, session, 90), BL-1629 (SshProtocolHandlerTests*, 139), BL-1630 (Transport, 102). All touch only Curl.Protocol.Ssh.UnitTests, so the board runs them one at a time. Once they are Done, this task only runs the whole-project checks.
 
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Split into BL-1622..BL-1630 (one per folder group); waits on them, then runs only the whole-project checks.

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -16,6 +17,11 @@ namespace Curl.Protocol.Smtp;
 public sealed class SmtpProtocolHandlerNulByteTests
 {
     private const string Url = "smtp://127.0.0.1:18025/client";
+
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private const string Greeting = "220 localhost ESMTP\r\n";
 
@@ -37,7 +43,9 @@ public sealed class SmtpProtocolHandlerNulByteTests
         SmtpRun run = await RunAsync("220 hel\0lo\r\n", events, upload: null);
 
         AssertNulByteFailure(run);
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
+        ShowTranscript([NulByteFailure, Closing], events);
         CollectionAssert.AreEqual((string[])[NulByteFailure, Closing], events.Transcript);
     }
 
@@ -50,7 +58,9 @@ public sealed class SmtpProtocolHandlerNulByteTests
         SmtpRun run = await RunAsync("220 hi\r\n250 eh\0lo\r\n", events, upload: null);
 
         AssertNulByteFailure(run);
+        Diagnostics.Diff("sent", "EHLO client\r\n", run.Sent);
         Assert.AreEqual("EHLO client\r\n", run.Sent);
+        ShowTranscript(["< 220 hi\r\n", "> EHLO client\r\n", NulByteFailure, Closing], events);
         CollectionAssert.AreEqual((string[])["< 220 hi\r\n", "> EHLO client\r\n", NulByteFailure, Closing], events.Transcript);
     }
 
@@ -64,7 +74,9 @@ public sealed class SmtpProtocolHandlerNulByteTests
         SmtpRun run = await RunAsync(Greeting + ehloReply, events, upload: null);
 
         AssertNulByteFailure(run);
+        Diagnostics.Diff("sent", "EHLO client\r\n", run.Sent);
         Assert.AreEqual("EHLO client\r\n", run.Sent);
+        ShowTranscript(["< 220 localhost ESMTP\r\n", "> EHLO client\r\n", NulByteFailure, Closing], events);
         CollectionAssert.AreEqual(
             (string[])["< 220 localhost ESMTP\r\n", "> EHLO client\r\n", NulByteFailure, Closing],
             events.Transcript);
@@ -78,7 +90,9 @@ public sealed class SmtpProtocolHandlerNulByteTests
         SmtpRun run = await RunAsync(Greeting + EhloReply + "250 O\0K\r\n", events, upload: "one\r\n");
 
         AssertNulByteFailure(run);
+        Diagnostics.Diff("sent", "EHLO client\r\nMAIL FROM:<a@b>\r\n", run.Sent);
         Assert.AreEqual("EHLO client\r\nMAIL FROM:<a@b>\r\n", run.Sent);
+        ShowTranscript([.. OpenedSession, "> MAIL FROM:<a@b>\r\n", NulByteFailure, Closing], events);
         CollectionAssert.AreEqual(
             (string[])[.. OpenedSession, "> MAIL FROM:<a@b>\r\n", NulByteFailure, Closing],
             events.Transcript);
@@ -92,7 +106,9 @@ public sealed class SmtpProtocolHandlerNulByteTests
         SmtpRun run = await RunAsync(Greeting + EhloReply + "250 Rec\0order\r\n", events, upload: null);
 
         AssertNulByteFailure(run);
+        Diagnostics.Diff("sent", "EHLO client\r\nVRFY c@d\r\n", run.Sent);
         Assert.AreEqual("EHLO client\r\nVRFY c@d\r\n", run.Sent);
+        ShowTranscript([.. OpenedSession, "> VRFY c@d\r\n", NulByteFailure, Closing], events);
         CollectionAssert.AreEqual(
             (string[])[.. OpenedSession, "> VRFY c@d\r\n", NulByteFailure, Closing],
             events.Transcript);
@@ -106,17 +122,27 @@ public sealed class SmtpProtocolHandlerNulByteTests
 
         SmtpRun run = await RunAsync(Greeting + EhloReply + "250 Recorder\r\n" + "221 B\0ye\r\n", events, upload: null);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Diff("sent", "EHLO client\r\nVRFY c@d\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual("EHLO client\r\nVRFY c@d\r\nQUIT\r\n", run.Sent);
     }
 
-    private static void AssertNulByteFailure(SmtpRun run)
+    private void ShowTranscript(string[] expected, RecordingTransferEvents events) =>
+        Diagnostics.Diff(
+            "transcript",
+            string.Join(" | ", expected.Select(SmtpDiagnostics.Show)),
+            string.Join(" | ", events.Transcript.Select(SmtpDiagnostics.Show)));
+
+    private void AssertNulByteFailure(SmtpRun run)
     {
+        Diagnostics.AssertValues("exit code", CurlExitCode.WeirdServerReply, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Nul byte in server response line", run.Result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, run.Result.ExitCode);
         Assert.AreEqual("Nul byte in server response line", run.Result.ErrorMessage);
     }
 
-    private static Task<SmtpRun> RunAsync(string replies, RecordingTransferEvents events, string? upload)
+    private Task<SmtpRun> RunAsync(string replies, RecordingTransferEvents events, string? upload)
     {
         var context = new TransferContext
         {
@@ -126,6 +152,7 @@ public sealed class SmtpProtocolHandlerNulByteTests
             Upload = upload is null ? null : new MemoryStream(Encoding.Latin1.GetBytes(upload)),
             Mail = new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
         };
-        return SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
+        Diagnostics.Arrange("message body sent", SmtpDiagnostics.Show(upload));
+        return SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
     }
 }

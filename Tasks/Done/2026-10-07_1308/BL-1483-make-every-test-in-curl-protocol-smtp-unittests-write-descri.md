@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1483 — Make every test in Curl.Protocol.Smtp.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,22 @@ Every test in `Curl.Protocol.Smtp.UnitTests` writes, through BL-1457's shared `T
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Protocol.Smtp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Smtp.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Smtp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Smtp.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 221 test methods in 17 files.
+- Shared lines: the new `Fakes/SmtpDiagnostics.cs` and the `TestDiagnostics` overloads of `SmtpRun.ExecuteAsync` write each run's ARRANGE (URL, ssl level, `--mail-from`, `--mail-rcpt`, custom command, upload, server replies, handshakes) and ACT (result with exit code and error text, commands sent, connect targets, handshakes) lines; `ScriptedConnection.Script` exposes the scripted replies. Each test writes its own ASSERT or DIFF lines before its assertions.
+- Counts before and after (Select-String -AllMatches, excluding obj): `Assert.` 427 -> 427, `[TestMethod` 221 -> 221, `[DataRow(` 150 -> 150. Test run: 327 total (no test method or data row added or removed, so unchanged), 320 passed, 7 skipped by OS condition; 320 `END` lines, none with arrange, act or assert 0.
+- Slow tests: none printed a `SLOW:` line (whole run 1.3 s), so no follow-up task.
+- The throw tests (`Constructor_NullArgument_Throws` and the like) write their ASSERT line, naming the expected exception, before the call, because no diagnostic call goes inside an `Assert.Throws*` lambda.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Protocol.Smtp.UnitTests test writes ARRANGE, ACT and ASSERT or DIFF lines

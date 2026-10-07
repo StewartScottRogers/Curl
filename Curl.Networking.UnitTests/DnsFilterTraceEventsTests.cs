@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 using CountingTransferEvents = Curl.Networking.HandshakeCapturingTransferEventsTests.CountingTransferEvents;
 
@@ -17,13 +18,26 @@ public sealed class DnsFilterTraceEventsTests
 {
     private static readonly IPEndPoint EndPoint = new(IPAddress.Loopback, 80);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Start_WritesTheFilterCreationLinesForTheHostAndPort()
     {
         var inner = new CountingTransferEvents();
+        Diagnostics.Arrange("host", "127.0.0.1");
+        Diagnostics.Arrange("port", 47110);
 
         DnsFilterTraceEvents.Start(inner, "127.0.0.1", 47110);
 
+        var expected = new[]
+        {
+            "[DNS] created DNS filter for 127.0.0.1:47110, transport=3, queries=3",
+            "[DNS] added",
+            "[DNS] cf_dns_start host 127.0.0.1:47110",
+        };
+        AssertLines(expected, inner);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -41,9 +55,13 @@ public sealed class DnsFilterTraceEventsTests
     {
         // curl -s -v -4 --trace-config dns http://nonexistent.invalid:47114/ -> queries=1; -6 -> queries=2.
         var inner = new CountingTransferEvents();
+        Diagnostics.Arrange("host and port", "h:1");
+        Diagnostics.Arrange("family", family);
 
         DnsFilterTraceEvents.Start(inner, "h", 1, family);
 
+        WriteLines(inner);
+        Diagnostics.Diff("first line", $"[DNS] created DNS filter for h:1, transport=3, queries={queries}", inner.Calls[0]);
         Assert.AreEqual($"[DNS] created DNS filter for h:1, transport=3, queries={queries}", inner.Calls[0]);
     }
 
@@ -57,9 +75,21 @@ public sealed class DnsFilterTraceEventsTests
         var inner = new CountingTransferEvents();
         var events = DnsFilterTraceEvents.Start(inner, "nonexistent.invalid", 47114, family);
         inner.Calls.Clear();
+        Diagnostics.Arrange("host and port", "nonexistent.invalid:47114");
+        Diagnostics.Arrange("family", family);
 
         events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine("nonexistent.invalid", 47114));
 
+        var expected = new[]
+        {
+            $"[DNS] cache negative name resolve for nonexistent.invalid:47114 type={types}",
+            "Could not resolve: nonexistent.invalid:47114",
+            "[DNS] error resolving: 6",
+            "[DNS] Curl_conn_connect(block=0) -> 6, done=0",
+            "[DNS] Curl_conn_connect(), filter returned 6",
+            "[DNS] [1] shutdown async",
+        };
+        AssertLines(expected, inner);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -78,9 +108,11 @@ public sealed class DnsFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
         var events = new DnsFilterTraceEvents(inner);
+        Diagnostics.Arrange("info line", "  Trying 127.0.0.1:47110...");
 
         events.ReportInfo("  Trying 127.0.0.1:47110...");
 
+        AssertLines(new[] { "  Trying 127.0.0.1:47110...", "[DNS] Curl_conn_connect(block=0) -> 0, done=0" }, inner);
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:47110...", "[DNS] Curl_conn_connect(block=0) -> 0, done=0" }, inner.Calls);
     }
 
@@ -89,9 +121,17 @@ public sealed class DnsFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
         var events = new DnsFilterTraceEvents(inner);
+        Diagnostics.Arrange("info line", "Failed to connect to 127.0.0.1:47199 after 2026 ms: Could not connect to server");
 
         events.ReportInfo("Failed to connect to 127.0.0.1:47199 after 2026 ms: Could not connect to server");
 
+        var expected = new[]
+        {
+            "Failed to connect to 127.0.0.1:47199 after 2026 ms: Could not connect to server",
+            "[DNS] Curl_conn_connect(block=0) -> 7, done=0",
+            "[DNS] Curl_conn_connect(), filter returned 7",
+        };
+        AssertLines(expected, inner);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -106,10 +146,20 @@ public sealed class DnsFilterTraceEventsTests
     public void StartOverUnixSocket_WritesTheUnixSocketFiltersCreation_AndNoProgressAfterTrying()
     {
         var inner = new CountingTransferEvents();
+        Diagnostics.Arrange("socket path", "/run/app.sock");
+        Diagnostics.Arrange("info line", "  Trying /run/app.sock:0...");
 
         var events = DnsFilterTraceEvents.StartOverUnixSocket(inner, "/run/app.sock");
         events.ReportInfo("  Trying /run/app.sock:0...");
 
+        var expected = new[]
+        {
+            "[DNS] created DNS filter for /run/app.sock:0, transport=6, queries=3",
+            "[DNS] added",
+            "[DNS] cf_dns_start unix-domain-socket /run/app.sock:0",
+            "  Trying /run/app.sock:0...",
+        };
+        AssertLines(expected, inner);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -126,12 +176,26 @@ public sealed class DnsFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
         var events = new DnsFilterTraceEvents(inner, "AAAA", "foo", 47500);
+        Diagnostics.Arrange("negative type", "AAAA");
+        Diagnostics.Arrange("host and port", "foo:47500");
 
         events.ReportInfo("Negative DNS entry");
         events.ReportInfo("Could not resolve host: foo");
         events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine("foo", 47500));
         events.ReportInfo(DnsFilterTraceEvents.CouldNotResolveLine("foo"));
 
+        var expected = new[]
+        {
+            "[DNS] cache entry does not have type=AAAA addresses",
+            "Negative DNS entry",
+            "Could not resolve host: foo",
+            "Could not resolve: foo:47500",
+            "Could not resolve: foo",
+            "[DNS] error resolving: 6",
+            "[DNS] Curl_conn_connect(block=0) -> 6, done=0",
+            "[DNS] Curl_conn_connect(), filter returned 6",
+        };
+        AssertLines(expected, inner);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -152,10 +216,21 @@ public sealed class DnsFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
         var events = new DnsFilterTraceEvents(inner, host: "example.test", port: 47113);
+        Diagnostics.Arrange("host and port", "example.test:47113");
 
         events.ReportInfo("Host example.test:47113 was resolved.");
         events.ReportInfo("Failed to connect to example.test:47113 after 0 ms: Could not connect to server");
 
+        var expected = new[]
+        {
+            "[DNS] resolve complete for example.test:47113",
+            "Host example.test:47113 was resolved.",
+            "Failed to connect to example.test:47113 after 0 ms: Could not connect to server",
+            "[DNS] Curl_conn_connect(block=0) -> 7, done=0",
+            "[DNS] Curl_conn_connect(), filter returned 7",
+            "[DNS] [1] shutdown async",
+        };
+        AssertLines(expected, inner);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -174,10 +249,12 @@ public sealed class DnsFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
         var events = new DnsFilterTraceEvents(inner, host: "foo", port: 80);
+        Diagnostics.Arrange("host and port", "foo:80");
 
         events.ReportInfo("Hostname foo was found in DNS cache");
         events.ReportInfo("Host foo:80 was resolved.");
 
+        AssertLines(new[] { "Hostname foo was found in DNS cache", "Host foo:80 was resolved." }, inner);
         CollectionAssert.AreEqual(new[] { "Hostname foo was found in DNS cache", "Host foo:80 was resolved." }, inner.Calls);
     }
 
@@ -186,9 +263,11 @@ public sealed class DnsFilterTraceEventsTests
     {
         // curl answers localhost itself (measured, BL-1181 Notes).
         var inner = new CountingTransferEvents();
+        Diagnostics.Arrange("host and port", "localhost:80");
 
         new DnsFilterTraceEvents(inner, host: "localhost", port: 80).ReportInfo("Host localhost:80 was resolved.");
 
+        AssertLines(new[] { "Host localhost:80 was resolved." }, inner);
         CollectionAssert.AreEqual(new[] { "Host localhost:80 was resolved." }, inner.Calls);
     }
 
@@ -196,9 +275,11 @@ public sealed class DnsFilterTraceEventsTests
     public void ReportInfo_AnyOtherLine_IsPassedOnAlone()
     {
         var inner = new CountingTransferEvents();
+        Diagnostics.Arrange("host and port", "(none)");
 
         new DnsFilterTraceEvents(inner).ReportInfo("Host localhost:80 was resolved.");
 
+        AssertLines(new[] { "Host localhost:80 was resolved." }, inner);
         CollectionAssert.AreEqual(new[] { "Host localhost:80 was resolved." }, inner.Calls);
     }
 
@@ -206,9 +287,19 @@ public sealed class DnsFilterTraceEventsTests
     public void ReportConnectionOpened_IsBracketedByTheChainsConnectedLines()
     {
         var inner = new CountingTransferEvents();
+        Diagnostics.Arrange("opened connection", $"h at {EndPoint}, number 0");
 
         new DnsFilterTraceEvents(inner).ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = EndPoint, LocalEndPoint = EndPoint, ConnectionNumber = 0 });
 
+        var expected = new[]
+        {
+            "[DNS] connected filter chain below",
+            "[DNS] Curl_conn_connect(block=0) -> 0, done=1",
+            "opened",
+            "[DNS] removing connected setup filter",
+            "[DNS] destroy",
+        };
+        AssertLines(expected, inner);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -226,6 +317,7 @@ public sealed class DnsFilterTraceEventsTests
     {
         var inner = new CountingTransferEvents();
         var events = new DnsFilterTraceEvents(inner);
+        Diagnostics.Arrange("reports", "reused, handshake, TLS data, TLS message, trust, verify result, early data, request, response, sent, received");
 
         events.ReportConnectionReused(new ConnectionReusedEvent { Scheme = "http", IsProxy = false, HostName = "h", Port = 80, ConnectionNumber = 0 });
         events.ReportTlsHandshake(new TlsHandshakeEvent
@@ -247,8 +339,24 @@ public sealed class DnsFilterTraceEventsTests
         events.ReportDataSent([5]);
         events.ReportDataReceived([6]);
 
+        AssertLines(new[] { "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" }, inner);
         CollectionAssert.AreEqual(
             new[] { "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
             inner.Calls);
+    }
+
+    private void WriteLines(CountingTransferEvents inner)
+    {
+        Diagnostics.Act("line count", inner.Calls.Count);
+        for (var index = 0; index < inner.Calls.Count; index++)
+        {
+            Diagnostics.Act($"line {index}", inner.Calls[index]);
+        }
+    }
+
+    private void AssertLines(string[] expected, CountingTransferEvents inner)
+    {
+        WriteLines(inner);
+        Diagnostics.Diff("lines", string.Join('\n', expected), string.Join('\n', inner.Calls));
     }
 }

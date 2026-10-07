@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -29,6 +30,11 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
 
     private const string Closing = "* closing connection #0";
 
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("FOO", "user", null, null, Offered, DisplayName = "-u, AUTH FOO")]
     [DataRow("FOO", "user", null, "AUTH=PLAIN", Offered, DisplayName = "AUTH=PLAIN against AUTH FOO")]
@@ -42,11 +48,13 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
     {
         (SmtpRun run, RecordingTransferEvents events) = await RunAsync(mechanisms, user, bearerToken, loginOptions);
 
+        string[] expected = ["< 250 AUTH " + mechanisms + "\r\n", expectedLine, Closing];
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        Diagnostics.Diff("sent", "EHLO x\r\n", run.Sent);
+        AssertTranscript(expected, events.Transcript.TakeLast(3));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual("EHLO x\r\n", run.Sent);
-        CollectionAssert.AreEqual(
-            (string[])["< 250 AUTH " + mechanisms + "\r\n", expectedLine, Closing],
-            events.Transcript.TakeLast(3).ToArray());
+        CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(3).ToArray());
     }
 
     [TestMethod]
@@ -60,10 +68,11 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
         (SmtpRun run, RecordingTransferEvents events) = await RunAsync(mechanisms, "user", null, loginOptions);
 
         string[] notBuiltIn = [.. new[] { first, second }.OfType<string>().Select(mechanism => "* SASL: " + mechanism + " not builtin")];
+        string[] expected = ["< 250 AUTH " + mechanisms + "\r\n", Selectable, .. notBuiltIn, Closing];
+        Diagnostics.AssertValues("exit code", CurlExitCode.LoginDenied, run.Result.ExitCode);
+        AssertTranscript(expected, events.Transcript.TakeLast(notBuiltIn.Length + 3));
         Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
-        CollectionAssert.AreEqual(
-            (string[])["< 250 AUTH " + mechanisms + "\r\n", Selectable, .. notBuiltIn, Closing],
-            events.Transcript.TakeLast(notBuiltIn.Length + 3).ToArray());
+        CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(notBuiltIn.Length + 3).ToArray());
     }
 
     /// <summary>
@@ -87,6 +96,9 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
         (SmtpRun run, RecordingTransferEvents events) = await RunAsync(mechanisms, "user", null, loginOptions);
 
         string[] expected = ["< 250 AUTH " + mechanisms + "\r\n", Selectable, .. reasons.Select(reason => "* SASL: " + reason), Closing];
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        Diagnostics.Diff("sent", "EHLO x\r\n", run.Sent);
+        AssertTranscript(expected, events.Transcript.TakeLast(expected.Length));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual("EHLO x\r\n", run.Sent);
         CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(expected.Length).ToArray());
@@ -101,6 +113,8 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
     {
         (SmtpRun run, RecordingTransferEvents events) = await RunAsync("SCRAM-SHA-1", "user", "tok", null);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.LoginDenied, run.Result.ExitCode);
+        AssertTranscript([Overlap, Closing], events.Transcript.TakeLast(2));
         Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
         CollectionAssert.AreEqual((string[])[Overlap, Closing], events.Transcript.TakeLast(2).ToArray());
     }
@@ -123,8 +137,11 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
         };
 
         SmtpRun run = await SmtpRun.ExecuteAsync(
-            context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + Ehlo("EXTERNAL"))), new FakeSaslAuthenticator(null, null));
+            Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + Ehlo("EXTERNAL"))), new FakeSaslAuthenticator(null, null));
+        Diagnostics.ActEvents(run.Result, events);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.LoginDenied, run.Result.ExitCode);
+        AssertTranscript([Overlap, Closing], events.Transcript.TakeLast(2));
         Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
         CollectionAssert.AreEqual((string[])[Overlap, Closing], events.Transcript.TakeLast(2).ToArray());
     }
@@ -135,8 +152,11 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
         var context = Context("user", null, null, out RecordingTransferEvents events);
         string replies = Greeting + Ehlo(DefaultMechanisms) + "334 \r\n235 ok\r\n" + SmtpRun.HelpReply + "221 Bye\r\n";
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), new FakeSaslAuthenticator("PLAIN", [1]));
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), new FakeSaslAuthenticator("PLAIN", [1]));
+        Diagnostics.ActEvents(run.Result, events);
 
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
+        Diagnostics.Assert("a transcript line starts with \"* SASL:\"", false, events.Transcript.Any(line => line.StartsWith("* SASL:", StringComparison.Ordinal)));
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* SASL:", StringComparison.Ordinal)));
     }
@@ -148,8 +168,11 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
         var context = Context("user", null, null, out RecordingTransferEvents events);
         string replies = Greeting + Ehlo(DefaultMechanisms) + "535 no\r\n";
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), new FakeSaslAuthenticator("PLAIN", [1]));
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), new FakeSaslAuthenticator("PLAIN", [1]));
+        Diagnostics.ActEvents(run.Result, events);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        AssertTranscript(["< 535 no\r\n", Closing], events.Transcript.TakeLast(2));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         CollectionAssert.AreEqual((string[])["< 535 no\r\n", Closing], events.Transcript.TakeLast(2).ToArray());
     }
@@ -173,12 +196,25 @@ public sealed class SmtpProtocolHandlerNoLoginMechanismTests
     /// Runs a login against an <c>EHLO</c> offering <paramref name="mechanisms" /> with an
     /// authenticator that finds no mechanism it can use.
     /// </summary>
-    private static async Task<(SmtpRun Run, RecordingTransferEvents Events)> RunAsync(
+    private async Task<(SmtpRun Run, RecordingTransferEvents Events)> RunAsync(
         string mechanisms, string? user, string? bearerToken, string? loginOptions)
     {
         var context = Context(user, bearerToken, loginOptions, out RecordingTransferEvents events);
+        Diagnostics.Arrange("login options", SmtpDiagnostics.Show(loginOptions));
+        Diagnostics.Arrange("--oauth2-bearer", SmtpDiagnostics.Show(bearerToken));
+        Diagnostics.Arrange("-u user", SmtpDiagnostics.Show(user));
+        Diagnostics.Arrange("offered mechanisms", mechanisms);
         SmtpRun run = await SmtpRun.ExecuteAsync(
-            context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + Ehlo(mechanisms))), new FakeSaslAuthenticator(null, null));
+            Diagnostics,
+            context,
+            new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + Ehlo(mechanisms))),
+            new FakeSaslAuthenticator(null, null));
+        Diagnostics.ActEvents(run.Result, events);
         return (run, events);
     }
+
+    private static string Join(IEnumerable<string> lines) => string.Join(" | ", lines.Select(SmtpDiagnostics.Show));
+
+    private void AssertTranscript(string[] expected, IEnumerable<string> actual) =>
+        Diagnostics.Assert("transcript", Join(expected), Join(actual));
 }

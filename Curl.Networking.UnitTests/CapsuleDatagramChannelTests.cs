@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 
 using Curl.Networking.Fakes;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -14,12 +15,23 @@ public sealed class CapsuleDatagramChannelTests
 {
     private static readonly IPEndPoint Proxy = new(IPAddress.Parse("192.0.2.10"), 3128);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void BuildCapsule_ForA1200ByteDatagram_WritesCurlsTypeLengthAndContextId()
     {
-        var capsule = CapsuleDatagramChannel.BuildCapsule(new byte[1200]);
+        Diagnostics.Arrange("datagram length", 1200);
 
-        CollectionAssert.AreEqual(new byte[] { 0x00, 0x44, 0xB1, 0x00 }, capsule[..4]);
+        var capsule = CapsuleDatagramChannel.BuildCapsule(new byte[1200]);
+        Diagnostics.Act("capsule length", capsule.Length);
+        Diagnostics.Bytes("capsule header", capsule[..4]);
+
+        var expectedHeader = new byte[] { 0x00, 0x44, 0xB1, 0x00 };
+        Diagnostics.Diff("capsule header", expectedHeader, capsule[..4]);
+        CollectionAssert.AreEqual(expectedHeader, capsule[..4]);
+        Diagnostics.Assert("capsule length", 1204, capsule.Length);
         Assert.HasCount(1204, capsule);
     }
 
@@ -28,10 +40,23 @@ public sealed class CapsuleDatagramChannelTests
     {
         var connection = new ScriptedConnection([]);
         await using var channel = new CapsuleDatagramChannel(connection, Proxy);
+        var destination = new IPEndPoint(IPAddress.Loopback, 443);
+        Diagnostics.Arrange("proxy", Proxy);
+        Diagnostics.Arrange("destination", destination);
+        Diagnostics.Arrange("payload", "01 02 03");
 
-        await channel.SendAsync(new byte[] { 1, 2, 3 }, new IPEndPoint(IPAddress.Loopback, 443), CancellationToken.None);
+        using (Diagnostics.Phase("send"))
+        {
+            await channel.SendAsync(new byte[] { 1, 2, 3 }, destination, CancellationToken.None);
+        }
 
-        CollectionAssert.AreEqual(new byte[] { 0x00, 0x04, 0x00, 1, 2, 3 }, connection.Written);
+        Diagnostics.Act("flush count", connection.FlushCount);
+        Diagnostics.Bytes("written", connection.Written.ToArray());
+
+        var expected = new byte[] { 0x00, 0x04, 0x00, 1, 2, 3 };
+        Diagnostics.Diff("written", expected, connection.Written.ToArray());
+        CollectionAssert.AreEqual(expected, connection.Written);
+        Diagnostics.Assert("flush count", 1, connection.FlushCount);
         Assert.AreEqual(1, connection.FlushCount);
     }
 
@@ -47,12 +72,22 @@ public sealed class CapsuleDatagramChannelTests
         ];
         await using var channel = new CapsuleDatagramChannel(new ScriptedConnection(stream), Proxy);
         var buffer = new byte[16];
+        Diagnostics.Arrange("proxy", Proxy);
+        Diagnostics.Arrange("buffer length", buffer.Length);
+        Diagnostics.Bytes("stream", stream);
 
         var received = await channel.ReceiveAsync(buffer, CancellationToken.None);
+        Diagnostics.Act("received length", received.Length);
+        Diagnostics.Act("received remote end point", received.RemoteEndPoint);
 
+        Diagnostics.Assert("received length", 2, received.Length);
         Assert.AreEqual(2, received.Length);
-        CollectionAssert.AreEqual(new byte[] { 0x07, 0x08 }, buffer[..2]);
+        var expectedBytes = new byte[] { 0x07, 0x08 };
+        Diagnostics.Diff("received bytes", expectedBytes, buffer[..2]);
+        CollectionAssert.AreEqual(expectedBytes, buffer[..2]);
+        Diagnostics.Assert("received remote end point", Proxy, received.RemoteEndPoint);
         Assert.AreEqual(Proxy, received.RemoteEndPoint);
+        Diagnostics.Assert("server end point", Proxy, channel.ServerEndPoint);
         Assert.AreEqual(Proxy, channel.ServerEndPoint);
     }
 
@@ -63,24 +98,41 @@ public sealed class CapsuleDatagramChannelTests
         var connection = new ScriptedConnection([.. datagram, .. CapsuleDatagramChannel.BuildCapsule([9])]);
         await using var channel = new CapsuleDatagramChannel(connection, Proxy);
         var buffer = new byte[2];
+        Diagnostics.Arrange("first datagram length", 5);
+        Diagnostics.Arrange("second datagram length", 1);
+        Diagnostics.Arrange("buffer length", buffer.Length);
 
         var first = await channel.ReceiveAsync(buffer, CancellationToken.None);
         var firstBytes = buffer.ToArray();
         var second = await channel.ReceiveAsync(buffer, CancellationToken.None);
+        Diagnostics.Act("first length", first.Length);
+        Diagnostics.Act("second length", second.Length);
+        Diagnostics.Bytes("first bytes", firstBytes);
 
+        Diagnostics.Assert("first length", 2, first.Length);
         Assert.AreEqual(2, first.Length);
-        CollectionAssert.AreEqual(new byte[] { 1, 2 }, firstBytes);
+        var expectedFirst = new byte[] { 1, 2 };
+        Diagnostics.Diff("first bytes", expectedFirst, firstBytes);
+        CollectionAssert.AreEqual(expectedFirst, firstBytes);
+        Diagnostics.Assert("second length", 1, second.Length);
         Assert.AreEqual(1, second.Length);
+        Diagnostics.Assert("second first byte", 9, buffer[0]);
         Assert.AreEqual(9, buffer[0]);
     }
 
     [TestMethod]
     public async Task ReceiveAsync_WhenTheTunnelEndsMidCapsule_ThrowsConnectionReset()
     {
-        await using var channel = new CapsuleDatagramChannel(new ScriptedConnection([0x00, 0x05, 0x00, 1]), Proxy);
+        byte[] truncated = [0x00, 0x05, 0x00, 1];
+        await using var channel = new CapsuleDatagramChannel(new ScriptedConnection(truncated), Proxy);
+        Diagnostics.Arrange("truncated capsule length", truncated.Length);
+        Diagnostics.Arrange("declared capsule length", 5);
 
         var exception = await Assert.ThrowsExactlyAsync<SocketException>(() => channel.ReceiveAsync(new byte[8], CancellationToken.None).AsTask());
+        Diagnostics.Act("exception type", exception.GetType().Name);
+        Diagnostics.Act("socket error code", exception.SocketErrorCode);
 
+        Diagnostics.Assert("socket error code", SocketError.ConnectionReset, exception.SocketErrorCode);
         Assert.AreEqual(SocketError.ConnectionReset, exception.SocketErrorCode);
     }
 
@@ -90,10 +142,16 @@ public sealed class CapsuleDatagramChannelTests
         byte[] large = [0x41, 0x00, 0x52, 0x08, .. new byte[0x1208], .. CapsuleDatagramChannel.BuildCapsule([6])];
         await using var channel = new CapsuleDatagramChannel(new ScriptedConnection(large), Proxy);
         var buffer = new byte[4];
+        Diagnostics.Arrange("stream length", large.Length);
+        Diagnostics.Arrange("skipped capsule payload length", 0x1208);
 
         var received = await channel.ReceiveAsync(buffer, CancellationToken.None);
+        Diagnostics.Act("received length", received.Length);
+        Diagnostics.Act("first buffer byte", buffer[0]);
 
+        Diagnostics.Assert("received length", 1, received.Length);
         Assert.AreEqual(1, received.Length);
+        Diagnostics.Assert("first buffer byte", 6, buffer[0]);
         Assert.AreEqual(6, buffer[0]);
     }
 
@@ -101,8 +159,14 @@ public sealed class CapsuleDatagramChannelTests
     public async Task LocalEndPoint_IsTheConnections()
     {
         await using var channel = new CapsuleDatagramChannel(new CapsuleQuicProxyConnection(string.Empty, null), Proxy);
+        var expected = new IPEndPoint(IPAddress.Loopback, 50000);
+        Diagnostics.Arrange("proxy", Proxy);
 
-        Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 50000), channel.LocalEndPoint);
+        var localEndPoint = channel.LocalEndPoint;
+        Diagnostics.Act("local end point", localEndPoint);
+
+        Diagnostics.Assert("local end point", expected, localEndPoint);
+        Assert.AreEqual(expected, channel.LocalEndPoint);
     }
 
     [TestMethod]
@@ -110,10 +174,13 @@ public sealed class CapsuleDatagramChannelTests
     {
         var connection = new ScriptedConnection([]);
         var channel = new CapsuleDatagramChannel(connection, Proxy);
+        Diagnostics.Arrange("proxy", Proxy);
 
         await channel.DisposeAsync();
         await channel.DisposeAsync();
+        Diagnostics.Act("connection disposed", connection.IsDisposed);
 
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.IsTrue(connection.IsDisposed);
     }
 }

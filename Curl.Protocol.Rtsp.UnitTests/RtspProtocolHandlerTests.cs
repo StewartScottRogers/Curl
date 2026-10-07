@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Rtsp.Fakes;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Rtsp;
@@ -19,28 +20,52 @@ public sealed class RtspProtocolHandlerTests
 
     private const string Ok = "RTSP/1.0 200 OK\r\nCSeq: 1\r\nPublic: OPTIONS, DESCRIBE\r\n\r\n";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void SupportedSchemes_IsRtspOnly()
     {
+        string[] schemes = [.. Handler(new ScriptedConnection()).SupportedSchemes];
+
+        Diagnostics.Act("supported schemes", string.Join(", ", schemes));
+        Diagnostics.Assert("supported schemes", "rtsp", string.Join(", ", schemes));
         CollectionAssert.AreEqual(new[] { "rtsp" }, Handler(new ScriptedConnection()).SupportedSchemes.ToArray());
     }
 
     [TestMethod]
     public void Constructor_NullConnector_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new RtspProtocolHandler(null!, new RecordingAuthenticator()));
+        Diagnostics.Arrange("connector, authenticator", "null, RecordingAuthenticator");
+
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new RtspProtocolHandler(null!, new RecordingAuthenticator()));
+
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name} for {thrown.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public void Constructor_NullAuthenticator_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new RtspProtocolHandler(new RecordingConnector(ConnectResult.Connected(new ScriptedConnection())), null!));
+        Diagnostics.Arrange("connector, authenticator", "RecordingConnector, null");
+
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new RtspProtocolHandler(new RecordingConnector(ConnectResult.Connected(new ScriptedConnection())), null!));
+
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name} for {thrown.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws()
     {
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await Handler(new ScriptedConnection()).ExecuteAsync(null!));
+        Diagnostics.Arrange("context", "null");
+
+        ArgumentNullException thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await Handler(new ScriptedConnection()).ExecuteAsync(null!));
+
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name} for {thrown.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -50,10 +75,15 @@ public sealed class RtspProtocolHandlerTests
         var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
         var events = new RecordingTransferEvents();
 
-        await new RtspProtocolHandler(connector, new RecordingAuthenticator()).ExecuteAsync(
+        Diagnostics.Arrange("url", "rtsp://h/media");
+        Diagnostics.Arrange("proxy", proxy);
+
+        TransferResult result = await new RtspProtocolHandler(connector, new RecordingAuthenticator()).ExecuteAsync(
             new TransferContext { Url = CurlUrl.Parse("rtsp://h/media"), Output = new MemoryStream(), Proxy = proxy, Events = events });
 
+        Diagnostics.ActResult(result);
         ConnectTarget target = connector.Targets.Single();
+        Diagnostics.Assert("connect target", new ConnectTarget("h", 554, false) { Proxy = proxy, Events = events, PoolScheme = "rtsp" }, target);
         Assert.AreEqual(new ConnectTarget("h", 554, false) { Proxy = proxy, Events = events, PoolScheme = "rtsp" }, target);
     }
 
@@ -62,8 +92,10 @@ public sealed class RtspProtocolHandlerTests
     {
         var connector = new RecordingConnector(ConnectResult.Connected(Server(Ok)));
 
-        await new RtspProtocolHandler(connector, new RecordingAuthenticator()).ExecuteAsync(Context("rtsp://h:47950/media"));
+        TransferResult result = await new RtspProtocolHandler(connector, new RecordingAuthenticator()).ExecuteAsync(Context("rtsp://h:47950/media"));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Assert("connect port", 47950, connector.Targets.Single().Port);
         Assert.AreEqual(47950, connector.Targets.Single().Port);
     }
 
@@ -74,6 +106,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await new RtspProtocolHandler(connector, new RecordingAuthenticator()).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.CouldntConnect, result);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect", result.ErrorMessage);
         Assert.IsTrue(result.IsConnectionRefused);
@@ -88,6 +122,8 @@ public sealed class RtspProtocolHandlerTests
         TransferResult result = await Handler(server).ExecuteAsync(Context(output: output));
 
         Assert.AreEqual(Request, Encoding.Latin1.GetString(server.Sent));
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(0L, output.Length);
         Assert.IsTrue(server.IsDisposed);
@@ -110,9 +146,13 @@ public sealed class RtspProtocolHandlerTests
             ResumeFrom = resumeFrom,
             RangeText = rangeText,
         };
+        Diagnostics.ArrangeContext(context);
 
-        await Handler(server).ExecuteAsync(context);
+        TransferResult result = await Handler(server).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(server.Sent);
+        Diagnostics.DiffText("request sent", expected, server.Sent);
         Assert.AreEqual(expected, Encoding.Latin1.GetString(server.Sent));
     }
 
@@ -127,9 +167,13 @@ public sealed class RtspProtocolHandlerTests
             Http = new HttpRequestOptions { Referer = "http://r/" },
             RangeText = "1-2",
         };
+        Diagnostics.ArrangeContext(context);
 
-        await Handler(server).ExecuteAsync(context);
+        TransferResult result = await Handler(server).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(server.Sent);
+        Diagnostics.DiffText("request sent", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n", server.Sent);
         Assert.AreEqual(
             "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nRange: 1-2\r\nReferer: http://r/\r\nUser-Agent: curl/8.21.0\r\n\r\n",
             Encoding.Latin1.GetString(server.Sent));
@@ -148,9 +192,13 @@ public sealed class RtspProtocolHandlerTests
             Http = http,
             PostData = "abc"u8.ToArray(),
         };
+        Diagnostics.ArrangeContext(context);
 
-        await Handler(server).ExecuteAsync(context);
+        TransferResult result = await Handler(server).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(server.Sent);
+        Diagnostics.DiffText("request sent", Request, server.Sent);
         Assert.AreEqual(Request, Encoding.Latin1.GetString(server.Sent));
     }
 
@@ -162,6 +210,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context(output: output));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(5L, result.BytesTransferred);
         Assert.AreEqual(5L, result.Report!.DownloadSize);
@@ -176,6 +226,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context(output: output, headerOutput: output));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 2\r\n\r\n", Encoding.Latin1.GetString(output.ToArray()));
     }
@@ -185,8 +237,12 @@ public sealed class RtspProtocolHandlerTests
     {
         byte[][] reads = [Bytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 6\r\n\r\nab"), Bytes("cd"), Bytes("efEXTRA")];
 
+        Diagnostics.ArrangeReads(reads);
+
         TransferResult result = await Handler(new ScriptedConnection(reads)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Assert("bytes transferred", 6L, result.BytesTransferred);
         Assert.AreEqual(6L, result.BytesTransferred);
     }
 
@@ -197,6 +253,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 10\r\n\r\nab")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(2L, result.BytesTransferred);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 10\r\n\r\n", Encoding.Latin1.GetString(headers.ToArray()));
@@ -217,9 +275,15 @@ public sealed class RtspProtocolHandlerTests
             Http = http,
             Credentials = credentials,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.Arrange("authenticator answers", "Basic dTpw");
 
-        await new RtspProtocolHandler(new RecordingConnector(ConnectResult.Connected(server)), authenticator).ExecuteAsync(context);
+        TransferResult result = await new RtspProtocolHandler(new RecordingConnector(ConnectResult.Connected(server)), authenticator).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(server.Sent);
+        Diagnostics.Act("authenticator requests", authenticator.Requests.Count);
+        Diagnostics.DiffText("request sent", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: agent/1\r\nAuthorization: Basic dTpw\r\nX-Test: 1\r\n\r\n", server.Sent);
         Assert.AreEqual(
             "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: agent/1\r\nAuthorization: Basic dTpw\r\nX-Test: 1\r\n\r\n",
             Encoding.Latin1.GetString(server.Sent));
@@ -244,6 +308,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server(Ok)).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(Ok, Encoding.Latin1.GetString(headers.ToArray()));
     }
@@ -255,6 +321,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\nCSeq: 1\n\n")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\nCSeq: 1\n\n", Encoding.Latin1.GetString(headers.ToArray()));
     }
@@ -264,6 +332,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\ncseq:   1 \r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -272,6 +342,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1x\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -280,6 +352,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 7\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("The CSeq of this request 1 did not match the response 7", result.ErrorMessage);
         Assert.AreEqual(200, result.Report!.ResponseCode);
@@ -290,6 +364,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("The CSeq of this request 1 did not match the response 0", result.ErrorMessage);
     }
@@ -299,6 +375,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nCSeq: 2\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Diff("error", "The CSeq of this request 1 did not match the response 2", result.ErrorMessage ?? string.Empty);
         Assert.AreEqual("The CSeq of this request 1 did not match the response 2", result.ErrorMessage);
     }
 
@@ -309,6 +387,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 404 Not Found\r\nContent-Length: 3\r\n\r\nabc")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("The CSeq of this request 1 did not match the response 0", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 404 Not Found\r\nContent-Length: 3\r\n\r\n", Encoding.Latin1.GetString(headers.ToArray()));
@@ -319,6 +399,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 1234;timeout=60\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -332,6 +414,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\n" + lines + "\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -342,6 +426,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 1234;timeout=60\r\nSession: 9999\r\n\r\n")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspSessionError, result);
         Assert.AreEqual(CurlExitCode.RtspSessionError, result.ExitCode);
         Assert.AreEqual("Got RTSP Session ID Line [9999\r\n], but wanted ID [1234]", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\nSession: 1234;timeout=60\r\n", Encoding.Latin1.GetString(headers.ToArray()));
@@ -357,6 +443,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspSessionError, result);
         Assert.AreEqual(CurlExitCode.RtspSessionError, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
     }
@@ -368,6 +456,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context(http: new HttpRequestOptions { Fail = HttpFailMode.Fail }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspSessionError, result);
         Assert.AreEqual(CurlExitCode.RtspSessionError, result.ExitCode);
     }
 
@@ -383,6 +473,10 @@ public sealed class RtspProtocolHandlerTests
         TransferResult first = await handler.ExchangeAsync(server, Context(), session);
         TransferResult second = await handler.ExchangeAsync(server, Context(), session);
 
+        Diagnostics.ActResult(first);
+        Diagnostics.ActResult(second);
+        Diagnostics.ActSent(server.Sent);
+        Diagnostics.DiffText("requests sent", Request + "OPTIONS * RTSP/1.0\r\nCSeq: 2\r\nSession: 1234\r\nUser-Agent: curl/8.21.0\r\n\r\n", server.Sent);
         Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
         Assert.AreEqual(
@@ -402,6 +496,8 @@ public sealed class RtspProtocolHandlerTests
         await handler.ExchangeAsync(server, Context(), session);
         TransferResult second = await handler.ExchangeAsync(server, Context(), session);
 
+        Diagnostics.ActResult(second);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspSessionError, second);
         Assert.AreEqual(CurlExitCode.RtspSessionError, second.ExitCode);
         Assert.AreEqual("Got RTSP Session ID Line [9999\r\n], but wanted ID [1234]", second.ErrorMessage);
     }
@@ -416,6 +512,8 @@ public sealed class RtspProtocolHandlerTests
         await handler.ExchangeAsync(server, Context(), session);
         TransferResult second = await handler.ExchangeAsync(server, Context(), session);
 
+        Diagnostics.ActResult(second);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, second);
         Assert.AreEqual(CurlExitCode.RtspCseqError, second.ExitCode);
         Assert.AreEqual("The CSeq of this request 2 did not match the response 1", second.ErrorMessage);
     }
@@ -432,6 +530,10 @@ public sealed class RtspProtocolHandlerTests
         await handler.ExchangeAsync(server, Context(), session);
         await handler.ExchangeAsync(server, Context(), session);
 
+        Diagnostics.ActSent(server.Sent);
+        string sent = Encoding.Latin1.GetString(server.Sent);
+        const string expectedEnd = "CSeq: 2\r\nSession: \r\nUser-Agent: curl/8.21.0\r\n\r\n";
+        Diagnostics.Diff("requests sent end", expectedEnd, sent[^Math.Min(sent.Length, expectedEnd.Length)..]);
         StringAssert.EndsWith(Encoding.Latin1.GetString(server.Sent), "CSeq: 2\r\nSession: \r\nUser-Agent: curl/8.21.0\r\n\r\n");
     }
 
@@ -440,6 +542,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 404 Not Found\r\nCSeq: 1\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(404, result.Report!.ResponseCode);
     }
@@ -454,6 +558,8 @@ public sealed class RtspProtocolHandlerTests
         TransferResult result = await Handler(Server("RTSP/1.0 404 Not Found\r\nCSeq: 1\r\nContent-Length: 3\r\n\r\nabc"))
             .ExecuteAsync(Context(http: new HttpRequestOptions { Fail = fail }, headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.HttpReturnedError, result);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual("The requested URL returned error: 404", result.ErrorMessage);
         Assert.AreEqual(404, result.Report!.ResponseCode);
@@ -466,6 +572,8 @@ public sealed class RtspProtocolHandlerTests
         TransferResult result = await Handler(Server("RTSP/1.0 404 Not Found\r\n\r\n"))
             .ExecuteAsync(Context(http: new HttpRequestOptions { Fail = HttpFailMode.Fail }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.HttpReturnedError, result);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
     }
 
@@ -475,6 +583,8 @@ public sealed class RtspProtocolHandlerTests
         TransferResult result = await Handler(Server("RTSP/1.0 399 X\r\nCSeq: 1\r\n\r\n"))
             .ExecuteAsync(Context(http: new HttpRequestOptions { Fail = HttpFailMode.Fail }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -485,6 +595,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 099 X\r\nCSeq: 1\r\n\r\n")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.UnsupportedProtocol, result);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual("Unsupported response code in HTTP response", result.ErrorMessage);
         Assert.AreEqual(99, result.Report!.ResponseCode);
@@ -498,6 +610,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.GotNothing, result);
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual("Empty reply from server", result.ErrorMessage);
         Assert.AreEqual(0L, headers.Length);
@@ -512,6 +626,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.GotNothing, result);
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual("Empty reply from server", result.ErrorMessage);
     }
@@ -528,6 +644,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Weird server reply", result.ErrorMessage);
         Assert.AreEqual(0L, headers.Length);
@@ -538,6 +656,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200\r\nCSeq: 1\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -548,6 +668,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: x\r\n\r\n")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.WeirdServerReply, result);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Invalid Content-Length: value", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n", Encoding.Latin1.GetString(headers.ToArray()));
@@ -564,6 +686,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\n" + line + "\r\n")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("Unable to read the CSeq header: [" + line + "]", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 200 OK\r\n", Encoding.Latin1.GetString(headers.ToArray()));
@@ -576,6 +700,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\n" + line + "\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -584,6 +710,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: -3\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Diff("error", "The CSeq of this request 1 did not match the response -3", result.ErrorMessage ?? string.Empty);
         Assert.AreEqual("The CSeq of this request 1 did not match the response -3", result.ErrorMessage);
     }
 
@@ -594,6 +722,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\n")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("The CSeq of this request 1 did not match the response 0", result.ErrorMessage);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n", Encoding.Latin1.GetString(headers.ToArray()));
@@ -606,6 +736,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\nPubl")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\nPubl", Encoding.Latin1.GetString(headers.ToArray()));
     }
@@ -617,6 +749,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK")).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("RTSP/1.0 200 OK", Encoding.Latin1.GetString(headers.ToArray()));
         Assert.AreEqual(0, result.Report!.ResponseCode);
@@ -628,6 +762,8 @@ public sealed class RtspProtocolHandlerTests
         TransferResult result = await Handler(Server("RTSP/1.0 404 Not Found\r\nCSeq: 1\r\nX"))
             .ExecuteAsync(Context(http: new HttpRequestOptions { Fail = HttpFailMode.Fail }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -641,6 +777,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(server).ExecuteAsync(Context(http: new HttpRequestOptions { Headers = [header] }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("CSeq cannot be set as a custom header.", result.ErrorMessage);
         Assert.AreEqual(0, server.Sent.Length);
@@ -656,6 +794,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(server).ExecuteAsync(Context(http: new HttpRequestOptions { Headers = [header] }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.BadFunctionArgument, result);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
         Assert.AreEqual("Session ID cannot be set as a custom header.", result.ErrorMessage);
         Assert.AreEqual(0, server.Sent.Length);
@@ -666,6 +806,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server(Ok)).ExecuteAsync(Context(http: new HttpRequestOptions { Headers = ["Session: 5", "CSeq: 3"] }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
     }
 
@@ -676,6 +818,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(server).ExecuteAsync(Context(http: new HttpRequestOptions { Headers = ["X-Session: 1"] }));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nX-Session: 1\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
     }
@@ -685,6 +829,11 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n")).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Assert(
+            "status, method, header size, request size",
+            $"200, OPTIONS, 28, {Request.Length}",
+            $"{result.Report?.ResponseCode}, {result.Report?.Method}, {result.Report?.HeaderSize}, {result.Report?.RequestSize}");
         Assert.AreEqual(200, result.Report!.ResponseCode);
         Assert.AreEqual("OPTIONS", result.Report.Method);
         Assert.AreEqual(28L, result.Report.HeaderSize);
@@ -699,6 +848,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(new ScriptedConnection(reads)).ExecuteAsync(Context(headerOutput: headers));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(Ok, Encoding.Latin1.GetString(headers.ToArray()));
     }
@@ -710,6 +861,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual((long)reply.Length, result.Report!.HeaderSize);
     }
@@ -721,6 +874,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(Server(reply)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.TooLarge, result);
         Assert.AreEqual(CurlExitCode.TooLarge, result.ExitCode);
         Assert.AreEqual("A value or data field grew larger than allowed", result.ErrorMessage);
     }
@@ -733,6 +888,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(connection).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Send failure: Connection was reset", result.ErrorMessage);
     }
@@ -745,6 +902,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(new FailingConnection(writeFailure: reset)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Send failure: " + reset.InnerException!.Message, result.ErrorMessage);
     }
@@ -755,6 +914,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(new FailingConnection(writeFailure: Aborted())).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Send failure: Connection was aborted", result.ErrorMessage);
     }
@@ -767,6 +928,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(new FailingConnection(writeFailure: aborted)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Send failure: " + aborted.InnerException!.Message, result.ErrorMessage);
     }
@@ -776,6 +939,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(new FailingConnection(flushFailure: new IOException())).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
     }
@@ -786,6 +951,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(new FailingConnection(readFailure: Reset())).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Recv failure: Connection was reset", result.ErrorMessage);
     }
@@ -798,6 +965,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(new FailingConnection(readFailure: reset)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Recv failure: " + reset.InnerException!.Message, result.ErrorMessage);
     }
@@ -808,6 +977,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(new FailingConnection(readFailure: Aborted())).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Recv failure: Connection was aborted", result.ErrorMessage);
     }
@@ -820,6 +991,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(new FailingConnection(readFailure: aborted)).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Recv failure: " + aborted.InnerException!.Message, result.ErrorMessage);
     }
@@ -829,6 +1002,8 @@ public sealed class RtspProtocolHandlerTests
     {
         TransferResult result = await Handler(new FailingConnection(readFailure: new IOException())).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
     }
@@ -840,6 +1015,8 @@ public sealed class RtspProtocolHandlerTests
 
         TransferResult result = await Handler(connection).ExecuteAsync(Context());
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RecvError, result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
     }
 
@@ -849,6 +1026,8 @@ public sealed class RtspProtocolHandlerTests
         TransferResult result = await Handler(Server(Ok))
             .ExecuteAsync(Context(headerOutput: new FailingStream(new OutputWriteFailedException(3, "m"))));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.WriteError, result);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 17 returned 3", result.ErrorMessage);
     }
@@ -856,8 +1035,12 @@ public sealed class RtspProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_HeaderWriteFailsPlainly_ReportsNothingAccepted()
     {
+        Diagnostics.Arrange("header output", "FailingStream throwing a plain IOException");
+
         TransferResult result = await Handler(Server(Ok)).ExecuteAsync(Context(headerOutput: new FailingStream(new IOException())));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Diff("error", "Failure writing output to destination, passed 17 returned 0", result.ErrorMessage ?? string.Empty);
         Assert.AreEqual("Failure writing output to destination, passed 17 returned 0", result.ErrorMessage);
     }
 
@@ -873,15 +1056,26 @@ public sealed class RtspProtocolHandlerTests
             Output = new MemoryStream(),
             CancellationToken = cancellation.Token,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.Arrange("cancellation", "cancelled before the transfer starts");
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await Handler(Server(Ok)).ExecuteAsync(context));
+        OperationCanceledException thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await Handler(Server(Ok)).ExecuteAsync(context));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("exception type", nameof(OperationCanceledException), thrown.GetType().Name);
     }
 
-    private static RtspProtocolHandler Handler(IConnection connection) =>
-        new(new RecordingConnector(ConnectResult.Connected(connection)), new RecordingAuthenticator());
+    private RtspProtocolHandler Handler(IConnection connection)
+    {
+        Diagnostics.Arrange("connection", connection.GetType().Name);
+        return new(new RecordingConnector(ConnectResult.Connected(connection)), new RecordingAuthenticator());
+    }
 
-    private static ScriptedConnection Server(string reply) =>
-        reply.Length == 0 ? new ScriptedConnection() : new ScriptedConnection(Bytes(reply));
+    private ScriptedConnection Server(string reply)
+    {
+        Diagnostics.ArrangeReply(reply);
+        return reply.Length == 0 ? new ScriptedConnection() : new ScriptedConnection(Bytes(reply));
+    }
 
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 
@@ -889,18 +1083,22 @@ public sealed class RtspProtocolHandlerTests
 
     private static IOException Aborted() => new("aborted", new SocketException((int)SocketError.ConnectionAborted));
 
-    private static TransferContext Context(
+    private TransferContext Context(
         string url = "rtsp://127.0.0.1:47950/media",
         Stream? output = null,
         Stream? headerOutput = null,
-        HttpRequestOptions? http = null) =>
-        new()
+        HttpRequestOptions? http = null)
+    {
+        TransferContext context = new()
         {
             Url = CurlUrl.Parse(url),
             Output = output ?? new MemoryStream(),
             HeaderOutput = headerOutput,
             Http = http,
         };
+        Diagnostics.ArrangeContext(context);
+        return context;
+    }
 
     /// <summary>A connection that returns one head, then fails every later read.</summary>
     private sealed class HeadThenFailingConnection(byte[] head) : IConnection
