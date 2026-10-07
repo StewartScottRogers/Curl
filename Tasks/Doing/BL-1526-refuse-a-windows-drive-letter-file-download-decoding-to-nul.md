@@ -33,3 +33,4 @@ On Windows, a download of a drive-letter `file://` URL whose path decodes to a N
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
