@@ -3,6 +3,7 @@ using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -33,6 +34,10 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
 
     private ScriptedConnector server = new([]);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
@@ -46,6 +51,10 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
     {
         int exitCode = await RunAsync([Ok], "-sS", "--disallow-username-in-url", url);
 
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Assert("stderr", Refused + "\n", Lf(StandardErrorText));
+        Diagnostics.Assert("request targets", 0, server.Targets.Count);
+        Diagnostics.Assert("stdout length", 0, standardOutput.Length);
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual(Refused + NewLine, StandardErrorText);
         Assert.IsEmpty(server.Targets);
@@ -65,6 +74,9 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
     {
         int exitCode = await RunAsync([Ok], "-sS", "--disallow-username-in-url", url);
 
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Assert("stderr", Refused + "\n", Lf(StandardErrorText));
+        Diagnostics.Assert("request targets", 0, server.Targets.Count);
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual(Refused + NewLine, StandardErrorText);
         Assert.IsEmpty(server.Targets);
@@ -84,6 +96,8 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
     {
         int exitCode = await RunAsync([Ok], "-sS", url);
 
+        Diagnostics.Assert("exit code", expectedExitCode, exitCode);
+        Diagnostics.Assert("stderr", expectedError + "\n", Lf(StandardErrorText));
         Assert.AreEqual(expectedExitCode, exitCode);
         Assert.AreEqual(expectedError + NewLine, StandardErrorText);
     }
@@ -96,6 +110,8 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
     {
         int exitCode = await RunAsync([Ok], "-sS", "--disallow-username-in-url", url);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
+        Diagnostics.Assert("stderr starts with the first line", true, Lf(StandardErrorText).StartsWith(expectedFirstLine + "\n", StringComparison.Ordinal));
         Assert.AreEqual(3, exitCode);
         Assert.StartsWith(expectedFirstLine + NewLine, StandardErrorText);
     }
@@ -105,6 +121,8 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
     {
         int exitCode = await RunAsync([Ok], "-s", "--disallow-username-in-url", "http://u@127.0.0.1:18626/");
 
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Assert("stderr length", 0, standardError.Length);
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual(0, standardError.Length);
     }
@@ -115,6 +133,8 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
         // curl -sS --disallow-username-in-url -w ... http://u@127.0.0.1:18626/ -> [0|http://u@127.0.0.1:18626/||000|0].
         int exitCode = await RunAsync([Ok], "-sS", "--disallow-username-in-url", "-w", WriteOut, "http://u@127.0.0.1:18626/");
 
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Assert("stdout", "[0|http://u@127.0.0.1:18626/||000|0]", StandardOutputText);
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual("[0|http://u@127.0.0.1:18626/||000|0]", StandardOutputText);
     }
@@ -130,6 +150,9 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
 
         int exitCode = await RunAsync([Ok], arguments);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr length", 0, standardError.Length);
+        Diagnostics.Assert("request targets", 1, server.Targets.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(0, standardError.Length);
         Assert.HasCount(1, server.Targets);
@@ -144,6 +167,13 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
 
         int exitCode = await RunAsync([Found, Ok], "-sS", "-L", "--disallow-username-in-url", "-w", WriteOut, Url);
 
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Assert("stderr", Refused + "\n", Lf(StandardErrorText));
+        Diagnostics.Assert("stdout", "[1|http://u:p@127.0.0.1:18626/x||302|1]", StandardOutputText);
+        Diagnostics.Diff(
+            "request bytes",
+            "GET / HTTP/1.1\r\nHost: 127.0.0.1:18626\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            Encoding.Latin1.GetString(server.Written));
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual(Refused + NewLine, StandardErrorText);
         Assert.AreEqual("[1|http://u:p@127.0.0.1:18626/x||302|1]", StandardOutputText);
@@ -152,19 +182,33 @@ public sealed class CurlCommandRunnerDisallowUsernameInUrlTests
             Encoding.Latin1.GetString(server.Written));
     }
 
-    private Task<int> RunAsync(string[] responses, params string[] arguments)
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(string[] responses, params string[] arguments)
     {
         server = new ScriptedConnector(responses.Select(Encoding.Latin1.GetBytes));
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false)
-            .RunAsync(arguments);
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("scripted responses", responses.Length);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        Diagnostics.Bytes("request bytes", server.Written);
+        return exitCode;
     }
 }
