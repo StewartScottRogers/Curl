@@ -8,7 +8,7 @@ depends-on: [BL-1431]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: FR-067
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1448 — Count response headers across redirect hops, trailers and CONNECT heads toward curl's 5000 limit
 
@@ -23,9 +23,9 @@ curl 8.21.0's 5000-header limit (`curl: (100) Too many response headers, 5000 is
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Http.UnitTests` pins the measured exit code, header output and last `<` line for a `-L` redirect whose two hops carry 3000 headers each.
-- [ ] A test pins the measured behaviour for chunked trailers that take the count past 5000, or Notes record the measurement showing curl does not count them.
-- [ ] `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no failing member.
+- [x] A test in `Curl.Protocol.Http.UnitTests` pins the measured exit code, header output and last `<` line for a `-L` redirect whose two hops carry 3000 headers each.
+- [x] A test pins the measured behaviour for chunked trailers that take the count past 5000, or Notes record the measurement showing curl does not count them.
+- [x] `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes and `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no failing member.
 
 ## Notes
 
@@ -36,9 +36,14 @@ curl 8.21.0's 5000-header limit (`curl: (100) Too many response headers, 5000 is
 - `Curl.Core.UnitTests` is in BL-1532's `touches` (Doing on lane 2), so per the lane rules the task goes back to Backlog until they no longer overlap.
 - Plan for the next run: `HttpResponseHeadReader` takes the count already stored (`informationalHeaderCount` starts there) and exposes the count it stored; `HttpChunkedDecoder` counts each trailer line against the rest and fails exit 100 with `TooManyResponseHeaders`, then `-v` `Failed reading the chunked-encoded stream`, the trailers through the 5000th written to the header output.
 
+- Delivered 2026-10-07 (second run; BL-1532 no longer in Doing, so `Curl.Core.UnitTests` no longer overlaps): `HttpRequestOptions.ResponseHeadersStored` carries the count into an exchange and `TransferReport.ResponseHeadersStored` out of it (Abstractions); `RedirectFollower` sends each hop the previous hop's count, so the first hop starts at 0 (per transfer, as `Curl_pretransfer` clears it). In the handler an in-handler resend (401, 417) starts from its `earlier` report's count instead. `HttpResponseHeadReader.HeadersStoredBefore` starts the limit there; `HttpChunkedDecoder.TrailerLimit` is what is left after the heads, and the trailer past it fails with exit 100, the trailers before it written to the header output, then `-v` `* Too many response headers, 5000 is max` and `* Failed reading the chunked-encoded stream` (`HttpTransferException.InfoLines`). The head case now also reports its `* Too many response headers` `-v` line, which the redirect measurement shows after the last `<` line.
+- Measured again 2026-10-07 for the trailer case's stderr: `curl: (100) Too many response headers, 5000 is max` (the first `failf` keeps the error buffer), so the result's message is that, not the chunked line.
+- Left out, filed as BL-1608: CONNECT reply heads (counted in the connector, which this task does not touch) and HTTP/2 and HTTP/3 trailers; neither was measured here.
+- Gates: `dotnet build` clean, fast tests green (Http 1846 passed, Core 1442, Abstractions 730, Console 2661), `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary,Curl.Core.UnitLibrary,Curl.Protocol.Abstractions.UnitLibrary`: all 100% line and branch, 0 failing members (Http re-measured alone after moving an `await` out of a `catch`, whose closing brace the compiler leaves unreachable).
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Needs Curl.Core.UnitTests (RedirectFollower carries the header count between hops), which BL-1532 in Doing touches; measurements and plan are in Notes
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Response headers count toward 5000 across -L hops, resends and chunked trailers, with curl's exit 100 output
