@@ -35,3 +35,4 @@ Every test in these `Curl.Cryptography.UnitTests` files writes, through BL-1457'
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
