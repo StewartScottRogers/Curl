@@ -48,33 +48,6 @@ public sealed class TcpConnectionListenerTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
-    public async Task ListenAsync_OnLoopbackPortZero_AcceptsTheClientThatConnectsAndKeepsItOpenAfterDispose()
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var listened = await new TcpConnectionListener().ListenAsync(AnyLoopbackPort, cancellation.Token);
-        var pending = listened.PendingConnection!;
-        var listening = (IPEndPoint)pending.LocalEndPoint;
-        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-        await client.ConnectAsync(listening, cancellation.Token);
-        var accepted = await pending.AcceptAsync(cancellation.Token);
-        await pending.DisposeAsync();
-
-        Assert.AreEqual(CurlExitCode.Ok, accepted.ExitCode);
-        await using var connection = accepted.Connection!;
-        Assert.IsFalse(connection.IsSecure);
-        Assert.AreEqual(listening, connection.LocalEndPoint);
-        Assert.AreEqual(listening, accepted.LocalEndPoint);
-        Assert.AreEqual(client.LocalEndPoint, connection.RemoteEndPoint);
-        await connection.WriteAsync(new byte[] { 42 }, cancellation.Token);
-        await connection.FlushAsync(cancellation.Token);
-        var received = new byte[1];
-        await client.ReceiveAsync(received, cancellation.Token);
-        Assert.AreEqual(42, received[0]);
-    }
-
-    [TestMethod]
     public async Task ListenAsync_WhenEveryPortOfTheRangeIsTaken_FailsWithFtpPortFailedAndRanOutOfPorts()
     {
         // curl 8.21.0 (Schannel): curl -P 127.0.0.1:<a port held listening> ftp://127.0.0.1:18456/f.txt

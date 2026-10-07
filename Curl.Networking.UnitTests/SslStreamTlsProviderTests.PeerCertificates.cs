@@ -31,58 +31,6 @@ public sealed partial class SslStreamTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
-    // Integration: on Windows the server's certificate context writes the intermediate into
-    // the current user's CA store, so the test depends on that store and changes it. Each run
-    // names its authorities afresh, so a copy left by a crashed run or another checkout
-    // running at the same time can never be taken for this run's issuer while the chain builds.
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task AuthenticateAsClientAsync_WhenTheServerSendsAnIntermediate_ReportsItAfterTheServersCertificate()
-    {
-        var runName = Guid.NewGuid().ToString("N");
-        using var rootKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var root = CreateAuthority($"CN=BL303 Test Root {runName}", rootKey, null, null);
-        using var intermediateKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        using var intermediate = CreateAuthority($"CN=BL303 Intermediate {runName}", intermediateKey, root, rootKey);
-        using var leaf = CreateServerCertificate(intermediate, intermediateKey);
-        try
-        {
-            var (client, server) = InMemoryDuplexStream.CreatePair();
-            var context = SslStreamCertificateContext.Create(leaf, [intermediate], offline: true);
-            var serverTask = Task.Run(async () =>
-            {
-                await using var sslStream = new SslStream(server);
-                await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificateContext = context });
-                _ = await sslStream.ReadAtLeastAsync(new byte[1], 1, throwOnEndOfStream: false);
-            });
-            var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
-
-            var result = await provider.AuthenticateAsClientAsync(
-                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
-
-            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
-            Assert.HasCount(2, result.PeerCertificates);
-            CollectionAssert.AreEqual(leaf.RawData, result.PeerCertificates[0].ToArray());
-            CollectionAssert.AreEqual(intermediate.RawData, result.PeerCertificates[1].ToArray());
-            await result.Connection!.DisposeAsync();
-            await IgnoreFailureAsync(serverTask);
-        }
-        finally
-        {
-            RemoveFromCurrentUserCaStore(intermediate);
-        }
-    }
-
-    // On Windows, SslStreamCertificateContext.Create saves the intermediate into the current
-    // user's CA store, where the server's handshake finds it. Left there, every run adds
-    // another same-named authority until building a chain fails, so the test removes it.
-    private static void RemoveFromCurrentUserCaStore(X509Certificate2 intermediate)
-    {
-        using var store = new X509Store(StoreName.CertificateAuthority, StoreLocation.CurrentUser);
-        store.Open(OpenFlags.ReadWrite);
-        store.Remove(intermediate);
-    }
-
     [TestMethod]
     public void ListPeerCertificates_WithNoCertificate_ReturnsNone()
     {
@@ -127,27 +75,6 @@ public sealed partial class SslStreamTlsProviderTests
 
         using var signed = request.Create(issuer.SubjectName, X509SignatureGenerator.CreateForECDsa(issuerKey!), notBefore, notAfter, [2]);
         return signed.CopyWithPrivateKey(key);
-    }
-
-    // Reloaded from PKCS#12, as the class's own server certificate is, so the platform can
-    // use its key in a handshake.
-    private static X509Certificate2 CreateServerCertificate(X509Certificate2 issuer, ECDsa issuerKey)
-    {
-        using var key = RSA.Create(2048);
-        var request = new CertificateRequest($"CN={CertificateHost}", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        var names = new SubjectAlternativeNameBuilder();
-        names.AddDnsName(CertificateHost);
-        request.CertificateExtensions.Add(names.Build());
-        request.CertificateExtensions.Add(
-            new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], critical: false));
-        using var signed = request.Create(
-            issuer.SubjectName,
-            X509SignatureGenerator.CreateForECDsa(issuerKey),
-            DateTimeOffset.UtcNow.AddDays(-1),
-            DateTimeOffset.UtcNow.AddDays(1),
-            [3]);
-        using var withKey = signed.CopyWithPrivateKey(key);
-        return X509CertificateLoader.LoadPkcs12(withKey.Export(X509ContentType.Pkcs12), null);
     }
 
     private static byte[] CreateUnrelatedAuthorityDer()

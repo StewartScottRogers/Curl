@@ -18,20 +18,22 @@
     Strip the project-name suffix out of the default namespace. The directory is
     Curl.Core.UnitLibrary because the layout pairs it with Curl.Core.UnitTests, but
     consumers should write "using Curl.Core;" - carrying .UnitLibrary into every
-    namespace would put a build-layout detail in the public API. A test project
-    lands in the same namespace as the code it tests, which is what you want.
+    namespace would put a build-layout detail in the public API. Test projects
+    land in the same namespace as the code they test, which is what you want.
   -->
   <PropertyGroup>
     <RootNamespace Condition="$(MSBuildProjectName.EndsWith('.UnitLibrary'))">$(MSBuildProjectName.Replace('.UnitLibrary', ''))</RootNamespace>
     <RootNamespace Condition="$(MSBuildProjectName.EndsWith('.UnitTests'))">$(MSBuildProjectName.Replace('.UnitTests', ''))</RootNamespace>
+    <RootNamespace Condition="$(MSBuildProjectName.EndsWith('.IntegrationTests'))">$(MSBuildProjectName.Replace('.IntegrationTests', ''))</RootNamespace>
   </PropertyGroup>
 
   <!--
-    Test projects are identified by the .UnitTests suffix. They are never packed,
-    and they are exempt from the XML-documentation requirement: CS1591 on a public
-    test class is noise, and warnings are errors here.
+    Test projects are identified by the .UnitTests or .IntegrationTests suffixes.
+    They are never packed, and they are exempt from the XML-documentation
+    requirement: CS1591 on a public test class is noise, and warnings are errors
+    here.
   -->
-  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('UnitTests'))">
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('UnitTests')) Or $(MSBuildProjectName.EndsWith('IntegrationTests'))">
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
@@ -44,7 +46,7 @@
     ADR-0417): MSTest global test hooks that write each test's START, END and SLOW:
     lines, and the helper tests use for ARRANGE, ACT, ASSERT, BYTES, DIFF and PHASE lines.
   -->
-  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('UnitTests'))">
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('UnitTests')) Or $(MSBuildProjectName.EndsWith('IntegrationTests'))">
     <Compile Include="$(MSBuildThisFileDirectory)MSTestSettings.cs" Link="MSTestSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TestDiagnostics.cs" Link="TestDiagnostics.cs" />
   </ItemGroup>
@@ -63,7 +65,7 @@
     trim/ahead-of-time analyzers, because Curl.Console publishes native AOT and a
     library that is not AOT-clean would only fail later, further from its cause.
   -->
-  <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('UnitTests'))">
+  <PropertyGroup Condition="!$(MSBuildProjectName.EndsWith('UnitTests')) And !$(MSBuildProjectName.EndsWith('IntegrationTests'))">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
@@ -81,7 +83,7 @@
     <CodeMetricsConfigFile Condition="'$(CodeMetricsConfigFile)' == ''">$(MSBuildThisFileDirectory)CodeMetricsConfig.txt</CodeMetricsConfigFile>
   </PropertyGroup>
 
-  <ItemGroup Condition="!$(MSBuildProjectName.EndsWith('UnitTests'))">
+  <ItemGroup Condition="!$(MSBuildProjectName.EndsWith('UnitTests')) And !$(MSBuildProjectName.EndsWith('IntegrationTests'))">
     <AdditionalFiles Include="$(CodeMetricsConfigFile)" Visible="false" />
   </ItemGroup>
 
@@ -98,7 +100,7 @@
   -->
   <Target Name="VerifyAotCompatibility"
           BeforeTargets="Build"
-          Condition="!$(MSBuildProjectName.EndsWith('UnitTests'))">
+          Condition="!$(MSBuildProjectName.EndsWith('UnitTests')) And !$(MSBuildProjectName.EndsWith('IntegrationTests'))">
     <Error Condition="'$(IsAotCompatible)' != 'true'"
            Text="$(MSBuildProjectName) is a production project and must be ahead-of-time compatible. It sets IsAotCompatible=$(IsAotCompatible); remove that override and let Directory.Build.props set it to true." />
   </Target>

@@ -3,20 +3,12 @@ using System.Net.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
-using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
-/// <summary>
-/// Pins that the connection <see cref="TcpConnector" /> returns over the production
-/// <see cref="TcpDialer" /> reports its socket's local end point, which FTP's <c>-P -</c>
-/// announces (ADR-0102, BL-456), and that the TLS connection
-/// <see cref="SslStreamTlsProvider" /> wraps it in still reports it, so <c>-P -</c> works
-/// over <c>ftps://</c> (BL-465). They dial a loopback <see cref="TcpConnectionListener" />,
-/// so they are <c>Integration</c> tests, as <see cref="TcpDialerTests" /> is.
-/// </summary>
-public sealed partial class TcpConnectorTests
+[TestClass]
+public sealed class TcpConnectorLocalEndPointIntegrationTests
 {
     [TestMethod]
     [TestCategory("Integration")]
@@ -27,21 +19,18 @@ public sealed partial class TcpConnectorTests
             new ListenTarget(IPAddress.Loopback, 0, 0), cancellation.Token);
         await using var pending = listened.PendingConnection!;
         var port = ((IPEndPoint)pending.LocalEndPoint).Port;
-        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new TcpDialer(), new FakeTlsProvider(), TimeProvider.System);
-        Diagnostics.Arrange("target", "127.0.0.1 on a loopback listener's port, TLS False");
+        var connector = new TcpConnector(
+            new SystemDnsResolver(),
+            new TcpDialer(),
+            new SslStreamTlsProvider(new TlsClientOptions(Insecure: true)),
+            TimeProvider.System);
 
-        ConnectResult result;
-        using (Diagnostics.Phase("connect"))
-        {
-            result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: false), cancellation.Token);
-        }
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: false), cancellation.Token);
 
         await using var connection = result.Connection!;
         var accepted = await pending.AcceptAsync(cancellation.Token);
         await using var serverSide = accepted.Connection!;
 
-        Diagnostics.Act("exit code", result.ExitCode);
-        Diagnostics.Assert("local end point is the server's remote end point", true, Equals(serverSide.RemoteEndPoint, connection.LocalEndPoint));
         Assert.IsNotNull(connection.LocalEndPoint);
         Assert.AreEqual(result.LocalEndPoint, connection.LocalEndPoint);
         Assert.AreEqual(serverSide.RemoteEndPoint, connection.LocalEndPoint);
@@ -58,23 +47,19 @@ public sealed partial class TcpConnectorTests
         await using var pending = listened.PendingConnection!;
         var port = ((IPEndPoint)pending.LocalEndPoint).Port;
         var connector = new TcpConnector(
-            new FakeDnsResolver(Loopback), new TcpDialer(), new SslStreamTlsProvider(new TlsClientOptions(Insecure: true)), TimeProvider.System);
+            new SystemDnsResolver(),
+            new TcpDialer(),
+            new SslStreamTlsProvider(new TlsClientOptions(Insecure: true)),
+            TimeProvider.System);
         var server = AcceptTlsAsync(pending, serverCertificate, cancellation.Token);
-        Diagnostics.Arrange("target", "127.0.0.1 on a loopback TLS listener's port, TLS True, insecure");
 
-        ConnectResult result;
-        using (Diagnostics.Phase("connect and TLS handshake"))
-        {
-            result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: true), cancellation.Token);
-        }
+        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: true), cancellation.Token);
 
         await using var connection = result.Connection!;
         var (serverSide, serverStream) = await server;
         await using var serverConnection = serverSide;
         await using var serverTls = serverStream;
 
-        Diagnostics.Act("exit code", result.ExitCode);
-        Diagnostics.Assert("connection is secure", true, connection.IsSecure);
         Assert.IsTrue(connection.IsSecure);
         Assert.IsNotNull(connection.LocalEndPoint);
         Assert.AreEqual(result.LocalEndPoint, connection.LocalEndPoint);
@@ -100,8 +85,6 @@ public sealed partial class TcpConnectorTests
             new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], critical: false));
         using var ephemeral = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
 
-        // A server certificate with an ephemeral key can fail the handshake on Windows;
-        // reloading it from PKCS#12 gives it a key the platform can use.
         return X509CertificateLoader.LoadPkcs12(ephemeral.Export(X509ContentType.Pkcs12), null);
     }
 }
