@@ -46,7 +46,44 @@ completed:
 
 ## Notes
 
+- 2026-10-07, lane 8 (unfinished; the code is in the shift's stash for this task):
+  - Before, Release, per operation (C# file-based bench outside the repo, `#:project` on
+    the library, HEAD's copy vs the working copy, machine loaded by 8 other lanes):
+    X25519 580-824 us, X448 1976-2156 us, CAST-128 rekey + 2 blocks 62-65 us. A Debug
+    build of the same bench is 10-20x slower, so bench in Release only.
+  - Where the time went: X25519/X448 - every field multiply did 256 / 784 16-bit limb
+    products into a stackalloc'd 31 / 55-limb buffer, then cleared and zeroed it; the
+    inversions were 254 / 446 square-and-multiply steps (one multiply per bit).
+    CAST-128 - each S-box read scans all 256 entries one at a time by mask (ADR-0398);
+    B.2 does 640 scans per iteration in the two key schedules and 256 in the four blocks.
+  - Done in the working copy: `Field25519` on 5 x 51-bit limbs with 128-bit products
+    (`Math.BigMul`), 25 products per multiply and 15 per square, and the standard
+    254-squaring / 11-multiply inversion chain; `Field448` on 8 x 56-bit limbs, 64 / 36
+    products into a `Span<Int128>`, and an addition-chain inversion (~453 squarings, 13
+    multiplies); `Cast128.ReadBox` scans `Vector<uint>.Count` entries per compare
+    (`Vector.Equals` mask, `Vector.Sum` of the one kept lane). Callers that wrote the
+    second 16-bit limb by hand (X25519's a24, Edwards25519's d) now use
+    `SetSmall(uint)`. CLAUDE.md's limb descriptions updated. All 1335 fast tests and all
+    5 Integration tests of Curl.Cryptography.UnitTests pass in Release.
+  - After, same bench: X25519 285-376 us (2.0-2.2x), X448 744-764 us (2.6-2.8x), CAST
+    20.5-20.9 us (3.0-3.1x). Integration TRX (Release, loaded machine, tests in
+    parallel): X25519 million iterations 5 m 40 s (27 m 38 s in Context: 4.9x), X448
+    14 m 51 s (Context's 8 m 15 s was a quieter machine), CAST B.2 32.9 s (Context 1 m
+    42 s: 3.1x).
+  - Left: (1) X448 needs another ~2x - the `Span<Int128>` column loop, its Clear and
+    ZeroMemory dominate; unrolled locals as in `Field25519`, or Hamburg's Karatsuba on
+    the golden-ratio prime, are the next steps. (2) Even X25519's 25-product multiply
+    costs ~100 ns here: `Int128` adds and the signed `Math.BigMul`; an unsigned
+    `Math.BigMul(ulong, ulong)` path (non-negative limbs, Subtract and Negate adding a
+    multiple of p) is the next step. (3) CAST-128's masked scan is near the vector
+    width's limit already (32 compares per 256-entry box on AVX2); 5x for B.2 needs fewer
+    scans, e.g. one fused pass reading the four key-schedule boxes per row, or a
+    bitsliced S-box - or an ADR, under Stewart's delegation, that sets CAST's target at
+    what a constant-time scan can reach. (4) Measure-CodeQuality.ps1 not yet run on the
+    changed library. (5) The task's timings must be re-taken on an unloaded machine.
+
 ## Log
 
 - 2026-10-06: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: X25519 4.9x, X448 not yet 5x (Field448 needs unrolled limbs), CAST B.2 3.1x (masked scan near its limit); quality measure not run. See Notes.
