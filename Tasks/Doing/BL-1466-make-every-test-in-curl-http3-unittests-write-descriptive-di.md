@@ -40,3 +40,4 @@ Every test in `Curl.Http3.UnitTests` writes, through BL-1457's shared `TestDiagn
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
