@@ -33,3 +33,4 @@ A failed transfer under `--aws-sigv4` ends with curl's own error line (for a ref
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
