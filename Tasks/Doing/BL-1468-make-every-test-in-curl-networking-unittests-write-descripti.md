@@ -43,3 +43,4 @@ Every test in `Curl.Networking.UnitTests` writes, through BL-1457's shared `Test
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1552 to BL-1551 (one per range of test files); this task runs the whole-project checks once they are Done
+- 2026-10-07: Backlog -> Doing.
