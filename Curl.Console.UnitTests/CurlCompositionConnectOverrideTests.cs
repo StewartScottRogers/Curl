@@ -3,6 +3,7 @@ using System.Net;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -14,6 +15,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionConnectOverrideTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task CreateTcpConnector_WithResolve_DialsTheOverriddenAddress()
     {
@@ -21,9 +26,13 @@ public sealed class CurlCompositionConnectOverrideTests
 
         ConnectResult result = await ConnectAsync(server, "example.com", 80, "--resolve", "example.com:80:192.0.2.7");
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("server.Targets count", 1, server.Targets.Count);
         Assert.HasCount(1, server.Targets);
+        Diagnostics.Assert("server.Targets[0].Host", "192.0.2.7", server.Targets[0].Host);
         Assert.AreEqual("192.0.2.7", server.Targets[0].Host);
+        Diagnostics.Assert("server.Targets[0].Port", 80, server.Targets[0].Port);
         Assert.AreEqual(80, server.Targets[0].Port);
     }
 
@@ -34,9 +43,13 @@ public sealed class CurlCompositionConnectOverrideTests
 
         ConnectResult result = await ConnectAsync(server, "example.com", 80, "--connect-to", "example.com:80:mapped.test:8080");
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("server.Targets count", 1, server.Targets.Count);
         Assert.HasCount(1, server.Targets);
+        Diagnostics.Assert("server.Targets[0].Host", "127.0.0.1", server.Targets[0].Host);
         Assert.AreEqual("127.0.0.1", server.Targets[0].Host);
+        Diagnostics.Assert("server.Targets[0].Port", 8080, server.Targets[0].Port);
         Assert.AreEqual(8080, server.Targets[0].Port);
     }
 
@@ -56,9 +69,13 @@ public sealed class CurlCompositionConnectOverrideTests
             "--resolve",
             "example.com:80:192.0.2.1");
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("server.Targets count", 1, server.Targets.Count);
         Assert.HasCount(1, server.Targets);
+        Diagnostics.Assert("server.Targets[0].Host", "192.0.2.9", server.Targets[0].Host);
         Assert.AreEqual("192.0.2.9", server.Targets[0].Host);
+        Diagnostics.Assert("server.Targets[0].Port", 8080, server.Targets[0].Port);
         Assert.AreEqual(8080, server.Targets[0].Port);
     }
 
@@ -69,8 +86,11 @@ public sealed class CurlCompositionConnectOverrideTests
 
         ConnectResult result = await ConnectAsync(server, "example.com", 80);
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("server.Targets[0].Host", "127.0.0.1", server.Targets[0].Host);
         Assert.AreEqual("127.0.0.1", server.Targets[0].Host);
+        Diagnostics.Assert("server.Targets[0].Port", 80, server.Targets[0].Port);
         Assert.AreEqual(80, server.Targets[0].Port);
     }
 
@@ -81,8 +101,11 @@ public sealed class CurlCompositionConnectOverrideTests
 
         ConnectResult result = await ConnectAsync(server, "example.com", 80, "--resolve", "example.com:80:bad");
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "Could not parse CURLOPT_RESOLVE entry 'example.com:80:bad'", result.ErrorMessage);
         Assert.AreEqual("Could not parse CURLOPT_RESOLVE entry 'example.com:80:bad'", result.ErrorMessage);
+        Diagnostics.Assert("server.Targets count", 0, server.Targets.Count);
         Assert.IsEmpty(server.Targets);
     }
 
@@ -93,8 +116,11 @@ public sealed class CurlCompositionConnectOverrideTests
 
         ConnectResult result = await ConnectAsync(server, "example.com", 80, "--connect-to", "example.com:80:mapped.test:x");
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "No valid port number in 'mapped.test:x'", result.ErrorMessage);
         Assert.AreEqual("No valid port number in 'mapped.test:x'", result.ErrorMessage);
+        Diagnostics.Assert("server.Targets count", 0, server.Targets.Count);
         Assert.IsEmpty(server.Targets);
     }
 
@@ -106,6 +132,7 @@ public sealed class CurlCompositionConnectOverrideTests
         DatagramOpenResult result = await OpenTftpAsync(
             "--connect-to", "tftp.test:69:mapped.test:7000", "--resolve", "mapped.test:7000:127.0.0.1");
 
+        Diagnostics.Assert("result.Channel is not null", true, result.Channel is not null);
         Assert.IsNotNull(result.Channel);
         await using IDatagramChannel channel = result.Channel;
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 7000), channel.ServerEndPoint);
@@ -116,7 +143,9 @@ public sealed class CurlCompositionConnectOverrideTests
     {
         DatagramOpenResult result = await OpenTftpAsync("--resolve", "bad");
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "Could not parse CURLOPT_RESOLVE entry 'bad'", result.ErrorMessage);
         Assert.AreEqual("Could not parse CURLOPT_RESOLVE entry 'bad'", result.ErrorMessage);
     }
 
@@ -125,7 +154,9 @@ public sealed class CurlCompositionConnectOverrideTests
     {
         DatagramOpenResult result = await OpenTftpAsync("--connect-to", "tftp.test:69:mapped.test:x");
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "No valid port number in 'mapped.test:x'", result.ErrorMessage);
         Assert.AreEqual("No valid port number in 'mapped.test:x'", result.ErrorMessage);
     }
 
@@ -133,14 +164,24 @@ public sealed class CurlCompositionConnectOverrideTests
     /// Parses <paramref name="arguments" /> and a <c>tftp://tftp.test/</c> URL, builds the
     /// run's transports from them, and opens the UDP connector to <c>tftp.test</c> on port 69.
     /// </summary>
-    private static async Task<DatagramOpenResult> OpenTftpAsync(params string[] arguments)
+    private async Task<DatagramOpenResult> OpenTftpAsync(params string[] arguments)
     {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("tftp://tftp.test/")));
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "tftp://tftp.test/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
         CurlTransports transports = CurlComposition.CreateTransports(parsed.Options);
 
-        return await transports.UdpDatagramConnector.OpenAsync("tftp.test", 69, CancellationToken.None);
+        DatagramOpenResult result;
+        using (Diagnostics.Phase("open"))
+        {
+            result = await transports.UdpDatagramConnector.OpenAsync("tftp.test", 69, CancellationToken.None);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("server end point", result.Channel?.ServerEndPoint);
+        return result;
     }
 
     /// <summary>
@@ -148,8 +189,9 @@ public sealed class CurlCompositionConnectOverrideTests
     /// them over a <see cref="LoopbackDnsResolver" /> and <paramref name="server" />, and connects
     /// to <paramref name="host" /> on <paramref name="port" />.
     /// </summary>
-    private static async Task<ConnectResult> ConnectAsync(ScriptedConnector server, string host, int port, params string[] arguments)
+    private async Task<ConnectResult> ConnectAsync(ScriptedConnector server, string host, int port, params string[] arguments)
     {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append($"http://{host}:{port}/")));
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, $"http://{host}:{port}/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
 
@@ -161,6 +203,15 @@ public sealed class CurlCompositionConnectOverrideTests
             TimeProvider.System,
             HttpProxyTunnelOptions.Default);
 
-        return await connector.ConnectAsync(new ConnectTarget(host, port, false), CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("connect"))
+        {
+            result = await connector.ConnectAsync(new ConnectTarget(host, port, false), CancellationToken.None);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("dialled targets", string.Join(", ", server.Targets.Select(target => $"{target.Host}:{target.Port}")));
+        return result;
     }
 }

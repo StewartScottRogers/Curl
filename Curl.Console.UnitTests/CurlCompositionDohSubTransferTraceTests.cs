@@ -4,6 +4,7 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -20,6 +21,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionDohSubTransferTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string DohUrl = "http://127.0.0.1:47112/dns-query";
 
     private static readonly byte[] AnswerHead = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: ");
@@ -54,6 +59,7 @@ public sealed class CurlCompositionDohSubTransferTraceTests
             "* [DNS] DoH: Too small type AAAA for example.test",
             "* Could not resolve host: example.test",
         ];
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(string.Join('\n', expected), string.Join('\n', StandardErrorLines().Take(expected.Length)));
     }
@@ -74,6 +80,7 @@ public sealed class CurlCompositionDohSubTransferTraceTests
             "* [DNS] resolve complete for example.test:47113",
             "* Host example.test:47113 was resolved.",
         ];
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual(string.Join('\n', expected), string.Join('\n', StandardErrorLines().Skip(3).Take(expected.Length)));
     }
@@ -83,6 +90,7 @@ public sealed class CurlCompositionDohSubTransferTraceTests
     {
         await ConnectAsync([AAnswer, AAnswer], "-v");
 
+        Diagnostics.Assert("sub-transfer line present", false, StandardErrorLines().Any(line => line.Contains("DoH request is completed", StringComparison.Ordinal) || line.StartsWith("> POST", StringComparison.Ordinal)));
         Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("DoH request is completed", StringComparison.Ordinal) || line.StartsWith("> POST", StringComparison.Ordinal)));
     }
 
@@ -134,6 +142,8 @@ public sealed class CurlCompositionDohSubTransferTraceTests
     private async Task<ConnectResult> ConnectAsync(byte[][] dohAnswers, params string[] arguments)
     {
         string[] given = arguments.Length == 0 ? ["-v", "--trace-config", "dns"] : arguments;
+        Diagnostics.Arrange("arguments", string.Join(' ', given) + " --doh-url " + DohUrl + " http://example.test:47113/");
+        Diagnostics.Arrange("DoH answer lengths", string.Join(", ", dohAnswers.Select(answer => answer.Length)));
         CommandLineParseResult parsed = CommandLineParser.Parse([.. given, "--doh-url", DohUrl, "http://example.test:47113/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         CommandLineOptions options = parsed.Options;
@@ -149,6 +159,14 @@ public sealed class CurlCompositionDohSubTransferTraceTests
             resolverEvents: resolverEvents);
         VerboseTransferEventWriter events = new(standardError, writesDataLines: true, TlsBackend.Schannel);
 
-        return await connector.ConnectAsync(new ConnectTarget("example.test", 47113, false) { Events = events }, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("connect"))
+        {
+            result = await connector.ConnectAsync(new ConnectTarget("example.test", 47113, false) { Events = events }, CancellationToken.None);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("stderr lines", string.Join(" | ", StandardErrorLines()));
+        return result;
     }
 }

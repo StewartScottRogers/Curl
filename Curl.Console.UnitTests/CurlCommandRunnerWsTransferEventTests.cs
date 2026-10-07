@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -34,11 +35,16 @@ public sealed class CurlCommandRunnerWsTransferEventTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_Verbose_WritesTheMeasuredLines()
     {
         int exitCode = await RunAsync(["-sv"], Head101 + HelloAndClose, 59509);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             "*   Trying 127.0.0.1:47932..." + InfoEnd
@@ -78,6 +84,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
     {
         int exitCode = await RunAsync(["-sSv", "--trace-config", component], Head101 + "\x81\x02hi\x88\x00", 59511);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         StringAssert.EndsWith(
             WithMeasuredKey(Encoding.ASCII.GetString(standardError.ToArray())),
@@ -105,6 +112,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
     {
         int exitCode = await RunAsync(arguments, Head101 + "\x81\x02hi\x88\x00", 59512);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         string standardErrorText = Encoding.ASCII.GetString(standardError.ToArray());
         Assert.DoesNotContain("[WS] WS, using chunk size", standardErrorText);
@@ -117,6 +125,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
     {
         int exitCode = await RunAsync(["-si"], Head101 + HelloAndClose, 59510);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, Encoding.ASCII.GetString(standardError.ToArray()));
         Assert.AreEqual("hello\x03\xe8", Encoding.Latin1.GetString(standardOutput.ToArray()));
@@ -127,6 +136,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
     {
         int exitCode = await RunAsync(["-sv"], "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n", 64833);
 
+        Diagnostics.Assert("exit code", 22, exitCode);
         Assert.AreEqual(22, exitCode);
         StringAssert.EndsWith(
             WithMeasuredKey(Encoding.ASCII.GetString(standardError.ToArray())),
@@ -143,6 +153,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
     {
         int exitCode = await RunAsync(["-sv"], Head101, 64834);
 
+        Diagnostics.Assert("exit code", 52, exitCode);
         Assert.AreEqual(52, exitCode);
         StringAssert.EndsWith(
             WithMeasuredKey(Encoding.ASCII.GetString(standardError.ToArray())),
@@ -157,6 +168,7 @@ public sealed class CurlCommandRunnerWsTransferEventTests
     {
         int exitCode = await RunAsync(["--trace-ascii", "-"], Head101 + HelloAndClose, 61657);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             "*   Trying 127.0.0.1:47932...\n"
@@ -200,11 +212,28 @@ public sealed class CurlCommandRunnerWsTransferEventTests
         return text.Replace(key.Groups[1].Value, MeasuredKey, StringComparison.Ordinal);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> options, string reply, int localPort)
+    private async Task<int> RunAsync(IReadOnlyList<string> options, string reply, int localPort)
     {
+        Diagnostics.Arrange("arguments", string.Join(' ', options.Append("ws://127.0.0.1:47932/p")));
+        Diagnostics.Bytes("scripted reply", Encoding.Latin1.GetBytes(reply));
+        Diagnostics.Arrange("local port", localPort);
         var connector = new ReportingConnector(new ScriptedConnector([Encoding.Latin1.GetBytes(reply)]), localPort);
         var files = new InMemoryFileSystem();
 
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await RunCommandAsync(options, connector, files);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        return exitCode;
+    }
+
+    private Task<int> RunCommandAsync(IReadOnlyList<string> options, ReportingConnector connector, InMemoryFileSystem files)
+    {
         return new CurlCommandRunner(
                 parsed => new TransferDispatch(
                     new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
