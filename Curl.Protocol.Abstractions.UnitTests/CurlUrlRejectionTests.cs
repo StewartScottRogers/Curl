@@ -90,6 +90,28 @@ public sealed class CurlUrlRejectionTests
         Assert.AreEqual(CurlUrlRejection.None, rejection);
     }
 
+    // curl 8.21.0 on Windows, measured 2026-10-07 (BL-1526, ADR-0418): curl -sSv
+    // "file:///C:/dir/f.txt%00x" passes URL parsing and fails in file_connect with
+    // "URL using bad/illegal format or missing URL", as the drive-less form does; only a
+    // space in the path, as in a profile directory, makes the parser say "URL rejected".
+    [TestMethod]
+    public void TryParse_WithADriveLetterPathEscapingANul_AcceptsIt()
+    {
+        bool parsed = CurlUrl.TryParse("file:///C:/dir/f.txt%00x", pathAsIs: false, driveLetters: true, out _, out CurlUrlRejection rejection);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(CurlUrlRejection.None, rejection);
+    }
+
+    [TestMethod]
+    public void TryParse_WithADriveLetterPathHoldingASpace_SaysTheInputIsMalformed()
+    {
+        bool parsed = CurlUrl.TryParse("file:///C:/Users/Stewart Rogers/f.txt%00x", pathAsIs: false, driveLetters: true, out _, out CurlUrlRejection rejection);
+
+        Assert.IsFalse(parsed);
+        Assert.AreEqual(CurlUrlRejection.MalformedInput, rejection);
+    }
+
     [TestMethod]
     public void TryParse_OnThePublicOverloadWithAReason_SaysWhy()
     {
