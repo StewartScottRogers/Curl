@@ -1,0 +1,36 @@
+---
+id: BL-1618
+title: Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.WeirdHeaderLine and HttpProtocolHandlerTests.cs tests write descriptive diagnostic output
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: [BL-1457]
+touches: [Curl.Protocol.Http.UnitTests]
+requirement: none
+created: 2026-10-07
+completed:
+---
+# BL-1618 — Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.WeirdHeaderLine and HttpProtocolHandlerTests.cs tests write descriptive diagnostic output
+
+## Goal
+
+Every test in these `Curl.Protocol.Http.UnitTests` files (2 files, 50 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs, Act result and assertion context (plus `PHASE` timings where it has phases), with no test's logic or assertions changed: `HttpProtocolHandlerTests.WeirdHeaderLine.cs`, `HttpProtocolHandlerTests.cs`.
+
+## Context
+
+- Split from BL-1476 (one task per range of files, as its Notes direct); BL-1476 keeps the whole-project checks and depends on this task. Follow BL-1476's Context: what matters in this project (request line and headers, the scripted response, the parsed status, headers and body, each redirect or authentication step, the `CurlExitCode` with its error text), `Documentation/Wiki/Test-Diagnostics.md` and BL-1457's ADR for the line format; no prefix of your own; output only; large payloads through `BYTES`; nothing printed may depend on the operating system. BL-1478 (`Curl.Protocol.Ldap.UnitTests`) shows the pattern.
+- `HttpProtocolHandlerTests` is one partial class (563 test methods) spread over seven tasks, BL-1612 to BL-1618. "Its filter" below is `FullyQualifiedName~Curl.Protocol.Http.HttpProtocolHandlerTests.`, and the first criterion's check applies only to the `END` lines of test methods declared in this task's files. `HttpProtocolHandlerTests.cs` holds the class's shared helpers; one of them may write lines for every test that uses it.
+
+## Acceptance criteria
+
+- [ ] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [ ] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
+- [ ] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
+- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+
+## Notes
+
+## Log
+
+- 2026-10-07: Created.

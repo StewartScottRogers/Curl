@@ -4,7 +4,7 @@ title: Make every test in Curl.Protocol.Http.UnitTests write descriptive diagnos
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1457]
+depends-on: [BL-1457, BL-1610, BL-1611, BL-1612, BL-1613, BL-1614, BL-1615, BL-1616, BL-1617, BL-1618, BL-1619, BL-1620]
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-04
@@ -36,8 +36,10 @@ Every test in `Curl.Protocol.Http.UnitTests` writes, through BL-1457's shared `T
 ## Notes
 
 - Large: 1034 test methods in 119 files is probably more than one `/task-run` can finish. Stewart asked for one task per project, so it is filed whole. If the runner judges it too big, it splits it before changing any test: it files tasks that each cover a range of the project's files by name (each `-Pipeline direct -DependsOn BL-1457 -Touches Curl.Protocol.Http.UnitTests`, with these criteria limited to its files' classes through `--filter "FullyQualifiedName~<class>"`), adds them to this task's `depends-on`, and moves this task back to `Backlog`; this task then only runs the whole-project checks above.
+- 2026-10-07 (lane 3): split before any test changed. Recounted: 119 test files, 1042 `[TestMethod`/`[DataTestMethod` matches. Filed BL-1610 to BL-1620, eleven contiguous ranges of the files in path order, 50 to 128 test methods each (the size of BL-1580's ranges, which finish in one run). `HttpRequestHeadFormatterTests`'s four partial files stay in one task (BL-1619). `HttpProtocolHandlerTests` is one partial class of 563 test methods in the 55 of its 61 files that declare tests, too big for one run, so its files are spread over BL-1612 to BL-1618; each of those checks its whole-class filter's `END` lines only for the methods declared in its own files. This task now waits on all eleven and then only runs the whole-project checks.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Split into BL-1610 to BL-1620 by test file range (1042 test methods is too many for one run); waits on them, then runs the whole-project checks
