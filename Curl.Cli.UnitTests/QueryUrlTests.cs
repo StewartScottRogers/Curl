@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -23,6 +25,8 @@ namespace Curl.Cli;
 public sealed class QueryUrlTests
 {
     private const string Url = "http://127.0.0.1:18188/p";
+
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     [DataRow(Url, new[] { "-G", "-d", "a" }, Url + "?a")]
@@ -50,6 +54,10 @@ public sealed class QueryUrlTests
     {
         CommandLineParseResult result = Parse([.. arguments, url], new RecordingDataFileReader());
 
+        string? appended = result.IsAccepted ? QueryUrl.Append(url, result.Options) : null;
+        Diagnostics.Act("url", appended);
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("url", expectedUrl, appended);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedUrl, QueryUrl.Append(url, result.Options));
     }
@@ -58,9 +66,15 @@ public sealed class QueryUrlTests
     public void Append_UrlQueryAtFile_EncodesTheFileAfterAnEmptyPiece()
     {
         RecordingDataFileReader reader = new() { Files = { ["f.txt"] = "a b\r\nc\n"u8.ToArray() } };
+        Diagnostics.Bytes("f.txt", reader.Files["f.txt"]);
 
         CommandLineParseResult result = Parse(["--url-query", "", "--url-query", "n@f.txt", Url], reader);
 
+        string appended = QueryUrl.Append(Url, result.Options!);
+        Diagnostics.Act("url query", result.Options!.UrlQuery);
+        Diagnostics.Act("url", appended);
+        Diagnostics.Assert("url query", "&n=a+b%0D%0Ac%0A", result.Options!.UrlQuery);
+        Diagnostics.Assert("url", Url + "?&n=a+b%0D%0Ac%0A", appended);
         Assert.AreEqual("&n=a+b%0D%0Ac%0A", result.Options!.UrlQuery);
         Assert.AreEqual(Url + "?&n=a+b%0D%0Ac%0A", QueryUrl.Append(Url, result.Options));
     }
@@ -70,6 +84,13 @@ public sealed class QueryUrlTests
     {
         CommandLineParseResult result = Parse(["--url-query", "n@missing", Url], new RecordingDataFileReader());
 
+        string[] expectedStandardErrorLines =
+        [
+            "curl: Failed to open missing",
+            "curl: option --url-query: error encountered when reading a file",
+            CommandLineRefusal.TryHelpLine,
+        ];
+        Diagnostics.AssertRefusal(result, Curl.Protocol.Abstractions.CurlExitCode.ReadError, expectedStandardErrorLines);
         Assert.IsFalse(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
@@ -86,6 +107,10 @@ public sealed class QueryUrlTests
     {
         CommandLineParseResult result = Parse([Url], new RecordingDataFileReader());
 
+        Diagnostics.Act("url query", result.Options!.UrlQuery ?? "null");
+        Diagnostics.Act("data in query", result.Options!.DataInQuery);
+        Diagnostics.Assert("url query", "null", result.Options!.UrlQuery ?? "null");
+        Diagnostics.Assert("data in query", false, result.Options!.DataInQuery);
         Assert.IsNull(result.Options!.UrlQuery);
         Assert.IsFalse(result.Options!.DataInQuery);
     }
@@ -93,23 +118,38 @@ public sealed class QueryUrlTests
     [TestMethod]
     public void Append_NullUrl_Throws()
     {
+        Diagnostics.Arrange("url", "null");
+
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => QueryUrl.Append(null!, new CommandLineOptions()));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter", "url", exception.ParamName);
         Assert.AreEqual("url", exception.ParamName);
     }
 
     [TestMethod]
     public void Append_NullOptions_Throws()
     {
+        Diagnostics.Arrange("options", "null");
+
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => QueryUrl.Append(Url, null!));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter", "options", exception.ParamName);
         Assert.AreEqual("options", exception.ParamName);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        Diagnostics.ActParse(result);
+        return result;
+    }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

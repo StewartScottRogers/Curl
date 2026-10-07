@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -29,6 +31,8 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     private const string KeepAlive = "  curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);\n";
     private const string Before = Start + Agent + MaxRedirs;
     private const string After = Tls + KeepAlive;
+
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     [DataRow("--request-target|*", Start + "  curl_easy_setopt(curl, CURLOPT_REQUEST_TARGET, \"*\");\n" + Agent + MaxRedirs + After)]
@@ -87,34 +91,52 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     [DataRow("--crlf", Before + Tls + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n" + KeepAlive)]
     [DataRow("-w|x", Before + "  curl_easy_setopt(curl, CURLOPT_CERTINFO, 1L);\n" + After)]
     [DataRow("-w|%{http_code}", Before + "  curl_easy_setopt(curl, CURLOPT_CERTINFO, 1L);\n" + After)]
-    public void Generate_TransferOption_WritesCurlsLines(string arguments, string transfer) =>
-        Assert.AreEqual(transfer, TransferLinesFor(arguments + "|" + HttpUrl));
+    public void Generate_TransferOption_WritesCurlsLines(string arguments, string transfer)
+    {
+        string actual = TransferLinesFor(arguments + "|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", transfer, actual);
+        Assert.AreEqual(transfer, actual);
+    }
 
     [TestMethod]
-    public void Generate_CertificateInfoWithCaAndClientCertificate_SitsBetweenThem() =>
-        Assert.AreEqual(
+    public void Generate_CertificateInfoWithCaAndClientCertificate_SitsBetweenThem()
+    {
+        string expected =
             Before
             + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)5);\n"
             + "  curl_easy_setopt(curl, CURLOPT_CAINFO, \"up.txt\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_CERTINFO, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n"
-            + After,
-            TransferLinesFor("-C|5|-w|x|-E|c.pem|--cacert|up.txt|" + HttpUrl));
+            + After;
+
+        string actual = TransferLinesFor("-C|5|-w|x|-E|c.pem|--cacert|up.txt|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
-    public void Generate_TransferTextAmongTheNetrcLines_SitsBeforeTheLoginOptions() =>
-        Assert.AreEqual(
+    public void Generate_TransferTextAmongTheNetrcLines_SitsBeforeTheLoginOptions()
+    {
+        string expected =
             Start
             + "  curl_easy_setopt(curl, CURLOPT_NETRC, (long)CURL_NETRC_REQUIRED);\n"
             + "  curl_easy_setopt(curl, CURLOPT_NETRC_FILE, \"up.txt\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_LOGIN_OPTIONS, \"x\");\n"
-            + Agent + MaxRedirs + After,
-            TransferLinesFor("-B|--login-options|x|-n|--netrc-file|up.txt|" + HttpUrl));
+            + Agent + MaxRedirs + After;
+
+        string actual = TransferLinesFor("-B|--login-options|x|-n|--netrc-file|up.txt|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
-    public void Generate_CookieSessionThroughAProxy_SitsBeforeTheHeaderOption() =>
-        Assert.AreEqual(
+    public void Generate_CookieSessionThroughAProxy_SitsBeforeTheHeaderOption()
+    {
+        string expected =
             "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"https://127.0.0.1:1/\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n"
@@ -124,12 +146,18 @@ public sealed class LibcurlSourceCodeTransferOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_COOKIE, \"c=d\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_COOKIESESSION, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_HEADEROPT, 1L);\n"
-            + After,
-            TransferLinesFor("-x|http://p:1|-j|-b|c=d|--http1.1|https://127.0.0.1:1/"));
+            + After;
+
+        string actual = TransferLinesFor("-x|http://p:1|-j|-b|c=d|--http1.1|https://127.0.0.1:1/");
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
-    public void Generate_SpeedResumeAndConditionOnFtp_FollowThePassiveIpLine() =>
-        Assert.AreEqual(
+    public void Generate_SpeedResumeAndConditionOnFtp_FollowThePassiveIpLine()
+    {
+        string expected =
             FtpStart + Agent + PassiveIp
             + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 20L);\n"
@@ -138,12 +166,18 @@ public sealed class LibcurlSourceCodeTransferOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFUNMODSINCE);\n"
             + "  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n"
             + KeepAlive
-            + "  curl_easy_setopt(curl, CURLOPT_ABSTRACT_UNIX_SOCKET, \"s\");\n",
-            TransferLinesFor("-C|5|--abstract-unix-socket|s|-z|-20200101|-y|20|" + FtpUrl));
+            + "  curl_easy_setopt(curl, CURLOPT_ABSTRACT_UNIX_SOCKET, \"s\");\n";
+
+        string actual = TransferLinesFor("-C|5|--abstract-unix-socket|s|-z|-20200101|-y|20|" + FtpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
-    public void Generate_TransferOptionsTogetherOnHttp_WriteEveryLineInCurlsOrder() =>
-        Assert.AreEqual(
+    public void Generate_TransferOptionsTogetherOnHttp_WriteEveryLineInCurlsOrder()
+    {
+        string expected =
             Start
             + "  curl_easy_setopt(curl, CURLOPT_REQUEST_TARGET, \"*\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, 1L);\n"
@@ -187,21 +221,31 @@ public sealed class LibcurlSourceCodeTransferOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_TCP_KEEPCNT, 5L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, \"/s\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS, 300L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_DISALLOW_USERNAME_IN_URL, 1L);\n",
-            TransferLinesFor(
+            + "  curl_easy_setopt(curl, CURLOPT_DISALLOW_USERNAME_IN_URL, 1L);\n";
+
+        string actual = TransferLinesFor(
                 "--disallow-username-in-url|--alt-svc|a.txt|--hsts|h.txt|--interface|lo|--local-port|1000-2000|--doh-url|https://d/q"
                 + "|--unix-socket|/s|--keepalive-time|30|--keepalive-cnt|5|-r|0-5|--max-filesize|100"
                 + "|--happy-eyeballs-timeout-ms|300|--expect100-timeout|2|-Y|100|-y|20|-z|20200101|-j|--follow|--max-redirs|5"
                 + "|--post301|--post303|--tr-encoding|--ignore-content-length|--path-as-is|--http0.9|--request-target|*|--http1.1"
-                + "|--crlf|-B|-l|-a|-w|x|--form-escape|-F|a=b|" + HttpUrl));
+                + "|--crlf|-B|-l|-a|-w|x|--form-escape|-F|a=b|" + HttpUrl);
 
-    private static string TransferLinesFor(string arguments)
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private string TransferLinesFor(string arguments)
     {
         string[] parts = arguments.Split('|');
+        Diagnostics.ArrangeArguments(["-s", .. parts]);
         CommandLineOptions options = CommandLineParser.Parse(["-s", .. parts], _ => true).Options!;
         string source = LibcurlSourceCode.Generate([(options, parts[^1])]);
         int start = source.IndexOf("  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE", StringComparison.Ordinal);
         int end = source.IndexOf("\n  /* Here is a list", StringComparison.Ordinal);
-        return source[start..end];
+        string lines = source[start..end];
+        Diagnostics.Act("setopt lines", lines);
+        return lines;
     }
 }
