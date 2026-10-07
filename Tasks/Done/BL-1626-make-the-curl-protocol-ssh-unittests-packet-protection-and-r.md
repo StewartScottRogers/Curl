@@ -32,6 +32,12 @@ Every test in these files of `Curl.Protocol.Ssh.UnitTests` writes, through BL-14
 
 ## Notes
 
+- Helpers: reused BL-1625's `Keys/SshKeyDiagnostics` (`ActBytes`, `AssertBytes`, `ActAndAssertThrown`) and added `PacketProtection/SshPacketDiagnostics.cs` with `ArrangePacket` (ARRANGE line decoding packet_length, padding_length and message number, then BYTES) and `AssertHex` (expected hex against actual bytes, then DIFF). Tests that compared inline results (`Assert.AreEqual(x, f())`) now hold the result in a local first so it can be written; the calls and every assertion are kept.
+- The round-trip test in `SshPacketProtectionsTests` writes `PHASE write` and `PHASE read` lines (3-14 ms each).
+- Counts in the task's 14 test files, before -> after: `Assert.` 121 -> 121, `[TestMethod` 62 -> 62, `[DataRow(` 96 -> 96. The filtered run: 138 tests, 138 `END` lines, none with arrange, act or assert 0.
+- `dotnet build Curl.Protocol.Ssh.UnitTests -warnaserror` clean; the project's fast tests: 1673 passed.
+- No test printed a `SLOW:` line.
+
 ## Log
 
 - 2026-10-07: Created.
