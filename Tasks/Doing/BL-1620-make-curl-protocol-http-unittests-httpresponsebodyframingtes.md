@@ -34,3 +34,4 @@ Every test in these `Curl.Protocol.Http.UnitTests` files (12 files, 106 test met
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
