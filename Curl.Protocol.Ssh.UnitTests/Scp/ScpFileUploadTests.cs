@@ -1,8 +1,11 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Keys;
 using Curl.Protocol.Ssh.Sftp;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Scp;
@@ -17,6 +20,10 @@ namespace Curl.Protocol.Ssh.Scp;
 [TestClass]
 public sealed class ScpFileUploadTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string InvalidAcknowledgement = "Invalid ACK response from remote";
 
     private const string UnexpectedChannelClose = "Unexpected channel close";
@@ -32,12 +39,15 @@ public sealed class ScpFileUploadTests
     {
         Outcome outcome = await UploadAsync(ScpServerScript.Receiving(), "/home/u/files/new.txt", new MemoryStream(HelloScp));
 
+        Diagnostics.AssertResult(TransferResult.Success(10) with { Report = new TransferReport { UploadSize = 10 } }, outcome.Result);
         Assert.AreEqual(TransferResult.Success(10) with { Report = new TransferReport { UploadSize = 10 } }, outcome.Result);
+        Diagnostics.AssertProgress(new[] { (10L, (long?)10) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (10L, (long?)10) }, outcome.Progress);
         List<byte[]> written = SftpServerScript.SshPayloads(outcome.Written);
         byte[] serverChannel = UInt32(SftpServerScript.ServerChannel);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelOpen], Name("session"), UInt32(0), UInt32(2097152), UInt32(32768)), written[0]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelRequest], serverChannel, Name("exec"), [1], Name("scp -t '/home/u/files/new.txt'")), written[1]);
+        Diagnostics.AssertBytes("channel bytes", Join("C0644 10 new.txt\n"u8.ToArray(), HelloScp), outcome.ChannelBytes);
         CollectionAssert.AreEqual(Join("C0644 10 new.txt\n"u8.ToArray(), HelloScp), outcome.ChannelBytes, "no T line before and no zero byte after, as measured");
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelEof], serverChannel), written[^2]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelClose], serverChannel), written[^1]);
@@ -52,7 +62,9 @@ public sealed class ScpFileUploadTests
     {
         Outcome outcome = await UploadAsync(ScpServerScript.Receiving(), "/f/m.txt", new MemoryStream(HelloScp), (UnixFileMode)mode);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, outcome.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, outcome.Result.ExitCode);
+        Diagnostics.AssertBytes("file line", Encoding.ASCII.GetBytes($"{expected} 10 m.txt\n"), outcome.ChannelBytes[..^HelloScp.Length]);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes($"{expected} 10 m.txt\n"), outcome.ChannelBytes[..^HelloScp.Length]);
     }
 
@@ -64,8 +76,11 @@ public sealed class ScpFileUploadTests
     {
         Outcome outcome = await UploadAsync(ScpServerScript.Receiving(), urlPath, new MemoryStream(HelloScp));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, outcome.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, outcome.Result.ExitCode);
         byte[] request = SftpServerScript.SshPayloads(outcome.Written)[1];
+        Diagnostics.AssertBytes("exec command", Encoding.Latin1.GetBytes(command), request[(1 + 4 + 4 + 4 + 1 + 4)..]);
+        Diagnostics.AssertBytes("file line", Encoding.Latin1.GetBytes($"C0644 10 {name}\n"), outcome.ChannelBytes[..^HelloScp.Length]);
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes(command), request[(1 + 4 + 4 + 4 + 1 + 4)..]);
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes($"C0644 10 {name}\n"), outcome.ChannelBytes[..^HelloScp.Length]);
     }
@@ -75,8 +90,11 @@ public sealed class ScpFileUploadTests
     {
         Outcome outcome = await UploadAsync(ScpServerScript.Receiving(), "/f/empty.txt", new MemoryStream());
 
+        Diagnostics.AssertResult(TransferResult.Success(0) with { Report = new TransferReport() }, outcome.Result);
         Assert.AreEqual(TransferResult.Success(0) with { Report = new TransferReport() }, outcome.Result);
+        Diagnostics.AssertBytes("channel bytes", "C0644 0 empty.txt\n"u8.ToArray(), outcome.ChannelBytes);
         CollectionAssert.AreEqual("C0644 0 empty.txt\n"u8.ToArray(), outcome.ChannelBytes);
+        Diagnostics.AssertProgress([], outcome.Progress);
         Assert.IsEmpty(outcome.Progress);
     }
 
@@ -88,7 +106,9 @@ public sealed class ScpFileUploadTests
         Outcome outcome = await UploadAsync(ScpServerScript.Receiving(), "/f/big.bin", new MemoryStream(content));
 
         Assert.AreEqual(100000, outcome.Result.BytesTransferred);
+        Diagnostics.AssertBytes("channel bytes", Join("C0644 100000 big.bin\n"u8.ToArray(), content), outcome.ChannelBytes);
         CollectionAssert.AreEqual(Join("C0644 100000 big.bin\n"u8.ToArray(), content), outcome.ChannelBytes);
+        Diagnostics.AssertProgress(new[] { (65536L, (long?)100000), (100000L, (long?)100000) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (65536L, (long?)100000), (100000L, (long?)100000) }, outcome.Progress);
     }
 
@@ -100,6 +120,7 @@ public sealed class ScpFileUploadTests
         Outcome outcome = await UploadAsync(ScpServerScript.Receiving(), "/f/rest", source);
 
         Assert.AreEqual(4, outcome.Result.BytesTransferred);
+        Diagnostics.AssertBytes("channel bytes", "C0644 4 rest\nscp\n"u8.ToArray(), outcome.ChannelBytes);
         CollectionAssert.AreEqual("C0644 4 rest\nscp\n"u8.ToArray(), outcome.ChannelBytes);
     }
 
@@ -108,6 +129,7 @@ public sealed class ScpFileUploadTests
     {
         Outcome outcome = await UploadAsync(ScpServerScript.Receiving(), "/f/x", new FailingStream(HelloScp));
 
+        Diagnostics.AssertResult(TransferResult.Success(0) with { Report = new TransferReport() }, outcome.Result);
         Assert.AreEqual(TransferResult.Success(0) with { Report = new TransferReport() }, outcome.Result);
     }
 
@@ -115,12 +137,19 @@ public sealed class ScpFileUploadTests
     public async Task UploadAsync_SourceOfUnknownSize_FailsWithExit25BeforeOpeningAChannelAsMeasured()
     {
         ScriptedConnection connection = new(ScpServerScript.Receiving().Bytes);
+        Diagnostics.ArrangeTransfer("/f/stdin.txt", ScpServerScript.Receiving().Bytes);
+        Diagnostics.Arrange("source", "an unseekable stream of 10 bytes");
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
                 .UploadAsync("/f/stdin.txt", Mode0644, new UnseekableStream(HelloScp), new RecordingProgress(), CancellationToken.None));
 
+        Diagnostics.ActFailure(failure);
+        Diagnostics.ActBytes("written", connection.Written);
+
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.UploadFailed, failure.ExitCode);
+        Diagnostics.AssertText("message", "SCP requires a known file size for upload", failure.Message);
         Assert.AreEqual("SCP requires a known file size for upload", failure.Message);
         Assert.IsEmpty(connection.Written);
     }
@@ -226,6 +255,7 @@ public sealed class ScpFileUploadTests
 
         Outcome outcome = await UploadAsync(script, "/f", new MemoryStream(content));
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 65536) with { Report = new TransferReport { UploadSize = 65536 } }, outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 65536) with { Report = new TransferReport { UploadSize = 65536 } }, outcome.Result);
     }
 
@@ -242,46 +272,81 @@ public sealed class ScpFileUploadTests
 
         Outcome outcome = await UploadAsync(script, "/f", new MemoryStream(HelloScp));
 
+        Diagnostics.AssertResult(TransferResult.Success(10) with { Report = new TransferReport { UploadSize = 10 } }, outcome.Result);
         Assert.AreEqual(TransferResult.Success(10) with { Report = new TransferReport { UploadSize = 10 } }, outcome.Result);
     }
 
     [TestMethod]
     [DataRow("/f/new.txt", 0b110_100_100, 10L, "C0644 10 new.txt\n")]
     [DataRow("f", 0b110_000_000, 0L, "C0600 0 f\n")]
-    public void FileLine_BuildsLibssh2sLine(string path, int mode, long size, string expected) =>
-        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes(expected), ScpFileUpload.FileLine((UnixFileMode)mode, size, Encoding.ASCII.GetBytes(path)));
-
-    private static void AssertFailure(SshTransferException failure, string message)
+    public void FileLine_BuildsLibssh2sLine(string path, int mode, long size, string expected)
     {
+        Diagnostics.Arrange("path, mode, size", $"{path}, {Convert.ToString(mode, 8)}, {size}");
+
+        byte[] line = ScpFileUpload.FileLine((UnixFileMode)mode, size, Encoding.ASCII.GetBytes(path));
+
+        Diagnostics.ActBytes("file line", line);
+        Diagnostics.AssertBytes("file line", Encoding.ASCII.GetBytes(expected), line);
+        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes(expected), ScpFileUpload.FileLine((UnixFileMode)mode, size, Encoding.ASCII.GetBytes(path)));
+    }
+
+    private void AssertFailure(SshTransferException failure, string message)
+    {
+        Diagnostics.AssertFailure(CurlExitCode.UploadFailed, message, failure);
         Assert.AreEqual(CurlExitCode.UploadFailed, failure.ExitCode);
         Assert.AreEqual(message, failure.Message);
     }
 
     // Measured: after a failure libssh2 sends EOF and CLOSE together, then waits.
-    private static void AssertClosedAtOnce(byte[] written)
+    private void AssertClosedAtOnce(byte[] written)
     {
         List<byte[]> payloads = SftpServerScript.SshPayloads(written);
         byte[] serverChannel = UInt32(SftpServerScript.ServerChannel);
+        Diagnostics.AssertBytes("second-last message (CHANNEL_EOF)", Join([SshConnectionMessageNumber.ChannelEof], serverChannel), payloads[^2]);
+        Diagnostics.AssertBytes("last message (CHANNEL_CLOSE)", Join([SshConnectionMessageNumber.ChannelClose], serverChannel), payloads[^1]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelEof], serverChannel), payloads[^2]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelClose], serverChannel), payloads[^1]);
     }
 
-    private static async Task<(SshTransferException Failure, byte[] Written)> UploadFailsAsync(ScpServerScript script)
+    private async Task<(SshTransferException Failure, byte[] Written)> UploadFailsAsync(ScpServerScript script)
     {
+        Diagnostics.ArrangeTransfer("/x/f", script.Bytes);
+        Diagnostics.Bytes("source", HelloScp);
         ScriptedConnection connection = new(script.Bytes);
-        SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
-            async () => await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
-                .UploadAsync("/x/f", Mode0644, new MemoryStream(HelloScp), new RecordingProgress(), CancellationToken.None));
+        SshTransferException failure;
+        using (Diagnostics.Phase("upload"))
+        {
+            failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+                async () => await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
+                    .UploadAsync("/x/f", Mode0644, new MemoryStream(HelloScp), new RecordingProgress(), CancellationToken.None));
+        }
+
+        Diagnostics.ActFailure(failure);
+        Diagnostics.ActBytes("channel bytes", ScpServerScript.ChannelBytes(connection.Written));
+        Diagnostics.ActSshMessages(connection.Written);
         return (failure, connection.Written);
     }
 
-    private static async Task<Outcome> UploadAsync(ScpServerScript script, string urlPath, Stream source, UnixFileMode mode = Mode0644)
+    private async Task<Outcome> UploadAsync(ScpServerScript script, string urlPath, Stream source, UnixFileMode mode = Mode0644)
     {
+        Diagnostics.ArrangeTransfer(urlPath, script.Bytes);
+        Diagnostics.Arrange("source", $"{source.GetType().Name}, {source.Length} bytes from position {source.Position}");
+        Diagnostics.Arrange("mode", Convert.ToString((int)mode, 8));
         ScriptedConnection connection = new(script.Bytes);
         RecordingProgress progress = new();
-        TransferResult result = await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
-            .UploadAsync(urlPath, mode, source, progress, CancellationToken.None);
-        return new Outcome(result, progress.Reports, connection.Written);
+        TransferResult result;
+        using (Diagnostics.Phase("upload"))
+        {
+            result = await new ScpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
+                .UploadAsync(urlPath, mode, source, progress, CancellationToken.None);
+        }
+
+        Outcome outcome = new(result, progress.Reports, connection.Written);
+        Diagnostics.Act("result", result);
+        Diagnostics.Act("progress", SshFileTransferDiagnostics.Progress(outcome.Progress));
+        Diagnostics.ActBytes("channel bytes", outcome.ChannelBytes);
+        Diagnostics.ActSshMessages(outcome.Written);
+        return outcome;
     }
 
     private sealed record Outcome(TransferResult Result, List<(long, long?)> Progress, byte[] Written)

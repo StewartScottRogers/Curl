@@ -1,6 +1,9 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Sftp;
@@ -15,6 +18,10 @@ namespace Curl.Protocol.Ssh.Sftp;
 [TestClass]
 public sealed class SftpDirectoryListingTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const uint Directory = 0x41ED;
 
     private const uint SymbolicLink = 0xA1FF;
@@ -58,7 +65,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/home/stewart_rogers/bl570/list/");
 
+        Diagnostics.AssertText("output", OpenSshListing, Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual(OpenSshListing, Encoding.UTF8.GetString(outcome.Output));
+        Diagnostics.AssertResult(TransferResult.Success(541), outcome.Result);
         Assert.AreEqual(TransferResult.Success(541), outcome.Result, "-w '%{size_download}' printed 541, as measured");
         Assert.AreEqual((541L, (long?)null), outcome.Progress[^1]);
         AssertRequests(
@@ -84,7 +93,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/", listOnly: true);
 
+        Diagnostics.AssertText("output", "sub\na.txt\n..\nbroken\n.\nlink\nb.bin\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("sub\na.txt\n..\nbroken\n.\nlink\nb.bin\n", Encoding.UTF8.GetString(outcome.Output));
+        Diagnostics.AssertResult(TransferResult.Success(33), outcome.Result);
         Assert.AreEqual(TransferResult.Success(33), outcome.Result);
         AssertRequests(outcome, 3, SftpServerScript.ReadDirectoryRequest(2), SftpServerScript.ReadDirectoryRequest(3), SftpServerScript.CloseRequest(4));
     }
@@ -105,6 +116,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/emptydir/", listOnly);
 
+        Diagnostics.AssertText("output", expected, Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual(expected, Encoding.UTF8.GetString(outcome.Output));
     }
 
@@ -120,6 +132,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/");
 
+        Diagnostics.AssertText("output", "LONG-f\nLONG-g\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-f\nLONG-g\n", Encoding.UTF8.GetString(outcome.Output));
         AssertRequests(outcome, 3, SftpServerScript.ReadDirectoryRequest(2), SftpServerScript.ReadDirectoryRequest(3), SftpServerScript.ReadDirectoryRequest(4), SftpServerScript.CloseRequest(5));
     }
@@ -131,7 +144,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/zeronames/");
 
+        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
         Assert.AreEqual(TransferResult.Success(0), outcome.Result);
+        Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
         AssertRequests(outcome, 3, SftpServerScript.ReadDirectoryRequest(2), SftpServerScript.CloseRequest(3));
     }
@@ -148,6 +163,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/~/sub/");
 
+        Diagnostics.AssertText("output", "LONG-f\nLONG-l -> tgt\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-f\nLONG-l -> tgt\n", Encoding.UTF8.GetString(outcome.Output));
         List<byte[]> requests = Requests(outcome);
         CollectionAssert.AreEqual(SftpServerScript.OpenDirectoryRequest("/home/fake/sub/"), requests[2]);
@@ -161,6 +177,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/x%2F");
 
+        Diagnostics.AssertBytes("request 2 (OPENDIR)", SftpServerScript.OpenDirectoryRequest("/d/x/"), Requests(outcome)[2]);
         CollectionAssert.AreEqual(SftpServerScript.OpenDirectoryRequest("/d/x/"), Requests(outcome)[2]);
     }
 
@@ -176,7 +193,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/readlinkok/");
 
+        Diagnostics.AssertText("output", "LONG-f\nLONG-l -> l\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-f\nLONG-l -> l\n", Encoding.UTF8.GetString(outcome.Output));
+        Diagnostics.AssertResult(TransferResult.Success(19), outcome.Result);
         Assert.AreEqual(TransferResult.Success(19), outcome.Result);
     }
 
@@ -193,7 +212,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/", listOnly, maxFileSize: 10);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (10) with 10 bytes", 10), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (10) with 10 bytes", 10), outcome.Result);
+        Diagnostics.AssertText("output", expected, Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual(expected, Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual((10L, (long?)null), outcome.Progress[^1]);
         AssertRequests(outcome, 3, SftpServerScript.ReadDirectoryRequest(2), SftpServerScript.CloseRequest(3));
@@ -217,7 +238,9 @@ public sealed class SftpDirectoryListingTests
         Outcome outcome = await ListAsync(script, "/d/", listOnly, maxFileSize);
 
         string expected = listOnly ? "abcdef\nghijkl\n" : "LONG-abcdef\nLONG-ghijkl\n";
+        Diagnostics.AssertResult(TransferResult.Success(expected.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        Diagnostics.AssertText("output", expected, Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual(expected, Encoding.UTF8.GetString(outcome.Output));
     }
 
@@ -232,7 +255,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/readlinkfail/");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.OutOfMemory, "Out of memory", 7), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.OutOfMemory, "Out of memory", 7), outcome.Result);
+        Diagnostics.AssertText("output", "LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
         AssertRequests(outcome, 3, SftpServerScript.ReadDirectoryRequest(2), SftpServerScript.ReadLinkRequest("/d/readlinkfail/l", 3), SftpServerScript.CloseRequest(4));
     }
@@ -247,7 +272,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/readdirfail/");
 
+        Diagnostics.AssertResult(TransferResult.Failure(exitCode, $"Could not open remote file for reading: {description} :: -31", 7), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(exitCode, $"Could not open remote file for reading: {description} :: -31", 7), outcome.Result);
+        Diagnostics.AssertText("output", "LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
         AssertRequests(outcome, 3, SftpServerScript.ReadDirectoryRequest(2), SftpServerScript.ReadDirectoryRequest(3), SftpServerScript.CloseRequest(4));
     }
@@ -265,7 +292,9 @@ public sealed class SftpDirectoryListingTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await List(connection, "/d/opendir/"));
 
+        Diagnostics.Assert("exit code", exitCode, failure.ExitCode);
         Assert.AreEqual(exitCode, failure.ExitCode);
+        Diagnostics.AssertText("message", "Could not open directory for reading: " + description, failure.Message);
         Assert.AreEqual("Could not open directory for reading: " + description, failure.Message);
         Assert.HasCount(3, SftpServerScript.SftpRequests(connection.Written), "no close without a handle, as measured");
     }
@@ -283,6 +312,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/opendirok/");
 
+        Diagnostics.AssertText("output", "LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
     }
 
@@ -297,6 +327,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/noperms/");
 
+        Diagnostics.AssertText("output", "LONG-x\n\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-x\n\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.HasCount(6, Requests(outcome));
     }
@@ -327,6 +358,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/allattrs/");
 
+        Diagnostics.AssertText("output", "LONG-a -> tgt\nLONG-f\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-a -> tgt\nLONG-f\n", Encoding.UTF8.GetString(outcome.Output));
     }
 
@@ -343,6 +375,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/");
 
+        Diagnostics.AssertText("output", "LONG-l -> tgt\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-l -> tgt\n", Encoding.UTF8.GetString(outcome.Output));
         CollectionAssert.AreEqual(SftpServerScript.ReadLinkRequest("/d/l", 3), Requests(outcome)[4]);
     }
@@ -353,13 +386,20 @@ public sealed class SftpDirectoryListingTests
         SftpServerScript script = SftpServerScript.Started().HomeDirectory().Status(1, SftpStatusCode.Ok);
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream output = new();
+        Diagnostics.ArrangeTransfer("/d/", script.Bytes);
+        Diagnostics.Arrange("options", "no body");
 
         TransferResult result = await new SftpDirectoryListing(SftpSessionTests.Transport(connection))
             .ListAsync("/d/", listOnly: false, noBody: true, output, new RecordingProgress(), CancellationToken.None);
 
+        Diagnostics.Act("result", result);
+        Diagnostics.ActBytes("output", output.ToArray());
+        Diagnostics.ActSftpRequests(connection.Written);
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
         Assert.AreEqual(0, output.Length);
         List<byte[]> requests = [.. SftpServerScript.SftpRequests(connection.Written)];
+        Diagnostics.DiffRequests(requests, 2, [SftpServerScript.StatRequest("/d/", 1)]);
         Assert.HasCount(3, requests, "INIT, REALPATH and the STAT for the file time");
         CollectionAssert.AreEqual(SftpServerScript.StatRequest("/d/", 1), requests[2]);
     }
@@ -371,7 +411,9 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 7), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 7), outcome.Result);
+        Diagnostics.AssertText("output", "LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
         Assert.AreEqual("LONG-f\n", Encoding.UTF8.GetString(outcome.Output));
     }
 
@@ -382,6 +424,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
     }
 
@@ -392,6 +435,7 @@ public sealed class SftpDirectoryListingTests
 
         Outcome outcome = await ListAsync(script, "/d/");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
     }
 
@@ -406,31 +450,61 @@ public sealed class SftpDirectoryListingTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await List(new ScriptedConnection(script.Bytes), "/d/"));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
+        Diagnostics.AssertText("message", "Error in the SSH layer", failure.Message);
         Assert.AreEqual("Error in the SSH layer", failure.Message);
     }
 
-    private static ValueTask<TransferResult> List(ScriptedConnection connection, string urlPath) =>
-        new SftpDirectoryListing(SftpSessionTests.Transport(connection))
-            .ListAsync(urlPath, listOnly: false, noBody: false, new MemoryStream(), new RecordingProgress(), CancellationToken.None);
-
-    private static async Task<Outcome> ListAsync(SftpServerScript script, string urlPath, bool listOnly = false, long? maxFileSize = null)
+    private async Task<TransferResult> List(ScriptedConnection connection, string urlPath)
     {
+        Diagnostics.Arrange("url path", urlPath);
+        using (Diagnostics.Phase("list"))
+        {
+            try
+            {
+                TransferResult result = await new SftpDirectoryListing(SftpSessionTests.Transport(connection))
+                    .ListAsync(urlPath, listOnly: false, noBody: false, new MemoryStream(), new RecordingProgress(), CancellationToken.None);
+                Diagnostics.Act("result", result);
+                return result;
+            }
+            catch (SshTransferException failure)
+            {
+                Diagnostics.ActFailure(failure);
+                Diagnostics.ActSftpRequests(connection.Written);
+                throw;
+            }
+        }
+    }
+
+    private async Task<Outcome> ListAsync(SftpServerScript script, string urlPath, bool listOnly = false, long? maxFileSize = null)
+    {
+        Diagnostics.ArrangeTransfer(urlPath, script.Bytes);
+        Diagnostics.Arrange("list only, max file size", $"{listOnly}, {maxFileSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(none)"}");
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream output = new();
         RecordingProgress progress = new();
-        TransferResult result = await new SftpDirectoryListing(SftpSessionTests.Transport(connection))
-            .ListAsync(urlPath, listOnly, noBody: false, output, progress, CancellationToken.None, maxFileSize: maxFileSize);
-        return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
+        TransferResult result;
+        using (Diagnostics.Phase("list"))
+        {
+            result = await new SftpDirectoryListing(SftpSessionTests.Transport(connection))
+                .ListAsync(urlPath, listOnly, noBody: false, output, progress, CancellationToken.None, maxFileSize: maxFileSize);
+        }
+
+        Outcome outcome = new(result, output.ToArray(), progress.Reports, connection.Written);
+        Diagnostics.ActTransfer(outcome.Result, outcome.Output, outcome.Progress);
+        Diagnostics.ActSftpRequests(outcome.Written);
+        return outcome;
     }
 
     private static List<byte[]> Requests(Outcome outcome) => SftpServerScript.SftpRequests(outcome.Written);
 
-    private static void AssertRequests(Outcome outcome, params byte[][] expected) => AssertRequests(outcome, 0, expected);
+    private void AssertRequests(Outcome outcome, params byte[][] expected) => AssertRequests(outcome, 0, expected);
 
-    private static void AssertRequests(Outcome outcome, int skipped, params byte[][] expected)
+    private void AssertRequests(Outcome outcome, int skipped, params byte[][] expected)
     {
         List<byte[]> requests = Requests(outcome);
+        Diagnostics.DiffRequests(requests, skipped, expected);
         Assert.HasCount(skipped + expected.Length, requests);
         for (int index = 0; index < expected.Length; index++)
         {

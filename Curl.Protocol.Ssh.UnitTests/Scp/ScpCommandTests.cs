@@ -1,4 +1,6 @@
 using System.Text;
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Scp;
 
@@ -9,12 +11,22 @@ namespace Curl.Protocol.Ssh.Scp;
 [TestClass]
 public sealed class ScpCommandTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("/x/it's!''here", "scp -pf '/x/it'\"'\"'s'\\!\"''\"'here'", DisplayName = "apostrophes and an exclamation mark, as measured")]
     [DataRow("/home/u/f", "scp -pf '/home/u/f'", DisplayName = "plain path, as measured")]
     [DataRow("a b.txt", "scp -pf 'a b.txt'", DisplayName = "space, as measured")]
     public void ForDownload_Path_BuildsTheCommandCurlSent(string path, string command)
     {
+        Diagnostics.Arrange("path", path);
+
+        byte[] actual = ScpCommand.ForDownload(Encoding.Latin1.GetBytes(path));
+
+        Diagnostics.Act("command", Encoding.Latin1.GetString(actual));
+        Diagnostics.AssertBytes("command", Encoding.Latin1.GetBytes(command), actual);
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes(command), ScpCommand.ForDownload(Encoding.Latin1.GetBytes(path)));
     }
 
@@ -30,6 +42,12 @@ public sealed class ScpCommandTests
     [DataRow("!a", "\\!'a'", DisplayName = "exclamation mark then a letter")]
     public void Quote_Argument_QuotesItAsLibssh2Does(string argument, string quoted)
     {
+        Diagnostics.Arrange("argument", argument);
+
+        byte[] actual = ScpCommand.Quote(Encoding.Latin1.GetBytes(argument));
+
+        Diagnostics.Act("quoted", Encoding.Latin1.GetString(actual));
+        Diagnostics.AssertBytes("quoted", Encoding.Latin1.GetBytes(quoted), actual);
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes(quoted), ScpCommand.Quote(Encoding.Latin1.GetBytes(argument)));
     }
 }
