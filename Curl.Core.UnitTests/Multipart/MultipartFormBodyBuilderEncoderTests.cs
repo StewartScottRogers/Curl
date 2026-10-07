@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core.Multipart;
 
@@ -155,13 +156,18 @@ public sealed class MultipartFormBodyBuilderEncoderTests
         MultipartFormBuildResult text = await BuildAsync(files, "------------------------qeWzJBSHPeBMTn23CunR06", TextPart("hello = world é", "7bit"));
         MultipartFormBuildResult file = await BuildAsync(files, "------------------------wJSaLIauxbMEuqsSoRUDKZ", FilePart("7bit"));
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         foreach (MultipartFormBuildResult result in new[] { text, file })
         {
+            diagnostics.Assert("isBuilt", false, result.IsBuilt);
             Assert.IsFalse(result.IsBuilt);
+            diagnostics.Assert("exit code", CurlExitCode.ReadError, result.Failure.ExitCode);
             Assert.AreEqual(CurlExitCode.ReadError, result.Failure.ExitCode);
+            diagnostics.Assert("error message", "read error getting mime data", result.Failure.ErrorMessage);
             Assert.AreEqual("read error getting mime data", result.Failure.ErrorMessage);
         }
 
+        diagnostics.Assert("file disposed", true, files.Opened.Single().IsDisposed);
         Assert.IsTrue(files.Opened.Single().IsDisposed, "The file read for checking is closed.");
     }
 
@@ -176,7 +182,10 @@ public sealed class MultipartFormBodyBuilderEncoderTests
             TextPart("é", "7bit"),
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "nope.txt", null, null, NoHeaders, NoParts));
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("exit code", CurlExitCode.ReadError, result.Failure!.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.Failure!.ExitCode);
+        diagnostics.Assert("error message", MultipartFormBodyBuilder.OpenFailedMessage, result.Failure.ErrorMessage);
         Assert.AreEqual(MultipartFormBodyBuilder.OpenFailedMessage, result.Failure.ErrorMessage);
     }
 
@@ -196,14 +205,20 @@ public sealed class MultipartFormBodyBuilderEncoderTests
         MultipartFormBuildResult file = await BuildAsync(files, B, FilePart(encoder));
         MultipartFormBuildResult missingFirst = await BuildAsync(files, B, missing, TextPart("x", encoder));
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         foreach (MultipartFormBuildResult result in new[] { text, file })
         {
+            diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, result.Failure!.ExitCode);
             Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.Failure!.ExitCode);
+            diagnostics.Assert("error message", "A libcurl function was given a bad argument", result.Failure.ErrorMessage);
             Assert.AreEqual("A libcurl function was given a bad argument", result.Failure.ErrorMessage);
+            diagnostics.Assert("unknown encoder message", MultipartFormBodyBuilder.UnknownEncoderMessage, result.Failure.ErrorMessage);
             Assert.AreEqual(MultipartFormBodyBuilder.UnknownEncoderMessage, result.Failure.ErrorMessage);
         }
 
+        diagnostics.Assert("exit code, missing file first", CurlExitCode.ReadError, missingFirst.Failure!.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, missingFirst.Failure!.ExitCode);
+        diagnostics.Assert("opened files", 0, files.Opened.Count);
         Assert.IsEmpty(files.Opened, "An unknown encoder fails before its file is opened.");
     }
 
@@ -231,8 +246,12 @@ public sealed class MultipartFormBodyBuilderEncoderTests
             "------------------------0000000000000000000000",
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "dev", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("exit code", CurlExitCode.ReadError, result.Failure!.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.Failure!.ExitCode);
+        diagnostics.Assert("error message", MultipartFormBodyBuilder.ReadFailedMessage, result.Failure.ErrorMessage);
         Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, result.Failure.ErrorMessage);
+        diagnostics.Assert("file disposed", true, files.Opened.Single().IsDisposed);
         Assert.IsTrue(files.Opened.Single().IsDisposed);
     }
 
@@ -245,13 +264,19 @@ public sealed class MultipartFormBodyBuilderEncoderTests
         MultipartFormBuildResult result = await BuildAsync(files, "------------------------0000000000000000000000", FilePart(encoder));
 
         FormFileSystem.TrackedStream file = files.Opened.Single();
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("isBuilt", true, result.IsBuilt);
         Assert.IsTrue(result.IsBuilt);
+        diagnostics.Assert("position after build", 0, file.Position);
         Assert.AreEqual(0, file.Position, "Nothing is read while building.");
+        diagnostics.Assert("disposed after build", false, file.IsDisposed);
         Assert.IsFalse(file.IsDisposed);
 
         await result.Body.Content.ReadExactlyAsync(new byte[300], TestContext.CancellationToken);
+        diagnostics.Act("position after read", file.Position);
         Assert.AreNotEqual(0, file.Position, "The file is read as the body is read.");
         await result.Body.Content.DisposeAsync();
+        diagnostics.Assert("disposed after body disposed", true, file.IsDisposed);
         Assert.IsTrue(file.IsDisposed);
     }
 
@@ -266,8 +291,11 @@ public sealed class MultipartFormBodyBuilderEncoderTests
             "------------------------0000000000000000000000",
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "dev", null, null, NoHeaders, NoParts) { Encoder = "base64" });
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("isBuilt", true, result.IsBuilt);
         Assert.IsTrue(result.IsBuilt);
-        await Assert.ThrowsExactlyAsync<IOException>(() => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        diagnostics.Act("exception", $"{failure.GetType().Name}: {failure.Message}");
         await result.Body.Content.DisposeAsync();
     }
 
@@ -278,7 +306,10 @@ public sealed class MultipartFormBodyBuilderEncoderTests
         FormFileSystem files = new FormFileSystem().WithFile("data.txt", "plain\r\nascii");
         MultipartFormBuildResult result = await BuildAsync(files, B, FilePart("7bit"));
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("disposed", false, files.Opened.Single().IsDisposed);
         Assert.IsFalse(files.Opened.Single().IsDisposed, "The checked file is streamed, not read into memory.");
+        diagnostics.Assert("position", 0, files.Opened.Single().Position);
         Assert.AreEqual(0, files.Opened.Single().Position, "The check leaves the file at its start.");
         string expected = FileHeaders(B, "7bit") + "plain\r\nascii" + $"\r\n--{B}--\r\n";
         await AssertBodyAsync(result, expected, expected.Length, "7bit file");
@@ -295,7 +326,10 @@ public sealed class MultipartFormBodyBuilderEncoderTests
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "pipe", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
 
         FormFileSystem.TrackedStream pipe = files.Opened.Single();
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("position", 0, pipe.Position);
         Assert.AreEqual(0, pipe.Position, "A pipe cannot be read twice, so nothing is read while building.");
+        diagnostics.Assert("disposed", false, pipe.IsDisposed);
         Assert.IsFalse(pipe.IsDisposed, "The pipe is streamed, not read into memory.");
         string expected = $"--{B}\r\nContent-Disposition: form-data; name=\"f\"\r\nContent-Transfer-Encoding: 7bit\r\n\r\nhi\r\n--{B}--\r\n";
         await AssertBodyAsync(result, expected, null, "7bit pipe");
@@ -311,9 +345,13 @@ public sealed class MultipartFormBodyBuilderEncoderTests
             "------------------------0000000000000000000000",
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "high", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("isBuilt", true, result.IsBuilt);
         Assert.IsTrue(result.IsBuilt);
         RequestBodyReadFailedException refused = await Assert.ThrowsExactlyAsync<RequestBodyReadFailedException>(
             () => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        diagnostics.Act("exception", refused.Message);
+        diagnostics.Assert("exception message", MultipartFormBodyBuilder.ReadFailedMessage, refused.Message);
         Assert.AreEqual(MultipartFormBodyBuilder.ReadFailedMessage, refused.Message);
         await result.Body.Content.DisposeAsync();
     }
@@ -327,9 +365,13 @@ public sealed class MultipartFormBodyBuilderEncoderTests
             "------------------------0000000000000000000000",
             new MultipartFormPart("f", MultipartFormPartKind.FileContent, "dev", null, null, NoHeaders, NoParts) { Encoder = "7bit" });
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("isBuilt", true, result.IsBuilt);
         Assert.IsTrue(result.IsBuilt);
-        await Assert.ThrowsExactlyAsync<IOException>(() => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => result.Body.Content.CopyToAsync(Stream.Null, TestContext.CancellationToken));
+        diagnostics.Act("exception", $"{failure.GetType().Name}: {failure.Message}");
         await result.Body.Content.DisposeAsync();
+        diagnostics.Assert("file disposed", true, files.Opened.Single().IsDisposed);
         Assert.IsTrue(files.Opened.Single().IsDisposed);
     }
 
@@ -342,7 +384,11 @@ public sealed class MultipartFormBodyBuilderEncoderTests
         MultipartFormBodyBuilder builder = new(new FormFileSystem(), Windows1252, boundaries.Dequeue);
         MultipartFormPart part = new("m", MultipartFormPartKind.Multipart, string.Empty, null, null, NoHeaders, NoParts) { Encoder = "bogus" };
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("boundaries", $"{B}, {Inner}");
+        diagnostics.Arrange("part", $"{part.Name}:{part.Kind}:{part.Encoder}");
         MultipartFormBuildResult result = await builder.BuildAsync([part], TestContext.CancellationToken);
+        diagnostics.Act("isBuilt", result.IsBuilt);
 
         string expected =
             $"--{B}\r\nContent-Disposition: form-data; name=\"m\"\r\nContent-Type: multipart/mixed; boundary={Inner}\r\n\r\n"
@@ -365,18 +411,28 @@ public sealed class MultipartFormBodyBuilderEncoderTests
     /// <summary>Builds with no length for a file that cannot seek, as curl on Linux and macOS declares none.</summary>
     private async Task<MultipartFormBuildResult> BuildAsync(FormFileSystem files, string boundary, params MultipartFormPart[] parts)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("boundary", boundary);
+        diagnostics.Arrange("parts", string.Join(", ", parts.Select(part => $"{part.Name}:{part.Kind}:{part.Encoder}")));
         MultipartFormBodyBuilder builder = new(files, Windows1252, () => boundary, standardInput: null, UnseekableFileLength.Unknown);
-        return await builder.BuildAsync(parts, TestContext.CancellationToken);
+        MultipartFormBuildResult built = await builder.BuildAsync(parts, TestContext.CancellationToken);
+        diagnostics.Act("isBuilt", built.IsBuilt);
+        return built;
     }
 
     private async Task AssertBodyAsync(MultipartFormBuildResult result, string expected, long? expectedLength, string spec)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("isBuilt", true, result.IsBuilt);
         Assert.IsTrue(result.IsBuilt, spec);
+        diagnostics.Assert("length", expectedLength, result.Body.Length);
         Assert.AreEqual(expectedLength, result.Body.Length, spec);
         using MemoryStream copy = new();
         await result.Body.Content.CopyToAsync(copy, TestContext.CancellationToken);
         await result.Body.Content.DisposeAsync();
         byte[] bytes = copy.ToArray();
+        diagnostics.Bytes("body", bytes);
+        diagnostics.Diff("body", expected, Windows1252.GetString(bytes));
         Assert.AreEqual(expected, Windows1252.GetString(bytes), spec);
     }
 }
