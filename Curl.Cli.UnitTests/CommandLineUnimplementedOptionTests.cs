@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -20,6 +21,10 @@ public sealed class CommandLineUnimplementedOptionTests
 
     private const string NotSupported = "the installed libcurl version does not support this";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private static IEnumerable<CurlOptionAlias> UnimplementedAliases =>
         CurlOptionAliasTable.Aliases.Where(alias => !CommandLineOptionTable.Rows.Any(row => row.LongName == alias.Name));
 
@@ -31,10 +36,16 @@ public sealed class CommandLineUnimplementedOptionTests
     [TestMethod]
     public void Parse_EveryAliasWithoutARow_IsRefusedAsNotSupported()
     {
+        int unimplementedAliasCount = ArrangeUnimplementedAliases();
+        int checkedAliasCount = 0;
+
         foreach (CurlOptionAlias alias in UnimplementedAliases)
         {
-            AssertRefused(CommandLineParser.Parse([$"--{alias.Name}", Url]), $"curl: option --{alias.Name}: {NotSupported}");
+            checkedAliasCount++;
+            AssertRefused(Parse([$"--{alias.Name}", Url]), $"curl: option --{alias.Name}: {NotSupported}");
         }
+
+        AssertAliasesChecked(unimplementedAliasCount, checkedAliasCount);
     }
 
     /// <summary>
@@ -44,40 +55,70 @@ public sealed class CommandLineUnimplementedOptionTests
     [TestMethod]
     public void EveryCurlLetter_HasARow()
     {
-        Assert.AreEqual(string.Empty, string.Concat(UnimplementedLetters));
+        Diagnostics.Arrange("curl letters", CurlOptionAliasTable.Aliases.Count(alias => alias.Letter != CurlOptionAliasTable.NoLetter));
+        string unimplementedLetters = string.Concat(UnimplementedLetters);
+        Diagnostics.Act("letters without a row", "\"" + unimplementedLetters + "\"");
+
+        Diagnostics.Assert("letters without a row", "\"\"", "\"" + unimplementedLetters + "\"");
+        Assert.AreEqual(string.Empty, unimplementedLetters);
     }
 
     [TestMethod]
     public void Parse_EveryAliasWithoutARowExpanded_IsRefusedAsNotSupported()
     {
+        int unimplementedAliasCount = ArrangeUnimplementedAliases();
+        int checkedAliasCount = 0;
+
         foreach (CurlOptionAlias alias in UnimplementedAliases)
         {
-            AssertRefused(CommandLineParser.Parse([$"--expand-{alias.Name}", "x", Url]), $"curl: option --expand-{alias.Name}: {NotSupported}");
+            checkedAliasCount++;
+            AssertRefused(Parse([$"--expand-{alias.Name}", "x", Url]), $"curl: option --expand-{alias.Name}: {NotSupported}");
         }
+
+        AssertAliasesChecked(unimplementedAliasCount, checkedAliasCount);
     }
 
     [TestMethod]
     public void Parse_EveryAliasWithoutARowNegated_IsRefusedAsTheAliasTableSays()
     {
+        int unimplementedAliasCount = ArrangeUnimplementedAliases();
+        int checkedAliasCount = 0;
+
         foreach (CurlOptionAlias alias in UnimplementedAliases)
         {
+            checkedAliasCount++;
             string reason = alias.NoPrefix == CurlOptionNoPrefix.NotAccepted
                 ? "the given option cannot be reversed with a --no- prefix"
                 : NotSupported;
-            AssertRefused(CommandLineParser.Parse([$"--no-{alias.Name}", Url]), $"curl: option --no-{alias.Name}: {reason}");
+            AssertRefused(Parse([$"--no-{alias.Name}", Url]), $"curl: option --no-{alias.Name}: {reason}");
         }
+
+        AssertAliasesChecked(unimplementedAliasCount, checkedAliasCount);
     }
 
     [TestMethod]
     public void Parse_EveryAlias_HasARowOrIsNeverRefusedAsUnknown()
     {
+        Diagnostics.Arrange("aliases", CurlOptionAliasTable.Aliases.Count);
+        List<string> refusedAsUnknown = [];
+
         foreach (CurlOptionAlias alias in CurlOptionAliasTable.Aliases)
         {
             CommandLineParseResult result = CommandLineParser.Parse([$"--{alias.Name}"]);
+            bool isUnknown = result.Refusal?.StandardErrorLines.Any(line => line.EndsWith(": is unknown", StringComparison.Ordinal)) ?? false;
+            if (isUnknown)
+            {
+                refusedAsUnknown.Add(alias.Name);
+                Diagnostics.Act("refused as unknown", alias.Name);
+            }
+
             Assert.IsFalse(
                 result.Refusal?.StandardErrorLines.Any(line => line.EndsWith(": is unknown", StringComparison.Ordinal)) ?? false,
                 alias.Name);
         }
+
+        Diagnostics.Act("aliases refused as unknown", refusedAsUnknown.Count);
+        Diagnostics.Assert("aliases refused as unknown", CommandLineParseDiagnostics.QuoteEach([]), CommandLineParseDiagnostics.QuoteEach(refusedAsUnknown));
     }
 
     [TestMethod]
@@ -88,16 +129,22 @@ public sealed class CommandLineUnimplementedOptionTests
     [DataRow("--expand-no-silent", "--expand-no-silent")]
     public void Parse_NameInNeitherTable_IsStillRefusedAsUnknown(string argument, string spelled)
     {
-        AssertRefused(CommandLineParser.Parse([argument, Url]), $"curl: option {spelled}: is unknown");
+        AssertRefused(Parse([argument, Url]), $"curl: option {spelled}: is unknown");
     }
 
     [TestMethod]
     public void Parse_UnimplementedOptionAfterSilent_IsStillRefusedAsNotSupported()
     {
+        int unimplementedAliasCount = ArrangeUnimplementedAliases();
+        int checkedAliasCount = 0;
+
         foreach (CurlOptionAlias alias in UnimplementedAliases.Take(1))
         {
-            AssertRefused(CommandLineParser.Parse(["-s", $"--{alias.Name}", Url]), $"curl: option --{alias.Name}: {NotSupported}");
+            checkedAliasCount++;
+            AssertRefused(Parse(["-s", $"--{alias.Name}", Url]), $"curl: option --{alias.Name}: {NotSupported}");
         }
+
+        AssertAliasesChecked(Math.Min(1, unimplementedAliasCount), checkedAliasCount);
     }
 
     /// <summary>
@@ -109,18 +156,33 @@ public sealed class CommandLineUnimplementedOptionTests
     [TestMethod]
     public void Parse_ConfigFileLineNamingAnUnimplementedOption_IsRefusedAsNotSupported()
     {
+        int unimplementedAliasCount = ArrangeUnimplementedAliases();
+        int checkedAliasCount = 0;
+
         foreach (CurlOptionAlias alias in UnimplementedAliases)
         {
+            checkedAliasCount++;
             CommandLineParseResult result = ParseConfigFile($"{alias.Name}\n");
 
+            Diagnostics.Assert("exit code", (int)CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal) is { } refusal ? (int)refusal.ExitCode : null);
             Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode, alias.Name);
             string[] lines = result.Refusal.StandardErrorLines.ToArray();
+            Diagnostics.Assert(
+                "joined first line",
+                $"curl: c.cfg:1 config file option '{alias.Name}' {NotSupported}",
+                lines[0] + string.Concat(lines[1..^2].Select(piece => piece[ErrorPrefix.Length..])));
             Assert.AreEqual(
                 $"curl: c.cfg:1 config file option '{alias.Name}' {NotSupported}",
                 lines[0] + string.Concat(lines[1..^2].Select(piece => piece[ErrorPrefix.Length..])),
                 string.Join("|", lines));
+            Diagnostics.Assert(
+                "last two lines",
+                CommandLineParseDiagnostics.QuoteEach([$"curl: option -K: {NotSupported}", CommandLineRefusal.TryHelpLine]),
+                CommandLineParseDiagnostics.QuoteEach(lines[^2..]));
             CollectionAssert.AreEqual(new[] { $"curl: option -K: {NotSupported}", CommandLineRefusal.TryHelpLine }, lines[^2..], alias.Name);
         }
+
+        AssertAliasesChecked(unimplementedAliasCount, checkedAliasCount);
     }
 
     [TestMethod]
@@ -128,6 +190,16 @@ public sealed class CommandLineUnimplementedOptionTests
     {
         CommandLineParseResult result = ParseConfigFile("bogus\n");
 
+        string[] expected =
+        [
+            "curl: c.cfg:1 config file option 'bogus' is unknown",
+            "curl: option -K: found an unknown config option",
+            CommandLineRefusal.TryHelpLine,
+        ];
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach(expected),
+            CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -138,15 +210,48 @@ public sealed class CommandLineUnimplementedOptionTests
             result.Refusal!.StandardErrorLines.ToArray());
     }
 
-    private static CommandLineParseResult ParseConfigFile(string text)
+    private int ArrangeUnimplementedAliases()
+    {
+        string[] names = [.. UnimplementedAliases.Select(alias => alias.Name)];
+        Diagnostics.Arrange("unimplemented aliases", CommandLineParseDiagnostics.QuoteEach(names));
+        return names.Length;
+    }
+
+    /// <summary>
+    /// Writes how many aliases the loop checked, so a test whose alias set is empty still shows an <c>ACT</c> and an
+    /// <c>ASSERT</c> line saying it checked none.
+    /// </summary>
+    private void AssertAliasesChecked(int expected, int checkedAliasCount)
+    {
+        Diagnostics.Act("aliases checked", checkedAliasCount);
+        Diagnostics.Assert("aliases checked", expected, checkedAliasCount);
+    }
+
+    /// <summary>Parses <paramref name="arguments"/>, writing them and the outcome as diagnostics.</summary>
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    /// <summary>Parses <c>-K c.cfg</c> with <paramref name="text"/> as the file, writing the text and the outcome as diagnostics.</summary>
+    private CommandLineParseResult ParseConfigFile(string text)
     {
         RecordingDataFileReader reader = new();
         reader.Files["c.cfg"] = Encoding.UTF8.GetBytes(text);
-        return CommandLineParser.Parse(["-K", "c.cfg", Url], _ => true, new UnexpectedPasswordPrompt(), reader);
+        string[] arguments = ["-K", "c.cfg", Url];
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Bytes("c.cfg", reader.Files["c.cfg"]);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        Diagnostics.ActParse(result);
+        return result;
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    private void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
     {
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, [expectedFirstLine, CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted, expectedFirstLine);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode, expectedFirstLine);
         CollectionAssert.AreEqual(
