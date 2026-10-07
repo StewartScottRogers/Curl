@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -35,6 +36,10 @@ public sealed class CommandLineHttpRequestOptionTests
 {
     private const string Url = "http://example.com/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("-X", "PUT")]
     [DataRow("--request", "DELETE")]
@@ -42,6 +47,8 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse([option, method, Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("request method", method, result.Options?.RequestMethod);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(method, result.Options.RequestMethod);
     }
@@ -51,6 +58,8 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-X", "PUT", "-X", "patch", Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("request method", "patch", result.Options?.RequestMethod);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("patch", result.Options.RequestMethod);
     }
@@ -60,6 +69,12 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse([Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("request method", null, result.Options?.RequestMethod);
+        Diagnostics.Assert("user agent", null, result.Options?.UserAgent);
+        Diagnostics.Assert("referer", null, result.Options?.Referer);
+        AssertListDiagnostics("headers", [], result.Options?.Headers);
+        AssertListDiagnostics("proxy headers", [], result.Options?.ProxyHeaders);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.RequestMethod);
         Assert.IsNull(result.Options.UserAgent);
@@ -86,6 +101,8 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse([option, value, Url]);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -95,6 +112,9 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-H", "X: 1", "--header", "X: 2", "-H", "Y:", "--header=Z;", Url]);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("headers", ["X: 1", "X: 2", "Y:", "Z;"], result.Options?.Headers);
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "X: 1", "X: 2", "Y:", "Z;" }, result.Options.Headers.ToArray());
         Assert.IsEmpty(result.WarningLines);
@@ -109,6 +129,9 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-H", header, Url]);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("headers", [header], result.Options?.Headers);
+        AssertListDiagnostics("warning lines", [$"Warning: The provided HTTP header '{header}' does not look like a header?"], result.WarningLines);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { header }, result.Options.Headers.ToArray());
         CollectionAssert.AreEqual(
@@ -123,6 +146,7 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-H", header, Url]);
 
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -131,6 +155,7 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-s", "-S", "-H", "foo", Url]);
 
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -139,6 +164,7 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-H", "foo", "-s", Url]);
 
+        Diagnostics.Assert("warning line count", 1, result.WarningLines.Count);
         Assert.HasCount(1, result.WarningLines);
     }
 
@@ -147,8 +173,14 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         RecordingDataFileReader reader = new() { Files = { ["h.txt"] = "A: 1\r\nB: 2\n\n\r\n  C: 3\nnocolon\nD;\n\nE: 4"u8.ToArray() } };
 
+        Diagnostics.Bytes("h.txt", reader.Files["h.txt"]);
+
         CommandLineParseResult result = Parse(["-H", "X: 0", "-H", "@h.txt", "-H", "F: 5", Url], reader);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("headers", ["X: 0", "A: 1", "B: 2", "  C: 3", "nocolon", "D;", "E: 4", "F: 5"], result.Options?.Headers);
+        AssertListDiagnostics("file reads", ["h.txt"], reader.Reads);
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "X: 0", "A: 1", "B: 2", "  C: 3", "nocolon", "D;", "E: 4", "F: 5" },
@@ -162,8 +194,12 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         RecordingDataFileReader reader = new() { Files = { ["empty"] = [] } };
 
+        Diagnostics.Bytes("empty", reader.Files["empty"]);
+
         CommandLineParseResult result = Parse(["--header", "@empty", Url], reader);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("headers", [], result.Options?.Headers);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.Options.Headers);
     }
@@ -173,8 +209,13 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         RecordingDataFileReader reader = new() { StandardInput = "X: from-stdin\n"u8.ToArray() };
 
+        Diagnostics.Bytes("standard input", reader.StandardInput);
+
         CommandLineParseResult result = Parse(["-H", "@-", Url], reader);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("headers", ["X: from-stdin"], result.Options?.Headers);
+        AssertListDiagnostics("file reads", ["-"], reader.Reads);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "X: from-stdin" }, result.Options.Headers.ToArray());
         CollectionAssert.AreEqual(new[] { "-" }, reader.Reads);
@@ -229,6 +270,8 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse([option, userAgent, Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("user agent", Quote(userAgent), Quote(result.Options?.UserAgent));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(userAgent, result.Options.UserAgent);
     }
@@ -243,6 +286,9 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse([option, referer, Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("referer", Quote(referer), Quote(result.Options?.Referer));
+        Diagnostics.Assert("auto referer", false, result.Options?.AutoReferer);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(referer, result.Options.Referer);
         Assert.IsFalse(result.Options.AutoReferer);
@@ -255,6 +301,9 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse([option, "http://r.example/x;auto", Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("referer", "http://r.example/x", result.Options?.Referer);
+        Diagnostics.Assert("auto referer", true, result.Options?.AutoReferer);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("http://r.example/x", result.Options.Referer);
         Assert.IsTrue(result.Options.AutoReferer);
@@ -267,6 +316,9 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse([option, ";auto", Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("referer", null, result.Options?.Referer);
+        Diagnostics.Assert("auto referer", true, result.Options?.AutoReferer);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.Referer);
         Assert.IsTrue(result.Options.AutoReferer);
@@ -277,6 +329,9 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-e", ";auto", "-e", "http://r.example/x", Url]);
 
+        AssertAcceptedDiagnostics(result);
+        Diagnostics.Assert("referer", "http://r.example/x", result.Options?.Referer);
+        Diagnostics.Assert("auto referer", false, result.Options?.AutoReferer);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("http://r.example/x", result.Options.Referer);
         Assert.IsFalse(result.Options.AutoReferer);
@@ -315,9 +370,13 @@ public sealed class CommandLineHttpRequestOptionTests
     [TestMethod]
     public void HeaderDoesNotLookLikeAHeader_NullHeader_Throws()
     {
+        Diagnostics.Arrange("header", "null");
+
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CommandLineWarning.HeaderDoesNotLookLikeAHeader(null!));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "header", exception.ParamName);
         Assert.AreEqual("header", exception.ParamName);
     }
 
@@ -326,6 +385,10 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["--proxy-header", "X-P: 1", "-H", "X: 0", "--proxy-header=X-Q: 2", Url]);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("proxy headers", ["X-P: 1", "X-Q: 2"], result.Options?.ProxyHeaders);
+        AssertListDiagnostics("headers", ["X: 0"], result.Options?.Headers);
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "X-P: 1", "X-Q: 2" }, result.Options.ProxyHeaders.ToArray());
         CollectionAssert.AreEqual(new[] { "X: 0" }, result.Options.Headers.ToArray());
@@ -339,6 +402,9 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["--proxy-header", header, Url]);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("proxy headers", [header], result.Options?.ProxyHeaders);
+        AssertListDiagnostics("warning lines", [$"Warning: The provided proxy header '{header}' does not look like a header?"], result.WarningLines);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { header }, result.Options.ProxyHeaders.ToArray());
         CollectionAssert.AreEqual(
@@ -351,6 +417,7 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         CommandLineParseResult result = Parse(["-s", "--proxy-header", "bogus", Url]);
 
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -359,8 +426,15 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         RecordingDataFileReader reader = new() { Files = { ["ph.txt"] = "A: 1\r\nB: 2\n\n  C: 3\nnocolon\n"u8.ToArray() } };
 
+        Diagnostics.Bytes("ph.txt", reader.Files["ph.txt"]);
+
         CommandLineParseResult result = Parse(["--proxy-header", "@ph.txt", "--proxy-header", "X-Q: 2", Url], reader);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("proxy headers", ["A: 1", "B: 2", "  C: 3", "nocolon", "X-Q: 2"], result.Options?.ProxyHeaders);
+        AssertListDiagnostics("headers", [], result.Options?.Headers);
+        AssertListDiagnostics("file reads", ["ph.txt"], reader.Reads);
+        AssertListDiagnostics("warning lines", [], result.WarningLines);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "A: 1", "B: 2", "  C: 3", "nocolon", "X-Q: 2" },
@@ -375,8 +449,12 @@ public sealed class CommandLineHttpRequestOptionTests
     {
         RecordingDataFileReader reader = new() { StandardInput = "X-P: from-stdin\n"u8.ToArray() };
 
+        Diagnostics.Bytes("standard input", reader.StandardInput);
+
         CommandLineParseResult result = Parse(["--proxy-header", "@-", Url], reader);
 
+        AssertAcceptedDiagnostics(result);
+        AssertListDiagnostics("proxy headers", ["X-P: from-stdin"], result.Options?.ProxyHeaders);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "X-P: from-stdin" }, result.Options.ProxyHeaders.ToArray());
     }
@@ -398,21 +476,31 @@ public sealed class CommandLineHttpRequestOptionTests
     [TestMethod]
     public void ProxyHeaderDoesNotLookLikeAHeader_NullHeader_Throws()
     {
+        Diagnostics.Arrange("header", "null");
+
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader(null!));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "header", exception.ParamName);
         Assert.AreEqual("header", exception.ParamName);
     }
 
-    private static void AssertCannotBeReversed(string argument)
+    private void AssertCannotBeReversed(string argument)
     {
         CommandLineParseResult result = Parse([argument, Url]);
 
         AssertRefused(result, CurlExitCode.FailedInit, $"curl: option {argument}: the given option cannot be reversed with a --no- prefix");
     }
 
-    private static void AssertRefused(CommandLineParseResult result, CurlExitCode exitCode, params string[] linesBeforeTryHelp)
+    private void AssertRefused(CommandLineParseResult result, CurlExitCode exitCode, params string[] linesBeforeTryHelp)
     {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", exitCode, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([.. linesBeforeTryHelp, CommandLineRefusal.TryHelpLine]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(exitCode, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -420,11 +508,24 @@ public sealed class CommandLineHttpRequestOptionTests
             result.Refusal.StandardErrorLines.ToArray());
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
+    private void AssertAcceptedDiagnostics(CommandLineParseResult result) =>
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+
+    private void AssertListDiagnostics(string label, IEnumerable<string?> expected, IEnumerable<string>? actual) =>
+        Diagnostics.Assert(label, CommandLineParseDiagnostics.QuoteEach(expected), actual is null ? "null" : CommandLineParseDiagnostics.QuoteEach(actual));
+
+    private static string Quote(string? value) => value is null ? "null" : "\"" + value + "\"";
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
         Parse(arguments, new RecordingDataFileReader());
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        Diagnostics.ActParse(result);
+        return result;
+    }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {
