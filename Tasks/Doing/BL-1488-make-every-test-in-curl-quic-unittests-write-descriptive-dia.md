@@ -42,3 +42,4 @@ Every test in `Curl.Quic.UnitTests` writes, through BL-1457's shared `TestDiagno
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Session budget ran out with work in the stash: all 24 files instrumented, build clean, 411/411 tests pass; left: Assert. count fell 901->896 (restore the 5 Assert calls removed, mostly QuicLossRecoveryTests OnLossDetectionTimeout and QuicPacketProtectionTests multi-throw tests), and 2 tests lack a line: QuicClientConnectionStateTests.OnLossDetectionTimeout_FirstInitialLost_* and QuicTransportParametersTests.Encode_CurlClientDefaults_MatchesCurlsBuild (act 0)
+- 2026-10-07: Backlog -> Doing.
