@@ -33,3 +33,4 @@ Under `-v`, a transfer that a required netrc file fails with exit 26 writes curl
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
