@@ -26,8 +26,13 @@
          open findings from the audit branch to re-audit; its reply goes to
          <stamp>\reports\<auditor>.md. A planted tree left changed afterwards marks that auditor
          as having written to the audited tree (unreliable), and is reset before the next.
-      6. Write-AuditScorecard.ps1 -ReliabilityOnly, then Write-AuditFindings.ps1, then
-         Write-AuditScorecard.ps1, writing into the audit branch.
+      6. Write-AuditScorecard.ps1 -ReliabilityOnly, then Write-AuditFindings.ps1 -Tree <planted>
+         -RerunReproductions, which reruns each mechanical reproduction the closure rule needs on
+         the clean audited commit (never the planted tree) and sets aside verdicts that overlap a
+         planted defect, then Write-AuditScorecard.ps1, writing into the audit branch (ADR-0422).
+      When -Auditors leaves out an auditor that has accepted findings, the run warns, in its
+      output and its log, that they will not be re-audited; the scorecard's Attention section
+      says so too.
       7. Commit there ("audit: scorecard <stamp>"), push origin audit, and open a pull request
          audit -> master unless one is open. This script never merges it: an interactive
          session does, once CI is green on all three platforms (Stewart's standing exception,
@@ -182,6 +187,21 @@ function Get-OpenFindings([string]$Findings, [string]$Auditor) {
     return $lines
 }
 
+function Get-SkippedAuditorWarnings([string]$Findings, [string[]]$Chosen) {
+    # One warning per auditor left out of this audit that has accepted findings: they go
+    # un-re-audited, so nothing can close or reopen them this time (ADR-0422).
+    $warnings = @()
+    foreach ($a in @($Order | Where-Object { $Chosen -notcontains $_ })) {
+        $ids = @()
+        foreach ($f in @(Get-ChildItem -LiteralPath $Findings -Filter 'AF-*.md' -ErrorAction SilentlyContinue | Sort-Object Name)) {
+            $t = [IO.File]::ReadAllText($f.FullName)
+            if ($t -match "(?m)^auditor: $a\s*$" -and $t -match '(?m)^status: accepted\s*$' -and $t -match '(?m)^id: (\S+)') { $ids += $Matches[1] }
+        }
+        if ($ids.Count) { $warnings += "Warning: -Auditors leaves out $a, which has $($ids.Count) accepted findings this audit will not re-audit: $($ids -join ', ')." }
+    }
+    return $warnings
+}
+
 # ------------------------------------------------------------------ self-test
 
 if ($SelfTest) {
@@ -199,6 +219,16 @@ if ($SelfTest) {
     Check 'the lane marker refuses, even alongside a shift' ((Get-RefusalReason @($shift) '1' $true) -like '*CURL_DARK_FACTORY_LANE*') 'marker'
     Check 'nothing running and no marker: no refusal' ((Get-RefusalReason @($other) '' $false) -eq '') 'none'
     Check '-AlongsideShift runs while a shift runs' ((Get-RefusalReason @($shift, $lane) '' $true) -eq '') 'none'
+    $scratch = Join-Path ([IO.Path]::GetTempPath()) ('runaudit-selftest-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force $scratch | Out-Null
+    try {
+        [IO.File]::WriteAllText((Join-Path $scratch 'AF-0001-x.md'), "---`nid: AF-0001`nauditor: quality`nstatus: accepted`n---`n")
+        [IO.File]::WriteAllText((Join-Path $scratch 'AF-0002-x.md'), "---`nid: AF-0002`nauditor: process`nstatus: proposed`n---`n")
+        $warnings = @(Get-SkippedAuditorWarnings $scratch @('security', 'process'))
+        Check 'leaving out an auditor with accepted findings warns, naming them' ($warnings.Count -eq 1 -and $warnings[0] -eq 'Warning: -Auditors leaves out quality, which has 1 accepted findings this audit will not re-audit: AF-0001.') "$warnings"
+        Check 'running every auditor warns about nothing' (@(Get-SkippedAuditorWarnings $scratch $Order).Count -eq 0) 'none'
+    }
+    finally { Remove-Item -Recurse -Force -LiteralPath $scratch -ErrorAction SilentlyContinue }
     exit $(if ($failed) { 1 } else { 0 })
 }
 
@@ -245,11 +275,12 @@ if ($Seed -lt 0) { $Seed = [int]($Started.Ticks % 1000000007) }
 
 if ($DryRun) {
     Write-Host "Audit dry run, $Stamp. Would run, from ${repo}:"
+    Get-SkippedAuditorWarnings (Join-Path $PSScriptRoot 'Findings') $Selected | ForEach-Object { Write-Host "  $_" }
     Write-Host "  2. git fetch origin; the worktree that has branch audit checked out, or git worktree add $AuditRoot\audit-branch audit (from origin/audit, else origin/master); git merge origin/master there"
     Write-Host "  3. git worktree add --detach $RunDir\planted $Ref; overlay Audit/Instructions, Audit/Tools, Audit/PlantedDefects and .claude/agents/audit-*.md from the audit branch; copy logs changed since the last scorecard from $repo.logs to $RunDir\logs; gh run list ... > $RunDir\logs\ci-runs.json"
     Write-Host "  4. claude -p --agent audit-seeder --model sonnet ... (seed $Seed, $Planted defects, manifest $RunDir\manifest.json)"
     foreach ($a in $Selected) { Write-Host "  5. claude -p --agent audit-$a --model $($Models[$a]) ... > $RunDir\reports\$a.md (scratch $RunDir\scratch\$a)" }
-    Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1; Write-AuditScorecard.ps1 (into the audit branch)"
+    Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1 -Tree $RunDir\planted -RerunReproductions (mechanical reruns on the clean, unplanted $Ref commit); Write-AuditScorecard.ps1 (into the audit branch)"
     Write-Host "  7. git commit -m 'audit: scorecard $Stamp'; git push origin audit; gh pr create --base master --head audit (unless one is open; never merged here)"
     Write-Host "  8. git worktree remove --force $RunDir\planted"
     exit 0
@@ -278,6 +309,7 @@ try {
     $auditTree = (Resolve-Path $auditTree).Path
     Invoke-Git @('-C', $auditTree, '-c', 'user.name=Audit runner', '-c', 'user.email=audit-runner@example.invalid', 'merge', '-q', '--no-edit', 'origin/master') | Out-Null
     Write-Step "audit branch at $auditTree, merged with origin/master"
+    Get-SkippedAuditorWarnings (Join-Path $auditTree 'Audit\Findings') $Selected | ForEach-Object { Write-Step $_ }
 
     # 3. the planted tree, the overlay and the logs
     $auditedCommit = "$(Invoke-Git @('-C', $repo, 'rev-parse', $Ref) | Select-Object -First 1)".Trim()
@@ -341,7 +373,7 @@ try {
     $changedArg = if ($changedTree.Count) { @('-ChangedTree', ($changedTree -join ',')) } else { @() }
     $unreliable = @(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditScorecard.ps1') @common @changedArg -ReliabilityOnly | Where-Object { $_ })
     $unreliableArg = if ($unreliable.Count) { @('-Unreliable', ($unreliable -join ',')) } else { @() }
-    $findingsLine = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditFindings.ps1') -ReportDirectory $reports -Manifest $manifest -FindingsDirectory (Join-Path $auditTree 'Audit\Findings') -Scorecard $scorecardName -Commit $auditedCommit -Date $Started.ToString('yyyy-MM-dd') @unreliableArg
+    $findingsLine = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditFindings.ps1') -ReportDirectory $reports -Manifest $manifest -FindingsDirectory (Join-Path $auditTree 'Audit\Findings') -Scorecard $scorecardName -Commit $auditedCommit -Date $Started.ToString('yyyy-MM-dd') -Tree $plantedTree -RerunReproductions @unreliableArg
     Write-Step "$findingsLine; unreliable: $(if ($unreliable.Count) { $unreliable -join ', ' } else { 'none' })"
     $finished = Get-Date
     $modelList = ($Selected | ForEach-Object { "$_=$($Models[$_])" }) -join ','
