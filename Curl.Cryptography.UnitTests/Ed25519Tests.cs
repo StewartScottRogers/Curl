@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Security.Cryptography;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -44,6 +45,9 @@ public sealed class Ed25519Tests
     // The group order L = 2^252 + 27742317777372353535851937790883648493 (RFC 8032 section 5.1).
     private static readonly BigInteger Order = BigInteger.Pow(2, 252) + BigInteger.Parse("27742317777372353535851937790883648493");
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     public static IEnumerable<object[]> Rfc8032Section71Vectors =>
     [
         // TEST 1
@@ -86,6 +90,7 @@ public sealed class Ed25519Tests
         ],
     ];
 
+
     [TestMethod]
     [DynamicData(nameof(Rfc8032Section71Vectors))]
     public void ComputePublicKey_Rfc8032Section71Vector_GivesThePublishedPublicKey(
@@ -95,10 +100,15 @@ public sealed class Ed25519Tests
         string message,
         string signature)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] result = new byte[Ed25519.PublicKeySize];
+        diagnostics.Arrange("vector source", $"RFC 8032 section 7.1, TEST {test}");
+        diagnostics.Bytes("private key", Convert.FromHexString(privateKey));
 
         Ed25519.ComputePublicKey(Convert.FromHexString(privateKey), result);
+        diagnostics.Act("public key", Convert.ToHexStringLower(result));
 
+        diagnostics.Diff("public key", Convert.FromHexString(publicKey), result);
         Assert.AreEqual(publicKey, Convert.ToHexStringLower(result), $"TEST {test}");
         Assert.IsNotNull(message);
         Assert.IsNotNull(signature);
@@ -113,10 +123,16 @@ public sealed class Ed25519Tests
         string message,
         string signature)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] result = new byte[Ed25519.SignatureSize];
+        diagnostics.Arrange("vector source", $"RFC 8032 section 7.1, TEST {test}");
+        diagnostics.Bytes("private key", Convert.FromHexString(privateKey));
+        diagnostics.Bytes("message", Convert.FromHexString(message));
 
         Ed25519.Sign(Convert.FromHexString(privateKey), Convert.FromHexString(message), result);
+        diagnostics.Act("signature", Convert.ToHexStringLower(result));
 
+        diagnostics.Diff("signature", Convert.FromHexString(signature), result);
         Assert.AreEqual(signature, Convert.ToHexStringLower(result), $"TEST {test}");
         Assert.IsNotNull(publicKey);
     }
@@ -130,8 +146,16 @@ public sealed class Ed25519Tests
         string message,
         string signature)
     {
-        bool valid = Ed25519.Verify(Convert.FromHexString(publicKey), Convert.FromHexString(message), Convert.FromHexString(signature));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", $"RFC 8032 section 7.1, TEST {test}");
+        diagnostics.Bytes("public key", Convert.FromHexString(publicKey));
+        diagnostics.Bytes("message", Convert.FromHexString(message));
+        diagnostics.Bytes("signature", Convert.FromHexString(signature));
 
+        bool valid = Ed25519.Verify(Convert.FromHexString(publicKey), Convert.FromHexString(message), Convert.FromHexString(signature));
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", true, valid);
         Assert.IsTrue(valid, $"TEST {test}");
         Assert.IsNotNull(privateKey);
     }
@@ -144,14 +168,20 @@ public sealed class Ed25519Tests
     [DataRow(15)]
     public void Verify_MessageBitFlipped_IsFalse(int bit)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] message = Convert.FromHexString("af82");
         message[bit / 8] ^= (byte)(1 << (bit % 8));
+        diagnostics.Arrange("vector source", "RFC 8032 section 7.1, TEST 3, message bit flipped");
+        diagnostics.Arrange("flipped bit", bit);
+        diagnostics.Bytes("message", message);
 
         bool valid = Ed25519.Verify(
             Convert.FromHexString("fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025"),
             message,
             Convert.FromHexString("6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a"));
+        diagnostics.Act("valid", valid);
 
+        diagnostics.Assert("valid", false, valid);
         Assert.IsFalse(valid);
     }
 
@@ -163,11 +193,17 @@ public sealed class Ed25519Tests
     [DataRow(400)]
     public void Verify_SignatureBitFlipped_IsFalse(int bit)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] signature = Convert.FromHexString(Test1Signature);
         signature[bit / 8] ^= (byte)(1 << (bit % 8));
+        diagnostics.Arrange("vector source", "RFC 8032 section 7.1, TEST 1, signature bit flipped");
+        diagnostics.Arrange("flipped bit", bit);
+        diagnostics.Bytes("signature", signature);
 
         bool valid = Ed25519.Verify(Convert.FromHexString(Test1PublicKey), [], signature);
+        diagnostics.Act("valid", valid);
 
+        diagnostics.Assert("valid", false, valid);
         Assert.IsFalse(valid);
     }
 
@@ -178,14 +214,20 @@ public sealed class Ed25519Tests
     [DataRow(false)]
     public void Verify_SNotBelowTheGroupOrder_IsFalse(bool addToTheValidS)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] signature = Convert.FromHexString(Test1Signature);
         BigInteger s = new(signature.AsSpan(32), isUnsigned: true);
         BigInteger replacement = addToTheValidS ? s + Order : Order;
         signature.AsSpan(32).Clear();
         Assert.IsTrue(replacement.TryWriteBytes(signature.AsSpan(32), out _, isUnsigned: true));
+        diagnostics.Arrange("vector source", "RFC 8032 section 7.1, TEST 1, S replaced (section 5.1.7)");
+        diagnostics.Arrange("S", addToTheValidS ? "S + L" : "L");
+        diagnostics.Bytes("signature", signature);
 
         bool valid = Ed25519.Verify(Convert.FromHexString(Test1PublicKey), [], signature);
+        diagnostics.Act("valid", valid);
 
+        diagnostics.Assert("valid", false, valid);
         Assert.IsFalse(valid);
     }
 
@@ -198,30 +240,48 @@ public sealed class Ed25519Tests
     [DataRow("0200000000000000000000000000000000000000000000000000000000000000")]
     public void Verify_UndecodablePublicKey_IsFalse(string publicKey)
     {
-        bool valid = Ed25519.Verify(Convert.FromHexString(publicKey), [], Convert.FromHexString(Test1Signature));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "RFC 8032 section 5.1.3, public key that does not decode; TEST 1 signature");
+        diagnostics.Bytes("public key", Convert.FromHexString(publicKey));
 
+        bool valid = Ed25519.Verify(Convert.FromHexString(publicKey), [], Convert.FromHexString(Test1Signature));
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", false, valid);
         Assert.IsFalse(valid);
     }
 
     [TestMethod]
     public void Sign_GeneratedPrivateKey_VerifiesUnderItsPublicKey()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] privateKey = new byte[Ed25519.PrivateKeySize];
         byte[] publicKey = new byte[Ed25519.PublicKeySize];
         byte[] signature = new byte[Ed25519.SignatureSize];
         byte[] message = "curl"u8.ToArray();
+        diagnostics.Bytes("message", message);
 
         Ed25519.GeneratePrivateKey(privateKey);
         Ed25519.ComputePublicKey(privateKey, publicKey);
         Ed25519.Sign(privateKey, message, signature);
+        bool valid = Ed25519.Verify(publicKey, message, signature);
+        diagnostics.Arrange("private key", "generated at random");
+        diagnostics.Act("valid", valid);
 
-        Assert.IsTrue(Ed25519.Verify(publicKey, message, signature));
+        diagnostics.Assert("valid", true, valid);
+        Assert.IsTrue(valid);
     }
 
     [TestMethod]
     public void GeneratePrivateKey_WrongLength_Throws()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => Ed25519.GeneratePrivateKey(new byte[31]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key length", 31);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => Ed25519.GeneratePrivateKey(new byte[31]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -229,8 +289,15 @@ public sealed class Ed25519Tests
     [DataRow(32, 33)]
     public void ComputePublicKey_WrongLength_Throws(int privateKeyLength, int publicKeyLength)
     {
-        Assert.ThrowsExactly<ArgumentException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key length", privateKeyLength);
+        diagnostics.Arrange("public key length", publicKeyLength);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => Ed25519.ComputePublicKey(new byte[privateKeyLength], new byte[publicKeyLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -238,8 +305,15 @@ public sealed class Ed25519Tests
     [DataRow(32, 63)]
     public void Sign_WrongLength_Throws(int privateKeyLength, int signatureLength)
     {
-        Assert.ThrowsExactly<ArgumentException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key length", privateKeyLength);
+        diagnostics.Arrange("signature length", signatureLength);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => Ed25519.Sign(new byte[privateKeyLength], [], new byte[signatureLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -247,7 +321,14 @@ public sealed class Ed25519Tests
     [DataRow(32, 65)]
     public void Verify_WrongLength_Throws(int publicKeyLength, int signatureLength)
     {
-        Assert.ThrowsExactly<ArgumentException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("public key length", publicKeyLength);
+        diagnostics.Arrange("signature length", signatureLength);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => Ed25519.Verify(new byte[publicKeyLength], [], new byte[signatureLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 }

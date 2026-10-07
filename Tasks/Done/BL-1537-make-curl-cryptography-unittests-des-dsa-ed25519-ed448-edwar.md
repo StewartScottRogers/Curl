@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1537 — Make Curl.Cryptography.UnitTests' DES, DSA, Ed25519, Ed448, Edwards25519 and Field25519 tests write descriptive diagnostic output
 
@@ -24,11 +24,11 @@ Every test in these `Curl.Cryptography.UnitTests` files writes, through BL-1457'
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Cryptography.UnitTests --filter "FullyQualifiedName~Curl.Cryptography.DesTests.|FullyQualifiedName~Curl.Cryptography.DeterministicDsaNonceTests.|FullyQualifiedName~Curl.Cryptography.DsaSignatureTests.|FullyQualifiedName~Curl.Cryptography.Ed25519Tests.|FullyQualifiedName~Curl.Cryptography.Ed448Tests.|FullyQualifiedName~Curl.Cryptography.Edwards25519Tests.|FullyQualifiedName~Curl.Cryptography.Field25519Tests." --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
-- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
-- [ ] `dotnet build Curl.Cryptography.UnitTests -warnaserror` is clean and `dotnet test Curl.Cryptography.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Cryptography.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+- [x] `dotnet test Curl.Cryptography.UnitTests --filter "FullyQualifiedName~Curl.Cryptography.DesTests.|FullyQualifiedName~Curl.Cryptography.DeterministicDsaNonceTests.|FullyQualifiedName~Curl.Cryptography.DsaSignatureTests.|FullyQualifiedName~Curl.Cryptography.Ed25519Tests.|FullyQualifiedName~Curl.Cryptography.Ed448Tests.|FullyQualifiedName~Curl.Cryptography.Edwards25519Tests.|FullyQualifiedName~Curl.Cryptography.Field25519Tests." --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Cryptography.UnitTests -warnaserror` is clean and `dotnet test Curl.Cryptography.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Cryptography.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
 
 ## Notes
 
@@ -36,3 +36,4 @@ Every test in these `Curl.Cryptography.UnitTests` files writes, through BL-1457'
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. DES, DSA, Ed25519, Ed448, Edwards25519 and Field25519 tests write ARRANGE, ACT, ASSERT/DIFF and PHASE diagnostics
