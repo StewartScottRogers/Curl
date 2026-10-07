@@ -1,3 +1,4 @@
+using Curl.Testing;
 using static Curl.Http3.Http3;
 using static Curl.Http3.Qpack;
 
@@ -11,11 +12,16 @@ namespace Curl.Http3;
 [TestClass]
 public sealed class Http3FrameTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task Data_RoundTrips()
     {
-        var bytes = new Http3DataFrame(FromHex("68656c6c6f")).ToBytes();
+        var bytes = Encode(new Http3DataFrame(FromHex("68656c6c6f")));
 
+        Diagnostics.Diff("encoded frame", FromHex("00 05 68656c6c6f"), bytes);
         CollectionAssert.AreEqual(FromHex("00 05 68656c6c6f"), bytes);
         var frame = (Http3DataFrame)await ReadOnlyFrameAsync(bytes);
         Assert.AreEqual(Http3FrameType.Data, frame.Type);
@@ -25,8 +31,9 @@ public sealed class Http3FrameTests
     [TestMethod]
     public async Task Headers_RoundTrips()
     {
-        var bytes = new Http3HeadersFrame(FromHex("0000d1")).ToBytes();
+        var bytes = Encode(new Http3HeadersFrame(FromHex("0000d1")));
 
+        Diagnostics.Diff("encoded frame", FromHex("01 03 0000d1"), bytes);
         CollectionAssert.AreEqual(FromHex("01 03 0000d1"), bytes);
         var frame = (Http3HeadersFrame)await ReadOnlyFrameAsync(bytes);
         Assert.AreEqual(Http3FrameType.Headers, frame.Type);
@@ -36,8 +43,9 @@ public sealed class Http3FrameTests
     [TestMethod]
     public async Task CancelPush_RoundTrips()
     {
-        var bytes = new Http3CancelPushFrame(300).ToBytes();
+        var bytes = Encode(new Http3CancelPushFrame(300));
 
+        Diagnostics.Diff("encoded frame", FromHex("03 02 412c"), bytes);
         CollectionAssert.AreEqual(FromHex("03 02 412c"), bytes);
         var frame = (Http3CancelPushFrame)await ReadOnlyFrameAsync(bytes);
         Assert.AreEqual(Http3FrameType.CancelPush, frame.Type);
@@ -47,19 +55,22 @@ public sealed class Http3FrameTests
     [TestMethod]
     public async Task Settings_RoundTrips()
     {
-        var bytes = new Http3SettingsFrame([new(0x06, 16384), new(0x01, 0)]).ToBytes();
+        var bytes = Encode(new Http3SettingsFrame([new(0x06, 16384), new(0x01, 0)]));
 
+        Diagnostics.Diff("encoded frame", FromHex("04 07 06 80004000 01 00"), bytes);
         CollectionAssert.AreEqual(FromHex("04 07 06 80004000 01 00"), bytes);
         var frame = (Http3SettingsFrame)await ReadOnlyFrameAsync(bytes);
         Assert.AreEqual(Http3FrameType.Settings, frame.Type);
+        Diagnostics.Assert("settings", "new(0x06, 16384), new(0x01, 0)", string.Join(", ", frame.Settings));
         CollectionAssert.AreEqual(new Http3Setting[] { new(0x06, 16384), new(0x01, 0) }, frame.Settings.ToArray());
     }
 
     [TestMethod]
     public async Task PushPromise_RoundTrips()
     {
-        var bytes = new Http3PushPromiseFrame(7, FromHex("0000d1")).ToBytes();
+        var bytes = Encode(new Http3PushPromiseFrame(7, FromHex("0000d1")));
 
+        Diagnostics.Diff("encoded frame", FromHex("05 04 07 0000d1"), bytes);
         CollectionAssert.AreEqual(FromHex("05 04 07 0000d1"), bytes);
         var frame = (Http3PushPromiseFrame)await ReadOnlyFrameAsync(bytes);
         Assert.AreEqual(Http3FrameType.PushPromise, frame.Type);
@@ -70,8 +81,9 @@ public sealed class Http3FrameTests
     [TestMethod]
     public async Task Goaway_RoundTrips()
     {
-        var bytes = new Http3GoawayFrame(8).ToBytes();
+        var bytes = Encode(new Http3GoawayFrame(8));
 
+        Diagnostics.Diff("encoded frame", FromHex("07 01 08"), bytes);
         CollectionAssert.AreEqual(FromHex("07 01 08"), bytes);
         var frame = (Http3GoawayFrame)await ReadOnlyFrameAsync(bytes);
         Assert.AreEqual(Http3FrameType.Goaway, frame.Type);
@@ -81,8 +93,9 @@ public sealed class Http3FrameTests
     [TestMethod]
     public async Task MaxPushId_RoundTrips()
     {
-        var bytes = new Http3MaxPushIdFrame(15293).ToBytes();
+        var bytes = Encode(new Http3MaxPushIdFrame(15293));
 
+        Diagnostics.Diff("encoded frame", FromHex("0d 02 7bbd"), bytes);
         CollectionAssert.AreEqual(FromHex("0d 02 7bbd"), bytes);
         var frame = (Http3MaxPushIdFrame)await ReadOnlyFrameAsync(bytes);
         Assert.AreEqual(Http3FrameType.MaxPushId, frame.Type);
@@ -90,20 +103,42 @@ public sealed class Http3FrameTests
     }
 
     [TestMethod]
-    public void ToBytes_IdOutsideTheRange_IsRejected() =>
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new Http3GoawayFrame(-1).ToBytes());
+    public void ToBytes_IdOutsideTheRange_IsRejected()
+    {
+        Diagnostics.Arrange("frame", "GOAWAY with ID -1");
+
+        var failure = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new Http3GoawayFrame(-1).ToBytes());
+
+        Diagnostics.Act("parameter", failure.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentOutOfRangeException), failure.GetType().Name);
+    }
 
     [TestMethod]
-    public void Settings_NullList_IsRejected() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => new Http3SettingsFrame(null!));
+    public void Settings_NullList_IsRejected()
+    {
+        Diagnostics.Arrange("settings", "null");
+
+        var failure = Assert.ThrowsExactly<ArgumentNullException>(() => new Http3SettingsFrame(null!));
+
+        Diagnostics.Act("parameter", failure.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), failure.GetType().Name);
+    }
 
     [TestMethod]
     public void GetValueOrDefault_GivesTheValueOrTheDefault()
     {
         Http3SettingsFrame frame = new([new(0x01, 4096), new(0x07, 16)]);
+        Diagnostics.Arrange("settings", string.Join(", ", frame.Settings));
 
-        Assert.AreEqual(16, frame.GetValueOrDefault(Http3SettingIdentifier.QpackBlockedStreams, 0));
-        Assert.AreEqual(-1, frame.GetValueOrDefault(Http3SettingIdentifier.MaximumFieldSectionSize, -1));
+        var blockedStreams = frame.GetValueOrDefault(Http3SettingIdentifier.QpackBlockedStreams, 0);
+        var maximumFieldSectionSize = frame.GetValueOrDefault(Http3SettingIdentifier.MaximumFieldSectionSize, -1);
+
+        Diagnostics.Act("QPACK_BLOCKED_STREAMS", blockedStreams);
+        Diagnostics.Act("MAX_FIELD_SECTION_SIZE (default -1)", maximumFieldSectionSize);
+        Diagnostics.Assert("QPACK_BLOCKED_STREAMS", 16L, blockedStreams);
+        Assert.AreEqual(16, blockedStreams);
+        Diagnostics.Assert("MAX_FIELD_SECTION_SIZE", -1L, maximumFieldSectionSize);
+        Assert.AreEqual(-1, maximumFieldSectionSize);
     }
 
     [TestMethod]
@@ -112,6 +147,7 @@ public sealed class Http3FrameTests
         // 0x21 and 0x1f * 2 + 0x21 = 0x5f are reserved (RFC 9114 section 7.2.4.1); 0x33 is SETTINGS_H3_DATAGRAM and kept.
         var frame = (Http3SettingsFrame)await ReadOnlyFrameAsync(FromHex("04 09 21 05 06 10 405f 00 33 01"));
 
+        Diagnostics.Assert("settings", "new(0x06, 16), new(0x33, 1)", string.Join(", ", frame.Settings));
         CollectionAssert.AreEqual(new Http3Setting[] { new(0x06, 16), new(0x33, 1) }, frame.Settings.ToArray());
     }
 
@@ -124,13 +160,15 @@ public sealed class Http3FrameTests
     [DataRow("04 02 33 02", DisplayName = "SETTINGS_H3_DATAGRAM 2")]
     [DataRow("04 09 33 c0 00 00 00 00 00 01 00", DisplayName = "SETTINGS_H3_DATAGRAM 256 in an eight-byte integer")]
     public async Task Settings_ForbiddenIdentifier_IsSettingsError(string hex) =>
-        Assert.AreEqual(Http3ErrorCode.SettingsError, await ErrorOfAsync(() => ReadAllFramesAsync(StreamOf(hex))));
+        Assert.AreEqual(Http3ErrorCode.SettingsError, await LoggedErrorOfAsync(Http3ErrorCode.SettingsError, hex));
 
     [TestMethod]
     public async Task Settings_ZeroOrOneSettingsOfZeroAndOne_AreKept()
     {
         var frame = (Http3SettingsFrame)await ReadOnlyFrameAsync(FromHex("04 04 08 01 33 00"));
 
+        Diagnostics.Act("settings", string.Join(", ", frame.Settings));
+        Diagnostics.Assert("settings count", 2, frame.Settings.Count);
         CollectionAssert.AreEqual(
             new Http3Setting[] { new(Http3SettingIdentifier.EnableConnectProtocol, 1), new(Http3SettingIdentifier.H3Datagram, 0) },
             frame.Settings.ToArray());
@@ -141,6 +179,8 @@ public sealed class Http3FrameTests
     {
         var frame = (Http3SettingsFrame)await ReadOnlyFrameAsync(FromHex("04 04 08 00 33 01"));
 
+        Diagnostics.Act("settings", string.Join(", ", frame.Settings));
+        Diagnostics.Assert("settings count", 2, frame.Settings.Count);
         CollectionAssert.AreEqual(
             new Http3Setting[] { new(Http3SettingIdentifier.EnableConnectProtocol, 0), new(Http3SettingIdentifier.H3Datagram, 1) },
             frame.Settings.ToArray());
@@ -155,11 +195,32 @@ public sealed class Http3FrameTests
     [DataRow("0d 02 01 01", DisplayName = "MAX_PUSH_ID with a byte too many")]
     [DataRow("05 00", DisplayName = "PUSH_PROMISE without a push ID")]
     public async Task Payload_NotHoldingItsFields_IsFrameError(string hex) =>
-        Assert.AreEqual(Http3ErrorCode.FrameError, await ErrorOfAsync(() => ReadAllFramesAsync(StreamOf(hex))));
+        Assert.AreEqual(Http3ErrorCode.FrameError, await LoggedErrorOfAsync(Http3ErrorCode.FrameError, hex));
 
-    private static async Task<Http3Frame> ReadOnlyFrameAsync(byte[] bytes)
+    private byte[] Encode(Http3Frame frame)
     {
+        Diagnostics.Arrange("frame", frame);
+        var bytes = frame.ToBytes();
+        Diagnostics.Bytes("encoded frame", bytes);
+        return bytes;
+    }
+
+    private async Task<Http3ErrorCode> LoggedErrorOfAsync(Http3ErrorCode expected, string hex)
+    {
+        Diagnostics.Arrange("stream", hex);
+
+        var error = await ErrorOfAsync(() => ReadAllFramesAsync(StreamOf(hex)));
+
+        Diagnostics.Act("connection error", error);
+        Diagnostics.Assert("connection error", expected, error);
+        return error;
+    }
+
+    private async Task<Http3Frame> ReadOnlyFrameAsync(byte[] bytes)
+    {
+        Diagnostics.Arrange("stream", Convert.ToHexString(bytes));
         var frames = await ReadAllFramesAsync(new MemoryStream(bytes));
+        Diagnostics.Act("frames read", string.Join(", ", frames));
         Assert.HasCount(1, frames);
         return frames[0];
     }

@@ -1,4 +1,5 @@
 using Curl.Http2;
+using Curl.Testing;
 using static Curl.Http3.Qpack;
 
 namespace Curl.Http3;
@@ -14,6 +15,10 @@ namespace Curl.Http3;
 public sealed class QpackAppendixBTests
 {
     private const long MaximumTableCapacity = 220;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     // Appendix B.1.
     private const string B1Section = "0000 510b 2f69 6e64 6578 2e68 746d 6c";
@@ -46,9 +51,13 @@ public sealed class QpackAppendixBTests
     public void Encoder_AppendixB1_EncodesAStaticNameReferenceLiteral()
     {
         var encoder = NewEncoder();
+        Diagnostics.Arrange("encoder", "maximum table capacity 220, maximum blocked streams 100");
 
         var section = encoder.EncodeFieldSection(0, Fields((":path", "/index.html")));
 
+        Diagnostics.Act("header list", ":path: /index.html");
+        Diagnostics.Bytes("section", section);
+        Diagnostics.Diff("section", FromHex(B1Section), section);
         CollectionAssert.AreEqual(FromHex(B1Section), section);
         Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
     }
@@ -57,10 +66,15 @@ public sealed class QpackAppendixBTests
     public void Encoder_AppendixB2_SetsCapacityInsertsBothFieldsAndReferencesThemPostBase()
     {
         var encoder = NewEncoder();
+        Diagnostics.Arrange("encoder", "maximum table capacity 220, maximum blocked streams 100");
 
         Assert.IsTrue(encoder.TrySetDynamicTableCapacity(220));
         var section = encoder.EncodeFieldSection(4, B2Fields);
 
+        Diagnostics.Act("header list", string.Join(", ", B2Fields));
+        Diagnostics.Bytes("section", section);
+        Diagnostics.Diff("section", FromHex(B2Section), section);
+        Diagnostics.Assert("dynamic table size", 106L, encoder.DynamicTableSize);
         CollectionAssert.AreEqual(FromHex(B2EncoderStream), encoder.TakeEncoderStreamBytes());
         CollectionAssert.AreEqual(FromHex(B2Section), section);
         Assert.AreEqual(106, encoder.DynamicTableSize);
@@ -72,11 +86,13 @@ public sealed class QpackAppendixBTests
     public void Encoder_AppendixB3ToB5_ProducesTheSpeculativeInsertDuplicateSectionAndEvictingInsert()
     {
         var encoder = NewEncoder();
+        Diagnostics.Arrange("encoder", "maximum table capacity 220, maximum blocked streams 100");
         encoder.TrySetDynamicTableCapacity(220);
         encoder.EncodeFieldSection(4, B2Fields);
         encoder.ReadDecoderStream(FromHex(B2DecoderStream));
         encoder.TakeEncoderStreamBytes();
 
+        Diagnostics.Act("state after B.2", $"insert count {encoder.InsertCount}, table size {encoder.DynamicTableSize}");
         Assert.IsTrue(encoder.TryInsert(new HeaderField("custom-key", "custom-value")));
         CollectionAssert.AreEqual(FromHex(B3EncoderStream), encoder.TakeEncoderStreamBytes());
         Assert.AreEqual(160, encoder.DynamicTableSize);
@@ -92,6 +108,7 @@ public sealed class QpackAppendixBTests
         Assert.IsTrue(encoder.TryInsert(new HeaderField("custom-key", "custom-value2")));
         CollectionAssert.AreEqual(FromHex(B5EncoderStream), encoder.TakeEncoderStreamBytes());
         Assert.AreEqual(215, encoder.DynamicTableSize);
+        Diagnostics.Assert("state after B.5", "insert count 5, table size 215", $"insert count {encoder.InsertCount}, table size {encoder.DynamicTableSize}");
         Assert.AreEqual(5, encoder.InsertCount);
     }
 
@@ -99,6 +116,7 @@ public sealed class QpackAppendixBTests
     public void Decoder_AppendixB1ToB5_DecodesEverySectionAndProducesEveryDecoderInstruction()
     {
         var decoder = NewDecoder();
+        Diagnostics.Arrange("decoder", "maximum table capacity 220, maximum blocked streams 100");
 
         CollectionAssert.AreEqual(Fields((":path", "/index.html")), Decode(decoder, 0, FromHex(B1Section)));
         Assert.IsEmpty(decoder.TakeDecoderStreamBytes());
@@ -124,6 +142,8 @@ public sealed class QpackAppendixBTests
         decoder.ReadEncoderStream(FromHex(B5EncoderStream));
         Assert.AreEqual(215, decoder.DynamicTableSize);
         Assert.AreEqual(5, decoder.InsertCount);
+        Diagnostics.Act("state after B.5", $"insert count {decoder.InsertCount}, table size {decoder.DynamicTableSize}, capacity {decoder.DynamicTableCapacity}");
+        Diagnostics.Assert("state after B.5", "insert count 5, table size 215, capacity 220", $"insert count {decoder.InsertCount}, table size {decoder.DynamicTableSize}, capacity {decoder.DynamicTableCapacity}");
         Assert.AreEqual(220, decoder.DynamicTableCapacity);
     }
 
@@ -131,12 +151,16 @@ public sealed class QpackAppendixBTests
     public void Decoder_AppendixB4SectionOnceTheDuplicateArrives_DecodesAndAcknowledges()
     {
         var decoder = NewDecoder();
+        Diagnostics.Arrange("decoder", "maximum table capacity 220, maximum blocked streams 100");
         decoder.ReadEncoderStream(FromHex(B2EncoderStream + B3EncoderStream));
         Assert.IsFalse(decoder.TryDecodeFieldSection(8, FromHex(B4Section), out _));
 
         decoder.ReadEncoderStream(FromHex(B4EncoderStream));
 
-        CollectionAssert.AreEqual(B4Fields, Decode(decoder, 8, FromHex(B4Section)));
+        var decoded = Decode(decoder, 8, FromHex(B4Section));
+        Diagnostics.Act("decoded", string.Join(", ", decoded));
+        Diagnostics.Assert("decoded", string.Join(", ", B4Fields), string.Join(", ", decoded));
+        CollectionAssert.AreEqual(B4Fields, decoded);
         Assert.AreEqual(0, decoder.BlockedStreamCount);
         CollectionAssert.AreEqual(FromHex("88"), decoder.TakeDecoderStreamBytes());
     }

@@ -1,3 +1,4 @@
+using Curl.Testing;
 using static Curl.Http3.Http3;
 
 namespace Curl.Http3;
@@ -12,22 +13,31 @@ public sealed class Http3ControlStreamReaderTests
 {
     private const string ServerSettings = "04 04 01 00 07 00";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task ReadFrameAsync_SettingsThenGoaways_AreRecorded()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("control stream", ServerSettings + " 21 01 00 07 01 08 07 01 04 07 01 04");
+
         // A grease frame (0x21) between frames is skipped.
         Http3ControlStreamReader reader = new(StreamOf(ServerSettings + " 21 01 00 07 01 08 07 01 04 07 01 04"));
         Assert.IsNull(reader.PeerSettings);
 
         var settings = await reader.ReadFrameAsync(CancellationToken.None);
+        diagnostics.Act("first frame", settings);
         Assert.AreSame(settings, reader.PeerSettings);
         Assert.IsNull(reader.GoawayStreamId);
 
         await reader.ReadFrameAsync(CancellationToken.None);
+        diagnostics.Assert("GOAWAY stream ID after the first GOAWAY", 8L, reader.GoawayStreamId);
         Assert.AreEqual(8, reader.GoawayStreamId);
         await reader.ReadFrameAsync(CancellationToken.None);
+        diagnostics.Assert("GOAWAY stream ID after the second GOAWAY", 4L, reader.GoawayStreamId);
         Assert.AreEqual(4, reader.GoawayStreamId);
         var repeated = (Http3GoawayFrame)await reader.ReadFrameAsync(CancellationToken.None);
+        diagnostics.Assert("repeated GOAWAY ID", 4L, repeated.Id);
         Assert.AreEqual(4, repeated.Id);
     }
 
@@ -35,7 +45,7 @@ public sealed class Http3ControlStreamReaderTests
     [DataRow("07 01 00", DisplayName = "GOAWAY")]
     [DataRow("00 00", DisplayName = "DATA")]
     public async Task ReadFrameAsync_FirstFrameNotSettings_IsMissingSettings(string hex) =>
-        Assert.AreEqual(Http3ErrorCode.MissingSettings, await ErrorOfFirstFramesAsync(hex, 1));
+        Assert.AreEqual(Http3ErrorCode.MissingSettings, await LoggedErrorOfFirstFramesAsync(Http3ErrorCode.MissingSettings, hex, 1));
 
     [TestMethod]
     [DataRow(ServerSettings, DisplayName = "a second SETTINGS")]
@@ -44,7 +54,7 @@ public sealed class Http3ControlStreamReaderTests
     [DataRow("05 03 00 0000", DisplayName = "PUSH_PROMISE")]
     [DataRow("0d 01 00", DisplayName = "MAX_PUSH_ID")]
     public async Task ReadFrameAsync_FrameNotAllowedOnTheControlStream_IsFrameUnexpected(string hex) =>
-        Assert.AreEqual(Http3ErrorCode.FrameUnexpected, await ErrorOfFirstFramesAsync(ServerSettings + " " + hex, 2));
+        Assert.AreEqual(Http3ErrorCode.FrameUnexpected, await LoggedErrorOfFirstFramesAsync(Http3ErrorCode.FrameUnexpected, ServerSettings + " " + hex, 2));
 
     [TestMethod]
     [DataRow("07 01 02", DisplayName = "GOAWAY naming a server-initiated stream")]
@@ -52,7 +62,7 @@ public sealed class Http3ControlStreamReaderTests
     [DataRow("07 01 04 07 01 08", DisplayName = "GOAWAY naming a larger stream than before")]
     [DataRow("03 01 00", DisplayName = "CANCEL_PUSH without MAX_PUSH_ID")]
     public async Task ReadFrameAsync_InvalidId_IsIdError(string hex) =>
-        Assert.AreEqual(Http3ErrorCode.IdError, await ErrorOfFirstFramesAsync(ServerSettings + " " + hex, 3));
+        Assert.AreEqual(Http3ErrorCode.IdError, await LoggedErrorOfFirstFramesAsync(Http3ErrorCode.IdError, ServerSettings + " " + hex, 3));
 
     [TestMethod]
     [DataRow("", DisplayName = "before SETTINGS")]
@@ -60,11 +70,24 @@ public sealed class Http3ControlStreamReaderTests
     [DataRow(ServerSettings, DisplayName = "after SETTINGS")]
     [DataRow(ServerSettings + " 07", DisplayName = "inside a frame after SETTINGS")]
     public async Task ReadFrameAsync_StreamEnding_IsClosedCriticalStream(string hex) =>
-        Assert.AreEqual(Http3ErrorCode.ClosedCriticalStream, await ErrorOfFirstFramesAsync(hex, 2));
+        Assert.AreEqual(Http3ErrorCode.ClosedCriticalStream, await LoggedErrorOfFirstFramesAsync(Http3ErrorCode.ClosedCriticalStream, hex, 2));
 
     [TestMethod]
     public async Task ReadFrameAsync_InvalidFrameBeforeTheEnd_KeepsItsError() =>
-        Assert.AreEqual(Http3ErrorCode.SettingsError, await ErrorOfFirstFramesAsync("04 02 02 00 07 01 00", 1));
+        Assert.AreEqual(Http3ErrorCode.SettingsError, await LoggedErrorOfFirstFramesAsync(Http3ErrorCode.SettingsError, "04 02 02 00 07 01 00", 1));
+
+    private async Task<Http3ErrorCode> LoggedErrorOfFirstFramesAsync(Http3ErrorCode expected, string hex, int frameCount)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("control stream", hex);
+        diagnostics.Arrange("frames read", frameCount);
+
+        var error = await ErrorOfFirstFramesAsync(hex, frameCount);
+
+        diagnostics.Act("connection error", error);
+        diagnostics.Assert("connection error", expected, error);
+        return error;
+    }
 
     private static Task<Http3ErrorCode> ErrorOfFirstFramesAsync(string hex, int frameCount) =>
         ErrorOfAsync(async () =>

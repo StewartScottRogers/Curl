@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Http3.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1466 — Make every test in Curl.Http3.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,21 @@ Every test in `Curl.Http3.UnitTests` writes, through BL-1457's shared `TestDiagn
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Http3.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Http3.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Http3.UnitTests -warnaserror` is clean and `dotnet test Curl.Http3.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Http3.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Http3.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Http3.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Http3.UnitTests -warnaserror` is clean and `dotnet test Curl.Http3.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Http3.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 118 test methods in 15 files.
+- Counts in `Curl.Http3.UnitTests` (excluding obj, `Select-String -AllMatches`), before -> after: `Assert.` 261 -> 261, `[TestMethod` 118 -> 118, `[DataRow(` 141 -> 141. Test run total 223 before and after; the detailed run prints 223 `END` lines and none with a zero arrange, act or assert count.
+- No test printed a `SLOW:` line (the slowest took about 25 ms), so no follow-up task was filed.
+- Choices: each test class gets a `TestContext` property and, where several tests share it, a `Diagnostics` property over `TestDiagnostics.For`. Where a shared error helper (`ErrorOf`, `ErrorOfFirstFramesAsync`) is used, a per-class `Logged...` wrapper writes the ACT and ASSERT lines and returns the error, so each test keeps its own `Assert.AreEqual` and the `Assert.` count stays the same. Exception-only tests log the exception type and parameter name; frames and QPACK sections go through `BYTES` and `DIFF`; header lists are logged before encoding and after decoding.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Http3.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF lines (223 tests, none zero, none slow)
