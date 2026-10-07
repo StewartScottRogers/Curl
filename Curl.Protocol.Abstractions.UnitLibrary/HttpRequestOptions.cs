@@ -91,6 +91,14 @@ public sealed record HttpRequestOptions
     public int RedirectsFollowed { get; init; }
 
     /// <summary>
+    /// Gets how many response headers the transfer stored before this request: 0 for the
+    /// first, and the earlier hops' <see cref="TransferReport.ResponseHeadersStored" /> for a
+    /// hop <c>-L</c> follows, since curl 8.21.0 counts every header of a transfer - its hops'
+    /// heads and trailers - toward its limit of 5000 (measured, BL-1448 Notes).
+    /// </summary>
+    public int ResponseHeadersStored { get; init; }
+
+    /// <summary>
     /// Gets how a status of 400 or above ends the transfer; <see cref="HttpFailMode.None" />
     /// when neither <c>-f</c> nor <c>--fail-with-body</c> was given.
     /// </summary>

@@ -23,4 +23,12 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     /// (ADR-0187). The message is then the <c>-v</c> line that reports the refusal.
     /// </summary>
     internal bool IsStreamRefused { get; init; }
+
+    /// <summary>
+    /// Gets the <c>-v</c> lines the handler reports for the failure, in order, once the head
+    /// lines it holds are reported; none by default. Too many response headers reports its
+    /// message, and among a chunked body's trailers also
+    /// <see cref="HttpTransferMessages.ChunkedStreamReadFailed" /> after it (measured, BL-1448 Notes).
+    /// </summary>
+    internal IReadOnlyList<string> InfoLines { get; init; } = [];
 }

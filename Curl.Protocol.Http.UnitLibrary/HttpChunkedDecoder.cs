@@ -68,6 +68,19 @@ internal sealed class HttpChunkedDecoder
     internal ReadOnlyMemory<byte> TrailerBytes => trailers.GetBuffer().AsMemory(0, (int)trailers.Length);
 
     /// <summary>
+    /// Gets how many trailer lines curl 8.21.0 stores before the next one fails with exit 100,
+    /// <see cref="HttpTransferMessages.TooManyResponseHeaders" />: what is left of
+    /// <see cref="HttpResponseHeadReader.MaximumHeaderCount" /> once the transfer's heads are
+    /// stored (measured, BL-1448 Notes). By default there is no limit.
+    /// </summary>
+    internal int TrailerLimit { get; init; } = int.MaxValue;
+
+    /// <summary>
+    /// Gets how many trailer lines have been decoded and kept in <see cref="TrailerBytes" />.
+    /// </summary>
+    internal int TrailerCount { get; private set; }
+
+    /// <summary>
     /// Decodes <paramref name="input" /> up to the end of the next run of chunk data, or to
     /// its end, or to the end of the body.
     /// </summary>
@@ -76,7 +89,7 @@ internal sealed class HttpChunkedDecoder
     /// <returns>The chunk data found, a slice of <paramref name="input" />; empty when none.</returns>
     /// <exception cref="HttpTransferException">
     /// A chunk size is malformed or too large, or a line ending is malformed (exit 56), a
-    /// trailer line has no colon (exit 8), or a trailer line is too long (exit 100).
+    /// trailer line has no colon (exit 8), a trailer line is too long, or one more trailer line than <see cref="TrailerLimit" /> arrives (exit 100).
     /// </exception>
     internal ReadOnlyMemory<byte> DecodeNext(ReadOnlyMemory<byte> input, out int consumed)
     {
@@ -235,8 +248,17 @@ internal sealed class HttpChunkedDecoder
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.HeaderWithoutColon);
         }
 
+        if (TrailerCount == TrailerLimit)
+        {
+            throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders)
+            {
+                InfoLines = [HttpTransferMessages.TooManyResponseHeaders, HttpTransferMessages.ChunkedStreamReadFailed],
+            };
+        }
+
         trailerLine.WriteTo(trailers);
         trailers.Write(LineEnding);
         trailerLine.SetLength(0);
+        TrailerCount++;
     }
 }

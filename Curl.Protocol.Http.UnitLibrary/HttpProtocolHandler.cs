@@ -1024,6 +1024,7 @@ public sealed class HttpProtocolHandler(
             LimitsFileSize = HttpDownloadConditions.LimitOf(context.MaxFileSize) is not null,
             DecodesTransferCoding = options.TransferEncoding,
             Log = exchangeLog,
+            HeadersStoredBefore = HeadersStoredBefore(earlier, options),
         };
         int cookiesStored = 0;
         HttpAuthProblemLines originProblems = new();
@@ -1031,6 +1032,7 @@ public sealed class HttpProtocolHandler(
         HttpResponseHeadReader headReader = new(responseConnection)
         {
             Events = context.Events,
+            HeadersStoredBefore = body.HeadersStoredBefore,
             LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
             LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
             StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine),
@@ -1067,6 +1069,7 @@ public sealed class HttpProtocolHandler(
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
             actedOn = headReader.HeadActedOn(exchange.Head);
+            body.HeadersStoredBefore = headReader.HeadersStoredWith(exchange.Head);
             exchangeLog.ReplyRead(actedOn);
             exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
@@ -1117,6 +1120,15 @@ public sealed class HttpProtocolHandler(
             UpgradedSession = UpgradedSessionOf(connection),
         };
     }
+
+    /// <summary>
+    /// Gives how many response headers the transfer stored before an exchange: those of the
+    /// exchange a retry answers, through its <paramref name="earlier" /> report, or else those
+    /// of the hops before this one (<see cref="HttpRequestOptions.ResponseHeadersStored" />),
+    /// since curl 8.21.0 counts them all toward one limit of 5000 (measured, BL-1448 Notes).
+    /// </summary>
+    private static int HeadersStoredBefore(TransferReport? earlier, HttpRequestOptions options) =>
+        earlier?.ResponseHeadersStored ?? options.ResponseHeadersStored;
 
     /// <summary>
     /// Gives how <c>-f</c> or <c>--fail-with-body</c> applies to a response: as asked, unless
@@ -1473,13 +1485,18 @@ public sealed class HttpProtocolHandler(
     /// Reports a read a socket error failed as the <c>-v</c> line curl 8.21.0's <c>failf</c> prints
     /// for it, such as <c>Recv failure: Connection was reset</c>, before the connection's end is
     /// reported (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
-    /// <c>cf-ngtcp2.c</c> prints for it (ADR-0187). Any other failure is left to the transfer's result.
+    /// <c>cf-ngtcp2.c</c> prints for it (ADR-0187), then the failure's own <see cref="HttpTransferException.InfoLines" />. Any other failure is left to the transfer's result.
     /// </summary>
     private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
     {
         if (failure.IsStreamRefused || failure.Message.StartsWith(HttpTransferMessages.ReceiveFailurePrefix, StringComparison.Ordinal))
         {
             events.ReportInfo(failure.Message);
+        }
+
+        foreach (string line in failure.InfoLines)
+        {
+            events.ReportInfo(line);
         }
     }
 
@@ -1758,8 +1775,24 @@ public sealed class HttpProtocolHandler(
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
         SetBodyLimitAndSinks(plan, body, discardsBody);
-        await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
-            .ConfigureAwait(false);
+        HttpTransferException? tooManyTrailers = null;
+        try
+        {
+            await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (HttpTransferException failure) when (failure.Message == HttpTransferMessages.TooManyResponseHeaders)
+        {
+            tooManyTrailers = failure;
+        }
+
+        if (tooManyTrailers is not null)
+        {
+            // curl 8.21.0 writes the trailers it stored before the one past the limit (measured, BL-1448 Notes).
+            await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
+            throw tooManyTrailers;
+        }
+
         ReadOnlyMemory<byte> trailers = await TrailersOfAsync(body, requestStream, cancellationToken).ConfigureAwait(false);
         await WriteHeadersAsync(context.HeaderOutput, trailers, cancellationToken).ConfigureAwait(false);
     }
@@ -2355,6 +2388,7 @@ public sealed class HttpProtocolHandler(
                 HeaderSize = earlier?.HeaderSize ?? 0,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,
+                ResponseHeadersStored = body.HeadersStored,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint,

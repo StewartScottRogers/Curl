@@ -210,6 +210,24 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_HopsResponseHeaders_AreSentToTheNextHopAsStoredBeforeIt()
+    {
+        // curl counts every header a transfer stores, its hops' included, toward 5000 (BL-1448 Notes).
+        TransferResult first = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { ResponseHeadersStored = 3002 } };
+        TransferResult second = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { ResponseHeadersStored = 4000 } };
+        ScriptedHandler handler = new(first, second, Ok(200, 0));
+
+        await Follow(handler, Context(Location()));
+
+        Diagnostics.Assert("handler.Contexts[0].Http!.ResponseHeadersStored", 0, handler.Contexts[0].Http!.ResponseHeadersStored);
+        Assert.AreEqual(0, handler.Contexts[0].Http!.ResponseHeadersStored);
+        Diagnostics.Assert("handler.Contexts[1].Http!.ResponseHeadersStored", 3002, handler.Contexts[1].Http!.ResponseHeadersStored);
+        Assert.AreEqual(3002, handler.Contexts[1].Http!.ResponseHeadersStored);
+        Diagnostics.Assert("handler.Contexts[2].Http!.ResponseHeadersStored", 4000, handler.Contexts[2].Http!.ResponseHeadersStored);
+        Assert.AreEqual(4000, handler.Contexts[2].Http!.ResponseHeadersStored);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_HopResendsReachTheLimit_Exits47BeforeTheNextHop()
     {
         TransferResult resent = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { RedirectCount = 3 } };
