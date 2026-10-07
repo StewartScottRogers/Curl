@@ -38,12 +38,15 @@ public sealed partial class TcpConnectorQuicTests
             Insecure: true,
             ClientCertificate: Escaped(WriteFile("client.pem", s_clientCertificate.ExportCertificatePem())),
             PrivateKey: WriteFile("key.pem", s_clientKey.ExportPkcs8PrivateKeyPem()));
+        Diagnostics.Arrange("client certificate", "client.pem with key.pem, server asks for one");
 
-        var result = await Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false), Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
         var presented = opener.Opened.Single().Server!.Tls!.ClientCertificate!.CertificateList.Single();
+        Diagnostics.Diff("presented certificate", s_clientCertificate.RawData, presented.CertificateData);
         CollectionAssert.AreEqual(s_clientCertificate.RawData, presented.CertificateData);
     }
 
@@ -54,9 +57,11 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(requestClientCertificate: true) };
         var file = WriteFile("both.pem", s_clientCertificate.ExportCertificatePem() + "\n" + s_clientKey.ExportPkcs8PrivateKeyPem());
         var options = new TlsClientOptions(Insecure: true, ClientCertificate: file);
+        Diagnostics.Arrange("client certificate", "both.pem holding certificate and key, Schannel build");
 
-        var result = await Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: true).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: true), Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
         Assert.IsNotNull(opener.Opened.Single().Server!.Tls!.ClientCertificate);
@@ -67,9 +72,11 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var options = new TlsClientOptions(Insecure: true, ClientCertificate: Escaped(Path.Combine(_certificateDirectory, "missing.pem")));
+        Diagnostics.Arrange("client certificate", "missing.pem, which does not exist");
 
-        var result = await Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false), Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCertProblem, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
         Assert.IsEmpty(opener.Opened);
     }
@@ -79,11 +86,14 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(cipherSuite: 0x1302) };
         var options = new TlsClientOptions(Insecure: true, Tls13Ciphers: "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256");
+        Diagnostics.Arrange("tls13 ciphers", options.Tls13Ciphers);
 
-        var result = await Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false), Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
+        ActCipherSuites(opener);
         CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303 }, opener.Opened.Single().Server!.Tls!.ClientHello!.CipherSuites.ToArray());
     }
 
@@ -93,11 +103,14 @@ public sealed partial class TcpConnectorQuicTests
         // The Schannel build refuses --ciphers over TCP; curl.se's LibreSSL build, which dials QUIC, does not.
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var options = new TlsClientOptions(Insecure: true, Ciphers: "ECDHE-RSA-AES128-GCM-SHA256");
+        Diagnostics.Arrange("ciphers", options.Ciphers);
 
-        var result = await Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: true).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: true), Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
+        ActCipherSuites(opener);
         CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301, 0x00ff }, opener.Opened.Single().Server!.Tls!.ClientHello!.CipherSuites.ToArray());
     }
 
@@ -109,9 +122,11 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var options = new TlsClientOptions(Insecure: true, Tls13Ciphers: tls13Ciphers);
+        Diagnostics.Arrange("tls13 ciphers", tls13Ciphers);
 
-        var result = await Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild: false), Target(events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCipher, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCipher, result.ExitCode);
         Assert.AreEqual(TlsFailureMessages.OpenSslTls13CipherSuiteUnusable(tls13Ciphers), result.ErrorMessage);
         Assert.IsEmpty(opener.Opened);
@@ -126,12 +141,15 @@ public sealed partial class TcpConnectorQuicTests
         // extensions kept, supported_versions TLS 1.3 only - over ClientHelloProfile.OpenSsl's lists.
         var profile = ClientHelloProfile.OpenSsl;
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
+        Diagnostics.Arrange("Schannel build", false);
 
-        var result = await Connector(opener, new ManualTimeProvider(), matchesSchannelBuild: false).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), matchesSchannelBuild: false), Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
         var hello = opener.Opened.Single().Server!.Tls!.ClientHello!;
+        Diagnostics.Act("extensions", string.Join(", ", hello.Extensions.Select(extension => extension.Type)));
         Assert.IsEmpty(hello.LegacySessionId);
         CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301 }, hello.CipherSuites.ToArray());
         CollectionAssert.AreEqual(
@@ -161,15 +179,21 @@ public sealed partial class TcpConnectorQuicTests
     public async Task ConnectMultiplexedAsync_InTheWindowsBuild_SendsCurlSesLibreSslClientHello()
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
+        Diagnostics.Arrange("Schannel build", true);
 
-        var result = await Connector(opener, new ManualTimeProvider(), matchesSchannelBuild: true).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), matchesSchannelBuild: true), Target());
 
         await using var connection = result.Connection!;
         var hello = opener.Opened.Single().Server!.Tls!.ClientHello!;
+        Diagnostics.Act("extensions", string.Join(", ", hello.Extensions.Select(extension => extension.Type)));
+        Diagnostics.Assert("extension count", QuicClientSettings.CreateLibreSslTlsSettings("quic.test").ExtensionOrder.Count(), hello.Extensions.Count());
         CollectionAssert.AreEqual(
             QuicClientSettings.CreateLibreSslTlsSettings("quic.test").ExtensionOrder.ToArray(),
             hello.Extensions.Select(extension => extension.Type).ToArray());
     }
+
+    private void ActCipherSuites(QuicServerChannelOpener opener) =>
+        Diagnostics.Act("offered cipher suites", string.Join(", ", opener.Opened.Single().Server!.Tls!.ClientHello!.CipherSuites.ToArray().Select(suite => $"0x{suite:x4}")));
 
     private static byte[] Data(ClientHello hello, TlsExtensionType type) => hello.Extensions.Single(extension => extension.Type == type).Data;
 

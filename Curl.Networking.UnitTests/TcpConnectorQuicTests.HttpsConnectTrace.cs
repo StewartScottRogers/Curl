@@ -21,10 +21,13 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = TracingConnector(opener, secondAttemptVersion);
+        Diagnostics.Arrange("second attempt version", secondAttemptVersion);
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
         await using var connection = result.Connection!;
+        ActFilterLines(events);
+        Diagnostics.Assert("last filter line", "[SETUP] destroy", FilterLines(events)[^1]);
         CollectionAssert.AreEqual(
             (string[])
             [
@@ -53,9 +56,12 @@ public sealed partial class TcpConnectorQuicTests
         // curl 8.22.0 --http3-only to a port with no QUIC listener (BL-1284 Notes).
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(closeAfterClientHello: 0x1) };
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("second attempt version", null);
 
-        var result = await TracingConnector(opener, null).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(TracingConnector(opener, null), Target(events));
 
+        ActFilterLines(events);
+        Diagnostics.Assert("connection", null, result.Connection);
         Assert.IsNull(result.Connection);
         CollectionAssert.AreEqual(
             new[] { "[HTTPS-CONNECT] connect, all attempts failed", $"[HTTPS-CONNECT] connect -> {(int)result.ExitCode}, done=0" },
@@ -70,11 +76,14 @@ public sealed partial class TcpConnectorQuicTests
         var events = new RecordingTransferEvents();
         var connector = TracingConnector(opener, "h2");
         var target = Target(events);
+        Diagnostics.Arrange("second attempt version", "h2");
 
-        var quic = await connector.ConnectMultiplexedAsync(target, CancellationToken.None);
+        var quic = await ConnectMultiplexedAsync(connector, target);
         events.Info.Clear();
-        var tcp = await connector.ConnectAsync(target, CancellationToken.None);
+        var tcp = await ConnectAsync(connector, target);
 
+        ActFilterLines(events);
+        Diagnostics.Assert("first filter line", "[HTTPS-CONNECT] h3 baller failed, starting h2", FilterLines(events)[0]);
         Assert.IsNull(quic.Connection);
         Assert.IsNotNull(tcp.Connection);
         CollectionAssert.AreEqual(
@@ -104,11 +113,14 @@ public sealed partial class TcpConnectorQuicTests
         var connector = TracingConnector(new QuicServerChannelOpener(), "h2");
         var target = Target(events);
         using var abandoned = new CancellationTokenSource();
+        Diagnostics.Arrange("QUIC peer", "silent, abandoned after the TCP connect");
 
         var quic = connector.ConnectMultiplexedAsync(target, abandoned.Token).AsTask();
-        var tcp = await connector.ConnectAsync(target, CancellationToken.None);
+        var tcp = await ConnectAsync(connector, target);
         await abandoned.CancelAsync();
 
+        ActFilterLines(events);
+        Diagnostics.Assert("TCP connection is null", false, tcp.Connection is null);
         Assert.IsNotNull(tcp.Connection);
         await Assert.ThrowsAsync<OperationCanceledException>(() => quic);
         string[] lines = FilterLines(events);
@@ -143,10 +155,13 @@ public sealed partial class TcpConnectorQuicTests
             TracesSetupFilter = true,
             HttpsConnectSecondAttemptVersion = "h2",
         };
+        Diagnostics.Arrange("traced filters", "SETUP");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
         await using var connection = result.Connection!;
+        ActFilterLines(events);
+        Diagnostics.Assert("filter line count", 4, FilterLines(events).Length);
         CollectionAssert.AreEqual(
             new[] { "[SETUP] happy eyeballing to origin quic.test:443", "  Trying 127.0.0.1:443...", "[SETUP] removing connected setup filter", "[SETUP] destroy" },
             FilterLines(events));
@@ -168,10 +183,13 @@ public sealed partial class TcpConnectorQuicTests
             TracesDnsFilter = true,
             HttpsConnectFirstAttemptVersion = "h3",
         };
+        Diagnostics.Arrange("traced filters", "HTTPS-CONNECT, DNS");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
         await using var connection = result.Connection!;
+        ActEvents(events);
+        Diagnostics.Assert("first line", "[HTTPS-CONNECT] added", events.Info[0]);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal)));
         Assert.AreEqual("[HTTPS-CONNECT] added", events.Info[0]);
     }
@@ -181,6 +199,9 @@ public sealed partial class TcpConnectorQuicTests
 
     private static string[] FilterLines(RecordingTransferEvents events) =>
         [.. events.Info.Where(line => line.StartsWith("[HTTPS-CONNECT] ", StringComparison.Ordinal) || line.StartsWith("[SETUP] ", StringComparison.Ordinal) || line.StartsWith("  Trying ", StringComparison.Ordinal))];
+
+    private void ActFilterLines(RecordingTransferEvents events) =>
+        Diagnostics.Act("filter lines", string.Join(" | ", FilterLines(events)));
 
     private static TcpConnector TracingConnector(QuicServerChannelOpener opener, string? secondAttemptVersion)
     {

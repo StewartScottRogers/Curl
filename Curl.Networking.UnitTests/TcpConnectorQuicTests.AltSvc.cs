@@ -23,10 +23,13 @@ public sealed partial class TcpConnectorQuicTests
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, new ManualTimeProvider());
         var target = AltSvcTarget(events);
+        Diagnostics.Arrange("alt-svc route", "h1 127.0.0.1 18736 -> h1 127.0.0.1 18735");
 
-        var quic = await connector.ConnectMultiplexedAsync(target, CancellationToken.None);
-        var tcp = await connector.ConnectAsync(target, CancellationToken.None);
+        var quic = await ConnectMultiplexedAsync(connector, target);
+        var tcp = await ConnectAsync(connector, target);
 
+        ActEvents(events);
+        Diagnostics.Assert("Alt-svc connecting lines", 1, events.Info.Count(line => line == AltSvcConnectingLine));
         Assert.IsNull(quic.Connection);
         Assert.IsNotNull(tcp.Connection);
         Assert.AreEqual(AltSvcConnectingLine, events.Info[0]);
@@ -40,9 +43,12 @@ public sealed partial class TcpConnectorQuicTests
     {
         var events = new RecordingTransferEvents();
         var connector = Connector(new QuicServerChannelOpener(), new ManualTimeProvider());
+        Diagnostics.Arrange("alt-svc route", "h1 127.0.0.1 18736 -> h1 127.0.0.1 18735");
 
-        var result = await connector.ConnectAsync(AltSvcTarget(events), CancellationToken.None);
+        var result = await ConnectAsync(connector, AltSvcTarget(events));
 
+        ActEvents(events);
+        Diagnostics.Assert("Alt-svc connecting lines", 1, events.Info.Count(line => line == AltSvcConnectingLine));
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual(AltSvcConnectingLine, events.Info[0]);
         Assert.AreEqual(1, events.Info.Count(line => line == AltSvcConnectingLine));
@@ -54,10 +60,13 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, new ManualTimeProvider());
+        Diagnostics.Arrange("alt-svc route", "h1 127.0.0.1 18736 -> h1 127.0.0.1 18735");
 
-        var result = await connector.ConnectMultiplexedAsync(AltSvcTarget(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, AltSvcTarget(events));
 
         await using var connection = result.Connection!;
+        ActEvents(events);
+        Diagnostics.Assert("remote end point", new IPEndPoint(IPAddress.Loopback, 18735), connection.RemoteEndPoint);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 18735), connection.RemoteEndPoint);
         Assert.AreEqual(AltSvcConnectingLine, events.Info[0]);
         Assert.AreEqual(1, events.Info.Count(line => line == AltSvcConnectingLine));
@@ -69,10 +78,13 @@ public sealed partial class TcpConnectorQuicTests
         // Each transfer builds its own target, so a second transfer reports the line again.
         var events = new RecordingTransferEvents();
         var connector = Connector(new QuicServerChannelOpener(), new ManualTimeProvider());
+        Diagnostics.Arrange("targets", "two, both to h1 127.0.0.1 18735");
 
-        await connector.ConnectAsync(AltSvcTarget(events), CancellationToken.None);
-        await connector.ConnectAsync(AltSvcTarget(events), CancellationToken.None);
+        await ConnectAsync(connector, AltSvcTarget(events));
+        await ConnectAsync(connector, AltSvcTarget(events));
 
+        ActEvents(events);
+        Diagnostics.Assert("Alt-svc connecting lines", 2, events.Info.Count(line => line == AltSvcConnectingLine));
         Assert.AreEqual(2, events.Info.Count(line => line == AltSvcConnectingLine));
     }
 

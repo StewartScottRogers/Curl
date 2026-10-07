@@ -6,6 +6,7 @@ using System.Security.Authentication;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 using Curl.Quic;
+using Curl.Testing;
 using Curl.Tls;
 
 namespace Curl.Networking;
@@ -23,6 +24,11 @@ public sealed partial class TcpConnectorQuicTests
 
     private readonly List<QuicTestServer> _servers = [];
 
+    /// <summary>Gets or sets the test's context, which carries its diagnostics (BL-1457).</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestCleanup]
     public void DisposeServers()
     {
@@ -38,9 +44,11 @@ public sealed partial class TcpConnectorQuicTests
     public async Task ConnectMultiplexedAsync_WithoutAQuicDialer_FailsAsTheInterfaceDoes()
     {
         var connector = new TcpConnector(new FakeDnsResolver(IPAddress.Loopback), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+        Diagnostics.Arrange("QUIC dialer", "none");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("QUIC is not available on this connector", result.ErrorMessage);
     }
@@ -49,8 +57,12 @@ public sealed partial class TcpConnectorQuicTests
     public async Task ConnectMultiplexedAsync_WithANullTarget_ThrowsArgumentNullException()
     {
         var connector = Connector(new QuicServerChannelOpener(), new ManualTimeProvider());
+        Diagnostics.Arrange("target", "null");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => connector.ConnectMultiplexedAsync(null!, CancellationToken.None).AsTask());
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => connector.ConnectMultiplexedAsync(null!, CancellationToken.None).AsTask());
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -62,11 +74,16 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, clock);
+        Diagnostics.Arrange("clock", "stepping from 100 ms");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
+        ActEvents(events);
+        Diagnostics.Act("timings", result.Timings);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
+        Diagnostics.Assert("application protocol", "h3", connection.ApplicationProtocol);
         Assert.AreEqual("h3", connection.ApplicationProtocol);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 443), connection.RemoteEndPoint);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 50123), connection.LocalEndPoint);
@@ -102,12 +119,17 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(initialMaxStreamsBidi: 100) };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, clock, writesHttp3ConnectionLines: true);
+        Diagnostics.Arrange("writes HTTP/3 connection lines", true);
+        Diagnostics.Arrange("server's initial_max_streams_bidi", 100);
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
         string[] lines = [.. events.Info.Skip(4)];
+        Diagnostics.Assert("HTTP/3 line count", 4, lines.Length);
         Assert.HasCount(4, lines, string.Join('\n', events.Info));
         Assert.StartsWith("[HTTP/3] handshake complete after ", lines[0]);
         Assert.EndsWith("ms, remote transport[max_udp_payload=65527, initial_max_data=1048576]", lines[0]);
@@ -120,10 +142,12 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target());
 
         await using var connection = result.Connection!;
         var serverName = opener.Opened.Single().Server!.Tls!.ClientHello!.Extensions.Single(extension => extension.Type == TlsExtensionType.ServerName);
+        Diagnostics.Bytes("server_name extension", serverName.Data);
+        Diagnostics.Assert("server name ends with", "quic.test", System.Text.Encoding.ASCII.GetString(serverName.Data));
         Assert.EndsWith("quic.test", System.Text.Encoding.ASCII.GetString(serverName.Data));
     }
 
@@ -132,10 +156,12 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), LocalEndPoint = null };
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("channel's local end point", "null");
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target(events));
 
         await using var connection = result.Connection!;
+        Diagnostics.Assert("opened local end point", new IPEndPoint(IPAddress.Any, 0), events.Opened.Single().LocalEndPoint);
         Assert.AreEqual(new IPEndPoint(IPAddress.Any, 0), events.Opened.Single().LocalEndPoint);
     }
 
@@ -146,11 +172,13 @@ public sealed partial class TcpConnectorQuicTests
         // BL-1051): a loopback peer is reached from 127.0.0.1.
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), ReportsARealUdpSocketsLocalEndPoint = true };
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("reports a real UDP socket's local end point", true);
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target(events));
 
         await using var connection = result.Connection!;
         var local = events.Opened.Single().LocalEndPoint;
+        Diagnostics.Assert("local address", IPAddress.Loopback, local.Address);
         Assert.AreEqual(IPAddress.Loopback, local.Address);
         Assert.AreNotEqual(0, local.Port);
     }
@@ -162,10 +190,12 @@ public sealed partial class TcpConnectorQuicTests
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, new ManualTimeProvider());
         _ = await connector.ConnectAsync(new ConnectTarget("quic.test", 443, UseTls: false), CancellationToken.None);
+        Diagnostics.Arrange("TCP connections before", 1);
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
         await using var connection = result.Connection!;
+        Diagnostics.Assert("connection number", 1, events.Opened.Single().ConnectionNumber);
         Assert.AreEqual(1, events.Opened.Single().ConnectionNumber);
     }
 
@@ -176,10 +206,13 @@ public sealed partial class TcpConnectorQuicTests
         var events = new RecordingTransferEvents();
         var resolver = new FakeDnsResolver(IPAddress.Loopback);
         var connector = Connector(opener, new ManualTimeProvider(), resolver: resolver, connectToMappings: new ConnectToMappings(["quic.test:443:mapped.test:8443"]));
+        Diagnostics.Arrange("connect-to", "quic.test:443:mapped.test:8443");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
         await using var connection = result.Connection!;
+        Diagnostics.Act("resolved hosts", string.Join(", ", resolver.ResolvedHosts));
+        Diagnostics.Assert("dialled end point", new IPEndPoint(IPAddress.Loopback, 8443), opener.Opened.Single().ServerEndPoint);
         CollectionAssert.AreEqual(new[] { "mapped.test" }, resolver.ResolvedHosts);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 8443), opener.Opened.Single().ServerEndPoint);
         Assert.AreEqual("mapped.test", events.Opened.Single().HostName);
@@ -190,9 +223,11 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener();
         var connector = Connector(opener, new ManualTimeProvider(), resolveOverrides: ResolveOverrides.Parse(["bad"]));
+        Diagnostics.Arrange("resolve entry", "bad");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual("Could not parse CURLOPT_RESOLVE entry 'bad'", result.ErrorMessage);
         Assert.IsEmpty(opener.Opened);
@@ -203,9 +238,11 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener();
         var connector = Connector(opener, new ManualTimeProvider(), resolver: new FakeDnsResolver());
+        Diagnostics.Arrange("resolver addresses", "none");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Could not resolve host: quic.test", result.ErrorMessage);
         Assert.IsEmpty(opener.Opened);
@@ -220,12 +257,16 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener();
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, clock, connectTimeout: TimeSpan.FromSeconds(1));
+        Diagnostics.Arrange("connect timeout", "1000 ms, then the clock advances 1000 ms");
 
         var connecting = connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None).AsTask();
         await opener.WaitingToReceive.WaitAsync();
         clock.Advance(1000);
         var result = await connecting;
 
+        ActResult(result.ExitCode, result.ErrorMessage);
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 1000 milliseconds", result.ErrorMessage);
         Assert.AreEqual("Connection timed out after 1000 milliseconds", events.Info[^1]);
@@ -241,12 +282,16 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener();
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, clock, connectTimeout: TimeSpan.Zero);
+        Diagnostics.Arrange("connect timeout", "none, then the clock advances 10000 ms");
 
         var connecting = connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None).AsTask();
         await opener.WaitingToReceive.WaitAsync();
         clock.Advance(10000);
         var result = await connecting;
 
+        ActResult(result.ExitCode, result.ErrorMessage);
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT", result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -263,9 +308,12 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(closeAfterClientHello: 0x2) };
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("server closes after ClientHello with", "0x2");
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target(events));
 
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -284,9 +332,12 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(closeAfterClientHello: 0x1) };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, new ManualTimeProvider(), resolver: new FakeDnsResolver(IPAddress.Loopback, SecondAddress));
+        Diagnostics.Arrange("resolver addresses", "127.0.0.1, 127.0.0.2");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { new IPEndPoint(IPAddress.Loopback, 443), new IPEndPoint(SecondAddress, 443) },
@@ -301,9 +352,12 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, new ManualTimeProvider(), new TlsClientOptions());
+        Diagnostics.Arrange("insecure", false);
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        // The certificate failure is in the platform's own words, so neither it nor the lines are written.
+        var result = await ConnectMultiplexedAsync(connector, Target(events), writesErrorMessage: false);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
         Assert.IsFalse(string.IsNullOrEmpty(result.ErrorMessage));
         CollectionAssert.AreEqual(
@@ -321,9 +375,11 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var connector = Connector(opener, new ManualTimeProvider(), new TlsClientOptions(CaCertificateFile: Path.Combine(Path.GetTempPath(), "no-such-dir-bl728", "ca.pem")));
+        Diagnostics.Arrange("CA certificate file", "no-such-dir-bl728/ca.pem under the temporary folder");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(), writesErrorMessage: false);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.ExitCode);
         Assert.IsTrue(opener.Opened.Single().IsDisposed);
     }
@@ -336,9 +392,11 @@ public sealed partial class TcpConnectorQuicTests
         var failure = new SocketException((int)SocketError.ConnectionReset);
         var opener = new QuicServerChannelOpener { ReceiveFailure = failure };
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("receive failure", SocketError.ConnectionReset);
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target(events), writesErrorMessage: false);
 
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual($"QUIC: recvfrom() unexpectedly returned -1 (errno={failure.ErrorCode}; Connection was reset)", result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -356,9 +414,11 @@ public sealed partial class TcpConnectorQuicTests
     {
         var failure = new SocketException((int)SocketError.ConnectionRefused);
         var opener = new QuicServerChannelOpener { ReceiveFailure = failure };
+        Diagnostics.Arrange("receive failure", SocketError.ConnectionRefused);
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target(), writesErrorMessage: false);
 
+        Diagnostics.Assert("error message ends with", "; Connection refused)", result.ErrorMessage?[result.ErrorMessage.LastIndexOf(';')..]);
         Assert.AreEqual($"QUIC: recvfrom() unexpectedly returned -1 (errno={failure.ErrorCode}; Connection refused)", result.ErrorMessage);
     }
 
@@ -367,9 +427,13 @@ public sealed partial class TcpConnectorQuicTests
     {
         var failure = new SocketException((int)SocketError.ConnectionReset);
         var opener = new QuicServerChannelOpener { ReceiveFailure = failure };
+        Diagnostics.Arrange("receive failure", SocketError.ConnectionReset);
+        Diagnostics.Arrange("Schannel build", false);
 
-        var result = await Connector(opener, new ManualTimeProvider(), matchesSchannelBuild: false).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider(), matchesSchannelBuild: false), Target(), writesErrorMessage: false);
 
+        // The errno and the system's message differ by platform, so only whether they match is written.
+        Diagnostics.Assert("error message is the system's", true, result.ErrorMessage == $"QUIC: recvfrom() unexpectedly returned -1 (errno={failure.ErrorCode}; {failure.Message})");
         Assert.AreEqual($"QUIC: recvfrom() unexpectedly returned -1 (errno={failure.ErrorCode}; {failure.Message})", result.ErrorMessage);
     }
 
@@ -389,10 +453,13 @@ public sealed partial class TcpConnectorQuicTests
         };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, new ManualTimeProvider(), resolver: new FakeDnsResolver(IPAddress.Loopback, SecondAddress));
+        Diagnostics.Arrange("resolver addresses", "127.0.0.1 (cannot open a socket), 127.0.0.2");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
         await using var connection = result.Connection!;
+        Diagnostics.Act("info line 5", events.Info[5]);
+        Diagnostics.Assert("remote end point", new IPEndPoint(SecondAddress, 443), connection.RemoteEndPoint);
         Assert.AreEqual(new IPEndPoint(SecondAddress, 443), connection.RemoteEndPoint);
         Assert.AreEqual("QUIC connect to 127.0.0.1 port 443 failed: Could not connect to server", events.Info[5]);
     }
@@ -411,9 +478,12 @@ public sealed partial class TcpConnectorQuicTests
         };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, clock, resolver: new FakeDnsResolver(IPAddress.Loopback, SecondAddress), connectTimeout: TimeSpan.FromSeconds(1));
+        Diagnostics.Arrange("connect timeout", "1000 ms; each failed open advances the clock 2000 ms");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
+        Diagnostics.Act("info line count", events.Info.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 2000 milliseconds", result.ErrorMessage);
         Assert.DoesNotContain("  Trying 127.0.0.2:443...", events.Info);
@@ -426,10 +496,13 @@ public sealed partial class TcpConnectorQuicTests
         using var cancellation = new CancellationTokenSource();
         var connecting = Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(), cancellation.Token).AsTask();
         await opener.WaitingToReceive.WaitAsync();
+        Diagnostics.Arrange("cancelled", "while waiting to receive");
 
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => connecting);
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(() => connecting);
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("channel disposed", true, opener.Opened.Single().IsDisposed);
         Assert.IsTrue(opener.Opened.Single().IsDisposed);
     }
 
@@ -439,9 +512,11 @@ public sealed partial class TcpConnectorQuicTests
         await using var pool = new PoolingConnector(
             new TcpConnector(new FakeDnsResolver(IPAddress.Loopback), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider()),
             new ManualTimeProvider());
+        Diagnostics.Arrange("inner connector", "TCP connector without a QUIC dialer");
 
-        var result = await pool.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(pool, Target());
 
+        Diagnostics.Assert("error message", "QUIC is not available on this connector", result.ErrorMessage);
         Assert.AreEqual("QUIC is not available on this connector", result.ErrorMessage);
     }
 
@@ -452,25 +527,42 @@ public sealed partial class TcpConnectorQuicTests
         var options = new TlsClientOptions();
         var clock = new ManualTimeProvider();
         var random = SystemTlsRandomSource.Instance;
+        Diagnostics.Arrange("null argument", "each of the four in turn");
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(null!, options, true, clock, random));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(opener, null!, true, clock, random));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(opener, options, true, null!, random));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(opener, options, true, clock, null!));
+        var exceptions = new[]
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(null!, options, true, clock, random)),
+            Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(opener, null!, true, clock, random)),
+            Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(opener, options, true, null!, random)),
+            Assert.ThrowsExactly<ArgumentNullException>(() => new QuicDialer(opener, options, true, clock, null!)),
+        };
+
+        Diagnostics.Act("parameter names", string.Join(", ", exceptions.Select(exception => exception.ParamName)));
+        Diagnostics.Assert("exceptions", 4, exceptions.Length);
     }
 
     [TestMethod]
     public void QuicDialer_PublicConstructor_CreatesADialer()
     {
-        Assert.IsNotNull(new QuicDialer(new TlsClientOptions(), TimeProvider.System, IPAddress.Loopback, 0));
+        Diagnostics.Arrange("local address", IPAddress.Loopback);
+
+        var dialer = new QuicDialer(new TlsClientOptions(), TimeProvider.System, IPAddress.Loopback, 0);
+
+        Diagnostics.Act("dialer", dialer.GetType().Name);
+        Diagnostics.Assert("dialer is null", false, dialer is null);
+        Assert.IsNotNull(dialer);
     }
 
     [TestMethod]
     public async Task UdpChannelOpener_Open_BindsTheLocalAddressGiven()
     {
+        Diagnostics.Arrange("local address", IPAddress.Loopback);
+
         await using var channel = new UdpChannelOpener(IPAddress.Loopback).Open(new IPEndPoint(IPAddress.Loopback, 9));
 
         var local = (IPEndPoint)channel.LocalEndPoint!;
+        Diagnostics.Act("local address", local.Address);
+        Diagnostics.Assert("local address", IPAddress.Loopback, local.Address);
         Assert.AreEqual(IPAddress.Loopback, local.Address);
         Assert.AreNotEqual(0, local.Port);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 9), channel.ServerEndPoint);
@@ -498,6 +590,48 @@ public sealed partial class TcpConnectorQuicTests
             connectToMappings: connectToMappings,
             connectTimeout: connectTimeout,
             quicDialer: new QuicDialer(opener, options ?? new TlsClientOptions(Insecure: true), matchesSchannelBuild, clock, SystemTlsRandomSource.Instance) { WritesHttp3ConnectionLines = writesHttp3ConnectionLines });
+
+    /// <summary>
+    /// Connects <paramref name="target" /> through <paramref name="connector" /> as the tests did
+    /// directly, writing the target as ARRANGE, the resolve, connect and handshake as one PHASE,
+    /// and the exit code and, unless <paramref name="writesErrorMessage" /> is false because it
+    /// holds a platform's own words, the error message as ACT.
+    /// </summary>
+    private async Task<MultiplexedConnectResult> ConnectMultiplexedAsync(IConnector connector, ConnectTarget target, bool writesErrorMessage = true)
+    {
+        Diagnostics.Arrange("target", $"{target.Host}:{target.Port}");
+        MultiplexedConnectResult result;
+        using (Diagnostics.Phase("resolve, connect and handshake"))
+        {
+            result = await connector.ConnectMultiplexedAsync(target, CancellationToken.None);
+        }
+
+        ActResult(result.ExitCode, writesErrorMessage ? result.ErrorMessage : "(not written: it holds the platform's own words)");
+        return result;
+    }
+
+    /// <summary>As <see cref="ConnectMultiplexedAsync(IConnector, ConnectTarget, bool)" />, for a TCP connect.</summary>
+    private async Task<ConnectResult> ConnectAsync(IConnector connector, ConnectTarget target)
+    {
+        Diagnostics.Arrange("target", $"{target.Host}:{target.Port}");
+        ConnectResult result;
+        using (Diagnostics.Phase("resolve, connect and handshake"))
+        {
+            result = await connector.ConnectAsync(target, CancellationToken.None);
+        }
+
+        ActResult(result.ExitCode, result.ErrorMessage);
+        return result;
+    }
+
+    private void ActResult(CurlExitCode exitCode, string? errorMessage)
+    {
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("error message", errorMessage);
+    }
+
+    private void ActEvents(RecordingTransferEvents events) =>
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
 
     private QuicTestServer Server(ulong? closeAfterClientHello = null, bool requestClientCertificate = false, ushort cipherSuite = 0x1301, ulong initialMaxStreamsBidi = 0)
     {

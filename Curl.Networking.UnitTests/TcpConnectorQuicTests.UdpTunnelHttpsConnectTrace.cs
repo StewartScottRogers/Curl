@@ -22,9 +22,12 @@ public sealed partial class TcpConnectorQuicTests
         // curl 8.22.0 --http3-only -x http://127.0.0.1:18321 https://example.com/, the proxy answering 403.
         var events = new RecordingTransferEvents();
         var connector = TracingTunnelConnector(_ => new CapsuleQuicProxyConnection(ForbiddenReply, null), null);
+        Diagnostics.Arrange("proxy reply", "403 Forbidden");
 
-        var result = await connector.ConnectMultiplexedAsync(TunnelTarget(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, TunnelTarget(events));
 
+        ActTunnelTranscript(events);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])
@@ -48,10 +51,13 @@ public sealed partial class TcpConnectorQuicTests
         var events = new RecordingTransferEvents();
         var connector = TracingTunnelConnector(_ => new CapsuleQuicProxyConnection(ForbiddenReply, null), "h2");
         var target = TunnelTarget(events);
+        Diagnostics.Arrange("proxy reply", "403 Forbidden, twice");
 
-        var quic = await connector.ConnectMultiplexedAsync(target, CancellationToken.None);
-        var tcp = await connector.ConnectAsync(target, CancellationToken.None);
+        var quic = await ConnectMultiplexedAsync(connector, target);
+        var tcp = await ConnectAsync(connector, target);
 
+        ActTunnelTranscript(events);
+        Diagnostics.Assert("TCP exit code", CurlExitCode.CouldntConnect, tcp.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, quic.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, tcp.ExitCode);
         CollectionAssert.AreEqual(
@@ -85,11 +91,14 @@ public sealed partial class TcpConnectorQuicTests
     {
         var events = new RecordingTransferEvents();
         var connector = TracingTunnelConnector(_ => new CapsuleQuicProxyConnection(UpgradeReply, Server()), "h2");
+        Diagnostics.Arrange("proxy reply", "101 Switching Protocols");
 
-        var result = await connector.ConnectMultiplexedAsync(TunnelTarget(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, TunnelTarget(events));
 
         await using var connection = result.Connection!;
         string[] transcript = TunnelTranscript(events);
+        ActTunnelTranscript(events);
+        Diagnostics.Assert("last transcript line", "* [SETUP] destroy", transcript[^1]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -114,10 +123,13 @@ public sealed partial class TcpConnectorQuicTests
         var tls = new SequencedTlsProvider(ConnectResult.Connected(secured, null));
         var events = new RecordingTransferEvents();
         var connector = TracingTunnelConnector(_ => new FakeConnection(), null, tls);
+        Diagnostics.Arrange("proxy kind", ProxyKind.Https);
 
-        await connector.ConnectMultiplexedAsync(TunnelTarget(events) with { Proxy = TunnelHttpProxy with { Kind = ProxyKind.Https } }, CancellationToken.None);
+        await ConnectMultiplexedAsync(connector, TunnelTarget(events) with { Proxy = TunnelHttpProxy with { Kind = ProxyKind.Https } });
 
         string[] transcript = TunnelTranscript(events);
+        ActTunnelTranscript(events);
+        Diagnostics.Assert("contains the SSL filter line", true, transcript.Contains("* [SETUP] added SSL filter for HTTP proxy"));
         CollectionAssert.AreEqual(
             new[] { "* [SETUP] added SSL filter for HTTP proxy", "* [SETUP] added HTTP proxy tunnel filter", "* CONNECT-UDP: no ALPN negotiated" },
             transcript[Array.IndexOf(transcript, "* [SETUP] added SSL filter for HTTP proxy")..][..3]);
@@ -127,9 +139,12 @@ public sealed partial class TcpConnectorQuicTests
     public async Task ConnectMultiplexedAsync_ThroughAnHttpProxyWithNoFilterTraced_WritesTheTunnelsVerboseLinesAlone()
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("traced filters", "none");
 
-        await TunnelConnector(_ => new CapsuleQuicProxyConnection(ForbiddenReply, null)).ConnectMultiplexedAsync(TunnelTarget(events), CancellationToken.None);
+        await ConnectMultiplexedAsync(TunnelConnector(_ => new CapsuleQuicProxyConnection(ForbiddenReply, null)), TunnelTarget(events));
 
+        ActTunnelTranscript(events);
+        Diagnostics.Assert("transcript line count", 6, TunnelTranscript(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -173,6 +188,9 @@ public sealed partial class TcpConnectorQuicTests
             || line.StartsWith("> GET ", StringComparison.Ordinal)
             || line.StartsWith("> CONNECT ", StringComparison.Ordinal)
             || line.StartsWith("< HTTP/", StringComparison.Ordinal))];
+
+    private void ActTunnelTranscript(RecordingTransferEvents events) =>
+        Diagnostics.Act("tunnel transcript", string.Join(" | ", TunnelTranscript(events)));
 
     private static TcpConnector TracingTunnelConnector(Func<IPEndPoint, IConnection> dialOutcome, string? secondAttemptVersion, ITlsProvider? tlsProvider = null)
     {
