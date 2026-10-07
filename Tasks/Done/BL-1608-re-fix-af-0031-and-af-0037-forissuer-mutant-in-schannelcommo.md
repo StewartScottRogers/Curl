@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1608 — Re-fix AF-0031 and AF-0037 forIssuer mutant in SchannelCommonNameCheck with a CA-issued certificate test
 
@@ -76,23 +76,38 @@ re-audit by the quality auditor confirms the fix, not when this task reaches Don
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests/SchannelCommonNameCheckTests.cs` has at least the two tests
+- [x] `Curl.Networking.UnitTests/SchannelCommonNameCheckTests.cs` has at least the two tests
       described above. Each uses a leaf issued by a separate CA (built with
       `CertificateRequest.Create(issuer, ...)`, not `CreateSelfSigned`), and the CA's name differs
       from the leaf's name.
-- [ ] With `Curl.Networking.UnitLibrary/SchannelCommonNameCheck.cs:30` edited by hand to
+- [x] With `Curl.Networking.UnitLibrary/SchannelCommonNameCheck.cs:30` edited by hand to
       `forIssuer: true`, at least one new test fails. With the line restored, all of them pass.
       Notes record both runs (the test names and their pass/fail results).
-- [ ] `git diff` shows no change under `Curl.Networking.UnitLibrary`.
-- [ ] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean.
-- [ ] `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` reports
+- [x] `git diff` shows no change under `Curl.Networking.UnitLibrary`.
+- [x] `dotnet build Curl.Networking.UnitTests -warnaserror` is clean.
+- [x] `dotnet test Curl.Networking.UnitTests --filter "TestCategory!=Integration"` reports
       Failed: 0.
-- [ ] `SchannelCommonNameCheck.cs` keeps 100% line and branch coverage
+- [x] `SchannelCommonNameCheck.cs` keeps 100% line and branch coverage
       (`powershell -NoProfile -File Measure-CodeQuality.ps1`).
 
 ## Notes
+
+- Test-only change, made directly (no production edit, so no plan stage). Added
+  `CreateIssuedCertificate(subject, issuer)` to `SchannelCommonNameCheckTests`: a self-signed
+  ECDSA CA (basic constraints, `KeyCertSign`) signing an ECDSA leaf with no subjectAltName
+  through `CertificateRequest.Create(authority, ...)`. ECDSA rather than the RSA 2048 of
+  `TlsFailureMessagesTests` because it is faster to generate and the check does not care.
+- Mutant run (line 30 edited by hand to `forIssuer: true`, filter
+  `FullyQualifiedName~SchannelCommonNameCheckTests`): Failed 2, Passed 19.
+  `CommonNameMatches_WithAnIssuedCertificateWhoseSubjectNamesTheHost_IsTrue` failed and
+  `CommonNameMatches_WithAnIssuedCertificateWhoseIssuerNamesTheHost_IsFalse` failed.
+- Line restored: `dotnet build Curl.Networking.UnitTests -warnaserror` 0 errors; fast tests
+  Failed 0, Passed 3035, Skipped 28; `git diff` shows nothing under `Curl.Networking.UnitLibrary`.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch,
+  0 failing members.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. SchannelCommonNameCheck's forIssuer mutant is killed by two CA-issued certificate tests
