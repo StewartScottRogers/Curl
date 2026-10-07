@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1618 — Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.WeirdHeaderLine and HttpProtocolHandlerTests.cs tests write descriptive diagnostic output
 
@@ -23,15 +23,21 @@ Every test in these `Curl.Protocol.Http.UnitTests` files (2 files, 50 test metho
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
-- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
-- [ ] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
 
 ## Notes
+
+- Counts before -> after (`Assert.`, `[TestMethod`, `[DataRow(`): `HttpProtocolHandlerTests.WeirdHeaderLine.cs` 10/4/3 -> 10/4/3; `HttpProtocolHandlerTests.cs` 155/46/27 -> 155/46/27. No assertion, test method or data row changed.
+- The class filter ran 798 tests (785 passed, 13 skipped); every test method declared in these two files printed an `END` line, and no `END` line in the run has a zero arrange, act or assert count.
+- The four `Throws` tests (the two expression-bodied constructor tests, `ExecuteAsync_NullContext_Throws` and `ExecuteAsync_Cancelled_Throws`) now keep the exception `Assert.ThrowsExactly` returns so they can write it; the assertion itself is unchanged. `AssertWeirdHeaderLineAsync` became an instance method so it can write through `Diagnostics`. The NUL byte in the scripted response is printed as `\0`.
+- No test printed a `SLOW:` line; no follow-up task needed.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. All 50 test methods in the two files write ARRANGE, ACT and ASSERT lines; build clean, 1846 fast tests pass
