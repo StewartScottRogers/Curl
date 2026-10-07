@@ -36,9 +36,6 @@ internal static class ConnectTunnelVerboseLines
     /// </summary>
     internal const string AllocateConnectBuffer = "allocate connect buffer";
 
-    // How CurlSocketErrorText.ReceiveFailure begins a failed read's message.
-    private const string ReceiveFailurePrefix = "Recv failure: ";
-
     /// <summary>
     /// The line curl writes after a non-<c>2xx</c> reply's <c>Transfer-Encoding</c> line that
     /// names <c>chunked</c> (measured, BL-1144 Notes).
@@ -172,23 +169,21 @@ internal static class ConnectTunnelVerboseLines
     }
 
     /// <summary>
-    /// Reports the failure curl writes as a <c>-v</c> line right after a reply line, the
+    /// Reports the failure curl writes as a <c>-v</c> line right after the reply lines it read:
+    /// the reply's own message, which curl's <c>failf</c> also writes as a <c>-v</c> line - the
     /// <c>Content-Length</c> line of an exit 8 <see cref="HttpProxyTunnel.UnsupportedContentLength" />
-    /// reply, and the <c>Recv failure: ...</c> of a read that failed before the reply's first
-    /// byte (BL-1449); nothing for any other reply (measured, BL-1399).
+    /// reply, the <c>Recv failure: ...</c> of a read that failed before the reply's first byte
+    /// (BL-1449), <c>Proxy CONNECT aborted</c> for a head the proxy closed or reset short, and
+    /// <c>CONNECT response too large</c> or <c>Too large response headers: ...</c> (measured with
+    /// curl 8.21.0, BL-1455 Notes); nothing for a reply that did not fail.
     /// </summary>
     /// <param name="events">Where the line goes.</param>
     /// <param name="reply">The reply read.</param>
     internal static void ReportReplyFailure(ITransferEvents events, HttpProxyTunnelReply reply)
     {
-        if (reply.FailureExitCode == CurlExitCode.WeirdServerReply)
+        if (reply.FailureMessage is { } failureMessage)
         {
-            events.ReportInfo(HttpProxyTunnel.UnsupportedContentLength);
-        }
-        else if (reply.FailureMessage?.StartsWith(ReceiveFailurePrefix, StringComparison.Ordinal) == true)
-        {
-            // The socket filter's failf, measured: "* Recv failure: Connection was reset" (BL-1449).
-            events.ReportInfo(reply.FailureMessage);
+            events.ReportInfo(failureMessage);
         }
     }
 
