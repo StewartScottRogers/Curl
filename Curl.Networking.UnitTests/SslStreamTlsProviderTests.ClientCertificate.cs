@@ -31,6 +31,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var handshake = await HandshakeWithClientCertificateRequestAsync(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
 
+        Diagnostics.Assert("received certificate", null, handshake.Received);
         Assert.AreEqual(CurlExitCode.Ok, handshake.Result.ExitCode);
         Assert.IsNull(handshake.Received);
     }
@@ -48,6 +49,7 @@ public sealed partial class SslStreamTlsProviderTests
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
 
+        Diagnostics.Assert("received certificate", null, handshake.Received);
         Assert.AreEqual(CurlExitCode.Ok, handshake.Result.ExitCode);
         Assert.IsNull(handshake.Received);
     }
@@ -153,8 +155,12 @@ public sealed partial class SslStreamTlsProviderTests
         var events = new RecordingTransferEvents();
         var options = new TlsClientOptions(Insecure: true, ClientCertificate: Path.Combine(_caFileDirectory, "nosuch.pem"));
 
+        Diagnostics.Arrange("TLS settings", "insecure, missing nosuch.pem as --cert, Schannel build, host 127.0.0.1");
+
         var result = await new SslStreamTlsProvider(options, SchannelBuild).AuthenticateAsClientAsync(new FakeConnection(), "127.0.0.1", events, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslCertProblem, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
         var trust = (TlsTrustEvent)Assert.ContainsSingle(events.TlsEvents);
         Assert.IsFalse(trust.UsesAutomaticClientCertificate);
@@ -168,8 +174,12 @@ public sealed partial class SslStreamTlsProviderTests
         var events = new RecordingTransferEvents();
         var options = new TlsClientOptions(Insecure: true, ClientCertificate: Path.Combine(_caFileDirectory, "nosuch.pem"));
 
+        Diagnostics.Arrange("TLS settings", "insecure, missing nosuch.pem as --cert, OpenSSL build, host 127.0.0.1");
+
         var result = await new SslStreamTlsProvider(options, OpenSslBuild).AuthenticateAsClientAsync(new FakeConnection(), "127.0.0.1", events, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslCertProblem, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCertProblem, result.ExitCode);
         Assert.IsEmpty(events.TlsEvents);
     }
@@ -362,18 +372,22 @@ public sealed partial class SslStreamTlsProviderTests
         return otherKey.ExportPkcs8PrivateKeyPem();
     }
 
-    private static void AssertPresented((ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed) handshake)
+    private void AssertPresented((ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed) handshake)
     {
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, handshake.Result.ExitCode);
+        Diagnostics.Assert("presented thumbprint", s_clientCertificate.GetCertHashString(), handshake.Received?.GetCertHashString());
         Assert.AreEqual(CurlExitCode.Ok, handshake.Result.ExitCode, handshake.Result.ErrorMessage);
         Assert.IsNotNull(handshake.Received);
         Assert.AreEqual(s_clientCertificate.GetCertHashString(), handshake.Received.GetCertHashString());
     }
 
-    private static void AssertFailed(
+    private void AssertFailed(
         (ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed) handshake,
         CurlExitCode expectedExitCode,
         string expectedMessage)
     {
+        Diagnostics.Assert("exit code", expectedExitCode, handshake.Result.ExitCode);
+        Diagnostics.Diff("error message", expectedMessage, handshake.Result.ErrorMessage ?? string.Empty);
         Assert.AreEqual(expectedExitCode, handshake.Result.ExitCode);
         Assert.AreEqual(expectedMessage, handshake.Result.ErrorMessage);
         Assert.IsNull(handshake.Result.Connection);
@@ -391,11 +405,15 @@ public sealed partial class SslStreamTlsProviderTests
 
     // The server asks for a client certificate and accepts whatever it gets, or none, so
     // the test sees exactly what the provider presented.
-    private static async Task<(ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed)> HandshakeWithClientCertificateRequestAsync(
+    private async Task<(ConnectResult Result, X509Certificate? Received, bool PlaintextDisposed)> HandshakeWithClientCertificateRequestAsync(
         TlsClientOptions options,
         bool matchesSchannelBuild,
         IClientCertificateStore? certificateStore = null)
     {
+        ArrangeOptions(options);
+        Diagnostics.Arrange("build", BuildName(matchesSchannelBuild));
+        Diagnostics.Arrange("client certificate", $"{s_clientCertificate.Subject} {s_clientCertificate.Thumbprint}");
+        Diagnostics.Arrange("certificate store", certificateStore is null ? "none" : "fake");
         var (client, server) = InMemoryDuplexStream.CreatePair();
         X509Certificate? received = null;
         var serverTask = Task.Run(async () =>
@@ -416,9 +434,14 @@ public sealed partial class SslStreamTlsProviderTests
             ? new SslStreamTlsProvider(options, matchesSchannelBuild)
             : new SslStreamTlsProvider(options, matchesSchannelBuild, TimeProvider.System, certificateStore);
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
 
+        ActResult(result);
         var plaintextDisposed = client.IsDisposed;
         if (result.Connection is not null)
         {
@@ -431,6 +454,7 @@ public sealed partial class SslStreamTlsProviderTests
             await IgnoreFailureAsync(serverTask);
         }
 
+        Diagnostics.Act("received certificate", received is null ? "none" : $"{received.Subject} {received.GetCertHashString()}");
         return (result, received, plaintextDisposed);
     }
 }
