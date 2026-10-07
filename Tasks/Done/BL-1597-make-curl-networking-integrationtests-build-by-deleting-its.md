@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.IntegrationTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1597 — Make Curl.Networking.IntegrationTests build by deleting its duplicate MSTestSettings.cs
 
@@ -28,15 +28,27 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.IntegrationTests/MSTestSettings.cs` no longer exists, and no other file in that folder declares an assembly-level `Parallelize` attribute.
-- [ ] `dotnet build -warnaserror` at the repository root is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `dotnet test Curl.Networking.IntegrationTests --filter "TestCategory=Integration"` runs the project's 11 test methods (with their data rows) and none fails on Windows; Notes record the runner's passed/skipped/total line.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports `Curl.Networking.UnitLibrary` at 100% line and 100% branch coverage. If it does not, Notes name the uncovered members and a follow-up task is filed for them; this task does not widen to fix them.
+- [x] `Curl.Networking.IntegrationTests/MSTestSettings.cs` no longer exists, and no other file in that folder declares an assembly-level `Parallelize` attribute.
+- [x] `dotnet build -warnaserror` at the repository root is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet test Curl.Networking.IntegrationTests --filter "TestCategory=Integration"` runs the project's 11 test methods (with their data rows) and none fails on Windows; Notes record the runner's passed/skipped/total line.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports `Curl.Networking.UnitLibrary` at 100% line and 100% branch coverage. If it does not, Notes name the uncovered members and a follow-up task is filed for them; this task does not widen to fix them.
 
 ## Notes
+
+- Stewart's 61ad7caaf had already deleted the duplicate `MSTestSettings.cs`, but added
+  `<Compile Remove="Z:\repos\Curl\MSTestSettings.cs" />`, an absolute path that matches only
+  his checkout. Removed it; the shared file linked by `Directory.Build.props` now applies on
+  every machine.
+- `AuthenticateAsClientAsync_WhenTheServerSendsAnIntermediate_ReportsItAfterTheServersCertificate`
+  failed on Windows with and without parallel runs: the rewrite awaited the server task after the
+  client closed, so the server's read threw "connection forcibly closed". The old version ignored
+  that failure; the test now catches the `IOException` the same way.
+- Runner line: `Passed! - Failed: 0, Passed: 10, Skipped: 2, Total: 12` (filter `TestCategory=Integration`).
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Machine-specific Compile Remove dropped and the moved TLS integration test fixed; build clean, fast tests green, coverage unchanged.
