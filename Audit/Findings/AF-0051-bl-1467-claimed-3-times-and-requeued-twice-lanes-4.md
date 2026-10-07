@@ -6,11 +6,15 @@ severity: Low
 status: proposed
 reason:
 key: process:logs:BL-1467:redone-work
+reproduction: none
 task: none
+tasks:
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0051 - BL-1467 claimed 3 times and requeued twice: lanes 4 and 5 each failed to integrate after rebasing onto other lanes' work

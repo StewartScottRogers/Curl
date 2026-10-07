@@ -6,11 +6,15 @@ severity: Low
 status: accepted
 reason: 
 key: conformance:Audit/Tools/Invoke-DifferentialConformance.ps1:Get-Normalised:stderr
+reproduction: none
 task: BL-1280
+tasks: BL-1280
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0024 - The differential tool does not normalise elapsed milliseconds in error text or the -v source port, so identical behaviour is counted as a difference

@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: accepted
 reason: 
-key: quality:Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:NextUpdateExpiryCheck:surviving-mutant
+key: quality:Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:DateRefusal-lt:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:116:<
 task: BL-1371
+tasks: BL-1371
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0029 - CRL expiry check `list.NextUpdate < now` can become `<=` with no test failing
@@ -30,7 +34,7 @@ Invoke-MutationTest (seed 0) mutated `return list.NextUpdate < now ? OpenSslVeri
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/CertificateRevocationListFile.cs:116:< -Member DateRefusal -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: Mutant at CertificateRevocationListFile.cs:116 is killed.

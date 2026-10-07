@@ -6,11 +6,15 @@ severity: Low
 status: accepted
 reason: 
 key: quality:Curl.Networking.UnitTests/FastOpenSocketOptionTests.cs:FailureToOpenSocket_WithMultipathTcpOnWindows_IsTheSystemsRefusal:weak-assertion
+reproduction: none
 task: BL-1382
+tasks: BL-1382
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0039 - FailureToOpenSocket_WithMultipathTcpOnWindows_IsTheSystemsRefusal asserts only IsNotNull on the result

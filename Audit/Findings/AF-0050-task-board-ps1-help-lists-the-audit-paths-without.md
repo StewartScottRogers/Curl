@@ -6,11 +6,15 @@ severity: Low
 status: proposed
 reason:
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-help
+reproduction: none
 task: none
+tasks:
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0050 - task-board.ps1 help lists the audit paths without the four guard files the code also treats as audit paths

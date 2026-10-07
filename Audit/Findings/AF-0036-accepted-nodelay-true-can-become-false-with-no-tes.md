@@ -3,15 +3,19 @@ id: AF-0036
 title: `accepted.NoDelay = true` can become false with no test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
-key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:accepted.NoDelay:surviving-mutant
+status: closed
+reason: Duplicate of AF-0030: the same surviving mutant (TcpPendingConnection.cs AcceptStreamConnectionAsync, true -> false), whose mechanical key both now carry (ADR-0422).
+key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:AcceptStreamConnectionAsync-true:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/TcpPendingConnection.cs:86:true
 task: BL-1379
+tasks: BL-1379
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
-closed:
-closed-by:
+duplicate-of: AF-0030
+closed: 2026-10-07
+closed-how: duplicate
+closed-by: session
 ---
 # AF-0036 - `accepted.NoDelay = true` can become false with no test failing
 
@@ -30,7 +34,7 @@ Mutant `accepted.NoDelay = false` survived at seed 0. No test checks that the ac
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TcpPendingConnection.cs:86:true -Member AcceptStreamConnectionAsync -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at TcpPendingConnection.cs:86 is killed.
@@ -44,3 +48,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 - 2026-10-03: filed proposed.
 - 2026-10-03: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Duplicate of AF-0030: the same surviving mutant (TcpPendingConnection.cs AcceptStreamConnectionAsync, true -> false), whose mechanical key both now carry (ADR-0422).
