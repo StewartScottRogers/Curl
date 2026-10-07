@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Telnet.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Telnet;
 
@@ -20,6 +21,10 @@ public sealed class TelnetProtocolHandlerMaxTimeTests
 
     private readonly SteppedClock clock = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_ReadCancelledOnceMaxTimePassed_EndsWithCurlsTelnetTimeOut()
     {
@@ -27,6 +32,9 @@ public sealed class TelnetProtocolHandlerMaxTimeTests
 
         TransferResult result = await ExecuteAsync(context, cancelledAfter: TimeSpan.FromSeconds(1));
 
+        Diagnostics.AssertExitCode(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Diagnostics.Diff("error", "Time-out", result.ErrorMessage ?? string.Empty);
+        Diagnostics.Assert("bytes transferred", 7L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Time-out", result.ErrorMessage);
         Assert.AreEqual(7, result.BytesTransferred);
@@ -37,9 +45,11 @@ public sealed class TelnetProtocolHandlerMaxTimeTests
     {
         clock.Advance(TimeSpan.FromSeconds(5));
         TransferContext context = Context(TimeSpan.FromSeconds(3), operationStarted: TimeSpan.FromSeconds(3).Ticks);
+        Diagnostics.Arrange("clock", "5 s; operation started at 3 s");
 
         TransferResult result = await ExecuteAsync(context, cancelledAfter: TimeSpan.FromSeconds(1));
 
+        Diagnostics.AssertExitCode(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
     }
 
@@ -52,8 +62,11 @@ public sealed class TelnetProtocolHandlerMaxTimeTests
         TimeSpan? maxTime = maxTimeSeconds is { } seconds ? TimeSpan.FromSeconds(seconds) : null;
         TransferContext context = Context(maxTime, operationStarted: null);
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+        var thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             () => ExecuteAsync(context, cancelledAfter: TimeSpan.FromSeconds(1)));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("thrown", nameof(OperationCanceledException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -67,15 +80,20 @@ public sealed class TelnetProtocolHandlerMaxTimeTests
             Upload = new MemoryStream(),
             Progress = progress,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReads([Hello]);
 
         await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(new ScriptedConnection(new ScriptedRead(Hello)))))
             .ExecuteAsync(context);
 
+        Diagnostics.ActLines("progress reports", progress.Reports);
+        Diagnostics.AssertLines("progress reports", ["started", "downloaded 7 of "], progress.Reports);
         CollectionAssert.AreEqual(new[] { "started", "downloaded 7 of " }, progress.Reports);
     }
 
-    private TransferContext Context(TimeSpan? maxTime, long? operationStarted) =>
-        new()
+    private TransferContext Context(TimeSpan? maxTime, long? operationStarted)
+    {
+        TransferContext context = new()
         {
             Url = TelnetUrl,
             Output = new MemoryStream(),
@@ -84,10 +102,19 @@ public sealed class TelnetProtocolHandlerMaxTimeTests
             OperationStarted = operationStarted,
             TimeProvider = clock,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.Arrange("operation started (ticks)", operationStarted?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(unset)");
+        return context;
+    }
 
-    private async Task<TransferResult> ExecuteAsync(TransferContext context, TimeSpan cancelledAfter) =>
-        await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(new CancelledAfterReplyConnection(clock, cancelledAfter))))
+    private async Task<TransferResult> ExecuteAsync(TransferContext context, TimeSpan cancelledAfter)
+    {
+        Diagnostics.Arrange("connection", $"replies hello\\r\\n, then its next read moves the clock {cancelledAfter} and is cancelled");
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(new CancelledAfterReplyConnection(clock, cancelledAfter))))
             .ExecuteAsync(context);
+        Diagnostics.ActResult(result);
+        return result;
+    }
 
     /// <summary>A clock that moves only when told to.</summary>
     private sealed class SteppedClock : TimeProvider

@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Telnet.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Telnet;
 
@@ -24,11 +25,17 @@ public sealed class TelnetProtocolHandlerUserNameTests
 
     private static readonly CurlUrl TelnetUrl = CurlUrl.Parse("telnet://example.test/");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_UserNameAndNewEnvironmentAskedFor_SendsWillNewEnvironOffersAndUser()
     {
         Exchange exchange = await RunAsync("bob", [], Read("FF FD 27"), Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FB 27 " + Offers + " " + UserVariableStart + " 62 6F 62 FF F0", exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual("FF FB 27 " + Offers + " " + UserVariableStart + " 62 6F 62 FF F0", exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
     }
@@ -42,6 +49,8 @@ public sealed class TelnetProtocolHandlerUserNameTests
             Read("FF FD 27"),
             Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FB 27 " + Offers + " " + UserVariableStart + " 62 6F 62 00 54 45 52 4D 01 76 74 31 30 30 FF F0", exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual(
             "FF FB 27 " + Offers + " " + UserVariableStart + " 62 6F 62 00 54 45 52 4D 01 76 74 31 30 30 FF F0",
             exchange.Sent);
@@ -53,6 +62,7 @@ public sealed class TelnetProtocolHandlerUserNameTests
     {
         Exchange exchange = await RunAsync("bob", [], Read("FF FB 01"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers + " FF FB 27", exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers + " FF FB 27", exchange.Sent);
     }
 
@@ -64,6 +74,7 @@ public sealed class TelnetProtocolHandlerUserNameTests
     {
         Exchange exchange = await RunAsync(userName, [], Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Diff("sent", UserVariableStart + expectedValue + " FF F0", exchange.Sent);
         Assert.AreEqual(UserVariableStart + expectedValue + " FF F0", exchange.Sent);
     }
 
@@ -75,6 +86,9 @@ public sealed class TelnetProtocolHandlerUserNameTests
     {
         Exchange exchange = await RunAsync(new string('A', length), [], Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Assert("sent length", 10 + expectedLength + 2, exchange.SentBytes.Length);
+        Diagnostics.Diff("sent start", UserVariableStart + " 41", exchange.Sent[..Math.Min(exchange.Sent.Length, UserVariableStart.Length + 3)]);
+        Diagnostics.Diff("sent end", "41 FF F0", exchange.Sent[Math.Max(0, exchange.Sent.Length - 8)..]);
         Assert.HasCount(10 + expectedLength + 2, exchange.SentBytes);
         Assert.StartsWith(UserVariableStart + " 41", exchange.Sent);
         Assert.EndsWith("41 FF F0", exchange.Sent);
@@ -89,6 +103,9 @@ public sealed class TelnetProtocolHandlerUserNameTests
         var connection = new ScriptedConnection(Read("FF FD 27"), Read("FF FA 27 01 FF F0"));
         var connector = new RecordingConnector(ConnectResult.Connected(connection));
         var output = new MemoryStream();
+        Diagnostics.Arrange("user name (-u)", "b\\xe9");
+        Diagnostics.Arrange("telnet options (-t)", telnetOptions.Length == 0 ? "(none)" : string.Join(" | ", telnetOptions));
+        Diagnostics.ArrangeReads([Read("FF FD 27"), Read("FF FA 27 01 FF F0")]);
 
         TransferResult result = await new TelnetProtocolHandler(connector).ExecuteAsync(
             new TransferContext
@@ -99,6 +116,12 @@ public sealed class TelnetProtocolHandlerUserNameTests
                 TelnetOptions = telnetOptions,
             });
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection.Sent);
+        Diagnostics.Act("connects", connector.Targets.Count);
+        Diagnostics.AssertExitCode(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Diagnostics.Diff("error", "A libcurl function was given a bad argument", result.ErrorMessage ?? string.Empty);
+        Diagnostics.Assert("connects", 1, connector.Targets.Count);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
         Assert.AreEqual("A libcurl function was given a bad argument", result.ErrorMessage);
         Assert.HasCount(1, connector.Targets);
@@ -112,6 +135,8 @@ public sealed class TelnetProtocolHandlerUserNameTests
     {
         Exchange exchange = await RunAsync("bob", ["TTYPE"], Read("FF FD 27"));
 
+        Diagnostics.AssertExitCode(CurlExitCode.SetoptOptionSyntax, exchange.Result.ExitCode);
+        Diagnostics.Diff("sent", string.Empty, exchange.Sent);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, exchange.Result.ExitCode);
         Assert.AreEqual(string.Empty, exchange.Sent);
     }
@@ -121,7 +146,7 @@ public sealed class TelnetProtocolHandlerUserNameTests
     private static string ToHex(byte[] bytes) =>
         string.Join(' ', Convert.ToHexString(bytes).Chunk(2).Select(pair => new string(pair)));
 
-    private static async Task<Exchange> RunAsync(string userName, string[] telnetOptions, params ScriptedRead[] reads)
+    private async Task<Exchange> RunAsync(string userName, string[] telnetOptions, params ScriptedRead[] reads)
     {
         var connection = new ScriptedConnection(reads);
         var context = new TransferContext
@@ -132,10 +157,15 @@ public sealed class TelnetProtocolHandlerUserNameTests
             Credentials = new NetworkCredential(userName, "x"),
             TelnetOptions = telnetOptions,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.Arrange("user name (-u)", $"{userName.Length} characters: {(userName.Length > 40 ? userName[..40] + "..." : userName)}");
+        Diagnostics.ArrangeReads(reads);
 
         TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
             .ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection.Sent);
         Assert.IsTrue(connection.IsDisposed);
         byte[] sent = connection.Sent;
         return new Exchange(result, sent, ToHex(sent));

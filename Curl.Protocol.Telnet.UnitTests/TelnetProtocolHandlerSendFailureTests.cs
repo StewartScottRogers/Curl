@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Telnet.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Telnet;
 
@@ -20,6 +21,10 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     /// <summary>The server's greeting in the measured run: <c>DO TERM-TYPE</c>, <c>WILL ECHO</c>, <c>hello</c>.</summary>
     private static readonly byte[] Greeting = Hex("FF FD 18 FF FB 01 68 65 6C 6C 6F");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_ServerNegotiates_SendsEachReplyAndOfferAsItsOwnWrite()
     {
@@ -27,6 +32,10 @@ public sealed class TelnetProtocolHandlerSendFailureTests
 
         Session session = await RunAsync(connection, []);
 
+        string[] writes = [.. connection.Writes.Select(Convert.ToHexString)];
+        Diagnostics.ActLines("writes", writes);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, session.Result.ExitCode);
+        Diagnostics.AssertLines("writes", ["FFFC18", "FFFD01", "FFFB00", "FFFD00", "FFFB03", "FFFD03"], writes);
         Assert.AreEqual(CurlExitCode.Ok, session.Result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "FFFC18", "FFFD01", "FFFB00", "FFFD00", "FFFB03", "FFFD03" },
@@ -38,9 +47,24 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     {
         var connection = new SocketFailingConnection(Greeting) { SuccessfulWrites = 1 };
         string failed = $"* Sending data failed ({connection.Failure.NativeErrorCode})";
+        Diagnostics.Arrange("successful writes", 1);
 
         Session session = await RunAsync(connection, []);
 
+        string[] expectedTranscript =
+        [
+            "* RCVD DO TERM TYPE", "* SENT WONT TERM TYPE",
+            "* RCVD WILL ECHO", failed, "* SENT DO ECHO",
+            "<= hello",
+            failed, "* SENT WILL BINARY",
+            failed, "* SENT DO BINARY",
+            failed, "* SENT WILL SUPPRESS GO AHEAD",
+            failed, "* SENT DO SUPPRESS GO AHEAD",
+            "* shutting down connection #0",
+        ];
+        Diagnostics.AssertResult(TransferResult.Success(5), session.Result);
+        Diagnostics.Diff("output", "hello", session.Output);
+        Diagnostics.AssertLines("transcript", expectedTranscript, session.Transcript);
         Assert.AreEqual(TransferResult.Success(5), session.Result);
         Assert.AreEqual("hello", session.Output);
         CollectionAssert.AreEqual(
@@ -64,6 +88,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     {
         Session session = await RunWindowSizeFailureAsync();
 
+        Diagnostics.Diff("transcript line 6", "* Send failure: Connection was aborted", session.Transcript[6]);
         Assert.AreEqual("* Send failure: Connection was aborted", session.Transcript[6]);
     }
 
@@ -73,6 +98,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     {
         Session session = await RunWindowSizeFailureAsync();
 
+        Diagnostics.Diff("transcript line 6", "* Send failure: Software caused connection abort", session.Transcript[6]);
         Assert.AreEqual("* Send failure: Software caused connection abort", session.Transcript[6]);
     }
 
@@ -82,9 +108,27 @@ public sealed class TelnetProtocolHandlerSendFailureTests
         var connection = new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1 };
         string failed = $"* Sending data failed ({connection.Failure.NativeErrorCode})";
         string sendFailure = "* Send failure: " + CurlSocketErrorText.Words(connection.Failure, OperatingSystem.IsWindows());
+        Diagnostics.Arrange("successful writes", 1);
 
         Session session = await RunAsync(connection, ["WS=80x24"]);
 
+        string[] expectedTranscript =
+        [
+            "* RCVD DO NAWS", "* SENT WILL NAWS",
+            "* SENT IAC SB ", "* NAWS", "* Width: 80 ; Height: 24",
+            failed, sendFailure, failed,
+            failed, "* SENT WILL BINARY",
+            failed, "* SENT DO BINARY",
+            failed, "* SENT WILL SUPPRESS GO AHEAD",
+            failed, "* SENT DO SUPPRESS GO AHEAD",
+            "<= hi",
+            "* shutting down connection #0",
+        ];
+        string[] firstWrites = [.. connection.Writes.Take(4).Select(Convert.ToHexString)];
+        Diagnostics.AssertResult(TransferResult.Success(2), session.Result);
+        Diagnostics.Diff("output", "hi", session.Output);
+        Diagnostics.AssertLines("transcript", expectedTranscript, session.Transcript);
+        Diagnostics.AssertLines("first four writes", ["FFFB1F", "FFFA1F", "00500018", "FFF0"], firstWrites);
         Assert.AreEqual(TransferResult.Success(2), session.Result);
         Assert.AreEqual("hi", session.Output);
         CollectionAssert.AreEqual(
@@ -114,6 +158,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
 
         Session session = await RunAsync(connection, [], "a\n"u8.ToArray());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Send failure: Connection was aborted"), session.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Send failure: Connection was aborted"), session.Result);
     }
 
@@ -125,6 +170,7 @@ public sealed class TelnetProtocolHandlerSendFailureTests
 
         Session session = await RunAsync(connection, [], "a\n"u8.ToArray());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Send failure: " + connection.Failure.Message), session.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Send failure: " + connection.Failure.Message), session.Result);
     }
 
@@ -137,9 +183,12 @@ public sealed class TelnetProtocolHandlerSendFailureTests
             SuccessfulWrites = 1,
             Failure = new SocketException((int)SocketError.NetworkReset),
         };
+        Diagnostics.Arrange("write failure", SocketError.NetworkReset);
 
         Session session = await RunAsync(connection, ["WS=80x24"]);
 
+        Diagnostics.Diff("transcript line 5", "* Sending data failed (10052)", session.Transcript[5]);
+        Diagnostics.Diff("transcript line 6", "* Send failure: Network has been reset", session.Transcript[6]);
         Assert.AreEqual("* Sending data failed (10052)", session.Transcript[5]);
         Assert.AreEqual("* Send failure: Network has been reset", session.Transcript[6]);
     }
@@ -150,9 +199,12 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     {
         var failure = new SocketException((int)SocketError.NetworkReset);
         var connection = new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1, Failure = failure };
+        Diagnostics.Arrange("write failure", SocketError.NetworkReset);
 
         Session session = await RunAsync(connection, ["WS=80x24"]);
 
+        Diagnostics.Diff("transcript line 5", $"* Sending data failed ({failure.NativeErrorCode})", session.Transcript[5]);
+        Diagnostics.Diff("transcript line 6", "* Send failure: " + failure.Message, session.Transcript[6]);
         Assert.AreEqual($"* Sending data failed ({failure.NativeErrorCode})", session.Transcript[5]);
         Assert.AreEqual("* Send failure: " + failure.Message, session.Transcript[6]);
     }
@@ -161,17 +213,23 @@ public sealed class TelnetProtocolHandlerSendFailureTests
     public async Task ExecuteAsync_ReplyWriteFailsWithoutSocketError_ExitsWith55FailedSendingDataToThePeer()
     {
         var connection = new FaultingConnection(Greeting) { WritesFail = true };
+        Diagnostics.Arrange("connection", "writes fail without a socket error");
 
         Session session = await RunAsync(connection, []);
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 5, "Failed sending data to the peer"), session.Result);
+        Diagnostics.Diff("transcript line 1", "* SENT WONT TERM TYPE", session.Transcript[1]);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 5, "Failed sending data to the peer"), session.Result);
         Assert.AreEqual("* SENT WONT TERM TYPE", session.Transcript[1]);
     }
 
-    private static Task<Session> RunWindowSizeFailureAsync() =>
-        RunAsync(new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1 }, ["WS=80x24"]);
+    private Task<Session> RunWindowSizeFailureAsync()
+    {
+        Diagnostics.Arrange("successful writes", 1);
+        return RunAsync(new SocketFailingConnection(Hex("FF FD 1F"), Latin1("hi")) { SuccessfulWrites = 1 }, ["WS=80x24"]);
+    }
 
-    private static async Task<Session> RunAsync(IConnection connection, string[] telnetOptions, byte[]? upload = null)
+    private async Task<Session> RunAsync(IConnection connection, string[] telnetOptions, byte[]? upload = null)
     {
         var events = new TranscriptTransferEvents();
         var output = new MemoryStream();
@@ -183,9 +241,19 @@ public sealed class TelnetProtocolHandlerSendFailureTests
             TelnetOptions = telnetOptions,
             Events = events,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.Arrange("connection", connection.GetType().Name);
+        if (upload is not null)
+        {
+            Diagnostics.ArrangeUpload(upload);
+        }
 
         TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
             .ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Diagnostics.ActOutput(output.ToArray());
+        Diagnostics.ActLines("transcript", events.Transcript);
         return new Session(result, Encoding.Latin1.GetString(output.ToArray()), events.Transcript);
     }
 

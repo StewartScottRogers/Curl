@@ -1,5 +1,6 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Telnet.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Telnet;
 
@@ -22,11 +23,17 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
 
     private static readonly CurlUrl TelnetUrl = CurlUrl.Parse("telnet://example.test/");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_WindowSize80x24AndServerDoNaws_SendsWillNawsTheSizeThenOffers()
     {
         Exchange exchange = await RunAsync(["WS=80x24"], Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual(WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
     }
@@ -41,6 +48,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync([option], Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F " + size + " FF F0 " + Offers, exchange.Sent);
         Assert.AreEqual(WillNaws + " FF FA 1F " + size + " FF F0 " + Offers, exchange.Sent);
     }
 
@@ -51,6 +59,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(option is null ? [] : [option], Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F 00 00 00 00 FF F0 " + Offers, exchange.Sent);
         Assert.AreEqual(WillNaws + " FF FA 1F 00 00 00 00 FF F0 " + Offers, exchange.Sent);
     }
 
@@ -62,6 +71,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync([option], Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
         Assert.AreEqual(WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
     }
 
@@ -70,6 +80,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24", "WS=100x50"], Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F 00 64 00 32 FF F0 " + Offers, exchange.Sent);
         Assert.AreEqual(WillNaws + " FF FA 1F 00 64 00 32 FF F0 " + Offers, exchange.Sent);
     }
 
@@ -78,6 +89,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24"], Read("FF FB 01"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers + " " + WillNaws, exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers + " " + WillNaws, exchange.Sent);
     }
 
@@ -86,6 +98,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync([], Read("FF FB 01"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers, exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers, exchange.Sent);
     }
 
@@ -96,6 +109,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
             ["WS=80x24", "TTYPE=vt100", "XDISPLOC=h:0", "NEW_ENV=A,b"],
             Read("FF FB 01"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers + " FF FB 18 FF FB 1F FF FB 23 FF FB 27", exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers + " FF FB 18 FF FB 1F FF FB 23 FF FB 27", exchange.Sent);
     }
 
@@ -104,6 +118,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24"], Read("FF FB 01"), Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers + " " + WillNaws + " FF FA 1F 00 50 00 18 FF F0", exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers + " " + WillNaws + " FF FA 1F 00 50 00 18 FF F0", exchange.Sent);
     }
 
@@ -112,6 +127,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync([], Read("FF FB 01"), Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers + " " + WillNaws + " FF FA 1F 00 00 00 00 FF F0", exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers + " " + WillNaws + " FF FA 1F 00 00 00 00 FF F0", exchange.Sent);
     }
 
@@ -120,6 +136,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24"], Read("FF FB 01"), Read("FF FE 1F"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers + " " + WillNaws, exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers + " " + WillNaws, exchange.Sent);
     }
 
@@ -128,6 +145,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24"], Read("FF FD 1F"), Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
         Assert.AreEqual(WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
     }
 
@@ -136,6 +154,9 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24"], Read("FF FD 1F"), Read("FF FE 1F"), Read("FF FD 1F"));
 
+        string expectedSent = WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers
+            + " FF FC 1F " + WillNaws + " FF FA 1F 00 50 00 18 FF F0";
+        Diagnostics.Diff("sent", expectedSent, exchange.Sent);
         Assert.AreEqual(
             WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers
             + " FF FC 1F " + WillNaws + " FF FA 1F 00 50 00 18 FF F0",
@@ -147,6 +168,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24"], Read("FF FD 1F"), Read("FF FA 1F 01 FF F0"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
         Assert.AreEqual(WillNaws + " FF FA 1F 00 50 00 18 FF F0 " + Offers, exchange.Sent);
     }
 
@@ -155,6 +177,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     {
         Exchange exchange = await RunAsync(["WS=80x24", "BINARY=0"], Read("FF FD 1F"));
 
+        Diagnostics.Diff("sent", WillNaws + " FF FA 1F 00 50 00 18 FF F0 FF FB 03 FF FD 03", exchange.Sent);
         Assert.AreEqual(WillNaws + " FF FA 1F 00 50 00 18 FF F0 FF FB 03 FF FD 03", exchange.Sent);
     }
 
@@ -163,7 +186,7 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
     private static string ToHex(byte[] bytes) =>
         string.Join(' ', Convert.ToHexString(bytes).Chunk(2).Select(pair => new string(pair)));
 
-    private static async Task<Exchange> RunAsync(string[] telnetOptions, params ScriptedRead[] reads)
+    private async Task<Exchange> RunAsync(string[] telnetOptions, params ScriptedRead[] reads)
     {
         var connection = new ScriptedConnection(reads);
         var context = new TransferContext
@@ -173,10 +196,14 @@ public sealed class TelnetProtocolHandlerWindowSizeTests
             Upload = new MemoryStream(),
             TelnetOptions = telnetOptions,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReads(reads);
 
         TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
             .ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection.Sent);
         Assert.IsTrue(connection.IsDisposed);
         return new Exchange(result, ToHex(connection.Sent));
     }
