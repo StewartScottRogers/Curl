@@ -1,10 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <Compile Remove="Z:\repos\Curl\MSTestSettings.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="MSTest" />
   </ItemGroup>
 

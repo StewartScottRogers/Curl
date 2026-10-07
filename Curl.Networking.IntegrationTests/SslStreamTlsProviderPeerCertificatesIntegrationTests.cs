@@ -48,7 +48,14 @@ public sealed class SslStreamTlsProviderPeerCertificatesIntegrationTests
             CollectionAssert.AreEqual(leaf.RawData, result.PeerCertificates[0].ToArray());
             CollectionAssert.AreEqual(intermediate.RawData, result.PeerCertificates[1].ToArray());
             await result.Connection!.DisposeAsync();
-            await serverTask;
+            try
+            {
+                await serverTask;
+            }
+            catch (IOException)
+            {
+                // The client closed first, so the server's read sees the connection reset.
+            }
         }
         finally
         {
