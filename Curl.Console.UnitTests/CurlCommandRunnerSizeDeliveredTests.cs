@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -31,6 +32,10 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
 
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_CompressedGzipBody_DownloadsTheEncodedBytesAndDeliversTheDecodedOnes()
     {
@@ -38,7 +43,9 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
 
         int exitCode = await RunAsync(response, "-s", "--compressed", "-o", "out", "-w", Sizes, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "51 501", StandardOutputText);
         Assert.AreEqual("51 501", StandardOutputText);
     }
 
@@ -49,7 +56,9 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
 
         int exitCode = await RunAsync(response, "-s", "-o", "out", "-w", Sizes, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "51 51", StandardOutputText);
         Assert.AreEqual("51 51", StandardOutputText);
     }
 
@@ -60,7 +69,9 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
 
         int exitCode = await RunAsync(response, "-s", "-o", "out", "-w", Sizes, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "12 12", StandardOutputText);
         Assert.AreEqual("12 12", StandardOutputText);
     }
 
@@ -78,7 +89,9 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
 
         int exitCode = await RunAsync(response, "-s", "--compressed", "-o", "out", "-w", Sizes, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "51 501", StandardOutputText);
         Assert.AreEqual("51 501", StandardOutputText);
     }
 
@@ -89,7 +102,9 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
 
         int exitCode = await RunAsync(response, "-s", "-w", "[" + Sizes + "]", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "hello world\n[12 12]", StandardOutputText);
         Assert.AreEqual("hello world\n[12 12]", StandardOutputText);
     }
 
@@ -100,7 +115,9 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
 
         int exitCode = await RunAsync(response, "-s", "--compressed", "-o", "out", "-w", "%{json}", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("stdout contains the sizes", true, StandardOutputText.Contains("\"size_delivered\":501,\"size_download\":51,\"size_header\":89,", StringComparison.Ordinal));
         StringAssert.Contains(StandardOutputText, "\"size_delivered\":501,\"size_download\":51,\"size_header\":89,");
     }
 
@@ -110,20 +127,30 @@ public sealed class CurlCommandRunnerSizeDeliveredTests
     /// Runs <paramref name="arguments" /> with <see cref="HttpProtocolHandler" /> over a
     /// <see cref="ScriptedConnector" /> answering <paramref name="response" /> and then closing.
     /// </summary>
-    private Task<int> RunAsync(byte[] response, params string[] arguments)
+    private async Task<int> RunAsync(byte[] response, params string[] arguments)
     {
         ScriptedConnector server = new([response]);
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("connector script", "one canned response, then close");
+        Diagnostics.Bytes("scripted response", response);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    new MemoryStream(),
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    writesProgressMeter: false)
+                .RunAsync(arguments);
+        }
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                new MemoryStream(),
-                new MemoryStream(),
-                runsOnWindows: false,
-                writesProgressMeter: false)
-            .RunAsync(arguments);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", StandardOutputText.Replace("\r\n", "\n", StringComparison.Ordinal));
+        return exitCode;
     }
 }

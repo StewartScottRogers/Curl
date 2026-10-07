@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -23,6 +24,14 @@ public sealed class CurlCommandRunnerSmbTransferEventTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());
+
+    private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
+
     [TestMethod]
     [DataRow("smb", false)]
     [DataRow("smbs", true)]
@@ -32,7 +41,17 @@ public sealed class CurlCommandRunnerSmbTransferEventTests
 
         int exitCode = await RunAsync(scripted, ["-sS", "-v", "-u", "User:Password", $"{scheme}://172.26.96.1:14450/share/dir/x.txt"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "hello world", StandardOutputText);
+        Diagnostics.Diff(
+            "stderr",
+            ("*   Trying 172.26.96.1:14450..." + InfoEnd
+            + "* Established connection to 172.26.96.1 (172.26.96.1 port 14450) from 172.26.99.197 port 54210 " + InfoEnd
+            + "{ [11 bytes data]" + InfoEnd
+            + "* shutting down connection #0" + InfoEnd).Replace("\r\n", "\n", StringComparison.Ordinal),
+            Lf(StandardErrorText));
+        Diagnostics.Assert("first target uses TLS", usesTls, scripted.Targets[0].UseTls);
         Assert.AreEqual("hello world", Encoding.ASCII.GetString(standardOutput.ToArray()));
         Assert.AreEqual(
             "*   Trying 172.26.96.1:14450..." + InfoEnd
@@ -48,6 +67,14 @@ public sealed class CurlCommandRunnerSmbTransferEventTests
     {
         int exitCode = await RunAsync(new ScriptedConnector([]), ["-sS", "-v", "smb://172.26.96.1:14450/share/dir/x.txt"]);
 
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            ("*   Trying 172.26.96.1:14450..." + InfoEnd
+            + "* Established connection to 172.26.96.1 (172.26.96.1 port 14450) from 172.26.99.197 port 54210 " + InfoEnd
+            + "* closing connection #0" + InfoEnd
+            + "curl: (67) Login denied" + Environment.NewLine).Replace("\r\n", "\n", StringComparison.Ordinal),
+            Lf(StandardErrorText));
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual(
             "*   Trying 172.26.96.1:14450..." + InfoEnd
@@ -79,10 +106,27 @@ public sealed class CurlCommandRunnerSmbTransferEventTests
             "00000023ff534d4271000000009801000000000000000000000000000700000064000000000000"),
     ];
 
-    private Task<int> RunAsync(ScriptedConnector scripted, string[] arguments)
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(ScriptedConnector scripted, string[] arguments)
     {
         var files = new InMemoryFileSystem();
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("connector script", "scripted SMB replies behind a connector that reports Trying and Established lines");
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await RunWithAsync(scripted, arguments, files);
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
+    }
+
+    private Task<int> RunWithAsync(ScriptedConnector scripted, string[] arguments, InMemoryFileSystem files)
+    {
         return new CurlCommandRunner(
                 _ => new TransferDispatch(
                     new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(

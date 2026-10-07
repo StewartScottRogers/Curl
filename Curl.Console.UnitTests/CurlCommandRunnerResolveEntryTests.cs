@@ -3,6 +3,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -20,6 +21,10 @@ public sealed class CurlCommandRunnerResolveEntryTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -29,14 +34,17 @@ public sealed class CurlCommandRunnerResolveEntryTests
             [Response("200 OK", string.Empty), Response("200 OK", string.Empty)],
             "--resolve", "foo.example:18486:127.0.0.1", "http://foo.example:18486/a", "http://foo.example:18486/b");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         string secondTransfer = StandardErrorText[StandardErrorText.IndexOf("* shutting down connection #0" + InfoEnd, StringComparison.Ordinal)..];
+        Diagnostics.Assert("second transfer starts with the reload lines", true, secondTransfer.StartsWith("* shutting down connection #0" + InfoEnd + "* RESOLVE foo.example:18486 - old addresses discarded" + InfoEnd + "* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd + "* Hostname foo.example was found in DNS cache" + InfoEnd, StringComparison.Ordinal));
         StringAssert.StartsWith(
             secondTransfer,
             "* shutting down connection #0" + InfoEnd
             + "* RESOLVE foo.example:18486 - old addresses discarded" + InfoEnd
             + "* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd
             + "* Hostname foo.example was found in DNS cache" + InfoEnd);
+        Diagnostics.Assert("occurrences of " + "* Added foo.example:18486:127.0.0.1 to DNS cache", 2, Occurrences("* Added foo.example:18486:127.0.0.1 to DNS cache"));
         Assert.AreEqual(2, Occurrences("* Added foo.example:18486:127.0.0.1 to DNS cache"));
     }
 
@@ -47,10 +55,15 @@ public sealed class CurlCommandRunnerResolveEntryTests
             [Response("302 Found", "Location: /b\r\n"), Response("200 OK", string.Empty)],
             "-L", "--resolve", "foo.example:18486:127.0.0.1", "http://foo.example:18486/a");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("stderr starts with the added line", true, StandardErrorText.StartsWith("* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd, StringComparison.Ordinal));
         StringAssert.StartsWith(StandardErrorText, "* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd);
+        Diagnostics.Assert("occurrences of " + "Added foo.example", 1, Occurrences("Added foo.example"));
         Assert.AreEqual(1, Occurrences("Added foo.example"));
+        Diagnostics.Assert("occurrences of " + "RESOLVE foo.example", 0, Occurrences("RESOLVE foo.example"));
         Assert.AreEqual(0, Occurrences("RESOLVE foo.example"));
+        Diagnostics.Assert("occurrences of " + "* Hostname foo.example was found in DNS cache", 2, Occurrences("* Hostname foo.example was found in DNS cache"));
         Assert.AreEqual(2, Occurrences("* Hostname foo.example was found in DNS cache"));
     }
 
@@ -59,8 +72,15 @@ public sealed class CurlCommandRunnerResolveEntryTests
     {
         TransferDispatch dispatch = new(new ProtocolDispatcher([]));
 
-        dispatch.LoadResolveEntries(NoTransferEvents.Instance);
+        Diagnostics.Arrange("dispatch", "no resolve-entry loader");
+        using (Diagnostics.Phase("load"))
+        {
+            dispatch.LoadResolveEntries(NoTransferEvents.Instance);
+        }
 
+        Diagnostics.Act("connection pool", dispatch.ConnectionPool is null ? "null" : "created");
+
+        Diagnostics.Assert("connection pool is null", true, dispatch.ConnectionPool is null);
         Assert.IsNull(dispatch.ConnectionPool);
     }
 
@@ -79,6 +99,7 @@ public sealed class CurlCommandRunnerResolveEntryTests
     private async Task<int> RunAsync(byte[][] responses, params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
+        Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             parsed.Options,
@@ -89,17 +110,29 @@ public sealed class CurlCommandRunnerResolveEntryTests
             HttpProxyTunnelOptions.Default);
         InMemoryFileSystem files = new();
 
-        return await new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
-                    [],
-                    loadResolveEntries: connector.LoadResolveEntries),
-                files,
-                files,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(["-s", "-v", .. arguments]);
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("scripted responses", Lf(string.Join("\n--\n", responses.Select(Encoding.Latin1.GetString))));
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        [],
+                        loadResolveEntries: connector.LoadResolveEntries),
+                    files,
+                    files,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(["-s", "-v", .. arguments]);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 }
