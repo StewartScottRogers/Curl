@@ -112,6 +112,42 @@ completed:
     members `MultiplySmall` need nothing beyond the ladder's tests for coverage, but
     `SquareColumn`'s even/odd branch must show both arms covered (it does by construction:
     columns 0-14).
+- 2026-10-07, lane 4 (unfinished; code left for the shift's stash, on top of lane 1's,
+  which is stash `fa91580c` - "darkfactory BL-1525 20261007-111121"):
+  - **Context swaps the two curve tests' names.** The TRX's `className` shows the
+    27-minute test is `X448Tests` (1M x ~1.66 ms) and the 8-minute one `X25519Tests`
+    (1M x ~0.49 ms). Targets at 5x are therefore X448 <= 5 m 32 s and X25519 <= 1 m 39 s.
+  - Disasm of lane 1's code (`DOTNET_JitDisasm='Multiply Square'`, Tier1): `Field25519`
+    called `Product` 24 times per Multiply (not inlined); `Field448.Multiply` and `Square`
+    called `Int128.op_Addition` 23 / 33 times and `op_RightShift` 6 / 12 times - once a
+    method passes the inline budget, every `Int128` operator is a real call.
+    `[AggressiveInlining]` on Column/SquareColumn made X448 slower (1.8 ms vs 1.0 ms).
+  - Done: new internal `Accumulator128` (two `ulong` halves, two's complement,
+    `MultiplyAdd`, `Add(long)`, `Add(Accumulator128)`, `ShiftRight`, `Low`; carry by bit
+    arithmetic, no comparison), every `[AggressiveInlining]`. `Field25519` Multiply/Square
+    use `SumOfProducts` (3 and 5 products) into it and `CarryProduct` takes it;
+    `Field448`'s Column/SquareColumn/FoldAndCarry/CarryColumns use it. Tier1 disasm now
+    shows no call in `Field25519.Multiply`/`Square`. 
+  - Bench, HEAD vs work, same run, Release: X25519 805-838 vs 282-292 us (2.9x), X448
+    3099-3147 vs 1169-1232 us (2.6x), CAST 55-60 vs 7.9-8.0 us (7x). Field25519.Multiply
+    is still 4 KB of code with a 776-byte frame: the `out ulong` low half of
+    `Math.BigMul` goes through memory and the 10 accumulators spill. Field448 is ~250 ns
+    per operation.
+  - Integration TRX, Release, `dotnet test Curl.Cryptography.UnitTests -c Release
+    --filter "TestCategory=Integration"`, all 5 pass, run while Measure-CodeQuality and
+    other lanes loaded the machine: X448 27 m 23 s, X25519 7 m 21 s, CAST B.2 23.4 s
+    (4.4x vs 1 m 42 s). Under this load the curve timings show nothing (the bench ratio
+    is 2.6-2.9x); the 5x criterion can only be judged on a machine without 8 lanes.
+  - Left: (1) X25519 and X448 to 5x on the bench ratio: the multiply must stop spilling -
+    try 64-bit-only arithmetic (radix 2^25.5 x 10 limbs for 25519, 16 x 28-bit limbs for
+    448 with Hamburg's Karatsuba), whose products need no 128-bit sum at all, or
+    `X86.Bmi2.X64.MultiplyNoFlags` / `ArmBase.Arm64.MultiplyHigh` with the portable path
+    beside it. (2) The 5x timings need a quiet machine: run this task interactively or
+    with one lane.
+  - `Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` on this run's code:
+    100% line, 100% branch, 0 members over the complexity or CRAP limits (report row
+    `| Curl.Cryptography.UnitLibrary | 100 | 100 | 777 | 0 | 10 |`). So the stashed code
+    passes every gate but the 5x speed-up; a later change must re-measure.
 
 ## Log
 
@@ -121,3 +157,4 @@ completed:
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: bench vs HEAD X25519 3.5x, X448 2.7x (needs Karatsuba or more JIT inlining work), CAST 7.5x; Integration TRX timings and Measure-CodeQuality not yet run. See Notes.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: new Accumulator128 removes Int128 calls; bench vs HEAD X25519 2.9x, X448 2.6x, CAST 7x; coverage 100/100, Integration tests pass. Left: X25519/X448 to 5x (64-bit-only limbs or Karatsuba) and timing on an unloaded machine. See Notes.
