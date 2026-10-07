@@ -273,14 +273,12 @@ internal static class Edwards25519
 
     private static long[] ComputeCurveConstant()
     {
-        // 121665 = 0x1DB41 and 121666 = 0x1DB42, as two 16-bit limbs each.
+        // d = -121665 / 121666.
         long[] numerator = new long[Field25519.LimbCount];
         long[] denominator = new long[Field25519.LimbCount];
-        Field25519.SetSmall(numerator, 0xDB41);
-        numerator[1] = 1;
+        Field25519.SetSmall(numerator, 121665);
         Field25519.Negate(numerator, numerator);
-        Field25519.SetSmall(denominator, 0xDB42);
-        denominator[1] = 1;
+        Field25519.SetSmall(denominator, 121666);
         Field25519.Invert(denominator, denominator);
         Field25519.Multiply(numerator, numerator, denominator);
         return numerator;

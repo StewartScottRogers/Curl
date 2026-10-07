@@ -12,7 +12,7 @@ Namespace `Curl.Cryptography`. It holds:
 
 - `ConstantTime` (internal): the branch-free helpers (mask from bit, select, less-than and
   equal masks, conditional swap, all-zero check) the primitives share.
-- `Field25519` (internal): GF(2^255 - 19) arithmetic on 16 limbs of 16 bits in a
+- `Field25519` (internal): GF(2^255 - 19) arithmetic on 5 limbs of 51 bits in a
   caller's `Span<long>`; X25519 uses it and Ed25519 reuses it.
 - `Edwards25519` (internal): edwards25519 points in extended coordinates - addition,
   constant-time scalar multiplication, encoding, and RFC 8032 section 5.1.3 decoding.
@@ -24,7 +24,7 @@ Namespace `Curl.Cryptography`. It holds:
 - `X25519` (public): RFC 7748 key agreement - `GeneratePrivateKey`, `ComputePublicKey`,
   and `TryComputeSharedSecret`, which returns `false` for the all-zero result of a
   low-order peer key.
-- `Field448` (internal): GF(2^448 - 2^224 - 1) arithmetic on 28 limbs of 16 bits in a
+- `Field448` (internal): GF(2^448 - 2^224 - 1) arithmetic on 8 limbs of 56 bits in a
   caller's `Span<long>`; X448 uses it and Ed448 reuses it.
 - `Edwards448` (internal): edwards448 points in projective coordinates - the complete
   addition of RFC 8032 section 5.2.4 (which also doubles), constant-time scalar
