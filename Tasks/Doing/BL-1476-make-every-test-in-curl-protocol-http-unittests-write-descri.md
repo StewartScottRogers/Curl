@@ -43,3 +43,4 @@ Every test in `Curl.Protocol.Http.UnitTests` writes, through BL-1457's shared `T
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1621 to BL-1620 by test file range (1042 test methods is too many for one run); waits on them, then runs the whole-project checks
+- 2026-10-07: Backlog -> Doing.
