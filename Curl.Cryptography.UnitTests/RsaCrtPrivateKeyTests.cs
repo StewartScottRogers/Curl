@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Security.Cryptography;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -55,31 +56,54 @@ public sealed class RsaCrtPrivateKeyTests
         "014c5ba5338328ccc6e7a90bf1c0ab3fd606ff4796d3c12e4b639ed9136a5fec6c16d8884bdd99cfdc521456b0742b736868cf90de099adb8d5ffd1deff39ba4"
         + "007ab746cefdb22d7df0e225f54627dc65466131721b90af445363a8358b9f607642f78fab0ab0f43b7168d64bae70d8827848d8ef1e421c5754ddf42c2589b5b3";
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(1, DisplayName = "pss-vect Example 1.1, 1024 bits")]
     [DataRow(2, DisplayName = "pss-vect Example 2.1, 1025 bits")]
     public void ApplyPrivateExponent_PublishedEncodedMessage_GivesThePublishedSignature(int example)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         RSAParameters parameters = example == 1 ? Example1 : Example2;
         byte[] expected = Convert.FromHexString(example == 1 ? Example1Signature : Example2Signature);
         using var key = new RsaCrtPrivateKey(parameters);
         byte[] encodedMessage = ApplyPublicExponent(parameters, expected);
         byte[] signature = new byte[key.ModulusLength];
+        diagnostics.Arrange("vector source", $"PKCS #1 v2.1 pss-vect.txt Example {example}.1");
+        diagnostics.Arrange("modulus length", key.ModulusLength);
+        diagnostics.Bytes("modulus", parameters.Modulus!);
+        diagnostics.Bytes("encoded message (signature^e mod n)", encodedMessage);
 
-        key.ApplyPrivateExponent(encodedMessage, signature);
+        using (diagnostics.Phase("apply private exponent"))
+        {
+            key.ApplyPrivateExponent(encodedMessage, signature);
+        }
 
+        diagnostics.Act("signature", Convert.ToHexString(signature));
+
+        diagnostics.Diff("signature", expected, signature);
         Assert.AreEqual(Convert.ToHexString(expected), Convert.ToHexString(signature));
     }
 
     [TestMethod]
     public void ApplyPrivateExponent_AnyBlindingRandom_GivesTheNonCrtPowerModN()
     {
-        using RSA rsa = RSA.Create(2048);
-        RSAParameters parameters = rsa.ExportParameters(includePrivateParameters: true);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        RSAParameters parameters;
+        using (diagnostics.Phase("generate 2048-bit key"))
+        {
+            using RSA rsa = RSA.Create(2048);
+            parameters = rsa.ExportParameters(includePrivateParameters: true);
+        }
+
         using var key = new RsaCrtPrivateKey(parameters);
         byte[] message = RandomNumberGenerator.GetBytes(key.ModulusLength);
         message[0] = 0;
         BigInteger expected = BigInteger.ModPow(ToInteger(message), ToInteger(parameters.D!), ToInteger(parameters.Modulus!));
+        diagnostics.Arrange("key", "a fresh random 2048-bit RSA key");
+        diagnostics.Arrange("message", $"{message.Length} random bytes, the first zeroed");
+        diagnostics.Arrange("blinding fills", "0x01, 0x5a, 0xff");
 
         foreach (byte fill in new byte[] { 0x01, 0x5a, 0xff })
         {
@@ -87,8 +111,14 @@ public sealed class RsaCrtPrivateKeyTests
             Array.Fill(blindingRandom, fill);
             byte[] signature = new byte[key.ModulusLength];
 
-            key.ApplyPrivateExponent(message, blindingRandom, signature);
+            using (diagnostics.Phase($"apply private exponent, blinding byte 0x{fill:x2}"))
+            {
+                key.ApplyPrivateExponent(message, blindingRandom, signature);
+            }
 
+            diagnostics.Act($"signature equals m^d mod n, blinding byte 0x{fill:x2}", expected == ToInteger(signature));
+
+            diagnostics.Assert($"signature, blinding byte 0x{fill:x2}", expected, ToInteger(signature));
             Assert.AreEqual(expected, ToInteger(signature), $"blinding byte 0x{fill:x2}");
         }
     }
@@ -96,12 +126,18 @@ public sealed class RsaCrtPrivateKeyTests
     [TestMethod]
     public void ApplyPrivateExponent_MessageOfZero_GivesZero()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using var key = new RsaCrtPrivateKey(Example1);
         byte[] signature = new byte[key.ModulusLength];
         Array.Fill(signature, (byte)0xaa);
+        diagnostics.Arrange("key", "pss-vect.txt Example 1, 1024 bits");
+        diagnostics.Arrange("message", $"{key.ModulusLength} zero bytes");
+        diagnostics.Arrange("destination fill", "0xaa");
 
         key.ApplyPrivateExponent(new byte[key.ModulusLength], signature);
+        diagnostics.Act("signature", Convert.ToHexString(signature));
 
+        diagnostics.Diff("signature", new byte[key.ModulusLength], signature);
         Assert.IsTrue(signature.All(value => value == 0));
     }
 
@@ -110,11 +146,16 @@ public sealed class RsaCrtPrivateKeyTests
     [DataRow(true, DisplayName = "m = 2^1024 - 1")]
     public void ApplyPrivateExponent_MessageNotBelowTheModulus_ThrowsArgumentException(bool allOnes)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using var key = new RsaCrtPrivateKey(Example1);
         byte[] message = allOnes ? Enumerable.Repeat((byte)0xff, key.ModulusLength).ToArray() : Example1.Modulus!;
+        diagnostics.Arrange("message", allOnes ? "2^1024 - 1" : "the modulus n");
+        diagnostics.Bytes("message", message);
 
         ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => key.ApplyPrivateExponent(message, new byte[key.ModulusLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
 
+        diagnostics.Assert("parameter name", "message", exception.ParamName);
         Assert.AreEqual("message", exception.ParamName);
     }
 
@@ -124,49 +165,67 @@ public sealed class RsaCrtPrivateKeyTests
     [DataRow(128, 136, 129, "destination")]
     public void ApplyPrivateExponent_WrongLength_ThrowsArgumentException(int messageLength, int randomLength, int destinationLength, string parameter)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using var key = new RsaCrtPrivateKey(Example1);
+        diagnostics.Arrange("message, blinding random and destination lengths", $"{messageLength}, {randomLength}, {destinationLength}");
 
         ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => key.ApplyPrivateExponent(new byte[messageLength], new byte[randomLength], new byte[destinationLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
 
+        diagnostics.Assert("parameter name", parameter, exception.ParamName);
         Assert.AreEqual(parameter, exception.ParamName);
     }
 
     [TestMethod]
     public void ApplyPrivateExponent_InconsistentCrtExponent_ThrowsCryptographicExceptionAndWritesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         RSAParameters broken = Example1;
         broken.DP = (byte[])Example1.DP!.Clone();
         broken.DP[^1] ^= 0x02;
         using var key = new RsaCrtPrivateKey(broken);
         byte[] signature = new byte[key.ModulusLength];
+        diagnostics.Arrange("key", "pss-vect.txt Example 1 with bit 1 of dP's last byte flipped");
+        diagnostics.Arrange("message", "pss-vect.txt Example 1.1's encoded message");
 
-        Assert.ThrowsExactly<CryptographicException>(
+        CryptographicException exception = Assert.ThrowsExactly<CryptographicException>(
             () => key.ApplyPrivateExponent(ApplyPublicExponent(Example1, Convert.FromHexString(Example1Signature)), signature));
+        diagnostics.Act("exception", exception.GetType().Name);
 
+        diagnostics.Diff("destination (expected untouched zeros)", new byte[key.ModulusLength], signature);
         Assert.IsTrue(signature.All(value => value == 0));
     }
 
     [TestMethod]
     public void Constructor_MissingOrEmptyCrtValue_ThrowsArgumentException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         RSAParameters withoutP = Example1;
         withoutP.P = null;
         RSAParameters emptyQ = Example1;
         emptyQ.Q = [];
+        diagnostics.Arrange("keys", "pss-vect.txt Example 1 without P, and with an empty Q");
 
-        Assert.ThrowsExactly<ArgumentException>(() => new RsaCrtPrivateKey(withoutP));
-        Assert.ThrowsExactly<ArgumentException>(() => new RsaCrtPrivateKey(emptyQ));
+        ArgumentException withoutPException = Assert.ThrowsExactly<ArgumentException>(() => new RsaCrtPrivateKey(withoutP));
+        ArgumentException emptyQException = Assert.ThrowsExactly<ArgumentException>(() => new RsaCrtPrivateKey(emptyQ));
+        diagnostics.Act("exceptions", $"{withoutPException.GetType().Name}, {emptyQException.GetType().Name}");
+
+        diagnostics.Assert("exceptions", $"{nameof(ArgumentException)}, {nameof(ArgumentException)}", $"{withoutPException.GetType().Name}, {emptyQException.GetType().Name}");
     }
 
     [TestMethod]
     public void Dispose_ThenApplyPrivateExponent_ThrowsObjectDisposedException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var key = new RsaCrtPrivateKey(Example1);
+        diagnostics.Arrange("key", "pss-vect.txt Example 1, then disposed");
 
         key.Dispose();
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => key.ApplyPrivateExponent(new byte[128], new byte[128]));
+        ObjectDisposedException exception = Assert.ThrowsExactly<ObjectDisposedException>(() => key.ApplyPrivateExponent(new byte[128], new byte[128]));
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ObjectDisposedException), exception.GetType().Name);
     }
 
     private static byte[] ApplyPublicExponent(RSAParameters parameters, byte[] signature)

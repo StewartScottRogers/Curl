@@ -1,4 +1,5 @@
 using System.Numerics;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -12,15 +13,26 @@ public sealed class MontgomeryModulusTests
     // 2^107 - 1, a Mersenne prime of 14 bytes, which is not a whole number of limbs.
     private static readonly byte[] Modulus = ((BigInteger.One << 107) - 1).ToByteArray(isUnsigned: true, isBigEndian: true);
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void ToLimbsAndFromLimbs_BigEndianBytes_RoundTripLeastSignificantLimbFirst()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         uint[] limbs = new uint[2];
         byte[] bytes = new byte[8];
+        byte[] input = [0x01, 0x02, 0x03, 0x04, 0x05];
+        diagnostics.Bytes("big-endian input", input);
+        diagnostics.Arrange("limb count", limbs.Length);
 
-        MontgomeryModulus.ToLimbs([0x01, 0x02, 0x03, 0x04, 0x05], limbs);
+        MontgomeryModulus.ToLimbs(input, limbs);
         MontgomeryModulus.FromLimbs(limbs, bytes);
+        diagnostics.Act("limbs", string.Join(", ", limbs.Select(limb => $"0x{limb:X8}")));
+        diagnostics.Act("bytes back", Convert.ToHexString(bytes));
 
+        diagnostics.Assert("limbs", "0x02030405, 0x00000001", string.Join(", ", limbs.Select(limb => $"0x{limb:X8}")));
+        diagnostics.Diff("bytes back", Convert.FromHexString("0000000102030405"), bytes);
         CollectionAssert.AreEqual(new uint[] { 0x02030405, 0x01 }, limbs);
         Assert.AreEqual("0000000102030405", Convert.ToHexString(bytes));
     }
@@ -31,15 +43,21 @@ public sealed class MontgomeryModulusTests
     [DataRow("0123456789ABCDEF0123456789", "00")]
     public void Multiply_OperandsBelowTheModulus_GivesTheProductTimesRInverse(string left, string right)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var modulus = new MontgomeryModulus(Modulus);
         BigInteger p = ToInteger(Modulus);
         BigInteger r = BigInteger.One << (32 * modulus.LimbCount);
         uint[] result = new uint[modulus.LimbCount];
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Arrange("left", left);
+        diagnostics.Arrange("right", right);
 
         modulus.Multiply(result, Limbs(modulus, left), Limbs(modulus, right), new uint[modulus.LimbCount + 2]);
+        diagnostics.Act("result", ToInteger(result));
 
         BigInteger expected = ToInteger(Convert.FromHexString(left)) * ToInteger(Convert.FromHexString(right))
             * BigInteger.ModPow(r, p - 2, p) % p;
+        diagnostics.Assert("left * right * R^-1 mod p", expected, ToInteger(result));
         Assert.AreEqual(expected, ToInteger(result));
     }
 
@@ -50,15 +68,25 @@ public sealed class MontgomeryModulusTests
     [DataRow("0123456789ABCDEF", "07FFFFFFFFFFFFFFFFFFFFFFFFFE")]
     public void Exponentiate_PublicTestValues_EqualsBigIntegerModPow(string baseValue, string exponent)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var modulus = new MontgomeryModulus(Modulus);
         uint[] result = new uint[modulus.LimbCount];
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Arrange("base", baseValue);
+        diagnostics.Arrange("exponent", exponent);
 
-        modulus.Exponentiate(Limbs(modulus, baseValue), Convert.FromHexString(exponent), result);
+        using (diagnostics.Phase("exponentiate"))
+        {
+            modulus.Exponentiate(Limbs(modulus, baseValue), Convert.FromHexString(exponent), result);
+        }
+
+        diagnostics.Act("result", ToInteger(result));
 
         BigInteger expected = BigInteger.ModPow(
             ToInteger(Convert.FromHexString(baseValue)),
             ToInteger(Convert.FromHexString(exponent)),
             ToInteger(Modulus));
+        diagnostics.Assert("base^exponent mod p", expected, ToInteger(result));
         Assert.AreEqual(expected, ToInteger(result));
     }
 
@@ -69,14 +97,19 @@ public sealed class MontgomeryModulusTests
     [DataRow("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")]
     public void Reduce_ValueOfAnyLength_EqualsTheBigIntegerRemainder(string value)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var modulus = new MontgomeryModulus(Modulus);
         byte[] bytes = Convert.FromHexString(value);
         uint[] limbs = new uint[(bytes.Length + 3) / 4];
         MontgomeryModulus.ToLimbs(bytes, limbs);
         uint[] result = new uint[modulus.LimbCount];
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Bytes("value", bytes);
 
         modulus.Reduce(limbs, result);
+        diagnostics.Act("result", ToInteger(result));
 
+        diagnostics.Assert("value mod p", ToInteger(bytes) % ToInteger(Modulus), ToInteger(result));
         Assert.AreEqual(ToInteger(bytes) % ToInteger(Modulus), ToInteger(result));
     }
 
@@ -86,13 +119,19 @@ public sealed class MontgomeryModulusTests
     [DataRow("00", "07FFFFFFFFFFFFFFFFFFFFFFFFFE")]
     public void Subtract_OperandsBelowTheModulus_EqualsTheDifferenceModuloTheModulus(string left, string right)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var modulus = new MontgomeryModulus(Modulus);
         BigInteger p = ToInteger(Modulus);
         uint[] result = new uint[modulus.LimbCount];
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Arrange("left", left);
+        diagnostics.Arrange("right", right);
 
         modulus.Subtract(result, Limbs(modulus, left), Limbs(modulus, right));
+        diagnostics.Act("result", ToInteger(result));
 
         BigInteger expected = ((ToInteger(Convert.FromHexString(left)) - ToInteger(Convert.FromHexString(right))) % p + p) % p;
+        diagnostics.Assert("(left - right) mod p", expected, ToInteger(result));
         Assert.AreEqual(expected, ToInteger(result));
     }
 
@@ -101,11 +140,17 @@ public sealed class MontgomeryModulusTests
     [DataRow("FFFFFFFFFFFFFFFFFFFFFFFFFFFF", "0123456789")]
     public void MultiplyModulo_LeftBelowRRightBelowTheModulus_EqualsTheProductModuloTheModulus(string left, string right)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var modulus = new MontgomeryModulus(Modulus);
         uint[] result = new uint[modulus.LimbCount];
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Arrange("left", left);
+        diagnostics.Arrange("right", right);
 
         modulus.MultiplyModulo(result, Limbs(modulus, left), Limbs(modulus, right));
+        diagnostics.Act("result", ToInteger(result));
 
+        diagnostics.Assert("left * right mod p", ToInteger(Convert.FromHexString(left)) * ToInteger(Convert.FromHexString(right)) % ToInteger(Modulus), ToInteger(result));
         Assert.AreEqual(ToInteger(Convert.FromHexString(left)) * ToInteger(Convert.FromHexString(right)) % ToInteger(Modulus), ToInteger(result));
     }
 
@@ -115,11 +160,24 @@ public sealed class MontgomeryModulusTests
     [DataRow("080000000000000000000000000000", false)]
     public void IsBelowModulus_Value_IsTrueOnlyBelowTheModulus(string value, bool expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var modulus = new MontgomeryModulus(Modulus);
         uint[] limbs = new uint[modulus.LimbCount];
         MontgomeryModulus.ToLimbs(Convert.FromHexString(value.PadLeft(28, '0')), limbs);
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Arrange("value", value);
 
+        bool below = modulus.IsBelowModulus(limbs);
+        diagnostics.Act("is below modulus", below);
+
+        diagnostics.Assert("is below modulus", expected, below);
         Assert.AreEqual(expected, modulus.IsBelowModulus(limbs));
+    }
+
+    private static void ArrangeModulus(TestDiagnostics diagnostics, MontgomeryModulus modulus)
+    {
+        diagnostics.Arrange("modulus", "2^107 - 1");
+        diagnostics.Arrange("limb count", modulus.LimbCount);
     }
 
     private static uint[] Limbs(MontgomeryModulus modulus, string hex)
