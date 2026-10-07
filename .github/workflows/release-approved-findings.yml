@@ -1,5 +1,7 @@
 # Release approved findings (BL-1249): turns the audit office's accepted findings whose
-# task is none into Curl tasks, the button on the board page's Audit tab made real.
+# task is none into Curl tasks, the button on the board page's Audit tab made real. The same
+# script also files a Re-fix task for an accepted finding a re-audit found still reproducing
+# after its tasks were Done, and records each finding's tasks history (ADR-0422).
 #
 # The filing itself stays in Audit/Tools/New-TasksFromAcceptedFindings.ps1, run from the
 # audit branch's checkout with CLAUDE_PROJECT_DIR set to the work/dark-factory checkout,
