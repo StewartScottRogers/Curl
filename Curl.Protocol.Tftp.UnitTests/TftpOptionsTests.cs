@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Tftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Tftp;
 
@@ -20,6 +22,10 @@ public sealed class TftpOptionsTests
     /// <summary>The server's transfer identifier: the new port it answers from.</summary>
     private static readonly IPEndPoint TransferEndPoint = new(IPAddress.Loopback, 50123);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(5, "8", DisplayName = "5 is raised to 8")]
     [DataRow(8, "8", DisplayName = "8 is sent as 8")]
@@ -33,11 +39,12 @@ public sealed class TftpOptionsTests
     {
         var channel = Channel(Data(1, "hello"));
 
-        await Handler(channel).ExecuteAsync(Context(tftpBlockSize: tftpBlockSize));
+        await RunAsync(channel, Context(tftpBlockSize: tftpBlockSize));
 
-        CollectionAssert.AreEqual(
-            ReadRequest($"file.txt\0octet\0tsize\00\0blksize\0{expectedBlksize}\0timeout\06\0"),
-            channel.Sent[0].Datagram);
+        byte[] expected = ReadRequest($"file.txt\0octet\0tsize\00\0blksize\0{expectedBlksize}\0timeout\06\0");
+        Diagnostics.Arrange("expected blksize", expectedBlksize);
+        Diagnostics.Diff("read request", expected, channel.Sent[0].Datagram);
+        CollectionAssert.AreEqual(expected, channel.Sent[0].Datagram);
     }
 
     [TestMethod]
@@ -46,11 +53,16 @@ public sealed class TftpOptionsTests
         var channel = Channel(Data(1, "hello"));
         var output = new MemoryStream();
 
-        var result = await Handler(channel).ExecuteAsync(Context(output: output, noOptions: true));
+        var result = await RunAsync(channel, Context(output: output, noOptions: true));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("read request", ReadRequest("file.txt\0octet\0"), channel.Sent[0].Datagram);
         CollectionAssert.AreEqual(ReadRequest("file.txt\0octet\0"), channel.Sent[0].Datagram);
-        Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()));
+        string written = Encoding.ASCII.GetString(output.ToArray());
+        Diagnostics.Assert("output", "hello", written);
+        Assert.AreEqual("hello", written);
+        Diagnostics.Diff("ack", new byte[] { 0, 4, 0, 1 }, channel.Sent[1].Datagram);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[1].Datagram);
     }
 
@@ -59,8 +71,9 @@ public sealed class TftpOptionsTests
     {
         var channel = Channel(Data(1, "hello"));
 
-        await Handler(channel).ExecuteAsync(Context(tftpBlockSize: 1024, noOptions: true));
+        await RunAsync(channel, Context(tftpBlockSize: 1024, noOptions: true));
 
+        Diagnostics.Diff("read request", ReadRequest("file.txt\0octet\0"), channel.Sent[0].Datagram);
         CollectionAssert.AreEqual(ReadRequest("file.txt\0octet\0"), channel.Sent[0].Datagram);
     }
 
@@ -72,13 +85,19 @@ public sealed class TftpOptionsTests
             Data(1, new string('a', 1024)),
             Data(2, new string('b', 1000)));
 
-        var result = await Handler(channel).ExecuteAsync(Context(tftpBlockSize: 1024));
+        var result = await RunAsync(channel, Context(tftpBlockSize: 1024));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 2024, result.BytesTransferred);
         Assert.AreEqual(2024, result.BytesTransferred);
+        Diagnostics.Assert("datagrams sent", 4, channel.Sent.Count);
         Assert.HasCount(4, channel.Sent);
+        Diagnostics.Diff("ack 0", new byte[] { 0, 4, 0, 0 }, channel.Sent[1].Datagram);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 0 }, channel.Sent[1].Datagram);
+        Diagnostics.Diff("ack 1", new byte[] { 0, 4, 0, 1 }, channel.Sent[2].Datagram);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[2].Datagram);
+        Diagnostics.Diff("ack 2", new byte[] { 0, 4, 0, 2 }, channel.Sent[3].Datagram);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 2 }, channel.Sent[3].Datagram);
     }
 
@@ -92,11 +111,15 @@ public sealed class TftpOptionsTests
     {
         var channel = Channel(Data(1, new string('a', 512)), Data(2, new string('b', 100)));
 
-        var result = await Handler(channel).ExecuteAsync(Context(tftpBlockSize: 1024));
+        var result = await RunAsync(channel, Context(tftpBlockSize: 1024));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 612, result.BytesTransferred);
         Assert.AreEqual(612, result.BytesTransferred);
+        Diagnostics.Assert("datagrams sent", 3, channel.Sent.Count);
         Assert.HasCount(3, channel.Sent);
+        Diagnostics.Diff("ack 2", new byte[] { 0, 4, 0, 2 }, channel.Sent[2].Datagram);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 2 }, channel.Sent[2].Datagram);
     }
 
@@ -108,8 +131,11 @@ public sealed class TftpOptionsTests
     public async Task ExecuteAsync_TftpNoOptionsUpload_SendsFileNameAndOctetOnlyThenData()
     {
         var channel = Channel(Ack(0), Ack(1));
+        Diagnostics.Arrange("url", "tftp://h/dest.txt");
+        Diagnostics.Arrange("no options", true);
+        Diagnostics.Arrange("upload bytes", 3);
 
-        var result = await Handler(channel).ExecuteAsync(new TransferContext
+        var result = await RunAsync(channel, new TransferContext
         {
             Url = CurlUrl.Parse("tftp://h/dest.txt"),
             Output = new MemoryStream(),
@@ -117,9 +143,13 @@ public sealed class TftpOptionsTests
             TftpNoOptions = true,
         });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 3, result.BytesTransferred);
         Assert.AreEqual(3, result.BytesTransferred);
+        Diagnostics.Diff("write request", WriteRequest("dest.txt\0octet\0"), channel.Sent[0].Datagram);
         CollectionAssert.AreEqual(WriteRequest("dest.txt\0octet\0"), channel.Sent[0].Datagram);
+        Diagnostics.Diff("data 1", new byte[] { 0, 3, 0, 1, 97, 98, 99 }, channel.Sent[1].Datagram);
         CollectionAssert.AreEqual(new byte[] { 0, 3, 0, 1, 97, 98, 99 }, channel.Sent[1].Datagram);
     }
 
@@ -127,8 +157,11 @@ public sealed class TftpOptionsTests
     public async Task ExecuteAsync_UploadWithTftpBlockSize_SendsItAsBlksize()
     {
         var channel = Channel(Ack(0), Ack(1));
+        Diagnostics.Arrange("url", "tftp://h/dest.txt");
+        Diagnostics.Arrange("block size", 70000);
+        Diagnostics.Arrange("upload bytes", 3);
 
-        await Handler(channel).ExecuteAsync(new TransferContext
+        await RunAsync(channel, new TransferContext
         {
             Url = CurlUrl.Parse("tftp://h/dest.txt"),
             Output = new MemoryStream(),
@@ -136,25 +169,50 @@ public sealed class TftpOptionsTests
             TftpBlockSize = 70000,
         });
 
-        CollectionAssert.AreEqual(
-            WriteRequest("dest.txt\0octet\0tsize\03\0blksize\065464\0timeout\06\0"),
-            channel.Sent[0].Datagram);
+        byte[] expected = WriteRequest("dest.txt\0octet\0tsize\03\0blksize\065464\0timeout\06\0");
+        Diagnostics.Diff("write request", expected, channel.Sent[0].Datagram);
+        CollectionAssert.AreEqual(expected, channel.Sent[0].Datagram);
     }
 
     private static TftpProtocolHandler Handler(ScriptedDatagramChannel channel) =>
         new(new RecordingDatagramConnector(DatagramOpenResult.Opened(channel)));
 
-    private static TransferContext Context(Stream? output = null, int? tftpBlockSize = null, bool noOptions = false) =>
-        new()
+    private async Task<TransferResult> RunAsync(ScriptedDatagramChannel channel, TransferContext context)
+    {
+        TransferResult result;
+        using (Diagnostics.Phase("transfer"))
+        {
+            result = await Handler(channel).ExecuteAsync(context);
+        }
+
+        TftpTestDiagnostics.Result(Diagnostics, result);
+        TftpTestDiagnostics.Sent(Diagnostics, channel);
+        return result;
+    }
+
+    private TransferContext Context(Stream? output = null, int? tftpBlockSize = null, bool noOptions = false)
+    {
+        Diagnostics.Arrange("url", "tftp://h/file.txt");
+        Diagnostics.Arrange("block size", tftpBlockSize?.ToString(CultureInfo.InvariantCulture) ?? "(default)");
+        Diagnostics.Arrange("no options", noOptions);
+        return new()
         {
             Url = CurlUrl.Parse("tftp://h/file.txt"),
             Output = output ?? new MemoryStream(),
             TftpBlockSize = tftpBlockSize,
             TftpNoOptions = noOptions,
         };
+    }
 
-    private static ScriptedDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script) =>
-        new(ServerEndPoint, script);
+    private ScriptedDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script)
+    {
+        for (int index = 0; index < script.Length; index++)
+        {
+            TftpTestDiagnostics.Scripted(Diagnostics, index, script[index].Datagram, script[index].Source);
+        }
+
+        return new(ServerEndPoint, script);
+    }
 
     private static byte[] ReadRequest(string fields) => [0, 1, .. Encoding.ASCII.GetBytes(fields)];
 

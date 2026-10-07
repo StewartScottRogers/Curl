@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Tftp.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1486 — Make every test in Curl.Protocol.Tftp.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,22 @@ Every test in `Curl.Protocol.Tftp.UnitTests` writes, through BL-1457's shared `T
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Protocol.Tftp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Tftp.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Tftp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Tftp.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 156 test methods in 12 files.
+- Added `TftpTestDiagnostics.cs`: it decodes a TFTP datagram (RRQ/WRQ file name, DATA/ACK block number, ERROR code and text, OACK options) into the label of a BYTES line, and writes a channel's sent datagrams, scripted datagrams and a `TransferResult` (exit code, error text, bytes). Shared private helpers (`Run`, `Channel`, `Context`) in each test class write the URL, options, clock advances and datagrams, so every test passes through them; each real assertion has a `Diagnostics.Assert` or `Diff` before it.
+- Counts (`Select-String -AllMatches`, excluding obj and bin): before `Assert.` 519, `[TestMethod` 161, `[DataRow(` 105; after 519, 161, 105. No test method, data row or assertion changed, so the run's total is unchanged by construction: 240 tests, all passed (no separate pre-change run was recorded; the method and data-row counts that make up the total are identical).
+- Detailed run: 240 `END` lines for 240 tests, none with `arrange 0`, `act 0` or `assert 0`.
+- SLOW: none. The slowest test took 473 ms, under the 3000 ms budget; no follow-up task filed.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Protocol.Tftp.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF lines with TFTP datagrams decoded as BYTES; 240 tests pass
