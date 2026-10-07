@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1648 — Stop UpstreamTestFileExpander running out of memory on a %repeat count near int.MaxValue
 
@@ -25,13 +25,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Conformance.UnitTests` expands `%repeat[2000000000 x ab]%` and gets the chosen bounded answer without allocating the output; it fails (or is impossible to run) before the fix.
-- [ ] Every vendored upstream case still expands as before: `UpstreamConformanceTests` passes with `PassingUpstreamCases.txt` unchanged.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage.
+- [x] A test in `Curl.Conformance.UnitTests` expands `%repeat[2000000000 x ab]%` and gets the chosen bounded answer without allocating the output; it fails (or is impossible to run) before the fix.
+- [x] Every vendored upstream case still expands as before: `UpstreamConformanceTests` passes with `PassingUpstreamCases.txt` unchanged.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Chose: one `%repeat` may produce at most 16 MiB characters (`UpstreamTestInstructions.MaximumRepeatLength`), checked as decoded content length times count before allocating; a longer one is left as written and `%repeat` is listed once in `UnsupportedInstructions`, so screening skips the case with a reason (ADR-0423). Largest vendored repeat is `%repeat[1053700 x x]%`, about 1 MiB.
+- Tests: `Expand_RepeatLongerThanTheLimit_IsLeftAsWrittenAndListedAsUnsupported` (2000000000 x ab, and one character past the cap) and `Expand_RepeatExactlyAtTheLimit_IsExpanded`.
+- Measured: Curl.Conformance.UnitLibrary 100% line, 100% branch. Full fast run green except one Curl.Cookies.UnitTests failure under load that passed twice when rerun alone (not touched by this task; same flake BL-1647 was parked on).
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A %repeat past 16 MiB is left as written and listed as unsupported instead of running out of memory (ADR-0423)
