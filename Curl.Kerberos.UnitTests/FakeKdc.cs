@@ -142,7 +142,34 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
     {
         KerberosKdcRequest request = KerberosKdcRequest.Decode(bytes);
         Requests.Add(request);
-        return Override(request) ?? (request.MessageType == KerberosMessageType.AsRequest ? AnswerAs(request) : AnswerTgs(request));
+        WriteExchangedMessage($"KDC request {Describe(request)}", bytes);
+        byte[] reply = Override(request) ?? (request.MessageType == KerberosMessageType.AsRequest ? AnswerAs(request) : AnswerTgs(request));
+        WriteExchangedMessage($"KDC reply to {request.MessageType}", reply);
+        return reply;
+    }
+
+    private static string Describe(KerberosKdcRequest request) =>
+        $"{request.MessageType}, client {Name(request.Body.ClientName)}, server {Name(request.Body.ServerName)}, realm {request.Body.Realm}, "
+        + $"etypes [{string.Join(", ", request.Body.EncryptionTypes)}], padata [{string.Join(", ", request.PreAuthenticationData.Select(data => data.DataType))}]";
+
+    private static string Name(KerberosPrincipalName? name) => name is null ? "none" : string.Join("/", name.Components);
+
+    /// <summary>
+    /// Writes one message a fake KDC, GSS acceptor or KCM exchanged, as an uncounted BYTES line
+    /// labelled with what it is: message type, principals, realm, encryption types, key usage.
+    /// Does nothing outside a test. It lives here, not beside the assertions, because
+    /// Curl.Authentication.UnitTests links this file and FakeGssAcceptor.cs but not the rest.
+    /// </summary>
+    /// <param name="label">What the message is.</param>
+    /// <param name="bytes">The message's bytes.</param>
+    internal static void WriteExchangedMessage(string label, ReadOnlySpan<byte> bytes)
+    {
+#pragma warning disable MSTESTEXP
+        if (TestContext.Current is { } testContext)
+#pragma warning restore MSTESTEXP
+        {
+            Curl.Testing.TestDiagnostics.For(testContext).Bytes(label, bytes);
+        }
     }
 
     private void ThrowWhenUnreachable(string host)
