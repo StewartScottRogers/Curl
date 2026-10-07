@@ -602,7 +602,9 @@ if ($SelfTest) {
         $Unreliable = @('quality')
         $script:MechanicalOutcomes = @{ 'AF-0010' = 'killed'; 'AF-0011' = 'survived' }
         $line2 = Invoke-WriteFindings
-        $c10 = Text 'AF-0010'; $c11 = Text 'AF-0011'; $c12 = Text 'AF-0012'; $c13 = Text 'AF-0013'; $c14 = Text 'AF-0014'; $c15 = Text 'AF-0015'; $c16 = Text 'AF-0019'; $c17 = Text 'AF-0017'; $c18 = Text 'AF-0018'
+        # LF throughout, whatever line endings the checkout gave the fixture.
+        function Lf([string]$Prefix) { (Text $Prefix) -replace "`r`n", "`n" }
+        $c10 = Lf 'AF-0010'; $c11 = Lf 'AF-0011'; $c12 = Lf 'AF-0012'; $c13 = Lf 'AF-0013'; $c14 = Lf 'AF-0014'; $c15 = Lf 'AF-0015'; $c16 = Lf 'AF-0019'; $c17 = Lf 'AF-0017'; $c18 = Lf 'AF-0018'
         Check 'an unreliable auditor''s "no" closes when the runner''s targeted mutant is killed' ($c10 -match '(?m)^status: closed$' -and $c10 -match '(?m)^closed-how: mechanical$' -and $c10 -match '(?m)^closed-by: 2026-10-14_0930.md$' -and $c10 -match "rerun: killed\.") 'AF-0010'
         Check 'a "no" the runner''s rerun contradicts (survived) stays open' ($c11 -match '(?m)^status: accepted$' -and $c11 -match "rerun: survived\.") 'AF-0011'
         Check 'another auditor''s re-audit is marked and closes nothing' ($c11 -match '\| reproduces: no \| \(re-audited by security\) looked fine') 'AF-0011'
