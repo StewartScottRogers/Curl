@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Imap.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1477 — Make every test in Curl.Protocol.Imap.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,22 @@ Every test in `Curl.Protocol.Imap.UnitTests` writes, through BL-1457's shared `T
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Imap.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Protocol.Imap.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Protocol.Imap.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Imap.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Imap.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Imap.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Imap.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Imap.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Imap.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Imap.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 215 test methods in 16 files.
+- Approach: a project-local `DiagnosticText` (escapes CR LF text, describes a `TransferResult`, joins transcript lines), and each file's `RunAsync`/`Report` helper made an instance method that writes the URL, scripted replies and options as `ARRANGE` and the result, commands sent, output and transcript as `ACT`; each test writes `ASSERT`/`DIFF` for what it checks. `Fakes/` unchanged: the per-file run helpers already wrap `ImapRun`, so writing there kept `ImapRun` free of a `TestContext`.
+- Counts before -> after (Select-String -AllMatches, excluding obj and bin): `Assert.` 498 -> 498, `[TestMethod` 215 -> 215, `[DataRow(` 275 -> 275. Total tests 425 -> 425; detailed run printed 425 `END Curl.` lines (a bare `END ` match also hits `APPEND` in ACT lines, so count anchored lines), none with a zero count.
+- SLOW: none. The whole project runs in under a second.
+- Some expected values were hoisted into locals so `Diff` and the unchanged `Assert` compare the same value; the null-argument tests now capture the thrown exception and log its type and parameter.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Protocol.Imap.UnitTests test writes ARRANGE, ACT and ASSERT or DIFF diagnostics; 425 END lines, none zero

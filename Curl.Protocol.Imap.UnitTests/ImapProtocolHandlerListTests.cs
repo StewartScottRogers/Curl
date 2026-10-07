@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -35,6 +36,11 @@ public sealed class ImapProtocolHandlerListTests
 
     private const string MalformedUrl = "URL using bad/illegal format or missing URL";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("", "LIST \"\" *", DisplayName = "imap://h/ (measured)")]
     [DataRow("INBOX", "LIST \"INBOX\" *", DisplayName = "imap://h/INBOX (measured)")]
@@ -47,8 +53,11 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Host + path, Opening + ListLines + "A002 OK LIST completed\r\n");
 
+        Diagnostics.Diff("sent", $"A001 CAPABILITY\r\nA002 {list}\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual($"A001 CAPABILITY\r\nA002 {list}\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", ListLines, run.Output);
         Assert.AreEqual(ListLines, run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Success(ListLines.Length), run.Result);
         Assert.AreEqual(TransferResult.Success(ListLines.Length), run.Result);
     }
 
@@ -58,6 +67,7 @@ public sealed class ImapProtocolHandlerListTests
         // Measured: LIST=* LIST () "/" A\r\n* OK noise\r\n* 3 EXISTS\r\n* 4 LIST x\r\nOK done.
         ListRun run = await RunAsync(Host, Opening + "* LIST () \"/\" A\r\n* OK noise\r\n* 3 EXISTS\r\n* 4 LIST x\r\n* LISTX y\r\n* list z\nA002 OK done\r\n");
 
+        Diagnostics.Diff("output", "* LIST () \"/\" A\r\n* 4 LIST x\r\n* list z\n", run.Output);
         Assert.AreEqual("* LIST () \"/\" A\r\n* 4 LIST x\r\n* list z\n", run.Output);
     }
 
@@ -68,8 +78,11 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Host, Opening + "* LIST () \"/\" A\r\n" + completion);
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", "* LIST () \"/\" A\r\n", run.Output);
         Assert.AreEqual("* LIST () \"/\" A\r\n", run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.QuoteError, QuoteError, 17), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, QuoteError, 17), run.Result);
     }
 
@@ -82,8 +95,11 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Host + path, Opening + SelectReply + "* SEARCH 1 2\r\nA003 OK SEARCH completed\r\n");
 
+        Diagnostics.Diff("sent", SentThroughSelect + $"A003 {search}\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + $"A003 {search}\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", "* SEARCH 1 2\r\n", run.Output);
         Assert.AreEqual("* SEARCH 1 2\r\n", run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Success(14), run.Result);
         Assert.AreEqual(TransferResult.Success(14), run.Result);
     }
 
@@ -93,6 +109,7 @@ public sealed class ImapProtocolHandlerListTests
         // Measured: SEARCH=* 1 EXISTS\r\n* SEARCH 5\r\n* search\r\nOK done.
         ListRun run = await RunAsync(Host + "INBOX?NEW", Opening + SelectReply + "* 1 EXISTS\r\n* SEARCH 5\r\n* search\r\nA003 OK done\r\n");
 
+        Diagnostics.Diff("output", "* SEARCH 5\r\n* search\r\n", run.Output);
         Assert.AreEqual("* SEARCH 5\r\n* search\r\n", run.Output);
     }
 
@@ -102,8 +119,11 @@ public sealed class ImapProtocolHandlerListTests
         // Measured: SEARCH=BAD Nope: empty stdout, LOGOUT, exit 21.
         ListRun run = await RunAsync(Host + "INBOX?NEW", Opening + SelectReply + "A003 BAD Nope\r\n");
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 SEARCH NEW\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 SEARCH NEW\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", string.Empty, run.Output);
         Assert.AreEqual(string.Empty, run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.QuoteError, QuoteError), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, QuoteError), run.Result);
     }
 
@@ -112,7 +132,9 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Host + "INBOX;UID=1?NEW", Opening + SelectReply + "* 1 FETCH (BODY[] {2}\r\nhi)\r\nA003 OK done\r\n");
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", "hi", run.Output);
         Assert.AreEqual("hi", run.Output);
     }
 
@@ -122,7 +144,9 @@ public sealed class ImapProtocolHandlerListTests
         // Measured: -X NOOP imap://h/INBOX, SELECT=NO nope: LOGOUT, exit 67.
         ListRun run = await RunAsync(Custom(Host + "INBOX", "NOOP"), Opening + "A002 NO nope\r\n");
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.LoginDenied, "Select failed"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Select failed"), run.Result);
     }
 
@@ -132,8 +156,11 @@ public sealed class ImapProtocolHandlerListTests
         // Measured: -X "EXAMINE INBOX" imap://h/: every EXAMINE line written, exit 0.
         ListRun run = await RunAsync(Custom(Host, "EXAMINE INBOX"), Opening + SelectLines + "A002 OK [READ-ONLY] EXAMINE completed\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 EXAMINE INBOX\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 EXAMINE INBOX\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", SelectLines, run.Output);
         Assert.AreEqual(SelectLines, run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Success(SelectLines.Length), run.Result);
         Assert.AreEqual(TransferResult.Success(SelectLines.Length), run.Result);
     }
 
@@ -145,7 +172,9 @@ public sealed class ImapProtocolHandlerListTests
             Custom(Host + "INBOX", "STORE 1 +FLAGS \\Seen"),
             Opening + SelectReply + "* 1 FETCH (FLAGS (\\Seen))\r\n* 2 EXISTS\r\n* STORE x\r\nA003 OK STORE completed\r\n");
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 STORE 1 +FLAGS \\Seen\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 STORE 1 +FLAGS \\Seen\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", "* 1 FETCH (FLAGS (\\Seen))\r\n* STORE x\r\n", run.Output);
         Assert.AreEqual("* 1 FETCH (FLAGS (\\Seen))\r\n* STORE x\r\n", run.Output);
     }
 
@@ -154,6 +183,7 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Custom(Host + "INBOX?NEW", "NOOP"), Opening + SelectReply + "A003 OK done\r\n");
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 NOOP\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 NOOP\r\nA004 LOGOUT\r\n", run.Sent);
     }
 
@@ -163,7 +193,9 @@ public sealed class ImapProtocolHandlerListTests
         // Measured: -X "STORE 1 +FLAGS \Seen" imap://h/INBOX answered BAD: LOGOUT, exit 21.
         ListRun run = await RunAsync(Custom(Host + "INBOX", "STORE 1 +FLAGS \\Seen"), Opening + SelectReply + "A003 BAD Command not recognized\r\n");
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 STORE 1 +FLAGS \\Seen\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 STORE 1 +FLAGS \\Seen\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.QuoteError, QuoteError), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, QuoteError), run.Result);
     }
 
@@ -183,7 +215,9 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Custom(Host, command), Opening + untagged + "A002 OK done\r\n");
 
+        Diagnostics.Diff("output", written, run.Output);
         Assert.AreEqual(written, run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Success(written.Length), run.Result);
         Assert.AreEqual(TransferResult.Success(written.Length), run.Result);
     }
 
@@ -194,7 +228,9 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Custom(Host + path, command), Opening + "* BYE\r\nA002 OK bye\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrl), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrl), run.Result);
     }
 
@@ -210,8 +246,11 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Host, Opening + replies + "A002 OK done\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Diff("output", written, run.Output);
         Assert.AreEqual(written, run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Success(written.Length), run.Result);
         Assert.AreEqual(TransferResult.Success(written.Length), run.Result);
     }
 
@@ -230,7 +269,9 @@ public sealed class ImapProtocolHandlerListTests
 
         ListRun run = await RunAsync(Host, Opening + replies + "A002 OK done\r\n");
 
+        Diagnostics.Assert("run.Output.Length", replies.Length, run.Output.Length);
         Assert.AreEqual(replies.Length, run.Output.Length);
+        Diagnostics.Assert("run.Result", TransferResult.Success(replies.Length), run.Result);
         Assert.AreEqual(TransferResult.Success(replies.Length), run.Result);
     }
 
@@ -240,7 +281,9 @@ public sealed class ImapProtocolHandlerListTests
         // Measured: INBOX?ALL, SEARCH=* SEARCH {3}\r\n1 2\r\n* SEARCH 4\r\nOK done.
         ListRun run = await RunAsync(Host + "INBOX?ALL", Opening + SelectReply + "* SEARCH {3}\r\n1 2\r\n* SEARCH 4\r\nA003 OK done\r\n");
 
+        Diagnostics.Diff("output", "* SEARCH {3}\r\n1 2", run.Output);
         Assert.AreEqual("* SEARCH {3}\r\n1 2", run.Output);
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 SEARCH ALL\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 SEARCH ALL\r\nA004 LOGOUT\r\n", run.Sent);
     }
 
@@ -249,8 +292,11 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Host, Opening + "* LIST () {10}\r\nabc");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LIST \"\" *\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LIST \"\" *\r\n", run.Sent);
+        Diagnostics.Diff("output", "* LIST () {10}\r\nabc", run.Output);
         Assert.AreEqual("* LIST () {10}\r\nabc", run.Output);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 7 bytes missing", 19), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 7 bytes missing", 19), run.Result);
     }
 
@@ -259,7 +305,9 @@ public sealed class ImapProtocolHandlerListTests
     {
         ListRun run = await RunAsync(Host, Opening + "* LIST () \"/\" A\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LIST \"\" *\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LIST \"\" *\r\n", run.Sent);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
 
@@ -272,7 +320,9 @@ public sealed class ImapProtocolHandlerListTests
 
         ListRun run = await RunAsync(context, Opening + replies);
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LIST \"\" *\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LIST \"\" *\r\n", run.Sent);
+        Diagnostics.Assert("run.Result", TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, " + counts), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, " + counts), run.Result);
     }
 
@@ -288,12 +338,17 @@ public sealed class ImapProtocolHandlerListTests
             Progress = new RecordingTransferProgress(),
         };
 
-    private static Task<ListRun> RunAsync(string url, string replies) => RunAsync(Context(url), replies);
+    private Task<ListRun> RunAsync(string url, string replies) => RunAsync(Context(url), replies);
 
-    private static async Task<ListRun> RunAsync(TransferContext context, string replies)
+    private async Task<ListRun> RunAsync(TransferContext context, string replies)
     {
+        Diagnostics.Arrange("url", context.Url.OriginalString);
+        Diagnostics.Arrange("server", DiagnosticText.Escape(replies));
         ImapRun run = await ImapRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
         string output = context.Output is MemoryStream memory ? Encoding.Latin1.GetString(memory.ToArray()) : string.Empty;
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        Diagnostics.Act("output", DiagnosticText.Escape(output));
         return new ListRun(run.Result, run.Sent, output);
     }
 

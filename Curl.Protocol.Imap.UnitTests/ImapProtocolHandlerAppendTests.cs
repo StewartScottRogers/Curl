@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -17,6 +18,11 @@ namespace Curl.Protocol.Imap;
 [TestClass]
 public sealed class ImapProtocolHandlerAppendTests
 {
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Host = "imap://127.0.0.1:18143/";
 
     private const string Opening = "* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN] ready\r\n"
@@ -42,7 +48,12 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + "INBOX", flags), Opening + Continuation + Appended + LogoutReply);
 
-        Assert.AreEqual($"A001 CAPABILITY\r\nA002 APPEND INBOX{flagList} {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n", run.Sent);
+        string expected = $"A001 CAPABILITY\r\nA002 APPEND INBOX{flagList} {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n";
+        Diagnostics.Arrange("flags", string.Join(",", flags));
+        Diagnostics.Diff("sent", expected, run.Sent);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 21, run.Result.BytesTransferred);
+        Assert.AreEqual(expected, run.Sent);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(21, run.Result.BytesTransferred);
         Assert.AreEqual(21, run.Result.Report!.UploadSize);
@@ -55,6 +66,7 @@ public sealed class ImapProtocolHandlerAppendTests
 
         AppendRun run = await RunAsync(context, Opening + Continuation + Appended + LogoutReply);
 
+        Diagnostics.Assert("sent starts with", true, run.Sent.StartsWith("A001 CAPABILITY\r\nA002 APPEND INBOX {21}\r\n", StringComparison.Ordinal));
         StringAssert.StartsWith(run.Sent, "A001 CAPABILITY\r\nA002 APPEND INBOX {21}\r\n", StringComparison.Ordinal);
     }
 
@@ -66,6 +78,7 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + path), Opening + Continuation + Appended + LogoutReply);
 
+        Diagnostics.Assert("sent starts with", true, run.Sent.StartsWith($"A001 CAPABILITY\r\nA002 APPEND {mailbox} (\\Seen) {{21}}\r\n", StringComparison.Ordinal));
         StringAssert.StartsWith(run.Sent, $"A001 CAPABILITY\r\nA002 APPEND {mailbox} (\\Seen) {{21}}\r\n", StringComparison.Ordinal);
     }
 
@@ -76,6 +89,7 @@ public sealed class ImapProtocolHandlerAppendTests
 
         AppendRun run = await RunAsync(context, Opening + Continuation + Appended + LogoutReply);
 
+        Diagnostics.Assert("sent starts with", true, run.Sent.StartsWith("A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {21}\r\n", StringComparison.Ordinal));
         StringAssert.StartsWith(run.Sent, "A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {21}\r\n", StringComparison.Ordinal);
     }
 
@@ -86,7 +100,10 @@ public sealed class ImapProtocolHandlerAppendTests
 
         AppendRun run = await RunAsync(Context(Host + "INBOX"), replies);
 
-        Assert.AreEqual($"A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n", run.Sent);
+        string expected = $"A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n";
+        Diagnostics.Diff("sent", expected, run.Sent);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, run.Result.ExitCode);
+        Assert.AreEqual(expected, run.Sent);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
     }
 
@@ -95,6 +112,7 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + "INBOX"), Opening + Continuation + Appended + LogoutReply);
 
+        Diagnostics.Diff("progress", "started,up 21/21", string.Join(",", run.Progress.Reports));
         CollectionAssert.AreEqual(new[] { "started", "up 21/21" }, run.Progress.Reports);
     }
 
@@ -105,7 +123,9 @@ public sealed class ImapProtocolHandlerAppendTests
 
         AppendRun run = await RunAsync(Context(Host + "INBOX", upload: upload), Opening + Continuation + Appended + LogoutReply);
 
-        Assert.AreEqual($"A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n", run.Sent);
+        string expected = $"A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n";
+        Diagnostics.Diff("sent", expected, run.Sent);
+        Assert.AreEqual(expected, run.Sent);
     }
 
     [TestMethod]
@@ -114,6 +134,8 @@ public sealed class ImapProtocolHandlerAppendTests
         // Measured: an empty file sends {0}, and after the continuation only the CRLF.
         AppendRun run = await RunAsync(Context(Host + "INBOX", upload: new MemoryStream()), Opening + Continuation + Appended + LogoutReply);
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {0}\r\n\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {0}\r\n\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(0, run.Result.Report!.UploadSize);
@@ -127,6 +149,8 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + path), Opening + "* BYE Logging out\r\nA002 OK LOGOUT completed\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UrlMalformat, "Cannot APPEND without a mailbox."), run.Result);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, "Cannot APPEND without a mailbox."), run.Result);
     }
@@ -139,6 +163,8 @@ public sealed class ImapProtocolHandlerAppendTests
 
         AppendRun run = await RunAsync(context, Opening + "* BYE Logging out\r\nA002 OK LOGOUT completed\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UploadFailed, "Cannot APPEND with unknown input file size"), run.Result);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UploadFailed, "Cannot APPEND with unknown input file size"), run.Result);
     }
@@ -150,7 +176,11 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + "INBOX"), Opening + Continuation + completion + LogoutReply);
 
-        Assert.AreEqual($"A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n", run.Sent);
+        string expected = $"A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {{21}}\r\n{Message}\r\nA003 LOGOUT\r\n";
+        Diagnostics.Diff("sent", expected, run.Sent);
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, run.Result.ExitCode);
+        Diagnostics.Assert("error message", UploadFailed, run.Result.ErrorMessage);
+        Assert.AreEqual(expected, run.Sent);
         Assert.AreEqual(CurlExitCode.UploadFailed, run.Result.ExitCode);
         Assert.AreEqual(UploadFailed, run.Result.ErrorMessage);
         Assert.AreEqual(21, run.Result.BytesTransferred);
@@ -164,6 +194,8 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + "INBOX"), Opening + answer + LogoutReply);
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {21}\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UploadFailed, UploadFailed), run.Result);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {21}\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UploadFailed, UploadFailed), run.Result);
         Assert.IsEmpty(run.Progress.Reports);
@@ -176,6 +208,8 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + "INBOX"), Opening + replies);
 
+        Diagnostics.Assert("sent contains LOGOUT", false, run.Sent.Contains("LOGOUT", StringComparison.Ordinal));
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
         Assert.IsFalse(run.Sent.Contains("LOGOUT", StringComparison.Ordinal));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
@@ -185,6 +219,7 @@ public sealed class ImapProtocolHandlerAppendTests
     {
         AppendRun run = await RunAsync(Context(Host + "INBOX"), Opening + Continuation + Continuation);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unexpected continuation response"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unexpected continuation response"), run.Result);
     }
 
@@ -199,9 +234,13 @@ public sealed class ImapProtocolHandlerAppendTests
             Progress = new RecordingTransferProgress(),
         };
 
-    private static async Task<AppendRun> RunAsync(TransferContext context, string replies)
+    private async Task<AppendRun> RunAsync(TransferContext context, string replies)
     {
+        Diagnostics.Arrange("url", context.Url.ToString());
+        Diagnostics.Arrange("server", DiagnosticText.Escape(replies));
         ImapRun run = await ImapRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
         return new AppendRun(run.Result, run.Sent, (RecordingTransferProgress)context.Progress);
     }
 
