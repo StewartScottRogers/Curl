@@ -1,4 +1,7 @@
+using System.Globalization;
+using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core.Globbing;
 
@@ -12,6 +15,8 @@ namespace Curl.Core.Globbing;
 [TestClass]
 public sealed class UrlGlobTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("file:///n/{a,b}x[1-2]", "file:///n/ax1|file:///n/ax2|file:///n/bx1|file:///n/bx2")]
     [DataRow("file:///n/[a-c][1-2]", "file:///n/a1|file:///n/a2|file:///n/b1|file:///n/b2|file:///n/c1|file:///n/c2")]
@@ -40,22 +45,37 @@ public sealed class UrlGlobTests
     [DataRow("", "")]
     public void Expand_WellFormedGlob_ProducesCurlsUrlsInCurlsOrder(string url, string expectedUrls)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Visible(url));
+
         Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out TransferResult? failure));
+        string[] urls = glob.Expand().Select(match => match.Url).ToArray();
+
+        diagnostics.Act("urls", Visible(string.Join("|", urls)));
+        diagnostics.Act("url count", glob.UrlCount);
+        diagnostics.Assert("failure", null, failure);
         Assert.IsNull(failure);
 
         string[] expected = expectedUrls.Split('|');
-        CollectionAssert.AreEqual(expected, glob.Expand().Select(match => match.Url).ToArray());
+        diagnostics.Diff("urls", expectedUrls, string.Join("|", urls));
+        CollectionAssert.AreEqual(expected, urls);
+        diagnostics.Assert("url count", (long)expected.Length, glob.UrlCount);
         Assert.AreEqual(expected.Length, glob.UrlCount);
     }
 
     [TestMethod]
     public void Expand_HundredSets_HasNoGlobLimit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string url = "file:///" + string.Concat(Enumerable.Repeat("{a}", 100));
+        diagnostics.Arrange("url", "file:/// and 100 copies of {a}");
 
         Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+        string expanded = glob.Expand().Single().Url;
 
-        Assert.AreEqual("file:///" + new string('a', 100), glob.Expand().Single().Url);
+        diagnostics.Act("url", expanded);
+        diagnostics.Assert("url", "file:///" + new string('a', 100), expanded);
+        Assert.AreEqual("file:///" + new string('a', 100), expanded);
     }
 
     [TestMethod]
@@ -66,24 +86,34 @@ public sealed class UrlGlobTests
     [DataRow("http://x/", "b{a}", 128, 394)]
     public void TryParse_256thPiece_IsTooManySetsAtCurlsMeasuredPosition(string prefix, string repeated, int copies, int column)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string url = prefix + string.Concat(Enumerable.Repeat(repeated, copies));
+        diagnostics.Arrange("url", $"{prefix} and {copies} copies of {repeated}");
 
         Assert.IsFalse(UrlGlob.TryParse(url, out UrlGlob? glob, out TransferResult? failure));
 
+        ActFailure(diagnostics, failure);
+        diagnostics.Assert("glob", null, glob);
         Assert.IsNull(glob);
+        diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
         string message = $"too many {{}} sets in position {column}:\n{url}\n{new string(' ', column - 1)}^";
+        diagnostics.Diff("error message", message[..511], failure.ErrorMessage ?? string.Empty);
         Assert.AreEqual(message[..511], failure.ErrorMessage);
     }
 
     [TestMethod]
     public void TryParse_UrlPastCurlsMessageBuffer_IsCutTo511CharactersAsUpstreamTest761Expects()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string url = "http://testingthis/" + string.Concat(Enumerable.Repeat("{a}b", 201));
+        diagnostics.Arrange("url", "http://testingthis/ and 201 copies of {a}b");
 
         Assert.IsFalse(UrlGlob.TryParse(url, out _, out TransferResult? failure));
 
+        ActFailure(diagnostics, failure);
         string expected = "too many {} sets in position 403:\nhttp://testingthis/" + string.Concat(Enumerable.Repeat("{a}b", 114)) + "{a";
+        diagnostics.Diff("error message", expected, failure.ErrorMessage ?? string.Empty);
         Assert.AreEqual(expected, failure.ErrorMessage);
     }
 
@@ -92,24 +122,37 @@ public sealed class UrlGlobTests
     [DataRow("http://t/", "{a}", 130, "http://t/")]
     public void TryParse_255PiecesOrFewer_Parses(string prefix, string repeated, int copies, string expectedPrefix)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string url = prefix + string.Concat(Enumerable.Repeat(repeated, copies));
+        diagnostics.Arrange("url", $"{prefix} and {copies} copies of {repeated}");
 
         Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
 
         string expanded = glob.Expand().Single().Url;
+        diagnostics.Act("url", expanded);
+        diagnostics.Assert("url starts with", expectedPrefix, expanded.StartsWith(expectedPrefix, StringComparison.Ordinal) ? expectedPrefix : expanded);
         Assert.StartsWith(expectedPrefix, expanded);
+        diagnostics.Assert("url contains {", false, expanded.Contains('{', StringComparison.Ordinal));
         Assert.DoesNotContain("{", expanded);
     }
 
     [TestMethod]
     public void Expand_NumberRangeToOneBelowMaximum_IsProducedLazily()
     {
-        Assert.IsTrue(UrlGlob.TryParse("file:///n/[0-9223372036854775806]", out UrlGlob? glob, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "file:///n/[0-9223372036854775806]");
 
+        Assert.IsTrue(UrlGlob.TryParse("file:///n/[0-9223372036854775806]", out UrlGlob? glob, out _));
+        string[] firstThree = glob.Expand().Take(3).Select(match => match.Url).ToArray();
+
+        diagnostics.Act("url count", glob.UrlCount);
+        diagnostics.Act("first three urls", string.Join("|", firstThree));
+        diagnostics.Assert("url count", long.MaxValue, glob.UrlCount);
         Assert.AreEqual(long.MaxValue, glob.UrlCount);
+        diagnostics.Assert("first three urls", "file:///n/0|file:///n/1|file:///n/2", string.Join("|", firstThree));
         CollectionAssert.AreEqual(
             new[] { "file:///n/0", "file:///n/1", "file:///n/2" },
-            glob.Expand().Take(3).Select(match => match.Url).ToArray());
+            firstThree);
     }
 
     [TestMethod]
@@ -122,24 +165,41 @@ public sealed class UrlGlobTests
     [DataRow("file:///n/\\{a\\}\\[\\]\\x[]", "o_#1", "o_#1")]
     public void SubstituteGlobValues_HashNumber_IsReplacedAsCurlReplacesIt(string url, string outputFileName, string expectedNames)
     {
-        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+        diagnostics.Arrange("output file name", outputFileName);
 
+        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+        string[] names = glob.Expand().Select(match => match.SubstituteGlobValues(outputFileName)).ToArray();
+
+        diagnostics.Act("names", string.Join("|", names));
+        diagnostics.Diff("names", expectedNames, string.Join("|", names));
         CollectionAssert.AreEqual(
             expectedNames.Split('|'),
-            glob.Expand().Select(match => match.SubstituteGlobValues(outputFileName)).ToArray());
+            names);
     }
 
     [TestMethod]
     public void Unglobbed_GlobOff_TakesUrlAndHashNumbersAsWritten()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UrlGlob glob = UrlGlob.Unglobbed("file:///n/[1-2]{a,b}");
+        diagnostics.Arrange("url", "file:///n/[1-2]{a,b} (glob off)");
 
         UrlGlobMatch match = glob.Expand().Single();
 
+        diagnostics.Act("url count", glob.UrlCount);
+        diagnostics.Act("url", match.Url);
+        diagnostics.Act("glob values", match.GlobValues.Count);
+        diagnostics.Assert("url count", 1L, glob.UrlCount);
         Assert.AreEqual(1, glob.UrlCount);
+        diagnostics.Assert("url", "file:///n/[1-2]{a,b}", match.Url);
         Assert.AreEqual("file:///n/[1-2]{a,b}", match.Url);
+        diagnostics.Assert("glob values", 0, match.GlobValues.Count);
         Assert.IsEmpty(match.GlobValues);
-        Assert.AreEqual("o_#1", match.SubstituteGlobValues("o_#1"));
+        string substituted = match.SubstituteGlobValues("o_#1");
+        diagnostics.Assert("substituted o_#1", "o_#1", substituted);
+        Assert.AreEqual("o_#1", substituted);
     }
 
     [TestMethod]
@@ -191,11 +251,19 @@ public sealed class UrlGlobTests
     [DataRow("file:///n/[a-z][0-999999999][0-999999999][a-z]", "range overflow", 42)]
     public void TryParse_MalformedGlob_IsUrlMalformatWithCurlsPositionMessage(string url, string reason, int column)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+
         Assert.IsFalse(UrlGlob.TryParse(url, out UrlGlob? glob, out TransferResult? failure));
 
+        ActFailure(diagnostics, failure);
+        diagnostics.Assert("glob", null, glob);
         Assert.IsNull(glob);
+        diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
-        Assert.AreEqual($"{reason} in position {column}:\n{url}\n{new string(' ', column - 1)}^", failure.ErrorMessage);
+        string expected = $"{reason} in position {column}:\n{url}\n{new string(' ', column - 1)}^";
+        diagnostics.Diff("error message", expected, failure.ErrorMessage ?? string.Empty);
+        Assert.AreEqual(expected, failure.ErrorMessage);
     }
 
     [TestMethod]
@@ -205,8 +273,13 @@ public sealed class UrlGlobTests
     [DataRow("file:///n/[0-999999999][0-999999999]{a,b,c,d,e,f,g,h,i,j}", "range overflow")]
     public void TryParse_MalformedGlob_MessageMatchesCurlsEdgeFormatting(string url, string message)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+
         Assert.IsFalse(UrlGlob.TryParse(url, out _, out TransferResult? failure));
 
+        ActFailure(diagnostics, failure);
+        diagnostics.Diff("error message", message, failure.ErrorMessage ?? string.Empty);
         Assert.AreEqual(message, failure.ErrorMessage);
     }
 
@@ -219,28 +292,55 @@ public sealed class UrlGlobTests
     [DataRow("http://[::g]/", "bad range specification", 9)]
     public void TryParse_BracketThatIsNotAnIPv6Literal_IsReadAsARange(string url, string reason, int column)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+
         Assert.IsFalse(UrlGlob.TryParse(url, out _, out TransferResult? failure));
 
-        Assert.AreEqual($"{reason} in position {column}:\n{url}\n{new string(' ', column - 1)}^", failure.ErrorMessage);
+        ActFailure(diagnostics, failure);
+        string expected = $"{reason} in position {column}:\n{url}\n{new string(' ', column - 1)}^";
+        diagnostics.Diff("error message", expected, failure.ErrorMessage ?? string.Empty);
+        Assert.AreEqual(expected, failure.ErrorMessage);
     }
 
     [TestMethod]
     public void TryParse_BracketLongerThanAnIPv6Literal_IsReadAsARange()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string url = "http://[" + new string(':', 126) + "]/";
+        diagnostics.Arrange("url", url);
 
         Assert.IsFalse(UrlGlob.TryParse(url, out _, out TransferResult? failure));
 
+        ActFailure(diagnostics, failure);
+        diagnostics.Assert(
+            "error message starts with",
+            "bad range specification in position 9:",
+            failure.ErrorMessage?[..Math.Min(failure.ErrorMessage.Length, "bad range specification in position 9:".Length)]);
         StringAssert.StartsWith(failure.ErrorMessage, "bad range specification in position 9:");
     }
 
     [TestMethod]
-    public void TryParse_NullUrl_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.TryParse(null!, out _, out _));
+    public void TryParse_NullUrl_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", null);
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.TryParse(null!, out _, out _));
+
+        ActException(diagnostics, exception);
+    }
 
     [TestMethod]
-    public void Unglobbed_NullUrl_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed(null!));
+    public void Unglobbed_NullUrl_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", null);
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed(null!));
+
+        ActException(diagnostics, exception);
+    }
 
     [TestMethod]
     [DataRow("file:///n/{a?b,c*d,e:f,g\"h,i<j,k>l,m|n,q/r}", "o_#1", "o_a_b|o_c_d|o_e:f|o_g_h|o_i_j|o_k_l|o_m_n|o_q/r")]
@@ -254,28 +354,51 @@ public sealed class UrlGlobTests
     [DataRow("file:///n/a", "a\\\\b\\c", "a\\\\b\\c")]
     public void ResolveOutputFileName_OnWindows_IsSanitizedAsCurlSanitizesIt(string url, string outputFileName, string expectedNames)
     {
-        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+        diagnostics.Arrange("output file name", Visible(outputFileName));
+        diagnostics.Arrange("sanitizes for windows", true);
 
+        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+        string[] names = glob.Expand().Select(match => match.ResolveOutputFileName(outputFileName, sanitizesForWindows: true)).ToArray();
+
+        diagnostics.Act("names", Visible(string.Join("|", names)));
+        diagnostics.Diff("names", expectedNames, string.Join("|", names));
         CollectionAssert.AreEqual(
             expectedNames.Split('|'),
-            glob.Expand().Select(match => match.ResolveOutputFileName(outputFileName, sanitizesForWindows: true)).ToArray());
+            names);
     }
 
     [TestMethod]
     public void ResolveOutputFileName_OnWindows_HasNoLengthLimit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string name = new('a', 40000);
+        diagnostics.Arrange("output file name", "40000 copies of a");
+        diagnostics.Arrange("sanitizes for windows", true);
         Assert.IsTrue(UrlGlob.TryParse("file:///n/a", out UrlGlob? glob, out _));
 
-        Assert.AreEqual(name, glob.Expand().Single().ResolveOutputFileName(name, sanitizesForWindows: true));
+        string resolved = glob.Expand().Single().ResolveOutputFileName(name, sanitizesForWindows: true);
+
+        diagnostics.Act("resolved length", resolved.Length);
+        diagnostics.Assert("resolved length", name.Length, resolved.Length);
+        Assert.AreEqual(name, resolved);
     }
 
     [TestMethod]
     public void ResolveOutputFileName_OffWindows_IsOnlySubstituted()
     {
-        Assert.IsTrue(UrlGlob.TryParse("file:///n/{a?b}", out UrlGlob? glob, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "file:///n/{a?b}");
+        diagnostics.Arrange("output file name", "o?_#1");
+        diagnostics.Arrange("sanitizes for windows", false);
 
-        Assert.AreEqual("o?_a?b", glob.Expand().Single().ResolveOutputFileName("o?_#1", sanitizesForWindows: false));
+        Assert.IsTrue(UrlGlob.TryParse("file:///n/{a?b}", out UrlGlob? glob, out _));
+        string resolved = glob.Expand().Single().ResolveOutputFileName("o?_#1", sanitizesForWindows: false);
+
+        diagnostics.Act("resolved", resolved);
+        diagnostics.Assert("resolved", "o?_a?b", resolved);
+        Assert.AreEqual("o?_a?b", resolved);
     }
 
     [TestMethod]
@@ -283,28 +406,60 @@ public sealed class UrlGlobTests
     [DataRow(false)]
     public void ResolveOutputFileName_GlobOff_IsTheNameAsWritten(bool sanitizesForWindows)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UrlGlobMatch match = UrlGlob.Unglobbed("file:///n/[1-2]").Expand().Single();
+        diagnostics.Arrange("url", "file:///n/[1-2] (glob off)");
+        diagnostics.Arrange("output file name", "o?x#1");
+        diagnostics.Arrange("sanitizes for windows", sanitizesForWindows);
 
-        Assert.AreEqual("o?x#1", match.ResolveOutputFileName("o?x#1", sanitizesForWindows));
+        string resolved = match.ResolveOutputFileName("o?x#1", sanitizesForWindows);
+
+        diagnostics.Act("resolved", resolved);
+        diagnostics.Assert("resolved", "o?x#1", resolved);
+        Assert.AreEqual("o?x#1", resolved);
     }
 
     [TestMethod]
-    public void ResolveOutputFileName_NullName_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().ResolveOutputFileName(null!, sanitizesForWindows: true));
+    public void ResolveOutputFileName_NullName_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("output file name", null);
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().ResolveOutputFileName(null!, sanitizesForWindows: true));
+
+        ActException(diagnostics, exception);
+    }
 
     [TestMethod]
-    public void SubstituteGlobValues_NullName_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().SubstituteGlobValues(null!));
+    public void SubstituteGlobValues_NullName_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("output file name", null);
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().SubstituteGlobValues(null!));
+
+        ActException(diagnostics, exception);
+    }
 
     [TestMethod]
     public void Expand_NamedGlobs_ExpandLikeUnnamedOnes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("named url", "http://h/{<a>x,y}[<b>1-2]");
+        diagnostics.Arrange("unnamed url", "http://h/{x,y}[1-2]");
         Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x,y}[<b>1-2]", out UrlGlob? named, out _));
         Assert.IsTrue(UrlGlob.TryParse("http://h/{x,y}[1-2]", out UrlGlob? unnamed, out _));
 
+        string[] unnamedUrls = unnamed.Expand().Select(match => match.Url).ToArray();
+        string[] namedUrls = named.Expand().Select(match => match.Url).ToArray();
+
+        diagnostics.Act("named urls", string.Join("|", namedUrls));
+        diagnostics.Act("named url count", named.UrlCount);
+        diagnostics.Diff("urls", string.Join("|", unnamedUrls), string.Join("|", namedUrls));
         CollectionAssert.AreEqual(
-            unnamed.Expand().Select(match => match.Url).ToArray(),
-            named.Expand().Select(match => match.Url).ToArray());
+            unnamedUrls,
+            namedUrls);
+        diagnostics.Assert("named url count", 4L, named.UrlCount);
         Assert.AreEqual(4, named.UrlCount);
     }
 
@@ -314,9 +469,16 @@ public sealed class UrlGlobTests
     [DataRow("#<a>-#2")]
     public void SubstituteGlobValues_NamedOrNumberedReference_IsTheGlobsValue(string outputFileName)
     {
-        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x,y}[<b>1-2]", out UrlGlob? glob, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "http://h/{<a>x,y}[<b>1-2]");
+        diagnostics.Arrange("output file name", outputFileName);
 
-        Assert.AreEqual("x-1", glob.Expand().First().SubstituteGlobValues(outputFileName));
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x,y}[<b>1-2]", out UrlGlob? glob, out _));
+        string substituted = glob.Expand().First().SubstituteGlobValues(outputFileName);
+
+        diagnostics.Act("substituted", substituted);
+        diagnostics.Assert("substituted", "x-1", substituted);
+        Assert.AreEqual("x-1", substituted);
     }
 
     [TestMethod]
@@ -324,57 +486,94 @@ public sealed class UrlGlobTests
     [DataRow("http://h/{<>x,y}", "http://h/x|http://h/y")]
     public void Expand_BrokenOrEmptyGlobName_IsReadAsCurlReadsIt(string url, string expectedUrls)
     {
-        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
 
-        CollectionAssert.AreEqual(expectedUrls.Split('|'), glob.Expand().Select(match => match.Url).ToArray());
+        Assert.IsTrue(UrlGlob.TryParse(url, out UrlGlob? glob, out _));
+        string[] urls = glob.Expand().Select(match => match.Url).ToArray();
+
+        diagnostics.Act("urls", string.Join("|", urls));
+        diagnostics.Diff("urls", expectedUrls, string.Join("|", urls));
+        CollectionAssert.AreEqual(expectedUrls.Split('|'), urls);
     }
 
     [TestMethod]
     public void Expand_GlobNameOverSixtyFourCharacters_IsSetContent()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string name = new('n', 65);
+        diagnostics.Arrange("url", $"http://h/{{<{name}>x,y}}");
         Assert.IsTrue(UrlGlob.TryParse($"http://h/{{<{name}>x,y}}", out UrlGlob? glob, out _));
 
+        string[] urls = glob.Expand().Select(match => match.Url).ToArray();
+
+        diagnostics.Act("urls", string.Join("|", urls));
+        diagnostics.Diff("urls", $"http://h/<{name}>x|http://h/y", string.Join("|", urls));
         CollectionAssert.AreEqual(
             new[] { $"http://h/<{name}>x", "http://h/y" },
-            glob.Expand().Select(match => match.Url).ToArray());
+            urls);
     }
 
     [TestMethod]
     public void SubstituteGlobValues_SixtyFourCharacterName_IsResolved()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string name = new('n', 64);
+        diagnostics.Arrange("url", $"http://h/{{<{name}>x,y}}");
+        diagnostics.Arrange("output file name", $"o_#<{name}>");
         Assert.IsTrue(UrlGlob.TryParse($"http://h/{{<{name}>x,y}}", out UrlGlob? glob, out _));
 
+        string[] urls = glob.Expand().Select(match => match.Url).ToArray();
+        string substituted = glob.Expand().First().SubstituteGlobValues($"o_#<{name}>");
+
+        diagnostics.Act("urls", string.Join("|", urls));
+        diagnostics.Act("substituted", substituted);
+        diagnostics.Diff("urls", "http://h/x|http://h/y", string.Join("|", urls));
         CollectionAssert.AreEqual(
             new[] { "http://h/x", "http://h/y" },
-            glob.Expand().Select(match => match.Url).ToArray());
-        Assert.AreEqual("o_x", glob.Expand().First().SubstituteGlobValues($"o_#<{name}>"));
+            urls);
+        diagnostics.Assert("substituted", "o_x", substituted);
+        Assert.AreEqual("o_x", substituted);
     }
 
     [TestMethod]
     public void TryParse_DuplicateGlobName_IsUrlMalformatAtCurlsPosition()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         const string url = "https://dummy.example/{<test>A,B}{<test>C,D}";
+        diagnostics.Arrange("url", url);
 
         Assert.IsFalse(UrlGlob.TryParse(url, out _, out TransferResult? failure));
 
+        ActFailure(diagnostics, failure);
+        diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
-        Assert.AreEqual($"Duplicate glob name in position 40:\n{url}\n{new string(' ', 39)}^", failure.ErrorMessage);
+        string expected = $"Duplicate glob name in position 40:\n{url}\n{new string(' ', 39)}^";
+        diagnostics.Diff("error message", expected, failure.ErrorMessage ?? string.Empty);
+        Assert.AreEqual(expected, failure.ErrorMessage);
     }
 
     [TestMethod]
     public void TryResolveOutputFileName_UnknownGlobName_IsBadFunctionArgumentAtCurlsPosition()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "http://h/{<a>x}");
+        diagnostics.Arrange("output file name", "somewhere/#<foo>");
         Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x}", out UrlGlob? glob, out _));
 
         Assert.IsFalse(glob.Expand().Single().TryResolveOutputFileName(
             "somewhere/#<foo>", sanitizesForWindows: false, out string? fileName, out TransferResult? failure));
 
+        diagnostics.Act("file name", fileName);
+        ActFailure(diagnostics, failure);
+        diagnostics.Assert("file name", null, fileName);
         Assert.IsNull(fileName);
+        diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, failure.ExitCode);
+        string expected = $"no glob exists with this name in position 16:\nsomewhere/#<foo>\n{new string(' ', 15)}^";
+        diagnostics.Diff("error message", expected, failure.ErrorMessage ?? string.Empty);
         Assert.AreEqual(
-            $"no glob exists with this name in position 16:\nsomewhere/#<foo>\n{new string(' ', 15)}^",
+            expected,
             failure.ErrorMessage);
     }
 
@@ -385,35 +584,89 @@ public sealed class UrlGlobTests
     [DataRow("o_#<" + "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn" + ">", false, "o_#<nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn>")]
     public void TryResolveOutputFileName_KnownOrMalformedReference_IsResolved(string outputFileName, bool sanitizesForWindows, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "http://h/{<a>x}");
+        diagnostics.Arrange("output file name", outputFileName);
+        diagnostics.Arrange("sanitizes for windows", sanitizesForWindows);
         Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x}", out UrlGlob? glob, out _));
 
         Assert.IsTrue(glob.Expand().Single().TryResolveOutputFileName(
             outputFileName, sanitizesForWindows, out string? fileName, out TransferResult? failure));
 
+        diagnostics.Act("file name", fileName);
+        diagnostics.Assert("failure", null, failure);
         Assert.IsNull(failure);
+        diagnostics.Assert("file name", expected, fileName);
         Assert.AreEqual(expected, fileName);
     }
 
     [TestMethod]
     public void SubstituteGlobValues_UnknownGlobName_IsLeftAsWritten()
     {
-        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x}", out UrlGlob? glob, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "http://h/{<a>x}");
+        diagnostics.Arrange("output file name", "o_#<foo>_#<a>");
 
-        Assert.AreEqual("o_#<foo>_x", glob.Expand().Single().SubstituteGlobValues("o_#<foo>_#<a>"));
+        Assert.IsTrue(UrlGlob.TryParse("http://h/{<a>x}", out UrlGlob? glob, out _));
+        string substituted = glob.Expand().Single().SubstituteGlobValues("o_#<foo>_#<a>");
+
+        diagnostics.Act("substituted", substituted);
+        diagnostics.Assert("substituted", "o_#<foo>_x", substituted);
+        Assert.AreEqual("o_#<foo>_x", substituted);
     }
 
     [TestMethod]
     public void TryResolveOutputFileName_GlobOff_IsTheNameAsWritten()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UrlGlobMatch match = UrlGlob.Unglobbed("http://h/{<a>x}").Expand().Single();
+        diagnostics.Arrange("url", "http://h/{<a>x} (glob off)");
+        diagnostics.Arrange("output file name", "o?#<foo>");
+        diagnostics.Arrange("sanitizes for windows", true);
 
         Assert.IsTrue(match.TryResolveOutputFileName("o?#<foo>", sanitizesForWindows: true, out string? fileName, out TransferResult? failure));
 
+        diagnostics.Act("file name", fileName);
+        diagnostics.Assert("failure", null, failure);
         Assert.IsNull(failure);
+        diagnostics.Assert("file name", "o?#<foo>", fileName);
         Assert.AreEqual("o?#<foo>", fileName);
     }
 
     [TestMethod]
-    public void TryResolveOutputFileName_NullName_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().TryResolveOutputFileName(null!, sanitizesForWindows: true, out _, out _));
+    public void TryResolveOutputFileName_NullName_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("output file name", null);
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlGlob.Unglobbed("x").Expand().Single().TryResolveOutputFileName(null!, sanitizesForWindows: true, out _, out _));
+
+        ActException(diagnostics, exception);
+    }
+
+    private static void ActFailure(TestDiagnostics diagnostics, TransferResult failure)
+    {
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Act("error message", Visible(failure.ErrorMessage ?? string.Empty));
+    }
+
+    private static void ActException(TestDiagnostics diagnostics, ArgumentNullException exception)
+    {
+        diagnostics.Act("exception", $"{exception.GetType().Name} ({exception.ParamName})");
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
+
+    /// <summary>Shows control characters as <c>\uXXXX</c> so each value stays on one line.</summary>
+    private static string Visible(string text)
+    {
+        var visible = new StringBuilder(text.Length);
+        foreach (char character in text)
+        {
+            visible.Append(char.IsControl(character)
+                ? "\\u" + ((int)character).ToString("X4", CultureInfo.InvariantCulture)
+                : character.ToString());
+        }
+
+        return visible.ToString();
+    }
 }
