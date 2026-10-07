@@ -1,6 +1,8 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -14,6 +16,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionNtlmTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "http://127.0.0.1:18526/x";
 
     private const string Request = "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18526\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
@@ -34,11 +40,15 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, tokens, "--ntlm", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", WithNtlm("AQ==") + WithNtlm("Aw=="), Latin1(server.Written));
         Assert.AreEqual(WithNtlm("AQ==") + WithNtlm("Aw=="), Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", "ok", run.StandardOutput);
         Assert.AreEqual("ok", run.StandardOutput);
         Assert.HasCount(1, server.Targets);
         CollectionAssert.AreEqual(Convert.FromBase64String(Type2), tokens.Contexts[1].IncomingTokens[1]);
+        Diagnostics.Assert("tokens.Requests[1]", new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" }, tokens.Requests[1]);
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" }, tokens.Requests[1]);
     }
 
@@ -52,11 +62,15 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, tokens, "-x", "http://127.0.0.1:18605", "--proxy-ntlm", "-U", "u:p", "http://example.test/");
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", string.Format(null, proxyRequest, "AQ==") + string.Format(null, proxyRequest, "Aw=="), Latin1(server.Written));
         Assert.AreEqual(string.Format(null, proxyRequest, "AQ==") + string.Format(null, proxyRequest, "Aw=="), Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", "ok", run.StandardOutput);
         Assert.AreEqual("ok", run.StandardOutput);
         Assert.HasCount(1, server.Targets);
         CollectionAssert.AreEqual(Convert.FromBase64String(Type2), tokens.Contexts[1].IncomingTokens[1]);
+        Diagnostics.Assert("tokens.Requests[1]", new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" }, tokens.Requests[1]);
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" }, tokens.Requests[1]);
     }
 
@@ -68,8 +82,11 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, tokens, "--anyauth", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", Request + WithNtlm("AQ==") + WithNtlm("Aw=="), Latin1(server.Written));
         Assert.AreEqual(Request + WithNtlm("AQ==") + WithNtlm("Aw=="), Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", "ok", run.StandardOutput);
         Assert.AreEqual("ok", run.StandardOutput);
         Assert.HasCount(1, server.Targets);
     }
@@ -81,8 +98,11 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, new TokenSource(), "--ntlm", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", WithNtlm("AQ==") + WithNtlm("AQ=="), Latin1(server.Written));
         Assert.AreEqual(WithNtlm("AQ==") + WithNtlm("AQ=="), Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", "nope", run.StandardOutput);
         Assert.AreEqual("nope", run.StandardOutput);
     }
 
@@ -93,8 +113,11 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, new TokenSource(), "--ntlm", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", WithNtlm("AQ==") + WithNtlm("Aw=="), Latin1(server.Written));
         Assert.AreEqual(WithNtlm("AQ==") + WithNtlm("Aw=="), Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", "nope", run.StandardOutput);
         Assert.AreEqual("nope", run.StandardOutput);
         Assert.IsEmpty(run.StandardError);
     }
@@ -107,7 +130,9 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, tokens, "--ntlm", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", Request, Latin1(server.Written));
         Assert.AreEqual(Request, Latin1(server.Written));
         Assert.IsEmpty(tokens.Requests);
     }
@@ -120,10 +145,12 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, null, "--ntlm", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         string[] authorizations = AuthorizationsOf(server);
         StringAssert.StartsWith(authorizations[0], "NTLM TlRMTVNTUAABAAAAB4IIog");
         StringAssert.StartsWith(authorizations[1], "NTLM TlRMTVNTUAADAAAAGAAYA");
+        Diagnostics.Assert("run.StandardOutput", "ok", run.StandardOutput);
         Assert.AreEqual("ok", run.StandardOutput);
     }
 
@@ -135,10 +162,13 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, null, "--ntlm", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         string[] authorizations = AuthorizationsOf(server);
+        Diagnostics.Assert("authorizations[0]", "NTLM TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=", authorizations[0]);
         Assert.AreEqual("NTLM TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=", authorizations[0]);
         StringAssert.StartsWith(authorizations[1], "NTLM TlRMTVNTUAADAAAAGAAYAEAAAABUAFQAWAAAAAAAAACsAAAAAgACAKwAAAAWABYArgAAAAAAAAAAAAAAM4KK4");
+        Diagnostics.Assert("run.StandardOutput", "ok", run.StandardOutput);
         Assert.AreEqual("ok", run.StandardOutput);
     }
 
@@ -150,8 +180,10 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, null, "--ntlm", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 94, run.ExitCode);
         Assert.AreEqual(94, run.ExitCode);
         Assert.IsEmpty(run.StandardOutput);
+        Diagnostics.Assert("run.StandardError", ("curl: (94) An authentication function returned an error" + Environment.NewLine).ReplaceLineEndings("\n"), run.StandardError.ReplaceLineEndings("\n"));
         Assert.AreEqual("curl: (94) An authentication function returned an error" + Environment.NewLine, run.StandardError);
     }
 
@@ -163,7 +195,9 @@ public sealed class CurlCompositionNtlmTests
 
         CurlRun run = await RunAsync(server, null, "--ntlm", "-u", "u:p", Url);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("run.StandardOutput", "nope", run.StandardOutput);
         Assert.AreEqual("nope", run.StandardOutput);
         Assert.IsEmpty(run.StandardError);
     }
@@ -177,12 +211,13 @@ public sealed class CurlCompositionNtlmTests
     private static string[] AuthorizationsOf(ScriptedConnector server) =>
         [.. Latin1(server.Written).Split("\r\n").Where(line => line.StartsWith("Authorization: ", StringComparison.Ordinal)).Select(line => line["Authorization: ".Length..])];
 
-    private static async Task<CurlRun> RunAsync(ScriptedConnector server, ISecurityContextFactory? tokens, params string[] arguments)
+    private async Task<CurlRun> RunAsync(ScriptedConnector server, ISecurityContextFactory? tokens, params string[] arguments)
     {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
 
+        Diagnostics.ArrangeCommandLine(["-sS", .. arguments]);
         int exitCode = await CurlComposition
             .CreateRunner(
                 standardOutput,
@@ -193,7 +228,10 @@ public sealed class CurlCompositionNtlmTests
                 securityContexts: tokens)
             .RunAsync(["-sS", .. arguments]);
 
-        return new CurlRun(exitCode, Latin1(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()));
+        CurlRun run = new(exitCode, Latin1(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.ActRun(run.ExitCode, run.StandardOutput, run.StandardError);
+        Diagnostics.ActWritten(server);
+        return run;
     }
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);

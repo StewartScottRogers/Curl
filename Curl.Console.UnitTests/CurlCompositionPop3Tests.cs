@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -16,6 +17,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionPop3Tests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Message = "Subject: a\r\n\r\nline one\r\n..two dots\r\n.one dot\r\nlast\r\n";
 
     private const string Greeting = "+OK POP3 ready <1896.697170952@localhost>\r\n";
@@ -42,6 +47,7 @@ public sealed class CurlCompositionPop3Tests
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, $"{scheme}://127.0.0.1:18110/1");
 
+        Diagnostics.AssertWritten(Capa + RetrAndQuit, connector);
         Assert.AreEqual(Capa + RetrAndQuit, Encoding.ASCII.GetString(connector.Written));
         Assert.AreEqual(("127.0.0.1", 18110, useTls), (connector.Targets.Single().Host, connector.Targets.Single().Port, connector.Targets.Single().UseTls));
         Assert.AreEqual(Message, standardOutput);
@@ -67,6 +73,7 @@ public sealed class CurlCompositionPop3Tests
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             connector, $"{scheme}://127.0.0.1:18110/1", "-u", "u:p");
 
+        Diagnostics.AssertWritten(Capa + "AUTH PLAIN\r\nAHUAcA==\r\n" + RetrAndQuit, connector);
         Assert.AreEqual(Capa + "AUTH PLAIN\r\nAHUAcA==\r\n" + RetrAndQuit, Encoding.ASCII.GetString(connector.Written));
         Assert.AreEqual(useTls, connector.Targets.Single().UseTls);
         Assert.AreEqual(Message, standardOutput);
@@ -87,23 +94,28 @@ public sealed class CurlCompositionPop3Tests
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "pop3://127.0.0.1:18110/9");
 
+        Diagnostics.AssertWritten(Capa + "RETR 9\r\nQUIT\r\n", connector);
         Assert.AreEqual(Capa + "RETR 9\r\nQUIT\r\n", Encoding.ASCII.GetString(connector.Written));
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual("curl: (8) Weird server reply" + Environment.NewLine, standardError);
         Assert.AreEqual(8, exitCode);
     }
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
+    private async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
         ScriptedConnector connector, string url, params string[] extraArguments)
     {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
 
+        Diagnostics.ArrangeCommandLine(["-sS", .. extraArguments, url]);
         int exitCode = await CurlComposition
             .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
             .RunAsync(["-sS", .. extraArguments, url]);
 
-        return (exitCode, Encoding.UTF8.GetString(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()));
+        (int ExitCode, string StandardOutput, string StandardError) result = (exitCode, Encoding.UTF8.GetString(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.ActRun(result.ExitCode, result.StandardOutput, result.StandardError);
+        Diagnostics.ActWritten(connector);
+        return result;
     }
 }

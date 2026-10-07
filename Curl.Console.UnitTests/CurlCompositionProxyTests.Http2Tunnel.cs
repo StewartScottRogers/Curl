@@ -23,6 +23,7 @@ public sealed partial class CurlCompositionProxyTests
     {
         HttpProxyTunnelOptions options = OpenSslBuildTunnelOptionsFor(["--proxy-http2", "-p", "-x", "https://127.0.0.1:18443", "http://example.com/a"]);
 
+        Diagnostics.Assert("options.ProxyHttp2", true, options.ProxyHttp2);
         Assert.IsTrue(options.ProxyHttp2);
     }
 
@@ -33,6 +34,7 @@ public sealed partial class CurlCompositionProxyTests
     {
         HttpProxyTunnelOptions options = OpenSslBuildTunnelOptionsFor(arguments);
 
+        Diagnostics.Assert("options.ProxyHttp2", false, options.ProxyHttp2);
         Assert.IsFalse(options.ProxyHttp2);
     }
 
@@ -52,6 +54,7 @@ public sealed partial class CurlCompositionProxyTests
         Run run = await RunAsync(connector, new Dictionary<string, string>(), ["-sS", "-p", "-x", "https://127.0.0.1:18443", "http://example.com/a"]);
 
         Assert.AreEqual(0, run.ExitCode, run.StandardError);
+        Diagnostics.Assert("run.StandardOutput", "hello", run.StandardOutput);
         Assert.AreEqual("hello", run.StandardOutput);
         byte[] written = server.Written;
         CollectionAssert.AreEqual(Http2Connection.ClientPreface.ToArray(), written.Take(Http2Connection.ClientPreface.Length).ToArray());
@@ -61,15 +64,23 @@ public sealed partial class CurlCompositionProxyTests
             new[] { ":method: CONNECT", ":authority: example.com:80", "user-agent: curl/8.21.0" },
             new HpackDecoder().Decode(Http2FramePayloadParser.ParseHeaders(connect).Fragment.Span).Select(field => $"{field.Name}: {field.Value}").ToArray());
         Http2Frame tunnelled = frames.First(frame => frame.Type == Http2FrameType.Data);
+        Diagnostics.Assert("tunnelled.StreamId", 1, tunnelled.StreamId);
         Assert.AreEqual(1, tunnelled.StreamId);
+        Diagnostics.Assert("Encoding.Latin1.GetString(tunnelled.Payload.Span)", TunnelledGet, Encoding.Latin1.GetString(tunnelled.Payload.Span));
         Assert.AreEqual(TunnelledGet, Encoding.Latin1.GetString(tunnelled.Payload.Span));
     }
 
     /// <summary>The tunnel options the production composition maps from <paramref name="arguments" /> parsed as curl's OpenSSL build parses them.</summary>
-    private static HttpProxyTunnelOptions OpenSslBuildTunnelOptionsFor(string[] arguments) =>
-        CurlComposition.CreateProxyTunnelOptions(
-            CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!,
-            new SystemSecurityContextFactory());
+    private HttpProxyTunnelOptions OpenSslBuildTunnelOptionsFor(string[] arguments)
+    {
+        Diagnostics.ArrangeCommandLine(arguments);
+        HttpProxyTunnelOptions options =
+            CurlComposition.CreateProxyTunnelOptions(
+                CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!,
+                new SystemSecurityContextFactory());
+        Diagnostics.Act("proxy auth schemes, HTTP/2 tunnel", $"{options.ProxyAuthSchemes}, {options.ProxyHttp2}");
+        return options;
+    }
 
     private static async Task<List<Http2Frame>> ReadFramesAsync(byte[] bytes)
     {

@@ -1,6 +1,8 @@
 using Curl.Protocol.Ldap;
 using Curl.Protocol.Ssh.Negotiation;
 
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -11,23 +13,44 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionPlatformLibraryTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(true, LdapDialect.WinLdap)]
     [DataRow(false, LdapDialect.OpenLdap)]
     public void LdapDialectFor_EachPlatform_IsItsCurlsLdapLibrary(bool runsOnWindows, LdapDialect expected)
     {
-        Assert.AreEqual(expected, CurlComposition.LdapDialectFor(runsOnWindows));
+        Diagnostics.Arrange("runsOnWindows", runsOnWindows);
+        LdapDialect dialect = CurlComposition.LdapDialectFor(runsOnWindows);
+        Diagnostics.Act("LDAP dialect", dialect);
+
+        Diagnostics.Assert("LDAP dialect", expected, dialect);
+        Assert.AreEqual(expected, dialect);
     }
 
     [TestMethod]
     public void SshAlgorithmPreferencesFor_Windows_IsTheSchannelBuilds()
     {
-        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, CurlComposition.SshAlgorithmPreferencesFor(runsOnWindows: true));
+        Diagnostics.Arrange("runsOnWindows", true);
+        SshAlgorithmPreferences preferences = CurlComposition.SshAlgorithmPreferencesFor(runsOnWindows: true);
+        bool isReference = ReferenceEquals(SshAlgorithmPreferences.WindowsReference, preferences);
+        Diagnostics.Act("is the Windows reference", isReference);
+
+        Diagnostics.Assert("is the Windows reference", true, isReference);
+        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, preferences);
     }
 
     [TestMethod]
     public void SshAlgorithmPreferencesFor_OffWindows_IsTheOpenSslBuilds()
     {
-        Assert.AreSame(SshAlgorithmPreferences.OpenSslReference, CurlComposition.SshAlgorithmPreferencesFor(runsOnWindows: false));
+        Diagnostics.Arrange("runsOnWindows", false);
+        SshAlgorithmPreferences preferences = CurlComposition.SshAlgorithmPreferencesFor(runsOnWindows: false);
+        bool isReference = ReferenceEquals(SshAlgorithmPreferences.OpenSslReference, preferences);
+        Diagnostics.Act("is the OpenSSL reference", isReference);
+
+        Diagnostics.Assert("is the OpenSSL reference", true, isReference);
+        Assert.AreSame(SshAlgorithmPreferences.OpenSslReference, preferences);
     }
 }
