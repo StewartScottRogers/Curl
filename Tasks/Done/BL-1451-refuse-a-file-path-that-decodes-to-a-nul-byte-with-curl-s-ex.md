@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitLibrary, Curl.Protocol.File.UnitTests]
 requirement: FR-019
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1451 — Refuse a file:// path that decodes to a NUL byte with curl's exit 3 before opening anything
 
@@ -25,13 +25,20 @@ A `file://` URL whose path percent-decodes to a NUL byte (`%00`) fails before an
 
 ## Acceptance criteria
 
-- [ ] Tests in `Curl.Protocol.File.UnitTests` pin a download of `file:///dir/f.txt%00x` and an upload to `file:///dir/up%00x` each failing with `CurlExitCode.UrlMalformat` and the message `URL using bad/illegal format or missing URL`, with nothing opened or created (assert on the fake file system), and the measured `-v` lines.
-- [ ] A test pins that `file:///dir/f%0atxt` is still decoded and opened (no refusal), as today.
-- [ ] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary` reports no failing member.
+- [x] Tests in `Curl.Protocol.File.UnitTests` pin a download of `file:///dir/f.txt%00x` and an upload to `file:///dir/up%00x` each failing with `CurlExitCode.UrlMalformat` and the message `URL using bad/illegal format or missing URL`, with nothing opened or created (assert on the fake file system), and the measured `-v` lines.
+- [x] A test pins that `file:///dir/f%0atxt` is still decoded and opened (no refusal), as today.
+- [x] `dotnet build Curl.Protocol.File.UnitTests -warnaserror` is clean; `dotnet test Curl.Protocol.File.UnitTests --filter "TestCategory!=Integration"` passes; `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary` reports no failing member.
 
 ## Notes
+
+- Measured 2026-10-07 on Windows, curl 8.21.0 (Schannel and MinGW builds): `curl -sSv file:///dir/f.txt%00x` and `curl -sSv -T f.txt file:///dir/up%00x` write only `curl: (3) URL using bad/illegal format or missing URL` - no `*` line under `-v`, not even `shutting down connection` - and create nothing. `file:///dir/f%0atxt` still exits 37 `Could not open file /dir/f%0Atxt`.
+- `FileProtocolHandler.TransferAsync` now refuses a parsed path whose `OsPath` holds a NUL with `CurlExitCode.UrlMalformat` and `FileTransferMessages.UrlMalformed`, before the resume check and any `IFileSystem` call, without `ReportFailure` (so no info line). ADR-0416.
+- Pinned in `FileProtocolHandlerNulBytePathTests` (download, upload, `%0a` still opened); the `-v` lines measured are none, asserted as an empty transcript.
+- Found: a Windows drive-letter *download* (`file:///C:/dir/f.txt%00x`) gets `* URL rejected: Malformed input to a URL function` from curl's URL parser instead; that is URL parsing in Curl.Protocol.Abstractions, outside this task's touches, so it is filed as BL-1526.
+- Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A file:// path decoding to NUL now fails with exit 3 'URL using bad/illegal format or missing URL' before anything opens, download and upload

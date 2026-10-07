@@ -30,6 +30,13 @@ internal static class FileTransferMessages
     internal const string BadUrl = "URL rejected: Bad file:// URL";
 
     /// <summary>
+    /// The exit 3 message for a <c>file://</c> path that percent-decodes to a NUL byte:
+    /// <c>curl_easy_strerror</c>'s text for <c>CURLE_URL_MALFORMAT</c>, since curl 8.21.0
+    /// writes no <c>failf</c> for it.
+    /// </summary>
+    internal const string UrlMalformed = "URL using bad/illegal format or missing URL";
+
+    /// <summary>
     /// The exit 23 message for a download destination that stopped accepting bytes.
     /// </summary>
     /// <param name="passed">The size of the chunk offered to the destination.</param>
