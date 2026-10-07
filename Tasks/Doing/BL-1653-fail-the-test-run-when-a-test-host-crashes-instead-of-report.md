@@ -32,3 +32,4 @@ When a test host process dies part way through a run (a stack overflow, `Environ
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
