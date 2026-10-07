@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Keys;
@@ -20,6 +21,10 @@ public sealed class OpenSshPrivateKeyDecoderTests
 
     private static readonly byte[] Salt = new byte[16];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("aes256-ctr", "none", DisplayName = "a cipher without a KDF")]
     [DataRow("none", "bcrypt", DisplayName = "a KDF without a cipher")]
@@ -28,31 +33,53 @@ public sealed class OpenSshPrivateKeyDecoderTests
     public void Read_CipherAndKdfThisDoesNotRead_ReturnsNull(string cipher, string kdf)
     {
         byte[] body = OpenSshKeyFile.Body(cipher, kdf, 1, TestDsaKey.PublicKeyBlob, OpenSshKeyFile.Section(1, 1, DsaFields));
+        Diagnostics.Arrange("cipher", cipher);
+        Diagnostics.Arrange("KDF", kdf);
+        Diagnostics.Bytes("body", body);
 
-        Assert.IsNull(OpenSshPrivateKeyDecoder.Read(body, Secret));
+        SshPrivateKey? key = OpenSshPrivateKeyDecoder.Read(body, Secret);
+
+        WriteKeyExpectingNone(key);
+        Assert.IsNull(key);
     }
 
     [TestMethod]
     public void Read_SecurityKey_ReturnsNull()
     {
         byte[] body = OpenSshKeyFile.Body([], Join(Name("sk-ssh-ed25519@openssh.com"), String(new byte[32])));
+        Diagnostics.Arrange("key type", "sk-ssh-ed25519@openssh.com");
+        Diagnostics.Bytes("body", body);
 
-        Assert.IsNull(OpenSshPrivateKeyDecoder.Read(body, []));
+        SshPrivateKey? key = OpenSshPrivateKeyDecoder.Read(body, []);
+
+        WriteKeyExpectingNone(key);
+        Assert.IsNull(key);
     }
 
     [TestMethod]
     public void Read_EcdsaOnAnotherCurve_ReturnsNull()
     {
         byte[] body = OpenSshKeyFile.Body([], Join(Name("ecdsa-sha2-nistp256"), Name("nistp192"), String([4]), Mpint([1])));
+        Diagnostics.Arrange("curve", "nistp192");
+        Diagnostics.Bytes("body", body);
 
-        Assert.IsNull(OpenSshPrivateKeyDecoder.Read(body, []));
+        SshPrivateKey? key = OpenSshPrivateKeyDecoder.Read(body, []);
+
+        WriteKeyExpectingNone(key);
+        Assert.IsNull(key);
     }
 
     [TestMethod]
     public void Read_DsaKey_ReadsIt()
     {
-        SshPrivateKey? key = OpenSshPrivateKeyDecoder.Read(OpenSshKeyFile.Body(TestDsaKey.PublicKeyBlob, DsaFields), []);
+        byte[] body = OpenSshKeyFile.Body(TestDsaKey.PublicKeyBlob, DsaFields);
+        Diagnostics.Arrange("key", "RFC 6979 DSA key, unencrypted");
+        Diagnostics.Bytes("body", body);
 
+        SshPrivateKey? key = OpenSshPrivateKeyDecoder.Read(body, []);
+
+        Diagnostics.ActKey(key);
+        Diagnostics.AssertBytes("public key blob", TestDsaKey.PublicKeyBlob, key?.PublicKeyBlob);
         CollectionAssert.AreEqual(TestDsaKey.PublicKeyBlob, key!.PublicKeyBlob);
     }
 
@@ -62,9 +89,15 @@ public sealed class OpenSshPrivateKeyDecoderTests
         byte[] seed = Convert.FromHexString("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         byte[] publicKey = Convert.FromHexString("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
         byte[] blob = Join(Name("ssh-ed25519"), String(publicKey));
+        byte[] body = OpenSshKeyFile.Body(blob, Join(Name("ssh-ed25519"), String(publicKey), String([.. seed, .. publicKey])));
+        Diagnostics.Arrange("key", "RFC 8032 section 7.1 test 1, unencrypted");
+        Diagnostics.Bytes("body", body);
 
-        SshPrivateKey? key = OpenSshPrivateKeyDecoder.Read(OpenSshKeyFile.Body(blob, Join(Name("ssh-ed25519"), String(publicKey), String([.. seed, .. publicKey]))), []);
+        SshPrivateKey? key = OpenSshPrivateKeyDecoder.Read(body, []);
 
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key class", nameof(Ed25519SshPrivateKey), key?.GetType().Name);
+        Diagnostics.AssertBytes("public key blob", blob, key?.PublicKeyBlob);
         Assert.IsInstanceOfType<Ed25519SshPrivateKey>(key);
         CollectionAssert.AreEqual(blob, key.PublicKeyBlob);
     }
@@ -73,8 +106,12 @@ public sealed class OpenSshPrivateKeyDecoderTests
     public void Read_Ed25519KeyWithAShortPrivateKey_Throws()
     {
         byte[] body = OpenSshKeyFile.Body([], Join(Name("ssh-ed25519"), String(new byte[32]), String(new byte[32])));
+        Diagnostics.Arrange("private key length", 32);
+        Diagnostics.Bytes("body", body);
 
-        Assert.ThrowsExactly<CryptographicException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+        var failure = Assert.ThrowsExactly<CryptographicException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+
+        Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
     [TestMethod]
@@ -83,22 +120,36 @@ public sealed class OpenSshPrivateKeyDecoderTests
     public void Read_OtherThanOneKey_Throws(uint keyCount)
     {
         byte[] body = OpenSshKeyFile.Body("none", "none", keyCount, TestDsaKey.PublicKeyBlob, OpenSshKeyFile.Section(1, 1, DsaFields));
+        Diagnostics.Arrange("key count", keyCount);
+        Diagnostics.Bytes("body", body);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+        var failure = Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+
+        Diagnostics.ActAndAssertThrown(nameof(InvalidDataException), failure);
     }
 
     [TestMethod]
     public void Read_CheckIntegersDiffer_Throws()
     {
         byte[] body = OpenSshKeyFile.Body("none", "none", 1, TestDsaKey.PublicKeyBlob, OpenSshKeyFile.Section(1, 2, DsaFields));
+        Diagnostics.Arrange("check integers", "1 and 2");
+        Diagnostics.Bytes("body", body);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+        var failure = Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+
+        Diagnostics.ActAndAssertThrown(nameof(InvalidDataException), failure);
     }
 
     [TestMethod]
     public void Read_NoMagic_Throws()
     {
-        Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read([.. "openssh-key-v2\0"u8], []));
+        byte[] body = [.. "openssh-key-v2\0"u8];
+        Diagnostics.Bytes("body", body);
+        Diagnostics.Arrange("magic", "openssh-key-v2");
+
+        var failure = Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+
+        Diagnostics.ActAndAssertThrown(nameof(InvalidDataException), failure);
     }
 
     [TestMethod]
@@ -108,8 +159,16 @@ public sealed class OpenSshPrivateKeyDecoderTests
     public void Read_EncryptedSectionNotWholeBlocks_Throws(string cipher, int length)
     {
         byte[] body = OpenSshKeyFile.Encrypted(cipher, Salt, 16, new byte[length], []);
+        Diagnostics.Arrange("cipher", cipher);
+        Diagnostics.Arrange("encrypted section length", length);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, Secret));
+        Exception failure;
+        using (Diagnostics.Phase("bcrypt-pbkdf and decrypt"))
+        {
+            failure = Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, Secret));
+        }
+
+        Diagnostics.ActAndAssertThrown(nameof(InvalidDataException), failure);
     }
 
     [TestMethod]
@@ -118,24 +177,38 @@ public sealed class OpenSshPrivateKeyDecoderTests
     public void Read_BcryptRoundsOutOfRange_Throws(uint rounds)
     {
         byte[] body = OpenSshKeyFile.Encrypted("aes256-ctr", Salt, rounds, new byte[16], []);
+        Diagnostics.Arrange("bcrypt rounds", rounds);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, Secret));
+        var failure = Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, Secret));
+
+        Diagnostics.ActAndAssertThrown(nameof(InvalidDataException), failure);
     }
 
     [TestMethod]
     public void Read_EncryptedWithoutAPassphrase_ThrowsAsBcryptPbkdfRefusesIt()
     {
         byte[] body = OpenSshKeyFile.Encrypted("aes256-ctr", Salt, 1, new byte[16], []);
+        Diagnostics.Arrange("passphrase", "(empty)");
 
-        Assert.ThrowsExactly<ArgumentException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+        var failure = Assert.ThrowsExactly<ArgumentException>(() => OpenSshPrivateKeyDecoder.Read(body, []));
+
+        Diagnostics.ActAndAssertThrown(nameof(ArgumentException), failure);
     }
 
     [TestMethod]
     public void Read_GcmWithoutItsTag_Throws()
     {
         byte[] body = OpenSshKeyFile.Encrypted("aes256-gcm@openssh.com", Salt, 1, new byte[16], new byte[15]);
+        Diagnostics.Arrange("cipher", "aes256-gcm@openssh.com");
+        Diagnostics.Arrange("tag length", 15);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, Secret));
+        Exception failure;
+        using (Diagnostics.Phase("bcrypt-pbkdf and decrypt"))
+        {
+            failure = Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, Secret));
+        }
+
+        Diagnostics.ActAndAssertThrown(nameof(InvalidDataException), failure);
     }
 
     [TestMethod]
@@ -145,15 +218,37 @@ public sealed class OpenSshPrivateKeyDecoderTests
     public void Read_WrongPassphrase_ThrowsAsTheCheckIntegersDiffer(string cipher)
     {
         byte[] body = PemBlock.Find(TestUserKeys.Ed25519OpenSshEncrypted[cipher])!.Body;
+        Diagnostics.Arrange("cipher", cipher);
+        Diagnostics.Arrange("passphrase", "nope");
 
-        Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, "nope"u8.ToArray()));
+        Exception failure;
+        using (Diagnostics.Phase("bcrypt-pbkdf and decrypt"))
+        {
+            failure = Assert.ThrowsExactly<InvalidDataException>(() => OpenSshPrivateKeyDecoder.Read(body, "nope"u8.ToArray()));
+        }
+
+        Diagnostics.ActAndAssertThrown(nameof(InvalidDataException), failure);
     }
 
     [TestMethod]
     public void Read_GcmWrongPassphrase_ThrowsAsTheTagFails()
     {
         byte[] body = PemBlock.Find(TestUserKeys.Ed25519OpenSshEncrypted["aes256-gcm@openssh.com"])!.Body;
+        Diagnostics.Arrange("cipher", "aes256-gcm@openssh.com");
+        Diagnostics.Arrange("passphrase", "nope");
 
-        Assert.Throws<CryptographicException>(() => OpenSshPrivateKeyDecoder.Read(body, "nope"u8.ToArray()));
+        Exception failure;
+        using (Diagnostics.Phase("bcrypt-pbkdf and decrypt"))
+        {
+            failure = Assert.Throws<CryptographicException>(() => OpenSshPrivateKeyDecoder.Read(body, "nope"u8.ToArray()));
+        }
+
+        Diagnostics.ActAndAssertThrown($"{nameof(CryptographicException)} or a subclass", failure);
+    }
+
+    private void WriteKeyExpectingNone(SshPrivateKey? key)
+    {
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key", "(none)", key?.KeyType ?? "(none)");
     }
 }
