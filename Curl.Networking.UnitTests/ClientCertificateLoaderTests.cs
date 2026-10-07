@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 using Curl.Networking.Fakes;
+using Curl.Testing;
 
 using CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
 
@@ -20,6 +21,10 @@ public sealed class ClientCertificateLoaderTests
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "curl-client-cert-" + Guid.NewGuid().ToString("N"));
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestCleanup]
     public void DeleteFiles()
     {
@@ -32,9 +37,14 @@ public sealed class ClientCertificateLoaderTests
     [TestMethod]
     public void LoadAsSchannelBuild_Pkcs12RsaKey_ExportsItsPrivateParameters()
     {
+        Diagnostics.Arrange("file name", "client.p12");
+        Diagnostics.Arrange("key", "RSA 2048");
         var path = WriteRsaPkcs12File(_directory);
+        Diagnostics.Arrange("file size", new FileInfo(path).Length);
 
         var (loaded, failure) = ClientCertificateLoader.LoadAsSchannelBuild(path, Passphrase, null, new FakeClientCertificateStore());
+        Diagnostics.Act("failure is null", failure is null);
+        Diagnostics.Act("loaded subject", loaded?.Subject);
 
         AssertPrivateParametersExport(loaded, failure);
     }
@@ -42,9 +52,14 @@ public sealed class ClientCertificateLoaderTests
     [TestMethod]
     public void LoadAsOpenSslBuild_Pkcs12RsaKey_ExportsItsPrivateParameters()
     {
+        Diagnostics.Arrange("file name", "client.p12");
+        Diagnostics.Arrange("certificate type", "P12");
         var path = WriteRsaPkcs12File(_directory);
+        Diagnostics.Arrange("file size", new FileInfo(path).Length);
 
         var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(path, Passphrase, null, "P12", null);
+        Diagnostics.Act("failure is null", failure is null);
+        Diagnostics.Act("loaded subject", loaded?.Subject);
 
         AssertPrivateParametersExport(loaded, failure);
     }
@@ -59,8 +74,14 @@ public sealed class ClientCertificateLoaderTests
         var keyFile = Path.Combine(_directory, "key.pem");
         File.WriteAllText(certificateFile, certificate.ExportCertificatePem());
         File.WriteAllText(keyFile, rsa.ExportPkcs8PrivateKeyPem());
+        Diagnostics.Arrange("certificate file", "cert.pem");
+        Diagnostics.Arrange("key file", "key.pem");
+        Diagnostics.Arrange("certificate subject", certificate.Subject);
+        Diagnostics.Arrange("certificate file length", new FileInfo(certificateFile).Length);
 
         var (loaded, failure) = ClientCertificateLoader.LoadAsOpenSslBuild(certificateFile, null, keyFile, null, null);
+        Diagnostics.Act("failure is null", failure is null);
+        Diagnostics.Act("loaded subject", loaded?.Subject);
 
         AssertPrivateParametersExport(loaded, failure);
     }
@@ -82,13 +103,16 @@ public sealed class ClientCertificateLoaderTests
         new CertificateRequest("CN=client", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)
             .CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
 
-    private static void AssertPrivateParametersExport(X509Certificate2? loaded, Curl.Protocol.Abstractions.ConnectResult? failure)
+    private void AssertPrivateParametersExport(X509Certificate2? loaded, Curl.Protocol.Abstractions.ConnectResult? failure)
     {
+        Diagnostics.Assert("failure is null", true, failure is null);
         Assert.IsNull(failure);
         using (loaded)
         {
             using var key = loaded!.GetRSAPrivateKey()!;
             var parameters = key.ExportParameters(includePrivateParameters: true);
+            Diagnostics.Act("private exponent length", parameters.D?.Length);
+            Diagnostics.Assert("private exponent exported", true, parameters.D is not null);
             Assert.IsNotNull(parameters.D);
         }
     }

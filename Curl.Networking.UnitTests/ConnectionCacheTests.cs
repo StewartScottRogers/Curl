@@ -1,5 +1,6 @@
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -11,9 +12,15 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class ConnectionCacheTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task DisposeAsync_WithAnIdleAndALeasedConnection_ClosesBoth()
     {
+        Diagnostics.Arrange("idle host", "idle.example");
+        Diagnostics.Arrange("in-use host", "in-use.example");
         var cache = new ConnectionCache(new ManualTimeProvider());
         var inner = new FakeConnector();
         var connector = new PoolingConnector(inner, cache, configuration: null);
@@ -22,9 +29,18 @@ public sealed class ConnectionCacheTests
         await idle.Connection.DisposeAsync();
         var inUse = await connector.ConnectAsync(Target("in-use.example"), CancellationToken.None);
 
-        await cache.DisposeAsync();
-        inUse.Connection!.MarkReusable();
-        await inUse.Connection.DisposeAsync();
+        using (Diagnostics.Phase("dispose cache"))
+        {
+            await cache.DisposeAsync();
+            inUse.Connection!.MarkReusable();
+            await inUse.Connection.DisposeAsync();
+        }
+
+        Diagnostics.Act("opened connection count", inner.Opened.Count);
+        Diagnostics.Act("idle connection disposed", inner.Opened[0].IsDisposed);
+        Diagnostics.Act("in-use connection disposed", inner.Opened[1].IsDisposed);
+        Diagnostics.Assert("idle connection disposed", true, inner.Opened[0].IsDisposed);
+        Diagnostics.Assert("in-use connection disposed", true, inner.Opened[1].IsDisposed);
 
         Assert.IsTrue(inner.Opened[0].IsDisposed);
         Assert.IsTrue(inner.Opened[1].IsDisposed);

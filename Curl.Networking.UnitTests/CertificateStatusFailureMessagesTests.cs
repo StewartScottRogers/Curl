@@ -1,3 +1,4 @@
+using Curl.Testing;
 using Curl.Tls;
 
 namespace Curl.Networking;
@@ -12,6 +13,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class CertificateStatusFailureMessagesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(OcspStapleStatus.NoResponse, 0, "No OCSP response received")]
     [DataRow(OcspStapleStatus.Malformed, 0, "Invalid OCSP response")]
@@ -32,6 +37,15 @@ public sealed class CertificateStatusFailureMessagesTests
     [DataRow(OcspStapleStatus.Revoked, 6, "SSL certificate revocation reason: certificateHold (6)")]
     [DataRow(OcspStapleStatus.Revoked, 8, "SSL certificate revocation reason: removeFromCRL (8)")]
     [DataRow(OcspStapleStatus.Revoked, -1, "SSL certificate revocation reason: (UNKNOWN) (-1)")]
-    public void For_EachRejectedOutcome_IsCurlsText(OcspStapleStatus status, int code, string expected) =>
-        Assert.AreEqual(expected, CertificateStatusFailureMessages.For(new OcspStapleOutcome(status, code)));
+    public void For_EachRejectedOutcome_IsCurlsText(OcspStapleStatus status, int code, string expected)
+    {
+        Diagnostics.Arrange("status", status);
+        Diagnostics.Arrange("code", code);
+
+        var message = CertificateStatusFailureMessages.For(new OcspStapleOutcome(status, code));
+        Diagnostics.Act("message", message);
+
+        Diagnostics.Diff("message", expected, message);
+        Assert.AreEqual(expected, message);
+    }
 }
