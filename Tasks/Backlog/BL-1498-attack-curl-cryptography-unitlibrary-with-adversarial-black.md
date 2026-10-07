@@ -38,3 +38,4 @@ completed:
 - 2026-10-06: Created.
 - 2026-10-06: Now depends on BL-1525, which speeds up X25519, X448 and CAST-128, so the attacks run against the final code.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Lane 3 could not integrate: fast tests failed twice (Curl.Cookies.UnitTests: EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother; then no test named) after rebasing onto the other lanes' work. The work is on branch factory/BL-1498-lane-3-20261007-111121; start with git cherry-pick --no-commit factory/BL-1498-lane-3-20261007-111121 and fix it.
