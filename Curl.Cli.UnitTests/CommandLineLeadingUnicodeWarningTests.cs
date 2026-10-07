@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -22,6 +23,10 @@ public sealed class CommandLineLeadingUnicodeWarningTests
 
     private const string LeftSingleQuoteData = "‘a";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private static IReadOnlyList<string> WarningFor(string value) =>
     [
         $"Warning: The argument '{value}' starts with a Unicode character. Maybe ASCII was ",
@@ -33,6 +38,8 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["-o", EnDashX, Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, WarningFor(EnDashX));
+        Diagnostics.Assert("output files", CommandLineParseDiagnostics.QuoteEach([EnDashX]), CommandLineParseDiagnostics.QuoteEach(result.Options?.OutputFiles ?? []));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(WarningFor(EnDashX).ToList(), result.WarningLines.ToList());
         CollectionAssert.AreEqual(new[] { EnDashX }, result.Options.OutputFiles.ToList());
@@ -43,6 +50,13 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["-H", LeftQuoteHeader, Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(
+            result,
+            [
+                $"Warning: The argument '{LeftQuoteHeader}' starts with a Unicode character. Maybe ASCII ",
+                "Warning: was intended?",
+            ]);
+        Diagnostics.Assert("headers", CommandLineParseDiagnostics.QuoteEach([LeftQuoteHeader]), CommandLineParseDiagnostics.QuoteEach(result.Options?.Headers ?? []));
         Assert.IsTrue(result.IsAccepted);
         // Three bytes longer than the en dash value in UTF-8, so curl's 79-column wrap cuts one word earlier.
         CollectionAssert.AreEqual(
@@ -60,6 +74,13 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["--data", LeftSingleQuoteData, Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, WarningFor(LeftSingleQuoteData));
+        if (result.Options?.PostData is { } postData)
+        {
+            Diagnostics.Bytes("post data", postData.ToArray());
+        }
+
+        Diagnostics.Assert("post data", LeftSingleQuoteData, result.Options?.PostData is { } data ? Encoding.UTF8.GetString(data.Span) : null);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(WarningFor(LeftSingleQuoteData).ToList(), result.WarningLines.ToList());
         Assert.AreEqual(LeftSingleQuoteData, Encoding.UTF8.GetString(result.Options.PostData!.Value.Span));
@@ -70,6 +91,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["--output=" + EnDashX, Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, WarningFor(EnDashX));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(WarningFor(EnDashX).ToList(), result.WarningLines.ToList());
     }
@@ -83,6 +105,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["-o", value, Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, []);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -94,6 +117,11 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["-o", value, Url], isWindows: false);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert(
+            "first warning line",
+            $"Warning: The argument '{value}' starts with a Unicode character. Maybe ASCII was ",
+            result.WarningLines.Count > 0 ? result.WarningLines[0] : null);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual($"Warning: The argument '{value}' starts with a Unicode character. Maybe ASCII was ", result.WarningLines[0]);
     }
@@ -103,6 +131,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["–" + Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, []);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -112,6 +141,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["--egd-file", EnDashX, Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, ["Warning: --egd-file is deprecated and has no function anymore"]);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "Warning: --egd-file is deprecated and has no function anymore" }, result.WarningLines.ToList());
     }
@@ -124,6 +154,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse([option, value, Url], isWindows: true);
 
+        AssertAcceptedWithWarnings(result, []);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -133,6 +164,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["-s", "-o", EnDashX, Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, []);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -142,6 +174,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["-o", EnDashX, "-s", Url], isWindows: false);
 
+        AssertAcceptedWithWarnings(result, WarningFor(EnDashX));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(WarningFor(EnDashX).ToList(), result.WarningLines.ToList());
     }
@@ -153,6 +186,13 @@ public sealed class CommandLineLeadingUnicodeWarningTests
         // on every platform, so its Windows build warns about them as its other builds do (upstream test 470).
         CommandLineParseResult result = ParseConfigFile("-H “host:fake”\n", silentFirst: false);
 
+        AssertAcceptedWithWarnings(
+            result,
+            [
+                "Warning: The argument '“host:fake”' starts with a Unicode character. Maybe ",
+                "Warning: ASCII was intended?",
+            ]);
+        Diagnostics.Assert("headers", CommandLineParseDiagnostics.QuoteEach(["“host:fake”"]), CommandLineParseDiagnostics.QuoteEach(result.Options?.Headers ?? []));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
@@ -169,6 +209,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = Parse(["-H", "“host:fake”", Url], isWindows: true);
 
+        AssertAcceptedWithWarnings(result, []);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -178,6 +219,7 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     {
         CommandLineParseResult result = ParseConfigFile("-H “host:fake”\n", silentFirst: true);
 
+        AssertAcceptedWithWarnings(result, []);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -185,27 +227,53 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     [TestMethod]
     public void ReadsArgumentsAsUtf8FollowsThePlatformSwitch()
     {
-        Assert.IsTrue(Parse([Url], isWindows: false).Options!.ReadsArgumentsAsUtf8);
-        Assert.IsFalse(Parse([Url], isWindows: true).Options!.ReadsArgumentsAsUtf8);
+        bool offWindows = Parse([Url], isWindows: false).Options!.ReadsArgumentsAsUtf8;
+        bool onWindows = Parse([Url], isWindows: true).Options!.ReadsArgumentsAsUtf8;
+
+        Diagnostics.Assert("reads arguments as UTF-8 off Windows", true, offWindows);
+        Diagnostics.Assert("reads arguments as UTF-8 on Windows", false, onWindows);
+        Assert.IsTrue(offWindows);
+        Assert.IsFalse(onWindows);
     }
 
     [TestMethod]
     public void ProcessPlatformParseReadsArgumentsAsUtf8OnlyOffWindows()
     {
+        Diagnostics.ArrangeArguments([Url]);
         CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        Diagnostics.ActParse(result);
 
+        // Printed as a match, not the platform's own value, so the line reads the same on every platform.
+        Diagnostics.Assert("reads arguments as UTF-8 exactly when off Windows", true, result.Options?.ReadsArgumentsAsUtf8 == !OperatingSystem.IsWindows());
         Assert.AreEqual(!OperatingSystem.IsWindows(), result.Options!.ReadsArgumentsAsUtf8);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, bool isWindows) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), new RecordingDataFileReader(), isWindows);
+    private void AssertAcceptedWithWarnings(CommandLineParseResult result, IReadOnlyList<string> warningLines)
+    {
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(warningLines), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+    }
 
-    private static CommandLineParseResult ParseConfigFile(string contents, bool silentFirst)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, bool isWindows)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("parse as Windows", isWindows);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), new RecordingDataFileReader(), isWindows);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private CommandLineParseResult ParseConfigFile(string contents, bool silentFirst)
     {
         RecordingDataFileReader reader = new();
         reader.Files["config.txt"] = Encoding.UTF8.GetBytes(contents);
         string[] arguments = silentFirst ? ["-s", "-K", "config.txt", Url] : ["-K", "config.txt", Url];
-        return CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: true);
+        Diagnostics.Bytes("config file config.txt", reader.Files["config.txt"]);
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("parse as Windows", true);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: true);
+        Diagnostics.ActParse(result);
+        return result;
     }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt

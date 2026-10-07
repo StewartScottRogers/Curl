@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -15,6 +16,9 @@ public sealed class DeterministicDsaNonceTests
 
     private static readonly byte[] PrivateKey = Convert.FromHexString("411602CB19A6CCC34494D79D98EF1E7ED5AF25F7");
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("SHA1", "sample", "7BDB6B0FF756E1BB5D53583EF979082F9AD5BD5B")]
     [DataRow("SHA224", "sample", "562097C06782D60C3037BA7BE104774344687649")]
@@ -25,23 +29,43 @@ public sealed class DeterministicDsaNonceTests
     [DataRow("SHA256", "test", "5A67592E8128E03A417B0484410FB72C0B630E1A")]
     public void NextCandidate_Rfc6979Dsa1024_FirstCandidateBelowQIsPublishedK(string hashName, string message, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] hash = Hash(hashName, Encoding.ASCII.GetBytes(message));
         byte[] reducedHash = ReduceModSubprime(hash);
         using DeterministicDsaNonce nonces = new(new HashAlgorithmName(hashName), PrivateKey, reducedHash);
         byte[] candidate = new byte[Subprime.Length];
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1 (DSA, 1024 bits)");
+        diagnostics.Arrange("hash", hashName);
+        diagnostics.Arrange("message", message);
+        diagnostics.Bytes("subprime q", Subprime);
+        diagnostics.Bytes("private key x", PrivateKey);
+        diagnostics.Bytes("reduced hash", reducedHash);
 
+        int candidates = 0;
         do
         {
             nonces.NextCandidate(candidate);
+            candidates++;
         }
         while (candidate.AsSpan().SequenceCompareTo(Subprime) >= 0);
+        diagnostics.Act("candidates drawn", candidates);
+        diagnostics.Act("k", Convert.ToHexString(candidate));
 
+        diagnostics.Diff("k", Convert.FromHexString(expected), candidate);
         Assert.AreEqual(expected, Convert.ToHexString(candidate));
     }
 
     [TestMethod]
-    public void DigestLength_UnsupportedHash_ThrowsArgumentException() =>
-        Assert.ThrowsExactly<ArgumentException>(() => DeterministicDsaNonce.DigestLength(HashAlgorithmName.SHA3_256));
+    public void DigestLength_UnsupportedHash_ThrowsArgumentException()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("hash", HashAlgorithmName.SHA3_256.Name);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => DeterministicDsaNonce.DigestLength(HashAlgorithmName.SHA3_256));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
+    }
 
     private static byte[] Hash(string hashName, byte[] message)
     {

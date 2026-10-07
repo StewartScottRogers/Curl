@@ -38,8 +38,9 @@ public sealed partial class TcpConnectorTests
         var events = new CountingTransferEvents();
         var connector = HttpsConnectTraceConnector(new ScriptedConnection(Encoding.Latin1.GetBytes(TunnelEstablishedReply)), ProxyAddress);
 
-        var result = await connector.ConnectAsync(HttpsOriginThrough(TunnelProxy, events), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsOriginThrough(TunnelProxy, events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         AssertTunnelLines(
             [
@@ -79,8 +80,9 @@ public sealed partial class TcpConnectorTests
             ProxyAddress,
             new FakeTlsProvider { FailureToReturn = ConnectResult.Failed(CurlExitCode.SslConnectError, "x") });
 
-        var result = await connector.ConnectAsync(HttpsOriginThrough(TunnelProxy, events), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsOriginThrough(TunnelProxy, events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "[HTTPS-CONNECT] connect, all attempts failed", "[HTTPS-CONNECT] connect -> 35, done=0" },
@@ -95,8 +97,9 @@ public sealed partial class TcpConnectorTests
         var connector = HttpsConnectTraceConnector(new ScriptedConnection([.. Socks5NoAuthentication, .. Socks5Succeeded]), ProxyAddress);
         var socks = new ProxyEndpoint(ProxyKind.Socks5Hostname, "192.0.2.10", 1080, null);
 
-        var result = await connector.ConnectAsync(HttpsOriginThrough(socks, events), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsOriginThrough(socks, events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         AssertTunnelLines(
             [
@@ -126,8 +129,16 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_TracingTheSetupFilterThroughSocksToAnHttpOrigin_EyeballsToTheSocksProxyAsOrigin()
     {
         // curl -s -v --trace-config setup -x socks5h://127.0.0.1:18457 http://example.test/ (BL-1254 Notes).
-        var events = await TraceThroughSocksAsync(ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], tracesSocks: false, tracesSetup: true);
+        Diagnostics.Arrange("proxy", "socks5h to example.test, setup filter traced");
+        RecordingTransferEvents events;
+        using (Diagnostics.Phase("socks handshake"))
+        {
+            events = await TraceThroughSocksAsync(ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], tracesSocks: false, tracesSetup: true);
+        }
 
+        Diagnostics.Act("info lines", events.Info.Count);
+
+        Diagnostics.Assert("first setup line", SetupFilterTraceEvents.AddedLine, events.Info.First(line => line.StartsWith("[SETUP]", StringComparison.Ordinal)));
         AssertTunnelLines(
             [
                 SetupFilterTraceEvents.AddedLine,
@@ -156,8 +167,9 @@ public sealed partial class TcpConnectorTests
             TracesHttpsConnectFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.test", 443, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: true) { Events = events, PoolScheme = "https" });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         AssertTunnelLines(
             [
@@ -193,8 +205,9 @@ public sealed partial class TcpConnectorTests
             TracesHttpsConnectFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("example.test", 80, UseTls: false) { Events = events, PoolScheme = "http" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 80, UseTls: false) { Events = events, PoolScheme = "http" });
 
+        Diagnostics.Assert("first call", SetupFilterTraceEvents.AddedLine, events.Calls[0]);
         AssertTunnelLines(
             [
                 SetupFilterTraceEvents.AddedLine,
@@ -221,8 +234,9 @@ public sealed partial class TcpConnectorTests
             TracesHttpsConnectFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.test", 443, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: true) { Events = events, PoolScheme = "https" });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "[HTTPS-CONNECT] connect, all attempts failed", "[HTTPS-CONNECT] connect -> 7, done=0" },

@@ -40,10 +40,23 @@
     Every test project compiles the shared MSTestSettings.cs at the repository root,
     which carries the assembly-level parallelization policy MSTest's MSTEST0001
     analyzer insists on. It is linked rather than copied so the policy has one home.
+    Beside it, every test project compiles the shared TestDiagnostics.cs (BL-1457,
+    ADR-0417): MSTest global test hooks that write each test's START, END and SLOW:
+    lines, and the helper tests use for ARRANGE, ACT, ASSERT, BYTES, DIFF and PHASE lines.
   -->
   <ItemGroup Condition="$(MSBuildProjectName.EndsWith('UnitTests'))">
     <Compile Include="$(MSBuildThisFileDirectory)MSTestSettings.cs" Link="MSTestSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TestDiagnostics.cs" Link="TestDiagnostics.cs" />
   </ItemGroup>
+
+  <!--
+    Curl.Console.UnitTests references Curl.Protocol.Ssh.UnitTests, which shows it its
+    internals, so it sees two copies of the linked TestDiagnostics types. CS0436 says the
+    compiler uses the project's own copy - the right one - so it is not an error there.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Curl.Console.UnitTests'">
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
+  </PropertyGroup>
 
   <!--
     Production projects document every public member (CLAUDE.md) and are held to the

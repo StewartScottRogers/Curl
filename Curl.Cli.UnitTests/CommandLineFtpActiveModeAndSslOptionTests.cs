@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -21,11 +22,20 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
 {
     private const string Url = "ftp://127.0.0.1:1/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoActiveModeOrSslOptions_LeavesThemAtAdr0102Defaults()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp port", null, result.Options?.FtpPort);
+        Diagnostics.Assert("ftp use eprt", true, result.Options?.FtpUseEprt);
+        Diagnostics.Assert("ssl level", TransportSecurityLevel.None, result.Options?.SslLevel);
+        Diagnostics.Assert("ftp ssl control only", false, result.Options?.FtpSslControlOnly);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.FtpPort);
         Assert.IsTrue(result.Options.FtpUseEprt);
@@ -39,8 +49,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow("--ftp-port", "[::1]:4000")]
     public void Parse_FtpPort_RecordsTheAddressVerbatim(string option, string address)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, address, Url]);
+        CommandLineParseResult result = Parse([option, address, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp port", address, result.Options?.FtpPort);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(address, result.Options.FtpPort);
     }
@@ -48,8 +60,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_FtpPortTwice_TheLaterWins()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-P", "-", "--ftp-port", "127.0.0.1", Url]);
+        CommandLineParseResult result = Parse(["-P", "-", "--ftp-port", "127.0.0.1", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp port", "127.0.0.1", result.Options?.FtpPort);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("127.0.0.1", result.Options.FtpPort);
     }
@@ -59,7 +73,7 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow("--ftp-port")]
     public void Parse_FtpPortAsLastArgument_RequiresAParameterAsCurlDoes(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option]);
+        CommandLineParseResult result = Parse([option]);
 
         AssertRefused(result, $"curl: option {option}: requires parameter");
     }
@@ -69,7 +83,7 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow("--ftp-port")]
     public void Parse_FtpPortBlank_IsRefusedAsBlankAsCurlDoes(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, string.Empty, Url]);
+        CommandLineParseResult result = Parse([option, string.Empty, Url]);
 
         AssertRefused(result, $"curl: option {option}: blank argument where content is expected");
     }
@@ -77,7 +91,7 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_NegatedFtpPort_IsRefusedAsNotReversible()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-ftp-port", "-", Url]);
+        CommandLineParseResult result = Parse(["--no-ftp-port", "-", Url]);
 
         AssertRefused(result, "curl: option --no-ftp-port: the given option cannot be reversed with a --no- prefix");
     }
@@ -87,8 +101,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow("--ftp-port")]
     public void Parse_FtpPasvAfterFtpPort_ClearsTheAddressAsCurlDoes(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, "-", "--ftp-pasv", Url]);
+        CommandLineParseResult result = Parse([option, "-", "--ftp-pasv", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp port", null, result.Options?.FtpPort);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.FtpPort);
     }
@@ -96,8 +112,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_FtpPortAfterFtpPasv_TheLaterWinsAsCurlDoes()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-pasv", "-P", "-", Url]);
+        CommandLineParseResult result = Parse(["--ftp-pasv", "-P", "-", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp port", "-", result.Options?.FtpPort);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("-", result.Options.FtpPort);
     }
@@ -105,8 +123,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_FtpPasvAlone_LeavesPassiveMode()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-pasv", Url]);
+        CommandLineParseResult result = Parse(["--ftp-pasv", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp port", null, result.Options?.FtpPort);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.FtpPort);
     }
@@ -114,7 +134,7 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_NegatedFtpPasv_IsRefusedAsNotReversible()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-ftp-pasv", Url]);
+        CommandLineParseResult result = Parse(["--no-ftp-pasv", Url]);
 
         AssertRefused(result, "curl: option --no-ftp-pasv: the given option cannot be reversed with a --no- prefix");
     }
@@ -129,8 +149,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow(new[] { "--no-disable-epsv", "--no-epsv" }, true)]
     public void Parse_EpsvDisableEpsvAndTheirNegations_TheLaterWins(string[] flags, bool expectedDisabled)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp disable epsv", expectedDisabled, result.Options?.FtpDisableEpsv);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedDisabled, result.Options.FtpDisableEpsv);
     }
@@ -146,8 +168,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow(new[] { "--disable-eprt", "--eprt" }, true)]
     public void Parse_DisableEprtEprtAndTheirNegations_TheLaterWins(string[] flags, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp use eprt", expected, result.Options?.FtpUseEprt);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpUseEprt);
     }
@@ -157,8 +181,12 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow("--ftp-ssl")]
     public void Parse_Ssl_TriesTheUpgradeAndWarnsAsCurlDoes(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, Url]);
+        CommandLineParseResult result = Parse([option, Url]);
 
+        string[] expectedWarnings = [$"Warning: {option} is an insecure option, consider --ssl-reqd instead"];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ssl level", TransportSecurityLevel.Try, result.Options?.SslLevel);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expectedWarnings), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TransportSecurityLevel.Try, result.Options.SslLevel);
         CollectionAssert.AreEqual(
@@ -169,8 +197,11 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_SslWithValue_WarnsWithTheLongNameOnly()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ssl=x", Url]);
+        CommandLineParseResult result = Parse(["--ssl=x", Url]);
 
+        string[] expectedWarnings = ["Warning: --ssl is an insecure option, consider --ssl-reqd instead"];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expectedWarnings), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "Warning: --ssl is an insecure option, consider --ssl-reqd instead" },
@@ -180,8 +211,11 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_SilentThenSsl_DropsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--ssl", Url]);
+        CommandLineParseResult result = Parse(["-s", "--ssl", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ssl level", TransportSecurityLevel.Try, result.Options?.SslLevel);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TransportSecurityLevel.Try, result.Options.SslLevel);
         Assert.IsEmpty(result.WarningLines);
@@ -190,8 +224,9 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [TestMethod]
     public void Parse_SslThenSilent_KeepsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ssl", "-s", Url]);
+        CommandLineParseResult result = Parse(["--ssl", "-s", Url]);
 
+        Diagnostics.Assert("warning line count", 1, result.WarningLines.Count);
         Assert.HasCount(1, result.WarningLines);
     }
 
@@ -200,8 +235,11 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow("--no-ftp-ssl")]
     public void Parse_NegatedSsl_DoesNotWarn(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, Url]);
+        CommandLineParseResult result = Parse([option, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ssl level", TransportSecurityLevel.None, result.Options?.SslLevel);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TransportSecurityLevel.None, result.Options.SslLevel);
         Assert.IsEmpty(result.WarningLines);
@@ -220,8 +258,10 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow(new[] { "--ssl-reqd", "--ssl" }, TransportSecurityLevel.Required)]
     public void Parse_SslAndSslReqdAndTheirNegations_AreIndependentAndRequiredWins(string[] flags, TransportSecurityLevel expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ssl level", expected, result.Options?.SslLevel);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.SslLevel);
     }
@@ -234,15 +274,32 @@ public sealed class CommandLineFtpActiveModeAndSslOptionTests
     [DataRow(new[] { "--ftp-ssl-control", "--ssl-reqd" }, true, TransportSecurityLevel.Required)]
     public void Parse_FtpSslControlAndItsNegation_RequiresTlsOnTheControlConnection(string[] flags, bool expectedControlOnly, TransportSecurityLevel expectedLevel)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp ssl control only", expectedControlOnly, result.Options?.FtpSslControlOnly);
+        Diagnostics.Assert("ssl level", expectedLevel, result.Options?.SslLevel);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedControlOnly, result.Options.FtpSslControlOnly);
         Assert.AreEqual(expectedLevel, result.Options.SslLevel);
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    private CommandLineParseResult Parse(string[] arguments)
     {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([expectedFirstLine, CommandLineRefusal.TryHelpLine]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -8,6 +10,9 @@ namespace Curl.Cryptography;
 [TestClass]
 public sealed class Rc4Tests
 {
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     // RFC 6229 section 2: key, offset in the keystream, the 16 keystream bytes there.
     // key: 0x0102030405
     [DataRow("0102030405", 0, "B2396305F03DC027CCC3524A0A1118A8")]
@@ -278,12 +283,18 @@ public sealed class Rc4Tests
     [TestMethod]
     public void DiscardKeyStreamThenApplyKeyStream_Rfc6229Vector_GivesThePublishedKeyStream(string key, int offset, string keyStream)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Rc4 rc4 = new(Convert.FromHexString(key));
         byte[] output = new byte[16];
+        diagnostics.Arrange("vector source", "RFC 6229 section 2");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Arrange("keystream offset", offset);
 
         rc4.DiscardKeyStream(offset);
         rc4.ApplyKeyStream(new byte[16], output);
+        diagnostics.Act("keystream", Convert.ToHexString(output));
 
+        diagnostics.Diff("keystream", Convert.FromHexString(keyStream), output);
         Assert.AreEqual(keyStream, Convert.ToHexString(output));
     }
 
@@ -292,42 +303,61 @@ public sealed class Rc4Tests
     [TestMethod]
     public void DiscardKeyStream_Rfc4345DiscardLength_StartsAtRfc6229Offset1536()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Rc4 rc4 = new(Convert.FromHexString("0102030405060708090A0B0C0D0E0F10"));
         byte[] output = new byte[16];
+        diagnostics.Arrange("vector source", "RFC 4345 section 4 discard, RFC 6229 section 2 offset 1536");
+        diagnostics.Bytes("key", Convert.FromHexString("0102030405060708090A0B0C0D0E0F10"));
+        diagnostics.Arrange("discard length", Rc4.Rfc4345DiscardLength);
 
         rc4.DiscardKeyStream(Rc4.Rfc4345DiscardLength);
         rc4.ApplyKeyStream(new byte[16], output);
+        diagnostics.Act("keystream", Convert.ToHexString(output));
 
+        diagnostics.Diff("keystream", Convert.FromHexString("FFA0B514647EC04F6306B892AE661181"), output);
         Assert.AreEqual("FFA0B514647EC04F6306B892AE661181", Convert.ToHexString(output));
     }
 
     [TestMethod]
     public void ApplyKeyStream_InPlaceAcrossTwoCalls_EncryptsAndAnotherInstanceDecrypts()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] key = Convert.FromHexString("0102030405");
         byte[] message = "Arcfour in two pieces"u8.ToArray();
         byte[] buffer = (byte[])message.Clone();
         using Rc4 encryptor = new(key);
         using Rc4 decryptor = new(key);
+        diagnostics.Bytes("key", key);
+        diagnostics.Bytes("message", message);
+        diagnostics.Arrange("encrypt split", "5 bytes, then the rest");
 
         encryptor.ApplyKeyStream(buffer.AsSpan(0, 5), buffer.AsSpan(0, 5));
         encryptor.ApplyKeyStream(buffer.AsSpan(5), buffer.AsSpan(5));
+        diagnostics.Bytes("ciphertext", buffer);
+        diagnostics.Diff("ciphertext against message (expected to differ)", message, buffer);
         CollectionAssert.AreNotEqual(message, buffer);
         decryptor.ApplyKeyStream(buffer, buffer);
+        diagnostics.Act("decrypted", Convert.ToHexString(buffer));
 
+        diagnostics.Diff("decrypted", message, buffer);
         CollectionAssert.AreEqual(message, buffer);
     }
 
     [TestMethod]
     public void ApplyKeyStreamAndDiscardKeyStream_Empty_ChangeNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Rc4 rc4 = new(Convert.FromHexString("0102030405"));
         byte[] output = new byte[16];
+        diagnostics.Arrange("vector source", "RFC 6229 section 2, key 0x0102030405, offset 0");
+        diagnostics.Arrange("calls before", "ApplyKeyStream of 0 bytes, DiscardKeyStream(0)");
 
         rc4.ApplyKeyStream([], []);
         rc4.DiscardKeyStream(0);
         rc4.ApplyKeyStream(new byte[16], output);
+        diagnostics.Act("keystream", Convert.ToHexString(output));
 
+        diagnostics.Diff("keystream", Convert.FromHexString("B2396305F03DC027CCC3524A0A1118A8"), output);
         Assert.AreEqual("B2396305F03DC027CCC3524A0A1118A8", Convert.ToHexString(output));
     }
 
@@ -336,8 +366,13 @@ public sealed class Rc4Tests
     [DataRow(257)]
     public void Constructor_KeyOutsideOneTo256Bytes_ThrowsArgumentException(int length)
     {
-        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new Rc4(new byte[length]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", length);
 
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new Rc4(new byte[length]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("parameter name", "key", exception.ParamName);
         Assert.AreEqual("key", exception.ParamName);
     }
 
@@ -346,15 +381,22 @@ public sealed class Rc4Tests
     [DataRow(256)]
     public void Constructor_OneOr256ByteKey_IsAccepted(int length)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Rc4 encryptor = new(new byte[length]);
         using Rc4 decryptor = new(new byte[length]);
         byte[] plaintext = new byte[16];
         byte[] ciphertext = new byte[16];
         byte[] decrypted = new byte[16];
+        diagnostics.Arrange("key", $"{length} zero bytes");
+        diagnostics.Bytes("plaintext", plaintext);
 
         encryptor.ApplyKeyStream(plaintext, ciphertext);
         decryptor.ApplyKeyStream(ciphertext, decrypted);
+        diagnostics.Act("ciphertext", Convert.ToHexString(ciphertext));
+        diagnostics.Bytes("decrypted", decrypted);
 
+        diagnostics.Diff("ciphertext against plaintext (expected to differ)", plaintext, ciphertext);
+        diagnostics.Diff("decrypted", plaintext, decrypted);
         CollectionAssert.AreNotEqual(plaintext, ciphertext);
         CollectionAssert.AreEqual(plaintext, decrypted);
     }
@@ -362,30 +404,44 @@ public sealed class Rc4Tests
     [TestMethod]
     public void ApplyKeyStream_DestinationOfAnotherLength_ThrowsArgumentException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Rc4 rc4 = new(new byte[16]);
+        diagnostics.Arrange("source and destination lengths", "8, 9");
 
         ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => rc4.ApplyKeyStream(new byte[8], new byte[9]));
+        diagnostics.Act("exception", exception.GetType().Name);
 
+        diagnostics.Assert("parameter name", "destination", exception.ParamName);
         Assert.AreEqual("destination", exception.ParamName);
     }
 
     [TestMethod]
     public void DiscardKeyStream_NegativeLength_ThrowsArgumentOutOfRangeException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Rc4 rc4 = new(new byte[16]);
+        diagnostics.Arrange("discard length", -1);
 
         ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => rc4.DiscardKeyStream(-1));
+        diagnostics.Act("exception", exception.GetType().Name);
 
+        diagnostics.Assert("parameter name", "length", exception.ParamName);
         Assert.AreEqual("length", exception.ParamName);
     }
 
     [TestMethod]
     public void EveryOperation_AfterDispose_ThrowsObjectDisposedException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         Rc4 rc4 = new(new byte[16]);
         rc4.Dispose();
+        diagnostics.Arrange("state", "disposed");
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => rc4.ApplyKeyStream(new byte[1], new byte[1]));
-        Assert.ThrowsExactly<ObjectDisposedException>(() => rc4.DiscardKeyStream(1));
+        ObjectDisposedException applyException = Assert.ThrowsExactly<ObjectDisposedException>(() => rc4.ApplyKeyStream(new byte[1], new byte[1]));
+        ObjectDisposedException discardException = Assert.ThrowsExactly<ObjectDisposedException>(() => rc4.DiscardKeyStream(1));
+        diagnostics.Act("ApplyKeyStream exception", applyException.GetType().Name);
+        diagnostics.Act("DiscardKeyStream exception", discardException.GetType().Name);
+
+        diagnostics.Assert("exceptions", $"{nameof(ObjectDisposedException)}, {nameof(ObjectDisposedException)}", $"{applyException.GetType().Name}, {discardException.GetType().Name}");
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -15,6 +17,10 @@ public sealed class CommandLineLocationFollowOverrideTests
 
     private const string FollowOverridesLocation = "Warning: --follow overrides --location";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(new[] { "-L", "--follow", Url }, new[] { FollowOverridesLocation })]
     [DataRow(new[] { "--follow", "-L", Url }, new[] { LocationOverridesFollow })]
@@ -29,8 +35,10 @@ public sealed class CommandLineLocationFollowOverrideTests
     [DataRow(new[] { "-L", "-r", "5", "--follow", Url }, new[] { "Warning: A specified range MUST include at least one dash (-). Appending one for you", FollowOverridesLocation })]
     public void Parse_OneRedirectOptionReplacingTheOther_WarnsInOrder(string[] arguments, string[] warningLines)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(warningLines), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(warningLines, result.WarningLines.ToArray());
     }
@@ -46,8 +54,10 @@ public sealed class CommandLineLocationFollowOverrideTests
     [DataRow(new[] { "-L", "--location-trusted", Url })]
     public void Parse_NoOverrideOrSilent_WarnsNothing(string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -59,10 +69,21 @@ public sealed class CommandLineLocationFollowOverrideTests
     [DataRow(new[] { "--follow", "--no-location", Url }, false, false)]
     public void Parse_OneRedirectOptionReplacingTheOther_LastOneWins(string[] arguments, bool followRedirects, bool followRedirectsPerSpec)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("follow redirects", followRedirects, result.Options?.FollowRedirects);
+        Diagnostics.Assert("follow redirects per spec", followRedirectsPerSpec, result.Options?.FollowRedirectsPerSpec);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(followRedirects, result.Options.FollowRedirects);
         Assert.AreEqual(followRedirectsPerSpec, result.Options.FollowRedirectsPerSpec);
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }

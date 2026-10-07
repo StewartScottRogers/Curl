@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-1431]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: FR-067
 created: 2026-10-04
 completed:
@@ -29,6 +29,15 @@ curl 8.21.0's 5000-header limit (`curl: (100) Too many response headers, 5000 is
 
 ## Notes
 
+- Measured 2026-10-07, curl 8.21.0 (mingw64, Schannel), `Record-CurlExchange.ps1 -sv -i`:
+  - `-L`, hop 1 `302` with `Location`, `Content-Length: 0` and `X-H1..X-H3000` (3002 headers), hop 2 `200` with `Content-Length: 2` and `X-H1..X-H3000`: exit 100. Hop 2 counts on from 3002: its `Content-Length` and `X-H1..X-H1997` reach 5000, and `< X-H1998: v` is the last `<` line, then `* Too many response headers, 5000 is max` and `* closing connection #1`. The header output (`-i`) holds hop 1's whole head and hop 2's head through `X-H1997: v\r\n` (no blank line, no body). So the count runs across hops and is cleared only per transfer (`Curl_pretransfer`).
+  - Chunked trailers: a `200` with `Transfer-Encoding: chunked` and `X-A: 1` (2 headers), body `ok`, then trailers `X-T1..X-T4999`: exit 100. The header output ends `okX-T1: v\r\n...X-T4998: v\r\n` (the 5000th header); `-v` shows no `<` line for trailers, only `{ [58893 bytes data]`, then `* Too many response headers, 5000 is max` and `* Failed reading the chunked-encoded stream`. So trailers count on from the final head's headers.
+- Scope found: the hops of a `-L` chain are separate `HttpProtocolHandler.ExecuteAsync` calls driven by `Curl.Core.UnitLibrary/RedirectFollower.cs`, so the stored-header count has to travel between hops: the handler reports it (`TransferReport`, Abstractions) and `RedirectFollower` passes it into the next hop's `HttpRequestOptions` (Abstractions), reset at each transfer's first hop. That needs `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Core.UnitLibrary` and `Curl.Core.UnitTests`, added to `touches`. A count kept in the handler or keyed on `ITransferEvents` was rejected: the handler is shared by `--parallel` transfers and `NoTransferEvents.Instance` is shared by every quiet one.
+- `Curl.Core.UnitTests` is in BL-1532's `touches` (Doing on lane 2), so per the lane rules the task goes back to Backlog until they no longer overlap.
+- Plan for the next run: `HttpResponseHeadReader` takes the count already stored (`informationalHeaderCount` starts there) and exposes the count it stored; `HttpChunkedDecoder` counts each trailer line against the rest and fails exit 100 with `TooManyResponseHeaders`, then `-v` `Failed reading the chunked-encoded stream`, the trailers through the 5000th written to the header output.
+
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Needs Curl.Core.UnitTests (RedirectFollower carries the header count between hops), which BL-1532 in Doing touches; measurements and plan are in Notes

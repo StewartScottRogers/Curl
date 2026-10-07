@@ -23,8 +23,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesDnsFilter = true };
         var target = new ConnectTarget("example.test", 80, UseTls: false) { Events = events, Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 47115, null) };
 
-        var result = await connector.ConnectAsync(target, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -55,8 +56,9 @@ public sealed partial class TcpConnectorTests
             TracesDnsFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.test", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 80, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -87,8 +89,9 @@ public sealed partial class TcpConnectorTests
             TracesDnsFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("foo", 47500, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("foo", 47500, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -117,8 +120,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesDnsFilter = true };
 
-        await connector.ConnectAsync(new ConnectTarget("example.test", 47199, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 47199, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("events.Calls.Skip(2).Take(3).ToArray()", string.Join(" | ", new[] { "[DNS] cf_dns_start host example.test:47199", "[DNS] resolve complete for example.test:47199", "Host example.test:47199 was resolved.", }), string.Join(" | ", events.Calls.Skip(2).Take(3).ToArray()));
         CollectionAssert.AreEqual(
             new[]
             {

@@ -28,10 +28,11 @@ public sealed partial class TcpConnectorTests
         var first = new RecordingTransferEvents();
         var second = new RecordingTransferEvents();
 
-        await firstGroup.ConnectAsync(new ConnectTarget("localhost", SharedCachePort, UseTls: false) { Events = first }, CancellationToken.None);
-        await secondGroup.ConnectAsync(new ConnectTarget("localhost", SharedCachePort, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(firstGroup, new ConnectTarget("localhost", SharedCachePort, UseTls: false) { Events = first });
+        await ConnectLoggedAsync(secondGroup, new ConnectTarget("localhost", SharedCachePort, UseTls: false) { Events = second });
 
         string[] resolvedLines = ["Host localhost:18531 was resolved.", "IPv6: ::1", "IPv4: 127.0.0.1", "  Trying [::1]:18531..."];
+        Diagnostics.Assert("second group first line", "Hostname localhost was found in DNS cache", second.Info.FirstOrDefault());
         CollectionAssert.AreEqual(resolvedLines, first.Info);
         CollectionAssert.AreEqual(new[] { "Hostname localhost was found in DNS cache" }.Concat(resolvedLines).ToArray(), second.Info);
         CollectionAssert.AreEqual(new[] { "localhost" }, resolver.ResolvedHosts);
@@ -46,9 +47,10 @@ public sealed partial class TcpConnectorTests
         var dnsCache = new DnsCache();
         var second = new RecordingTransferEvents();
 
-        await CreateConnectorOver(resolver, dnsCache).ConnectAsync(new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false), CancellationToken.None);
-        await CreateConnectorOver(resolver, dnsCache).ConnectAsync(new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(CreateConnectorOver(resolver, dnsCache), new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false));
+        await ConnectLoggedAsync(CreateConnectorOver(resolver, dnsCache), new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("second group first line", "Hostname 127.0.0.1 was found in DNS cache", second.Info.FirstOrDefault());
         CollectionAssert.AreEqual(new[] { "Hostname 127.0.0.1 was found in DNS cache", "  Trying 127.0.0.1:18531..." }, second.Info);
     }
 
@@ -58,9 +60,10 @@ public sealed partial class TcpConnectorTests
         var resolver = new FakeDnsResolver(Loopback);
         var second = new RecordingTransferEvents();
 
-        await CreateConnectorOver(resolver, new DnsCache()).ConnectAsync(new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false), CancellationToken.None);
-        await CreateConnectorOver(resolver, new DnsCache()).ConnectAsync(new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(CreateConnectorOver(resolver, new DnsCache()), new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false));
+        await ConnectLoggedAsync(CreateConnectorOver(resolver, new DnsCache()), new ConnectTarget("127.0.0.1", SharedCachePort, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("second group lines", "  Trying 127.0.0.1:18531...", string.Join(" | ", second.Info));
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:18531..." }, second.Info);
         CollectionAssert.AreEqual(new[] { "127.0.0.1", "127.0.0.1" }, resolver.ResolvedHosts);
     }
@@ -78,9 +81,10 @@ public sealed partial class TcpConnectorTests
         var firstGroup = new TcpConnector(resolver, new FakeTcpDialer { DialOutcome = _ => new FakeConnection() }, new FakeTlsProvider(), new ManualTimeProvider(), resolveOverrides: ResolveOverrides.Parse([resolveEntry]), dnsCache: dnsCache);
         var second = new RecordingTransferEvents();
 
-        await firstGroup.ConnectAsync(new ConnectTarget("foo.example", SharedCachePort, UseTls: false), CancellationToken.None);
-        await CreateConnectorOver(resolver, dnsCache).ConnectAsync(new ConnectTarget("foo.example", SharedCachePort, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(firstGroup, new ConnectTarget("foo.example", SharedCachePort, UseTls: false));
+        await ConnectLoggedAsync(CreateConnectorOver(resolver, dnsCache), new ConnectTarget("foo.example", SharedCachePort, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("second group first line", "Hostname foo.example was found in DNS cache", second.Info.FirstOrDefault());
         CollectionAssert.AreEqual(
             new[] { "Hostname foo.example was found in DNS cache", "Host foo.example:18531 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", "  Trying 127.0.0.1:18531..." },
             second.Info);
@@ -99,10 +103,11 @@ public sealed partial class TcpConnectorTests
         var secondGroup = new TcpConnector(resolver, new FakeTcpDialer { DialOutcome = _ => new FakeConnection() }, new FakeTlsProvider(), new ManualTimeProvider(), resolveOverrides: ResolveOverrides.Parse(["localhost:18531:127.0.0.1"]), dnsCache: dnsCache);
         var second = new RecordingTransferEvents();
 
-        await CreateConnectorOver(resolver, dnsCache).ConnectAsync(new ConnectTarget("localhost", SharedCachePort, UseTls: false), CancellationToken.None);
+        await ConnectLoggedAsync(CreateConnectorOver(resolver, dnsCache), new ConnectTarget("localhost", SharedCachePort, UseTls: false));
         secondGroup.LoadResolveEntries(second);
-        await secondGroup.ConnectAsync(new ConnectTarget("localhost", SharedCachePort, UseTls: false) { Events = second }, CancellationToken.None);
+        await ConnectLoggedAsync(secondGroup, new ConnectTarget("localhost", SharedCachePort, UseTls: false) { Events = second });
 
+        Diagnostics.Assert("second group first line", "RESOLVE localhost:18531 - old addresses discarded", second.Info.FirstOrDefault());
         CollectionAssert.AreEqual(
             new[]
             {

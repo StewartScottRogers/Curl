@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
@@ -98,7 +99,7 @@ public sealed class ConnectTunnelVerboseLinesTests
     }
 
     [TestMethod]
-    public void ReportReplyFailure_WritesTheUnsupportedContentLengthAndRecvFailureLinesOnly()
+    public void ReportReplyFailure_FailedReplies_WriteEachFailureMessageAndNothingForAReplyThatDidNotFail()
     {
         var events = new RecordingTransferEvents();
 
@@ -106,8 +107,28 @@ public sealed class ConnectTunnelVerboseLinesTests
         ConnectTunnelVerboseLines.ReportReplyFailure(events, new HttpProxyTunnelReply(407, null));
         ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Unsupported Content-Length value") with { FailureExitCode = CurlExitCode.WeirdServerReply });
         ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Recv failure: Connection was reset"));
+        ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("CONNECT response too large"));
 
-        CollectionAssert.AreEqual(new[] { "* Unsupported Content-Length value", "* Recv failure: Connection was reset" }, events.Transcript);
+        CollectionAssert.AreEqual(
+            new[] { "* Proxy CONNECT aborted", "* Unsupported Content-Length value", "* Recv failure: Connection was reset", "* CONNECT response too large" },
+            events.Transcript);
+    }
+
+    [TestMethod]
+    public async Task ReportReplyFailure_ReplyHeadCutShort_WritesProxyConnectAbortedAfterTheLinesRead()
+    {
+        var events = new RecordingTransferEvents();
+        // Measured with Record-CurlExchange.ps1 -ResetAfterResponse: * Proxy CONNECT aborted (BL-1455 Notes).
+        var connection = new ScriptedConnection("HTTP/1.1 200 OK\r\n"u8.ToArray())
+        {
+            ExceptionAfterScript = new IOException("Unable to read data from the transport connection.", new SocketException((int)SocketError.ConnectionReset)),
+        };
+        var reply = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, null);
+        ConnectTunnelVerboseLines.ReportReplyFailure(events, reply);
+
+        Assert.AreEqual("* Proxy CONNECT aborted", events.Transcript[^1]);
     }
 
     [TestMethod]

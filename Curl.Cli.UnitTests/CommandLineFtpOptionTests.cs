@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -14,11 +15,22 @@ public sealed class CommandLineFtpOptionTests
 {
     private const string Url = "ftp://127.0.0.1:1/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoFtpOptions_LeavesThemAtCurlsDefaults()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp disable epsv", false, result.Options?.FtpDisableEpsv);
+        Diagnostics.Assert("ftp skip pasv ip", true, result.Options?.FtpSkipPasvIp);
+        Diagnostics.Assert("ftp file method", FtpFileMethod.MultiCwd, result.Options?.FtpFileMethod);
+        Diagnostics.Assert("ftp create directories", false, result.Options?.FtpCreateDirectories);
+        Diagnostics.Assert("list only", false, result.Options?.ListOnly);
+        Diagnostics.Assert("quote commands", "[]", CommandLineParseDiagnostics.QuoteEach(result.Options?.QuoteCommands ?? []));
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.FtpDisableEpsv);
         Assert.IsTrue(result.Options.FtpSkipPasvIp);
@@ -31,8 +43,10 @@ public sealed class CommandLineFtpOptionTests
     [TestMethod]
     public void Parse_DisableEpsv_SetsFtpDisableEpsv()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--disable-epsv", Url]);
+        CommandLineParseResult result = Parse(["--disable-epsv", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp disable epsv", true, result.Options?.FtpDisableEpsv);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.FtpDisableEpsv);
     }
@@ -42,8 +56,10 @@ public sealed class CommandLineFtpOptionTests
     [DataRow(new[] { "--no-disable-epsv", "--disable-epsv" }, true)]
     public void Parse_DisableEpsvAndItsNegation_TheLaterWins(string[] flags, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp disable epsv", expected, result.Options?.FtpDisableEpsv);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpDisableEpsv);
     }
@@ -55,8 +71,10 @@ public sealed class CommandLineFtpOptionTests
     [DataRow(new[] { "--no-ftp-skip-pasv-ip", "--ftp-skip-pasv-ip" }, true)]
     public void Parse_FtpSkipPasvIpAndItsNegation_TheLaterWins(string[] flags, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp skip pasv ip", expected, result.Options?.FtpSkipPasvIp);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpSkipPasvIp);
     }
@@ -70,8 +88,11 @@ public sealed class CommandLineFtpOptionTests
     [DataRow("SingleCwd", FtpFileMethod.SingleCwd)]
     public void Parse_FtpMethodCurlAccepts_SetsFtpFileMethodWithoutWarning(string value, FtpFileMethod expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-method", value, Url]);
+        CommandLineParseResult result = Parse(["--ftp-method", value, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp file method", expected, result.Options?.FtpFileMethod);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpFileMethod);
         Assert.IsEmpty(result.WarningLines);
@@ -83,8 +104,12 @@ public sealed class CommandLineFtpOptionTests
     [DataRow("")]
     public void Parse_FtpMethodCurlDoesNotRecognise_WarnsAndUsesMultiCwd(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-method", "nocwd", "--ftp-method", value, Url]);
+        CommandLineParseResult result = Parse(["--ftp-method", "nocwd", "--ftp-method", value, Url]);
 
+        string[] expectedWarnings = [$"Warning: unrecognized ftp file method '{value}', using default"];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp file method", FtpFileMethod.MultiCwd, result.Options?.FtpFileMethod);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expectedWarnings), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(FtpFileMethod.MultiCwd, result.Options.FtpFileMethod);
         CollectionAssert.AreEqual(
@@ -95,9 +120,16 @@ public sealed class CommandLineFtpOptionTests
     [TestMethod]
     public void Parse_FtpMethodLongEnoughToWrap_WarnsOnTwoLinesAsCurlDoes()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--ftp-method", "aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm", Url]);
 
+        string[] expectedWarnings =
+        [
+            "Warning: unrecognized ftp file method 'aaaa bbbb cccc dddd eeee ffff gggg hhhh ",
+            "Warning: iiii jjjj kkkk llll mmmm', using default",
+        ];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expectedWarnings), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
@@ -111,8 +143,11 @@ public sealed class CommandLineFtpOptionTests
     [TestMethod]
     public void Parse_SilentThenBadFtpMethod_DropsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--ftp-method", "bogus", Url]);
+        CommandLineParseResult result = Parse(["-s", "--ftp-method", "bogus", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp file method", FtpFileMethod.MultiCwd, result.Options?.FtpFileMethod);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(FtpFileMethod.MultiCwd, result.Options.FtpFileMethod);
         Assert.IsEmpty(result.WarningLines);
@@ -124,8 +159,10 @@ public sealed class CommandLineFtpOptionTests
     [DataRow(new[] { "--no-ftp-create-dirs", "--ftp-create-dirs" }, true)]
     public void Parse_FtpCreateDirsAndItsNegation_TheLaterWins(string[] flags, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp create directories", expected, result.Options?.FtpCreateDirectories);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpCreateDirectories);
     }
@@ -137,8 +174,10 @@ public sealed class CommandLineFtpOptionTests
     [DataRow(new[] { "--no-list-only", "-l" }, true)]
     public void Parse_ListOnlyAndItsNegation_TheLaterWins(string[] flags, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("list only", expected, result.Options?.ListOnly);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.ListOnly);
     }
@@ -146,9 +185,12 @@ public sealed class CommandLineFtpOptionTests
     [TestMethod]
     public void Parse_RepeatedQuote_RecordsEveryCommandVerbatimInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["-Q", "NOOP", "--quote", "-DELE x", "-Q", "+*SITE CHMOD 644 y", "-Q", "", Url]);
 
+        string[] expectedCommands = ["NOOP", "-DELE x", "+*SITE CHMOD 644 y", ""];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("quote commands", CommandLineParseDiagnostics.QuoteEach(expectedCommands), CommandLineParseDiagnostics.QuoteEach(result.Options?.QuoteCommands ?? []));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "NOOP", "-DELE x", "+*SITE CHMOD 644 y", "" },
@@ -161,7 +203,7 @@ public sealed class CommandLineFtpOptionTests
     [DataRow("--quote")]
     public void Parse_ValueOptionAsLastArgument_RefusesAsRequiringParameter(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, spelledOption]);
+        CommandLineParseResult result = Parse([Url, spelledOption]);
 
         AssertRefused(result, $"curl: option {spelledOption}: requires parameter");
     }
@@ -171,13 +213,27 @@ public sealed class CommandLineFtpOptionTests
     [DataRow("--no-quote")]
     public void Parse_NegatedValueOption_IsRefusedAsNotReversible(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "x", Url]);
+        CommandLineParseResult result = Parse([spelledOption, "x", Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix");
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    private CommandLineParseResult Parse(string[] arguments)
     {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([expectedFirstLine, CommandLineRefusal.TryHelpLine]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(

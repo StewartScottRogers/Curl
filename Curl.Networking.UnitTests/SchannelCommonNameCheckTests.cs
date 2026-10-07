@@ -2,6 +2,8 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -11,6 +13,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class SchannelCommonNameCheckTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("localhost", "localhost")]
     [DataRow("LocalHost", "localhost")]
@@ -18,8 +24,17 @@ public sealed class SchannelCommonNameCheckTests
     [DataRow("localhost", "localhost.")]
     [DataRow("*.example.com", "www.example.com")]
     [DataRow("*.Example.com", "WWW.example.COM")]
-    public void PatternMatchesHost_WithAMatchingPattern_IsTrue(string pattern, string host) =>
+    public void PatternMatchesHost_WithAMatchingPattern_IsTrue(string pattern, string host)
+    {
+        Diagnostics.Arrange("pattern, host", $"{pattern}, {host}");
+
+        var matches = SchannelCommonNameCheck.PatternMatchesHost(pattern, host);
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", true, matches);
+
         Assert.IsTrue(SchannelCommonNameCheck.PatternMatchesHost(pattern, host));
+    }
 
     [TestMethod]
     [DataRow("", "localhost")]
@@ -30,13 +45,29 @@ public sealed class SchannelCommonNameCheckTests
     [DataRow("*.example.com", "a.b.example.com")]
     [DataRow("*.0.0.1", "127.0.0.1")]
     [DataRow("w*.example.com", "www.example.com")]
-    public void PatternMatchesHost_WithAPatternThatDoesNotMatch_IsFalse(string pattern, string host) =>
+    public void PatternMatchesHost_WithAPatternThatDoesNotMatch_IsFalse(string pattern, string host)
+    {
+        Diagnostics.Arrange("pattern, host", $"{pattern}, {host}");
+
+        var matches = SchannelCommonNameCheck.PatternMatchesHost(pattern, host);
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", false, matches);
+
         Assert.IsFalse(SchannelCommonNameCheck.PatternMatchesHost(pattern, host));
+    }
 
     [TestMethod]
     public void CommonNameMatches_WithOnlyAnIpAlternativeNameAndTheHostAsCommonName_IsTrue()
     {
         using var certificate = CreateCertificate("CN=localhost", names => names.AddIpAddress(IPAddress.Loopback));
+
+        Diagnostics.Arrange("subject, alternative names, host", "CN=localhost, IP 127.0.0.1, localhost");
+
+        var matches = SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", true, matches);
 
         Assert.IsTrue(SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost"));
     }
@@ -46,6 +77,13 @@ public sealed class SchannelCommonNameCheckTests
     {
         using var certificate = CreateCertificate("CN=localhost", addNames: null);
 
+        Diagnostics.Arrange("subject, alternative names, host", "CN=localhost, none, localhost");
+
+        var matches = SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", true, matches);
+
         Assert.IsTrue(SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost"));
     }
 
@@ -53,6 +91,13 @@ public sealed class SchannelCommonNameCheckTests
     public void CommonNameMatches_WithADnsAlternativeName_IsFalse()
     {
         using var certificate = CreateCertificate("CN=localhost", names => names.AddDnsName("other.example"));
+
+        Diagnostics.Arrange("subject, alternative names, host", "CN=localhost, DNS other.example, localhost");
+
+        var matches = SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", false, matches);
 
         Assert.IsFalse(SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost"));
     }
@@ -62,6 +107,13 @@ public sealed class SchannelCommonNameCheckTests
     {
         using var certificate = CreateCertificate("CN=127.0.0.1", addNames: null);
 
+        Diagnostics.Arrange("subject, alternative names, host", "CN=127.0.0.1, none, 127.0.0.1");
+
+        var matches = SchannelCommonNameCheck.CommonNameMatches(certificate, "127.0.0.1");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", false, matches);
+
         Assert.IsFalse(SchannelCommonNameCheck.CommonNameMatches(certificate, "127.0.0.1"));
     }
 
@@ -69,6 +121,13 @@ public sealed class SchannelCommonNameCheckTests
     public void CommonNameMatches_WithAnotherHost_IsFalse()
     {
         using var certificate = CreateCertificate("CN=localhost", names => names.AddIpAddress(IPAddress.Loopback));
+
+        Diagnostics.Arrange("subject, alternative names, host", "CN=localhost, IP 127.0.0.1, wrong.example");
+
+        var matches = SchannelCommonNameCheck.CommonNameMatches(certificate, "wrong.example");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", false, matches);
 
         Assert.IsFalse(SchannelCommonNameCheck.CommonNameMatches(certificate, "wrong.example"));
     }

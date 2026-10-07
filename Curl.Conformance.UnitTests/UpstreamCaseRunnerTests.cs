@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Conformance;
 
@@ -11,6 +12,8 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamCaseRunnerTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string HttpCase =
         "<testcase>\n<reply>\n<data crlf=\"headers\">\nHTTP/1.1 200 OK\n\nbody\n</data>\n</reply>\n"
         + "<client>\n<server>\nhttp\n</server>\n<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n</command>\n</client>\n"
@@ -19,6 +22,7 @@ public sealed class UpstreamCaseRunnerTests
     [TestMethod]
     public async Task RunAsync_CaseThatMatches_Passes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         List<string>? arguments = null;
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
@@ -29,19 +33,25 @@ public sealed class UpstreamCaseRunnerTests
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, HttpCase);
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        diagnostics.Assert("first argument", "--output", arguments![0]);
         Assert.AreEqual("--output", arguments![0]);
+        diagnostics.Assert("arguments after the output file", "--include http://127.0.0.1:8990/5", string.Join(' ', arguments.Skip(2)));
         CollectionAssert.AreEqual(new[] { "--include", "http://127.0.0.1:8990/5" }, arguments.Skip(2).ToArray());
     }
 
     [TestMethod]
     public async Task RunAsync_CaseThatDiffers_FailsWithTheFirstDifference()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(3));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, HttpCase);
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Failed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        diagnostics.Assert("detail starts with the expected text", true, outcome.Detail is not null && outcome.Detail.StartsWith("<verify><protocol> differs at byte 0", StringComparison.Ordinal));
         StringAssert.StartsWith(outcome.Detail, "<verify><protocol> differs at byte 0");
     }
 
@@ -53,6 +63,7 @@ public sealed class UpstreamCaseRunnerTests
     [DataRow(" option=\"force-output\"", "<verify>\n<stdout>\n</stdout>\n</verify>\n", new[] { "--output", "*", "--include", "a" })]
     public async Task RunAsync_PutsRuntestsArgumentsBeforeTheCommand(string commandAttributes, string verify, string[] expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string[]? arguments = null;
         UpstreamCaseRunner runner = Runner(invocation =>
         {
@@ -62,12 +73,15 @@ public sealed class UpstreamCaseRunnerTests
 
         await RunAsync(runner, $"<testcase>\n<client>\n<command{commandAttributes}>\na\n</command>\n</client>\n{verify}</testcase>\n");
 
+        diagnostics.Arrange("expected arguments", string.Join(' ', expected));
+        diagnostics.Assert("arguments", string.Join(' ', expected), string.Join(' ', arguments!.Select(argument => argument.EndsWith("/curl.out", StringComparison.Ordinal) ? "*" : argument).ToArray()));
         CollectionAssert.AreEqual(expected, arguments!.Select(argument => argument.EndsWith("/curl.out", StringComparison.Ordinal) ? "*" : argument).ToArray());
     }
 
     [TestMethod]
     public async Task RunAsync_WritesClientFilesAndGivesStdinAndSavesTheStandardStreams()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string logDirectory = CreateLogDirectory();
         string? stdin = null;
         UpstreamCaseRunner runner = Runner(async invocation =>
@@ -81,10 +95,12 @@ public sealed class UpstreamCaseRunnerTests
             + "<file name=\"%LOGDIR/sub/in.txt\" nonewline=\"yes\">\nfile body\n</file>\n<stdin>\ntyped\n</stdin>\n</client>\n"
             + "<verify>\n<stdout nonewline=\"yes\">\nfile body\n</stdout>\n<file2 name=\"%LOGDIR/stderr%TESTNUMBER\">\nwarned\n</file2>\n</verify>\n</testcase>\n";
 
-        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), logDirectory);
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
         Assert.AreEqual("typed\n", stdin);
+        diagnostics.Diff("stdout file", "file body", File.ReadAllText($"{logDirectory}/stdout5"));
         Assert.AreEqual("file body", File.ReadAllText($"{logDirectory}/stdout5"));
     }
 
@@ -93,6 +109,7 @@ public sealed class UpstreamCaseRunnerTests
     [DataRow("yes", "GET / HTTP/1.0\r\n\r\nbody\r\n")]
     public async Task RunAsync_StdinAndFileWithCrlf_AreGivenWithCrlfLineEndings(string crlf, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string logDirectory = CreateLogDirectory();
         string? stdin = null;
         UpstreamCaseRunner runner = Runner(async invocation =>
@@ -104,8 +121,11 @@ public sealed class UpstreamCaseRunnerTests
         string testFile = $"<testcase>\n<client>\n<command>\na\n</command>\n<file name=\"%LOGDIR/in.txt\" crlf=\"{crlf}\">\n{body}</file>\n"
             + $"<stdin crlf=\"{crlf}\">\n{body}</stdin>\n</client>\n</testcase>\n";
 
-        await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), logDirectory);
+        await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
 
+        diagnostics.Arrange("crlf attribute", crlf);
+        diagnostics.Diff("stdin", expected, stdin ?? string.Empty);
+        diagnostics.Diff("file", expected, File.ReadAllText($"{logDirectory}/in.txt"));
         Assert.AreEqual(expected, stdin);
         Assert.AreEqual(expected, File.ReadAllText($"{logDirectory}/in.txt"));
     }
@@ -113,6 +133,7 @@ public sealed class UpstreamCaseRunnerTests
     [TestMethod]
     public async Task RunAsync_OutputFileCurlWrote_IsComparedWithTheReplyData()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(invocation =>
         {
             File.WriteAllText(invocation.Arguments[1], "served\n");
@@ -121,45 +142,55 @@ public sealed class UpstreamCaseRunnerTests
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<reply>\n<data>\nserved\n</data>\n</reply>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
     [TestMethod]
     public async Task RunAsync_CaseTheHarnessCannotRun_IsSkippedWithTheReason()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nftp://%HOSTIP:%FTPPORT/\n</command>\n</client>\n</testcase>\n");
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        diagnostics.Assert("detail", "the harness has no value for %FTPPORT", outcome.Detail);
         Assert.AreEqual("the harness has no value for %FTPPORT", outcome.Detail);
     }
 
     [TestMethod]
     public async Task RunAsync_FileThatDoesNotParse_IsSkippedWithTheParseFailure()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<reply>\n<data>\n</testcase>\n");
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        diagnostics.Assert("detail is present", true, !string.IsNullOrEmpty(outcome.Detail));
         Assert.IsFalse(string.IsNullOrEmpty(outcome.Detail));
     }
 
     [TestMethod]
     public async Task RunAsync_FeaturesDecideIfBlocks()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = new(_ => Task.FromResult(0), UpstreamCurlPlatform.Windows, TimeProvider.System, TimeSpan.FromSeconds(10));
         string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n<verify>\n<errorcode>\n%if win32\n0\n%else\n1\n%endif\n</errorcode>\n</verify>\n</testcase>\n";
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
     [TestMethod]
     public async Task RunAsync_CurlThatNeverFinishes_FailsAfterTheTimeLimit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ExpiringTimeProvider time = new();
         UpstreamCaseRunner runner = new(_ => new TaskCompletionSource<int>().Task, UpstreamCurlPlatform.Unix, time, TimeSpan.FromMilliseconds(1));
 
@@ -167,13 +198,16 @@ public sealed class UpstreamCaseRunnerTests
         await time.ExpireTheTimeLimitAsync();
         UpstreamCaseOutcome outcome = await running;
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Failed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        diagnostics.Assert("detail", "curl did not finish within 0.001 seconds", outcome.Detail);
         Assert.AreEqual("curl did not finish within 0.001 seconds", outcome.Detail);
     }
 
     [TestMethod]
     public async Task RunAsync_CurlThatLoopsWithoutYielding_FailsAfterTheTimeLimitAndIsStoppedByTheAbandonedServer()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ExpiringTimeProvider time = new();
         TaskCompletionSource<Exception> loopEnded = new(TaskCreationOptions.RunContinuationsAsynchronously);
         UpstreamCaseRunner runner = new(invocation => LoopUntilTheServerFails(invocation.Connector, loopEnded), UpstreamCurlPlatform.Unix, time, TimeSpan.FromMilliseconds(1));
@@ -182,14 +216,19 @@ public sealed class UpstreamCaseRunnerTests
         await time.ExpireTheTimeLimitAsync();
         UpstreamCaseOutcome outcome = await running;
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Failed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        diagnostics.Assert("detail", "curl did not finish within 0.001 seconds", outcome.Detail);
         Assert.AreEqual("curl did not finish within 0.001 seconds", outcome.Detail);
-        Assert.IsInstanceOfType<IOException>(await loopEnded.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Exception loopException = await loopEnded.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        diagnostics.Assert("loop ended with", nameof(IOException), loopException.GetType().Name);
+        Assert.IsInstanceOfType<IOException>(loopException);
     }
 
     [TestMethod]
     public async Task RunAsync_WriteDelaysWithNoCurlTimer_AreSkippedSoTheCaseTakesNoRealTime()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         // Two writes a minute apart would take two minutes on the real clock; the limit is ten seconds.
         string testFile = HttpCase.Replace("</reply>", "<servercmd>\nwritedelay: 60000\n</servercmd>\n</reply>", StringComparison.Ordinal);
         UpstreamCaseRunner runner = Runner(async invocation =>
@@ -200,12 +239,14 @@ public sealed class UpstreamCaseRunnerTests
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
     [TestMethod]
     public async Task RunAsync_WriteDelaysWithACurlTimer_TakeRealTime()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string testFile = HttpCase
             .Replace("</reply>", "<servercmd>\nwritedelay: 300\n</servercmd>\n</reply>", StringComparison.Ordinal)
             .Replace("%TESTNUMBER\n</command>", "%TESTNUMBER -m 5\n</command>", StringComparison.Ordinal);
@@ -218,24 +259,31 @@ public sealed class UpstreamCaseRunnerTests
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
-        Assert.IsGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(300), TimeProvider.System.GetElapsedTime(startedAt));
+        TimeSpan elapsed = TimeProvider.System.GetElapsedTime(startedAt);
+        diagnostics.Assert("waited at least 300 ms", true, elapsed >= TimeSpan.FromMilliseconds(300));
+        Assert.IsGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(300), elapsed);
     }
 
     [TestMethod]
     public async Task RunAsync_CurlThatThrows_FailsNamingTheException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new InvalidOperationException("boom"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Failed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+        diagnostics.Assert("detail", "curl threw InvalidOperationException: boom", outcome.Detail);
         Assert.AreEqual("curl threw InvalidOperationException: boom", outcome.Detail);
     }
 
     [TestMethod]
     public async Task RunAsync_CurlReachingForUdp_GetsAnUnreachableConnector()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IDatagramConnector? datagramConnector = null;
         UpstreamCaseRunner runner = Runner(invocation =>
         {
@@ -245,44 +293,65 @@ public sealed class UpstreamCaseRunnerTests
 
         await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
 
+        diagnostics.Assert("datagram connector type", nameof(UnreachableDatagramConnector), datagramConnector?.GetType().Name ?? "(none)");
         Assert.IsInstanceOfType<UnreachableDatagramConnector>(datagramConnector);
     }
 
     [TestMethod]
     public async Task RunAsync_LogDirectoryWithABlank_Throws()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
 
-        await Assert.ThrowsExactlyAsync<ArgumentException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, "/a b"));
+        diagnostics.Arrange("log directory", "/a b");
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, "/a b"));
+        diagnostics.Act("exception type", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public async Task RunAsync_NullLogDirectory_Throws()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, null!));
+        diagnostics.Arrange("log directory", "(null)");
+        ArgumentNullException exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, null!));
+        diagnostics.Act("exception type", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public async Task RunAsync_IncludesReadFilesAndAMissingOneIsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string logDirectory = CreateLogDirectory();
         File.WriteAllText(Path.Combine(logDirectory, "code.txt"), "7\r\n");
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(7));
         string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n<verify>\n<errorcode>\n"
             + "%include %LOGDIR/missing.txt%\n%includetext %LOGDIR/code.txt%\n</errorcode>\n</verify>\n</testcase>\n";
 
-        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), logDirectory);
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
 
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
     private static UpstreamCaseRunner Runner(Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
         new(runCurl, UpstreamCurlPlatform.Unix, TimeProvider.System, TimeSpan.FromSeconds(10));
 
-    private static Task<UpstreamCaseOutcome> RunAsync(UpstreamCaseRunner runner, string testFile) =>
-        runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory());
+    private Task<UpstreamCaseOutcome> RunAsync(UpstreamCaseRunner runner, string testFile) =>
+        RunWithLogDirectoryAsync(runner, testFile, CreateLogDirectory());
+
+    private async Task<UpstreamCaseOutcome> RunWithLogDirectoryAsync(UpstreamCaseRunner runner, string testFile, string logDirectory)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test file", testFile);
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), logDirectory);
+        diagnostics.Act("outcome kind", outcome.Kind);
+        diagnostics.Act("outcome detail", outcome.Detail);
+        return outcome;
+    }
 
     // Beside the tests, whose path has no blank in the development checkout, unlike the user's temporary folder.
     private static string CreateLogDirectory() =>

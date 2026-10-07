@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -19,6 +20,10 @@ public sealed class CommandLineFormOptionTests
     private const string Url = "http://example.com/";
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow("-F", "a=b")]
@@ -48,6 +53,7 @@ public sealed class CommandLineFormOptionTests
         CommandLineParseResult result = Parse([Url]);
 
         AssertAccepted(result);
+        Diagnostics.Assert("form part count", 0, result.Options!.FormParts.Count);
         Assert.IsEmpty(result.Options!.FormParts);
     }
 
@@ -69,6 +75,7 @@ public sealed class CommandLineFormOptionTests
 
         AssertAccepted(result);
         AssertPart(result.Options!.FormParts.Single(), "a", FormPartKind.FileUpload, "-", fileName: "s");
+        Diagnostics.Assert("file reads", "[]", CommandLineParseDiagnostics.QuoteEach(reader.Reads));
         Assert.IsEmpty(reader.Reads);
     }
 
@@ -96,6 +103,7 @@ public sealed class CommandLineFormOptionTests
         CommandLineParseResult result = Parse(["-F", "a=b", "--form-string", "c=d", "-F", "e=@f.txt", Url]);
 
         AssertAccepted(result);
+        Diagnostics.Assert("part names", "[\"a\", \"c\", \"e\"]", CommandLineParseDiagnostics.QuoteEach(result.Options!.FormParts.Select(part => part.Name)));
         CollectionAssert.AreEqual(new[] { "a", "c", "e" }, result.Options!.FormParts.Select(part => part.Name).ToArray());
     }
 
@@ -157,6 +165,7 @@ public sealed class CommandLineFormOptionTests
         CommandLineParseResult result = Parse(["-F", "a=b;headers=X-A: 1;headers= \"Y: ;\"", Url]);
 
         AssertAccepted(result);
+        Diagnostics.Assert("part headers", "[\"X-A: 1\", \"Y: ;\"]", CommandLineParseDiagnostics.QuoteEach(result.Options!.FormParts.Single().Headers));
         CollectionAssert.AreEqual(new[] { "X-A: 1", "Y: ;" }, result.Options!.FormParts.Single().Headers.ToArray());
     }
 
@@ -171,6 +180,7 @@ public sealed class CommandLineFormOptionTests
         CommandLineParseResult result = Parse(["-F", value, Url], reader);
 
         AssertAccepted(result);
+        Diagnostics.Assert("part headers", "[\"X-H: 1\", \"X-J: 2\"]", CommandLineParseDiagnostics.QuoteEach(result.Options!.FormParts.Single().Headers));
         CollectionAssert.AreEqual(new[] { "X-H: 1", "X-J: 2" }, result.Options!.FormParts.Single().Headers.ToArray());
     }
 
@@ -181,10 +191,12 @@ public sealed class CommandLineFormOptionTests
     {
         RecordingDataFileReader reader = new();
         reader.Files["h.txt"] = Encoding.UTF8.GetBytes(contents);
+        Diagnostics.Bytes("h.txt", reader.Files["h.txt"]);
 
         CommandLineParseResult result = Parse(["-F", "a=b;headers=@h.txt", Url], reader);
 
         AssertAccepted(result);
+        Diagnostics.Assert("part headers", CommandLineParseDiagnostics.QuoteEach(headers), CommandLineParseDiagnostics.QuoteEach(result.Options!.FormParts.Single().Headers));
         CollectionAssert.AreEqual(headers, result.Options!.FormParts.Single().Headers.ToArray());
     }
 
@@ -194,6 +206,7 @@ public sealed class CommandLineFormOptionTests
         CommandLineParseResult result = Parse(["-F", "a=b;headers=@nx.txt", Url]);
 
         AssertAccepted(result, "Warning: Cannot read from nx.txt: No such file or directory");
+        Diagnostics.Assert("part headers", "[]", CommandLineParseDiagnostics.QuoteEach(result.Options!.FormParts.Single().Headers));
         Assert.IsEmpty(result.Options!.FormParts.Single().Headers);
     }
 
@@ -277,6 +290,7 @@ public sealed class CommandLineFormOptionTests
         AssertAccepted(result);
         FormPartSpecification group = result.Options!.FormParts.Single();
         AssertPart(group, "a", FormPartKind.Multipart, string.Empty);
+        Diagnostics.Assert("sub-part count", 2, group.Parts.Count);
         Assert.HasCount(2, group.Parts);
         AssertPart(group.Parts[0], null, FormPartKind.FileUpload, "f.txt", contentType: "x/y");
         AssertPart(group.Parts[1], null, FormPartKind.FileUpload, "g.txt", fileName: "G");
@@ -289,6 +303,7 @@ public sealed class CommandLineFormOptionTests
 
         AssertAccepted(result);
         IReadOnlyList<FormPartSpecification> parts = result.Options!.FormParts;
+        Diagnostics.Assert("form part count", 2, parts.Count);
         Assert.HasCount(2, parts);
         AssertPart(parts[0], "a", FormPartKind.Multipart, string.Empty, contentType: "multipart/mixed");
         AssertPart(parts[0].Parts.Single(), "b", FormPartKind.Text, "c");
@@ -312,6 +327,7 @@ public sealed class CommandLineFormOptionTests
         AssertAccepted(result, "Warning: Field filename not allowed here: z", "Warning: Field encoder not allowed here: 7bit");
         FormPartSpecification multipart = result.Options!.FormParts.Single();
         AssertPart(multipart, "a", FormPartKind.Multipart, string.Empty);
+        Diagnostics.Assert("part headers", "[\"X: 1\"]", CommandLineParseDiagnostics.QuoteEach(multipart.Headers));
         CollectionAssert.AreEqual(new[] { "X: 1" }, multipart.Headers.ToArray());
     }
 
@@ -485,8 +501,14 @@ public sealed class CommandLineFormOptionTests
         AssertRefused(result, [], $"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp);
     }
 
-    private static void AssertPart(FormPartSpecification part, string? name, FormPartKind kind, string content, string? contentType = null, string? fileName = null, string? encoder = null)
+    private void AssertPart(FormPartSpecification part, string? name, FormPartKind kind, string content, string? contentType = null, string? fileName = null, string? encoder = null)
     {
+        Diagnostics.Assert("part name", name, part.Name);
+        Diagnostics.Assert("part kind", kind, part.Kind);
+        Diagnostics.Assert("part content", Quote(content), Quote(part.Content));
+        Diagnostics.Assert("part content type", Quote(contentType), Quote(part.ContentType));
+        Diagnostics.Assert("part file name", Quote(fileName), Quote(part.FileName));
+        Diagnostics.Assert("part encoder", encoder, part.Encoder);
         Assert.AreEqual(name, part.Name);
         Assert.AreEqual(kind, part.Kind);
         Assert.AreEqual(content, part.Content);
@@ -495,22 +517,33 @@ public sealed class CommandLineFormOptionTests
         Assert.AreEqual(encoder, part.Encoder);
     }
 
-    private static void AssertAccepted(CommandLineParseResult result, params string[] warningLines)
+    private void AssertAccepted(CommandLineParseResult result, params string[] warningLines)
     {
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(warningLines), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted, result.Refusal is null ? string.Empty : string.Join('\n', result.Refusal.StandardErrorLines));
         CollectionAssert.AreEqual(warningLines, result.WarningLines.ToArray());
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string[] warningLines, params string[] refusalLines)
+    private void AssertRefused(CommandLineParseResult result, string[] warningLines, params string[] refusalLines)
     {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(warningLines), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(refusalLines), CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(warningLines, result.WarningLines.ToArray());
         CollectionAssert.AreEqual(refusalLines, result.Refusal.StandardErrorLines.ToArray());
     }
 
-    private static void AssertRefusedAtTransferSetup(CommandLineParseResult result, string[] refusalLines)
+    private void AssertRefusedAtTransferSetup(CommandLineParseResult result, string[] refusalLines)
     {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert("found at transfer setup", true, result.Refusal?.FoundAtTransferSetup);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(refusalLines), CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         Assert.IsTrue(result.Refusal.FoundAtTransferSetup);
@@ -518,11 +551,18 @@ public sealed class CommandLineFormOptionTests
         CollectionAssert.AreEqual(refusalLines, result.Refusal.StandardErrorLines.ToArray());
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
+    private static string Quote(string? value) => value is null ? "null" : "\"" + value + "\"";
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
         Parse(arguments, new RecordingDataFileReader());
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        Diagnostics.ActParse(result);
+        return result;
+    }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

@@ -1,5 +1,7 @@
 using System.Net;
 
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -17,11 +19,17 @@ public sealed class ServiceBindingRecordDecoderTests
     /// <summary><c>foo.example.org.</c>, uncompressed.</summary>
     private const string FooExampleOrg = "03666F6F076578616D706C65036F726700";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Decode_AppendixD1AliasForm_ReturnsPriorityZeroAndTheTarget()
     {
         // example.com. HTTPS 0 foo.example.com.
         var record = Decoded("0000" + FooExampleCom);
+
+        Diagnostics.Assert("priority, target", "0, foo.example.com", $"{record.Priority}, {record.TargetName}");
 
         Assert.AreEqual(0, record.Priority);
         Assert.AreEqual("foo.example.com", record.TargetName);
@@ -36,6 +44,8 @@ public sealed class ServiceBindingRecordDecoderTests
         // example.com. SVCB 1 .
         var record = Decoded("000100");
 
+        Diagnostics.Assert("priority, target", "1, .", $"{record.Priority}, {record.TargetName}");
+
         Assert.AreEqual(1, record.Priority);
         Assert.AreEqual(".", record.TargetName);
     }
@@ -46,6 +56,8 @@ public sealed class ServiceBindingRecordDecoderTests
         // example.com. SVCB 16 foo.example.com. port=53
         var record = Decoded("0010" + FooExampleCom + "000300020035");
 
+        Diagnostics.Assert("priority, port", "16, 53", $"{record.Priority}, {record.Port}");
+
         Assert.AreEqual(16, record.Priority);
         Assert.AreEqual((ushort)53, record.Port);
     }
@@ -55,7 +67,11 @@ public sealed class ServiceBindingRecordDecoderTests
     [DataRow("029B000968656C6C6FD2716F6F", DisplayName = "key667=hello\\210qoo")]
     public void Decode_AppendixD2GenericKey_SkipsTheUnknownKey(string parameters)
     {
+        Diagnostics.Arrange("parameters", parameters);
+
         var record = Decoded("0001" + FooExampleCom + parameters);
+
+        Diagnostics.Assert("target", "foo.example.com", record.TargetName);
 
         Assert.AreEqual("foo.example.com", record.TargetName);
         Assert.IsEmpty(record.ApplicationProtocols);
@@ -69,6 +85,8 @@ public sealed class ServiceBindingRecordDecoderTests
         var record = Decoded("0001" + FooExampleCom + "00060020"
             + "20010DB8000000000000000000000001" + "20010DB8000000000000000000530001");
 
+        Diagnostics.Assert("ipv6 hints", "2001:db8::1, 2001:db8::53:1", string.Join(", ", record.IPv6Hints));
+
         CollectionAssert.AreEqual(
             new[] { IPAddress.Parse("2001:db8::1"), IPAddress.Parse("2001:db8::53:1") },
             record.IPv6Hints.ToArray());
@@ -80,6 +98,9 @@ public sealed class ServiceBindingRecordDecoderTests
         // example.com. SVCB 1 example.com. ipv6hint="2001:db8:122:344::192.0.2.33"
         var record = Decoded("0001076578616D706C6503636F6D00" + "00060010" + "20010DB80122034400000000C0000221");
 
+        Diagnostics.Assert("target", "example.com", record.TargetName);
+        Diagnostics.Assert("ipv6 hints", "2001:db8:122:344::c000:221", string.Join(", ", record.IPv6Hints));
+
         Assert.AreEqual("example.com", record.TargetName);
         CollectionAssert.AreEqual(new[] { IPAddress.Parse("2001:db8:122:344::192.0.2.33") }, record.IPv6Hints.ToArray());
     }
@@ -90,6 +111,9 @@ public sealed class ServiceBindingRecordDecoderTests
         // example.com. SVCB 16 foo.example.org. (alpn=h2,h3-19 mandatory=ipv4hint,alpn ipv4hint=192.0.2.1)
         var record = Decoded("0010" + FooExampleOrg
             + "000000040001000400010009026832056833" + "2D3139" + "00040004C0000201");
+
+        Diagnostics.Assert("alpn", "h2, h3-19", string.Join(", ", record.ApplicationProtocols));
+        Diagnostics.Assert("ipv4 hints", "192.0.2.1", string.Join(", ", record.IPv4Hints));
 
         Assert.AreEqual(16, record.Priority);
         Assert.AreEqual("foo.example.org", record.TargetName);
@@ -103,6 +127,8 @@ public sealed class ServiceBindingRecordDecoderTests
         // example.com. SVCB 16 foo.example.org. alpn="f\\oo\,bar,h2"
         var record = Decoded("0010" + FooExampleOrg + "0001000C" + "08665C6F6F2C626172" + "026832");
 
+        Diagnostics.Assert("alpn", "f\\oo,bar | h2", string.Join(" | ", record.ApplicationProtocols));
+
         CollectionAssert.AreEqual(new[] { "f\\oo,bar", "h2" }, record.ApplicationProtocols.ToArray());
     }
 
@@ -110,6 +136,10 @@ public sealed class ServiceBindingRecordDecoderTests
     public void Decode_ARecordWithEch_ReturnsTheEchConfigListAndNoDefaultAlpn()
     {
         var record = Decoded("000100" + "00010003026832" + "00020000" + "00050006AABBCCDDEEFF");
+
+        Diagnostics.Assert("alpn", "h2", string.Join(", ", record.ApplicationProtocols));
+        Diagnostics.Assert("no-default-alpn", true, record.NoDefaultApplicationProtocol);
+        Diagnostics.Bytes("ech config list", record.EchConfigList.Span);
 
         CollectionAssert.AreEqual(new[] { "h2" }, record.ApplicationProtocols.ToArray());
         Assert.IsTrue(record.NoDefaultApplicationProtocol);
@@ -133,15 +163,30 @@ public sealed class ServiceBindingRecordDecoderTests
     [DataRow("00010000060000", ServiceBindingFailure.BadParameterValue, DisplayName = "empty ipv6hint")]
     public void Decode_AMalformedRecord_IsRefusedWithItsFailure(string hex, ServiceBindingFailure expected)
     {
+        Diagnostics.Arrange("record hex", hex);
+
         var decoding = ServiceBindingRecordDecoder.Decode(Convert.FromHexString(hex));
+
+        Diagnostics.Act("failure", decoding.Failure);
+        Diagnostics.Act("record", decoding.Record);
+        Diagnostics.Assert("failure", expected, decoding.Failure);
+        Diagnostics.Assert("record", null, decoding.Record);
 
         Assert.AreEqual(expected, decoding.Failure);
         Assert.IsNull(decoding.Record);
     }
 
-    private static ServiceBindingRecord Decoded(string hex)
+    private ServiceBindingRecord Decoded(string hex)
     {
-        var decoding = ServiceBindingRecordDecoder.Decode(Convert.FromHexString(hex));
+        var bytes = Convert.FromHexString(hex);
+        Diagnostics.Bytes("record", bytes);
+        Diagnostics.Arrange("record length", bytes.Length);
+
+        var decoding = ServiceBindingRecordDecoder.Decode(bytes);
+
+        Diagnostics.Act("failure", decoding.Failure);
+        Diagnostics.Act("record", decoding.Record);
+        Diagnostics.Assert("failure", ServiceBindingFailure.None, decoding.Failure);
 
         Assert.AreEqual(ServiceBindingFailure.None, decoding.Failure);
         return decoding.Record!;

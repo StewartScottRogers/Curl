@@ -24,7 +24,8 @@ namespace Curl.Console;
 /// Windows, where <c>USERPROFILE</c> stands in when <c>HOME</c> is not set. A file that cannot be
 /// read, a directory included, fails the transfer with <c>(26) .netrc error: no such file</c>
 /// unless <c>--netrc-optional</c> is in effect, and a malformed one with
-/// <c>(26) .netrc error: syntax error</c> on the same terms.
+/// <c>(26) .netrc error: syntax error</c> on the same terms. The runner writes every failure this
+/// lookup returns as a <c>-v</c> info line first, as curl 8.21.0's <c>failf</c> does (BL-1411, BL-1447).
 /// </para>
 /// <para>
 /// The URL's percent-decoded user name picks the entry (<see cref="NetrcFile" />). A matching
@@ -168,15 +169,6 @@ internal sealed class TransferCredentialLookup(
             : null;
         return failure is null;
     }
-
-    /// <summary>
-    /// Whether <paramref name="failure" /> refuses credentials for a control character, which curl
-    /// 8.21.0 also writes as a <c>-v</c> info line before its <c>curl: (N)</c> line.
-    /// </summary>
-    /// <param name="failure">A failure <see cref="TryLookUp" /> returned.</param>
-    /// <returns><see langword="true" /> for <see cref="UrlCredentialsMessage" /> and <see cref="NetrcControlCodeMessage" />.</returns>
-    internal static bool IsControlCodeRefusal(TransferResult failure) =>
-        failure.ErrorMessage is UrlCredentialsMessage or NetrcControlCodeMessage;
 
     /// <summary>
     /// curl 8.21.0's <c>-v</c> line for a netrc file that gave the host no entry, or, under

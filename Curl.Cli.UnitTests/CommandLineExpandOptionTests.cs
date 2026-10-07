@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -30,6 +31,10 @@ public sealed class CommandLineExpandOptionTests
 {
     private const string Url = "http://example.com/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("[{{a}}]", "[hello]")]
     [DataRow("{{a}}{{a}}", "hellohello")]
@@ -51,6 +56,8 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--variable", "a=hello", "--expand-user-agent", template, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("user agent", expected, result.Options?.UserAgent);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options!.UserAgent);
     }
@@ -69,8 +76,11 @@ public sealed class CommandLineExpandOptionTests
     {
         RecordingDataFileReader reader = new() { Files = { ["v.bin"] = content } };
 
+        Diagnostics.Bytes("v.bin", content);
         CommandLineParseResult result = Parse(["--variable", "a@v.bin", "--expand-data", $"{{{{a:{functions}}}}}", Url], reader);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Diff("post data", expected, result.Options?.PostData?.ToArray() ?? []);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(expected, result.Options!.PostData!.Value.ToArray());
     }
@@ -98,6 +108,7 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--variable", $"a={content}", "--expand-user-agent", "{{a:64dec}}", Url]);
 
+        Diagnostics.Assert("user agent", expected, result.Options?.UserAgent);
         Assert.AreEqual(expected, result.Options!.UserAgent);
     }
 
@@ -114,6 +125,10 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--variable", "a=x", "--expand-data", template, Url]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        AssertStandardErrorLines(
+            [$"curl: unknown variable function in '{functions}'", "curl: option --expand-data: variable expansion failure", CommandLineRefusal.TryHelpLine],
+            result);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -131,6 +146,8 @@ public sealed class CommandLineExpandOptionTests
         CommandLineParseResult silent = Parse(["-s", "--variable", "a=x", "--expand-data", "{{a:bogus}}", Url]);
         CommandLineParseResult shown = Parse(["-s", "-S", "--variable", "a=x", "--expand-data", "{{a:bogus}}", Url]);
 
+        AssertStandardErrorLines(["curl: option --expand-data: variable expansion failure", CommandLineRefusal.TryHelpLine], silent);
+        Diagnostics.Assert("shown stderr line count", 3, shown.Refusal?.StandardErrorLines.Count);
         CollectionAssert.AreEqual(
             new[] { "curl: option --expand-data: variable expansion failure", CommandLineRefusal.TryHelpLine },
             silent.Refusal!.StandardErrorLines.ToArray());
@@ -145,6 +162,10 @@ public sealed class CommandLineExpandOptionTests
         CommandLineParseResult refused = Parse(["--variable", "a@nul.bin", "--expand-data", "{{a}}", Url], reader);
         CommandLineParseResult unused = Parse(["--variable", "a@nul.bin", "--expand-data", "x", Url], reader);
 
+        AssertStandardErrorLines(
+            ["curl: variable contains null byte", "curl: option --expand-data: variable expansion failure", CommandLineRefusal.TryHelpLine],
+            refused);
+        Diagnostics.Assert("unused accepted", true, unused.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "curl: variable contains null byte", "curl: option --expand-data: variable expansion failure", CommandLineRefusal.TryHelpLine },
             refused.Refusal!.StandardErrorLines.ToArray());
@@ -160,6 +181,9 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--expand-user-agent", template, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("user agent", template, result.Options?.UserAgent);
+        AssertWarningLines([warning], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(template, result.Options!.UserAgent);
         CollectionAssert.AreEqual(new[] { warning }, result.WarningLines.ToArray());
@@ -173,6 +197,14 @@ public sealed class CommandLineExpandOptionTests
 
         CommandLineParseResult result = Parse(["--expand-user-agent", template, Url]);
 
+        string[] expectedWarnings =
+        [
+            "Warning: bad variable name length ",
+            "Warning: '{{" + new string('x', 67),
+            "Warning: " + new string('x', 61) + "}}'",
+        ];
+        Diagnostics.Assert("user agent", template, result.Options?.UserAgent);
+        AssertWarningLines(expectedWarnings, result);
         Assert.AreEqual(template, result.Options!.UserAgent);
         CollectionAssert.AreEqual(
             new[]
@@ -191,6 +223,8 @@ public sealed class CommandLineExpandOptionTests
 
         CommandLineParseResult result = Parse(["--expand-user-agent", $"[{{{{{name}}}}}]", Url]);
 
+        Diagnostics.Assert("user agent", "[]", result.Options?.UserAgent);
+        AssertWarningLines([], result);
         Assert.AreEqual("[]", result.Options!.UserAgent);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -200,6 +234,7 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["-s", "--expand-user-agent", "[{{a", Url]);
 
+        AssertWarningLines([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -208,6 +243,7 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--variable=a=v", "--expand-user-agent=[{{a}}]", Url]);
 
+        Diagnostics.Assert("user agent", "[v]", result.Options?.UserAgent);
         Assert.AreEqual("[v]", result.Options!.UserAgent);
     }
 
@@ -216,6 +252,7 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--variable", "a=1", "--expand-variable", "b={{a}}{{a}}", "--expand-user-agent", "[{{b}}]", Url]);
 
+        Diagnostics.Assert("user agent", "[11]", result.Options?.UserAgent);
         Assert.AreEqual("[11]", result.Options!.UserAgent);
     }
 
@@ -226,6 +263,7 @@ public sealed class CommandLineExpandOptionTests
 
         CommandLineParseResult result = Parse(["--variable", "f=body.txt", "--expand-data", "@{{f}}", Url], reader);
 
+        Diagnostics.Diff("post data", "body"u8.ToArray(), result.Options?.PostData?.ToArray() ?? []);
         CollectionAssert.AreEqual("body"u8.ToArray(), result.Options!.PostData!.Value.ToArray());
     }
 
@@ -234,6 +272,7 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--expand-url", "http://example.com/{{nope}}"]);
 
+        Diagnostics.Assert("urls", CommandLineParseDiagnostics.QuoteEach(["http://example.com/"]), CommandLineParseDiagnostics.QuoteEach(result.Options?.Urls ?? []));
         CollectionAssert.AreEqual(new[] { "http://example.com/" }, result.Options!.Urls.ToArray());
     }
 
@@ -247,6 +286,8 @@ public sealed class CommandLineExpandOptionTests
 
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        AssertStandardErrorLines([$"curl: option {argument}: variable expansion failure", CommandLineRefusal.TryHelpLine], result);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {argument}: variable expansion failure", CommandLineRefusal.TryHelpLine },
@@ -258,6 +299,8 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse(["--expand-silent", null!, Url]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        AssertStandardErrorLines(["curl: option --expand-silent: variable expansion failure", CommandLineRefusal.TryHelpLine], result);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "curl: option --expand-silent: variable expansion failure", CommandLineRefusal.TryHelpLine },
@@ -269,6 +312,8 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse([Url, "--expand-silent"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("silent", true, result.Options?.Silent);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options!.Silent);
     }
@@ -278,6 +323,7 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse([Url, "--expand-data"]);
 
+        Diagnostics.Assert("first stderr line", "curl: option --expand-data: requires parameter", result.Refusal?.StandardErrorLines.FirstOrDefault());
         Assert.AreEqual("curl: option --expand-data: requires parameter", result.Refusal!.StandardErrorLines[0]);
     }
 
@@ -290,6 +336,7 @@ public sealed class CommandLineExpandOptionTests
     {
         CommandLineParseResult result = Parse([argument, "x", Url]);
 
+        Diagnostics.Assert("first stderr line", $"curl: option {argument}: is unknown", result.Refusal?.StandardErrorLines.FirstOrDefault());
         Assert.AreEqual($"curl: option {argument}: is unknown", result.Refusal!.StandardErrorLines[0]);
     }
 
@@ -300,6 +347,13 @@ public sealed class CommandLineExpandOptionTests
 
         CommandLineParseResult result = Parse(["-K", "k3.cfg", Url], reader);
 
+        AssertStandardErrorLines(
+            [
+                "curl: k3.cfg:1 config file option 'expand-silent' variable expansion failure",
+                "curl: option -K: variable expansion failure",
+                CommandLineRefusal.TryHelpLine,
+            ],
+            result);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -317,6 +371,14 @@ public sealed class CommandLineExpandOptionTests
 
         CommandLineParseResult result = Parse(["-K", "k2.cfg", Url], reader);
 
+        AssertStandardErrorLines(
+            [
+                "curl: unknown variable function in ':nope'",
+                "curl: k2.cfg:2 config file option 'expand-data' variable expansion failure",
+                "curl: option -K: variable expansion failure",
+                CommandLineRefusal.TryHelpLine,
+            ],
+            result);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -335,14 +397,32 @@ public sealed class CommandLineExpandOptionTests
 
         CommandLineParseResult result = Parse(["-K", "k1.cfg", Url], reader);
 
+        Diagnostics.Assert("silent", true, result.Options?.Silent);
         Assert.IsTrue(result.Options!.Silent);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
         Parse(arguments, new RecordingDataFileReader());
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => false, new UnexpectedPasswordPrompt(), reader);
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => false, new UnexpectedPasswordPrompt(), reader);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertStandardErrorLines(string[] expected, CommandLineParseResult result) =>
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach(expected),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
+
+    private void AssertWarningLines(string[] expected, CommandLineParseResult result) =>
+        Diagnostics.Assert(
+            "warning lines",
+            CommandLineParseDiagnostics.QuoteEach(expected),
+            CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

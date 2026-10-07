@@ -17,10 +17,14 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_CookieAdded_ReportsAddedCookie()
     {
         RecordingTransferEvents events = new();
+        string[] headers = ["n2=v; Path=/; Domain=example.co.uk"];
+        Diagnostics.ArrangeSetCookies(CoUk, headers, Now);
 
-        new CookieStore().StoreFromResponse(CoUk, ["n2=v; Path=/; Domain=example.co.uk"], Now, events);
+        new CookieStore().StoreFromResponse(CoUk, headers, Now, events);
 
-        CollectionAssert.AreEqual(new[] { "Added cookie n2=\"v\" for domain example.co.uk, path /, expire 0" }, events.Info);
+        string[] expected = ["Added cookie n2=\"v\" for domain example.co.uk, path /, expire 0"];
+        LogReportedLines(events, expected);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     [TestMethod]
@@ -30,26 +34,32 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_DomainIsAPublicSuffix_ReportsTheDrop(string domainAttribute, string printedDomain)
     {
         RecordingTransferEvents events = new();
+        string[] headers = [$"n1=v; Path=/; {domainAttribute}"];
+        Diagnostics.ArrangeSetCookies(CoUk, headers, Now);
 
-        new CookieStore().StoreFromResponse(CoUk, [$"n1=v; Path=/; {domainAttribute}"], Now, events);
+        new CookieStore().StoreFromResponse(CoUk, headers, Now, events);
 
-        CollectionAssert.AreEqual(new[] { $"cookie 'n1' dropped, domain 'www.example.co.uk' must not set cookies for '{printedDomain}'" }, events.Info);
+        string[] expected = [$"cookie 'n1' dropped, domain 'www.example.co.uk' must not set cookies for '{printedDomain}'"];
+        LogReportedLines(events, expected);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     [TestMethod]
     public void StoreFromResponse_NamesakeReplaced_ReportsReplacedCookie()
     {
         RecordingTransferEvents events = new();
+        string[] headers = ["r=1; Path=/", "r=2; Path=/"];
+        Diagnostics.ArrangeSetCookies(CoUk, headers, Now);
 
-        new CookieStore().StoreFromResponse(CoUk, ["r=1; Path=/", "r=2; Path=/"], Now, events);
+        new CookieStore().StoreFromResponse(CoUk, headers, Now, events);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "Added cookie r=\"1\" for domain www.example.co.uk, path /, expire 0",
-                "Replaced cookie r=\"2\" for domain www.example.co.uk, path /, expire 0",
-            },
-            events.Info);
+        string[] expected =
+        [
+            "Added cookie r=\"1\" for domain www.example.co.uk, path /, expire 0",
+            "Replaced cookie r=\"2\" for domain www.example.co.uk, path /, expire 0",
+        ];
+        LogReportedLines(events, expected);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     /// <summary>
@@ -62,19 +72,23 @@ public sealed partial class CookieStoreTests
     {
         RecordingTransferEvents events = new();
         CookieStore store = new();
+        string[] coUkHeaders = ["m=1; Path=/; Max-Age=100", "z=1; Path=/; Max-Age=0", "qv=\"a b\"; Path=/p"];
+        string[] loopbackHeaders = ["j=1; Domain=127.0.0.1; Path=/"];
+        Diagnostics.ArrangeSetCookies(CoUk, coUkHeaders, Now);
+        Diagnostics.ArrangeSetCookies(Loopback, loopbackHeaders, Now);
 
-        store.StoreFromResponse(CoUk, ["m=1; Path=/; Max-Age=100", "z=1; Path=/; Max-Age=0", "qv=\"a b\"; Path=/p"], Now, events);
-        store.StoreFromResponse(Loopback, ["j=1; Domain=127.0.0.1; Path=/"], Now, events);
+        store.StoreFromResponse(CoUk, coUkHeaders, Now, events);
+        store.StoreFromResponse(Loopback, loopbackHeaders, Now, events);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                $"Added cookie m=\"1\" for domain www.example.co.uk, path /, expire {Now.ToUnixTimeSeconds() + 100}",
-                "Added cookie z=\"1\" for domain www.example.co.uk, path /, expire 1",
-                "Added cookie qv=\"\"a b\"\" for domain www.example.co.uk, path /p, expire 0",
-                "Added cookie j=\"1\" for domain 127.0.0.1, path /, expire 0",
-            },
-            events.Info);
+        string[] expected =
+        [
+            $"Added cookie m=\"1\" for domain www.example.co.uk, path /, expire {Now.ToUnixTimeSeconds() + 100}",
+            "Added cookie z=\"1\" for domain www.example.co.uk, path /, expire 1",
+            "Added cookie qv=\"\"a b\"\" for domain www.example.co.uk, path /p, expire 0",
+            "Added cookie j=\"1\" for domain 127.0.0.1, path /, expire 0",
+        ];
+        LogReportedLines(events, expected);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     /// <summary>
@@ -86,14 +100,20 @@ public sealed partial class CookieStoreTests
     {
         RecordingTransferEvents events = new();
         CookieStore store = new();
+        Diagnostics.ArrangeText("cookie file", "www.example.co.uk\tFALSE\t/\tTRUE\t0\ts\t1\n");
         using (StringReader file = new("www.example.co.uk\tFALSE\t/\tTRUE\t0\ts\t1\n"))
         {
             store.LoadCookieFile(file, discardSessionCookies: false, Now);
         }
 
-        store.StoreFromResponse(CoUk, ["s=2; Path=/"], Now, events);
+        string[] headers = ["s=2; Path=/"];
+        Diagnostics.ArrangeSetCookies(CoUk, headers, Now);
 
-        CollectionAssert.AreEqual(new[] { "cookie 's' for domain 'www.example.co.uk' dropped, would overlay an existing cookie" }, events.Info);
+        store.StoreFromResponse(CoUk, headers, Now, events);
+
+        string[] expected = ["cookie 's' for domain 'www.example.co.uk' dropped, would overlay an existing cookie"];
+        LogReportedLines(events, expected);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     /// <summary>
@@ -104,9 +124,17 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_PastTheLimit_ReportsNothingForThem()
     {
         RecordingTransferEvents events = new();
+        string[] headers = ["noequals", .. Enumerable.Range(1, 52).Select(number => $"k{number}=v; Path=/")];
+        Diagnostics.Arrange(
+            "Set-Cookie headers",
+            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"noequals, then k1=v; Path=/ to k52=v; Path=/ ({headers.Length} in all) from {CoUk.OriginalString} at Unix {Now.ToUnixTimeSeconds()}"));
 
-        new CookieStore().StoreFromResponse(CoUk, ["noequals", .. Enumerable.Range(1, 52).Select(number => $"k{number}=v; Path=/")], Now, events);
+        new CookieStore().StoreFromResponse(CoUk, headers, Now, events);
 
+        Diagnostics.Act("-v lines reported", events.Info.Count);
+        Diagnostics.Assert("-v line count", CookieStore.MostCookiesStoredPerResponse + 1, events.Info.Count);
+        Diagnostics.AssertText("first -v line", "invalid cookie, dropped", events.Info[0]);
+        Diagnostics.AssertText("last -v line", "Added cookie k50=\"v\" for domain www.example.co.uk, path /, expire 0", events.Info[^1]);
         Assert.HasCount(CookieStore.MostCookiesStoredPerResponse + 1, events.Info);
         Assert.AreEqual("invalid cookie, dropped", events.Info[0]);
         Assert.AreEqual("Added cookie k50=\"v\" for domain www.example.co.uk, path /, expire 0", events.Info[^1]);
@@ -120,16 +148,18 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_ExpiredArrivalThenNamesake_ReportsTheNamesakeAdded()
     {
         RecordingTransferEvents events = new();
+        string[] headers = ["a=1; Max-Age=0", "a=2"];
+        Diagnostics.ArrangeSetCookies(Loopback, headers, Now);
 
-        new CookieStore().StoreFromResponse(Loopback, ["a=1; Max-Age=0", "a=2"], Now, events);
+        new CookieStore().StoreFromResponse(Loopback, headers, Now, events);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "Added cookie a=\"1\" for domain 127.0.0.1, path /, expire 1",
-                "Added cookie a=\"2\" for domain 127.0.0.1, path /, expire 0",
-            },
-            events.Info);
+        string[] expected =
+        [
+            "Added cookie a=\"1\" for domain 127.0.0.1, path /, expire 1",
+            "Added cookie a=\"2\" for domain 127.0.0.1, path /, expire 0",
+        ];
+        LogReportedLines(events, expected);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     /// <summary>
@@ -141,11 +171,20 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange(
+            "single headers and the count so far",
+            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"a=1 at 7, noequals after the first, b=1 at the limit {CookieStore.MostCookiesStoredPerResponse}"));
 
         int afterStored = store.StoreFromResponse(Loopback, "a=1", 7, Now, events);
         int afterRefused = store.StoreFromResponse(Loopback, "noequals", afterStored, Now, events);
         int pastTheLimit = store.StoreFromResponse(Loopback, "b=1", CookieStore.MostCookiesStoredPerResponse, Now, events);
 
+        Diagnostics.Act("counts returned (stored, refused, past the limit)", $"{afterStored}, {afterRefused}, {pastTheLimit}");
+        Diagnostics.Assert("count after a stored header", 8, afterStored);
+        Diagnostics.Assert("count after a refused header", 8, afterRefused);
+        Diagnostics.Assert("count past the limit", CookieStore.MostCookiesStoredPerResponse, pastTheLimit);
+        Diagnostics.Assert("-v line count", 2, events.Info.Count);
+        Diagnostics.Assert("stored cookie name", "a", store.Cookies.Single().Name);
         Assert.AreEqual(8, afterStored);
         Assert.AreEqual(8, afterRefused);
         Assert.AreEqual(CookieStore.MostCookiesStoredPerResponse, pastTheLimit);
@@ -154,17 +193,26 @@ public sealed partial class CookieStoreTests
     }
 
     [TestMethod]
-    public void StoreFromResponse_NullEvents_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().StoreFromResponse(Www, [], Now, null!));
+    public void StoreFromResponse_NullEvents_Throws()
+    {
+        ArrangeNullArgument("events");
+
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().StoreFromResponse(Www, [], Now, null!));
+
+        LogThrown(thrown);
+    }
 
     [TestMethod]
     public void StoreFromResponse_OneHeaderNullArgument_Throws()
     {
         CookieStore store = new();
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(null!, "a=1", 0, Now, NoTransferEvents.Instance));
-        Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, (string)null!, 0, Now, NoTransferEvents.Instance));
-        Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, "a=1", 0, Now, null!));
+        ArrangeNullArgument("url");
+        LogThrown(Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(null!, "a=1", 0, Now, NoTransferEvents.Instance)));
+        ArrangeNullArgument("setCookieHeader");
+        LogThrown(Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, (string)null!, 0, Now, NoTransferEvents.Instance)));
+        ArrangeNullArgument("events");
+        LogThrown(Assert.ThrowsExactly<ArgumentNullException>(() => store.StoreFromResponse(Www, "a=1", 0, Now, null!)));
     }
 
     /// <summary>
@@ -178,6 +226,7 @@ public sealed partial class CookieStoreTests
     public void GetCookieHeader_ManyCookies_ReportsTheMostCookiesSent(int stored, bool reported)
     {
         CookieStore store = new();
+        Diagnostics.Arrange("cookies stored, k1=v to k<n>=v", stored);
         foreach (int number in Enumerable.Range(1, stored))
         {
             store.StoreFromResponse(Loopback, "k" + number.ToString(System.Globalization.CultureInfo.InvariantCulture) + "=v", 0, Now, NoTransferEvents.Instance);
@@ -187,8 +236,12 @@ public sealed partial class CookieStoreTests
 
         string header = store.GetCookieHeader(Loopback, secure: false, Now, [], events)!;
 
+        string[] expected = reported ? ["Included max number of cookies (150) in request!"] : [];
+        Diagnostics.Act("cookies in the Cookie header", header.Split("; ").Length);
+        Diagnostics.Assert("cookies in the Cookie header", Math.Min(stored, CookieStore.MostCookiesSent), header.Split("; ").Length);
+        LogReportedLines(events, expected);
         Assert.HasCount(Math.Min(stored, CookieStore.MostCookiesSent), header.Split("; "));
-        CollectionAssert.AreEqual(reported ? new[] { "Included max number of cookies (150) in request!" } : Array.Empty<string>(), events.Info);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     /// <summary>
@@ -199,23 +252,37 @@ public sealed partial class CookieStoreTests
     public void GetCookieHeader_HeaderTooLong_ReportsTheFirstCookieLeftOut()
     {
         CookieStore store = new();
+        Diagnostics.Arrange("cookies (name:value length)", "aaa:4000 bb:4000 c:165 dd:1, plus the -b string s=1");
         store.StoreFromResponse(Loopback, ["aaa=" + new string('x', 4000), "bb=" + new string('x', 4000), "c=" + new string('x', 165), "dd=1"], Now, NoTransferEvents.Instance);
         RecordingTransferEvents events = new();
 
         string header = store.GetCookieHeader(Loopback, secure: false, Now, ["s=1"], events)!;
 
-        Assert.AreEqual("aaa,dd,bb", string.Join(',', header.Split("; ").Select(pair => pair.Split('=')[0])));
-        CollectionAssert.AreEqual(new[] { "Restricted outgoing cookies due to header size, 'c' not sent" }, events.Info);
+        string names = string.Join(',', header.Split("; ").Select(pair => pair.Split('=')[0]));
+        Diagnostics.Act("header length", header.Length);
+        Diagnostics.AssertText("names sent", "aaa,dd,bb", names);
+        string[] expected = ["Restricted outgoing cookies due to header size, 'c' not sent"];
+        LogReportedLines(events, expected);
+        Assert.AreEqual("aaa,dd,bb", names);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     [TestMethod]
     public void GetCookieHeader_WithinTheLimits_ReportsNothingAndSendsTheStrings()
     {
         CookieStore store = new();
-        store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
+        string[] headers = ["a=1"];
+        Diagnostics.ArrangeSetCookies(Loopback, headers, Now);
+        Diagnostics.Arrange("-b string", "s=1");
+        store.StoreFromResponse(Loopback, headers, Now, NoTransferEvents.Instance);
         RecordingTransferEvents events = new();
 
-        Assert.AreEqual("a=1; s=1", store.GetCookieHeader(Loopback, secure: false, Now, ["s=1"], events));
+        string? header = store.GetCookieHeader(Loopback, secure: false, Now, ["s=1"], events);
+
+        Diagnostics.ActText("Cookie header", header);
+        Diagnostics.AssertText("Cookie header", "a=1; s=1", header);
+        LogReportedLines(events, []);
+        Assert.AreEqual("a=1; s=1", header);
         Assert.IsEmpty(events.Info);
     }
 
@@ -223,29 +290,56 @@ public sealed partial class CookieStoreTests
     public void GetCookieHeader_EventsHeaderTooLong_ReportsTheFirstCookieLeftOut()
     {
         CookieStore store = new();
+        Diagnostics.Arrange("cookies (name:value length)", "aaa:4000 bb:4000 c:165 dd:1, plus the added string s=1");
         store.StoreFromResponse(Loopback, ["aaa=" + new string('x', 4000), "bb=" + new string('x', 4000), "c=" + new string('x', 165), "dd=1"], Now, NoTransferEvents.Instance);
         store.AddCookieString("s=1");
         RecordingTransferEvents events = new();
 
         string header = store.GetCookieHeader(Loopback, secure: false, Now, events)!;
 
-        Assert.AreEqual("aaa,dd,bb", string.Join(',', header.Split("; ").Select(pair => pair.Split('=')[0])));
-        CollectionAssert.AreEqual(new[] { "Restricted outgoing cookies due to header size, 'c' not sent" }, events.Info);
+        string names = string.Join(',', header.Split("; ").Select(pair => pair.Split('=')[0]));
+        Diagnostics.Act("header length", header.Length);
+        Diagnostics.AssertText("names sent", "aaa,dd,bb", names);
+        string[] expected = ["Restricted outgoing cookies due to header size, 'c' not sent"];
+        LogReportedLines(events, expected);
+        Assert.AreEqual("aaa,dd,bb", names);
+        CollectionAssert.AreEqual(expected, events.Info);
     }
 
     [TestMethod]
     public void GetCookieHeader_EventsWithinTheLimits_SendsTheAddedCookieStrings()
     {
         CookieStore store = new();
-        store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
+        string[] headers = ["a=1"];
+        Diagnostics.ArrangeSetCookies(Loopback, headers, Now);
+        store.StoreFromResponse(Loopback, headers, Now, NoTransferEvents.Instance);
         store.AddCookieString("s=1");
+        Diagnostics.Arrange("added -b string", "s=1");
         RecordingTransferEvents events = new();
 
-        Assert.AreEqual("a=1; s=1", store.GetCookieHeader(Loopback, secure: false, Now, events));
+        string? header = store.GetCookieHeader(Loopback, secure: false, Now, events);
+
+        Diagnostics.ActText("Cookie header", header);
+        Diagnostics.AssertText("Cookie header", "a=1; s=1", header);
+        LogReportedLines(events, []);
+        Assert.AreEqual("a=1; s=1", header);
         Assert.IsEmpty(events.Info);
     }
 
     [TestMethod]
-    public void GetCookieHeader_NullEvents_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(Loopback, secure: false, Now, [], null!));
+    public void GetCookieHeader_NullEvents_Throws()
+    {
+        ArrangeNullArgument("events");
+
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new CookieStore().GetCookieHeader(Loopback, secure: false, Now, [], null!));
+
+        LogThrown(thrown);
+    }
+
+    /// <summary>Writes the <c>-v</c> lines the store reported as an ACT line, then the ASSERT and DIFF lines against <paramref name="expected"/>.</summary>
+    private void LogReportedLines(RecordingTransferEvents events, IEnumerable<string> expected)
+    {
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
+        Diagnostics.AssertTexts("-v lines reported", expected, events.Info);
+    }
 }

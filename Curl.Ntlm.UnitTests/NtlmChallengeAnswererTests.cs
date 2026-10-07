@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Ntlm;
 
 /// <summary>
@@ -17,17 +19,25 @@ public sealed class NtlmChallengeAnswererTests
 
     private static readonly DateTimeOffset Now = new(2026, 9, 28, 12, 34, 56, 789, TimeSpan.Zero);
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Answer_ExtendedSessionSecurity_SendsNtlmV2AtTheWholeSecond()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         NtlmNegotiateFlags flags = NtlmNegotiateFlags.NegotiateUnicode | NtlmNegotiateFlags.NegotiateNtlm |
             NtlmNegotiateFlags.NegotiateExtendedSessionSecurity | NtlmNegotiateFlags.NegotiateTargetInfo;
         NtlmChallengeMessage challenge = new(flags, ServerChallenge, [], TargetInformation, []);
+        ArrangeChallenge(diagnostics, challenge, @"Domain\User", "Password");
 
         NtlmAuthenticateMessage message = CreateAnswerer().Answer(challenge, @"Domain\User", "Password");
+        ActMessage(diagnostics, message);
 
         NtlmResponses expected = NtlmResponseComputation.ComputeV2(
             "User", "Domain", "Password", ServerChallenge, ClientChallenge, new DateTimeOffset(2026, 9, 28, 12, 34, 56, TimeSpan.Zero), TargetInformation);
+        diagnostics.Assert("flags", flags, message.Flags);
+        diagnostics.Diff("LM response", expected.LmChallengeResponse, message.LmChallengeResponse);
+        diagnostics.Diff("NT response", expected.NtChallengeResponse, message.NtChallengeResponse);
         Assert.AreEqual(flags, message.Flags);
         CollectionAssert.AreEqual(expected.LmChallengeResponse, message.LmChallengeResponse);
         CollectionAssert.AreEqual(expected.NtChallengeResponse, message.NtChallengeResponse);
@@ -39,12 +49,18 @@ public sealed class NtlmChallengeAnswererTests
     [TestMethod]
     public void Answer_NoExtendedSessionSecurity_SendsNtlmV1()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         NtlmNegotiateFlags flags = NtlmNegotiateFlags.NegotiateUnicode | NtlmNegotiateFlags.NegotiateNtlm;
         NtlmChallengeMessage challenge = new(flags, ServerChallenge, [], [], []);
+        ArrangeChallenge(diagnostics, challenge, "User", "Password");
 
         NtlmAuthenticateMessage message = CreateAnswerer().Answer(challenge, "User", "Password");
+        ActMessage(diagnostics, message);
 
         NtlmResponses expected = NtlmResponseComputation.ComputeV1("Password", ServerChallenge, flags);
+        diagnostics.Assert("flags", flags, message.Flags);
+        diagnostics.Diff("LM response", expected.LmChallengeResponse, message.LmChallengeResponse);
+        diagnostics.Diff("NT response", expected.NtChallengeResponse, message.NtChallengeResponse);
         Assert.AreEqual(flags, message.Flags);
         CollectionAssert.AreEqual(expected.LmChallengeResponse, message.LmChallengeResponse);
         CollectionAssert.AreEqual(expected.NtChallengeResponse, message.NtChallengeResponse);
@@ -55,7 +71,33 @@ public sealed class NtlmChallengeAnswererTests
     [TestMethod]
     public void Answer_NullChallenge_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CreateAnswerer().Answer(null!, "User", "Password"));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", "null");
+        diagnostics.Arrange("user name and password", "User, Password");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CreateAnswerer().Answer(null!, "User", "Password"));
+
+        diagnostics.Act("exception", $"{exception.GetType().Name} for {exception.ParamName}");
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
+
+    private static void ArrangeChallenge(TestDiagnostics diagnostics, NtlmChallengeMessage challenge, string userName, string password)
+    {
+        diagnostics.Arrange("challenge flags", $"0x{(uint)challenge.Flags:X8} ({challenge.Flags})");
+        diagnostics.Bytes("server challenge", challenge.ServerChallenge);
+        diagnostics.Bytes("target information", challenge.TargetInformation);
+        diagnostics.Arrange("user name", userName);
+        diagnostics.Arrange("password", password);
+        diagnostics.Arrange("time", Now.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        diagnostics.Bytes("client challenge", ClientChallenge);
+    }
+
+    private static void ActMessage(TestDiagnostics diagnostics, NtlmAuthenticateMessage message)
+    {
+        diagnostics.Act("flags", $"0x{(uint)message.Flags:X8} ({message.Flags})");
+        diagnostics.Act("domain, user, workstation", $"'{message.Domain}', '{message.User}', '{message.Workstation}'");
+        diagnostics.Bytes("LM response", message.LmChallengeResponse);
+        diagnostics.Bytes("NT response", message.NtChallengeResponse);
     }
 
     private static NtlmChallengeAnswerer CreateAnswerer() => new(new FixedTimeProvider(Now), new FixedRandomSource(ClientChallenge));

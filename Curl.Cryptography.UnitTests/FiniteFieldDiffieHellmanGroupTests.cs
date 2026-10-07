@@ -1,4 +1,5 @@
 using System.Numerics;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -11,6 +12,9 @@ namespace Curl.Cryptography;
 [TestClass]
 public sealed class FiniteFieldDiffieHellmanGroupTests
 {
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     // RFC 2409 section 6.1: 2^768 - 2^704 - 1 + 2^64 * { [2^638 pi] + 149686 }; section 6.2 and
     // RFC 3526 sections 3, 5 and 7: the same shape with the offsets below.
     // RFC 7919 appendix A: 2^b - 2^(b-64) + {[2^(b-130) e] + X} * 2^64 - 1.
@@ -27,10 +31,27 @@ public sealed class FiniteFieldDiffieHellmanGroupTests
     [DataRow("Ffdhe8192", 8192, "e", 10965728)]
     public void Prime_NamedGroup_EqualsTheRfcHexadecimalTextAndFormula(string name, int bits, string constant, int offset)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", constant == "pi" ? "RFC 2409 section 6 or RFC 3526, prime text and formula with pi" : "RFC 7919 appendix A, prime text and formula with e");
+        diagnostics.Arrange("group", name);
+        diagnostics.Arrange("bits", bits);
+        diagnostics.Arrange("formula offset", offset);
         FiniteFieldDiffieHellmanGroup group = NamedGroup(name);
-        BigInteger scaledConstant = constant == "pi" ? ComputeScaledPi(bits - 130) : ComputeScaledE(bits - 130);
-        BigInteger formula = (BigInteger.One << bits) - (BigInteger.One << (bits - 64)) - 1 + ((scaledConstant + offset) << 64);
+        BigInteger scaledConstant;
+        using (diagnostics.Phase($"compute 2^{bits - 130} {constant}"))
+        {
+            scaledConstant = constant == "pi" ? ComputeScaledPi(bits - 130) : ComputeScaledE(bits - 130);
+        }
 
+        BigInteger formula = (BigInteger.One << bits) - (BigInteger.One << (bits - 64)) - 1 + ((scaledConstant + offset) << 64);
+        diagnostics.Bytes("prime", group.Prime);
+        diagnostics.Act("prime length", group.PrimeLength);
+        diagnostics.Act("generator", Convert.ToHexString(group.Generator));
+
+        diagnostics.Diff("prime against the RFC text", Convert.FromHexString(RfcPrime(name)), group.Prime);
+        diagnostics.Diff("prime against the formula", formula.ToByteArray(isUnsigned: true, isBigEndian: true), group.Prime);
+        diagnostics.Assert("prime length", bits / 8, group.PrimeLength);
+        diagnostics.Assert("generator", "02", Convert.ToHexString(group.Generator));
         Assert.AreEqual(RfcPrime(name), Convert.ToHexString(group.Prime));
         Assert.AreEqual(formula, new BigInteger(group.Prime, isUnsigned: true, isBigEndian: true));
         Assert.AreEqual(bits / 8, group.PrimeLength);
@@ -40,8 +61,17 @@ public sealed class FiniteFieldDiffieHellmanGroupTests
     [TestMethod]
     public void TryCreate_OddPrimeAndGeneratorInRange_StripsLeadingZerosAndKeepsBoth()
     {
-        bool created = FiniteFieldDiffieHellmanGroup.TryCreate([0x00, 0x01, 0x07], [0x00, 0x05], out FiniteFieldDiffieHellmanGroup? group);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("prime", "000107");
+        diagnostics.Arrange("generator", "0005");
 
+        bool created = FiniteFieldDiffieHellmanGroup.TryCreate([0x00, 0x01, 0x07], [0x00, 0x05], out FiniteFieldDiffieHellmanGroup? group);
+        diagnostics.Act("created", created);
+
+        diagnostics.Assert("created", true, created);
+        diagnostics.Assert("prime", "0107", group is null ? null : Convert.ToHexString(group.Prime));
+        diagnostics.Assert("generator", "05", group is null ? null : Convert.ToHexString(group.Generator));
+        diagnostics.Assert("prime length", 2, group?.PrimeLength);
         Assert.IsTrue(created);
         Assert.AreEqual("0107", Convert.ToHexString(group!.Prime));
         Assert.AreEqual("05", Convert.ToHexString(group.Generator));
@@ -57,11 +87,18 @@ public sealed class FiniteFieldDiffieHellmanGroupTests
     [DataRow("0107", "0107", DisplayName = "g = p")]
     public void TryCreate_GroupOutOfRange_ReturnsFalse(string prime, string generator)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("prime", prime);
+        diagnostics.Arrange("generator", generator);
+
         bool created = FiniteFieldDiffieHellmanGroup.TryCreate(
             Convert.FromHexString(prime),
             Convert.FromHexString(generator),
             out FiniteFieldDiffieHellmanGroup? group);
+        diagnostics.Act("created", created);
 
+        diagnostics.Assert("created", false, created);
+        diagnostics.Assert("group is null", true, group is null);
         Assert.IsFalse(created);
         Assert.IsNull(group);
     }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -11,11 +13,14 @@ public sealed class CommandLineAsciiCrlfAndAppendOptionTests
 {
     private const string Url = "http://127.0.0.1:1/";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Parse_NoneOfTheOptions_LeavesAllOff()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        AssertSwitches(false, false, false, result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.UseAscii);
         Assert.IsFalse(result.Options.ConvertLineEndings);
@@ -27,8 +32,9 @@ public sealed class CommandLineAsciiCrlfAndAppendOptionTests
     [DataRow("--use-ascii")]
     public void Parse_UseAscii_AsksForAscii(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("use ascii", true, result.Options?.UseAscii);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.UseAscii);
     }
@@ -36,8 +42,9 @@ public sealed class CommandLineAsciiCrlfAndAppendOptionTests
     [TestMethod]
     public void Parse_Crlf_AsksForLineEndingConversion()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--crlf", Url]);
+        CommandLineParseResult result = Parse(["--crlf", Url]);
 
+        TestDiagnostics.For(TestContext).Assert("convert line endings", true, result.Options?.ConvertLineEndings);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.ConvertLineEndings);
     }
@@ -47,8 +54,9 @@ public sealed class CommandLineAsciiCrlfAndAppendOptionTests
     [DataRow("--append")]
     public void Parse_Append_AsksToAppend(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("append", true, result.Options?.Append);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Append);
     }
@@ -56,8 +64,10 @@ public sealed class CommandLineAsciiCrlfAndAppendOptionTests
     [TestMethod]
     public void Parse_BAndAInABundle_AsksForAsciiAndAppend()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-sBa", Url]);
+        CommandLineParseResult result = Parse(["-sBa", Url]);
 
+        TestDiagnostics.For(TestContext).Assert("silent", true, result.Options?.Silent);
+        AssertSwitches(true, false, true, result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.Silent);
         Assert.IsTrue(result.Options.UseAscii);
@@ -67,9 +77,10 @@ public sealed class CommandLineAsciiCrlfAndAppendOptionTests
     [TestMethod]
     public void Parse_EachOptionThenItsNoSpelling_LeavesAllOff()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["-B", "--crlf", "-a", "--no-use-ascii", "--no-crlf", "--no-append", Url]);
 
+        AssertSwitches(false, false, false, result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.UseAscii);
         Assert.IsFalse(result.Options.ConvertLineEndings);
@@ -79,12 +90,30 @@ public sealed class CommandLineAsciiCrlfAndAppendOptionTests
     [TestMethod]
     public void Parse_EachNoSpellingThenItsOption_TurnsAllOn()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--no-use-ascii", "--no-crlf", "--no-append", "--use-ascii", "--crlf", "--append", Url]);
 
+        AssertSwitches(true, true, true, result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.UseAscii);
         Assert.IsTrue(result.Options.ConvertLineEndings);
         Assert.IsTrue(result.Options.Append);
+    }
+
+    private CommandLineParseResult Parse(string[] arguments)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertSwitches(bool useAscii, bool convertLineEndings, bool append, CommandLineParseResult result)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("use ascii", useAscii, result.Options?.UseAscii);
+        diagnostics.Assert("convert line endings", convertLineEndings, result.Options?.ConvertLineEndings);
+        diagnostics.Assert("append", append, result.Options?.Append);
     }
 }

@@ -309,7 +309,7 @@ public sealed class HttpProtocolHandler(
         TransferResult result = Http3RefusalOf(plan) is { } refusal
             ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
-        return WithFirstAuthorizationFailure(result, authorizationLines.Lines);
+        return WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines);
     }
 
     /// <summary>
@@ -319,8 +319,13 @@ public sealed class HttpProtocolHandler(
     /// one, so <c>curl: (22)</c> after <c>-f</c> meets the 401 carries it rather than
     /// <c>The requested URL returned error: 401</c> (measured, BL-955 Notes; ADR-0344).
     /// </summary>
-    private static TransferResult WithFirstAuthorizationFailure(TransferResult result, IReadOnlyList<string> authorizationLines) =>
-        result.ExitCode != CurlExitCode.Ok && authorizationLines.Count > 0
+    /// <remarks>
+    /// An <c>--aws-sigv4</c> transfer keeps its own message: every line its signer reports is a
+    /// <c>-v</c> info line, never a failure, so the string to sign never becomes the error
+    /// message (BL-1454).
+    /// </remarks>
+    private static TransferResult WithFirstAuthorizationFailure(TransferResult result, HttpAuthRequest request, IReadOnlyList<string> authorizationLines) =>
+        result.ExitCode != CurlExitCode.Ok && request.AwsSigV4 is null && authorizationLines.Count > 0
             ? result with { ErrorMessage = authorizationLines[0] }
             : result;
 
@@ -912,8 +917,9 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reports what became of the connection once it is disposed, as curl 8.21.0's <c>-v</c>
     /// does (ADR-0050): left intact when marked reusable, closed when the transfer failed, and
-    /// shut down otherwise - its response did not persist, or it died before its response, in
-    /// which case the line that the request goes out again follows. A connection left intact
+    /// shut down otherwise - its response did not persist, or it died before its response. When
+    /// the request goes out again on a new connection - after it died, or as a retry such as the
+    /// resend after a 417 (measured, BL-1446 Notes) - the line saying so follows. A connection left intact
     /// that another transfer still shares, on a stream of its own, is reported by the last
     /// transfer on it, not this one (BL-717).
     /// </summary>
@@ -926,7 +932,7 @@ public sealed class HttpProtocolHandler(
         }
 
         context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
-        if (outcome.DiedBeforeResponse)
+        if (outcome.Retry is not null)
         {
             context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url));
         }
@@ -1040,7 +1046,7 @@ public sealed class HttpProtocolHandler(
             AcceptsHttp09 = options.AllowHttp09Reply,
             IgnoresContentLength = options.IgnoreContentLength,
             IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
-            IsSwitchedToHttp2 =() => IsSwitchedToHttp2(connection),
+            IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
             DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
         HttpRequestPlan? retry = null;
@@ -1073,7 +1079,7 @@ public sealed class HttpProtocolHandler(
             HttpFailMode fail = FailModeOf(options, retry);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
-            ReportIgnoredBody(plan, actedOn, discardsBody);
+            ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
             delivery = DeliveryOf(plan, actedOn, discardsBody);
             HttpDownloadConditions.ReportUndeliveredBody(context, actedOn, delivery);
             bool ignoresBody = IgnoresBody(plan, actedOn, delivery, discardsBody);
@@ -1398,8 +1404,9 @@ public sealed class HttpProtocolHandler(
     /// head's empty line (measured, BL-449 Notes): <c>Ignoring the response-body</c> when the
     /// body is discarded - a redirect <c>-L</c> follows, or a response answered with a retry -
     /// on a connection that stays open, and then <c>setting size while ignoring</c> when its
-    /// length is known from a Content-Length. Nothing when the connection closes after it:
-    /// curl reads no such body at all.
+    /// length is known from a Content-Length. Nothing when the connection closes after it, as
+    /// it does once the request body was cut short (measured, BL-1446 Notes): curl reads no
+    /// such body at all.
     /// </summary>
     private static void ReportIgnoredBody(HttpRequestPlan plan, HttpResponseHead head, bool discardsBody)
     {
@@ -1911,7 +1918,25 @@ public sealed class HttpProtocolHandler(
 
         plan.Context.Events.ReportInfo(bodyLeftUnsent ? HttpConnectionInfoLines.Got417WhileWaiting : HttpConnectionInfoLines.Got417WhileSending);
         ThrowIfRedirectLimitReached(plan);
+        ReportUploadAbandoned(plan.Context.Events, upload, bodyLeftUnsent);
         return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent);
+    }
+
+    /// <summary>
+    /// Reports what curl 8.21.0 writes after <c>Got HTTP failure 417 while sending data</c>, before
+    /// the 417's empty line (measured, BL-1446 Notes): <c>Need to rewind upload for next request</c>
+    /// and <c>abort upload after having sent N bytes</c>. Nothing after a 417 that arrived while
+    /// the body still waited for <c>100 Continue</c>, as none of it was sent.
+    /// </summary>
+    private static void ReportUploadAbandoned(ITransferEvents events, HttpRequestBodyWriter upload, bool bodyLeftUnsent)
+    {
+        if (bodyLeftUnsent)
+        {
+            return;
+        }
+
+        events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
+        events.ReportInfo(HttpConnectionInfoLines.AbortUpload(upload.BytesSent));
     }
 
     /// <summary>

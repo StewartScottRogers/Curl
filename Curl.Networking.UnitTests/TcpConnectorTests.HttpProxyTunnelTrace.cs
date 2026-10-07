@@ -28,6 +28,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -v --trace-config proxy -p -x http://127.0.0.1:18932 http://example.test/x (BL-1193 Notes).
         var (events, result) = await TraceThroughTunnelAsync(TunnelEstablishedReply);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         AssertTunnelLines(
             new[]
@@ -72,6 +73,7 @@ public sealed partial class TcpConnectorTests
         // curl's OpenSSL build writes allocate connect buffer before Establishing (ADR-0342).
         var (events, _) = await TraceThroughTunnelAsync(TunnelEstablishedReply, matchesSchannelBuild: false);
 
+        Diagnostics.Assert("connect start line", "* [H1-PROXY] CONNECT start", events.Transcript[5]);
         AssertTunnelLines(
             new[]
             {
@@ -100,6 +102,7 @@ public sealed partial class TcpConnectorTests
 
         await TraceThroughTunnelAsync(TunnelEstablishedReply, events: recording);
 
+        Diagnostics.Assert("events opened before removal", 1, openedBeforeRemoval);
         Assert.AreEqual(1, openedBeforeRemoval);
     }
 
@@ -112,6 +115,7 @@ public sealed partial class TcpConnectorTests
         var (events, _) = await TraceThroughTunnelAsync(TunnelEstablishedReply, tracesHttpProxy, tracesH1Proxy);
 
         var tunnelLines = events.Info.Where(line => line.StartsWith("[HTTP-PROXY] ", StringComparison.Ordinal) || line.StartsWith("[H1-PROXY] ", StringComparison.Ordinal)).ToArray();
+        Diagnostics.Assert("tunnel line count", count, tunnelLines.Length);
         Assert.HasCount(count, tunnelLines);
         Assert.IsTrue(tunnelLines.All(line => line.StartsWith(prefix, StringComparison.Ordinal)));
     }
@@ -121,6 +125,7 @@ public sealed partial class TcpConnectorTests
     {
         var (events, result) = await TraceThroughTunnelAsync(TunnelEstablishedReply, tracesHttpProxy: false, tracesH1Proxy: false);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith('[')));
     }
@@ -132,6 +137,7 @@ public sealed partial class TcpConnectorTests
         // answering 403: exit 7 after 'response', CONNECT response and 'failed' (BL-1193 Notes).
         var (events, result) = await TraceThroughTunnelAsync("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         AssertTunnelLines(
             new[]
@@ -150,6 +156,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -vv -p -x http://127.0.0.1:18933 http://example.test/x (BL-1193 Notes).
         var (events, _) = await TraceThroughTunnelAsync(TunnelEstablishedReply, tracesHttpProxy: false, tracesH1Proxy: false, tracesSetup: true);
 
+        Diagnostics.Assert("first line", "* [SETUP] added", events.Transcript[0]);
         AssertTunnelLines(
             new[]
             {
@@ -173,6 +180,7 @@ public sealed partial class TcpConnectorTests
         var target = TunnelTarget with { Proxy = TunnelProxy with { Kind = ProxyKind.Http10 } };
         var (events, _) = await TraceThroughTunnelAsync("HTTP/1.0 200 Connection established\r\n\r\n", tracesSetup: true, target: target, connectHead: TunnelConnectHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal));
 
+        Diagnostics.Assert("eyeballing line", "[SETUP] happy eyeballing to proxy 192.0.2.10:3128", events.Info[1]);
         Assert.AreEqual("[SETUP] happy eyeballing to proxy 192.0.2.10:3128", events.Info[1]);
     }
 
@@ -182,6 +190,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -v --trace-config all -p -x http://127.0.0.1:18931 http://example.test/x (BL-1193 Notes).
         var (events, _) = await TraceThroughTunnelAsync(TunnelEstablishedReply, tracesSetup: true);
 
+        Diagnostics.Assert("last line", "* [H1-PROXY] query ALPN", events.Transcript[^1]);
         AssertTunnelLines(
             new[]
             {
@@ -202,6 +211,7 @@ public sealed partial class TcpConnectorTests
         var target = new ConnectTarget("example.test", 443, UseTls: true) { Proxy = TunnelProxy, PoolScheme = "https" };
         var (events, _) = await TraceThroughTunnelAsync(TunnelEstablishedReply, tracesSetup: true, target: target);
 
+        Diagnostics.Assert("setup added line written", false, events.Info.Contains(SetupFilterTraceEvents.AddedLine));
         Assert.IsFalse(events.Info.Contains(SetupFilterTraceEvents.AddedLine));
         Assert.AreEqual("[SETUP] happy eyeballing to proxy 192.0.2.10:3128", events.Info[0]);
         var failed = events.Info.IndexOf("[H1-PROXY] new tunnel state 'failed'");
@@ -225,8 +235,9 @@ public sealed partial class TcpConnectorTests
             TracesH1ProxyFilter = true,
         };
 
-        var result = await connector.ConnectAsync(TunnelTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, TunnelTarget with { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         AssertTunnelLines(
             new[] { SetupFilterTraceEvents.AddedLine, "[SETUP] happy eyeballing to proxy 192.0.2.10:3128" },
@@ -239,13 +250,19 @@ public sealed partial class TcpConnectorTests
         var events = new HeadRecordingTransferEvents();
         var connector = TunnelConnector(new ScriptedConnection(Encoding.Latin1.GetBytes(TunnelEstablishedReply)), tracesSetup: true);
 
-        await connector.ConnectAsync(TunnelTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, TunnelTarget with { Events = events });
 
+        Diagnostics.Assert("reply head", TunnelEstablishedReply, string.Concat(events.Heads));
         AssertTunnelLines(new[] { TunnelEstablishedReply }, events.Heads);
     }
 
-    private static void AssertTunnelLines(string[] expected, IEnumerable<string> actual) =>
-        Assert.AreEqual(string.Join(Environment.NewLine, expected), string.Join(Environment.NewLine, actual));
+    private void AssertTunnelLines(string[] expected, IEnumerable<string> actual)
+    {
+        var expectedText = string.Join(Environment.NewLine, expected);
+        var actualText = string.Join(Environment.NewLine, actual);
+        Diagnostics.Diff("tunnel lines", string.Join('\n', expected), string.Join('\n', actual));
+        Assert.AreEqual(expectedText, actualText);
+    }
 
     private static ConnectTarget TunnelTarget => new("example.test", 80, UseTls: false) { Proxy = TunnelProxy, PoolScheme = "http" };
 
@@ -266,7 +283,7 @@ public sealed partial class TcpConnectorTests
 
     // Connects to example.test:80 (or the target given) through an HTTP proxy at
     // proxy.example:3128 that answers the CONNECT with proxyReply.
-    private static async Task<(RecordingTransferEvents Events, ConnectResult Result)> TraceThroughTunnelAsync(
+    private async Task<(RecordingTransferEvents Events, ConnectResult Result)> TraceThroughTunnelAsync(
         string proxyReply,
         bool tracesHttpProxy = true,
         bool tracesH1Proxy = true,
@@ -279,7 +296,7 @@ public sealed partial class TcpConnectorTests
         events ??= new RecordingTransferEvents();
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(proxyReply));
         var connector = TunnelConnector(proxyConnection, tracesHttpProxy, tracesH1Proxy, tracesSetup, matchesSchannelBuild);
-        var result = await connector.ConnectAsync((target ?? TunnelTarget) with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, (target ?? TunnelTarget) with { Events = events });
         Assert.AreEqual(connectHead.Replace("example.test:80", $"example.test:{(target ?? TunnelTarget).Port}", StringComparison.Ordinal), Encoding.Latin1.GetString(proxyConnection.Written.ToArray()));
         return (events, result);
     }

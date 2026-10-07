@@ -203,7 +203,8 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
     }
 
     /// <summary>
-    /// Parses the URL's path, refuses a negative resume offset, then uploads or downloads.
+    /// Parses the URL's path, refuses one that decodes to a NUL and a negative resume offset,
+    /// then uploads or downloads.
     /// </summary>
     /// <param name="context">The transfer being performed.</param>
     /// <returns>The outcome of the transfer.</returns>
@@ -214,6 +215,13 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             return ReportFailure(
                 context.Events,
                 TransferResult.Failure(CurlExitCode.UrlMalformat, FileTransferMessages.BadUrl));
+        }
+
+        // curl 8.21.0's file_connect decodes the path with REJECT_ZERO and writes no failf,
+        // so a path decoding to a NUL ends with exit 3 and no -v line (BL-1451, ADR-0416).
+        if (path.OsPath.Contains('\0', StringComparison.Ordinal))
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, FileTransferMessages.UrlMalformed);
         }
 
         if (context.ResumeFrom is < 0)

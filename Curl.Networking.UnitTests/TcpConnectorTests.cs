@@ -2,6 +2,7 @@ using System.Net;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -14,14 +15,22 @@ public sealed partial class TcpConnectorTests
 {
     private static readonly IPAddress Loopback = IPAddress.Parse("127.0.0.1");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    /// <summary>Gets the running test's diagnostics.</summary>
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ConnectAsync_WithNullTarget_ThrowsArgumentNullException()
     {
+        Diagnostics.Arrange("target", "null");
         var connector = CreateConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider());
 
         var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
             async () => await connector.ConnectAsync(null!, CancellationToken.None));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "target", exception.ParamName);
         Assert.AreEqual("target", exception.ParamName);
     }
 
@@ -33,10 +42,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer();
         var connector = new TcpConnector(new SystemDnsResolver(), dialer, new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget(new string('a', 300), 80, UseTls: false),
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget(new string('a', 300), 80, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Could not resolve host: " + new string('a', 231), result.ErrorMessage);
         Assert.IsEmpty(dialer.DialedEndPoints);
@@ -49,10 +57,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer();
         var connector = CreateConnector(resolver, dialer, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("nonexistent.invalid", 2628, UseTls: false),
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("nonexistent.invalid", 2628, UseTls: false));
 
+        Diagnostics.Assert("dialed end points", 0, dialer.DialedEndPoints.Count);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Could not resolve host: nonexistent.invalid", result.ErrorMessage);
         Assert.IsNull(result.Connection);
@@ -74,8 +81,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), timeProvider);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false));
 
+        Diagnostics.Assert("connection refused", true, result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(
             "Failed to connect to 127.0.0.1:1 after 2013 ms: Could not connect to server",
@@ -101,10 +109,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), timeProvider);
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("127.0.0.1", 1, UseTls: false) { IsForwardProxy = true },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { IsForwardProxy = true });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(
             "Failed to connect to 127.0.0.1:1 over proxy 127.0.0.1 after 2028 ms: Could not connect to server",
@@ -120,11 +127,11 @@ public sealed partial class TcpConnectorTests
         // (measured with Record-CurlExchange.ps1 2026-10-01, BL-1024).
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding("bogus0", null, null, 0, 1), Interfaces(("lo", [IPAddress.Loopback])));
+        Diagnostics.Arrange("interface", "bogus0");
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("127.0.0.1", 47599, UseTls: false) { IsForwardProxy = true },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false) { IsForwardProxy = true });
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(
             "Failed to connect to 127.0.0.1:47599 over proxy 127.0.0.1 after 0 ms: Failed binding local connection end",
@@ -145,9 +152,11 @@ public sealed partial class TcpConnectorTests
                 : (int)System.Net.Sockets.SocketError.AddressNotAvailable),
         };
         var connector = CreateConnector(new FakeDnsResolver(refused, IPAddress.Any), dialer, new FakeTlsProvider());
+        Diagnostics.Arrange("addresses", "192.0.2.1 refuses, 0.0.0.0 not available");
 
-        var result = await connector.ConnectAsync(new ConnectTarget("0.0.0.0", 1, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("0.0.0.0", 1, UseTls: false));
 
+        Diagnostics.Assert("connection refused", false, result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsFalse(result.IsConnectionRefused);
     }
@@ -163,9 +172,11 @@ public sealed partial class TcpConnectorTests
                 : (int)System.Net.Sockets.SocketError.ConnectionRefused),
         };
         var connector = CreateConnector(new FakeDnsResolver(unavailable, Loopback), dialer, new FakeTlsProvider());
+        Diagnostics.Arrange("addresses", "192.0.2.1 not available, 127.0.0.1 refuses");
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 1, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 1, UseTls: false));
 
+        Diagnostics.Assert("connection refused", true, result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsTrue(result.IsConnectionRefused);
     }
@@ -184,9 +195,12 @@ public sealed partial class TcpConnectorTests
                 : secondConnection,
         };
         var connector = CreateConnector(new FakeDnsResolver(first, second, third), dialer, new FakeTlsProvider());
+        Diagnostics.Arrange("resolver order", "192.0.2.1 (refuses), 192.0.2.2, 192.0.2.3");
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 80, UseTls: false));
 
+        Diagnostics.Act("dialed end points", string.Join(", ", dialer.DialedEndPoints));
+        Diagnostics.Assert("dial count", 2, dialer.DialedEndPoints.Count);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(secondConnection, result.Connection);
         Assert.IsNull(result.UnixSocketPath);
@@ -205,8 +219,9 @@ public sealed partial class TcpConnectorTests
             new FakeTcpDialer { DialOutcome = _ => plaintext },
             tlsProvider);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 636, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 636, UseTls: true));
 
+        Diagnostics.Assert("TLS target host", "example.com", tlsProvider.ReceivedTargetHost);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(tlsProvider.SecuredConnection, result.Connection);
         Assert.AreSame(plaintext, tlsProvider.ReceivedPlaintext);
@@ -223,8 +238,9 @@ public sealed partial class TcpConnectorTests
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
             tlsProvider);
 
-        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { Events = events });
 
+        Diagnostics.Assert("events passed on", true, ReferenceEquals(events, tlsProvider.ReceivedEvents));
         Assert.AreSame(events, tlsProvider.ReceivedEvents);
         CollectionAssert.AreEqual(new[] { false }, tlsProvider.ReceivedIsProxy);
     }
@@ -239,8 +255,9 @@ public sealed partial class TcpConnectorTests
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
             tlsProvider);
 
-        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" });
 
+        Diagnostics.Assert("ALPN offers", "http/1.1", OfferedProtocols(tlsProvider));
         CollectionAssert.AreEqual(new[] { "http/1.1" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
     }
 
@@ -256,8 +273,9 @@ public sealed partial class TcpConnectorTests
             TimeProvider.System,
             httpOverTlsApplicationProtocols: HttpApplicationProtocols.H2ThenHttp11);
 
-        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" });
 
+        Diagnostics.Assert("ALPN offers", "h2,http/1.1", OfferedProtocols(tlsProvider));
         CollectionAssert.AreEqual(new[] { "h2", "http/1.1" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
     }
 
@@ -267,6 +285,7 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_OverTls_GivesTheProtocolTheServerAcceptedThroughAlpn(string? accepted)
     {
         // curl -v --http2 https://example.com/ says ALPN: server accepted h2, then using HTTP/2 (BL-660 Notes).
+        Diagnostics.Arrange("server accepts", accepted);
         var connector = new TcpConnector(
             new FakeDnsResolver(Loopback),
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
@@ -274,16 +293,20 @@ public sealed partial class TcpConnectorTests
             TimeProvider.System,
             httpOverTlsApplicationProtocols: HttpApplicationProtocols.H2ThenHttp11);
 
-        var connect = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+        var connect = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" });
 
+        Diagnostics.Assert("application protocol", accepted, connect.ApplicationProtocol);
         Assert.AreEqual(accepted, connect.ApplicationProtocol);
     }
 
     [TestMethod]
     public void HttpOverTlsApplicationProtocols_NotGiven_IsHttp11Only()
     {
+        Diagnostics.Arrange("httpOverTlsApplicationProtocols", "not given");
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer(), new FakeTlsProvider(), TimeProvider.System);
 
+        Diagnostics.Act("protocols", string.Join(",", connector.HttpOverTlsApplicationProtocols));
+        Diagnostics.Assert("is Http11Only", true, ReferenceEquals(HttpApplicationProtocols.Http11Only, connector.HttpOverTlsApplicationProtocols));
         Assert.AreSame(HttpApplicationProtocols.Http11Only, connector.HttpOverTlsApplicationProtocols);
     }
 
@@ -295,7 +318,13 @@ public sealed partial class TcpConnectorTests
     public void ApplicationProtocolsFor_OffersTheHttpListOnlyForHttpOverTlsToTheOrigin(string? poolScheme, bool isForwardProxy, bool offersHttpList)
     {
         var target = new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = poolScheme, IsForwardProxy = isForwardProxy };
+        Diagnostics.Arrange("pool scheme", poolScheme);
+        Diagnostics.Arrange("forward proxy", isForwardProxy);
 
+        var offered = string.Join(",", TcpConnector.ApplicationProtocolsFor(target, HttpApplicationProtocols.H2Only).ToArray());
+        Diagnostics.Act("offered", offered);
+
+        Diagnostics.Assert("offered", offersHttpList ? "h2" : string.Empty, offered);
         CollectionAssert.AreEqual(
             offersHttpList ? new[] { "h2" } : Array.Empty<string>(),
             TcpConnector.ApplicationProtocolsFor(target, HttpApplicationProtocols.H2Only).ToArray());
@@ -310,7 +339,12 @@ public sealed partial class TcpConnectorTests
         // curl -v --http2 --proxy-insecure -x https://proxy http://example.test/ says
         // ALPN: curl offers http/1.1 for the proxy's handshake (8.21.0 Schannel and OpenSSL, measured, BL-753).
         var target = new ConnectTarget("proxy.example", 443, UseTls: true) { PoolScheme = poolScheme, IsForwardProxy = true };
+        Diagnostics.Arrange("pool scheme", poolScheme);
 
+        var offered = string.Join(",", TcpConnector.ApplicationProtocolsFor(target, HttpApplicationProtocols.H2ThenHttp11).ToArray());
+        Diagnostics.Act("offered", offered);
+
+        Diagnostics.Assert("offered", "http/1.1", offered);
         CollectionAssert.AreEqual(
             new[] { "http/1.1" },
             TcpConnector.ApplicationProtocolsFor(target, HttpApplicationProtocols.H2ThenHttp11).ToArray());
@@ -329,10 +363,9 @@ public sealed partial class TcpConnectorTests
             TimeProvider.System,
             httpOverTlsApplicationProtocols: HttpApplicationProtocols.H2ThenHttp11);
 
-        await connector.ConnectAsync(
-            new ConnectTarget("proxy.example", 443, UseTls: true) { IsForwardProxy = true },
-            CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("proxy.example", 443, UseTls: true) { IsForwardProxy = true });
 
+        Diagnostics.Assert("ALPN offers", "http/1.1", OfferedProtocols(tlsProvider));
         CollectionAssert.AreEqual(new[] { "http/1.1" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
     }
 
@@ -348,15 +381,17 @@ public sealed partial class TcpConnectorTests
             tlsProvider,
             TimeProvider.System,
             httpOverTlsApplicationProtocols: HttpApplicationProtocols.H2ThenHttp11);
+        Diagnostics.Arrange("proxy", "https://proxy.example:443");
 
-        await connector.ConnectAsync(
+        await ConnectLoggedAsync(
+            connector,
             new ConnectTarget("example.com", 443, UseTls: true)
             {
                 PoolScheme = "https",
                 Proxy = new ProxyEndpoint(ProxyKind.Https, "proxy.example", 443, null),
-            },
-            CancellationToken.None);
+            });
 
+        Diagnostics.Assert("ALPN offers", "http/1.1", OfferedProtocols(tlsProvider));
         CollectionAssert.AreEqual(new[] { "http/1.1" }, Assert.ContainsSingle(tlsProvider.ReceivedApplicationProtocols).ToArray());
     }
 
@@ -372,10 +407,9 @@ public sealed partial class TcpConnectorTests
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
             tlsProvider);
 
-        await connector.ConnectAsync(
-            new ConnectTarget("proxy.example", 443, UseTls: true) { Events = events, IsForwardProxy = true },
-            CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("proxy.example", 443, UseTls: true) { Events = events, IsForwardProxy = true });
 
+        Diagnostics.Assert("handshake is the proxy's", "True", string.Join(",", tlsProvider.ReceivedIsProxy));
         Assert.AreSame(events, tlsProvider.ReceivedEvents);
         CollectionAssert.AreEqual(new[] { true }, tlsProvider.ReceivedIsProxy);
     }
@@ -389,15 +423,17 @@ public sealed partial class TcpConnectorTests
             new FakeDnsResolver(Loopback),
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
             tlsProvider);
+        Diagnostics.Arrange("proxy", "https://proxy.example:443");
 
-        await connector.ConnectAsync(
+        await ConnectLoggedAsync(
+            connector,
             new ConnectTarget("example.com", 443, UseTls: true)
             {
                 Events = events,
                 Proxy = new ProxyEndpoint(ProxyKind.Https, "proxy.example", 443, null),
-            },
-            CancellationToken.None);
+            });
 
+        Diagnostics.Assert("TLS target host", "proxy.example", tlsProvider.ReceivedTargetHost);
         Assert.AreSame(events, tlsProvider.ReceivedEvents);
         CollectionAssert.AreEqual(new[] { true }, tlsProvider.ReceivedIsProxy);
         Assert.AreEqual("proxy.example", tlsProvider.ReceivedTargetHost);
@@ -412,9 +448,11 @@ public sealed partial class TcpConnectorTests
             new FakeDnsResolver(Loopback),
             new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
             tlsProvider);
+        Diagnostics.Arrange("handshake failure", "SslConnectError, x");
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true));
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("x", result.ErrorMessage);
         Assert.IsNull(result.Connection);
@@ -431,8 +469,9 @@ public sealed partial class TcpConnectorTests
             new FakeTcpDialer { DialOutcome = _ => plaintext },
             tlsProvider);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 389, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 389, UseTls: false));
 
+        Diagnostics.Assert("handshake count", 0, tlsProvider.HandshakeCount);
         Assert.AreSame(plaintext, result.Connection);
         Assert.AreEqual(0, tlsProvider.HandshakeCount);
     }
@@ -442,9 +481,13 @@ public sealed partial class TcpConnectorTests
     {
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new OperationCanceledException() };
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
+        Diagnostics.Arrange("dial", "throws OperationCanceledException");
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false), CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false)));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(OperationCanceledException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -453,13 +496,38 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer();
         var resolver = new FakeDnsResolver { ExceptionToThrow = new OperationCanceledException() };
         var connector = CreateConnector(resolver, dialer, new FakeTlsProvider());
+        Diagnostics.Arrange("resolve", "throws OperationCanceledException");
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await connector.ConnectAsync(new ConnectTarget("example.com", 80, UseTls: false), CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 80, UseTls: false)));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("dialed end points", 0, dialer.DialedEndPoints.Count);
         Assert.IsEmpty(dialer.DialedEndPoints);
     }
 
     private static TcpConnector CreateConnector(FakeDnsResolver resolver, FakeTcpDialer dialer, FakeTlsProvider tlsProvider) =>
         new(resolver, dialer, tlsProvider, new ManualTimeProvider());
+
+    /// <summary>
+    /// Writes <paramref name="target" /> as ARRANGE, connects it inside a <c>connect</c> PHASE,
+    /// and writes the exit code and error message as ACT.
+    /// </summary>
+    private async Task<ConnectResult> ConnectLoggedAsync(TcpConnector connector, ConnectTarget target)
+    {
+        Diagnostics.Arrange("target", $"{target.Host}:{target.Port}, TLS {target.UseTls}, forward proxy {target.IsForwardProxy}");
+        ConnectResult result;
+        using (Diagnostics.Phase("connect"))
+        {
+            result = await connector.ConnectAsync(target, CancellationToken.None);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        return result;
+    }
+
+    /// <summary>The ALPN lists the TLS provider was offered, comma-joined, one list per line.</summary>
+    private static string OfferedProtocols(FakeTlsProvider tlsProvider) =>
+        string.Join(" | ", tlsProvider.ReceivedApplicationProtocols.Select(list => string.Join(",", list)));
 }

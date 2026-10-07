@@ -8,6 +8,7 @@ using System.Text;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -40,6 +41,11 @@ public sealed partial class SslStreamTlsProviderTests
     private static readonly IPEndPoint ServerEndPoint = new(IPAddress.Loopback, 443);
 
     private static X509Certificate2 s_serverCertificate = null!;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    /// <summary>Gets the running test's diagnostics.</summary>
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [ClassInitialize]
     public static void CreateServerCertificate(TestContext context)
@@ -82,24 +88,34 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public void Constructor_WithNullOptions_ThrowsArgumentNullException()
     {
+        Diagnostics.Arrange("options", "null");
+
         var exception = Assert.ThrowsExactly<ArgumentNullException>(() => new SslStreamTlsProvider(null!));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "options", exception.ParamName);
         Assert.AreEqual("options", exception.ParamName);
     }
 
     [TestMethod]
     public void Warnings_WithCaCertificateDirectoryOnThisPlatform_AreThoseOfThePlatformsUsualBuild()
     {
+        Diagnostics.Arrange("CA path", "set, platform build");
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateDirectory: _caFileDirectory));
 
+        Diagnostics.Act("warnings", string.Join(" | ", provider.Warnings));
+        Diagnostics.Assert("warning count", OperatingSystem.IsWindows() ? 1 : 0, provider.Warnings.Count);
         Assert.HasCount(OperatingSystem.IsWindows() ? 1 : 0, provider.Warnings);
     }
 
     [TestMethod]
     public void Warnings_WithCaCertificateDirectoryInTheSchannelBuild_AreTheOneUnwrappedLineSchannelCurlWarns()
     {
+        Diagnostics.Arrange("CA path", "set, Schannel build");
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateDirectory: _caFileDirectory), SchannelBuild);
 
+        Diagnostics.Act("warnings", string.Join(" | ", provider.Warnings));
+        Diagnostics.Assert("warning count", 1, provider.Warnings.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -111,38 +127,50 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public void Warnings_WithCaCertificateDirectoryInTheOpenSslBuild_AreEmpty()
     {
+        Diagnostics.Arrange("CA path", "set, OpenSSL build");
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateDirectory: _caFileDirectory), OpenSslBuild);
 
+        Diagnostics.Act("warnings", string.Join(" | ", provider.Warnings));
+        Diagnostics.Assert("warning count", 0, provider.Warnings.Count);
         Assert.IsEmpty(provider.Warnings);
     }
 
     [TestMethod]
     public void Warnings_WithoutCaCertificateDirectoryInTheSchannelBuild_AreEmpty()
     {
+        Diagnostics.Arrange("CA path", "none, Schannel build");
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), SchannelBuild);
 
+        Diagnostics.Act("warnings", string.Join(" | ", provider.Warnings));
+        Diagnostics.Assert("warning count", 0, provider.Warnings.Count);
         Assert.IsEmpty(provider.Warnings);
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithNullPlaintext_ThrowsArgumentNullException()
     {
+        Diagnostics.Arrange("plaintext", "null");
         var provider = new SslStreamTlsProvider(new TlsClientOptions());
 
         var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
             async () => await provider.AuthenticateAsClientAsync(null!, CertificateHost, CancellationToken.None));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "plaintext", exception.ParamName);
         Assert.AreEqual("plaintext", exception.ParamName);
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithBlankTargetHost_ThrowsArgumentException()
     {
+        Diagnostics.Arrange("target host", "\" \"");
         var provider = new SslStreamTlsProvider(new TlsClientOptions());
 
         var exception = await Assert.ThrowsExactlyAsync<ArgumentException>(
             async () => await provider.AuthenticateAsClientAsync(new FakeConnection(), " ", CancellationToken.None));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "targetHost", exception.ParamName);
         Assert.AreEqual("targetHost", exception.ParamName);
     }
 
@@ -153,10 +181,17 @@ public sealed partial class SslStreamTlsProviderTests
         var serverTask = RunEchoServerAsync(server, SslProtocols.None);
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
         var localEndPoint = new IPEndPoint(IPAddress.Loopback, 50000);
+        Diagnostics.Arrange("TLS settings", "insecure, local end point 127.0.0.1:50000");
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint, localEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint, localEndPoint), CertificateHost, CancellationToken.None);
+        }
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await using var connection = result.Connection!;
         Assert.IsTrue(connection.IsSecure);
@@ -178,6 +213,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var result = await HandshakeAsync(new TlsClientOptions(), CertificateHost, SslProtocols.None);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.IsNotNull(result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -188,6 +224,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var result = await HandshakeAsync(new TlsClientOptions(), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.",
@@ -204,8 +241,11 @@ public sealed partial class SslStreamTlsProviderTests
         RecordingTransferEvents? events = null;
         events = new RecordingTransferEvents { OnInfo = _ => handshakesBeforeEcho = events!.Handshakes.Count };
 
+        Diagnostics.Arrange("TLS settings", "verifying, Schannel build, ALPN http/1.1");
         var result = await PinReportingHandshakeAsync(new TlsClientOptions(), events, SchannelBuild, ["http/1.1"]);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
         Assert.AreEqual(UntrustedRootLine, result.ErrorMessage);
         Assert.AreEqual(UntrustedRootLine, Assert.ContainsSingle(events.Info));
@@ -221,8 +261,11 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var events = new RecordingTransferEvents();
 
+        Diagnostics.Arrange("TLS settings", $"insecure {insecure}, {BuildName(matchesSchannelBuild)} build, ALPN http/1.1");
         var result = await PinReportingHandshakeAsync(new TlsClientOptions(Insecure: insecure), events, matchesSchannelBuild, ["http/1.1"]);
 
+        ActResult(result);
+        Diagnostics.Assert("contains untrusted root line", false, events.Info.Contains(UntrustedRootLine));
         CollectionAssert.DoesNotContain(events.Info, UntrustedRootLine);
         if (result.Connection is { } connection)
         {
@@ -235,6 +278,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var result = await HandshakeAsync(new TlsClientOptions(), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
     }
@@ -250,6 +294,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var result = await HandshakeAsync(new TlsClientOptions(), "wrong.example", SslProtocols.None, matchesSchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(expected, result.Result.ErrorMessage);
     }
@@ -259,6 +304,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var result = await HandshakeAsync(new TlsClientOptions(), "wrong.example", SslProtocols.None);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.IsTrue(result.PlaintextDisposed);
     }
@@ -268,6 +314,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var result = await HandshakeAsync(new TlsClientOptions(Insecure: true), CertificateHost, SslProtocols.None);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         Assert.IsFalse(result.PlaintextDisposed);
         await result.Result.Connection!.DisposeAsync();
@@ -278,6 +325,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var result = await HandshakeAsync(new TlsClientOptions(Insecure: true), "wrong.example", SslProtocols.None);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -292,6 +340,7 @@ public sealed partial class SslStreamTlsProviderTests
             CertificateHost,
             SslProtocols.Tls12);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.IsNotNull(result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -300,6 +349,9 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithTls13MinimumAgainstATls12OnlyServerInTheSchannelBuildOnWindows_ReportsTheSecurityStatus()
     {
+        Diagnostics.Arrange("platform", "Windows only");
+        Diagnostics.Act("running on Windows", OperatingSystem.IsWindows());
+        Diagnostics.Assert("running on Windows", true, OperatingSystem.IsWindows());
         if (!OperatingSystem.IsWindows())
         {
             Assert.Inconclusive("Only Windows' Schannel returns a security status; other platforms have no Win32Exception to name.");
@@ -313,6 +365,7 @@ public sealed partial class SslStreamTlsProviderTests
             SslProtocols.Tls12,
             SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(
             "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - The message received was unexpected or badly formatted.",
@@ -322,6 +375,9 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithTls13MinimumAgainstATls12OnlyServerInTheOpenSslBuildOnLinux_ReportsTheOpenSslErrorString()
     {
+        Diagnostics.Arrange("platform", "Linux only");
+        Diagnostics.Act("running on Linux", OperatingSystem.IsLinux());
+        Diagnostics.Assert("running on Linux", true, OperatingSystem.IsLinux());
         if (!OperatingSystem.IsLinux())
         {
             Assert.Inconclusive("Only Linux's SslStream runs on OpenSSL and carries an OpenSSL error string.");
@@ -335,6 +391,7 @@ public sealed partial class SslStreamTlsProviderTests
             SslProtocols.Tls12,
             OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual("TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version", result.Result.ErrorMessage);
     }
@@ -347,6 +404,7 @@ public sealed partial class SslStreamTlsProviderTests
             CertificateHost,
             SslProtocols.Tls12);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -366,11 +424,14 @@ public sealed partial class SslStreamTlsProviderTests
             await server.DisposeAsync();
         });
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
+        Diagnostics.Arrange("server", $"closes after the first ClientHello byte, {BuildName(matchesSchannelBuild)} build");
 
         var result = await provider.AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
 
         await closeAfterClientHello;
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(expected, result.ErrorMessage);
         Assert.IsTrue(client.IsDisposed);
@@ -396,11 +457,14 @@ public sealed partial class SslStreamTlsProviderTests
         RecordingTransferEvents? events = null;
         events = new RecordingTransferEvents { OnInfo = _ => handshakesAtLastInfo = events!.Handshakes.Count };
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
+        Diagnostics.Arrange("server", $"closes after the first ClientHello byte, {BuildName(matchesSchannelBuild)} build");
 
         var result = await provider.AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), CertificateHost, events, false, ["http/1.1"], CancellationToken.None);
 
         await closeAfterClientHello;
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(expectedEchoes, events.Info.Count(line => line == result.ErrorMessage));
         if (matchesSchannelBuild)
@@ -423,10 +487,13 @@ public sealed partial class SslStreamTlsProviderTests
         string expected)
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true), matchesSchannelBuild);
+        Diagnostics.Arrange("server", $"resets with {socketError}, {BuildName(matchesSchannelBuild)} build");
 
         var result = await provider.AuthenticateAsClientAsync(
             new ResettingConnection(socketError), CertificateHost, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(expected, result.ErrorMessage);
     }
@@ -435,9 +502,12 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WhenThePlaintextConnectionThrows_FailsWithSslConnectError()
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions());
+        Diagnostics.Arrange("plaintext", "a connection that throws, platform build");
 
         var result = await provider.AuthenticateAsClientAsync(new FakeConnection(), CertificateHost, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
     }
 
@@ -445,9 +515,12 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WhenThePlaintextConnectionThrowsInTheSchannelBuild_ReportsTheHandshakeWasNotReceived()
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), SchannelBuild);
+        Diagnostics.Arrange("plaintext", "a connection that throws, Schannel build");
 
         var result = await provider.AuthenticateAsClientAsync(new FakeConnection(), CertificateHost, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("schannel: failed to receive handshake, SSL/TLS connection failed", result.ErrorMessage);
     }
@@ -456,9 +529,12 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WhenThePlaintextConnectionThrowsInTheOpenSslBuild_ReportsTheInnermostMessage()
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), OpenSslBuild);
+        Diagnostics.Arrange("plaintext", "a connection that throws, OpenSSL build");
 
         var result = await provider.AuthenticateAsClientAsync(new FakeConnection(), CertificateHost, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual($"TLS connect error: {new NotSupportedException().Message}", result.ErrorMessage);
     }
@@ -469,13 +545,16 @@ public sealed partial class SslStreamTlsProviderTests
         var (client, server) = InMemoryDuplexStream.CreatePair();
         using var cancellation = new CancellationTokenSource();
         var provider = new SslStreamTlsProvider(new TlsClientOptions());
+        Diagnostics.Arrange("cancellation", "after the server reads the first ClientHello byte");
 
         var handshake = provider.AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), CertificateHost, cancellation.Token).AsTask();
         await server.ReadExactlyAsync(new byte[1], CancellationToken.None);
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () => await handshake);
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(async () => await handshake);
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("plaintext disposed", true, client.IsDisposed);
         Assert.IsTrue(client.IsDisposed);
     }
 
@@ -489,6 +568,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, matchesSchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         Assert.IsFalse(result.PlaintextDisposed);
         await result.Result.Connection!.DisposeAsync();
@@ -502,6 +582,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), "wrong.example", SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "schannel: CertGetNameString() failed to match connection hostname (wrong.example) against server certificate names",
@@ -517,6 +598,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), "wrong.example", SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "SSL: no alternative certificate subject name matches target hostname 'wrong.example'",
@@ -531,6 +613,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("schannel: the certificate or certificate chain is based on an untrusted root", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -544,6 +627,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
     }
@@ -566,6 +650,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(Insecure: true, CaCertificateFile: caFile), CertificateHost, SslProtocols.None);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -576,6 +661,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: _caFileDirectory), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
         Assert.AreEqual($"schannel: failed to open CA file '{_caFileDirectory}'", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -587,6 +673,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: _caFileDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
         Assert.AreEqual($"error adding trust anchors from file: {_caFileDirectory}", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -605,6 +692,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("schannel: the certificate or certificate chain is based on an untrusted root", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -623,6 +711,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCacertBadfile, result.Result.ExitCode);
         Assert.AreEqual($"error adding trust anchors from file: {caFile}", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -636,6 +725,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -648,6 +738,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         Assert.IsFalse(result.PlaintextDisposed);
         await result.Result.Connection!.DisposeAsync();
@@ -665,6 +756,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -679,6 +771,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
     }
@@ -695,6 +788,7 @@ public sealed partial class SslStreamTlsProviderTests
             SslProtocols.None,
             OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -707,6 +801,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
     }
@@ -728,6 +823,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: self-signed certificate (18)", result.Result.ErrorMessage);
     }
@@ -740,6 +836,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted.",
@@ -754,6 +851,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), "wrong.example", SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "SSL: no alternative certificate subject name matches target hostname 'wrong.example'",
@@ -773,6 +871,7 @@ public sealed partial class SslStreamTlsProviderTests
             SslProtocols.None,
             SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("schannel: the certificate or certificate chain is based on an untrusted root", result.Result.ErrorMessage);
     }
@@ -783,8 +882,13 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), OpenSslBuild);
         var anchors = new X509Certificate2Collection { s_serverCertificate };
 
+        Diagnostics.Arrange("policy errors", "RemoteCertificateNotAvailable, no chain, OpenSSL build");
+        Diagnostics.Arrange("anchor", $"{s_serverCertificate.Subject} {s_serverCertificate.Thumbprint}");
+
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateNotAvailable, null, CertificateHost, anchors);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(
             (CurlExitCode.PeerFailedVerification, "SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)"),
             failure);
@@ -797,8 +901,13 @@ public sealed partial class SslStreamTlsProviderTests
         var anchors = new X509Certificate2Collection { s_serverCertificate };
         using var chain = new X509Chain();
 
+        Diagnostics.Arrange("policy errors", "RemoteCertificateChainErrors, empty chain, OpenSSL build");
+        Diagnostics.Arrange("anchor", $"{s_serverCertificate.Subject} {s_serverCertificate.Thumbprint}");
+
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, CertificateHost, anchors);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(
             (CurlExitCode.PeerFailedVerification, "SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)"),
             failure);
@@ -840,31 +949,50 @@ public sealed partial class SslStreamTlsProviderTests
         return authority.ExportCertificatePem();
     }
 
-    private static Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
+    private Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
         TlsClientOptions options,
         string targetHost,
-        SslProtocols serverProtocols) =>
-        HandshakeAsync(new SslStreamTlsProvider(options), targetHost, serverProtocols);
+        SslProtocols serverProtocols)
+    {
+        ArrangeOptions(options);
+        return HandshakeAsync(new SslStreamTlsProvider(options), targetHost, serverProtocols);
+    }
 
-    private static Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
+    private Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
         TlsClientOptions options,
         string targetHost,
         SslProtocols serverProtocols,
-        bool matchesSchannelBuild) =>
-        HandshakeAsync(new SslStreamTlsProvider(options, matchesSchannelBuild), targetHost, serverProtocols);
+        bool matchesSchannelBuild)
+    {
+        ArrangeOptions(options);
+        Diagnostics.Arrange("build", BuildName(matchesSchannelBuild));
+        return HandshakeAsync(new SslStreamTlsProvider(options, matchesSchannelBuild), targetHost, serverProtocols);
+    }
 
-    private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
+    /// <summary>
+    /// Writes the target host and server protocols as ARRANGE, runs the handshake against the
+    /// echo server inside a <c>handshake</c> PHASE, and writes its outcome as ACT.
+    /// </summary>
+    private async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeAsync(
         SslStreamTlsProvider provider,
         string targetHost,
         SslProtocols serverProtocols)
     {
+        Diagnostics.Arrange("target host", targetHost);
+        Diagnostics.Arrange("server protocols", serverProtocols);
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, serverProtocols);
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), targetHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), targetHost, CancellationToken.None);
+        }
 
+        ActResult(result);
         var plaintextDisposed = client.IsDisposed;
+        Diagnostics.Act("plaintext disposed", plaintextDisposed);
         if (plaintextDisposed)
         {
             await IgnoreFailureAsync(serverTask);
@@ -873,8 +1001,36 @@ public sealed partial class SslStreamTlsProviderTests
         return (result, plaintextDisposed);
     }
 
-    private static async Task AssertTls13IsAvailableAsync()
+    private static string BuildName(bool matchesSchannelBuild) => matchesSchannelBuild ? "Schannel" : "OpenSSL";
+
+    /// <summary>
+    /// Writes the TLS settings a test chose as ARRANGE. Paths are written only as set or
+    /// none, so no line depends on the operating system's temporary folder.
+    /// </summary>
+    private void ArrangeOptions(TlsClientOptions options)
     {
+        Diagnostics.Arrange(
+            "TLS settings",
+            $"insecure {options.Insecure}, minimum {options.MinimumVersion}, maximum {options.MaximumVersion}, " +
+            $"CA file {SetOrNone(options.CaCertificateFile)}, CA path {SetOrNone(options.CaCertificateDirectory)}, " +
+            $"cert {SetOrNone(options.ClientCertificate)}, cert type {options.CertificateType ?? "none"}, " +
+            $"key {SetOrNone(options.PrivateKey)}, key type {options.PrivateKeyType ?? "none"}, " +
+            $"auto client cert {options.AutoClientCertificate}, ciphers {options.Ciphers ?? "none"}, " +
+            $"TLS 1.3 ciphers {options.Tls13Ciphers ?? "none"}, ALPN {options.UseAlpn}");
+    }
+
+    private static string SetOrNone(string? value) => value is null ? "none" : "set";
+
+    private void ActResult(ConnectResult result)
+    {
+        Diagnostics.Act("exit code", result.ExitCode);
+        // The test's own temporary folder differs by operating system, so it is written as <test folder>.
+        Diagnostics.Act("error message", result.ErrorMessage?.Replace(_caFileDirectory, "<test folder>", StringComparison.Ordinal));
+    }
+
+    private async Task AssertTls13IsAvailableAsync()
+    {
+        Diagnostics.Arrange("probe", "a TLS 1.3-only handshake against the echo server");
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.Tls13);
         await using var clientStream = new SslStream(client);
@@ -886,9 +1042,12 @@ public sealed partial class SslStreamTlsProviderTests
                 EnabledSslProtocols = SslProtocols.Tls13,
                 RemoteCertificateValidationCallback = (_, _, _, _) => true,
             });
+            Diagnostics.Act("TLS 1.3 probe", "completed");
         }
         catch (Exception exception) when (exception is AuthenticationException or IOException)
         {
+            Diagnostics.Act("TLS 1.3 probe", $"failed: {exception.GetType().Name}");
+            Diagnostics.Assert("TLS 1.3 available", true, false);
             Assert.Inconclusive($"This operating system cannot run a TLS 1.3 handshake: {exception.Message}");
         }
         finally

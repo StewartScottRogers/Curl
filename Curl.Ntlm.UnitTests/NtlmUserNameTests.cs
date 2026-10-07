@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Ntlm;
 
 /// <summary>
@@ -8,6 +10,8 @@ namespace Curl.Ntlm;
 [TestClass]
 public sealed class NtlmUserNameTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("user", "", "user")]
     [DataRow(@"DOMAIN\user", "DOMAIN", "user")]
@@ -17,8 +21,14 @@ public sealed class NtlmUserNameTests
     [DataRow(@"\user", "", "user")]
     public void SplitDomain_UserName_SplitsAtTheFirstBackslashElseTheFirstSlash(string userName, string domain, string user)
     {
-        (string Domain, string User) split = NtlmUserName.SplitDomain(userName);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("user name", userName);
 
+        (string Domain, string User) split = NtlmUserName.SplitDomain(userName);
+        diagnostics.Act("split", $"domain '{split.Domain}', user '{split.User}'");
+
+        diagnostics.Diff("domain", domain, split.Domain);
+        diagnostics.Diff("user", user, split.User);
         Assert.AreEqual(domain, split.Domain);
         Assert.AreEqual(user, split.User);
     }

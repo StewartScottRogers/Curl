@@ -181,6 +181,11 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
     /// <returns>The transfer's outcome when this datagram ended it, otherwise <see langword="null" />.</returns>
     private async ValueTask<TransferResult?> AnswerAsync(DatagramReceived received)
     {
+        if (ReferenceEquals(received, TftpTimeLimits.RefusedReceive))
+        {
+            return await AnswerTooShortAsync().ConfigureAwait(false);
+        }
+
         pinnedEndPoint ??= received.RemoteEndPoint;
         if (!pinnedEndPoint.Equals(received.RemoteEndPoint))
         {
@@ -189,8 +194,7 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
 
         if (received.Length < TftpPackets.DataHeaderLength)
         {
-            notedFailure ??= TooShortMessage;
-            return await ResendOrRunOutAsync().ConfigureAwait(false);
+            return await AnswerTooShortAsync().ConfigureAwait(false);
         }
 
         return await AnswerPacketAsync(received).ConfigureAwait(false);
@@ -276,6 +280,18 @@ internal sealed class TftpUpload(ITransferContext context, IDatagramChannel chan
 
         NoteFailure(string.Create(CultureInfo.InvariantCulture, $"tftp_tx: internal error, event: {opcode}"));
         return ValueTask.FromResult<TransferResult?>(null);
+    }
+
+    /// <summary>
+    /// Answers a datagram under four bytes, or a receive the server's port refused, as curl
+    /// does: notes <c>Received too short packet</c>, and re-sends the last packet at once
+    /// without moving the next scheduled re-send.
+    /// </summary>
+    /// <returns>The failure when the retries had already run out, otherwise <see langword="null" />.</returns>
+    private ValueTask<TransferResult?> AnswerTooShortAsync()
+    {
+        NoteFailure(TooShortMessage);
+        return ResendOrRunOutAsync();
     }
 
     /// <summary>

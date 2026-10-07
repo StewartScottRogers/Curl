@@ -28,8 +28,9 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 48764, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 48764, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("events.Calls", string.Join(" | ", new[] { "[SETUP] added", "[DNS] created DNS filter for 127.0.0.1:48764, transport=3, queries=3", "[DNS] added", "[DNS] cf_dns_start host 127.0.0.1:48764", "[SETUP] happy eyeballing to origin 127.0.0.1:48764", "[HAPPY-EYEBALLS] init ip ballers for transport 3", "[HAPPY-EYEBALLS] want to do more", "[HAPPY-EYEBALLS] check for next AAAA address: none", "[HAPPY-EYEBALLS] check for next A address: found", "[HAPPY-EYEBALLS] starting first attempt for ipv4 -> 0", "  Trying 127.0.0.1:48764...", "[TCP] Set TCP_KEEP* on fd=3", "[TCP] cf_socket_open() -> 0, fd=3", "[TCP] local address 0.0.0.0 port 0...", "[HAPPY-EYEBALLS] checked connect attempts: 1 ongoing, 0 inconclusive", "[DNS] Curl_conn_connect(block=0) -> 0, done=0", "[TCP] adjust_pollset, !connected, POLLOUT fd=3", "[HAPPY-EYEBALLS] adjust_pollset -> 0, 1 socks", "[TCP] connected on fd=3", "[HAPPY-EYEBALLS] connect attempt #0 successful", "[HAPPY-EYEBALLS] Connected to 127.0.0.1 (127.0.0.1) port 48764", "[DNS] connected filter chain below", "[DNS] Curl_conn_connect(block=0) -> 0, done=1", "opened", "[DNS] removing connected setup filter", "[DNS] destroy", "[SETUP] removing connected setup filter", "[SETUP] destroy", "[HAPPY-EYEBALLS] removing connected setup filter", "[HAPPY-EYEBALLS] destroy", }), string.Join(" | ", events.Calls));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -75,8 +76,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesHappyEyeballsFilter = true };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         var failedAt = events.Calls.FindIndex(line => line.StartsWith("Failed to connect to ", StringComparison.Ordinal));
         CollectionAssert.AreEqual(
@@ -97,13 +99,16 @@ public sealed partial class TcpConnectorTests
             TracesHappyEyeballsFilter = true,
         };
 
+        Diagnostics.Arrange("target", "dual.example:18644 resolving to ::1 and 127.0.0.1, happy eyeballs timeout 200 ms");
         var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
         time.Advance(200);
         await dialer.WaitForDialsAsync(2);
         dialer.Connect(IPv4Attempt, new StallingConnection());
-        await connecting;
+        Diagnostics.Act("exit code", (await connecting).ExitCode);
 
         var lines = events.Info.Where(line => line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal)).ToList();
+        Diagnostics.Act("[HAPPY-EYEBALLS] lines", string.Join(" | ", lines));
+        Diagnostics.Assert("last [HAPPY-EYEBALLS] line", ConnectAttemptTraceEvents.DestroyLine, lines[^1]);
         CollectionAssert.IsSubsetOf(
             new[]
             {
@@ -129,13 +134,15 @@ public sealed partial class TcpConnectorTests
             TracesTimers = true,
         };
 
+        Diagnostics.Arrange("target", "dual.example:18644 resolving to ::1 and 127.0.0.1, happy eyeballs timeout 200 ms");
         var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
         time.Advance(200);
         await dialer.WaitForDialsAsync(2);
         dialer.Connect(IPv4Attempt, new StallingConnection());
-        await connecting;
+        Diagnostics.Act("exit code", (await connecting).ExitCode);
 
         var lines = events.Info.Where(line => line.StartsWith("  Trying ", StringComparison.Ordinal) || line.StartsWith('[')).ToList();
+        Diagnostics.Assert("lines", string.Join(" | ", new[] { "  Trying [::1]:18644...", "[TIMER] [HAPPY_EYEBALLS] set for 200000ns", "[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms", "  Trying 127.0.0.1:18644...", "[TIMER] [HAPPY_EYEBALLS] cleared", }), string.Join(" | ", lines));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -164,14 +171,16 @@ public sealed partial class TcpConnectorTests
             TracesDnsFilter = true,
         };
 
+        Diagnostics.Arrange("target", "dual.example:18644 resolving to ::1 and 127.0.0.1, happy eyeballs timeout 200 ms");
         var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
         time.Advance(200);
         await dialer.WaitForDialsAsync(2);
         dialer.Connect(IPv4Attempt, new StallingConnection());
-        await connecting;
+        Diagnostics.Act("exit code", (await connecting).ExitCode);
 
         Assert.StartsWith("[DNS] ", events.Info[1]);
         var lines = events.Info.Where(line => line.StartsWith("  Trying ", StringComparison.Ordinal) || line.StartsWith("[TIMER]", StringComparison.Ordinal)).ToList();
+        Diagnostics.Assert("lines", string.Join(" | ", new[] { "[TIMER] [CONNECTTIMEOUT] set for 1000000ns", "  Trying [::1]:18644...", "[TIMER] [HAPPY_EYEBALLS] set for 200000ns", "[TIMER] [HAPPY_EYEBALLS] expires in 200000ns", "[TIMER] [CONNECTTIMEOUT] expires in 1000000ns", "[TIMER] [HAPPY_EYEBALLS] gives multi timeout in 200ms", "  Trying 127.0.0.1:18644...", "[TIMER] [CONNECTTIMEOUT] expires in 800000ns", "[TIMER] [CONNECTTIMEOUT] gives multi timeout in 800ms", "[TIMER] [HAPPY_EYEBALLS] cleared", }), string.Join(" | ", lines));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -197,8 +206,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesTimers = true };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsFalse(events.Calls.Any(line => line.StartsWith('[')));
     }
@@ -213,9 +223,10 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47195, UseTls: false) { Events = events, PoolScheme = "http" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47195, UseTls: false) { Events = events, PoolScheme = "http" });
         await result.Connection!.WriteAsync(new byte[79], CancellationToken.None);
 
+        Diagnostics.Assert("events.Calls.Skip(5).ToArray()", string.Join(" | ", new[] { "[TCP] connected on fd=3", "opened", TcpConnector.QueryAlpnLine, "[TCP] send(len=79) -> 0, 79" }), string.Join(" | ", events.Calls.Skip(5).ToArray()));
         CollectionAssert.AreEqual(
             new[] { "[TCP] connected on fd=3", "opened", TcpConnector.QueryAlpnLine, "[TCP] send(len=79) -> 0, 79" },
             events.Calls.Skip(5).ToArray());
@@ -232,9 +243,10 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47195, UseTls: false) { Events = events, PoolScheme = poolScheme }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47195, UseTls: false) { Events = events, PoolScheme = poolScheme });
         await result.Connection!.WriteAsync(new byte[79], CancellationToken.None);
 
+        Diagnostics.Assert("events.Calls[^1]", "opened", events.Calls[^1]);
         Assert.AreEqual("opened", events.Calls[^1]);
     }
 
@@ -249,9 +261,10 @@ public sealed partial class TcpConnectorTests
         };
         var lines = new TcpIoTraceLines("TCP-1", ReceiveLength: null, WritesWouldBlockReads: true);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 59271, UseTls: false) { Events = events, TcpIoTrace = lines }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 59271, UseTls: false) { Events = events, TcpIoTrace = lines });
         await result.Connection!.ReadAsync(new byte[5], CancellationToken.None);
 
+        Diagnostics.Assert("events.Calls.Skip(5).ToArray()", string.Join(" | ", new[] { "[TCP] connected on fd=3", "opened", "[TCP-1] recv(len=5) -> 0, 5" }), string.Join(" | ", events.Calls.Skip(5).ToArray()));
         CollectionAssert.AreEqual(
             new[] { "[TCP] connected on fd=3", "opened", "[TCP-1] recv(len=5) -> 0, 5" },
             events.Calls.Skip(5).ToArray());
@@ -263,11 +276,10 @@ public sealed partial class TcpConnectorTests
         var events = new CountingTransferEvents();
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) }, new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("127.0.0.1", 59271, UseTls: false) { Events = events, TcpIoTrace = new TcpIoTraceLines("TCP", 900, WritesWouldBlockReads: false) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 59271, UseTls: false) { Events = events, TcpIoTrace = new TcpIoTraceLines("TCP", 900, WritesWouldBlockReads: false) });
         await result.Connection!.WriteAsync(new byte[16], CancellationToken.None);
 
+        Diagnostics.Assert("events.Calls[^1]", "opened", events.Calls[^1]);
         Assert.AreEqual("opened", events.Calls[^1]);
     }
 
@@ -281,8 +293,9 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 48761, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 48761, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("events.Calls", string.Join(" | ", new[] { "  Trying 127.0.0.1:48761...", "[TCP] Set TCP_KEEP* on fd=3", "[TCP] cf_socket_open() -> 0, fd=3", "[TCP] local address 0.0.0.0 port 0...", "[TCP] adjust_pollset, !connected, POLLOUT fd=3", "[TCP] connected on fd=3", "opened", }), string.Join(" | ", events.Calls));
         CollectionAssert.AreEqual(
             new[]
             {

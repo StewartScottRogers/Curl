@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -15,28 +16,44 @@ public sealed class CommandLineIpfsGatewayOptionTests
     private const string Url = "http://127.0.0.1:1/";
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_WithoutIpfsGateway_LeavesTheGatewayUnset()
     {
-        Assert.IsNull(Accept().IpfsGateway);
+        string? gateway = Accept().IpfsGateway;
+
+        Diagnostics.Assert("ipfs gateway", null, gateway);
+        Assert.IsNull(gateway);
     }
 
     [TestMethod]
     public void Parse_IpfsGateway_RecordsTheGatewayVerbatim()
     {
-        Assert.AreEqual("127.0.0.1:1", Accept("--ipfs-gateway", "127.0.0.1:1").IpfsGateway);
+        string? gateway = Accept("--ipfs-gateway", "127.0.0.1:1").IpfsGateway;
+
+        Diagnostics.Assert("ipfs gateway", "127.0.0.1:1", gateway);
+        Assert.AreEqual("127.0.0.1:1", gateway);
     }
 
     [TestMethod]
     public void Parse_IpfsGatewayWithAttachedValue_RecordsTheGateway()
     {
-        Assert.AreEqual("http://gw.example/", Accept("--ipfs-gateway=http://gw.example/").IpfsGateway);
+        string? gateway = Accept("--ipfs-gateway=http://gw.example/").IpfsGateway;
+
+        Diagnostics.Assert("ipfs gateway", "http://gw.example/", gateway);
+        Assert.AreEqual("http://gw.example/", gateway);
     }
 
     [TestMethod]
     public void Parse_IpfsGatewayGivenTwice_KeepsTheLast()
     {
-        Assert.AreEqual("http://second/", Accept("--ipfs-gateway", "http://first/", "--ipfs-gateway", "http://second/").IpfsGateway);
+        string? gateway = Accept("--ipfs-gateway", "http://first/", "--ipfs-gateway", "http://second/").IpfsGateway;
+
+        Diagnostics.Assert("ipfs gateway", "http://second/", gateway);
+        Assert.AreEqual("http://second/", gateway);
     }
 
     [TestMethod]
@@ -44,13 +61,16 @@ public sealed class CommandLineIpfsGatewayOptionTests
     [DataRow("foo://h:1/")]
     public void Parse_MalformedIpfsGateway_IsAcceptedForTheRewriterToRefuse(string gateway)
     {
-        Assert.AreEqual(gateway, Accept("--ipfs-gateway", gateway).IpfsGateway);
+        string? actualGateway = Accept("--ipfs-gateway", gateway).IpfsGateway;
+
+        Diagnostics.Assert("ipfs gateway", gateway, actualGateway);
+        Assert.AreEqual(gateway, actualGateway);
     }
 
     [TestMethod]
     public void Parse_EmptyIpfsGateway_IsRefusedAsBlank()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ipfs-gateway", "", Url]);
+        CommandLineParseResult result = Parse(["--ipfs-gateway", "", Url]);
 
         AssertRefused(result, "curl: option --ipfs-gateway: blank argument where content is expected");
     }
@@ -58,7 +78,7 @@ public sealed class CommandLineIpfsGatewayOptionTests
     [TestMethod]
     public void Parse_IpfsGatewayLast_IsRefusedAsNeedingParameter()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--ipfs-gateway"]);
+        CommandLineParseResult result = Parse([Url, "--ipfs-gateway"]);
 
         AssertRefused(result, "curl: option --ipfs-gateway: requires parameter");
     }
@@ -66,23 +86,38 @@ public sealed class CommandLineIpfsGatewayOptionTests
     [TestMethod]
     public void Parse_NegatedIpfsGateway_IsRefusedAsNotReversible()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-ipfs-gateway", "x", Url]);
+        CommandLineParseResult result = Parse(["--no-ipfs-gateway", "x", Url]);
 
         AssertRefused(result, "curl: option --no-ipfs-gateway: the given option cannot be reversed with a --no- prefix");
     }
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    private CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string optionLine)
+    private void AssertRefused(CommandLineParseResult result, string optionLine)
     {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([optionLine, TryHelp]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { optionLine, TryHelp }, result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }

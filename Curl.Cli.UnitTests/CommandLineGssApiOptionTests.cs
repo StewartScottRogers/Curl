@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -15,11 +16,19 @@ public sealed class CommandLineGssApiOptionTests
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoGssApiOptions_LeavesThemNotGiven()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("delegation", GssApiDelegation.None, result.Options?.GssApiDelegation);
+        Diagnostics.Assert("service name", null, result.Options?.ServiceName);
+        Diagnostics.Assert("proxy service name", null, result.Options?.ProxyServiceName);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(GssApiDelegation.None, result.Options.GssApiDelegation);
         Assert.IsNull(result.Options.ServiceName);
@@ -35,8 +44,11 @@ public sealed class CommandLineGssApiOptionTests
     [DataRow("ALWAYS", GssApiDelegation.Always)]
     public void Parse_DelegationCurlRecognises_SetsItWithoutWarning(string value, GssApiDelegation expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--delegation", "always", "--delegation", value, Url]);
+        CommandLineParseResult result = Parse(["--delegation", "always", "--delegation", value, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("delegation", expected, result.Options?.GssApiDelegation);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.GssApiDelegation);
         Assert.IsEmpty(result.WarningLines);
@@ -47,8 +59,11 @@ public sealed class CommandLineGssApiOptionTests
     [DataRow("")]
     public void Parse_DelegationCurlDoesNotRecognise_WarnsAndUsesNone(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--delegation", "always", "--delegation", value, Url]);
+        CommandLineParseResult result = Parse(["--delegation", "always", "--delegation", value, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("delegation", GssApiDelegation.None, result.Options?.GssApiDelegation);
+        AssertWarningDiagnostics(result, $"Warning: unrecognized delegation method '{value}', using none");
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(GssApiDelegation.None, result.Options.GssApiDelegation);
         CollectionAssert.AreEqual(
@@ -59,9 +74,14 @@ public sealed class CommandLineGssApiOptionTests
     [TestMethod]
     public void Parse_DelegationLongEnoughToWrap_WarnsOnTwoLinesAsCurlDoes()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--delegation", "aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        AssertWarningDiagnostics(
+            result,
+            "Warning: unrecognized delegation method 'aaaa bbbb cccc dddd eeee ffff gggg ",
+            "Warning: hhhh iiii jjjj kkkk llll mmmm', using none");
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
@@ -75,8 +95,10 @@ public sealed class CommandLineGssApiOptionTests
     [TestMethod]
     public void Parse_SilentBeforeUnrecognisedDelegation_DropsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--delegation", "bogus", Url]);
+        CommandLineParseResult result = Parse(["-s", "--delegation", "bogus", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        AssertWarningDiagnostics(result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -84,8 +106,10 @@ public sealed class CommandLineGssApiOptionTests
     [TestMethod]
     public void Parse_SilentAfterUnrecognisedDelegation_KeepsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--delegation", "bogus", "-s", Url]);
+        CommandLineParseResult result = Parse(["--delegation", "bogus", "-s", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        AssertWarningDiagnostics(result, "Warning: unrecognized delegation method 'bogus', using none");
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "Warning: unrecognized delegation method 'bogus', using none" },
@@ -95,8 +119,11 @@ public sealed class CommandLineGssApiOptionTests
     [TestMethod]
     public void Parse_ServiceName_RecordsTheLastValueVerbatim()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--service-name", "first", "--service-name", "HTTP/host@REALM", Url]);
+        CommandLineParseResult result = Parse(["--service-name", "first", "--service-name", "HTTP/host@REALM", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("service name", "HTTP/host@REALM", result.Options?.ServiceName);
+        Diagnostics.Assert("proxy service name", null, result.Options?.ProxyServiceName);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("HTTP/host@REALM", result.Options.ServiceName);
         Assert.IsNull(result.Options.ProxyServiceName);
@@ -105,8 +132,11 @@ public sealed class CommandLineGssApiOptionTests
     [TestMethod]
     public void Parse_ProxyServiceName_RecordsTheLastValueVerbatim()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-service-name", "first", "--proxy-service-name", "proxy", Url]);
+        CommandLineParseResult result = Parse(["--proxy-service-name", "first", "--proxy-service-name", "proxy", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("proxy service name", "proxy", result.Options?.ProxyServiceName);
+        Diagnostics.Assert("service name", null, result.Options?.ServiceName);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("proxy", result.Options.ProxyServiceName);
         Assert.IsNull(result.Options.ServiceName);
@@ -117,8 +147,9 @@ public sealed class CommandLineGssApiOptionTests
     [DataRow("--proxy-service-name")]
     public void Parse_EmptyServiceName_RefusesAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, string.Empty, Url]);
+        CommandLineParseResult result = Parse([spelledOption, string.Empty, Url]);
 
+        AssertRefusalDiagnostics(result, $"curl: option {spelledOption}: blank argument where content is expected", TryHelp);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: blank argument where content is expected", TryHelp },
@@ -132,8 +163,9 @@ public sealed class CommandLineGssApiOptionTests
     [DataRow("--no-krb")]
     public void Parse_NegatedGssApiOption_IsRefusedAsNotReversible(string argument)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, "x", Url]);
+        CommandLineParseResult result = Parse([argument, "x", Url]);
 
+        AssertRefusalDiagnostics(result, $"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp },
@@ -147,8 +179,11 @@ public sealed class CommandLineGssApiOptionTests
     [DataRow("")]
     public void Parse_Krb_TakesAnyLevelAndWarnsThatItHasNoFunction(string level)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--krb", level, Url]);
+        CommandLineParseResult result = Parse(["--krb", level, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("urls", CommandLineParseDiagnostics.QuoteEach([Url]), CommandLineParseDiagnostics.QuoteEach(result.Options?.Urls ?? []));
+        AssertWarningDiagnostics(result, "Warning: --krb is deprecated and has no function anymore");
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
         CollectionAssert.AreEqual(
@@ -159,11 +194,29 @@ public sealed class CommandLineGssApiOptionTests
     [TestMethod]
     public void Parse_KrbLast_RequiresParameter()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--krb"]);
+        CommandLineParseResult result = Parse([Url, "--krb"]);
 
+        AssertRefusalDiagnostics(result, "curl: option --krb: requires parameter", TryHelp);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "curl: option --krb: requires parameter", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private void AssertWarningDiagnostics(CommandLineParseResult result, params string[] warningLines) =>
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(warningLines), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+
+    private void AssertRefusalDiagnostics(CommandLineParseResult result, params string[] standardErrorLines)
+    {
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(standardErrorLines), CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }

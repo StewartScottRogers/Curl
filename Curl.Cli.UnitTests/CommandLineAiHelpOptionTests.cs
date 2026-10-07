@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -11,6 +12,8 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class CommandLineAiHelpOptionTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("--ai-help", null)]
     [DataRow("--ai-help=", null)]
@@ -21,8 +24,16 @@ public sealed class CommandLineAiHelpOptionTests
     [DataRow("-s --ai-help", null)]
     public void Parse_AiHelp_IsAcceptedAndAsksForAiHelpWithItsSubject(string arguments, string? subject)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments.Split(' '));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string[] split = arguments.Split(' ');
+        diagnostics.ArrangeArguments(split);
 
+        CommandLineParseResult result = CommandLineParser.Parse(split);
+        diagnostics.ActParse(result);
+        diagnostics.Act("ai help requested", result.Options?.AiHelpRequested);
+        diagnostics.Act("help requested", result.Options?.HelpRequested);
+
+        diagnostics.Assert("ai help subject", subject, result.Options?.AiHelpSubject);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.AiHelpRequested);
         Assert.AreEqual(subject, result.Options.AiHelpSubject);
@@ -32,17 +43,31 @@ public sealed class CommandLineAiHelpOptionTests
     [TestMethod]
     public void Parse_NoAiHelp_IsRefusedAsNotReversible()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-ai-help"]);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string[] arguments = ["--no-ai-help"];
+        diagnostics.ArrangeArguments(arguments);
 
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+
+        const string Expected = "curl: option --no-ai-help: the given option cannot be reversed with a --no- prefix";
+        diagnostics.Assert("first stderr line", Expected, result.Refusal?.StandardErrorLines[0]);
         Assert.IsFalse(result.IsAccepted);
-        Assert.AreEqual("curl: option --no-ai-help: the given option cannot be reversed with a --no- prefix", result.Refusal.StandardErrorLines[0]);
+        Assert.AreEqual(Expected, result.Refusal.StandardErrorLines[0]);
     }
 
     [TestMethod]
     public void Parse_NoAiHelpOption_AsksForNoAiHelp()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["file:///nx"]);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string[] arguments = ["file:///nx"];
+        diagnostics.ArrangeArguments(arguments);
 
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+
+        diagnostics.Assert("ai help requested", false, result.Options?.AiHelpRequested);
+        diagnostics.Assert("ai help subject", null, result.Options?.AiHelpSubject);
         Assert.IsFalse(result.Options!.AiHelpRequested);
         Assert.IsNull(result.Options.AiHelpSubject);
     }
@@ -52,11 +77,19 @@ public sealed class CommandLineAiHelpOptionTests
     [DataRow("ai-help all")]
     public void Parse_AiHelpInConfigFile_IsIgnored(string line)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         RecordingDataFileReader reader = new();
         reader.Files["ai.cfg"] = Encoding.UTF8.GetBytes(line + "\n");
+        string[] arguments = ["-K", "ai.cfg", "file:///nx"];
+        diagnostics.Arrange("ai.cfg", line + "\\n");
+        diagnostics.ArrangeArguments(arguments);
 
-        CommandLineParseResult result = CommandLineParser.Parse(["-K", "ai.cfg", "file:///nx"], _ => false, new NoPasswordPrompt(), reader);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => false, new NoPasswordPrompt(), reader);
+        diagnostics.ActParse(result);
+        diagnostics.Act("config file help subjects", result.ConfigFileHelpSubjects.Count);
 
+        diagnostics.Assert("ai help requested", false, result.Options?.AiHelpRequested);
+        diagnostics.Assert("ai help subject", null, result.Options?.AiHelpSubject);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.AiHelpRequested);
         Assert.IsNull(result.Options.AiHelpSubject);

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Tftp.Fakes;
@@ -337,6 +338,49 @@ public sealed class TftpDownloadRetransmissionTests
     }
 
     [TestMethod]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionRefused)]
+    public async Task ExecuteAsync_EveryReceiveRefused_ReportsTooShortResendsAtOnceThenCouldntConnect(SocketError error)
+    {
+        var refusal = FallsSilentDatagramChannel.Refusal(error);
+        var channel = Channel(refusal, refusal, refusal);
+        var events = new RecordingTransferEvents();
+
+        var result = await Run(channel, Context(connectTimeout: TimeSpan.FromSeconds(10), events: events));
+
+        AssertReadRequestsSentAt(channel, timeoutSeconds: 3, 0, 0, 0);
+        Assert.AreEqual(TimeSpan.Zero, clock.Now);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+        Assert.AreEqual(3, events.Steps.Count(step => step == "Received too short packet"));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RefusedReceiveThenLastBlock_ResendsReadRequestToServerAndCompletes()
+    {
+        var channel = Channel(FallsSilentDatagramChannel.Refusal(SocketError.ConnectionReset), Data(1, "hello"));
+        var output = new MemoryStream();
+
+        var result = await Run(channel, Context(output: output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.HasCount(3, channel.Sent);
+        Assert.AreEqual(ServerEndPoint, channel.Sent[1].Destination);
+        Assert.AreEqual(TransferEndPoint, channel.Sent[2].Destination);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReceiveFailsWithOtherSocketError_ThrowsSocketException()
+    {
+        var channel = Channel(FallsSilentDatagramChannel.Refusal(SocketError.NetworkDown));
+
+        var thrown = await Assert.ThrowsExactlyAsync<SocketException>(async () => await Run(channel, Context()));
+
+        Assert.AreEqual(SocketError.NetworkDown, thrown.SocketErrorCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TokenCancelledWhileWaiting_ThrowsOperationCanceled()
     {
         using var cancellation = new CancellationTokenSource();
@@ -435,9 +479,11 @@ public sealed class TftpDownloadRetransmissionTests
         TimeSpan? maxTime = null,
         Stream? output = null,
         CancellationToken cancellationToken = default,
-        long? operationStarted = null) =>
+        long? operationStarted = null,
+        RecordingTransferEvents? events = null) =>
         new()
         {
+            Events = events ?? new RecordingTransferEvents(),
             Url = CurlUrl.Parse("tftp://h/file.txt"),
             Output = output ?? new MemoryStream(),
             ConnectTimeout = connectTimeout,

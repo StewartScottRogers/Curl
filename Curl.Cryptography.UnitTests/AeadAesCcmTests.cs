@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -16,6 +18,9 @@ public sealed class AeadAesCcmTests
     private const string NistNonce = "101112131415161718191A1B1C";
     private const string NistAssociatedData = "000102030405060708090A0B0C0D0E0F10111213";
     private const string NistPayload = "202122232425262728292A2B2C2D2E2F3031323334353637";
+
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
 
     // RFC 3610 section 8, packet vectors 1 to 24: the key, the nonce, the number of
     // cleartext header octets (the associated data), the input packet, and the
@@ -47,14 +52,17 @@ public sealed class AeadAesCcmTests
     [DataRow("D7828D13B2B0BDC325A76236DF93CC6B", "008D493B30AE8B3C9696766CFA", 12, "6E37A6EF546D955D34AB6059ABF21C0B02FEB88F856DF4A37381BCE3CC128517D4", "6E37A6EF546D955D34AB6059F32905B88A641B04B9C9FFB58CC390900F3DA12AB16DCE9E82EFA16DA62059")]
     public void EncryptAndTryDecrypt_Rfc3610PacketVector_MatchThePublishedPacket(string key, string nonce, int headerLength, string input, string output)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] inputBytes = Convert.FromHexString(input);
         byte[] outputBytes = Convert.FromHexString(output);
         byte[] associatedData = inputBytes[..headerLength];
         byte[] plaintext = inputBytes[headerLength..];
         byte[] expectedCiphertext = outputBytes[headerLength..inputBytes.Length];
         byte[] expectedTag = outputBytes[inputBytes.Length..];
+        diagnostics.Arrange("vector source", "RFC 3610 section 8 packet vector");
+        diagnostics.Arrange("header length", headerLength);
 
-        AssertSealsAndOpens(key, nonce, associatedData, plaintext, expectedCiphertext, expectedTag);
+        AssertSealsAndOpens(diagnostics, key, nonce, associatedData, plaintext, expectedCiphertext, expectedTag);
     }
 
     // NIST SP 800-38C appendix C.1 to C.3: nonce, associated data and payload lengths,
@@ -66,7 +74,12 @@ public sealed class AeadAesCcmTests
     public void EncryptAndTryDecrypt_NistSp80038CAppendixCExample_MatchThePublishedCiphertextAndTag(
         int nonceLength, int associatedDataLength, int payloadLength, string ciphertext, string tag)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "NIST SP 800-38C appendix C example");
+        diagnostics.Arrange("nonce, associated data and payload lengths", $"{nonceLength}, {associatedDataLength}, {payloadLength}");
+
         AssertSealsAndOpens(
+            diagnostics,
             NistKey,
             NistNonce[..(nonceLength * 2)],
             Convert.FromHexString(NistAssociatedData[..(associatedDataLength * 2)]),
@@ -84,13 +97,18 @@ public sealed class AeadAesCcmTests
     [DataRow(0xFF00, "817119215DC8084CBC223EC9D9872807")]
     public void EncryptAndTryDecrypt_AssociatedDataEitherSideOfTheLongLengthMark_MatchTheBclTag(int associatedDataLength, string tag)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] associatedData = new byte[associatedDataLength];
         for (int index = 0; index < associatedData.Length; index++)
         {
             associatedData[index] = (byte)index;
         }
 
+        diagnostics.Arrange("vector source", "BCL AesCcm tag pinned on Windows, 2026-09-29");
+        diagnostics.Arrange("associated data length", associatedDataLength);
+
         AssertSealsAndOpens(
+            diagnostics,
             NistKey,
             NistNonce[..24],
             associatedData,
@@ -104,7 +122,11 @@ public sealed class AeadAesCcmTests
     [TestMethod]
     public void EncryptAndTryDecrypt_EmptyPayload_MatchTheBclTag()
     {
-        AssertSealsAndOpens(NistKey, NistNonce[..24], [0x00], [], [], Convert.FromHexString("483C9B51B98D7E989063DE09E88F4E09"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "BCL AesCcm tag pinned on Windows, 2026-09-29");
+        diagnostics.Arrange("payload length", 0);
+
+        AssertSealsAndOpens(diagnostics, NistKey, NistNonce[..24], [0x00], [], [], Convert.FromHexString("483C9B51B98D7E989063DE09E88F4E09"));
     }
 
     // An 11-byte nonce leaves a 4-byte length field, the one width where the length check
@@ -114,7 +136,12 @@ public sealed class AeadAesCcmTests
     [TestMethod]
     public void EncryptAndTryDecrypt_ElevenByteNonce_MatchTheBclCiphertextAndTag()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "BCL AesCcm ciphertext and tag pinned on Windows, 2026-10-03");
+        diagnostics.Arrange("nonce length", 11);
+
         AssertSealsAndOpens(
+            diagnostics,
             NistKey,
             NistNonce[..22],
             Convert.FromHexString(NistAssociatedData),
@@ -133,6 +160,7 @@ public sealed class AeadAesCcmTests
     [DataRow("associatedData", 7)]
     public void TryDecrypt_Rfc3610VectorWithAChangedBit_ReturnsFalseAndZeroesThePlaintext(string changed, int index)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] output = Convert.FromHexString("0001020304050607588C979A61C663D2F066D0C2C0F989806D5F6B61DAC38417E8D12CFDF926E0");
         Dictionary<string, byte[]> inputs = new()
         {
@@ -144,9 +172,16 @@ public sealed class AeadAesCcmTests
         byte[] plaintext = new byte[23];
         Array.Fill(plaintext, (byte)0xAA);
         using AeadAesCcm aead = new(Convert.FromHexString("C0C1C2C3C4C5C6C7C8C9CACBCCCDCECF"));
+        diagnostics.Arrange("vector source", "RFC 3610 section 8 packet vector 1");
+        diagnostics.Arrange("changed input and bit index", $"{changed}, {index}");
+        diagnostics.Bytes("changed tag", inputs["tag"]);
 
         bool succeeded = aead.TryDecrypt(Convert.FromHexString("00000003020100A0A1A2A3A4A5"), inputs["ciphertext"], inputs["tag"], plaintext, inputs["associatedData"]);
+        diagnostics.Act("succeeded", succeeded);
+        diagnostics.Bytes("plaintext after failure", plaintext);
 
+        diagnostics.Assert("succeeded", false, succeeded);
+        diagnostics.Diff("plaintext left all zero", new byte[plaintext.Length], plaintext);
         Assert.IsFalse(succeeded);
         Assert.IsTrue(plaintext.All(value => value == 0));
     }
@@ -155,11 +190,14 @@ public sealed class AeadAesCcmTests
     [TestMethod]
     public void EncryptAndTryDecrypt_ThirteenByteNonce_TakesAtMost65535Bytes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadAesCcm aead = new(Convert.FromHexString(NistKey));
         byte[] nonce = Convert.FromHexString(NistNonce);
         byte[] plaintext = new byte[65535];
         byte[] ciphertext = new byte[65535];
         byte[] tag = new byte[16];
+        diagnostics.Arrange("limit", "13-byte nonce, 65,535 bytes fit and 65,536 do not");
+        diagnostics.Bytes("nonce", nonce);
 
         aead.Encrypt(nonce, plaintext, ciphertext, tag);
         bool succeeded = aead.TryDecrypt(nonce, ciphertext, tag, plaintext);
@@ -167,7 +205,13 @@ public sealed class AeadAesCcmTests
             () => aead.Encrypt(nonce, new byte[65536], new byte[65536], tag));
         ArgumentException decrypt = Assert.ThrowsExactly<ArgumentException>(
             () => aead.TryDecrypt(nonce, new byte[65536], tag, new byte[65536]));
+        diagnostics.Act("round trip succeeded", succeeded);
+        diagnostics.Act("encrypt ParamName", encrypt.ParamName);
+        diagnostics.Act("decrypt ParamName", decrypt.ParamName);
 
+        diagnostics.Assert("round trip succeeded", true, succeeded);
+        diagnostics.Assert("encrypt ParamName", "source", encrypt.ParamName);
+        diagnostics.Assert("decrypt ParamName", "source", decrypt.ParamName);
         Assert.IsTrue(succeeded);
         Assert.AreEqual("source", encrypt.ParamName);
         Assert.AreEqual("source", decrypt.ParamName);
@@ -178,8 +222,13 @@ public sealed class AeadAesCcmTests
     [DataRow(33)]
     public void Constructor_KeyNotSixteenTwentyFourOrThirtyTwoBytes_Throws(int keyLength)
     {
-        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new AeadAesCcm(new byte[keyLength]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", keyLength);
 
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new AeadAesCcm(new byte[keyLength]));
+        diagnostics.Act("ParamName", exception.ParamName);
+
+        diagnostics.Assert("ParamName", "key", exception.ParamName);
         Assert.AreEqual("key", exception.ParamName);
     }
 
@@ -192,13 +241,19 @@ public sealed class AeadAesCcmTests
     [DataRow(12, 4, 5, 16, "destination")]
     public void EncryptAndTryDecrypt_WrongLength_Throws(int nonceLength, int sourceLength, int destinationLength, int tagLength, string parameterName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadAesCcm aead = new(new byte[16]);
+        diagnostics.Arrange("nonce, source, destination and tag lengths", $"{nonceLength}, {sourceLength}, {destinationLength}, {tagLength}");
 
         ArgumentException encrypt = Assert.ThrowsExactly<ArgumentException>(
             () => aead.Encrypt(new byte[nonceLength], new byte[sourceLength], new byte[destinationLength], new byte[tagLength]));
         ArgumentException decrypt = Assert.ThrowsExactly<ArgumentException>(
             () => aead.TryDecrypt(new byte[nonceLength], new byte[sourceLength], new byte[tagLength], new byte[destinationLength]));
+        diagnostics.Act("encrypt ParamName", encrypt.ParamName);
+        diagnostics.Act("decrypt ParamName", decrypt.ParamName);
 
+        diagnostics.Assert("encrypt ParamName", parameterName, encrypt.ParamName);
+        diagnostics.Assert("decrypt ParamName", parameterName, decrypt.ParamName);
         Assert.AreEqual(parameterName, encrypt.ParamName);
         Assert.AreEqual(parameterName, decrypt.ParamName);
     }
@@ -206,25 +261,42 @@ public sealed class AeadAesCcmTests
     [TestMethod]
     public void Dispose_LaterCallsThrow()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         AeadAesCcm aead = new(new byte[32]);
+        diagnostics.Arrange("state", "disposed 32-byte-key instance");
 
         aead.Dispose();
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => aead.Encrypt(new byte[12], [], [], new byte[16]));
-        Assert.ThrowsExactly<ObjectDisposedException>(() => aead.TryDecrypt(new byte[12], [], new byte[16], []));
+        var encrypt = Assert.ThrowsExactly<ObjectDisposedException>(() => aead.Encrypt(new byte[12], [], [], new byte[16]));
+        var decrypt = Assert.ThrowsExactly<ObjectDisposedException>(() => aead.TryDecrypt(new byte[12], [], new byte[16], []));
+        diagnostics.Act("encrypt exception", encrypt.GetType().Name);
+        diagnostics.Act("decrypt exception", decrypt.GetType().Name);
+
+        diagnostics.Assert("encrypt exception", nameof(ObjectDisposedException), encrypt.GetType().Name);
+        diagnostics.Assert("decrypt exception", nameof(ObjectDisposedException), decrypt.GetType().Name);
     }
 
-    private static void AssertSealsAndOpens(string key, string nonce, byte[] associatedData, byte[] plaintext, byte[] expectedCiphertext, byte[] expectedTag)
+    private static void AssertSealsAndOpens(TestDiagnostics diagnostics, string key, string nonce, byte[] associatedData, byte[] plaintext, byte[] expectedCiphertext, byte[] expectedTag)
     {
         using AeadAesCcm aead = new(Convert.FromHexString(key));
         byte[] nonceBytes = Convert.FromHexString(nonce);
         byte[] ciphertext = new byte[plaintext.Length];
         byte[] tag = new byte[expectedTag.Length];
         byte[] decrypted = new byte[plaintext.Length];
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("nonce", nonceBytes);
+        diagnostics.Bytes("plaintext", plaintext);
 
         aead.Encrypt(nonceBytes, plaintext, ciphertext, tag, associatedData);
         bool succeeded = aead.TryDecrypt(nonceBytes, expectedCiphertext, expectedTag, decrypted, associatedData);
+        diagnostics.Bytes("ciphertext", ciphertext);
+        diagnostics.Bytes("tag", tag);
+        diagnostics.Act("decrypt succeeded", succeeded);
 
+        diagnostics.Diff("ciphertext", expectedCiphertext, ciphertext);
+        diagnostics.Diff("tag", expectedTag, tag);
+        diagnostics.Assert("decrypt succeeded", true, succeeded);
+        diagnostics.Diff("decrypted plaintext", plaintext, decrypted);
         Assert.AreEqual(Convert.ToHexString(expectedCiphertext), Convert.ToHexString(ciphertext));
         Assert.AreEqual(Convert.ToHexString(expectedTag), Convert.ToHexString(tag));
         Assert.IsTrue(succeeded);

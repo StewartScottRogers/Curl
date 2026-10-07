@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Core;
 
 /// <summary>
@@ -9,6 +11,8 @@ namespace Curl.Core;
 public sealed class RetryAfterHeaderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 27, 5, 26, 14, TimeSpan.Zero);
+
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     [DataRow("3", 3L)]
@@ -26,8 +30,18 @@ public sealed class RetryAfterHeaderTests
     [DataRow("21601", 21600L)]
     [DataRow("9999999", 21600L)]
     [DataRow("99999999999999999999", 0L)]
-    public void ParseSeconds_DelaySeconds_ReadsLeadingDigitsCappedAtSixHours(string value, long expected) =>
-        Assert.AreEqual(expected, RetryAfterHeader.ParseSeconds(value, Now));
+    public void ParseSeconds_DelaySeconds_ReadsLeadingDigitsCappedAtSixHours(string value, long expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("Retry-After", value);
+        diagnostics.Arrange("now", Now.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        long seconds = RetryAfterHeader.ParseSeconds(value, Now);
+
+        diagnostics.Act("seconds", seconds);
+        diagnostics.Assert("seconds", expected, seconds);
+        Assert.AreEqual(expected, seconds);
+    }
 
     [TestMethod]
     [DataRow("Sun, 27 Sep 2026 05:26:19 GMT", 5L)]
@@ -35,8 +49,18 @@ public sealed class RetryAfterHeaderTests
     [DataRow("Sun Sep 27 05:26:44 2026", 30L)]
     [DataRow("Sun Sep 27 12:26:14 2026", 21600L)]
     [DataRow("Sat, 01 Jan 2000 00:00:00 GMT", 0L)]
-    public void ParseSeconds_HttpDate_ReadsSecondsFromNowCappedAtSixHours(string value, long expected) =>
-        Assert.AreEqual(expected, RetryAfterHeader.ParseSeconds(value, Now));
+    public void ParseSeconds_HttpDate_ReadsSecondsFromNowCappedAtSixHours(string value, long expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("Retry-After", value);
+        diagnostics.Arrange("now", Now.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        long seconds = RetryAfterHeader.ParseSeconds(value, Now);
+
+        diagnostics.Act("seconds", seconds);
+        diagnostics.Assert("seconds", expected, seconds);
+        Assert.AreEqual(expected, seconds);
+    }
 
     /// <summary>
     /// Dates outside RFC 9110 that curl 8.21.0's <c>Curl_getdate_capped</c> still reads, measured
@@ -52,10 +76,28 @@ public sealed class RetryAfterHeaderTests
     [DataRow("27 Sep 2026 06:26:18 +0100", 4L)]
     [DataRow("1 Jan 2000", 0L)]
     [DataRow("5 Sep", 5L)]
-    public void ParseSeconds_LenientDate_ReadsAsCurlGetdateDoes(string value, long expected) =>
-        Assert.AreEqual(expected, RetryAfterHeader.ParseSeconds(value, Now));
+    public void ParseSeconds_LenientDate_ReadsAsCurlGetdateDoes(string value, long expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("Retry-After", value);
+        diagnostics.Arrange("now", Now.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        long seconds = RetryAfterHeader.ParseSeconds(value, Now);
+
+        diagnostics.Act("seconds", seconds);
+        diagnostics.Assert("seconds", expected, seconds);
+        Assert.AreEqual(expected, seconds);
+    }
 
     [TestMethod]
-    public void ParseSeconds_NullValue_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => RetryAfterHeader.ParseSeconds(null!, Now));
+    public void ParseSeconds_NullValue_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("Retry-After", "(null)");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => RetryAfterHeader.ParseSeconds(null!, Now));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 }

@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -17,6 +18,8 @@ public sealed class CommandLineConfigFileTests
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("url = \"http://a/\"")]
     [DataRow("url=http://a/")]
@@ -29,8 +32,10 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "a.cfg"], ("a.cfg", line + "\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "http://a/" }, result.Options.Urls.ToArray());
+        TestDiagnostics.For(TestContext).Assert("WarningLines count", 0, result.WarningLines.Count);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -39,6 +44,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-o", "first", "--config", "a.cfg", "-o", "last", Url], ("a.cfg", "output = middle\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "first", "middle", "last" }, result.Options.OutputFiles.ToArray());
     }
@@ -48,8 +54,11 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "a.cfg", Url], ("a.cfg", "-sS\n-ofile\n-o other\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("Silent", true, result.Options.Silent);
         Assert.IsTrue(result.Options.Silent);
+        TestDiagnostics.For(TestContext).Assert("ShowError", true, result.Options.ShowError);
         Assert.IsTrue(result.Options.ShowError);
         CollectionAssert.AreEqual(new[] { "file", "other" }, result.Options.OutputFiles.ToArray());
     }
@@ -59,7 +68,9 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-s", "-K", "a.cfg", Url], ("a.cfg", "no-silent\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("Silent", false, result.Options.Silent);
         Assert.IsFalse(result.Options.Silent);
     }
 
@@ -68,8 +79,10 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "a.cfg"], ("a.cfg", "\n# comment\n  \t# indented comment\n \t \nurl = http://a/ # trailing comment\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "http://a/" }, result.Options.Urls.ToArray());
+        TestDiagnostics.For(TestContext).Assert("WarningLines count", 0, result.WarningLines.Count);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -78,6 +91,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "a.cfg"], ("a.cfg", "url http://a/"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "http://a/" }, result.Options!.Urls.ToArray());
     }
 
@@ -90,6 +104,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "crlf.cfg"], ("crlf.cfg", "silent\r\nbogus\r\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "curl: option -K: found an unknown config option", TryHelp },
             result.Refusal!.StandardErrorLines.ToArray());
@@ -110,8 +125,11 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "q.cfg", Url], ("q.cfg", $"request = {parameter}\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("RequestMethod", expected, result.Options.RequestMethod);
         Assert.AreEqual(expected, result.Options.RequestMethod);
+        TestDiagnostics.For(TestContext).Assert("WarningLines count", 0, result.WarningLines.Count);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -121,7 +139,9 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "e.cfg", Url], ("e.cfg", "user-agent = \"\"\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("UserAgent", string.Empty, result.Options.UserAgent);
         Assert.AreEqual(string.Empty, result.Options.UserAgent);
     }
 
@@ -131,6 +151,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "ws.cfg"], ("ws.cfg", "url = x y\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "x" }, result.Options.Urls.ToArray());
         CollectionAssert.AreEqual(
@@ -150,7 +171,9 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "a.cfg"], ("a.cfg", line));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "x" }, result.Options!.Urls.ToArray());
+        TestDiagnostics.For(TestContext).Assert("WarningLines count", 0, result.WarningLines.Count);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -160,6 +183,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "sq.cfg", Url], ("sq.cfg", "output 'x'\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "'x'" }, result.Options.OutputFiles.ToArray());
         CollectionAssert.AreEqual(
@@ -177,6 +201,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "sep2.cfg", Url], ("sep2.cfg", "--output : x\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { ":" }, result.Options.OutputFiles.ToArray());
         CollectionAssert.AreEqual(
@@ -193,7 +218,9 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-s", "-K", "ws.cfg"], ("ws.cfg", "url = x y\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("WarningLines count", 0, result.WarningLines.Count);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -202,6 +229,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "outer.cfg"], ("outer.cfg", "-K inner.cfg\n"), ("inner.cfg", "url = \"http://127.0.0.1:1/in\"\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "http://127.0.0.1:1/in" }, result.Options.Urls.ToArray());
     }
@@ -209,10 +237,17 @@ public sealed class CommandLineConfigFileTests
     [TestMethod]
     public void Parse_ConfigFileDash_ReadsStandardInputAndNamesItStdin()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         RecordingDataFileReader reader = new() { StandardInput = Encoding.UTF8.GetBytes("bogus\n") };
+        string[] arguments = ["-K", "-"];
+        diagnostics.Bytes("standard input", reader.StandardInput);
+        diagnostics.ArrangeArguments(arguments);
 
-        CommandLineParseResult result = CommandLineParser.Parse(["-K", "-"], _ => true, new UnexpectedPasswordPrompt(), reader);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        diagnostics.ActParse(result);
+        diagnostics.Act("files read", CommandLineParseDiagnostics.QuoteEach(reader.Reads));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "-" }, reader.Reads);
         CollectionAssert.AreEqual(
             new[]
@@ -229,6 +264,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "b.cfg"], ("b.cfg", "bogus\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -250,6 +286,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "c.cfg"], ("c.cfg", "\n# c\n  bogus = 1\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -275,6 +312,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "a.cfg"], ("a.cfg", option + "\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.StandardErrorLines[0]", $"curl: a.cfg:1 config file option '{option}' is unknown", result.Refusal?.StandardErrorLines[0]);
         Assert.AreEqual($"curl: a.cfg:1 config file option '{option}' is unknown", result.Refusal!.StandardErrorLines[0]);
     }
 
@@ -284,6 +322,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "n3.cfg"], ("n3.cfg", "K u.cfg\n"), ("u.cfg", "bogus\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -299,6 +338,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "n4.cfg"], ("n4.cfg", "-K u.cfg\n"), ("u.cfg", "bogus\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -316,6 +356,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "r.cfg"], ("r.cfg", "output\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -333,6 +374,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "r2.cfg"], ("r2.cfg", "output \"\"\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -356,6 +398,7 @@ public sealed class CommandLineConfigFileTests
 
         CommandLineParseResult result = Parse(["-K", file]);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -374,6 +417,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "g3.cfg"], ("g3.cfg", "--output=x y\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -391,6 +435,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "g.cfg"], ("g.cfg", "silent foo\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "curl: option -K: had unsupported trailing garbage", TryHelp },
             result.Refusal!.StandardErrorLines.ToArray());
@@ -403,6 +448,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "a.cfg", Url], ("a.cfg", line + "\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
     }
 
@@ -413,6 +459,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse([option, "nx.cfg", Url]);
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.ReadError, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -431,6 +478,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(value is null ? [option] : [option, value]);
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.ReadError, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -447,6 +495,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-s", "-K", "nx.cfg"]);
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.ReadError, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "curl: option -K: error encountered when reading a file", TryHelp },
@@ -458,6 +507,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-s", "-S", "-K", "nx.cfg"]);
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.StandardErrorLines[0]", "curl: cannot read config from 'nx.cfg'", result.Refusal?.StandardErrorLines[0]);
         Assert.AreEqual("curl: cannot read config from 'nx.cfg'", result.Refusal!.StandardErrorLines[0]);
     }
 
@@ -466,6 +516,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-s", "-K", "u.cfg"], ("u.cfg", "bogus\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "curl: option -K: found an unknown config option", TryHelp },
             result.Refusal!.StandardErrorLines.ToArray());
@@ -476,6 +527,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "n1.cfg"], ("n1.cfg", "-K nx.cfg\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.ReadError, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -494,6 +546,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "d.cfg", Url], ("d.cfg", "data @nx\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.ReadError, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -513,6 +566,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "n2.cfg"], ("n2.cfg", "config n2.cfg\n"));
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -534,6 +588,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-s", "-K", "n2.cfg"], ("n2.cfg", "config n2.cfg\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "curl: option -K: is badly used here", TryHelp },
             result.Refusal!.StandardErrorLines.ToArray());
@@ -547,6 +602,7 @@ public sealed class CommandLineConfigFileTests
             ("a.cfg", "-K b.cfg\n"),
             ("b.cfg", "url http://a/\n"));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.HasCount(6, result.Options.Urls);
     }
@@ -556,6 +612,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K", "-bogus"]);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "Warning: The filename argument '-bogus' looks like a flag." }, result.WarningLines.ToArray());
         CollectionAssert.AreEqual(
             new[]
@@ -572,6 +629,7 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse(["-K"]);
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "curl: option -K: requires parameter", TryHelp },
@@ -585,21 +643,27 @@ public sealed class CommandLineConfigFileTests
     {
         CommandLineParseResult result = Parse([argument, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("Refusal.ExitCode", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, params (string Name, string Text)[] files)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, params (string Name, string Text)[] files)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         RecordingDataFileReader reader = new();
         foreach ((string name, string text) in files)
         {
             reader.Files[name] = Encoding.UTF8.GetBytes(text);
+            diagnostics.Bytes("config file " + name, reader.Files[name]);
         }
 
-        return CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        diagnostics.ActParse(result);
+        return result;
     }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt

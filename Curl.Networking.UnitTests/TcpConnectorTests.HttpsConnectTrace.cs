@@ -30,8 +30,9 @@ public sealed partial class TcpConnectorTests
             HttpsConnectFirstAttemptVersion = "h1",
         };
 
-        var result = await connector.ConnectAsync(HttpsOrigin(events), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsOrigin(events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -70,8 +71,9 @@ public sealed partial class TcpConnectorTests
             TracesHttpsConnectFilter = true,
         };
 
-        await connector.ConnectAsync(HttpsOrigin(events), CancellationToken.None);
+        await ConnectLoggedAsync(connector, HttpsOrigin(events));
 
+        Diagnostics.Assert("first call", "[HTTPS-CONNECT] added", events.Calls[0]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -105,8 +107,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesHttpsConnectFilter = true };
 
-        var result = await connector.ConnectAsync(HttpsOrigin(events), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsOrigin(events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "[HTTPS-CONNECT] connect, all attempts failed", "[HTTPS-CONNECT] connect -> 7, done=0" },
@@ -125,8 +128,9 @@ public sealed partial class TcpConnectorTests
             TracesHttpsConnectFilter = true,
         };
 
-        await connector.ConnectAsync(HttpsOrigin(events), CancellationToken.None);
+        await ConnectLoggedAsync(connector, HttpsOrigin(events));
 
+        Diagnostics.Assert("last call", "[HTTPS-CONNECT] connect -> 60, done=0", events.Calls[^1]);
         CollectionAssert.AreEqual(
             new[] { "[HTTPS-CONNECT] connect, all attempts failed", "[HTTPS-CONNECT] connect -> 60, done=0" },
             events.Calls.TakeLast(2).ToArray());
@@ -138,8 +142,9 @@ public sealed partial class TcpConnectorTests
         var events = new CountingTransferEvents();
         var connector = new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider()) { TracesHttpsConnectFilter = true };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("nowhere.test", 18443, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("nowhere.test", 18443, UseTls: true) { Events = events, PoolScheme = "https" });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "[HTTPS-CONNECT] added" },
@@ -160,8 +165,9 @@ public sealed partial class TcpConnectorTests
         };
         var target = new ConnectTarget("127.0.0.1", 18443, useTls) { Events = events, PoolScheme = scheme, IsForwardProxy = forwardProxy };
 
-        await connector.ConnectAsync(target, CancellationToken.None);
+        await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("https connect line written", false, events.Calls.Any(line => line.StartsWith("[HTTPS-CONNECT]", StringComparison.Ordinal)));
         Assert.IsFalse(events.Calls.Any(line => line.StartsWith("[HTTPS-CONNECT]", StringComparison.Ordinal)));
     }
 
@@ -175,8 +181,9 @@ public sealed partial class TcpConnectorTests
             TracesSetupFilter = true,
         };
 
-        await connector.ConnectAsync(HttpsOrigin(events), CancellationToken.None);
+        await ConnectLoggedAsync(connector, HttpsOrigin(events));
 
+        Diagnostics.Assert("first call", "[SETUP] happy eyeballing to origin 127.0.0.1:18443", events.Calls[0]);
         CollectionAssert.AreEqual(
             new[]
             {

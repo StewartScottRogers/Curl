@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
 
 namespace Curl.Networking;
@@ -29,6 +30,10 @@ public sealed class SslStreamConnectionClearTlsTests
     private static readonly IPEndPoint ServerEndPoint = new(IPAddress.Loopback, 990);
 
     private static X509Certificate2 s_serverCertificate = null!;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     /// <summary>What the test server does after the handshake instead of sending <c>close_notify</c>.</summary>
     public enum ServerAnswer
@@ -62,7 +67,19 @@ public sealed class SslStreamConnectionClearTlsTests
     [TestMethod]
     public async Task ClearTlsAsync_ActiveAsTheOpenSslBuild_SendsCloseNotifyThenPlainText()
     {
-        var sent = await ClearAndSendPwdAsync(sendCloseNotifyFirst: true);
+        Diagnostics.Arrange("send close_notify first", true);
+        Diagnostics.Arrange("matches Schannel build", false);
+
+        byte[] sent;
+        using (Diagnostics.Phase("clear TLS and send PWD"))
+        {
+            sent = await ClearAndSendPwdAsync(sendCloseNotifyFirst: true);
+        }
+
+        Diagnostics.Act("first record type", sent[0]);
+        Diagnostics.Act("last five bytes", Encoding.ASCII.GetString(sent[^5..]));
+        Diagnostics.Assert("first record type", AlertRecordType, sent[0]);
+        Diagnostics.Assert("last five bytes", "PWD\r\n", Encoding.ASCII.GetString(sent[^5..]));
 
         Assert.AreEqual(AlertRecordType, sent[0], "close_notify goes first.");
         Assert.AreEqual("PWD\r\n", Encoding.ASCII.GetString(sent[^5..]));
@@ -71,7 +88,18 @@ public sealed class SslStreamConnectionClearTlsTests
     [TestMethod]
     public async Task ClearTlsAsync_PassiveAsTheOpenSslBuild_SendsOnlyThePlainText()
     {
-        var sent = await ClearAndSendPwdAsync(sendCloseNotifyFirst: false);
+        Diagnostics.Arrange("send close_notify first", false);
+        Diagnostics.Arrange("matches Schannel build", false);
+
+        byte[] sent;
+        using (Diagnostics.Phase("clear TLS and send PWD"))
+        {
+            sent = await ClearAndSendPwdAsync(sendCloseNotifyFirst: false);
+        }
+
+        Diagnostics.Bytes("bytes the server read", sent);
+        Diagnostics.Act("bytes the server read", Encoding.ASCII.GetString(sent));
+        Diagnostics.Assert("bytes the server read", "PWD\r\n", Encoding.ASCII.GetString(sent));
 
         Assert.AreEqual("PWD\r\n", Encoding.ASCII.GetString(sent));
     }
@@ -81,6 +109,9 @@ public sealed class SslStreamConnectionClearTlsTests
     [DataRow(false)]
     public async Task ClearTlsAsync_AsTheSchannelBuild_SendsCloseNotifyAndReturnsNull(bool sendCloseNotifyFirst)
     {
+        Diagnostics.Arrange("send close_notify first", sendCloseNotifyFirst);
+        Diagnostics.Arrange("matches Schannel build", true);
+
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
         {
@@ -89,12 +120,24 @@ public sealed class SslStreamConnectionClearTlsTests
             _ = await server.ReadAsync(first);
             return first[0];
         });
+        IConnection? plaintext;
         await using var connection = await ConnectAsync(client, matchesSchannelBuild: true);
 
-        var plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst, CancellationToken.None);
+        using (Diagnostics.Phase("clear TLS"))
+        {
+            plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst, CancellationToken.None);
+        }
+
+        Diagnostics.Act("plaintext connection returned", plaintext is not null);
+        Diagnostics.Assert("plaintext connection returned", false, plaintext is not null);
 
         Assert.IsNull(plaintext);
-        Assert.AreEqual(AlertRecordType, await serverTask);
+
+        var firstByteTheServerRead = await serverTask;
+
+        Diagnostics.Act("first byte the server read", firstByteTheServerRead);
+        Diagnostics.Assert("first byte the server read", AlertRecordType, firstByteTheServerRead);
+        Assert.AreEqual(AlertRecordType, firstByteTheServerRead);
     }
 
     [TestMethod]
@@ -103,6 +146,9 @@ public sealed class SslStreamConnectionClearTlsTests
     [DataRow(ServerAnswer.EndInsideARecord)]
     public async Task ClearTlsAsync_WhenTheServerSendsNoCloseNotify_ReturnsNull(ServerAnswer answer)
     {
+        Diagnostics.Arrange("server answer", answer);
+        Diagnostics.Arrange("send close_notify first", false);
+
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
         {
@@ -120,9 +166,16 @@ public sealed class SslStreamConnectionClearTlsTests
 
             await server.DisposeAsync();
         });
+        IConnection? plaintext;
         await using var connection = await ConnectAsync(client, matchesSchannelBuild: false);
 
-        var plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst: false, CancellationToken.None);
+        using (Diagnostics.Phase("clear TLS"))
+        {
+            plaintext = await connection.ClearTlsAsync(sendCloseNotifyFirst: false, CancellationToken.None);
+        }
+
+        Diagnostics.Act("plaintext connection returned", plaintext is not null);
+        Diagnostics.Assert("plaintext connection returned", false, plaintext is not null);
 
         Assert.IsNull(plaintext);
         await IgnoreFailureAsync(serverTask);

@@ -26,6 +26,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), SchannelBuild), leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("schannel: the revocation status is unknown", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -42,6 +43,7 @@ public sealed partial class SslStreamTlsProviderTests
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile, SkipRevocationCheck: true), SchannelBuild),
             leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -56,6 +58,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), OpenSslBuild), leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -75,6 +78,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), SchannelBuild), leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "schannel: this certificate or one of the certificates in the certificate chain is not time valid",
@@ -92,6 +96,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), SchannelBuild), leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("schannel: the certificate chain is incomplete", result.Result.ErrorMessage);
     }
@@ -104,8 +109,12 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), SchannelBuild);
         using var chain = BuildTrustedChainOutOfDate();
 
+        Diagnostics.Arrange("policy errors", $"RemoteCertificateChainErrors, chain status {string.Join(",", chain.ChainStatus.Select(status => status.Status))}");
+
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("failure is set", true, failure is not null);
         Assert.AreEqual(
             (CurlExitCode.SslConnectError,
                 "schannel: next InitializeSecurityContext failed: SEC_E_CERT_EXPIRED (0x80090328) - The received certificate has expired."),
@@ -118,8 +127,12 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: "root.pem"), SchannelBuild);
         using var chain = BuildTrustedChainOutOfDate();
 
+        Diagnostics.Arrange("policy errors", $"RemoteCertificateChainErrors, chain status {string.Join(",", chain.ChainStatus.Select(status => status.Status))}");
+
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("failure is set", true, failure is not null);
         Assert.AreEqual(
             (CurlExitCode.PeerFailedVerification,
                 "schannel: this certificate or one of the certificates in the certificate chain is not time valid"),
@@ -132,8 +145,12 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), SchannelBuild);
         using var chain = new X509Chain();
 
+        Diagnostics.Arrange("policy errors", $"RemoteCertificateChainErrors, chain status {string.Join(",", chain.ChainStatus.Select(status => status.Status))}");
+
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("failure is set", true, failure is not null);
         Assert.AreEqual(
             (CurlExitCode.PeerFailedVerification,
                 "schannel: SEC_E_UNTRUSTED_ROOT (0x80090325) - The certificate chain was issued by an authority that is not trusted."),
@@ -190,11 +207,13 @@ public sealed partial class SslStreamTlsProviderTests
         return X509CertificateLoader.LoadPkcs12(withKey.Export(X509ContentType.Pkcs12), null);
     }
 
-    private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithServerCertificateAsync(
+    private async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithServerCertificateAsync(
         SslStreamTlsProvider provider,
         X509Certificate2 serverCertificate,
         string targetHost = CertificateHost)
     {
+        Diagnostics.Arrange("server certificate", $"{serverCertificate.Subject} {serverCertificate.Thumbprint}, issued by {serverCertificate.Issuer}");
+        Diagnostics.Arrange("target host", targetHost);
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = Task.Run(async () =>
         {
@@ -203,9 +222,14 @@ public sealed partial class SslStreamTlsProviderTests
             _ = await sslStream.ReadAtLeastAsync(new byte[1], 1, throwOnEndOfStream: false);
         });
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), targetHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), targetHost, CancellationToken.None);
+        }
 
+        ActResult(result);
         var plaintextDisposed = client.IsDisposed;
         if (plaintextDisposed)
         {

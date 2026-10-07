@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Conformance;
 
@@ -14,6 +15,8 @@ public sealed class UpstreamTestFileExpanderTests
 
     private static readonly HashSet<string> NoFeatures = [];
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("%TESTNUMBER", "TESTNUMBER", "1500")]
     [DataRow("%LOGDIR", "LOGDIR", @"C:\temp\case1500")]
@@ -27,6 +30,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand($"a {written} b\n", new Dictionary<string, string> { [name] = value });
 
+        Diagnostics.Diff("expanded text", $"a {value} b\n", Text(expansion));
+
         Assert.AreEqual($"a {value} b\n", Text(expansion));
         Assert.IsEmpty(expansion.UnknownVariables);
     }
@@ -38,6 +43,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = Expand("<file name=\"%LOGDIR/out%TESTNUMBER\">\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n", variables);
 
+        Diagnostics.Diff("expanded text", "<file name=\"log/out7\">\nhttp://127.0.0.1:8990/7\n", Text(expansion));
+
         Assert.AreEqual("<file name=\"log/out7\">\nhttp://127.0.0.1:8990/7\n", Text(expansion));
     }
 
@@ -48,6 +55,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = Expand("%CLIENT6IP-NB %CLIENT6IP\n", variables);
 
+        Diagnostics.Diff("expanded text", "::1 [::1]\n", Text(expansion));
+
         Assert.AreEqual("::1 [::1]\n", Text(expansion));
     }
 
@@ -55,6 +64,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_LeavesPercentThatStartsNoVariableAlone()
     {
         UpstreamTestFileExpansion expansion = Expand("-w '%{http_code}' http://x/a%20b 100% %\n", NoVariables);
+
+        Diagnostics.Diff("expanded text", "-w '%{http_code}' http://x/a%20b 100% %\n", Text(expansion));
 
         Assert.AreEqual("-w '%{http_code}' http://x/a%20b 100% %\n", Text(expansion));
         Assert.IsEmpty(expansion.UnknownVariables);
@@ -65,6 +76,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%hostip\n", new Dictionary<string, string> { ["HOSTIP"] = "127.0.0.1" });
 
+        Diagnostics.Diff("expanded text", "%hostip\n", Text(expansion));
+
         Assert.AreEqual("%hostip\n", Text(expansion));
     }
 
@@ -72,6 +85,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_DoesNotExpandAValueAgain()
     {
         UpstreamTestFileExpansion expansion = Expand("%PWD\n", new Dictionary<string, string> { ["PWD"] = "%HOSTIP", ["HOSTIP"] = "127.0.0.1" });
+
+        Diagnostics.Diff("expanded text", "%HOSTIP\n", Text(expansion));
 
         Assert.AreEqual("%HOSTIP\n", Text(expansion));
     }
@@ -81,6 +96,7 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%PWD\n", new Dictionary<string, string> { ["PWD"] = "C:\\Ünï" });
 
+        Diagnostics.Diff("expanded bytes", Encoding.UTF8.GetBytes("C:\\Ünï\n"), expansion.File.ToArray());
         CollectionAssert.AreEqual(Encoding.UTF8.GetBytes("C:\\Ünï\n"), expansion.File.ToArray());
     }
 
@@ -89,6 +105,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%x\n", new Dictionary<string, string> { [""] = "never" });
 
+        Diagnostics.Diff("expanded text", "%x\n", Text(expansion));
+
         Assert.AreEqual("%x\n", Text(expansion));
     }
 
@@ -96,6 +114,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_ListsUnknownUpstreamVariablesOnceInOrderAndLeavesThemAsWritten()
     {
         UpstreamTestFileExpansion expansion = Expand("%SSHPORT %HOSTIP %SSHPORT %PROXYPORT\n", new Dictionary<string, string> { ["HOSTIP"] = "h" });
+
+        Diagnostics.Diff("expanded text", "%SSHPORT h %SSHPORT %PROXYPORT\n", Text(expansion));
 
         Assert.AreEqual("%SSHPORT h %SSHPORT %PROXYPORT\n", Text(expansion));
         CollectionAssert.AreEqual(new[] { "%SSHPORT", "%PROXYPORT" }, expansion.UnknownVariables.ToArray());
@@ -106,6 +126,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%if missing\n%SSHPORT\n%endif\n", NoVariables);
 
+        Diagnostics.Diff("expanded text", string.Empty, Text(expansion));
+
         Assert.AreEqual(string.Empty, Text(expansion));
         Assert.IsEmpty(expansion.UnknownVariables);
     }
@@ -115,6 +137,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("a\n%if brotli\nyes\n%else\nno\n%endif\nb\n", NoVariables, "brotli");
 
+        Diagnostics.Diff("expanded text", "a\nyes\nb\n", Text(expansion));
+
         Assert.AreEqual("a\nyes\nb\n", Text(expansion));
     }
 
@@ -122,6 +146,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_KeepsTheElseBranchWhenTheFeatureIsAbsent()
     {
         UpstreamTestFileExpansion expansion = Expand("a\n%if brotli\nyes\n%else\nno\n%endif\nb\n", NoVariables);
+
+        Diagnostics.Diff("expanded text", "a\nno\nb\n", Text(expansion));
 
         Assert.AreEqual("a\nno\nb\n", Text(expansion));
     }
@@ -132,6 +158,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_NegatedIfHoldsWhenTheFeatureIsAbsent(bool featurePresent, string expected)
     {
         UpstreamTestFileExpansion expansion = Expand("%if !brotli\nabsent\n%endif\n", NoVariables, featurePresent ? ["brotli"] : []);
+
+        Diagnostics.Diff("expanded text", expected, Text(expansion));
 
         Assert.AreEqual(expected, Text(expansion));
     }
@@ -147,6 +175,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = Expand(File, NoVariables, features);
 
+        Diagnostics.Diff("expanded text", expected, Text(expansion));
+
         Assert.AreEqual(expected, Text(expansion));
     }
 
@@ -155,6 +185,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%if !x\n%if y\n1\n%else\n2\n%endif\n%endif\n3\n", NoVariables, "x");
 
+        Diagnostics.Diff("expanded text", "3\n", Text(expansion));
+
         Assert.AreEqual("3\n", Text(expansion));
     }
 
@@ -162,6 +194,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_ReadsTheFeatureNameUpToTheFirstCharacterOutsideItsAlphabet()
     {
         UpstreamTestFileExpansion expansion = Expand("%if HTTP-2_x # comment\nkept\n%endif\n", NoVariables, "HTTP-2_x");
+
+        Diagnostics.Diff("expanded text", "kept\n", Text(expansion));
 
         Assert.AreEqual("kept\n", Text(expansion));
     }
@@ -173,8 +207,11 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestCaseParseResult result = Expand(File, NoVariables).Parse();
 
+        Diagnostics.Act("parsed", result.IsParsed);
+        Diagnostics.Assert("parsed", true, result.IsParsed);
         Assert.IsTrue(result.IsParsed);
         UpstreamTestSection data = result.TestCase.FindAll("reply", "data").Single();
+        Diagnostics.Diff("reply data", "plain\n", Encoding.Latin1.GetString(data.Content.Span));
         Assert.AreEqual("plain\n", Encoding.Latin1.GetString(data.Content.Span));
     }
 
@@ -183,6 +220,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%ifdef x\n", NoVariables);
 
+        Diagnostics.Diff("expanded text", "%ifdef x\n", Text(expansion));
+
         Assert.AreEqual("%ifdef x\n", Text(expansion));
     }
 
@@ -190,6 +229,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_LeavesAnIfStillOpenAtTheEndWithoutAnError()
     {
         UpstreamTestFileExpansion expansion = Expand("%if x\nkept\n", NoVariables, "x");
+
+        Diagnostics.Diff("expanded text", "kept\n", Text(expansion));
 
         Assert.AreEqual("kept\n", Text(expansion));
         Assert.IsNull(expansion.ConditionError);
@@ -202,6 +243,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand($"a\n{directive}\nb\n", NoVariables);
 
+        Diagnostics.Diff("expanded text", "a\n", Text(expansion));
+
         Assert.AreEqual("a\n", Text(expansion));
         Assert.AreEqual(error, expansion.ConditionError);
     }
@@ -211,6 +254,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("a%SPb%TABc%CR%LTd%GT%AMP\n", NoVariables);
 
+        Diagnostics.Diff("expanded text", "a b\tc\r<d>&\n", Text(expansion));
+
         Assert.AreEqual("a b\tc\r<d>&\n", Text(expansion));
     }
 
@@ -218,6 +263,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_EncodesBase64AfterSubstitutingVariablesAndPercentPairs()
     {
         UpstreamTestFileExpansion expansion = Expand("%b64[%HTTPPORT %9a]b64% %B64[x]B64%\n", new Dictionary<string, string> { ["HTTPPORT"] = "8990" });
+
+        Diagnostics.Diff("expanded text", $"{Convert.ToBase64String([.. "8990 "u8, 0x9a])} eA==\n", Text(expansion));
 
         Assert.AreEqual($"{Convert.ToBase64String([.. "8990 "u8, 0x9a])} eA==\n", Text(expansion));
     }
@@ -227,6 +274,7 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%hex[%00%01%FFz%4]hex%\n", NoVariables);
 
+        Diagnostics.Diff("expanded bytes", new byte[] { 0x00, 0x01, 0xFF, (byte)'z', (byte)'%', (byte)'4', (byte)'\n' }, expansion.File.ToArray());
         CollectionAssert.AreEqual(new byte[] { 0x00, 0x01, 0xFF, (byte)'z', (byte)'%', (byte)'4', (byte)'\n' }, expansion.File.ToArray());
     }
 
@@ -235,6 +283,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%hex[%41\n", NoVariables);
 
+        Diagnostics.Diff("expanded text", "%hex[%41\n", Text(expansion));
+
         Assert.AreEqual("%hex[%41\n", Text(expansion));
     }
 
@@ -242,6 +292,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_RepeatsContent()
     {
         UpstreamTestFileExpansion expansion = Expand("[%repeat[3 x hi%21]%][%REPEAT[2 X a]%][%repeat[0 x a]%]\n", NoVariables);
+
+        Diagnostics.Diff("expanded text", "[hi!hi!hi!][aa][]\n", Text(expansion));
 
         Assert.AreEqual("[hi!hi!hi!][aa][]\n", Text(expansion));
     }
@@ -256,6 +308,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand(written + "\n", NoVariables);
 
+        Diagnostics.Diff("expanded text", written + "\n", Text(expansion));
+
         Assert.AreEqual(written + "\n", Text(expansion));
     }
 
@@ -263,6 +317,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_LeavesARepeatCutOffAtTheEndOfTheFileAsWritten()
     {
         UpstreamTestFileExpansion expansion = Expand("%repeat[12", NoVariables);
+
+        Diagnostics.Diff("expanded text", "%repeat[12", Text(expansion));
 
         Assert.AreEqual("%repeat[12", Text(expansion));
     }
@@ -272,6 +328,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%repeat[2 x a]%", NoVariables);
 
+        Diagnostics.Diff("expanded text", "aa", Text(expansion));
+
         Assert.AreEqual("aa", Text(expansion));
     }
 
@@ -280,6 +338,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%repeat[2 x %hex[%0a]hex%]%\n", NoVariables);
 
+        Diagnostics.Diff("expanded text", "%repeat[2 x \n]%\n", Text(expansion));
+
         Assert.AreEqual("%repeat[2 x \n]%\n", Text(expansion));
     }
 
@@ -287,6 +347,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_SkipsAMalformedRepeatToReachALaterOne()
     {
         UpstreamTestFileExpansion expansion = Expand("%repeat[q] %repeat[2 x b]%\n", NoVariables);
+
+        Diagnostics.Diff("expanded text", "%repeat[q] bb\n", Text(expansion));
 
         Assert.AreEqual("%repeat[q] bb\n", Text(expansion));
     }
@@ -298,6 +360,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = Expand(File, NoVariables);
 
+        Diagnostics.Diff("expanded text", File, Text(expansion));
+
         Assert.AreEqual(File, Text(expansion));
         CollectionAssert.AreEqual(new[] { "%days", "%include", "%includetext", "%sha256b64file", "%strippemfile" }, expansion.UnsupportedInstructions.ToArray());
     }
@@ -307,6 +371,7 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%INCLUDE x%\n%INCLUDETEXT y%\n", NoVariables);
 
+        Diagnostics.Assert("unsupported instruction count", 0, expansion.UnsupportedInstructions.Count);
         Assert.IsEmpty(expansion.UnsupportedInstructions);
     }
 
@@ -319,6 +384,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles($"<data>\n%include %LOGDIR/a.txt%{lineBreak}</data>\n", files);
 
+        Diagnostics.Diff("expanded text", "<data>\nraw\r\nbytes\xff</data>\n", Text(expansion));
+
         Assert.AreEqual("<data>\nraw\r\nbytes\xff</data>\n", Text(expansion));
         Assert.IsEmpty(expansion.UnsupportedInstructions);
     }
@@ -329,6 +396,8 @@ public sealed class UpstreamTestFileExpanderTests
         Dictionary<string, byte[]> files = new() { ["log/5/t.txt"] = Encoding.Latin1.GetBytes("test %TESTNUMBER\r\nend\rx\r\n") };
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("%includetext %LOGDIR/t.txt%\r\n", files);
+
+        Diagnostics.Diff("expanded text", "test 5\nend\rx\n", Text(expansion));
 
         Assert.AreEqual("test 5\nend\rx\n", Text(expansion));
         Assert.IsEmpty(expansion.UnsupportedInstructions);
@@ -341,6 +410,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("%b64[a]b64%%SP%include m%\n", files);
 
+        Diagnostics.Diff("expanded text", "YQ== %SP %b64[a]b64% %TESTNUMBER %include m%\n", Text(expansion));
+
         Assert.AreEqual("YQ== %SP %b64[a]b64% %TESTNUMBER %include m%\n", Text(expansion));
     }
 
@@ -351,6 +422,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("%includetext t%\n", files);
 
+        Diagnostics.Diff("expanded text", "a b %includetext t%\n", Text(expansion));
+
         Assert.AreEqual("a b %includetext t%\n", Text(expansion));
     }
 
@@ -358,6 +431,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_MissingFileIsIncludedAsNothing()
     {
         UpstreamTestFileExpansion expansion = ExpandWithFiles("a\n%include gone%\n%includetext gone%\nb\n", []);
+
+        Diagnostics.Diff("expanded text", "a\nb\n", Text(expansion));
 
         Assert.AreEqual("a\nb\n", Text(expansion));
         Assert.IsEmpty(expansion.UnsupportedInstructions);
@@ -370,6 +445,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("%include x% %include y%\r\r\n%include x%", files);
 
+        Diagnostics.Diff("expanded text", "%include x% Y%include x%", Text(expansion));
+
         Assert.AreEqual("%include x% Y%include x%", Text(expansion));
     }
 
@@ -378,6 +455,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = ExpandWithFiles("%include x\n%includetext y\n", new() { ["x\n"] = "X"u8.ToArray() });
 
+        Diagnostics.Diff("expanded text", "%include x\n%includetext y\n", Text(expansion));
+
         Assert.AreEqual("%include x\n%includetext y\n", Text(expansion));
     }
 
@@ -385,6 +464,8 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_IncludePathIsGivenToTheReaderAsUtf8Text()
     {
         List<string> paths = [];
+        Diagnostics.Arrange("test file", "%include %LOGDIR/f%\n");
+        Diagnostics.Arrange("LOGDIR", "d\u00e9");
 
         UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes("%include %LOGDIR/f%\n"), new Dictionary<string, string> { ["LOGDIR"] = "d\u00e9" }, NoFeatures, path =>
         {
@@ -392,6 +473,8 @@ public sealed class UpstreamTestFileExpanderTests
             return null;
         });
 
+        Diagnostics.Act("paths read", string.Join(",", paths));
+        Diagnostics.Assert("paths read", "d\u00e9/f", string.Join(",", paths));
         CollectionAssert.AreEqual(new[] { "d\u00e9/f" }, paths);
     }
 
@@ -400,6 +483,7 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%includetext a%\n%include b%\n%includetext c% %include d%\n", NoVariables);
 
+        Diagnostics.Assert("unsupported instructions", "%includetext,%include", string.Join(",", expansion.UnsupportedInstructions));
         CollectionAssert.AreEqual(new[] { "%includetext", "%include" }, expansion.UnsupportedInstructions.ToArray());
     }
 
@@ -411,6 +495,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("pin %sha256b64file[%LOGDIR/k.pub]sha256b64file% %SHA256B64FILE[%LOGDIR/k.pub]SHA256B64FILE%\n", files);
 
+        Diagnostics.Diff("expanded text", "pin ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0= ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=\n", Text(expansion));
+
         Assert.AreEqual("pin ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0= ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=\n", Text(expansion));
         Assert.IsEmpty(expansion.UnsupportedInstructions);
     }
@@ -419,6 +505,7 @@ public sealed class UpstreamTestFileExpanderTests
     public void Expand_FileInstructionPathHasItsPercentPairsDecodedBeforeTheRead()
     {
         List<string> paths = [];
+        Diagnostics.Arrange("test file", "%sha256b64file[log%2F5/k%2epub]sha256b64file%%strippemfile[a%2Fb]strippemfile%\n");
 
         UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes("%sha256b64file[log%2F5/k%2epub]sha256b64file%%strippemfile[a%2Fb]strippemfile%\n"), NoVariables, NoFeatures, path =>
         {
@@ -426,6 +513,8 @@ public sealed class UpstreamTestFileExpanderTests
             return null;
         });
 
+        Diagnostics.Act("paths read", string.Join(",", paths));
+        Diagnostics.Assert("paths read", "log/5/k.pub,a/b", string.Join(",", paths));
         CollectionAssert.AreEqual(new[] { "log/5/k.pub", "a/b" }, paths);
     }
 
@@ -434,6 +523,8 @@ public sealed class UpstreamTestFileExpanderTests
     {
         // SHA-256 of no bytes is e3b0c442…b855.
         UpstreamTestFileExpansion expansion = ExpandWithFiles("[%sha256b64file[gone]sha256b64file%][%strippemfile[gone]strippemfile%]\n", []);
+
+        Diagnostics.Diff("expanded text", "[47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=][]\n", Text(expansion));
 
         Assert.AreEqual("[47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=][]\n", Text(expansion));
     }
@@ -459,6 +550,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("<%strippemfile[%LOGDIR/c.pem]strippemfile%>\n", files);
 
+        Diagnostics.Diff("expanded text", $"<{expected}>\n", Text(expansion));
+
         Assert.AreEqual($"<{expected}>\n", Text(expansion));
         Assert.IsEmpty(expansion.UnsupportedInstructions);
     }
@@ -474,6 +567,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("%STRIPPEMFILE[a]STRIPPEMFILE%|%strippemfile[b]strippemfile%\n", files);
 
+        Diagnostics.Diff("expanded text", "-----BEGIN K-----\nk\n-----END K-----|-----BEGIN C-----\nc\n-----END C-----\n", Text(expansion));
+
         Assert.AreEqual("-----BEGIN K-----\nk\n-----END K-----|-----BEGIN C-----\nc\n-----END C-----\n", Text(expansion));
     }
 
@@ -484,6 +579,8 @@ public sealed class UpstreamTestFileExpanderTests
 
         UpstreamTestFileExpansion expansion = ExpandWithFiles("%include i%\n", files);
 
+        Diagnostics.Diff("expanded text", "ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=\n", Text(expansion));
+
         Assert.AreEqual("ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=\n", Text(expansion));
     }
 
@@ -492,6 +589,7 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("%STRIPPEMFILE[a]STRIPPEMFILE%\n%Sha256B64File[b]sha256b64file% %strippemfile[c]strippemfile%\n", NoVariables);
 
+        Diagnostics.Assert("unsupported instructions", "%strippemfile,%sha256b64file", string.Join(",", expansion.UnsupportedInstructions));
         CollectionAssert.AreEqual(new[] { "%strippemfile", "%sha256b64file" }, expansion.UnsupportedInstructions.ToArray());
     }
 
@@ -500,32 +598,59 @@ public sealed class UpstreamTestFileExpanderTests
     {
         UpstreamTestFileExpansion expansion = Expand("a\nb", NoVariables);
 
+        Diagnostics.Diff("expanded text", "a\nb", Text(expansion));
+
         Assert.AreEqual("a\nb", Text(expansion));
     }
 
     [TestMethod]
     public void Expand_RejectsNullArguments()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamTestFileExpander.Expand([], null!, NoFeatures));
-        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamTestFileExpander.Expand([], NoVariables, null!));
+        Diagnostics.Arrange("null argument", "variables, then features");
+        ArgumentNullException first = Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamTestFileExpander.Expand([], null!, NoFeatures));
+        ArgumentNullException second = Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamTestFileExpander.Expand([], NoVariables, null!));
+        Diagnostics.Act("exception for null variables", first.Message);
+        Diagnostics.Act("exception for null features", second.Message);
+        Diagnostics.Assert("exception types", "ArgumentNullException,ArgumentNullException", $"{first.GetType().Name},{second.GetType().Name}");
     }
 
     [TestMethod]
     public void Expansion_RejectsNullLists()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new UpstreamTestFileExpansion(Array.Empty<byte>(), null!, [], null));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new UpstreamTestFileExpansion(Array.Empty<byte>(), [], null!, null));
+        Diagnostics.Arrange("null argument", "unknown variables, then unsupported instructions");
+        ArgumentNullException first = Assert.ThrowsExactly<ArgumentNullException>(() => new UpstreamTestFileExpansion(Array.Empty<byte>(), null!, [], null));
+        ArgumentNullException second = Assert.ThrowsExactly<ArgumentNullException>(() => new UpstreamTestFileExpansion(Array.Empty<byte>(), [], null!, null));
+        Diagnostics.Act("exception for null unknown variables", first.Message);
+        Diagnostics.Act("exception for null unsupported instructions", second.Message);
+        Diagnostics.Assert("exception types", "ArgumentNullException,ArgumentNullException", $"{first.GetType().Name},{second.GetType().Name}");
     }
 
-    private static UpstreamTestFileExpansion Expand(string file, IReadOnlyDictionary<string, string> variables, params string[] features) =>
-        UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes(file), variables, features.ToHashSet(StringComparer.Ordinal));
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
-    private static UpstreamTestFileExpansion ExpandWithFiles(string file, Dictionary<string, byte[]> files) =>
-        UpstreamTestFileExpander.Expand(
+    private UpstreamTestFileExpansion Expand(string file, IReadOnlyDictionary<string, string> variables, params string[] features)
+    {
+        Diagnostics.Arrange("test file", file);
+        Diagnostics.Arrange("variables", string.Join(",", variables.Select(pair => $"{pair.Key}={pair.Value}")));
+        Diagnostics.Arrange("features", string.Join(",", features));
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(Encoding.Latin1.GetBytes(file), variables, features.ToHashSet(StringComparer.Ordinal));
+        Diagnostics.Act("expanded text", Text(expansion));
+        Diagnostics.Act("unknown variables", string.Join(",", expansion.UnknownVariables));
+        return expansion;
+    }
+
+    private UpstreamTestFileExpansion ExpandWithFiles(string file, Dictionary<string, byte[]> files)
+    {
+        Diagnostics.Arrange("test file", file);
+        Diagnostics.Arrange("readable files", string.Join(",", files.Keys));
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(
             Encoding.Latin1.GetBytes(file),
             new Dictionary<string, string> { ["LOGDIR"] = "log/5", ["TESTNUMBER"] = "5" },
             NoFeatures,
             path => files.GetValueOrDefault(path));
+        Diagnostics.Act("expanded text", Text(expansion));
+        Diagnostics.Act("unsupported instructions", string.Join(",", expansion.UnsupportedInstructions));
+        return expansion;
+    }
 
     private static string Text(UpstreamTestFileExpansion expansion) => Encoding.Latin1.GetString(expansion.File.Span);
 }

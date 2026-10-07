@@ -275,7 +275,8 @@ through the runner's `IDataFileReader` and environment. The URL's percent-decode
 the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
 login takes the URL's user name, and one with no password sends an empty one, never the URL's
 (BL-1356); with no entry the URL's user and password are sent. A required file that is missing or malformed fails each URL with
-`curl: (26) .netrc error: no such file` or `syntax error` before anything is sent;
+`curl: (26) .netrc error: no such file` or `syntax error` before anything is sent, `-v` writing
+the same text as an info line first (BL-1447);
 `--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
 gives `RedirectFollower` the same lookup for each redirect hop's URL, so every hop sends its own
 host's entry or none, `--location-trusted` or not (BL-790). Measured on curl 8.21.0 (BL-505 Notes).

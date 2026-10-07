@@ -22,8 +22,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(new ConnectTarget(host, port, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, port, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Not resolving .onion address (RFC 7686)", result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -42,8 +43,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(), resolveOverrides: ResolveOverrides.Parse(["x.onion:80:127.0.0.1"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("x.onion", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("x.onion", 80, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "Added x.onion:80:127.0.0.1 to DNS cache", "Not resolving .onion address (RFC 7686)", "Could not resolve: x.onion:80", "Could not resolve: x.onion" },
@@ -61,8 +63,9 @@ public sealed partial class TcpConnectorTests
         var resolver = new FakeDnsResolver(Loopback);
         var connector = new TcpConnector(resolver, new FakeTcpDialer { DialOutcome = _ => new FakeConnection() }, new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(new ConnectTarget(host, 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, 80, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { host }, resolver.ResolvedHosts);
     }
@@ -76,8 +79,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider());
         var target = new ConnectTarget("example.onion", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1, null) };
 
-        var result = await connector.ConnectAsync(target, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.DoesNotContain(resolver.ResolvedHosts, "example.onion");
         Assert.HasCount(1, dialer.DialedEndPoints);

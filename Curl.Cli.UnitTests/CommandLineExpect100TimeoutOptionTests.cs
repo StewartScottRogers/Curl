@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -16,11 +17,17 @@ public sealed class CommandLineExpect100TimeoutOptionTests
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NotGiven_LeavesItNotGiven()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("expect100 timeout", null, result.Options?.Expect100Timeout);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.Expect100Timeout);
     }
@@ -33,8 +40,11 @@ public sealed class CommandLineExpect100TimeoutOptionTests
     [DataRow("2147482.999", 2147482999)]
     public void Parse_Seconds_RecordsThemToTheMillisecond(string value, long expectedMilliseconds)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--expect100-timeout", value, Url]);
+        CommandLineParseResult result = Parse(["--expect100-timeout", value, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("expect100 timeout", TimeSpan.FromMilliseconds(expectedMilliseconds), result.Options?.Expect100Timeout);
+        Diagnostics.Assert("connect timeout", null, result.Options?.ConnectTimeout);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), result.Options.Expect100Timeout);
         Assert.IsNull(result.Options.ConnectTimeout);
@@ -43,8 +53,10 @@ public sealed class CommandLineExpect100TimeoutOptionTests
     [TestMethod]
     public void Parse_GivenTwiceWithEquals_KeepsTheLast()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--expect100-timeout", "5", "--expect100-timeout=0.5", Url]);
+        CommandLineParseResult result = Parse(["--expect100-timeout", "5", "--expect100-timeout=0.5", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("expect100 timeout", TimeSpan.FromMilliseconds(500), result.Options?.Expect100Timeout);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TimeSpan.FromMilliseconds(500), result.Options.Expect100Timeout);
     }
@@ -56,8 +68,11 @@ public sealed class CommandLineExpect100TimeoutOptionTests
     [DataRow("1.", "too large number")]
     public void Parse_UnreadableValue_IsRefusedWithExit2(string value, string reason)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--expect100-timeout", value, Url]);
+        CommandLineParseResult result = Parse(["--expect100-timeout", value, Url]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        AssertStandardErrorLines(result, $"curl: option --expect100-timeout: {reason}");
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -69,11 +84,27 @@ public sealed class CommandLineExpect100TimeoutOptionTests
     [OSCondition(OperatingSystems.Windows)]
     public void Parse_OnWindows_MoreThanMaximumWholeSeconds_IsRefused()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--expect100-timeout", "2147483", Url]);
+        CommandLineParseResult result = Parse(["--expect100-timeout", "2147483", Url]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        AssertStandardErrorLines(result, "curl: option --expect100-timeout: expected a proper numerical parameter");
         Assert.IsFalse(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "curl: option --expect100-timeout: expected a proper numerical parameter", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
     }
+
+    private CommandLineParseResult Parse(string[] arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertStandardErrorLines(CommandLineParseResult result, string optionLine) =>
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([optionLine, TryHelp]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
 }

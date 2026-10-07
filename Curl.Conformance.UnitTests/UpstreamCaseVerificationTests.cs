@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Conformance;
 
@@ -9,10 +10,14 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamCaseVerificationTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void FindFirstDifference_NothingToVerifyAndExitZero_ReturnsNull()
     {
-        Assert.IsNull(Verify("", Run()));
+        string? difference = Verify("", Run());
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
@@ -21,7 +26,9 @@ public sealed class UpstreamCaseVerificationTests
         string sections = "<verify>\n<protocol crlf=\"yes\">\nGET / HTTP/1.1\nDate: expected\nUser-Agent: curl/x\n</protocol>\n"
             + "<strip>\n^Date:\n</strip>\n<strippart>\ns/curl\\/[0-9.]+/curl\\/x/\n# comment\n</strippart>\n</verify>\n";
 
-        Assert.IsNull(Verify(sections, Run(received: "GET / HTTP/1.1\r\nDate: now\r\nUser-Agent: curl/8.21.0\r\n")));
+        string? difference = Verify(sections, Run(received: "GET / HTTP/1.1\r\nDate: now\r\nUser-Agent: curl/8.21.0\r\n"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
@@ -29,7 +36,9 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<verify>\n<protocol crlf=\"yes\" nonewline=\"yes\">\nPOST / HTTP/1.1\n\nbody\n</protocol>\n</verify>\n";
 
-        Assert.IsNull(Verify(sections, Run(received: "POST / HTTP/1.1\r\n\r\nbody")));
+        string? difference = Verify(sections, Run(received: "POST / HTTP/1.1\r\n\r\nbody"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
@@ -37,9 +46,9 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<verify>\n<protocol nonewline=\"yes\">\nGET / HTTP/1.1\n</protocol>\n</verify>\n";
 
-        Assert.AreEqual(
-            "<verify><protocol> differs at byte 5 (line 1): expected \"GET / HTTP/1.1\", got \"GET /x HTTP/1.1\"",
-            Verify(sections, Run(received: "GET /x HTTP/1.1")));
+        string? difference = Verify(sections, Run(received: "GET /x HTTP/1.1"));
+        ExpectDifference("<verify><protocol> differs at byte 5 (line 1): expected \"GET / HTTP/1.1\", got \"GET /x HTTP/1.1\"", difference);
+        Assert.AreEqual("<verify><protocol> differs at byte 5 (line 1): expected \"GET / HTTP/1.1\", got \"GET /x HTTP/1.1\"", difference);
     }
 
     [TestMethod]
@@ -47,10 +56,12 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<reply>\n<data crlf=\"headers\">\nHTTP/1.1 200 OK\n\nbody\n</data>\n</reply>\n";
 
-        Assert.IsNull(Verify(sections, Run(outputFile: "HTTP/1.1 200 OK\r\n\r\nbody\n")));
-        Assert.AreEqual(
-            "the --output file against <reply><data> differs at byte 0 (line 1): expected \"HTTP/1.1 200 OK\\r\\n\", got the end",
-            Verify(sections, Run()));
+        string? difference = Verify(sections, Run(outputFile: "HTTP/1.1 200 OK\r\n\r\nbody\n"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+        string? difference2 = Verify(sections, Run());
+        ExpectDifference("the --output file against <reply><data> differs at byte 0 (line 1): expected \"HTTP/1.1 200 OK\\r\\n\", got the end", difference2);
+        Assert.AreEqual("the --output file against <reply><data> differs at byte 0 (line 1): expected \"HTTP/1.1 200 OK\\r\\n\", got the end", difference2);
     }
 
     [TestMethod]
@@ -58,7 +69,9 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<reply>\n<data base64=\"yes\">\naGk=\n</data>\n</reply>\n";
 
-        Assert.IsNull(Verify(sections, Run(outputFile: "hi")));
+        string? difference = Verify(sections, Run(outputFile: "hi"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
@@ -68,20 +81,27 @@ public sealed class UpstreamCaseVerificationTests
 
         string? difference = Verify(sections, Run(received: new string('a', 40) + "!\n"));
 
+        ExpectDifference("the strip pattern ^(a+)+$ took longer than 1 seconds", difference);
         Assert.AreEqual("the strip pattern ^(a+)+$ took longer than 1 seconds", difference);
     }
 
     [TestMethod]
     public void FindFirstDifference_ReplyDataMarkedNocheck_IsNotCompared()
     {
-        Assert.IsNull(Verify("<reply>\n<data nocheck=\"yes\">\nx\n</data>\n</reply>\n", Run()));
+        string? difference = Verify("<reply>\n<data nocheck=\"yes\">\nx\n</data>\n</reply>\n", Run());
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
     public void FindFirstDifference_EmptyReplyData_IsComparedOnlyUnderSendzero()
     {
-        Assert.IsNull(Verify("<reply>\n<data>\n</data>\n</reply>\n", Run(outputFile: "x")));
-        Assert.IsNotNull(Verify("<reply>\n<data sendzero=\"yes\">\n</data>\n</reply>\n", Run(outputFile: "x")));
+        string? difference = Verify("<reply>\n<data>\n</data>\n</reply>\n", Run(outputFile: "x"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+        string? difference2 = Verify("<reply>\n<data sendzero=\"yes\">\n</data>\n</reply>\n", Run(outputFile: "x"));
+        ExpectPresent(difference2);
+        Assert.IsNotNull(difference2);
     }
 
     [TestMethod]
@@ -89,13 +109,17 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<reply>\n<data>\nserved\n</data>\n<datacheck nonewline=\"yes\">\none\n</datacheck>\n<datacheck2>\ntwo\n</datacheck2>\n</reply>\n";
 
-        Assert.IsNull(Verify(sections, Run(outputFile: "onetwo\n")));
+        string? difference = Verify(sections, Run(outputFile: "onetwo\n"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
     public void FindFirstDifference_ReplyDataInTextMode_IgnoresLineEndings()
     {
-        Assert.IsNull(Verify("<reply>\n<data mode=\"text\">\na\nb\n</data>\n</reply>\n", Run(outputFile: "a\r\nb\n")));
+        string? difference = Verify("<reply>\n<data mode=\"text\">\na\nb\n</data>\n</reply>\n", Run(outputFile: "a\r\nb\n"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
@@ -103,15 +127,17 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<verify>\n<stdout crlf=\"yes\" nonewline=\"yes\">\nline\nlast\n</stdout>\n<stripfile>\ns/^noise\\n//\n</stripfile>\n</verify>\n";
 
-        Assert.IsNull(Verify(sections, Run(standardOutput: "noise\nline\r\nlast")));
+        string? difference = Verify(sections, Run(standardOutput: "noise\nline\r\nlast"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
     public void FindFirstDifference_StdoutThatDiffers_NamesIt()
     {
-        Assert.AreEqual(
-            "<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"",
-            Verify("<verify>\n<stdout>\na\n</stdout>\n</verify>\n", Run(standardOutput: "b\n")));
+        string? difference = Verify("<verify>\n<stdout>\na\n</stdout>\n</verify>\n", Run(standardOutput: "b\n"));
+        ExpectDifference("<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"", difference);
+        Assert.AreEqual("<verify><stdout> differs at byte 0 (line 1): expected \"a\\n\", got \"b\\n\"", difference);
     }
 
     [TestMethod]
@@ -119,8 +145,12 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<verify>\n<stderr mode=\"text\">\ncurl: (6) x\n</stderr>\n</verify>\n";
 
-        Assert.IsNull(Verify(sections, Run(standardError: "curl: (6) x\r\n")));
-        Assert.IsNotNull(Verify(sections, Run(standardError: "curl: (7) x\r\n")));
+        string? difference = Verify(sections, Run(standardError: "curl: (6) x\r\n"));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+        string? difference2 = Verify(sections, Run(standardError: "curl: (7) x\r\n"));
+        ExpectPresent(difference2);
+        Assert.IsNotNull(difference2);
     }
 
     [TestMethod]
@@ -129,7 +159,9 @@ public sealed class UpstreamCaseVerificationTests
         string path = TemporaryFile("keep\ndrop\n");
         string sections = $"<verify>\n<file1 name=\"{path}\">\nkeep\n</file1>\n<stripfile1>\ns/^drop\\n//\n</stripfile1>\n</verify>\n";
 
-        Assert.IsNull(Verify(sections, Run()));
+        string? difference = Verify(sections, Run());
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
     }
 
     [TestMethod]
@@ -137,9 +169,9 @@ public sealed class UpstreamCaseVerificationTests
     {
         string path = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}").Replace('\\', '/');
 
-        Assert.AreEqual(
-            $"<verify><file> ({path}) differs at byte 0 (line 1): expected \"x\\n\", got the end",
-            Verify($"<verify>\n<file name=\"{path}\">\nx\n</file>\n</verify>\n", Run()));
+        string? difference = Verify($"<verify>\n<file name=\"{path}\">\nx\n</file>\n</verify>\n", Run());
+        ExpectDifference($"<verify><file> ({path}) differs at byte 0 (line 1): expected \"x\\n\", got the end", difference);
+        Assert.AreEqual($"<verify><file> ({path}) differs at byte 0 (line 1): expected \"x\\n\", got the end", difference);
     }
 
     [TestMethod]
@@ -148,19 +180,42 @@ public sealed class UpstreamCaseVerificationTests
         string path = TemporaryFile("x");
         string missing = path + ".missing";
 
-        Assert.IsNull(Verify($"<verify>\n<notexists>\n{missing}\n</notexists>\n</verify>\n", Run()));
-        Assert.AreEqual($"<verify><notexists>: {path} exists", Verify($"<verify>\n<notexists>\n{missing}\n{path}\n</notexists>\n</verify>\n", Run()));
+        string? difference = Verify($"<verify>\n<notexists>\n{missing}\n</notexists>\n</verify>\n", Run());
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+        string? difference2 = Verify($"<verify>\n<notexists>\n{missing}\n{path}\n</notexists>\n</verify>\n", Run());
+        ExpectDifference($"<verify><notexists>: {path} exists", difference2);
+        Assert.AreEqual($"<verify><notexists>: {path} exists", difference2);
     }
 
     [TestMethod]
     public void FindFirstDifference_ExitCode_IsComparedWithErrorcodeOrZero()
     {
-        Assert.IsNull(Verify("<verify>\n<errorcode>\n6\n</errorcode>\n</verify>\n", Run(exitCode: 6)));
-        Assert.AreEqual("<verify><errorcode>: expected exit code 0, got 6", Verify("", Run(exitCode: 6)));
+        string? difference = Verify("<verify>\n<errorcode>\n6\n</errorcode>\n</verify>\n", Run(exitCode: 6));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+        string? difference2 = Verify("", Run(exitCode: 6));
+        ExpectDifference("<verify><errorcode>: expected exit code 0, got 6", difference2);
+        Assert.AreEqual("<verify><errorcode>: expected exit code 0, got 6", difference2);
     }
 
-    private static string? Verify(string sections, UpstreamCaseRun run) =>
-        UpstreamCaseVerification.FindFirstDifference(ParsedTestCase.From(sections), run);
+    private string? Verify(string sections, UpstreamCaseRun run)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", Neutral(sections));
+        string? difference = UpstreamCaseVerification.FindFirstDifference(ParsedTestCase.From(sections), run);
+        diagnostics.Act("first difference", Neutral(difference));
+        return difference;
+    }
+
+    private void ExpectDifference(string? expected, string? actual) =>
+        TestDiagnostics.For(TestContext).Assert("first difference", Neutral(expected), Neutral(actual));
+
+    private void ExpectPresent(string? actual) =>
+        TestDiagnostics.For(TestContext).Assert("a difference is reported", true, actual is not null);
+
+    private static string Neutral(string? text) =>
+        (text ?? "(none)").Replace(Path.GetTempPath().Replace('\\', '/'), "<temp>/");
 
     private static UpstreamCaseRun Run(int exitCode = 0, string standardOutput = "", string standardError = "", string received = "", string outputFile = "") =>
         new(exitCode, Bytes(standardOutput), Bytes(standardError), Bytes(received), Bytes(outputFile));

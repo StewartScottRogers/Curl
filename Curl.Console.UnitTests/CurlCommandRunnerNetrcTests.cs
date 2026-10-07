@@ -556,6 +556,32 @@ public sealed class CurlCommandRunnerNetrcTests
         Assert.AreEqual("* Protocol \"qttp\" not supported\ncurl: (1) Protocol \"qttp\" not supported" + NewLine, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_VerboseRequiredNetrcMissing_WritesTheNetrcErrorInfoLineFirst()
+    {
+        // curl -v -n http://127.0.0.1:<port>/ with HOME and USERPROFILE an empty directory
+        // (measured 2026-10-07, BL-1447 Notes): the info line, then the curl: (26) line, exit 26.
+        int exitCode = await RunAsync(["-v", "-n", Url]);
+
+        Assert.AreEqual(26, exitCode);
+        Assert.AreEqual("* .netrc error: no such file\n" + NoSuchFileLine, StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_VerboseRequiredNetrcMalformed_WritesTheSyntaxErrorInfoLineFirst()
+    {
+        // curl -v --netrc-file <file with an unterminated quote> http://127.0.0.1:<port>/
+        // (measured 2026-10-07, BL-1447 Notes): the info line, then the curl: (26) line, exit 26.
+        dataFiles.Files["."] = Encoding.UTF8.GetBytes(Malformed);
+
+        int exitCode = await RunAsync(["-v", "--netrc-file", ".", Url]);
+
+        Assert.AreEqual(26, exitCode);
+        Assert.AreEqual("* .netrc error: syntax error\ncurl: (26) .netrc error: syntax error" + NewLine, StandardErrorText);
+        Assert.IsEmpty(http.Contexts);
+    }
+
     private async Task<string[]> RunRedirectedToLocalhostAsync(string[] options)
     {
         ScriptedConnector server = new(

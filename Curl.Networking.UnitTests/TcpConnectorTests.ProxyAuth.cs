@@ -49,8 +49,9 @@ public sealed partial class TcpConnectorTests
         var first = new ScriptedConnection(Encoding.Latin1.GetBytes(BasicChallengeClosing));
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Basic, first);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("CONNECT tunnel failed, response 407", result.ErrorMessage);
         Assert.AreEqual(BasicConnect, Encoding.Latin1.GetString([.. first.Written]));
@@ -66,8 +67,9 @@ public sealed partial class TcpConnectorTests
         var second = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, first, second);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(second, result.Connection);
         Assert.AreEqual(200, result.ProxyConnectResponseCode);
@@ -87,8 +89,9 @@ public sealed partial class TcpConnectorTests
             + EstablishedReply));
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(connection, result.Connection);
         Assert.AreEqual(UnauthenticatedConnect + DigestConnect, Encoding.Latin1.GetString([.. connection.Written]));
@@ -107,8 +110,9 @@ public sealed partial class TcpConnectorTests
             + EstablishedReply));
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(connection, result.Connection);
         Assert.AreEqual(UnauthenticatedConnect + DigestConnect, Encoding.Latin1.GetString([.. connection.Written]));
@@ -126,8 +130,9 @@ public sealed partial class TcpConnectorTests
             + "zz\r\nhello\r\n0\r\n\r\n"));
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("chunk hex-length char not a hex digit: 0x7a", result.ErrorMessage);
         Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. connection.Written]));
@@ -143,8 +148,9 @@ public sealed partial class TcpConnectorTests
         var second = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));
         var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, first, second);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("connection is the second one", true, ReferenceEquals(second, result.Connection));
         Assert.AreSame(second, result.Connection);
         Assert.AreEqual(DigestConnect, Encoding.Latin1.GetString([.. second.Written]));
         Assert.IsTrue(first.IsDisposed);
@@ -160,8 +166,9 @@ public sealed partial class TcpConnectorTests
         var second = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));
         var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Any, first, second);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. first.Written]));
         Assert.AreEqual(expectedSecondConnect, Encoding.Latin1.GetString([.. second.Written]));
@@ -182,8 +189,9 @@ public sealed partial class TcpConnectorTests
         };
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Any, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlSocketErrorText.ReceiveFailure(failure), result.ErrorMessage);
         Assert.AreEqual(UnauthenticatedConnect + BasicConnect, Encoding.Latin1.GetString([.. connection.Written]));
@@ -200,8 +208,9 @@ public sealed partial class TcpConnectorTests
         var second = new ScriptedConnection(Encoding.Latin1.GetBytes(DigestChallengeClosing));
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, first, second);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("CONNECT tunnel failed, response 407", result.ErrorMessage);
         Assert.AreEqual(DigestConnect, Encoding.Latin1.GetString([.. second.Written]));
@@ -216,10 +225,11 @@ public sealed partial class TcpConnectorTests
         var first = new ScriptedConnection(Encoding.Latin1.GetBytes(DigestChallengeClosing));
         var (connector, dialer) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, first);
 
-        var result = await connector.ConnectAsync(
-            AuthenticatingTarget with { Proxy = AuthenticatingProxy with { Credential = null } },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            AuthenticatingTarget with { Proxy = AuthenticatingProxy with { Credential = null } });
 
+        Diagnostics.Assert("error message", "CONNECT tunnel failed, response 407", result.ErrorMessage);
         Assert.AreEqual("CONNECT tunnel failed, response 407", result.ErrorMessage);
         Assert.HasCount(1, dialer.DialedEndPoints);
     }
@@ -233,10 +243,11 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new ScriptedConnection([]) };
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), dialer, tlsProvider, new ManualTimeProvider(), AuthenticatingOptions(HttpAuthSchemes.Digest));
 
-        var result = await connector.ConnectAsync(
-            AuthenticatingTarget with { Proxy = new ProxyEndpoint(ProxyKind.Https, "localhost", 18602, new NetworkCredential("u", "p")) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            AuthenticatingTarget with { Proxy = new ProxyEndpoint(ProxyKind.Https, "localhost", 18602, new NetworkCredential("u", "p")) });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(secondTls, result.Connection);
         Assert.AreEqual(DigestConnect, Encoding.Latin1.GetString([.. secondTls.Written]));

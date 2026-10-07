@@ -20,9 +20,12 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_DomainIsAPublicSuffix_DropsTheCookie(string host, string domainAttribute)
     {
         CookieStore store = new();
+        Diagnostics.ArrangeSetCookies(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now);
 
         store.StoreFromResponse(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now, NoTransferEvents.Instance);
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
 
+        Diagnostics.Assert("stored cookie count", 0, store.Cookies.Count);
         Assert.IsEmpty(store.Cookies);
     }
 
@@ -36,9 +39,12 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_DomainIsNotAPublicSuffix_KeepsTheCookie(string host, string domainAttribute, string storedDomain)
     {
         CookieStore store = new();
+        Diagnostics.ArrangeSetCookies(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now);
 
         store.StoreFromResponse(CurlUrl.Parse($"http://{host}/"), [$"n=v; Path=/; {domainAttribute}"], Now, NoTransferEvents.Instance);
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
 
+        Diagnostics.AssertText("stored domain", storedDomain, store.Cookies.Single().Domain);
         Assert.AreEqual(storedDomain, store.Cookies.Single().Domain);
     }
 
@@ -51,9 +57,13 @@ public sealed partial class CookieStoreTests
         string label = new('a', 60);
         CurlUrl url = CurlUrl.Parse($"http://{label}.{label}.{label}.{label}.{lastLabels}/");
         CookieStore store = new();
+        Diagnostics.Arrange("host length", url.Host.Length);
+        Diagnostics.ArrangeSetCookies(url, ["n=v; Path=/"], Now);
 
         store.StoreFromResponse(url, ["n=v; Path=/"], Now, NoTransferEvents.Instance);
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
 
+        Diagnostics.Assert("stored cookie count", storedCount, store.Cookies.Count);
         Assert.HasCount(storedCount, store.Cookies);
     }
 
@@ -65,9 +75,12 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_DomainIsThePunycodeFormOfANonAsciiSuffix_DropsTheCookie()
     {
         CookieStore store = new();
+        Diagnostics.ArrangeSetCookies(CurlUrl.Parse("http://www.example.xn--55qx5d.cn/"), ["n=v; Path=/; Domain=xn--55qx5d.cn"], Now);
 
         store.StoreFromResponse(CurlUrl.Parse("http://www.example.xn--55qx5d.cn/"), ["n=v; Path=/; Domain=xn--55qx5d.cn"], Now, NoTransferEvents.Instance);
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
 
+        Diagnostics.Assert("stored cookie count", 0, store.Cookies.Count);
         Assert.IsEmpty(store.Cookies);
     }
 }

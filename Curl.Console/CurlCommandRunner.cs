@@ -1406,7 +1406,7 @@ internal sealed class CurlCommandRunner(
     {
         for (int index = 0; index < options.Urls.Count; index++)
         {
-            if (!TryParseUploadFiles(options, index, out IReadOnlyList<string?>? uploadFiles, out TransferResult? globFailure)
+            if (!TryParseUploadFiles(options, index, out IReadOnlyList<UrlGlobMatch?>? uploadFiles, out TransferResult? globFailure)
                 || !TryParseGlob(options, index, out UrlGlob? glob, out globFailure))
             {
                 await WriteGlobFailureLinesAsync(options, globFailure).ConfigureAwait(false);
@@ -1450,15 +1450,21 @@ internal sealed class CurlCommandRunner(
         TransferDispatch dispatch,
         CommandLineOptions options,
         int index,
-        IReadOnlyList<string?> uploadFiles,
+        IReadOnlyList<UrlGlobMatch?> uploadFiles,
         UrlGlob glob,
         CurlExitCode exitCode)
     {
-        foreach (string? uploadFile in uploadFiles)
+        foreach (UrlGlobMatch? uploadMatch in uploadFiles)
         {
             foreach (UrlGlobMatch match in glob.Expand())
             {
-                UrlTransfer transfer = new(options, index, firstUrlNumberOfGroup + index, nextTransferId++, match, uploadFile, runsOnWindows);
+                if (!UrlTransfer.TryCreate(options, index, firstUrlNumberOfGroup + index, nextTransferId++, match, uploadMatch, runsOnWindows, out UrlTransfer? transfer, out TransferResult? nameFailure))
+                {
+                    await WriteGlobFailureLinesAsync(options, nameFailure).ConfigureAwait(false);
+                    await RecordParallelRunEndAsync(nameFailure).ConfigureAwait(false);
+                    return (nameFailure.ExitCode, true);
+                }
+
                 (exitCode, bool runEnded) = await RunTransferAsync(dispatch, options, transfer, exitCode).ConfigureAwait(false);
                 if (runEnded)
                 {
@@ -1487,7 +1493,7 @@ internal sealed class CurlCommandRunner(
     private static bool TryParseUploadFiles(
         CommandLineOptions options,
         int index,
-        [NotNullWhen(true)] out IReadOnlyList<string?>? uploadFiles,
+        [NotNullWhen(true)] out IReadOnlyList<UrlGlobMatch?>? uploadFiles,
         [NotNullWhen(false)] out TransferResult? failure)
     {
         if (UploadFileOf(options, index) is not { } uploadFile)
@@ -1503,7 +1509,7 @@ internal sealed class CurlCommandRunner(
             return false;
         }
 
-        uploadFiles = [.. glob.ExpandUploadFiles()];
+        uploadFiles = [.. glob.ExpandUploadMatches()];
         return true;
     }
 
@@ -3505,8 +3511,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="transfer">
-    /// The transfer, whose events get curl's <c>-v</c> info line for credentials refused for a control
-    /// character (BL-1411).
+    /// The transfer, whose events get curl's <c>-v</c> info line for every credential failure: credentials
+    /// refused for a control character (BL-1411) and a required netrc file missing or malformed (BL-1447).
     /// </param>
     /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
     /// <param name="failure">The proxy's, the credentials' or the netrc file's failure, when one refuses the transfer.</param>
@@ -3535,7 +3541,7 @@ internal sealed class CurlCommandRunner(
         bool looked = CredentialLookup.TryLookUp(
             options, url, out NetworkCredential? lookedUpCredentials, out failure, EventsBeforeConnecting(transfer).ReportInfo);
         Running.LookedUpCredentials = lookedUpCredentials;
-        if (failure is not null && TransferCredentialLookup.IsControlCodeRefusal(failure))
+        if (failure is not null)
         {
             EventsBeforeConnecting(transfer).ReportInfo(failure.ErrorMessage!);
         }

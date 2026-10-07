@@ -1,5 +1,6 @@
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -14,27 +15,51 @@ public sealed class PoolingConnectorSharedCacheTests
 {
     private readonly ManualTimeProvider _time = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Constructor_WithNullInnerConnector_ThrowsArgumentNullException()
     {
-        var exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => new PoolingConnector(null!, new ConnectionCache(_time), configuration: null));
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("inner connector", "null");
 
+        ArgumentNullException exception;
+        using (diagnostics.Phase("construct"))
+        {
+            exception = Assert.ThrowsExactly<ArgumentNullException>(
+                () => new PoolingConnector(null!, new ConnectionCache(_time), configuration: null));
+        }
+
+        diagnostics.Act("parameter name", exception.ParamName);
+        diagnostics.Assert("parameter name", "innerConnector", exception.ParamName);
         Assert.AreEqual("innerConnector", exception.ParamName);
     }
 
     [TestMethod]
     public void Constructor_WithNullCache_ThrowsArgumentNullException()
     {
-        var exception = Assert.ThrowsExactly<ArgumentNullException>(
-            () => new PoolingConnector(new FakeConnector(), null!, configuration: null));
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("cache", "null");
 
+        ArgumentNullException exception;
+        using (diagnostics.Phase("construct"))
+        {
+            exception = Assert.ThrowsExactly<ArgumentNullException>(
+                () => new PoolingConnector(new FakeConnector(), null!, configuration: null));
+        }
+
+        diagnostics.Act("parameter name", exception.ParamName);
+        diagnostics.Assert("parameter name", "cache", exception.ParamName);
         Assert.AreEqual("cache", exception.ParamName);
     }
 
     [TestMethod]
     public async Task ConnectAsync_InALaterGroupWithAnEqualConfiguration_ReusesTheEarlierGroupsConnection()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("configurations", "settings and an equal copy of it");
         var cache = new ConnectionCache(_time);
         var firstInner = new FakeConnector();
         var laterInner = new FakeConnector();
@@ -43,8 +68,16 @@ public sealed class PoolingConnectorSharedCacheTests
         await ReturnToCacheAsync(first);
         await first.DisposeAsync();
 
-        var reused = await later.ConnectAsync(Target(), CancellationToken.None);
+        ConnectResult reused;
+        using (diagnostics.Phase("later connect"))
+        {
+            reused = await later.ConnectAsync(Target(), CancellationToken.None);
+        }
 
+        diagnostics.Act("reused", reused.IsReused);
+        diagnostics.Act("connection number", reused.ConnectionNumber);
+        diagnostics.Act("later inner targets", laterInner.Targets.Count);
+        diagnostics.Assert("connection number", 0L, reused.ConnectionNumber);
         Assert.IsTrue(reused.IsReused);
         Assert.AreEqual(0L, reused.ConnectionNumber);
         Assert.IsEmpty(laterInner.Targets);
@@ -54,6 +87,8 @@ public sealed class PoolingConnectorSharedCacheTests
     [TestMethod]
     public async Task ConnectAsync_InALaterGroupWithADifferentConfiguration_OpensItsOwnWithTheNextNumber()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("configurations", "verifies the peer versus insecure");
         var cache = new ConnectionCache(_time);
         var firstInner = new FakeConnector();
         var laterInner = new FakeConnector();
@@ -61,8 +96,16 @@ public sealed class PoolingConnectorSharedCacheTests
         var later = new PoolingConnector(laterInner, cache, "insecure");
         await ReturnToCacheAsync(first);
 
-        var opened = await later.ConnectAsync(Target(), CancellationToken.None);
+        ConnectResult opened;
+        using (diagnostics.Phase("later connect"))
+        {
+            opened = await later.ConnectAsync(Target(), CancellationToken.None);
+        }
 
+        diagnostics.Act("reused", opened.IsReused);
+        diagnostics.Act("connection number", opened.ConnectionNumber);
+        diagnostics.Act("later inner targets", laterInner.Targets.Count);
+        diagnostics.Assert("connection number", 1L, opened.ConnectionNumber);
         Assert.IsFalse(opened.IsReused);
         Assert.AreEqual(1L, opened.ConnectionNumber);
         Assert.HasCount(1, laterInner.Targets);
@@ -71,12 +114,21 @@ public sealed class PoolingConnectorSharedCacheTests
     [TestMethod]
     public async Task ConnectAsync_WithAConfigurationAgainstAPoolWithout_OpensItsOwn()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("configurations", "none pooled, settings requested");
         var cache = new ConnectionCache(_time);
         var laterInner = new FakeConnector();
         await ReturnToCacheAsync(new PoolingConnector(new FakeConnector(), cache, configuration: null));
 
-        var opened = await new PoolingConnector(laterInner, cache, "settings").ConnectAsync(Target(), CancellationToken.None);
+        ConnectResult opened;
+        using (diagnostics.Phase("later connect"))
+        {
+            opened = await new PoolingConnector(laterInner, cache, "settings").ConnectAsync(Target(), CancellationToken.None);
+        }
 
+        diagnostics.Act("reused", opened.IsReused);
+        diagnostics.Act("later inner targets", laterInner.Targets.Count);
+        diagnostics.Assert("later inner targets", 1, laterInner.Targets.Count);
         Assert.IsFalse(opened.IsReused);
         Assert.HasCount(1, laterInner.Targets);
     }
@@ -84,14 +136,23 @@ public sealed class PoolingConnectorSharedCacheTests
     [TestMethod]
     public async Task Over_OpensThroughTheGivenConnectorNumberedInTheSamePool()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("waits for multiplexing", true);
         var inner = new FakeConnector();
         var otherInner = new FakeConnector();
         await using var pool = new PoolingConnector(inner, _time) { WaitsForMultiplexing = true };
         var other = pool.Over(otherInner);
 
-        var first = await pool.ConnectAsync(new ConnectTarget("origin.example", 21, false), CancellationToken.None);
-        var second = await other.ConnectAsync(new ConnectTarget("192.0.2.1", 1025, false), CancellationToken.None);
+        ConnectResult first, second;
+        using (diagnostics.Phase("connect through both"))
+        {
+            first = await pool.ConnectAsync(new ConnectTarget("origin.example", 21, false), CancellationToken.None);
+            second = await other.ConnectAsync(new ConnectTarget("192.0.2.1", 1025, false), CancellationToken.None);
+        }
 
+        diagnostics.Act("first connection number", first.ConnectionNumber);
+        diagnostics.Act("second connection number", second.ConnectionNumber);
+        diagnostics.Assert("second connection number", 1L, second.ConnectionNumber);
         Assert.AreEqual(0L, first.ConnectionNumber);
         Assert.AreEqual(1L, second.ConnectionNumber);
         Assert.HasCount(1, inner.Targets);
@@ -102,14 +163,23 @@ public sealed class PoolingConnectorSharedCacheTests
     [TestMethod]
     public async Task Over_ReusesAConnectionItsOwnerPooledAndLeavesTheCacheOpenWhenDisposed()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("target", "http://origin.example:80");
         var inner = new FakeConnector();
         await using var pool = new PoolingConnector(inner, _time);
         var other = pool.Over(new FakeConnector());
         await ReturnToCacheAsync(pool);
 
-        var reused = await other.ConnectAsync(Target(), CancellationToken.None);
-        await other.DisposeAsync();
+        ConnectResult reused;
+        using (diagnostics.Phase("connect over"))
+        {
+            reused = await other.ConnectAsync(Target(), CancellationToken.None);
+            await other.DisposeAsync();
+        }
 
+        diagnostics.Act("reused", reused.IsReused);
+        diagnostics.Act("pooled connection disposed", inner.Opened[0].IsDisposed);
+        diagnostics.Assert("reused", true, reused.IsReused);
         Assert.IsTrue(reused.IsReused);
         Assert.IsFalse(inner.Opened[0].IsDisposed);
     }
@@ -117,37 +187,61 @@ public sealed class PoolingConnectorSharedCacheTests
     [TestMethod]
     public async Task DisposeAsync_OfAConnectorOverAGivenCache_LeavesItsIdleConnectionsOpen()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("target", "http://origin.example:80");
         var cache = new ConnectionCache(_time);
         var inner = new FakeConnector();
         var connector = new PoolingConnector(inner, cache, configuration: null);
         await ReturnToCacheAsync(connector);
 
-        await connector.DisposeAsync();
+        using (diagnostics.Phase("dispose connector"))
+        {
+            await connector.DisposeAsync();
+        }
 
+        diagnostics.Act("idle connection disposed", inner.Opened[0].IsDisposed);
+        diagnostics.Assert("idle connection disposed", false, inner.Opened[0].IsDisposed);
         Assert.IsFalse(inner.Opened[0].IsDisposed);
     }
 
     [TestMethod]
     public async Task NumberingDatagrams_WithNullConnector_ThrowsArgumentNullException()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("datagram connector", "null");
         await using var pool = new PoolingConnector(new FakeConnector(), _time);
 
-        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => pool.NumberingDatagrams(null!));
+        ArgumentNullException exception;
+        using (diagnostics.Phase("number datagrams"))
+        {
+            exception = Assert.ThrowsExactly<ArgumentNullException>(() => pool.NumberingDatagrams(null!));
+        }
 
+        diagnostics.Act("parameter name", exception.ParamName);
+        diagnostics.Assert("parameter name", "datagramConnector", exception.ParamName);
         Assert.AreEqual("datagramConnector", exception.ParamName);
     }
 
     [TestMethod]
     public async Task NumberingDatagrams_AfterATcpConnection_NumbersEachOpenNextInThePool()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("datagram endpoint", "tftp.example:69");
         await using var pool = new PoolingConnector(new FakeConnector(), _time);
         var channel = new UnusedChannel();
         var datagrams = pool.NumberingDatagrams(new FixedDatagramConnector(DatagramOpenResult.Opened(channel)));
         await ReturnToCacheAsync(pool);
 
-        var first = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
-        var second = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
+        DatagramOpenResult first, second;
+        using (diagnostics.Phase("open twice"))
+        {
+            first = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
+            second = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
+        }
 
+        diagnostics.Act("first connection number", first.ConnectionNumber);
+        diagnostics.Act("second connection number", second.ConnectionNumber);
+        diagnostics.Assert("second connection number", 2L, second.ConnectionNumber);
         Assert.AreSame(channel, first.Channel);
         Assert.AreEqual(1L, first.ConnectionNumber);
         Assert.AreEqual(2L, second.ConnectionNumber);
@@ -156,12 +250,23 @@ public sealed class PoolingConnectorSharedCacheTests
     [TestMethod]
     public async Task NumberingDatagrams_WhenTheOpenFails_NumbersTheFailureAndTheNextTcpConnectionAfterIt()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("failure", "Could not resolve host: tftp.example");
         await using var pool = new PoolingConnector(new FakeConnector(), _time);
         var datagrams = pool.NumberingDatagrams(new FixedDatagramConnector(DatagramOpenResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: tftp.example")));
 
-        var failed = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
-        var connected = await pool.ConnectAsync(Target(), CancellationToken.None);
+        DatagramOpenResult failed;
+        ConnectResult connected;
+        using (diagnostics.Phase("open then connect"))
+        {
+            failed = await datagrams.OpenAsync("tftp.example", 69, CancellationToken.None);
+            connected = await pool.ConnectAsync(Target(), CancellationToken.None);
+        }
 
+        diagnostics.Act("failed exit code", failed.ExitCode);
+        diagnostics.Act("failed connection number", failed.ConnectionNumber);
+        diagnostics.Act("connected connection number", connected.ConnectionNumber);
+        diagnostics.Assert("failed error message", "Could not resolve host: tftp.example", failed.ErrorMessage);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, failed.ExitCode);
         Assert.AreEqual("Could not resolve host: tftp.example", failed.ErrorMessage);
         Assert.AreEqual(0L, failed.ConnectionNumber);
@@ -171,12 +276,22 @@ public sealed class PoolingConnectorSharedCacheTests
     [TestMethod]
     public async Task ConnectionNumbers_AfterATcpConnection_GivesTheNextNumberAndTheNextConnectionTheOneAfter()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("next target", "http://other.example:80");
         await using var pool = new PoolingConnector(new FakeConnector(), _time);
         await ReturnToCacheAsync(pool);
 
-        long fileTransferNumber = pool.ConnectionNumbers.NumberNextConnection();
-        var connected = await pool.ConnectAsync(new ConnectTarget("other.example", 80, false) { PoolScheme = "http" }, CancellationToken.None);
+        long fileTransferNumber;
+        ConnectResult connected;
+        using (diagnostics.Phase("number then connect"))
+        {
+            fileTransferNumber = pool.ConnectionNumbers.NumberNextConnection();
+            connected = await pool.ConnectAsync(new ConnectTarget("other.example", 80, false) { PoolScheme = "http" }, CancellationToken.None);
+        }
 
+        diagnostics.Act("file transfer number", fileTransferNumber);
+        diagnostics.Act("connected connection number", connected.ConnectionNumber);
+        diagnostics.Assert("connected connection number", 2L, connected.ConnectionNumber);
         Assert.AreEqual(1L, fileTransferNumber);
         Assert.AreEqual(2L, connected.ConnectionNumber);
     }

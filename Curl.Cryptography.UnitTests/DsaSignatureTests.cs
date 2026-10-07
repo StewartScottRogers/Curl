@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -53,6 +54,9 @@ public sealed class DsaSignatureTests
         + "5126E9B8BF21E8358EE0E0A30EF13FD6A664C0DCE3731F7FB49A4845A4FD8254687972A2D382599C9BAC4E0ED7998193078913032558134976410B89D2C171D1"
         + "23AC35FD977219597AA7D15C1A9A428E59194F75C721EBCBCFAE44696A499AFA74E04299F132026601638CB87AB79190D4A0986315DA8EEC6561C938996BEADF";
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("SHA1", "sample", "2E1A0C2562B2912CAAF89186FB0F42001585DA55", "29EFB6B0AFF2D7A68EB70CA313022253B9A88DF5")]
     [DataRow("SHA224", "sample", "4BC3B686AEA70145856814A6F1BB53346F02101E", "410697B92295D994D21EDD2F4ADA85566F6F94C1")]
@@ -65,7 +69,7 @@ public sealed class DsaSignatureTests
     [DataRow("SHA384", "test", "854CF929B58D73C3CBFDC421E8D5430CD6DB5E66", "91D0E0F53E22F898D158380676A871A157CDA622")]
     [DataRow("SHA512", "test", "8EA47E475BA8AC6F2D821DA3BD212D11A3DEB9A0", "7C670C7AD72B6C050C109E1790008097125433E8")]
     public void SignHash_Rfc6979Dsa1024_GivesPublishedSignature(string hashName, string message, string r, string s) =>
-        AssertRfc6979Signature(Prime1024, Subprime1024, Generator1024, PrivateKey1024, PublicKey1024, hashName, message, r + s);
+        AssertRfc6979Signature("RFC 6979 appendix A.2.1 (DSA, 1024 bits)", Prime1024, Subprime1024, Generator1024, PrivateKey1024, PublicKey1024, hashName, message, r + s);
 
     [TestMethod]
     [DataRow("SHA1", "sample", "3A1B2DBD7489D6ED7E608FD036C83AF396E290DBD602408E8677DAABD6E7445A", "D26FCBA19FA3E3058FFC02CA1596CDBB6E0D20CB37B06054F7E36DED0CDBBCCF")]
@@ -79,7 +83,7 @@ public sealed class DsaSignatureTests
     [DataRow("SHA384", "test", "239E66DDBE8F8C230A3D071D601B6FFBDFB5901F94D444C6AF56F732BEB954BE", "6BD737513D5E72FE85D1C750E0F73921FE299B945AAD1C802F15C26A43D34961")]
     [DataRow("SHA512", "test", "89EC4BB1400ECCFF8E7D9AA515CD1DE7803F2DAFF09693EE7FD1353E90A68307", "C9F0BDABCC0D880BB137A994CC7F3980CE91CC10FAF529FC46565B15CEA854E1")]
     public void SignHash_Rfc6979Dsa2048_GivesPublishedSignature(string hashName, string message, string r, string s) =>
-        AssertRfc6979Signature(Prime2048, Subprime2048, Generator2048, PrivateKey2048, PublicKey2048, hashName, message, r + s);
+        AssertRfc6979Signature("RFC 6979 appendix A.2.2 (DSA, 2048 bits)", Prime2048, Subprime2048, Generator2048, PrivateKey2048, PublicKey2048, hashName, message, r + s);
 
     [TestMethod]
     [DataRow("L=1024, N=160, SHA-1", "SHA1")]
@@ -88,30 +92,59 @@ public sealed class DsaSignatureTests
     [DataRow("L=3072, N=256, SHA-256", "SHA256")]
     public void VerifyHash_CavpSigVer_GivesPublishedResult(string group, string hashName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "NIST CAVP FIPS 186-4 DSA SigVer.rsp, KnownAnswers/dsa-sigver-fips-186-4.txt");
+        diagnostics.Arrange("group", group);
+        diagnostics.Arrange("hash", hashName);
         List<Dictionary<string, string>> vectors = ReadSigVerGroup(group);
+        diagnostics.Act("vectors read", vectors.Count);
+        diagnostics.Assert("vectors read", 15, vectors.Count);
         Assert.HasCount(15, vectors);
-        foreach (Dictionary<string, string> vector in vectors)
+        int passing = 0;
+        using (diagnostics.Phase("verify"))
         {
-            byte[] hash = Hash(hashName, Convert.FromHexString(vector["Msg"]));
-            byte[] signature = Convert.FromHexString(vector["R"] + vector["S"]);
-            bool valid = DsaSignature.VerifyHash(
-                Convert.FromHexString(vector["P"]),
-                Convert.FromHexString(vector["Q"]),
-                Convert.FromHexString(vector["G"]),
-                Convert.FromHexString(vector["Y"]),
-                hash,
-                signature);
-            Assert.AreEqual(vector["Result"].StartsWith('P'), valid, $"{group}: Msg = {vector["Msg"][..16]}..., Result = {vector["Result"]}");
+            foreach (Dictionary<string, string> vector in vectors)
+            {
+                byte[] hash = Hash(hashName, Convert.FromHexString(vector["Msg"]));
+                byte[] signature = Convert.FromHexString(vector["R"] + vector["S"]);
+                bool valid = DsaSignature.VerifyHash(
+                    Convert.FromHexString(vector["P"]),
+                    Convert.FromHexString(vector["Q"]),
+                    Convert.FromHexString(vector["G"]),
+                    Convert.FromHexString(vector["Y"]),
+                    hash,
+                    signature);
+                bool expected = vector["Result"].StartsWith('P');
+                if (valid != expected)
+                {
+                    diagnostics.Bytes("message", Convert.FromHexString(vector["Msg"]));
+                    diagnostics.Bytes("signature", signature);
+                    diagnostics.Assert($"valid, Result = {vector["Result"]}", expected, valid);
+                }
+
+                passing += valid ? 1 : 0;
+                Assert.AreEqual(expected, valid, $"{group}: Msg = {vector["Msg"][..16]}..., Result = {vector["Result"]}");
+            }
         }
+
+        diagnostics.Act("signatures valid", passing);
     }
 
     [TestMethod]
     public void VerifyHash_FlippedBitInHash_ReturnsFalse()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         (byte[] hash, byte[] signature) = SignSample1024();
         hash[^1] ^= 1;
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1, SHA-1, \"sample\", last hash bit flipped");
+        diagnostics.Bytes("hash", hash);
+        diagnostics.Bytes("signature", signature);
 
-        Assert.IsFalse(Verify1024(PublicKey1024, hash, signature));
+        bool valid = Verify1024(PublicKey1024, hash, signature);
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", false, valid);
+        Assert.IsFalse(valid);
     }
 
     [TestMethod]
@@ -122,10 +155,19 @@ public sealed class DsaSignatureTests
     [DataRow(20, Subprime1024, DisplayName = "s = q")]
     public void VerifyHash_ROrSOutsideOneToQMinusOne_ReturnsFalse(int offset, string value)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         (byte[] hash, byte[] signature) = SignSample1024();
         Convert.FromHexString(value).CopyTo(signature, offset);
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1, SHA-1, \"sample\"");
+        diagnostics.Arrange("replaced", offset == 0 ? "r" : "s");
+        diagnostics.Bytes("hash", hash);
+        diagnostics.Bytes("signature", signature);
 
-        Assert.IsFalse(Verify1024(PublicKey1024, hash, signature));
+        bool valid = Verify1024(PublicKey1024, hash, signature);
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", false, valid);
+        Assert.IsFalse(valid);
     }
 
     [TestMethod]
@@ -133,19 +175,35 @@ public sealed class DsaSignatureTests
     [DataRow(41)]
     public void VerifyHash_SignatureOfWrongLength_ReturnsFalse(int length)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         (byte[] hash, byte[] signature) = SignSample1024();
         byte[] resized = new byte[length];
         signature.AsSpan(0, Math.Min(length, signature.Length)).CopyTo(resized);
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1, SHA-1, \"sample\"");
+        diagnostics.Arrange("signature length", length);
+        diagnostics.Bytes("signature", resized);
 
-        Assert.IsFalse(Verify1024(PublicKey1024, hash, resized));
+        bool valid = Verify1024(PublicKey1024, hash, resized);
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", false, valid);
+        Assert.IsFalse(valid);
     }
 
     [TestMethod]
     public void VerifyHash_PublicKeyWithLeadingZeroBytes_ReturnsTrue()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         (byte[] hash, byte[] signature) = SignSample1024();
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1, SHA-1, \"sample\"");
+        diagnostics.Bytes("public key y", Convert.FromHexString("0000" + PublicKey1024));
+        diagnostics.Bytes("signature", signature);
 
-        Assert.IsTrue(Verify1024("0000" + PublicKey1024, hash, signature));
+        bool valid = Verify1024("0000" + PublicKey1024, hash, signature);
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", true, valid);
+        Assert.IsTrue(valid);
     }
 
     [TestMethod]
@@ -153,9 +211,16 @@ public sealed class DsaSignatureTests
     [DataRow("01" + Prime1024, DisplayName = "y longer than p")]
     public void VerifyHash_PublicKeyNotBelowPrime_ReturnsFalse(string publicKey)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         (byte[] hash, byte[] signature) = SignSample1024();
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1, SHA-1, \"sample\"");
+        diagnostics.Bytes("public key y", Convert.FromHexString(publicKey));
 
-        Assert.IsFalse(Verify1024(publicKey, hash, signature));
+        bool valid = Verify1024(publicKey, hash, signature);
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", false, valid);
+        Assert.IsFalse(valid);
     }
 
     [TestMethod]
@@ -171,47 +236,83 @@ public sealed class DsaSignatureTests
     [DataRow(Prime1024, Subprime1024, "01" + Prime1024, DisplayName = "g longer than p")]
     public void VerifyHash_DomainParametersOutsideAcceptedRange_ReturnsFalse(string prime, string subprime, string generator)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         (byte[] hash, byte[] signature) = SignSample1024();
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1, SHA-1, \"sample\", domain parameters altered");
+        diagnostics.Bytes("prime p", Convert.FromHexString(prime));
+        diagnostics.Bytes("subprime q", Convert.FromHexString(subprime));
+        diagnostics.Bytes("generator g", Convert.FromHexString(generator));
 
-        Assert.IsFalse(DsaSignature.VerifyHash(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(PublicKey1024), hash, signature));
-        Assert.ThrowsExactly<ArgumentException>(() => new DsaSignature(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(PrivateKey1024)));
+        bool valid = DsaSignature.VerifyHash(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(PublicKey1024), hash, signature);
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", false, valid);
+        Assert.IsFalse(valid);
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new DsaSignature(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(PrivateKey1024)));
+        diagnostics.Act("constructor exception", exception.GetType().Name);
+        diagnostics.Assert("constructor exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void VerifyHash_PrimeLongerThanTenThousandBits_ReturnsFalse()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] prime = new byte[1251];
         prime[0] = 0x80;
         prime[^1] = 0x01;
+        diagnostics.Arrange("prime bits", prime.Length * 8);
 
-        Assert.IsFalse(DsaSignature.VerifyHash(prime, Convert.FromHexString(Subprime1024), [2], [2], new byte[20], new byte[40]));
+        bool valid = DsaSignature.VerifyHash(prime, Convert.FromHexString(Subprime1024), [2], [2], new byte[20], new byte[40]);
+        diagnostics.Act("valid", valid);
+
+        diagnostics.Assert("valid", false, valid);
+        Assert.IsFalse(valid);
     }
 
     [TestMethod]
     [DataRow("00", DisplayName = "x = 0")]
     [DataRow(Subprime1024, DisplayName = "x = q")]
     [DataRow("01" + PrivateKey1024, DisplayName = "x longer than q")]
-    public void Constructor_PrivateKeyOutsideOneToQMinusOne_ThrowsArgumentException(string privateKey) =>
-        Assert.ThrowsExactly<ArgumentException>(() => new DsaSignature(Convert.FromHexString(Prime1024), Convert.FromHexString(Subprime1024), Convert.FromHexString(Generator1024), Convert.FromHexString(privateKey)));
+    public void Constructor_PrivateKeyOutsideOneToQMinusOne_ThrowsArgumentException(string privateKey)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("domain", "RFC 6979 appendix A.2.1 (DSA, 1024 bits)");
+        diagnostics.Bytes("private key x", Convert.FromHexString(privateKey));
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new DsaSignature(Convert.FromHexString(Prime1024), Convert.FromHexString(Subprime1024), Convert.FromHexString(Generator1024), Convert.FromHexString(privateKey)));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
+    }
 
     [TestMethod]
     public void SignHash_PrivateKeyAsMpintWithLeadingZero_GivesSameSignature()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] hash = SHA1.HashData(Encoding.ASCII.GetBytes("sample"));
         using DsaSignature key = new(Convert.FromHexString("00" + Prime1024), Convert.FromHexString("00" + Subprime1024), Convert.FromHexString(Generator1024), Convert.FromHexString("00" + PrivateKey1024));
         byte[] signature = new byte[key.SignatureLength];
+        diagnostics.Arrange("vector source", "RFC 6979 appendix A.2.1, SHA-1, \"sample\", p, q and x with a leading zero byte");
+        diagnostics.Bytes("hash", hash);
 
         key.SignHash(hash, HashAlgorithmName.SHA1, signature);
+        diagnostics.Act("signature", Convert.ToHexString(signature));
 
+        diagnostics.Diff("signature", Convert.FromHexString("2E1A0C2562B2912CAAF89186FB0F42001585DA5529EFB6B0AFF2D7A68EB70CA313022253B9A88DF5"), signature);
         Assert.AreEqual("2E1A0C2562B2912CAAF89186FB0F42001585DA5529EFB6B0AFF2D7A68EB70CA313022253B9A88DF5", Convert.ToHexString(signature));
     }
 
     [TestMethod]
     public void SignHash_UnsupportedHashAlgorithm_ThrowsArgumentException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using DsaSignature key = CreateKey1024();
+        diagnostics.Arrange("hash", HashAlgorithmName.MD5.Name);
 
-        Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[16], HashAlgorithmName.MD5, new byte[40]));
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[16], HashAlgorithmName.MD5, new byte[40]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -219,41 +320,81 @@ public sealed class DsaSignatureTests
     [DataRow(20, 39)]
     public void SignHash_WrongLength_ThrowsArgumentException(int hashLength, int destinationLength)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using DsaSignature key = CreateKey1024();
+        diagnostics.Arrange("hash length", hashLength);
+        diagnostics.Arrange("destination length", destinationLength);
 
-        Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[hashLength], HashAlgorithmName.SHA1, new byte[destinationLength]));
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[hashLength], HashAlgorithmName.SHA1, new byte[destinationLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void Dispose_ThenSignHash_ThrowsObjectDisposedException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         DsaSignature key = CreateKey1024();
+        diagnostics.Arrange("domain", "RFC 6979 appendix A.2.1 (DSA, 1024 bits)");
 
         key.Dispose();
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => key.SignHash(new byte[20], HashAlgorithmName.SHA1, new byte[40]));
+        ObjectDisposedException exception = Assert.ThrowsExactly<ObjectDisposedException>(() => key.SignHash(new byte[20], HashAlgorithmName.SHA1, new byte[40]));
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ObjectDisposedException), exception.GetType().Name);
     }
 
     [TestMethod]
     [DataRow("SHA224", "23097D223405D8228642A477BDA255B32AADBCE4BDA0B3F7E36C9DA7", DisplayName = "SHA-224, FIPS 180-2 appendix B")]
     [DataRow("SHA256", "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD", DisplayName = "SHA-256, FIPS 180-2 appendix B")]
-    public void HashData_Abc_GivesPublishedDigest(string hashName, string expected) =>
-        Assert.AreEqual(expected, Convert.ToHexString(DsaSignature.HashData("abc"u8, new HashAlgorithmName(hashName))));
+    public void HashData_Abc_GivesPublishedDigest(string hashName, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "FIPS 180-2 appendix B");
+        diagnostics.Arrange("hash", hashName);
+        diagnostics.Arrange("message", "abc");
+
+        byte[] digest = DsaSignature.HashData("abc"u8, new HashAlgorithmName(hashName));
+        diagnostics.Act("digest", Convert.ToHexString(digest));
+
+        diagnostics.Diff("digest", Convert.FromHexString(expected), digest);
+        Assert.AreEqual(expected, Convert.ToHexString(digest));
+    }
 
     [TestMethod]
-    public void HashData_HashDsaDoesNotUse_Throws() =>
-        Assert.ThrowsExactly<ArgumentException>(() => DsaSignature.HashData("abc"u8, HashAlgorithmName.MD5));
-
-    private static void AssertRfc6979Signature(string prime, string subprime, string generator, string privateKey, string publicKey, string hashName, string message, string expected)
+    public void HashData_HashDsaDoesNotUse_Throws()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("hash", HashAlgorithmName.MD5.Name);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => DsaSignature.HashData("abc"u8, HashAlgorithmName.MD5));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
+    }
+
+    private void AssertRfc6979Signature(string source, string prime, string subprime, string generator, string privateKey, string publicKey, string hashName, string message, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] hash = Hash(hashName, Encoding.ASCII.GetBytes(message));
         using DsaSignature key = new(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(privateKey));
         byte[] signature = new byte[key.SignatureLength];
+        diagnostics.Arrange("vector source", source);
+        diagnostics.Arrange("hash", hashName);
+        diagnostics.Arrange("message", message);
+        diagnostics.Bytes("private key x", Convert.FromHexString(privateKey));
+        diagnostics.Bytes("hash", hash);
 
         key.SignHash(hash, new HashAlgorithmName(hashName), signature);
+        bool valid = DsaSignature.VerifyHash(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(publicKey), hash, signature);
+        diagnostics.Act("signature", Convert.ToHexString(signature));
+        diagnostics.Act("verifies", valid);
 
+        diagnostics.Diff("signature", Convert.FromHexString(expected), signature);
+        diagnostics.Assert("verifies", true, valid);
         Assert.AreEqual(expected, Convert.ToHexString(signature));
-        Assert.IsTrue(DsaSignature.VerifyHash(Convert.FromHexString(prime), Convert.FromHexString(subprime), Convert.FromHexString(generator), Convert.FromHexString(publicKey), hash, signature));
+        Assert.IsTrue(valid);
     }
 
     private static DsaSignature CreateKey1024() =>

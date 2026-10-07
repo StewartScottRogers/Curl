@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Core;
@@ -20,6 +21,10 @@ public sealed class RedirectFollowerTests
 
     private static readonly BytesBody PostBody = new(new byte[] { (byte)'x', (byte)'=', (byte)'1' }, "application/x-www-form-urlencoded");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task FollowAsync_WithoutLocation_ReturnsDispatcherResultUnchanged()
     {
@@ -28,7 +33,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(new HttpRequestOptions()));
 
+        Diagnostics.Assert("result is the same instance", true, ReferenceEquals(redirect, result));
         Assert.AreSame(redirect, result);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
     }
 
@@ -40,6 +47,7 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, new TransferContext { Url = CurlUrl.Parse(First), Output = Stream.Null });
 
+        Diagnostics.Assert("result is the same instance", true, ReferenceEquals(redirect, result));
         Assert.AreSame(redirect, result);
     }
 
@@ -48,8 +56,15 @@ public sealed class RedirectFollowerTests
     {
         RedirectFollower follower = new(new ProtocolDispatcher([]));
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await follower.FollowAsync(null!, new RedirectPolicy()));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await follower.FollowAsync(Context(Location()), null!));
+        Diagnostics.Arrange("calls", "FollowAsync(null, policy), FollowAsync(context, null)");
+
+        ArgumentNullException nullContext = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await follower.FollowAsync(null!, new RedirectPolicy()));
+        ArgumentNullException nullPolicy = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await follower.FollowAsync(Context(Location()), null!));
+
+        Diagnostics.Act("null context exception parameter", nullContext.ParamName);
+        Diagnostics.Act("null policy exception parameter", nullPolicy.ParamName);
+        Diagnostics.Assert("null context exception", nameof(ArgumentNullException), nullContext.GetType().Name);
+        Diagnostics.Assert("null policy exception", nameof(ArgumentNullException), nullPolicy.GetType().Name);
     }
 
     [TestMethod]
@@ -62,13 +77,19 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("result.BytesTransferred", 5, result.BytesTransferred);
         Assert.AreEqual(5, result.BytesTransferred);
+        Diagnostics.Assert("handler.Contexts.Select(context => context.Url.OriginalString).ToArray()", string.Join(", ", new[] { First, "http://127.0.0.1:18203/b", Next }), string.Join(", ", handler.Contexts.Select(context => context.Url.OriginalString).ToArray()));
         CollectionAssert.AreEqual(
             new[] { First, "http://127.0.0.1:18203/b", Next },
             handler.Contexts.Select(context => context.Url.OriginalString).ToArray());
+        Diagnostics.Assert("result.Report!.RedirectCount", 2, result.Report!.RedirectCount);
         Assert.AreEqual(2, result.Report!.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", Next, result.Report.EffectiveUrl);
         Assert.AreEqual(Next, result.Report.EffectiveUrl);
+        Diagnostics.Assert("result.Report.ResponseCode", 200, result.Report.ResponseCode);
         Assert.AreEqual(200, result.Report.ResponseCode);
     }
 
@@ -84,9 +105,11 @@ public sealed class RedirectFollowerTests
         TransferResult result = await Follow(
             handler, Context(Location() with { AutoReferer = true, Referer = "http://r/" }, url: "http://u:p@127.0.0.1:18203/a?q=1#f"));
 
+        Diagnostics.Assert("handler.Contexts.Select(context => context.Http!.Referer).ToArray()", string.Join(", ", new[] { "http://r/", "http://127.0.0.1:18203/a?q=1", "https://h.example/b" }), string.Join(", ", handler.Contexts.Select(context => context.Http!.Referer).ToArray()));
         CollectionAssert.AreEqual(
             new[] { "http://r/", "http://127.0.0.1:18203/a?q=1", "https://h.example/b" },
             handler.Contexts.Select(context => context.Http!.Referer).ToArray());
+        Diagnostics.Assert("result.Report!.Referer", "https://h.example/b", result.Report!.Referer);
         Assert.AreEqual("https://h.example/b", result.Report!.Referer);
     }
 
@@ -97,9 +120,11 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location() with { Referer = "http://r/" }));
 
+        Diagnostics.Assert("handler.Contexts.Select(context => context.Http!.Referer).ToArray()", string.Join(", ", new[] { "http://r/", "http://r/" }), string.Join(", ", handler.Contexts.Select(context => context.Http!.Referer).ToArray()));
         CollectionAssert.AreEqual(
             new[] { "http://r/", "http://r/" },
             handler.Contexts.Select(context => context.Http!.Referer).ToArray());
+        Diagnostics.Assert("result.Report!.Referer", "http://r/", result.Report!.Referer);
         Assert.AreEqual("http://r/", result.Report!.Referer);
     }
 
@@ -111,7 +136,9 @@ public sealed class RedirectFollowerTests
         TransferResult result = await Follow(
             handler, Context(Location() with { AutoReferer = true }), new RedirectPolicy { MaxRedirects = 1 });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Diagnostics.Assert("result.Report!.Referer", First, result.Report!.Referer);
         Assert.AreEqual(First, result.Report!.Referer);
     }
 
@@ -122,7 +149,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.Report!.RedirectCount", 0, result.Report!.RedirectCount);
         Assert.AreEqual(0, result.Report!.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", null, result.Report.EffectiveUrl);
         Assert.IsNull(result.Report.EffectiveUrl);
     }
 
@@ -138,9 +167,13 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = maxRedirects });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", $"Maximum ({maxRedirects}) redirects followed", result.ErrorMessage);
         Assert.AreEqual($"Maximum ({maxRedirects}) redirects followed", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", requests, handler.Contexts.Count());
         Assert.HasCount(requests, handler.Contexts);
+        Diagnostics.Assert("result.Report!.RedirectCount", maxRedirects, result.Report!.RedirectCount);
         Assert.AreEqual(maxRedirects, result.Report!.RedirectCount);
     }
 
@@ -151,8 +184,11 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "Maximum (50) redirects followed", result.ErrorMessage);
         Assert.AreEqual("Maximum (50) redirects followed", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 51, handler.Contexts.Count());
         Assert.HasCount(51, handler.Contexts);
     }
 
@@ -165,8 +201,11 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("handler.Contexts[0].Http!.RedirectsFollowed", 0, handler.Contexts[0].Http!.RedirectsFollowed);
         Assert.AreEqual(0, handler.Contexts[0].Http!.RedirectsFollowed);
+        Diagnostics.Assert("handler.Contexts[1].Http!.RedirectsFollowed", 3, handler.Contexts[1].Http!.RedirectsFollowed);
         Assert.AreEqual(3, handler.Contexts[1].Http!.RedirectsFollowed);
+        Diagnostics.Assert("result.Report!.RedirectCount", 3, result.Report!.RedirectCount);
         Assert.AreEqual(3, result.Report!.RedirectCount);
     }
 
@@ -178,9 +217,13 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 3 });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "Maximum (3) redirects followed", result.ErrorMessage);
         Assert.AreEqual("Maximum (3) redirects followed", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
+        Diagnostics.Assert("result.Report!.RedirectCount", 3, result.Report!.RedirectCount);
         Assert.AreEqual(3, result.Report!.RedirectCount);
     }
 
@@ -192,7 +235,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = -1 });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("result.Report!.RedirectCount", 60, result.Report!.RedirectCount);
         Assert.AreEqual(60, result.Report!.RedirectCount);
     }
 
@@ -204,6 +249,7 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 0 });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
     }
 
@@ -219,7 +265,9 @@ public sealed class RedirectFollowerTests
         await Follow(handler, Context(Location() with { Body = PostBody }, postData: true));
 
         ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Http!.Body", null, second.Http!.Body);
         Assert.IsNull(second.Http!.Body);
+        Diagnostics.Assert("second.PostData", null, second.PostData);
         Assert.IsNull(second.PostData);
     }
 
@@ -241,7 +289,9 @@ public sealed class RedirectFollowerTests
         await Follow(handler, Context(Location() with { Body = PostBody }, postData: true), policy);
 
         ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Http!.Body is the same instance", true, ReferenceEquals(PostBody, second.Http!.Body));
         Assert.AreSame(PostBody, second.Http!.Body);
+        Diagnostics.Assert("second.PostData is not null", true, second.PostData is not null);
         Assert.IsNotNull(second.PostData);
     }
 
@@ -261,6 +311,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location() with { Body = PostBody }), policy);
 
+        Diagnostics.Assert("handler.Contexts[1].Http!.Body", null, handler.Contexts[1].Http!.Body);
         Assert.IsNull(handler.Contexts[1].Http!.Body);
     }
 
@@ -274,6 +325,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location() with { Body = PostBody }));
 
+        Diagnostics.Assert("handler.Contexts[1].Http!.Body is the same instance", true, ReferenceEquals(PostBody, handler.Contexts[1].Http!.Body));
         Assert.AreSame(PostBody, handler.Contexts[1].Http!.Body);
     }
 
@@ -289,8 +341,11 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location() with { Body = body }));
 
+        Diagnostics.Assert("handler.StreamBodies count", 2, handler.StreamBodies.Count());
         Assert.HasCount(2, handler.StreamBodies);
+        Diagnostics.Assert("handler.StreamBodies[0]", string.Join(", ", new byte[] { 1, 2, 3 }), string.Join(", ", handler.StreamBodies[0]));
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.StreamBodies[0]);
+        Diagnostics.Assert("handler.StreamBodies[1]", string.Join(", ", new byte[] { 1, 2, 3 }), string.Join(", ", handler.StreamBodies[1]));
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.StreamBodies[1]);
     }
 
@@ -326,6 +381,7 @@ public sealed class RedirectFollowerTests
     {
         TransferResult result = await FollowNonSeekableBody(307, runsOnWindows: null);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
     }
 
@@ -335,6 +391,7 @@ public sealed class RedirectFollowerTests
     {
         TransferResult result = await FollowNonSeekableBody(307, runsOnWindows: null);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SendFailRewind, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
     }
 
@@ -346,8 +403,11 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location() with { Body = body }));
 
+        Diagnostics.Assert("result.IsSuccess", true, result.IsSuccess);
         Assert.IsTrue(result.IsSuccess);
+        Diagnostics.Assert("handler.Contexts count", 2, handler.Contexts.Count());
         Assert.HasCount(2, handler.Contexts);
+        Diagnostics.Assert("handler.Contexts[1].Http!.Body", null, handler.Contexts[1].Http!.Body);
         Assert.IsNull(handler.Contexts[1].Http!.Body);
     }
 
@@ -359,8 +419,11 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location() with { Body = new StreamBody(content, 3, "multipart/form-data; boundary=b") }));
 
+        Diagnostics.Assert("handler.StreamBodies count", 1, handler.StreamBodies.Count());
         Assert.HasCount(1, handler.StreamBodies);
+        Diagnostics.Assert("handler.Contexts[1].Http!.Body", null, handler.Contexts[1].Http!.Body);
         Assert.IsNull(handler.Contexts[1].Http!.Body);
+        Diagnostics.Assert("content.Position", 3L, content.Position);
         Assert.AreEqual(3L, content.Position);
     }
 
@@ -373,7 +436,9 @@ public sealed class RedirectFollowerTests
         await Follow(handler, Context(Location() with { CustomMethod = "POST", Body = PostBody }));
 
         HttpRequestOptions second = handler.Contexts[1].Http!;
+        Diagnostics.Assert("second.CustomMethod", "POST", second.CustomMethod);
         Assert.AreEqual("POST", second.CustomMethod);
+        Diagnostics.Assert("second.Body", null, second.Body);
         Assert.IsNull(second.Body);
     }
 
@@ -401,8 +466,11 @@ public sealed class RedirectFollowerTests
             new RedirectPolicy { DropsCustomMethodOnSwitchToGet = follow });
 
         ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Http!.CustomMethod", method, second.Http!.CustomMethod);
         Assert.AreEqual(method, second.Http!.CustomMethod);
+        Diagnostics.Assert("second.Http.Body is not null", keepsBody, second.Http.Body is not null);
         Assert.AreEqual(keepsBody, second.Http.Body is not null);
+        Diagnostics.Assert("second.PostData is not null", keepsBody, second.PostData is not null);
         Assert.AreEqual(keepsBody, second.PostData is not null);
     }
 
@@ -424,6 +492,7 @@ public sealed class RedirectFollowerTests
             Context(Location() with { CustomMethod = "DELETE" }),
             new RedirectPolicy { DropsCustomMethodOnSwitchToGet = follow });
 
+        Diagnostics.Assert("handler.Contexts[1].Http!.CustomMethod", method, handler.Contexts[1].Http!.CustomMethod);
         Assert.AreEqual(method, handler.Contexts[1].Http!.CustomMethod);
     }
 
@@ -438,6 +507,7 @@ public sealed class RedirectFollowerTests
             Context(Location() with { CustomMethod = "DELETE" }),
             new RedirectPolicy { DropsCustomMethodOnSwitchToGet = true, KeepPostOn303 = true });
 
+        Diagnostics.Assert("handler.Contexts[1].Http!.CustomMethod", null, handler.Contexts[1].Http!.CustomMethod);
         Assert.IsNull(handler.Contexts[1].Http!.CustomMethod);
     }
 
@@ -460,7 +530,9 @@ public sealed class RedirectFollowerTests
         await Follow(handler, Context(Location() with { CustomMethod = "PUT", Body = PostBody }), policy);
 
         HttpRequestOptions second = handler.Contexts[1].Http!;
+        Diagnostics.Assert("second.CustomMethod", "PUT", second.CustomMethod);
         Assert.AreEqual("PUT", second.CustomMethod);
+        Diagnostics.Assert("second.Body is the same instance", true, ReferenceEquals(PostBody, second.Body));
         Assert.AreSame(PostBody, second.Body);
     }
 
@@ -478,7 +550,9 @@ public sealed class RedirectFollowerTests
             new RedirectPolicy { DropsCustomMethodOnSwitchToGet = true });
 
         ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Http!.CustomMethod", method, second.Http!.CustomMethod);
         Assert.AreEqual(method, second.Http!.CustomMethod);
+        Diagnostics.Assert("second.Upload is not null", keepsUpload, second.Upload is not null);
         Assert.AreEqual(keepsUpload, second.Upload is not null);
     }
 
@@ -492,6 +566,7 @@ public sealed class RedirectFollowerTests
             Context(Location() with { CustomMethod = "PUT", Body = PostBody }),
             new RedirectPolicy { DropsCustomMethodOnSwitchToGet = true });
 
+        Diagnostics.Assert("handler.Contexts[2].Http!.CustomMethod", null, handler.Contexts[2].Http!.CustomMethod);
         Assert.IsNull(handler.Contexts[2].Http!.CustomMethod);
     }
 
@@ -502,6 +577,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location() with { Body = PostBody }));
 
+        Diagnostics.Assert("handler.Contexts[2].Http!.Body", null, handler.Contexts[2].Http!.Body);
         Assert.IsNull(handler.Contexts[2].Http!.Body);
     }
 
@@ -524,6 +600,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, first);
 
+        Diagnostics.Assert("handler.Contexts[1].ResumeUploadFromUnknownOffset", expected, handler.Contexts[1].ResumeUploadFromUnknownOffset);
         Assert.AreEqual(expected, handler.Contexts[1].ResumeUploadFromUnknownOffset);
     }
 
@@ -535,6 +612,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location(), upload: true));
 
+        Diagnostics.Assert("handler.Contexts[1].Upload", null, handler.Contexts[1].Upload);
         Assert.IsNull(handler.Contexts[1].Upload);
     }
 
@@ -548,6 +626,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location(), upload: true));
 
+        Diagnostics.Assert("handler.Contexts[1].Upload is not null", true, handler.Contexts[1].Upload is not null);
         Assert.IsNotNull(handler.Contexts[1].Upload);
     }
 
@@ -563,9 +642,11 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location(), upload: true));
 
+        Diagnostics.Assert("handler.Uploads count", 3, handler.Uploads.Count());
         Assert.HasCount(3, handler.Uploads);
         foreach (byte[] sent in handler.Uploads)
         {
+            Diagnostics.Assert("sent", string.Join(", ", new byte[] { 1, 2, 3 }), string.Join(", ", sent));
             CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, sent);
         }
     }
@@ -582,9 +663,13 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, context);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("handler.Uploads count", 2, handler.Uploads.Count());
         Assert.HasCount(2, handler.Uploads);
+        Diagnostics.Assert("handler.Uploads[0]", string.Join(", ", new byte[] { 1, 2, 3 }), string.Join(", ", handler.Uploads[0]));
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.Uploads[0]);
+        Diagnostics.Assert("handler.Uploads[1] count", 0, handler.Uploads[1].Count());
         Assert.IsEmpty(handler.Uploads[1]);
     }
 
@@ -596,6 +681,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location(), noBody: true));
 
+        Diagnostics.Assert("handler.Contexts[1].NoBody", true, handler.Contexts[1].NoBody);
         Assert.IsTrue(handler.Contexts[1].NoBody);
     }
 
@@ -617,8 +703,11 @@ public sealed class RedirectFollowerTests
         await Follow(handler, Context(http, credentials: true));
 
         ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Credentials", null, second.Credentials);
         Assert.IsNull(second.Credentials);
+        Diagnostics.Assert("second.Http!.BearerToken", null, second.Http!.BearerToken);
         Assert.IsNull(second.Http!.BearerToken);
+        Diagnostics.Assert("second.Http.Headers.ToArray()", string.Join(", ", new[] { "X-K: v" }), string.Join(", ", second.Http.Headers.ToArray()));
         CollectionAssert.AreEqual(new[] { "X-K: v" }, second.Http.Headers.ToArray());
     }
 
@@ -635,8 +724,11 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location() with { AltSvcRoute = route }));
 
+        Diagnostics.Assert("handler.Contexts[0].Http!.AltSvcRoute is the same instance", true, ReferenceEquals(route, handler.Contexts[0].Http!.AltSvcRoute));
         Assert.AreSame(route, handler.Contexts[0].Http!.AltSvcRoute);
+        Diagnostics.Assert("handler.Contexts[1].Http!.AltSvcRoute", kept ? route : null, handler.Contexts[1].Http!.AltSvcRoute);
         Assert.AreEqual(kept ? route : null, handler.Contexts[1].Http!.AltSvcRoute);
+        Diagnostics.Assert("handler.Contexts[2].Http!.AltSvcRoute", kept ? route : null, handler.Contexts[2].Http!.AltSvcRoute);
         Assert.AreEqual(kept ? route : null, handler.Contexts[2].Http!.AltSvcRoute);
     }
 
@@ -655,11 +747,19 @@ public sealed class RedirectFollowerTests
                 return http with { AltSvcRoute = null, Version = HttpVersionPreference.Http11 };
             });
 
-        await follower.FollowAsync(Context(Location() with { AltSvcRoute = route, Version = HttpVersionPreference.Http3Only }), new RedirectPolicy());
+        Diagnostics.Arrange("first hop Alt-Svc route", route);
 
+        await FollowLogged(follower, handler, Context(Location() with { AltSvcRoute = route, Version = HttpVersionPreference.Http3Only }), new RedirectPolicy());
+
+        Diagnostics.Act("hosts looked up", string.Join(", ", looked.Select(url => url.Host)));
+
+        Diagnostics.Assert("handler.Contexts[0].Http!.AltSvcRoute is the same instance", true, ReferenceEquals(route, handler.Contexts[0].Http!.AltSvcRoute));
         Assert.AreSame(route, handler.Contexts[0].Http!.AltSvcRoute);
+        Diagnostics.Assert("handler.Contexts[1].Http!.AltSvcRoute", null, handler.Contexts[1].Http!.AltSvcRoute);
         Assert.IsNull(handler.Contexts[1].Http!.AltSvcRoute);
+        Diagnostics.Assert("handler.Contexts[1].Http!.Version", HttpVersionPreference.Http11, handler.Contexts[1].Http!.Version);
         Assert.AreEqual(HttpVersionPreference.Http11, handler.Contexts[1].Http!.Version);
+        Diagnostics.Assert("looked.Single().Host", "localhost", looked.Single().Host);
         Assert.AreEqual("localhost", looked.Single().Host);
     }
 
@@ -677,8 +777,11 @@ public sealed class RedirectFollowerTests
         await Follow(handler, Context(http, credentials: true, url: first), new RedirectPolicy { LocationTrusted = trusted });
 
         ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Credentials is not null", true, second.Credentials is not null);
         Assert.IsNotNull(second.Credentials);
+        Diagnostics.Assert("second.Http!.BearerToken", "zz", second.Http!.BearerToken);
         Assert.AreEqual("zz", second.Http!.BearerToken);
+        Diagnostics.Assert("second.Http.Headers.ToArray()", string.Join(", ", new[] { "Cookie: a=b" }), string.Join(", ", second.Http.Headers.ToArray()));
         CollectionAssert.AreEqual(new[] { "Cookie: a=b" }, second.Http.Headers.ToArray());
     }
 
@@ -710,6 +813,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, CredentialContext(first, credentials), new RedirectPolicy { LocationTrusted = trusted });
 
+        Diagnostics.Assert("UserAndPassword(handler.Contexts[1].Credentials)", expected, UserAndPassword(handler.Contexts[1].Credentials));
         Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
     }
 
@@ -730,6 +834,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, CredentialContext(first, credentials));
 
+        Diagnostics.Assert("UserAndPassword(handler.Contexts[1].Credentials)", expected, UserAndPassword(handler.Contexts[1].Credentials));
         Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
     }
 
@@ -750,9 +855,13 @@ public sealed class RedirectFollowerTests
             new ProtocolDispatcher([handler]),
             selectHopCredentials: url => url.Host == "localhost" ? new NetworkCredential("lu", "lp") : null);
 
-        await follower.FollowAsync(Context(Location(), credentials: true), new RedirectPolicy { LocationTrusted = trusted });
+        await FollowLogged(follower, handler, Context(Location(), credentials: true), new RedirectPolicy { LocationTrusted = trusted });
 
+        Diagnostics.Act("hop credentials", string.Join(" -> ", handler.Contexts.Select(context => UserAndPassword(context.Credentials) ?? "(none)")));
+
+        Diagnostics.Assert("UserAndPassword(handler.Contexts[0].Credentials)", "u:p", UserAndPassword(handler.Contexts[0].Credentials));
         Assert.AreEqual("u:p", UserAndPassword(handler.Contexts[0].Credentials));
+        Diagnostics.Assert("UserAndPassword(handler.Contexts[1].Credentials)", expected, UserAndPassword(handler.Contexts[1].Credentials));
         Assert.AreEqual(expected, UserAndPassword(handler.Contexts[1].Credentials));
     }
 
@@ -763,7 +872,9 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location(), credentials: true));
 
+        Diagnostics.Assert("handler.Contexts[1].Credentials", null, handler.Contexts[1].Credentials);
         Assert.IsNull(handler.Contexts[1].Credentials);
+        Diagnostics.Assert("handler.Contexts[2].Credentials is not null", true, handler.Contexts[2].Credentials is not null);
         Assert.IsNotNull(handler.Contexts[2].Credentials);
     }
 
@@ -784,14 +895,20 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", $"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
         Assert.AreEqual($"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
         // Measured against curl 8.21.0 on 2026-10-02 (BL-1277 Notes): --proto-redir =http with
         // Location: ftp://127.0.0.1/z -> -w '%{num_redirects}|%{url_effective}' writes 1|ftp://127.0.0.1/z.
+        Diagnostics.Assert("result.Report!.RedirectCount", 1, result.Report!.RedirectCount);
         Assert.AreEqual(1, result.Report!.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", target, result.Report.EffectiveUrl);
         Assert.AreEqual(target, result.Report.EffectiveUrl);
         // Measured against curl 8.21.0 on 2026-09-27 (BL-289): -w '[%{redirect_url}]' writes [].
+        Diagnostics.Assert("result.Report.RedirectUrl", null, result.Report.RedirectUrl);
         Assert.IsNull(result.Report.RedirectUrl);
     }
 
@@ -812,8 +929,11 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), policy);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", $"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
         Assert.AreEqual($"Protocol \"{scheme}\" is disabled (in redirect)", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
     }
 
@@ -827,6 +947,7 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), policy);
 
+        Diagnostics.Assert("result.ErrorMessage", "Protocol \"file\" is disabled (in redirect)", result.ErrorMessage);
         Assert.AreEqual("Protocol \"file\" is disabled (in redirect)", result.ErrorMessage);
     }
 
@@ -845,12 +966,19 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { DisallowsUserInUrl = true });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.LoginDenied, result.ExitCode);
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", RedirectFollower.CredentialsInUrlMessage, result.ErrorMessage);
         Assert.AreEqual(RedirectFollower.CredentialsInUrlMessage, result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
+        Diagnostics.Assert("result.Report!.ResponseCode", 302, result.Report!.ResponseCode);
         Assert.AreEqual(302, result.Report!.ResponseCode);
+        Diagnostics.Assert("result.Report.RedirectCount", 1, result.Report.RedirectCount);
         Assert.AreEqual(1, result.Report.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", target, result.Report.EffectiveUrl);
         Assert.AreEqual(target, result.Report.EffectiveUrl);
+        Diagnostics.Assert("result.Report.RedirectUrl", null, result.Report.RedirectUrl);
         Assert.IsNull(result.Report.RedirectUrl);
     }
 
@@ -861,7 +989,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { DisallowsUserInUrl = true });
 
+        Diagnostics.Assert("result.IsSuccess", true, result.IsSuccess);
         Assert.IsTrue(result.IsSuccess);
+        Diagnostics.Assert("handler.Contexts count", 2, handler.Contexts.Count());
         Assert.HasCount(2, handler.Contexts);
     }
 
@@ -872,7 +1002,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.IsSuccess", true, result.IsSuccess);
         Assert.IsTrue(result.IsSuccess);
+        Diagnostics.Assert("handler.Contexts count", 2, handler.Contexts.Count());
         Assert.HasCount(2, handler.Contexts);
     }
 
@@ -890,7 +1022,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), policy);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("handler.Contexts[1].Url.OriginalString", "dict://127.0.0.1:48523/x", handler.Contexts[1].Url.OriginalString);
         Assert.AreEqual("dict://127.0.0.1:48523/x", handler.Contexts[1].Url.OriginalString);
     }
 
@@ -907,8 +1041,11 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(http), policy);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "Protocol \"http\" is disabled", result.ErrorMessage);
         Assert.AreEqual("Protocol \"http\" is disabled", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 0, handler.Contexts.Count());
         Assert.IsEmpty(handler.Contexts);
     }
 
@@ -923,13 +1060,18 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "The redirect target URL could not be parsed: Unsupported URL scheme", result.ErrorMessage);
         Assert.AreEqual("The redirect target URL could not be parsed: Unsupported URL scheme", result.ErrorMessage);
         // Measured against curl 8.21.0 (BL-289): -w '[%{redirect_url}]' writes [].
+        Diagnostics.Assert("result.Report!.RedirectUrl", null, result.Report!.RedirectUrl);
         Assert.IsNull(result.Report!.RedirectUrl);
         // Measured against curl 8.21.0 on 2026-10-02 (BL-1277 Notes): Location: foo://h/z ->
         // -w '%{num_redirects}|%{url_effective}' writes 1 and the first URL.
+        Diagnostics.Assert("result.Report.RedirectCount", 1, result.Report.RedirectCount);
         Assert.AreEqual(1, result.Report.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", null, result.Report.EffectiveUrl);
         Assert.IsNull(result.Report.EffectiveUrl);
     }
 
@@ -948,14 +1090,20 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", $"The redirect target URL could not be parsed: {reason}", result.ErrorMessage);
         Assert.AreEqual($"The redirect target URL could not be parsed: {reason}", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
         // Measured against curl 8.21.0 on 2026-10-02 (AF-0021, BL-1277 Notes): Location:
         // http://127.0.0.1:x/z -> -w '%{num_redirects}|%{url_effective}' writes 1 and the first URL.
+        Diagnostics.Assert("result.Report!.RedirectCount", 1, result.Report!.RedirectCount);
         Assert.AreEqual(1, result.Report!.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", null, result.Report.EffectiveUrl);
         Assert.IsNull(result.Report.EffectiveUrl);
         // Measured against curl 8.21.0 (BL-289): -w '[%{redirect_url}]' writes [].
+        Diagnostics.Assert("result.Report.RedirectUrl", null, result.Report.RedirectUrl);
         Assert.IsNull(result.Report.RedirectUrl);
     }
 
@@ -967,8 +1115,10 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), new RedirectPolicy { MaxRedirects = 0 });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
         // Measured against curl 8.21.0 (BL-289): the limit refusal keeps it, [http://[bad].
+        Diagnostics.Assert("result.Report!.RedirectUrl", "http://[bad", result.Report!.RedirectUrl);
         Assert.AreEqual("http://[bad", result.Report!.RedirectUrl);
     }
 
@@ -982,7 +1132,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("handler.Contexts[1].Url.OriginalString", target, handler.Contexts[1].Url.OriginalString);
         Assert.AreEqual(target, handler.Contexts[1].Url.OriginalString);
     }
 
@@ -994,7 +1146,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()), policy);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("handler.Contexts count", 2, handler.Contexts.Count());
         Assert.HasCount(2, handler.Contexts);
     }
 
@@ -1008,7 +1162,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
     }
 
@@ -1019,6 +1175,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
     }
 
@@ -1033,9 +1190,13 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "boom", result.ErrorMessage);
         Assert.AreEqual("boom", result.ErrorMessage);
+        Diagnostics.Assert("result.Report!.RedirectCount", 1, result.Report!.RedirectCount);
         Assert.AreEqual(1, result.Report!.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", "http://127.0.0.1:18203/b", result.Report.EffectiveUrl);
         Assert.AreEqual("http://127.0.0.1:18203/b", result.Report.EffectiveUrl);
     }
 
@@ -1046,8 +1207,11 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.BytesTransferred", 7, result.BytesTransferred);
         Assert.AreEqual(7, result.BytesTransferred);
+        Diagnostics.Assert("result.Report!.RedirectCount", 0, result.Report!.RedirectCount);
         Assert.AreEqual(0, result.Report!.RedirectCount);
+        Diagnostics.Assert("result.Report.Timings", null, result.Report.Timings);
         Assert.IsNull(result.Report.Timings);
     }
 
@@ -1061,9 +1225,13 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location()));
 
+        Diagnostics.Assert("result.Report!.HeaderSize", 1110, result.Report!.HeaderSize);
         Assert.AreEqual(1110, result.Report!.HeaderSize);
+        Diagnostics.Assert("result.Report.RequestSize", 2220, result.Report.RequestSize);
         Assert.AreEqual(2220, result.Report.RequestSize);
+        Diagnostics.Assert("result.Report.ConnectionCount", 2, result.Report.ConnectionCount);
         Assert.AreEqual(2, result.Report.ConnectionCount);
+        Diagnostics.Assert("result.Report.DownloadSize", 5, result.Report.DownloadSize);
         Assert.AreEqual(5, result.Report.DownloadSize);
     }
 
@@ -1079,8 +1247,11 @@ public sealed class RedirectFollowerTests
         TransferResult result = await Follow(handler, Context(Location(), timeProvider: clock));
 
         TransferTimings timings = result.Report!.Timings!;
+        Diagnostics.Assert("timings.Started", 1000, timings.Started);
         Assert.AreEqual(1000, timings.Started);
+        Diagnostics.Assert("timings.Completed", 1750, timings.Completed);
         Assert.AreEqual(1750, timings.Completed);
+        Diagnostics.Assert("timings.RedirectDuration", TimeSpan.FromMilliseconds(400), timings.RedirectDuration);
         Assert.AreEqual(TimeSpan.FromMilliseconds(400), timings.RedirectDuration);
     }
 
@@ -1092,7 +1263,9 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, Context(Location(), timeProvider: clock));
 
+        Diagnostics.Assert("result.Report!.Timings!.Started", 1400, result.Report!.Timings!.Started);
         Assert.AreEqual(1400, result.Report!.Timings!.Started);
+        Diagnostics.Assert("result.Report.Timings.RedirectDuration", TimeSpan.Zero, result.Report.Timings.RedirectDuration);
         Assert.AreEqual(TimeSpan.Zero, result.Report.Timings.RedirectDuration);
     }
 
@@ -1110,6 +1283,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, first);
 
+        Diagnostics.Assert("handler.Contexts[1].PathAsIs", true, handler.Contexts[1].PathAsIs);
         Assert.IsTrue(handler.Contexts[1].PathAsIs);
     }
 
@@ -1132,10 +1306,15 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await Follow(handler, limited);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
         Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
+        Diagnostics.Assert("result.Report!.RedirectCount", 1, result.Report!.RedirectCount);
         Assert.AreEqual(1, result.Report!.RedirectCount);
+        Diagnostics.Assert("TimeSpan.FromTicks(time.GetTimestamp())", TimeSpan.FromSeconds(2), TimeSpan.FromTicks(time.GetTimestamp()));
         Assert.AreEqual(TimeSpan.FromSeconds(2), TimeSpan.FromTicks(time.GetTimestamp()));
+        Diagnostics.Assert("time.Waits.ToArray()", string.Join(", ", new[] { TimeSpan.FromMilliseconds(1500), TimeSpan.FromMilliseconds(500) }), string.Join(", ", time.Waits.ToArray()));
         CollectionAssert.AreEqual(new[] { TimeSpan.FromMilliseconds(1500), TimeSpan.FromMilliseconds(500) }, time.Waits.ToArray());
     }
 
@@ -1147,8 +1326,11 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, first);
 
+        Diagnostics.Assert("handler.Contexts[0].OperationStarted", null, handler.Contexts[0].OperationStarted);
         Assert.IsNull(handler.Contexts[0].OperationStarted);
+        Diagnostics.Assert("handler.Contexts[1].OperationStarted is not null", true, handler.Contexts[1].OperationStarted is not null);
         Assert.IsNotNull(handler.Contexts[1].OperationStarted);
+        Diagnostics.Assert("handler.Contexts[2].OperationStarted", handler.Contexts[1].OperationStarted, handler.Contexts[2].OperationStarted);
         Assert.AreEqual(handler.Contexts[1].OperationStarted, handler.Contexts[2].OperationStarted);
     }
 
@@ -1166,6 +1348,7 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, first);
 
+        Diagnostics.Assert("handler.Contexts[1].OperationStarted", 42L, handler.Contexts[1].OperationStarted);
         Assert.AreEqual(42L, handler.Contexts[1].OperationStarted);
     }
 
@@ -1202,23 +1385,41 @@ public sealed class RedirectFollowerTests
         await Follow(handler, first);
 
         ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Output is the same instance", true, ReferenceEquals(output, second.Output));
         Assert.AreSame(output, second.Output);
+        Diagnostics.Assert("second.ResumeFrom", first.ResumeFrom, second.ResumeFrom);
         Assert.AreEqual(first.ResumeFrom, second.ResumeFrom);
+        Diagnostics.Assert("second.Range", first.Range, second.Range);
         Assert.AreEqual(first.Range, second.Range);
+        Diagnostics.Assert("second.RangeText", first.RangeText, second.RangeText);
         Assert.AreEqual(first.RangeText, second.RangeText);
+        Diagnostics.Assert("second.MaxFileSize", first.MaxFileSize, second.MaxFileSize);
         Assert.AreEqual(first.MaxFileSize, second.MaxFileSize);
+        Diagnostics.Assert("second.NoBody", true, second.NoBody);
         Assert.IsTrue(second.NoBody);
+        Diagnostics.Assert("second.TimeCondition", first.TimeCondition, second.TimeCondition);
         Assert.AreEqual(first.TimeCondition, second.TimeCondition);
+        Diagnostics.Assert("second.HeaderOutput is the same instance", true, ReferenceEquals(headers, second.HeaderOutput));
         Assert.AreSame(headers, second.HeaderOutput);
+        Diagnostics.Assert("second.TelnetOptions is the same instance", true, ReferenceEquals(first.TelnetOptions, second.TelnetOptions));
         Assert.AreSame(first.TelnetOptions, second.TelnetOptions);
+        Diagnostics.Assert("second.TftpBlockSize", first.TftpBlockSize, second.TftpBlockSize);
         Assert.AreEqual(first.TftpBlockSize, second.TftpBlockSize);
+        Diagnostics.Assert("second.TftpNoOptions", true, second.TftpNoOptions);
         Assert.IsTrue(second.TftpNoOptions);
+        Diagnostics.Assert("second.ConvertLineEndings", true, second.ConvertLineEndings);
         Assert.IsTrue(second.ConvertLineEndings);
+        Diagnostics.Assert("second.CreateFileMode", first.CreateFileMode, second.CreateFileMode);
         Assert.AreEqual(first.CreateFileMode, second.CreateFileMode);
+        Diagnostics.Assert("second.ConnectTimeout", first.ConnectTimeout, second.ConnectTimeout);
         Assert.AreEqual(first.ConnectTimeout, second.ConnectTimeout);
+        Diagnostics.Assert("second.MaxTime", first.MaxTime, second.MaxTime);
         Assert.AreEqual(first.MaxTime, second.MaxTime);
+        Diagnostics.Assert("second.Http", first.Http with { RedirectsFollowed = 1 }, second.Http);
         Assert.AreEqual(first.Http with { RedirectsFollowed = 1 }, second.Http);
+        Diagnostics.Assert("second.TimeProvider is the same instance", true, ReferenceEquals(first.TimeProvider, second.TimeProvider));
         Assert.AreSame(first.TimeProvider, second.TimeProvider);
+        Diagnostics.Assert("second.CancellationToken", first.CancellationToken, second.CancellationToken);
         Assert.AreEqual(first.CancellationToken, second.CancellationToken);
     }
 
@@ -1237,7 +1438,9 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, first);
 
+        Diagnostics.Assert("handler.Contexts count", 2, handler.Contexts.Count());
         Assert.HasCount(2, handler.Contexts);
+        Diagnostics.Assert("handler.Contexts[1].Progress is the same instance", true, ReferenceEquals(progress, handler.Contexts[1].Progress));
         Assert.AreSame(progress, handler.Contexts[1].Progress);
     }
 
@@ -1256,7 +1459,9 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, first);
 
+        Diagnostics.Assert("handler.Contexts count", 2, handler.Contexts.Count());
         Assert.HasCount(2, handler.Contexts);
+        Diagnostics.Assert("handler.Contexts[1].Events is the same instance", true, ReferenceEquals(events, handler.Contexts[1].Events));
         Assert.AreSame(events, handler.Contexts[1].Events);
     }
 
@@ -1276,7 +1481,9 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, first);
 
+        Diagnostics.Assert("handler.Contexts[1].Proxy is the same instance", true, ReferenceEquals(socks, handler.Contexts[1].Proxy));
         Assert.AreSame(socks, handler.Contexts[1].Proxy);
+        Diagnostics.Assert("handler.Contexts[1].Http!.ForwardProxy is the same instance", true, ReferenceEquals(forward, handler.Contexts[1].Http!.ForwardProxy));
         Assert.AreSame(forward, handler.Contexts[1].Http!.ForwardProxy);
     }
 
@@ -1298,11 +1505,17 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await FollowWith(selector, handler, Context(Location() with { ForwardProxy = first }));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("asked", string.Join(", ", new[] { "http://b.test/", "https://c.test/" }), string.Join(", ", asked));
         CollectionAssert.AreEqual(new[] { "http://b.test/", "https://c.test/" }, asked);
+        Diagnostics.Assert("handler.Contexts[1].Proxy", null, handler.Contexts[1].Proxy);
         Assert.IsNull(handler.Contexts[1].Proxy);
+        Diagnostics.Assert("handler.Contexts[1].Http!.ForwardProxy", null, handler.Contexts[1].Http!.ForwardProxy);
         Assert.IsNull(handler.Contexts[1].Http!.ForwardProxy);
+        Diagnostics.Assert("handler.Contexts[2].Proxy is the same instance", true, ReferenceEquals(third, handler.Contexts[2].Proxy));
         Assert.AreSame(third, handler.Contexts[2].Proxy);
+        Diagnostics.Assert("handler.Contexts[2].Http!.ForwardProxy is the same instance", true, ReferenceEquals(third, handler.Contexts[2].Http!.ForwardProxy));
         Assert.AreSame(third, handler.Contexts[2].Http!.ForwardProxy);
     }
 
@@ -1320,9 +1533,13 @@ public sealed class RedirectFollowerTests
 
         TransferResult result = await FollowWith(selector, handler, Context(Location()));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveProxy, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveProxy, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "bad proxy", result.ErrorMessage);
         Assert.AreEqual("bad proxy", result.ErrorMessage);
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
+        Diagnostics.Assert("result.Report!.RedirectCount", 0, result.Report!.RedirectCount);
         Assert.AreEqual(0, result.Report!.RedirectCount);
     }
 
@@ -1362,37 +1579,94 @@ public sealed class RedirectFollowerTests
     private static string? UserAndPassword(NetworkCredential? credentials) =>
         credentials is null ? null : $"{credentials.UserName}:{credentials.Password}";
 
-    private static Task<TransferResult> Follow(IProtocolHandler handler, ITransferContext context, RedirectPolicy? policy = null) =>
-        new RedirectFollower(new ProtocolDispatcher([handler]))
-            .FollowAsync(context, policy ?? new RedirectPolicy())
-            .AsTask();
+    private Task<TransferResult> Follow(IProtocolHandler handler, ITransferContext context, RedirectPolicy? policy = null) =>
+        FollowLogged(new RedirectFollower(new ProtocolDispatcher([handler])), handler, context, policy ?? new RedirectPolicy());
 
-    private static async Task<TransferResult> FollowNonSeekableBody(int status, bool? runsOnWindows)
+    /// <summary>
+    /// Follows <paramref name="context" /> and writes the first request and policy as ARRANGE
+    /// lines and the result and the chain of requests the handler saw as ACT lines.
+    /// </summary>
+    private async Task<TransferResult> FollowLogged(RedirectFollower follower, IProtocolHandler handler, ITransferContext context, RedirectPolicy policy)
+    {
+        WriteArrange(context, policy, handler);
+
+        TransferResult result = await follower.FollowAsync(context, policy);
+
+        WriteAct(result, handler);
+        return result;
+    }
+
+    private void WriteArrange(ITransferContext context, RedirectPolicy policy, IProtocolHandler handler)
+    {
+        Diagnostics.Arrange("first request", DescribeRequest(context));
+        Diagnostics.Arrange(
+            "policy",
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"max redirects {policy.MaxRedirects}, post301/302/303 {policy.KeepPostOn301}/{policy.KeepPostOn302}/{policy.KeepPostOn303}, location trusted {policy.LocationTrusted}, drops custom method {policy.DropsCustomMethodOnSwitchToGet}, disallows user {policy.DisallowsUserInUrl}, redirect schemes {string.Join(",", policy.AllowedSchemes.Order(StringComparer.Ordinal))}"));
+        if (handler is ScriptedHandler scripted)
+        {
+            Diagnostics.Arrange("scripted responses", scripted.DescribeScript());
+        }
+    }
+
+    private void WriteAct(TransferResult result, IProtocolHandler handler)
+    {
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error", result.ErrorMessage);
+        Diagnostics.Act(
+            "report",
+            result.Report is not { } report
+                ? "(none)"
+                : string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"response code {report.ResponseCode}, redirects {report.RedirectCount}, effective URL {report.EffectiveUrl}, redirect URL {report.RedirectUrl}"));
+        if (handler is ScriptedHandler scripted)
+        {
+            Diagnostics.Act("redirect chain", string.Join(" -> ", scripted.Contexts.Select(DescribeRequest)));
+        }
+    }
+
+    private static string DescribeRequest(ITransferContext context) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{context.Url.OriginalString} [method {context.Http?.CustomMethod ?? "-"}, body {context.Http?.Body?.GetType().Name ?? "-"}, upload {context.Upload is not null}, no body {context.NoBody}, credentials {context.Credentials is not null}]");
+
+    private async Task<TransferResult> FollowNonSeekableBody(int status, bool? runsOnWindows)
     {
         ScriptedHandler handler = new(Redirect(status, Next), Ok(200, 0));
         StreamBody body = new(new NonSeekableStream([1, 2, 3]), null, "multipart/form-data; boundary=b");
+        Diagnostics.Arrange("runs on Windows", runsOnWindows?.ToString() ?? "(platform default)");
 
-        TransferResult result = await new RedirectFollower(new ProtocolDispatcher([handler]), runsOnWindows: runsOnWindows)
-            .FollowAsync(Context(Location() with { Body = body }), new RedirectPolicy());
+        TransferResult result = await FollowLogged(
+            new RedirectFollower(new ProtocolDispatcher([handler]), runsOnWindows: runsOnWindows),
+            handler,
+            Context(Location() with { Body = body }),
+            new RedirectPolicy());
 
+        Diagnostics.Assert("handler.Contexts count", 1, handler.Contexts.Count());
         Assert.HasCount(1, handler.Contexts);
         return result;
     }
 
-    private static void AssertRewindFailure(TransferResult result, int status, CurlExitCode exitCode, string message)
+    private void AssertRewindFailure(TransferResult result, int status, CurlExitCode exitCode, string message)
     {
+        Diagnostics.Assert("result.ExitCode", exitCode, result.ExitCode);
         Assert.AreEqual(exitCode, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", message, result.ErrorMessage);
         Assert.AreEqual(message, result.ErrorMessage);
+        Diagnostics.Assert("result.Report!.ResponseCode", status, result.Report!.ResponseCode);
         Assert.AreEqual(status, result.Report!.ResponseCode);
+        Diagnostics.Assert("result.Report.RedirectCount", 1, result.Report.RedirectCount);
         Assert.AreEqual(1, result.Report.RedirectCount);
+        Diagnostics.Assert("result.Report.EffectiveUrl", Next, result.Report.EffectiveUrl);
         Assert.AreEqual(Next, result.Report.EffectiveUrl);
+        Diagnostics.Assert("result.Report.RedirectUrl", null, result.Report.RedirectUrl);
         Assert.IsNull(result.Report.RedirectUrl);
     }
 
-    private static Task<TransferResult> FollowWith(HopProxySelector selector, IProtocolHandler handler, ITransferContext context) =>
-        new RedirectFollower(new ProtocolDispatcher([handler]), selector)
-            .FollowAsync(context, new RedirectPolicy())
-            .AsTask();
+    private Task<TransferResult> FollowWith(HopProxySelector selector, IProtocolHandler handler, ITransferContext context) =>
+        FollowLogged(new RedirectFollower(new ProtocolDispatcher([handler]), selector), handler, context, new RedirectPolicy());
 
     private static TransferResult Redirect(
         int status,
@@ -1436,6 +1710,13 @@ public sealed class RedirectFollowerTests
         public List<byte[]> Uploads { get; } = [];
 
         public List<byte[]> StreamBodies { get; } = [];
+
+        public string DescribeScript() =>
+            string.Join(
+                ", ",
+                script.Select(result => string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{result.ExitCode} {result.Report?.ResponseCode} {result.Report?.RedirectUrl}").TrimEnd()));
 
         public ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
         {

@@ -25,6 +25,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(Insecure: true, Ciphers: ciphers), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual("schannel: Failed setting algorithm cipher list", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -38,6 +39,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(Insecure: true, Tls13Ciphers: tls13Ciphers), CertificateHost, SslProtocols.None, SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -48,6 +50,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(Insecure: true, Ciphers: "BOGUS"), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual("failed setting cipher list: BOGUS", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -59,6 +62,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeAsync(
             new TlsClientOptions(Insecure: true, Tls13Ciphers: "BOGUS"), CertificateHost, SslProtocols.None, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual("failed setting TLS 1.3 cipher suite: BOGUS", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -72,6 +76,9 @@ public sealed partial class SslStreamTlsProviderTests
         string? tls13Ciphers,
         string expectedMessage)
     {
+        Diagnostics.Arrange("platform", "Windows only");
+        Diagnostics.Act("running on Windows", OperatingSystem.IsWindows());
+        Diagnostics.Assert("running on Windows", true, OperatingSystem.IsWindows());
         if (!OperatingSystem.IsWindows())
         {
             Assert.Inconclusive("Only Windows lacks CipherSuitesPolicy; elsewhere the OpenSSL build applies the list.");
@@ -83,6 +90,7 @@ public sealed partial class SslStreamTlsProviderTests
             SslProtocols.None,
             OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCipher, result.Result.ExitCode);
         Assert.AreEqual(expectedMessage, result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -96,6 +104,7 @@ public sealed partial class SslStreamTlsProviderTests
 
         var result = await HandshakeAsync(provider, CertificateHost, SslProtocols.Tls12);
 
+        Diagnostics.Assert("exit code", OperatingSystem.IsWindows() ? CurlExitCode.SslCipher : CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(OperatingSystem.IsWindows() ? CurlExitCode.SslCipher : CurlExitCode.Ok, result.Result.ExitCode);
         if (result.Result.Connection is { } connection)
         {
@@ -120,11 +129,15 @@ public sealed partial class SslStreamTlsProviderTests
             },
         };
         var (client, _) = InMemoryDuplexStream.CreatePair();
+        ArrangeOptions(options);
 
         var result = await provider.AuthenticateAsClientAsync(
             new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Act("policy suites", string.Join(",", factory.Suites ?? []));
         var (expectedSuites, _) = OpenSslCipherSuites.Select(options.Ciphers, options.Tls13Ciphers);
+        Diagnostics.Assert("policy suites", string.Join(",", expectedSuites ?? []), string.Join(",", factory.Suites ?? []));
         CollectionAssert.AreEqual(expectedSuites!.ToArray(), factory.Suites);
         Assert.AreSame<object>(factory.Policy, handshakeOptions!.CipherSuitesPolicy);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
@@ -138,11 +151,13 @@ public sealed partial class SslStreamTlsProviderTests
         string ciphers,
         TlsCipherSuite expected)
     {
+        Diagnostics.Arrange("ciphers", ciphers);
         AssertCipherSuitesPolicyIsSupported();
 
         var negotiated = await NegotiateAsync(
             new TlsClientOptions(Insecure: true, Ciphers: ciphers), SslProtocols.Tls12, s_tls12ServerSuites);
 
+        Diagnostics.Assert("negotiated suite", expected, negotiated);
         Assert.AreEqual(expected, negotiated);
     }
 
@@ -153,17 +168,21 @@ public sealed partial class SslStreamTlsProviderTests
         string tls13Ciphers,
         TlsCipherSuite expected)
     {
+        Diagnostics.Arrange("TLS 1.3 ciphers", tls13Ciphers);
         AssertCipherSuitesPolicyIsSupported();
         await AssertTls13IsAvailableAsync();
 
         var negotiated = await NegotiateAsync(
             new TlsClientOptions(Insecure: true, Tls13Ciphers: tls13Ciphers), SslProtocols.Tls13, serverSuites: null);
 
+        Diagnostics.Assert("negotiated suite", expected, negotiated);
         Assert.AreEqual(expected, negotiated);
     }
 
-    private static void AssertCipherSuitesPolicyIsSupported()
+    private void AssertCipherSuitesPolicyIsSupported()
     {
+        Diagnostics.Act("CipherSuitesPolicy supported", !OperatingSystem.IsWindows());
+        Diagnostics.Assert("CipherSuitesPolicy supported", true, !OperatingSystem.IsWindows());
         if (OperatingSystem.IsWindows())
         {
             Assert.Inconclusive("CipherSuitesPolicy is not supported on Windows, so no named suite can be negotiated here.");
@@ -182,9 +201,11 @@ public sealed partial class SslStreamTlsProviderTests
 
     // The suite the server side agreed, after the OpenSSL build's handshake. The server offers
     // serverSuites when given, and its platform default otherwise.
-    private static async Task<TlsCipherSuite> NegotiateAsync(
+    private async Task<TlsCipherSuite> NegotiateAsync(
         TlsClientOptions options, SslProtocols serverProtocols, TlsCipherSuite[]? serverSuites)
     {
+        ArrangeOptions(options);
+        Diagnostics.Arrange("server", $"{serverProtocols}, suites {(serverSuites is null ? "default" : string.Join(",", serverSuites))}");
         var (client, server) = InMemoryDuplexStream.CreatePair();
         await using var serverStream = new SslStream(server);
         var serverTask = serverStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
@@ -195,11 +216,17 @@ public sealed partial class SslStreamTlsProviderTests
         });
         var provider = new SslStreamTlsProvider(options, OpenSslBuild);
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
 
+        ActResult(result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         await serverTask;
+        Diagnostics.Act("negotiated suite", serverStream.NegotiatedCipherSuite);
         await result.Connection!.DisposeAsync();
         return serverStream.NegotiatedCipherSuite;
     }

@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -16,11 +17,14 @@ public sealed class CommandLineDnsOptionTests
     private const string Url = "http://127.0.0.1:1/";
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Parse_WithoutDnsOptions_LeavesThemUnset()
     {
         CommandLineOptions options = Accept();
 
+        TestDiagnostics.For(TestContext).Assert("dns servers", null, options.DnsServers);
         Assert.IsNull(options.DnsServers);
         Assert.IsNull(options.DnsInterface);
         Assert.IsNull(options.DnsIPv4Address);
@@ -69,6 +73,7 @@ public sealed class CommandLineDnsOptionTests
             "--dns-ipv4-addr", "10.0.0.1", "--dns-ipv4-addr", "10.0.0.2",
             "--dns-ipv6-addr", "::1", "--dns-ipv6-addr", "::2");
 
+        TestDiagnostics.For(TestContext).Assert("dns servers", "8.8.8.8", options.DnsServers);
         Assert.AreEqual("8.8.8.8", options.DnsServers);
         Assert.AreEqual("eth1", options.DnsInterface);
         Assert.AreEqual("10.0.0.2", options.DnsIPv4Address);
@@ -114,7 +119,7 @@ public sealed class CommandLineDnsOptionTests
     [DataRow("--dns-ipv6-addr")]
     public void Parse_EmptyValue_IsRefusedAsBlank(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, "", Url]);
+        CommandLineParseResult result = Parse([option, "", Url]);
 
         AssertRefused(result, $"curl: option {option}: blank argument where content is expected");
     }
@@ -126,7 +131,7 @@ public sealed class CommandLineDnsOptionTests
     [DataRow("--dns-ipv6-addr")]
     public void Parse_OptionLast_IsRefusedAsNeedingParameter(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, option]);
+        CommandLineParseResult result = Parse([Url, option]);
 
         AssertRefused(result, $"curl: option {option}: requires parameter");
     }
@@ -138,7 +143,7 @@ public sealed class CommandLineDnsOptionTests
     [DataRow("dns-ipv6-addr")]
     public void Parse_NegatedOption_IsRefusedAsNotReversible(string longName)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([$"--no-{longName}", "x", Url]);
+        CommandLineParseResult result = Parse([$"--no-{longName}", "x", Url]);
 
         AssertRefused(result, $"curl: option --no-{longName}: the given option cannot be reversed with a --no- prefix");
     }
@@ -146,23 +151,46 @@ public sealed class CommandLineDnsOptionTests
     [TestMethod]
     public void Parse_DnsServersBeforeNext_DoesNotReachTheNextGroup()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--dns-servers", "1.1.1.1", Url, "--next", Url]);
+        CommandLineParseResult result = Parse(["--dns-servers", "1.1.1.1", Url, "--next", Url]);
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        diagnostics.Assert("group 0 dns servers", "1.1.1.1", result.Groups[0].DnsServers);
+        diagnostics.Assert("group 1 dns servers", null, result.Groups[1].DnsServers);
         Assert.AreEqual("1.1.1.1", result.Groups[0].DnsServers);
         Assert.IsNull(result.Groups[1].DnsServers);
     }
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    private CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        TestDiagnostics.For(TestContext).Act(
+            "dns options",
+            $"servers {Quote(result.Options.DnsServers)}, interface {Quote(result.Options.DnsInterface)}, ipv4 {Quote(result.Options.DnsIPv4Address)}, ipv6 {Quote(result.Options.DnsIPv6Address)}");
         return result.Options;
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string optionLine)
+    private CommandLineParseResult Parse(string[] arguments)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+        return result;
+    }
+
+    private static string Quote(string? value) => value is null ? "null" : "\"" + value + "\"";
+
+    private void AssertRefused(CommandLineParseResult result, string optionLine)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("accepted", false, result.IsAccepted);
+        diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        diagnostics.Assert("first stderr line", optionLine, result.Refusal?.StandardErrorLines.FirstOrDefault());
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { optionLine, TryHelp }, result.Refusal.StandardErrorLines.ToArray());

@@ -28,8 +28,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer();
         var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveProxy, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveProxy, result.ExitCode);
         Assert.AreEqual("Could not resolve proxy: proxy.example", result.ErrorMessage);
         CollectionAssert.AreEqual(new[] { "proxy.example" }, resolver.ResolvedHosts);
@@ -44,10 +45,11 @@ public sealed partial class TcpConnectorTests
         var proxyHost = new string('a', 300);
         var connector = new TcpConnector(new SystemDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(
-            PlainTarget with { Proxy = new ProxyEndpoint(ProxyKind.Http, proxyHost, 3128, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            PlainTarget with { Proxy = new ProxyEndpoint(ProxyKind.Http, proxyHost, 3128, null) });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveProxy, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveProxy, result.ExitCode);
         Assert.AreEqual("Could not resolve proxy: " + new string('a', 230), result.ErrorMessage);
     }
@@ -68,10 +70,11 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), dialer, new FakeTlsProvider(), timeProvider);
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.com", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "localhost", 1, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "localhost", 1, null) });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(
             "Failed to connect to example.com:8080 over proxy localhost after 2268 ms: Could not connect to server",
@@ -92,8 +95,9 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply));
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual($"CONNECT tunnel failed, response {statusCode}", result.ErrorMessage);
         Assert.IsNull(result.Connection);
@@ -107,8 +111,9 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection([]);
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Proxy CONNECT aborted", result.ErrorMessage);
         Assert.IsTrue(proxyConnection.IsDisposed);
@@ -123,8 +128,9 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 407 Proxy Auth\r\nContent-Length: abc\r\nX-After: 1\r\n\r\n"));
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget with { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Unsupported Content-Length value", result.ErrorMessage);
         Assert.IsTrue(proxyConnection.IsDisposed);
@@ -139,8 +145,9 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nX-Pad: " + new string('a', 16377)));
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("CONNECT response too large", result.ErrorMessage);
         Assert.IsTrue(proxyConnection.IsDisposed);
@@ -152,9 +159,11 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection([]) { ReadException = new IOException("reset") };
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
 
-        await Assert.ThrowsExactlyAsync<IOException>(
-            async () => await connector.ConnectAsync(PlainTarget, CancellationToken.None));
+        var exception = await Assert.ThrowsExactlyAsync<IOException>(
+            async () => await ConnectLoggedAsync(connector, PlainTarget));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("proxy connection disposed", true, proxyConnection.IsDisposed);
         Assert.IsTrue(proxyConnection.IsDisposed);
     }
 
@@ -165,10 +174,11 @@ public sealed partial class TcpConnectorTests
         // curl: (7) Failed to connect to ::1:8080 over proxy localhost after 2239 ms: Could not connect to server
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("::1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "localhost", 1, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("::1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "localhost", 1, null) });
 
+        Diagnostics.Assert("error message", "Failed to connect to ::1:8080 over proxy localhost after 0 ms: Could not connect to server", result.ErrorMessage);
         Assert.AreEqual(
             "Failed to connect to ::1:8080 over proxy localhost after 0 ms: Could not connect to server",
             result.ErrorMessage);
@@ -183,8 +193,9 @@ public sealed partial class TcpConnectorTests
         var tlsProvider = new FakeTlsProvider();
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), dialer, tlsProvider, new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(proxyConnection, result.Connection);
         Assert.AreEqual(200, result.ProxyConnectResponseCode);
@@ -205,8 +216,9 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"));
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(result.MappedHost);
         Assert.AreEqual(0, result.MappedPort);
@@ -223,8 +235,9 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             new HttpProxyTunnelOptions("Agent/1", Encoding.UTF8));
 
-        await connector.ConnectAsync(PlainTarget, CancellationToken.None);
+        await ConnectLoggedAsync(connector, PlainTarget);
 
+        Diagnostics.Assert("User-Agent header sent", true, Encoding.Latin1.GetString([.. proxyConnection.Written]).Contains("\r\nUser-Agent: Agent/1\r\n", StringComparison.Ordinal));
         StringAssert.Contains(Encoding.Latin1.GetString([.. proxyConnection.Written]), "\r\nUser-Agent: Agent/1\r\n");
     }
 
@@ -235,10 +248,11 @@ public sealed partial class TcpConnectorTests
         var tlsProvider = new FakeTlsProvider();
         var connector = CreateProxyConnector(proxyConnection, tlsProvider);
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(tlsProvider.SecuredConnection, result.Connection);
         Assert.AreEqual(200, result.ProxyConnectResponseCode);
@@ -254,10 +268,11 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\n"));
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider { FailureToReturn = failure });
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy });
 
+        Diagnostics.Assert("exit code", failure.ExitCode, result.ExitCode);
         Assert.AreEqual(failure.ExitCode, result.ExitCode);
         Assert.AreEqual(failure.ErrorMessage, result.ErrorMessage);
     }

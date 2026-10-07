@@ -24,8 +24,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new StallingTcpDialer { OnStalled = () => time.Advance(1001) };
         var connector = new TcpConnector(new FakeDnsResolver(IPAddress.Parse("10.255.255.1")), dialer, new FakeTlsProvider(), time, connectTimeout: OneSecond);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("10.255.255.1", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("10.255.255.1", 80, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 1001 milliseconds", result.ErrorMessage);
         Assert.IsNull(result.Connection);
@@ -43,8 +44,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, tlsProvider, time, connectTimeout: OneSecond);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18510, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18510, UseTls: true));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 1006 milliseconds", result.ErrorMessage);
     }
@@ -58,8 +60,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), time, connectTimeout: OneSecond);
         var target = new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null) };
 
-        var result = await connector.ConnectAsync(target, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 2000 milliseconds", result.ErrorMessage);
         Assert.IsTrue(connection.IsDisposed);
@@ -72,8 +75,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => { time.Advance(999); return new FakeConnection(); } };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), time, connectTimeout: OneSecond);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 80, UseTls: false));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNotNull(result.Connection);
     }
@@ -89,8 +93,9 @@ public sealed partial class TcpConnectorTests
         TimeSpan? connectTimeout = seconds is { } given ? TimeSpan.FromSeconds(given) : null;
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, tlsProvider, time, connectTimeout: connectTimeout);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 443, UseTls: true));
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 300000 milliseconds", result.ErrorMessage);
         Assert.AreEqual(TimeSpan.FromSeconds(300), TcpConnector.DefaultConnectTimeout);
@@ -102,9 +107,13 @@ public sealed partial class TcpConnectorTests
         using var caller = new CancellationTokenSource();
         var dialer = new StallingTcpDialer { OnStalled = caller.Cancel };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(), connectTimeout: OneSecond);
+        Diagnostics.Arrange("connect timeout", OneSecond);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
             async () => await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 80, UseTls: false), caller.Token));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("caller cancelled", true, caller.IsCancellationRequested);
     }
 
     [TestMethod]
@@ -116,8 +125,11 @@ public sealed partial class TcpConnectorTests
         var dialer = new StallingTcpDialer { OnStalled = caller.Cancel };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), time, connectTimeout: OneSecond);
 
+        Diagnostics.Arrange("connect timeout", OneSecond);
         var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 80, UseTls: false), caller.Token);
+        Diagnostics.Act("exit code", result.ExitCode);
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
     }
 }

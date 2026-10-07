@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -15,6 +17,9 @@ public sealed class BlowfishTests
     // "7654321 Now is the time for " with its trailing NUL, zero-padded to four blocks.
     private const string ChainPlaintext = "37363534333231204E6F77206973207468652074696D6520666F722000000000";
     private const string ChainCiphertext = "6B77B4D63006DEE605B156E27403979358DEB9E7154616D959F1652BD5FF92CC";
+
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
 
     // vectors-2.txt, "ecb test data": key, clear, cipher.
     [TestMethod]
@@ -53,13 +58,22 @@ public sealed class BlowfishTests
     [DataRow("FEDCBA9876543210", "FFFFFFFFFFFFFFFF", "6B5C5A9C5D9E0A5A")]
     public void EncryptBlockAndDecryptBlock_EcbVector_GiveThePublishedCipherAndClearBytes(string key, string clear, string cipher)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(Convert.FromHexString(key));
         byte[] encrypted = new byte[Blowfish.BlockSize];
         byte[] decrypted = new byte[Blowfish.BlockSize];
+        diagnostics.Arrange("vector source", "Schneier vectors-2.txt ecb test data");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("clear", Convert.FromHexString(clear));
+        diagnostics.Bytes("cipher", Convert.FromHexString(cipher));
 
         blowfish.EncryptBlock(Convert.FromHexString(clear), encrypted);
         blowfish.DecryptBlock(Convert.FromHexString(cipher), decrypted);
+        diagnostics.Act("encrypted", Convert.ToHexString(encrypted));
+        diagnostics.Act("decrypted", Convert.ToHexString(decrypted));
 
+        diagnostics.Diff("encrypted", Convert.FromHexString(cipher), encrypted);
+        diagnostics.Diff("decrypted", Convert.FromHexString(clear), decrypted);
         Assert.AreEqual(cipher, Convert.ToHexString(encrypted));
         Assert.AreEqual(clear, Convert.ToHexString(decrypted));
     }
@@ -92,11 +106,17 @@ public sealed class BlowfishTests
     [DataRow("F0E1D2C3B4A5968778695A4B3C2D1E0F0011223344556677", "05044B62FA52D080")]
     public void EncryptBlock_SetKeyVector_GivesThePublishedCipherBytes(string key, string cipher)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(Convert.FromHexString(key));
         byte[] encrypted = new byte[Blowfish.BlockSize];
+        diagnostics.Arrange("vector source", "Schneier vectors-2.txt set_key test data");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("clear", Convert.FromHexString("FEDCBA9876543210"));
 
         blowfish.EncryptBlock(Convert.FromHexString("FEDCBA9876543210"), encrypted);
+        diagnostics.Act("encrypted", Convert.ToHexString(encrypted));
 
+        diagnostics.Diff("encrypted", Convert.FromHexString(cipher), encrypted);
         Assert.AreEqual(cipher, Convert.ToHexString(encrypted));
     }
 
@@ -104,11 +124,18 @@ public sealed class BlowfishTests
     [TestMethod]
     public void EncryptCbc_ChainingModeVector_GivesThePublishedCipherText()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(Convert.FromHexString(ChainKey));
         byte[] ciphertext = new byte[ChainPlaintext.Length / 2];
+        diagnostics.Arrange("vector source", "Schneier vectors-2.txt chaining mode test data");
+        diagnostics.Bytes("key", Convert.FromHexString(ChainKey));
+        diagnostics.Bytes("initialization vector", Convert.FromHexString(ChainVector));
+        diagnostics.Bytes("plaintext", Convert.FromHexString(ChainPlaintext));
 
         blowfish.EncryptCbc(Convert.FromHexString(ChainVector), Convert.FromHexString(ChainPlaintext), ciphertext);
+        diagnostics.Act("ciphertext", Convert.ToHexString(ciphertext));
 
+        diagnostics.Diff("ciphertext", Convert.FromHexString(ChainCiphertext), ciphertext);
         Assert.AreEqual(ChainCiphertext, Convert.ToHexString(ciphertext));
     }
 
@@ -116,40 +143,61 @@ public sealed class BlowfishTests
     [TestMethod]
     public void DecryptCbc_ChainingModeVector_GivesThePublishedData()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(Convert.FromHexString(ChainKey));
         byte[] plaintext = new byte[ChainCiphertext.Length / 2];
+        diagnostics.Arrange("vector source", "Schneier vectors-2.txt chaining mode test data");
+        diagnostics.Bytes("key", Convert.FromHexString(ChainKey));
+        diagnostics.Bytes("initialization vector", Convert.FromHexString(ChainVector));
+        diagnostics.Bytes("ciphertext", Convert.FromHexString(ChainCiphertext));
 
         blowfish.DecryptCbc(Convert.FromHexString(ChainVector), Convert.FromHexString(ChainCiphertext), plaintext);
+        diagnostics.Act("plaintext", Convert.ToHexString(plaintext));
 
+        diagnostics.Diff("plaintext", Convert.FromHexString(ChainPlaintext), plaintext);
         Assert.AreEqual(ChainPlaintext, Convert.ToHexString(plaintext));
     }
 
     [TestMethod]
     public void EncryptCbcThenDecryptCbc_InPlaceAndChainedAcrossTwoCalls_RoundTrips()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(Convert.FromHexString(ChainKey));
         byte[] buffer = Convert.FromHexString(ChainPlaintext);
         byte[] vector = Convert.FromHexString(ChainVector);
+        diagnostics.Arrange("vector source", "Schneier vectors-2.txt chaining mode test data, in place across two calls");
+        diagnostics.Bytes("key", Convert.FromHexString(ChainKey));
+        diagnostics.Bytes("initialization vector", vector);
+        diagnostics.Bytes("plaintext", buffer);
 
         blowfish.EncryptCbc(vector, buffer.AsSpan(0, 16), buffer.AsSpan(0, 16));
         blowfish.EncryptCbc(buffer.AsSpan(8, 8), buffer.AsSpan(16), buffer.AsSpan(16));
+        diagnostics.Act("ciphertext", Convert.ToHexString(buffer));
+        diagnostics.Diff("ciphertext", Convert.FromHexString(ChainCiphertext), buffer);
         Assert.AreEqual(ChainCiphertext, Convert.ToHexString(buffer));
 
         byte[] secondVector = buffer[8..16];
         blowfish.DecryptCbc(vector, buffer.AsSpan(0, 16), buffer.AsSpan(0, 16));
         blowfish.DecryptCbc(secondVector, buffer.AsSpan(16), buffer.AsSpan(16));
+        diagnostics.Act("round-tripped plaintext", Convert.ToHexString(buffer));
+        diagnostics.Diff("round-tripped plaintext", Convert.FromHexString(ChainPlaintext), buffer);
         Assert.AreEqual(ChainPlaintext, Convert.ToHexString(buffer));
     }
 
     [TestMethod]
     public void EncryptCbc_EmptySource_WritesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(Convert.FromHexString(ChainKey));
         byte[] buffer = [0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5];
+        diagnostics.Arrange("source length", 0);
+        diagnostics.Bytes("untouched buffer", buffer);
 
         blowfish.EncryptCbc(Convert.FromHexString(ChainVector), [], buffer.AsSpan(0, 0));
         blowfish.DecryptCbc(Convert.FromHexString(ChainVector), [], buffer.AsSpan(0, 0));
+        diagnostics.Act("buffer", Convert.ToHexString(buffer));
 
+        diagnostics.Assert("buffer", "A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer));
         Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer));
     }
 
@@ -158,22 +206,33 @@ public sealed class BlowfishTests
     [DataRow(57)]
     public void Constructor_KeyOutsideOneTo56Bytes_ThrowsArgumentException(int length)
     {
-        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new Blowfish(new byte[length]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", length);
 
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new Blowfish(new byte[length]));
+        diagnostics.Act("exception ParamName", exception.ParamName);
+
+        diagnostics.Assert("ParamName", "key", exception.ParamName);
         Assert.AreEqual("key", exception.ParamName);
     }
 
     [TestMethod]
     public void Constructor_56ByteKey_IsAccepted()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(new byte[Blowfish.MaximumKeySize]);
         byte[] plaintext = new byte[Blowfish.BlockSize];
         byte[] ciphertext = new byte[Blowfish.BlockSize];
         byte[] decrypted = new byte[Blowfish.BlockSize];
+        diagnostics.Arrange("key length", Blowfish.MaximumKeySize);
+        diagnostics.Bytes("plaintext", plaintext);
 
         blowfish.EncryptBlock(plaintext, ciphertext);
         blowfish.DecryptBlock(ciphertext, decrypted);
+        diagnostics.Act("ciphertext", Convert.ToHexString(ciphertext));
+        diagnostics.Act("decrypted", Convert.ToHexString(decrypted));
 
+        diagnostics.Diff("decrypted", plaintext, decrypted);
         CollectionAssert.AreNotEqual(plaintext, ciphertext);
         CollectionAssert.AreEqual(plaintext, decrypted);
     }
@@ -183,11 +242,18 @@ public sealed class BlowfishTests
     [DataRow(8, 9, "destination")]
     public void EncryptBlockAndDecryptBlock_WrongLength_ThrowArgumentException(int sourceLength, int destinationLength, string parameterName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(new byte[16]);
+        diagnostics.Arrange("source length", sourceLength);
+        diagnostics.Arrange("destination length", destinationLength);
 
         ArgumentException encrypting = Assert.ThrowsExactly<ArgumentException>(() => blowfish.EncryptBlock(new byte[sourceLength], new byte[destinationLength]));
         ArgumentException decrypting = Assert.ThrowsExactly<ArgumentException>(() => blowfish.DecryptBlock(new byte[sourceLength], new byte[destinationLength]));
+        diagnostics.Act("encrypting ParamName", encrypting.ParamName);
+        diagnostics.Act("decrypting ParamName", decrypting.ParamName);
 
+        diagnostics.Assert("encrypting ParamName", parameterName, encrypting.ParamName);
+        diagnostics.Assert("decrypting ParamName", parameterName, decrypting.ParamName);
         Assert.AreEqual(parameterName, encrypting.ParamName);
         Assert.AreEqual(parameterName, decrypting.ParamName);
     }
@@ -198,11 +264,19 @@ public sealed class BlowfishTests
     [DataRow(7, 16, 16, "initializationVector")]
     public void EncryptCbcAndDecryptCbc_WrongLength_ThrowArgumentException(int vectorLength, int sourceLength, int destinationLength, string parameterName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Blowfish blowfish = new(new byte[16]);
+        diagnostics.Arrange("vector length", vectorLength);
+        diagnostics.Arrange("source length", sourceLength);
+        diagnostics.Arrange("destination length", destinationLength);
 
         ArgumentException encrypting = Assert.ThrowsExactly<ArgumentException>(() => blowfish.EncryptCbc(new byte[vectorLength], new byte[sourceLength], new byte[destinationLength]));
         ArgumentException decrypting = Assert.ThrowsExactly<ArgumentException>(() => blowfish.DecryptCbc(new byte[vectorLength], new byte[sourceLength], new byte[destinationLength]));
+        diagnostics.Act("encrypting ParamName", encrypting.ParamName);
+        diagnostics.Act("decrypting ParamName", decrypting.ParamName);
 
+        diagnostics.Assert("encrypting ParamName", parameterName, encrypting.ParamName);
+        diagnostics.Assert("decrypting ParamName", parameterName, decrypting.ParamName);
         Assert.AreEqual(parameterName, encrypting.ParamName);
         Assert.AreEqual(parameterName, decrypting.ParamName);
     }
@@ -210,13 +284,21 @@ public sealed class BlowfishTests
     [TestMethod]
     public void EveryOperation_AfterDispose_ThrowsObjectDisposedException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         Blowfish blowfish = new(new byte[16]);
         blowfish.Dispose();
         byte[] block = new byte[Blowfish.BlockSize];
+        diagnostics.Arrange("state", "disposed");
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.EncryptBlock(block, block));
-        Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.DecryptBlock(block, block));
-        Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.EncryptCbc(block, block, block));
-        Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.DecryptCbc(block, block, block));
+        ObjectDisposedException encryptBlock = Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.EncryptBlock(block, block));
+        ObjectDisposedException decryptBlock = Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.DecryptBlock(block, block));
+        ObjectDisposedException encryptCbc = Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.EncryptCbc(block, block, block));
+        ObjectDisposedException decryptCbc = Assert.ThrowsExactly<ObjectDisposedException>(() => blowfish.DecryptCbc(block, block, block));
+        diagnostics.Act("EncryptBlock exception", encryptBlock.GetType().Name);
+        diagnostics.Act("DecryptBlock exception", decryptBlock.GetType().Name);
+        diagnostics.Act("EncryptCbc exception", encryptCbc.GetType().Name);
+        diagnostics.Act("DecryptCbc exception", decryptCbc.GetType().Name);
+
+        diagnostics.Assert("exception type", nameof(ObjectDisposedException), encryptBlock.GetType().Name);
     }
 }

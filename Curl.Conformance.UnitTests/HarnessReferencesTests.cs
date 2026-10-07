@@ -1,4 +1,5 @@
 using System.Reflection;
+using Curl.Testing;
 
 namespace Curl.Conformance;
 
@@ -10,19 +11,33 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class HarnessReferencesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void HarnessLibraryLoadsBesideTheTests()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("assembly to load", "Curl.Conformance.UnitLibrary");
+
         Assembly harness = Assembly.Load("Curl.Conformance.UnitLibrary");
 
-        Assert.AreEqual("Curl.Conformance.UnitLibrary", harness.GetName().Name);
+        string? name = harness.GetName().Name;
+        diagnostics.Act("loaded assembly name", name);
+        diagnostics.Assert("assembly name", "Curl.Conformance.UnitLibrary", name);
+        Assert.AreEqual("Curl.Conformance.UnitLibrary", name);
     }
 
     [TestMethod]
     public void CurlRunnerLoadsBesideTheTests()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("assembly to load", "curl");
+
         Assembly runner = Assembly.Load("curl");
 
-        Assert.AreEqual("curl", runner.GetName().Name);
+        string? name = runner.GetName().Name;
+        diagnostics.Act("loaded assembly name", name);
+        diagnostics.Assert("assembly name", "curl", name);
+        Assert.AreEqual("curl", name);
     }
 }

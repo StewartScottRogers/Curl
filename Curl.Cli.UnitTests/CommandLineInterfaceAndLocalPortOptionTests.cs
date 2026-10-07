@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -13,11 +14,17 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     private const string Url = "http://127.0.0.1:1/";
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_WithoutEitherOption_LeavesThemUnset()
     {
         CommandLineOptions options = Accept();
 
+        Diagnostics.Assert("interface", null, options.Interface?.Value);
+        Diagnostics.Assert("local ports", null, options.LocalPorts);
         Assert.IsNull(options.Interface);
         Assert.IsNull(options.LocalPorts);
     }
@@ -38,7 +45,10 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     [DataRow("5-000000000000000000000000006", 5, 6)]
     public void Parse_LocalPort_RecordsTheRange(string value, int first, int last)
     {
-        Assert.AreEqual(new LocalPortRange(first, last), Accept("--local-port", value).LocalPorts);
+        LocalPortRange? localPorts = Accept("--local-port", value).LocalPorts;
+
+        Diagnostics.Assert("local ports", new LocalPortRange(first, last), localPorts);
+        Assert.AreEqual(new LocalPortRange(first, last), localPorts);
     }
 
     [TestMethod]
@@ -73,7 +83,7 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     [DataRow("65535-65536")]
     public void Parse_MalformedLocalPort_IsRefusedAsBadlyUsed(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--local-port", value, Url]);
+        CommandLineParseResult result = Parse(["--local-port", value, Url]);
 
         AssertRefused(result, "curl: option --local-port: is badly used here");
     }
@@ -81,19 +91,25 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     [TestMethod]
     public void Parse_LocalPortRange_CountsItsPorts()
     {
-        Assert.AreEqual(6, Accept("--local-port", "3000-3005").LocalPorts!.Value.Count);
+        int count = Accept("--local-port", "3000-3005").LocalPorts!.Value.Count;
+
+        Diagnostics.Assert("local port count", 6, count);
+        Assert.AreEqual(6, count);
     }
 
     [TestMethod]
     public void Parse_LocalPortWithAttachedValue_RecordsTheRange()
     {
-        Assert.AreEqual(new LocalPortRange(8, 9), Accept("--local-port=8-9").LocalPorts);
+        LocalPortRange? localPorts = Accept("--local-port=8-9").LocalPorts;
+
+        Diagnostics.Assert("local ports", new LocalPortRange(8, 9), localPorts);
+        Assert.AreEqual(new LocalPortRange(8, 9), localPorts);
     }
 
     [TestMethod]
     public void Parse_EmptyInterface_IsRefusedAsBlank()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--interface", "", Url]);
+        CommandLineParseResult result = Parse(["--interface", "", Url]);
 
         AssertRefused(result, "curl: option --interface: blank argument where content is expected");
     }
@@ -107,6 +123,11 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     {
         InterfaceBinding binding = Accept("--interface", value).Interface!;
 
+        Diagnostics.Assert("value", value, binding.Value);
+        Diagnostics.Assert("interface or host name", value, binding.InterfaceOrHostName);
+        Diagnostics.Assert("interface name", null, binding.InterfaceName);
+        Diagnostics.Assert("host name", null, binding.HostName);
+        Diagnostics.Assert("malformed", false, binding.IsMalformed);
         Assert.AreEqual(value, binding.Value);
         Assert.AreEqual(value, binding.InterfaceOrHostName);
         Assert.IsNull(binding.InterfaceName);
@@ -146,9 +167,9 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     {
         string longName = new('a', 255);
 
-        Assert.IsFalse(Accept("--interface", "host!" + longName).Interface!.IsMalformed);
-        Assert.IsFalse(Accept("--interface", "ifhost!lo!" + longName).Interface!.IsMalformed);
-        Assert.IsFalse(Accept("--interface", "ifhost!" + longName + "!h").Interface!.IsMalformed);
+        Assert.IsFalse(AcceptMalformed(false, "--interface", "host!" + longName));
+        Assert.IsFalse(AcceptMalformed(false, "--interface", "ifhost!lo!" + longName));
+        Assert.IsFalse(AcceptMalformed(false, "--interface", "ifhost!" + longName + "!h"));
     }
 
     [TestMethod]
@@ -156,8 +177,8 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     {
         string name = new('a', 254);
 
-        Assert.IsFalse(Accept("--interface", name).Interface!.IsMalformed);
-        Assert.IsFalse(Accept("--interface", "if!" + name).Interface!.IsMalformed);
+        Assert.IsFalse(AcceptMalformed(false, "--interface", name));
+        Assert.IsFalse(AcceptMalformed(false, "--interface", "if!" + name));
     }
 
     [TestMethod]
@@ -170,6 +191,11 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     {
         InterfaceBinding binding = Accept("--interface", value).Interface!;
 
+        Diagnostics.Assert("value", value, binding.Value);
+        Diagnostics.Assert("malformed", true, binding.IsMalformed);
+        Diagnostics.Assert("interface or host name", null, binding.InterfaceOrHostName);
+        Diagnostics.Assert("interface name", null, binding.InterfaceName);
+        Diagnostics.Assert("host name", null, binding.HostName);
         Assert.AreEqual(value, binding.Value);
         Assert.IsTrue(binding.IsMalformed);
         Assert.IsNull(binding.InterfaceOrHostName);
@@ -182,8 +208,8 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     {
         string name = new('a', 255);
 
-        Assert.IsTrue(Accept("--interface", name).Interface!.IsMalformed);
-        Assert.IsTrue(Accept("--interface", "if!" + name).Interface!.IsMalformed);
+        Assert.IsTrue(AcceptMalformed(true, "--interface", name));
+        Assert.IsTrue(AcceptMalformed(true, "--interface", "if!" + name));
     }
 
     [TestMethod]
@@ -191,6 +217,8 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     {
         CommandLineOptions options = Accept("--interface", "eth0", "--interface", "eth1", "--local-port", "1", "--local-port", "2");
 
+        Diagnostics.Assert("interface", "eth1", options.Interface?.Value);
+        Diagnostics.Assert("local ports", new LocalPortRange(2, 2), options.LocalPorts);
         Assert.AreEqual("eth1", options.Interface!.Value);
         Assert.AreEqual(new LocalPortRange(2, 2), options.LocalPorts);
     }
@@ -200,7 +228,7 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     [DataRow("--local-port")]
     public void Parse_OptionLast_IsRefusedAsNeedingParameter(string option)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, option]);
+        CommandLineParseResult result = Parse([Url, option]);
 
         AssertRefused(result, $"curl: option {option}: requires parameter");
     }
@@ -210,7 +238,7 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     [DataRow("local-port")]
     public void Parse_NegatedOption_IsRefusedAsNotReversible(string longName)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([$"--no-{longName}", "1", Url]);
+        CommandLineParseResult result = Parse([$"--no-{longName}", "1", Url]);
 
         AssertRefused(result, $"curl: option --no-{longName}: the given option cannot be reversed with a --no- prefix");
     }
@@ -218,8 +246,12 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     [TestMethod]
     public void Parse_BeforeNext_DoesNotReachTheNextGroup()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--interface", "eth0", "--local-port", "9", Url, "--next", Url]);
+        CommandLineParseResult result = Parse(["--interface", "eth0", "--local-port", "9", Url, "--next", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("group 0 interface", "eth0", result.Groups.Count > 0 ? result.Groups[0].Interface?.Value : null);
+        Diagnostics.Assert("group 1 interface", null, result.Groups.Count > 1 ? result.Groups[1].Interface?.Value : null);
+        Diagnostics.Assert("group 1 local ports", null, result.Groups.Count > 1 ? result.Groups[1].LocalPorts : null);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNotNull(result.Groups[0].Interface);
         Assert.IsNull(result.Groups[1].Interface);
@@ -229,35 +261,71 @@ public sealed class CommandLineInterfaceAndLocalPortOptionTests
     [TestMethod]
     public void TryParse_NullValue_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => LocalPortRange.TryParse(null!, out _));
+        Diagnostics.Arrange("value", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => LocalPortRange.TryParse(null!, out _));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void InterfaceBindingParse_NullValue_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => InterfaceBinding.Parse(null!));
+        Diagnostics.Arrange("value", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => InterfaceBinding.Parse(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
-    private static void AssertBinding(InterfaceBinding binding, string? interfaceName, string? hostName)
+    private void AssertBinding(InterfaceBinding binding, string? interfaceName, string? hostName)
     {
+        Diagnostics.Assert("interface or host name", null, binding.InterfaceOrHostName);
+        Diagnostics.Assert("interface name", interfaceName, binding.InterfaceName);
+        Diagnostics.Assert("host name", hostName, binding.HostName);
+        Diagnostics.Assert("malformed", false, binding.IsMalformed);
         Assert.IsNull(binding.InterfaceOrHostName);
         Assert.AreEqual(interfaceName, binding.InterfaceName);
         Assert.AreEqual(hostName, binding.HostName);
         Assert.IsFalse(binding.IsMalformed);
     }
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    private bool AcceptMalformed(bool expected, params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        bool isMalformed = Accept(arguments).Interface!.IsMalformed;
+        Diagnostics.Assert("malformed", expected, isMalformed);
+        return isMalformed;
+    }
 
+    private CommandLineOptions Accept(params string[] arguments)
+    {
+        CommandLineParseResult result = Parse([.. arguments, Url]);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string optionLine)
+    private void AssertRefused(CommandLineParseResult result, string optionLine)
     {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([optionLine, TryHelp]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { optionLine, TryHelp }, result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }

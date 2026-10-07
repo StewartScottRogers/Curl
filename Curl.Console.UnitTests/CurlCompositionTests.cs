@@ -260,6 +260,78 @@ public sealed partial class CurlCompositionTests
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
+    public async Task CreateRunnerOverConnectors_WriteOutFileOpenerGiven_OpensTheOutputFileOnDisk()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"curl-bl1445-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        string source = Path.Combine(directory, "source.bin");
+        string target = Path.Combine(directory, "w.txt");
+        await System.IO.File.WriteAllBytesAsync(source, [1]);
+
+        try
+        {
+            using MemoryStream standardOutput = new();
+            using MemoryStream standardError = new();
+            using MemoryStream standardInput = new();
+
+            int exitCode = await CurlComposition
+                .CreateRunner(
+                    standardOutput,
+                    standardError,
+                    standardInput,
+                    new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+                    new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+                    writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: false))
+                .RunAsync([new Uri(source).AbsoluteUri, "-w", $"%output{{{target}}}F\\n"]);
+
+            Assert.AreEqual(0, exitCode);
+            Assert.AreEqual("F\n", await System.IO.File.ReadAllTextAsync(target));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task CreateRunnerOverConnectors_WritesProgressMeter_WritesTheMeterOnlyWhenAsked(bool writesProgressMeter)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"curl-bl1445-{Guid.NewGuid():N}.bin");
+        await System.IO.File.WriteAllBytesAsync(path, [1, 2, 3]);
+
+        try
+        {
+            using MemoryStream standardOutput = new();
+            using MemoryStream standardError = new();
+            using MemoryStream standardInput = new();
+
+            int exitCode = await CurlComposition
+                .CreateRunner(
+                    standardOutput,
+                    standardError,
+                    standardInput,
+                    new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+                    new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+                    writesProgressMeter: writesProgressMeter)
+                .RunAsync([new Uri(path).AbsoluteUri, "-o", Path.ChangeExtension(path, ".out")]);
+
+            Assert.AreEqual(0, exitCode);
+            string expected = writesProgressMeter
+                ? string.Concat(ProgressMeterLines.HeaderLines(null).Append(ProgressMeterLines.ZeroStatusLine).Select(line => line + Environment.NewLine))
+                : string.Empty;
+            Assert.AreEqual(expected, Encoding.UTF8.GetString(standardError.ToArray()));
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+            System.IO.File.Delete(Path.ChangeExtension(path, ".out"));
+        }
+    }
+
+    [TestMethod]
     public void CreateTransports_BothConnectors_ShareOneSystemDnsResolverAndTimeProviderSystem()
     {
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());

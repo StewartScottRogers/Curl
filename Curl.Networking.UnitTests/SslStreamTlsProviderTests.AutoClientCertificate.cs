@@ -35,6 +35,7 @@ public sealed partial class SslStreamTlsProviderTests
         var handshake = await HandshakeWithClientCertificateRequestAsync(
             new TlsClientOptions(Insecure: true, AutoClientCertificate: true), SchannelBuild, new FakeClientCertificateStore { Certificates = null });
 
+        Diagnostics.Assert("received certificate", null, handshake.Received);
         Assert.AreEqual(CurlExitCode.Ok, handshake.Result.ExitCode);
         Assert.IsNull(handshake.Received);
     }
@@ -46,6 +47,7 @@ public sealed partial class SslStreamTlsProviderTests
 
         var handshake = await HandshakeWithClientCertificateRequestAsync(new TlsClientOptions(Insecure: true), SchannelBuild, store);
 
+        Diagnostics.Assert("stores opened", 0, store.Opened.Count);
         Assert.IsNull(handshake.Received);
         Assert.IsEmpty(store.Opened);
     }

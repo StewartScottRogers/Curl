@@ -21,6 +21,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var handshakeOptions = await CaptureHandshakeOptionsAsync(new TlsClientOptions(Insecure: true), Http11);
 
+        Diagnostics.Assert("offered protocol count", 1, handshakeOptions.ApplicationProtocols?.Count);
         Assert.AreEqual(SslApplicationProtocol.Http11, Assert.ContainsSingle(handshakeOptions.ApplicationProtocols!));
     }
 
@@ -29,6 +30,7 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var handshakeOptions = await CaptureHandshakeOptionsAsync(new TlsClientOptions(Insecure: true, UseAlpn: false), Http11);
 
+        Diagnostics.Assert("ALPN extension", null, handshakeOptions.ApplicationProtocols);
         Assert.IsNull(handshakeOptions.ApplicationProtocols);
     }
 
@@ -39,6 +41,7 @@ public sealed partial class SslStreamTlsProviderTests
 
         var result = await AlpnReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, Http11);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         var handshake = Assert.ContainsSingle(events.Handshakes);
         CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
@@ -54,6 +57,7 @@ public sealed partial class SslStreamTlsProviderTests
 
         var result = await AlpnReportingHandshakeAsync(new TlsClientOptions(Insecure: true, UseAlpn: false), events, Http11);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.IsEmpty(Assert.ContainsSingle(events.Handshakes).OfferedApplicationProtocols);
         await result.Connection!.DisposeAsync();
@@ -62,45 +66,74 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithNullApplicationProtocols_ThrowsArgumentNullException()
     {
+        Diagnostics.Arrange("application protocols", "null");
         var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
 
         var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () =>
             await provider.AuthenticateAsClientAsync(
                 new FakeConnection(), CertificateHost, new RecordingTransferEvents(), isProxy: false, null!, CancellationToken.None));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "applicationProtocols", exception.ParamName);
         Assert.AreEqual("applicationProtocols", exception.ParamName);
     }
 
     [TestMethod]
     public void NegotiatedApplicationProtocol_WhenTheServerSelectedNone_IsNull()
     {
+        Diagnostics.Arrange("server selected", "none");
+
+        var negotiated = SslStreamTlsProvider.NegotiatedApplicationProtocol(default);
+
+        Diagnostics.Act("negotiated", negotiated);
+        Diagnostics.Assert("negotiated", null, negotiated);
         Assert.IsNull(SslStreamTlsProvider.NegotiatedApplicationProtocol(default));
     }
 
     [TestMethod]
     public void NegotiatedApplicationProtocol_WhenTheServerSelectedHttp11_NamesIt()
     {
+        Diagnostics.Arrange("server selected", "http/1.1");
+
+        var negotiated = SslStreamTlsProvider.NegotiatedApplicationProtocol(SslApplicationProtocol.Http11);
+
+        Diagnostics.Act("negotiated", negotiated);
+        Diagnostics.Assert("negotiated", "http/1.1", negotiated);
         Assert.AreEqual("http/1.1", SslStreamTlsProvider.NegotiatedApplicationProtocol(SslApplicationProtocol.Http11));
     }
 
     [TestMethod]
     public void ToSslApplicationProtocols_WithNone_IsNullSoNoAlpnExtensionIsSent()
     {
+        Diagnostics.Arrange("application protocols", "none");
+
+        var converted = SslStreamTlsProvider.ToSslApplicationProtocols([]);
+
+        Diagnostics.Act("converted", converted);
+        Diagnostics.Assert("converted", null, converted);
         Assert.IsNull(SslStreamTlsProvider.ToSslApplicationProtocols([]));
     }
 
     [TestMethod]
     public void ToSslApplicationProtocols_WithSeveral_KeepsTheirOrder()
     {
+        Diagnostics.Arrange("application protocols", "h2,http/1.1");
+
+        var converted = SslStreamTlsProvider.ToSslApplicationProtocols(["h2", "http/1.1"]);
+
+        Diagnostics.Act("converted", converted is null ? "null" : string.Join(",", converted));
+        Diagnostics.Assert("converted", "h2,http/1.1", converted is null ? "null" : string.Join(",", converted));
         CollectionAssert.AreEqual(
             new[] { SslApplicationProtocol.Http2, SslApplicationProtocol.Http11 },
             SslStreamTlsProvider.ToSslApplicationProtocols(["h2", "http/1.1"]));
     }
 
-    private static async Task<SslClientAuthenticationOptions> CaptureHandshakeOptionsAsync(
+    private async Task<SslClientAuthenticationOptions> CaptureHandshakeOptionsAsync(
         TlsClientOptions options,
         IReadOnlyList<string> applicationProtocols)
     {
+        ArrangeOptions(options);
+        Diagnostics.Arrange("application protocols", string.Join(",", applicationProtocols));
         SslClientAuthenticationOptions? handshakeOptions = null;
         var provider = new SslStreamTlsProvider(options, SchannelBuild)
         {
@@ -120,20 +153,29 @@ public sealed partial class SslStreamTlsProviderTests
             applicationProtocols,
             CancellationToken.None);
 
+        Diagnostics.Act("offered ALPN", handshakeOptions?.ApplicationProtocols is { } offered ? string.Join(",", offered) : "no extension");
         return handshakeOptions!;
     }
 
-    private static async Task<ConnectResult> AlpnReportingHandshakeAsync(
+    private async Task<ConnectResult> AlpnReportingHandshakeAsync(
         TlsClientOptions options,
         RecordingTransferEvents events,
         IReadOnlyList<string> applicationProtocols)
     {
+        ArrangeOptions(options);
+        Diagnostics.Arrange("application protocols", string.Join(",", applicationProtocols));
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.None);
         var provider = new SslStreamTlsProvider(options, SchannelBuild);
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, events, isProxy: false, applicationProtocols, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, events, isProxy: false, applicationProtocols, CancellationToken.None);
+        }
+
+        ActResult(result);
 
         if (result.Connection is null)
         {

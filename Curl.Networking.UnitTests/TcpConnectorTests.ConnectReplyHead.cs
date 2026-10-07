@@ -22,8 +22,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
         var events = new HeadRecordingTransferEvents();
 
-        var result = await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget with { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { reply }, events.Heads);
     }
@@ -36,8 +37,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
         var events = new HeadRecordingTransferEvents();
 
-        var result = await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget with { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "HTTP/1.1 403 Forbidden\r\nContent-Length: 3\r\n\r\n" }, events.Heads);
     }
@@ -50,8 +52,9 @@ public sealed partial class TcpConnectorTests
         var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, connection);
         var events = new HeadRecordingTransferEvents();
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { challenge, EstablishedReply }, events.Heads);
     }
@@ -63,8 +66,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
         var events = new HeadRecordingTransferEvents();
 
-        var result = await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, PlainTarget with { Events = events });
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.IsEmpty(events.Heads);
     }

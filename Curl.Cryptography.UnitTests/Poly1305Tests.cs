@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -21,6 +23,9 @@ public sealed class Poly1305Tests
 
     private const string Jabberwocky =
         "2754776173206272696c6c69672c20616e642074686520736c6974687920746f7665730a446964206779726520616e642067696d626c6520696e2074686520776162653a0a416c6c206d696d737920776572652074686520626f726f676f7665732c0a416e6420746865206d6f6d65207261746873206f757467726162652e";
+
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
 
     // RFC 8439 section 2.5.2, then Appendix A.3 test vectors #1 to #11 (key is r then s).
     [TestMethod]
@@ -46,26 +51,47 @@ public sealed class Poly1305Tests
         "13000000000000000000000000000000")]
     public void ComputeTag_Rfc8439Vector_GivesThePublishedTag(string key, string message, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] tag = new byte[Poly1305.TagSize];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.5.2 and Appendix A.3");
+        diagnostics.Bytes("key (r then s)", Convert.FromHexString(key));
+        diagnostics.Bytes("message", Convert.FromHexString(message));
 
         Poly1305.ComputeTag(Convert.FromHexString(key), Convert.FromHexString(message), tag);
+        diagnostics.Act("tag", Convert.ToHexStringLower(tag));
 
+        diagnostics.Diff("tag", Convert.FromHexString(expected), tag);
         Assert.AreEqual(expected, Convert.ToHexStringLower(tag));
     }
 
     [TestMethod]
     public void ComputeTag_EmptyMessage_GivesS()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] tag = new byte[Poly1305.TagSize];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.5.2 key, empty message");
+        diagnostics.Bytes("key (r then s)", Convert.FromHexString(ForumKey));
 
         Poly1305.ComputeTag(Convert.FromHexString(ForumKey), [], tag);
+        diagnostics.Act("tag", Convert.ToHexStringLower(tag));
 
+        diagnostics.Diff("tag", Convert.FromHexString("0103808afb0db2fd4abff6af4149f51b"), tag);
         Assert.AreEqual("0103808afb0db2fd4abff6af4149f51b", Convert.ToHexStringLower(tag));
     }
 
     [TestMethod]
     public void Verify_Rfc8439Section252Tag_ReturnsTrue()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.5.2");
+        diagnostics.Bytes("key (r then s)", Convert.FromHexString(ForumKey));
+        diagnostics.Bytes("message", Convert.FromHexString(ForumMessage));
+        diagnostics.Bytes("tag", Convert.FromHexString(ForumTag));
+
+        bool verified = Poly1305.Verify(Convert.FromHexString(ForumKey), Convert.FromHexString(ForumMessage), Convert.FromHexString(ForumTag));
+        diagnostics.Act("verified", verified);
+
+        diagnostics.Assert("verified", true, verified);
         Assert.IsTrue(Poly1305.Verify(Convert.FromHexString(ForumKey), Convert.FromHexString(ForumMessage), Convert.FromHexString(ForumTag)));
     }
 
@@ -74,18 +100,33 @@ public sealed class Poly1305Tests
     [DataRow(15)]
     public void Verify_TagWithAFlippedBit_ReturnsFalse(int flippedByte)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] tag = Convert.FromHexString(ForumTag);
         tag[flippedByte] ^= 0x80;
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.5.2, tag with bit 7 of one byte flipped");
+        diagnostics.Arrange("flipped byte", flippedByte);
+        diagnostics.Bytes("tag", tag);
 
+        bool verified = Poly1305.Verify(Convert.FromHexString(ForumKey), Convert.FromHexString(ForumMessage), tag);
+        diagnostics.Act("verified", verified);
+
+        diagnostics.Assert("verified", false, verified);
         Assert.IsFalse(Poly1305.Verify(Convert.FromHexString(ForumKey), Convert.FromHexString(ForumMessage), tag));
     }
 
     [TestMethod]
     public void Verify_MessageWithAFlippedBit_ReturnsFalse()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] message = Convert.FromHexString(ForumMessage);
         message[^1] ^= 1;
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.5.2, message with its last bit flipped");
+        diagnostics.Bytes("message", message);
 
+        bool verified = Poly1305.Verify(Convert.FromHexString(ForumKey), message, Convert.FromHexString(ForumTag));
+        diagnostics.Act("verified", verified);
+
+        diagnostics.Assert("verified", false, verified);
         Assert.IsFalse(Poly1305.Verify(Convert.FromHexString(ForumKey), message, Convert.FromHexString(ForumTag)));
     }
 
@@ -94,12 +135,25 @@ public sealed class Poly1305Tests
     [DataRow(32, 15)]
     public void ComputeTag_WrongLength_Throws(int keyLength, int tagLength)
     {
-        Assert.ThrowsExactly<ArgumentException>(() => Poly1305.ComputeTag(new byte[keyLength], [], new byte[tagLength]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", keyLength);
+        diagnostics.Arrange("tag length", tagLength);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => Poly1305.ComputeTag(new byte[keyLength], [], new byte[tagLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void Verify_TagIsNot16Bytes_Throws()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => Poly1305.Verify(new byte[Poly1305.KeySize], [], new byte[Poly1305.TagSize + 1]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("tag length", Poly1305.TagSize + 1);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => Poly1305.Verify(new byte[Poly1305.KeySize], [], new byte[Poly1305.TagSize + 1]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 }

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -28,6 +29,9 @@ public sealed class GaloisCounterModeTests
         "42831ec2217774244b7221b784d0d49ce3aa212f2c02a4e035c17e2329aca12e" +
         "21d514b25466931c7d8f6a5aac84aa051ba30b396a0aac973d58e091";
     private const string TestCase4Tag = "5bc94fbc3221a5db94fae95ae7121a47";
+
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     [DataRow(1, ZeroBlock, ZeroIv, "", "", "", "58e2fccefa7e3061367f1d57a4e7455a")]
@@ -67,10 +71,21 @@ public sealed class GaloisCounterModeTests
         byte[] decrypted = new byte[length];
         using AesBlockCipher aes = new(Convert.FromHexString(key));
         using GaloisCounterMode mode = new(aes);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", $"McGrew and Viega, \"The Galois/Counter Mode of Operation (GCM)\", appendix B, Test Case {testCase}");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("nonce", nonce);
+        diagnostics.Bytes("plaintext", plaintextBytes);
+        diagnostics.Bytes("associated data", associatedDataBytes);
 
         mode.Encrypt(nonce, plaintextBytes, actualCiphertext, actualTag, associatedDataBytes);
         bool succeeded = mode.TryDecrypt(nonce, expectedCiphertext, Convert.FromHexString(tag), decrypted, associatedDataBytes);
+        diagnostics.Act("decrypted", succeeded);
 
+        diagnostics.Diff("ciphertext", expectedCiphertext, actualCiphertext);
+        diagnostics.Diff("tag", Convert.FromHexString(tag), actualTag);
+        diagnostics.Assert("decrypted", true, succeeded);
+        diagnostics.Diff("plaintext", plaintextBytes, decrypted);
         Assert.AreEqual(Convert.ToHexString(expectedCiphertext), Convert.ToHexString(actualCiphertext), $"ciphertext of Test Case {testCase}");
         Assert.AreEqual(tag, Convert.ToHexString(actualTag).ToLowerInvariant(), $"tag of Test Case {testCase}");
         Assert.IsTrue(succeeded, $"Test Case {testCase} decrypts");
@@ -99,9 +114,17 @@ public sealed class GaloisCounterModeTests
         byte[] decrypted = new byte[ciphertext.Length];
         using AesBlockCipher aes = new(Convert.FromHexString(SpecificationKey));
         using GaloisCounterMode mode = new(aes);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "McGrew and Viega, GCM appendix B, Test Case 4, one bit flipped");
+        diagnostics.Arrange("flipped", $"{flippedInput} bit {bit}");
+        diagnostics.Bytes("ciphertext", ciphertext);
+        diagnostics.Bytes("tag", tag);
+        diagnostics.Bytes("associated data", associatedData);
 
         bool succeeded = mode.TryDecrypt(Convert.FromHexString(SpecificationIv), ciphertext, tag, decrypted, associatedData);
+        diagnostics.Act("decrypted", succeeded);
 
+        diagnostics.Assert("decrypted", false, succeeded);
         Assert.IsFalse(succeeded, $"{flippedInput} with bit {bit} flipped");
     }
 
@@ -111,6 +134,10 @@ public sealed class GaloisCounterModeTests
     [DataRow(32, 3)]
     public void EncryptAndTryDecrypt_OverAes_MatchAesGcmOnRandomInputs(int keyLength, int seed)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", $"the BCL's AesGcm on seeded random inputs (seed {seed}), plaintexts of 0 to 67 bytes");
+        diagnostics.Arrange("key length", keyLength);
+        using var phase = diagnostics.Phase("compare with AesGcm");
         Random random = new(seed);
         for (int plaintextLength = 0; plaintextLength <= 67; plaintextLength++)
         {
@@ -133,12 +160,26 @@ public sealed class GaloisCounterModeTests
 
             mode.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
             bool succeeded = mode.TryDecrypt(nonce, expectedCiphertext, expectedTag, decrypted, associatedData);
+            if (!succeeded || !expectedCiphertext.AsSpan().SequenceEqual(ciphertext) || !expectedTag.AsSpan().SequenceEqual(tag) || !plaintext.AsSpan().SequenceEqual(decrypted))
+            {
+                diagnostics.Arrange("failing plaintext length", plaintextLength);
+                diagnostics.Bytes("key", key);
+                diagnostics.Bytes("nonce", nonce);
+                diagnostics.Bytes("plaintext", plaintext);
+                diagnostics.Bytes("associated data", associatedData);
+                diagnostics.Diff("ciphertext", expectedCiphertext, ciphertext);
+                diagnostics.Diff("tag", expectedTag, tag);
+                diagnostics.Diff("plaintext", plaintext, decrypted);
+            }
 
             Assert.AreEqual(Convert.ToHexString(expectedCiphertext), Convert.ToHexString(ciphertext), $"ciphertext of {plaintextLength} bytes");
             Assert.AreEqual(Convert.ToHexString(expectedTag), Convert.ToHexString(tag), $"tag of {plaintextLength} bytes");
             Assert.IsTrue(succeeded);
             Assert.AreEqual(Convert.ToHexString(plaintext), Convert.ToHexString(decrypted));
         }
+
+        diagnostics.Act("plaintext lengths compared", 68);
+        diagnostics.Assert("every ciphertext, tag and plaintext matches AesGcm", true, true);
     }
 
     [TestMethod]
@@ -152,10 +193,20 @@ public sealed class GaloisCounterModeTests
         byte[] tag = new byte[GaloisCounterMode.TagSize];
         using AesBlockCipher aes = new(key);
         using GaloisCounterMode mode = new(aes);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "seeded random key, nonce and 50-byte plaintext (seed 4)");
+        diagnostics.Bytes("key", key);
+        diagnostics.Bytes("nonce", nonce);
+        diagnostics.Bytes("plaintext", plaintext);
 
         mode.Encrypt(nonce, buffer, buffer, tag, []);
+        diagnostics.Bytes("ciphertext", buffer);
+        diagnostics.Bytes("tag", tag);
         bool succeeded = mode.TryDecrypt(nonce, buffer, tag, buffer, []);
+        diagnostics.Act("decrypted", succeeded);
 
+        diagnostics.Assert("decrypted", true, succeeded);
+        diagnostics.Diff("plaintext", plaintext, buffer);
         Assert.IsTrue(succeeded);
         Assert.AreEqual(Convert.ToHexString(plaintext), Convert.ToHexString(buffer));
     }
@@ -167,7 +218,20 @@ public sealed class GaloisCounterModeTests
     {
         UInt128 one = new(0x8000000000000000UL, 0);
         UInt128 value = new(0x0123456789ABCDEFUL, 0xFEDCBA9876543210UL);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("one", one.ToString("X32", System.Globalization.CultureInfo.InvariantCulture));
+        diagnostics.Arrange("value", value.ToString("X32", System.Globalization.CultureInfo.InvariantCulture));
 
+        UInt128 right = GaloisCounterMode.Multiply(value, one);
+        UInt128 left = GaloisCounterMode.Multiply(one, value);
+        UInt128 zero = GaloisCounterMode.Multiply(value, UInt128.Zero);
+        diagnostics.Act("value * one", right.ToString("X32", System.Globalization.CultureInfo.InvariantCulture));
+        diagnostics.Act("one * value", left.ToString("X32", System.Globalization.CultureInfo.InvariantCulture));
+        diagnostics.Act("value * zero", zero.ToString("X32", System.Globalization.CultureInfo.InvariantCulture));
+
+        diagnostics.Assert("value * one", value, right);
+        diagnostics.Assert("one * value", value, left);
+        diagnostics.Assert("value * zero", UInt128.Zero, zero);
         Assert.AreEqual(value, GaloisCounterMode.Multiply(value, one));
         Assert.AreEqual(value, GaloisCounterMode.Multiply(one, value));
         Assert.AreEqual(UInt128.Zero, GaloisCounterMode.Multiply(value, UInt128.Zero));

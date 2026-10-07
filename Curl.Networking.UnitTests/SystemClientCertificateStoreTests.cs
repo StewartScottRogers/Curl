@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -7,13 +9,24 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class SystemClientCertificateStoreTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     [DataRow(nameof(ClientCertificateStoreLocation.CurrentUser))]
     [DataRow(nameof(ClientCertificateStoreLocation.LocalMachine))]
     public void OpenCertificates_WithTheMyStoreOnWindows_ReturnsItsCertificates(string location)
     {
-        Assert.IsNotNull(new SystemClientCertificateStore().OpenCertificates(Enum.Parse<ClientCertificateStoreLocation>(location), "MY"));
+        Diagnostics.Arrange("location, store", $"{location}, MY");
+
+        var certificates = new SystemClientCertificateStore().OpenCertificates(Enum.Parse<ClientCertificateStoreLocation>(location), "MY");
+
+        Diagnostics.Act("store opened", certificates is not null);
+        Diagnostics.Assert("store opened", true, certificates is not null);
+
+        Assert.IsNotNull(certificates);
     }
 
     [TestMethod]
@@ -21,7 +34,14 @@ public sealed class SystemClientCertificateStoreTests
     {
         var storeName = "NoSuchStore" + Guid.NewGuid().ToString("N");
 
-        Assert.IsNull(new SystemClientCertificateStore().OpenCertificates(ClientCertificateStoreLocation.CurrentUser, storeName));
+        Diagnostics.Arrange("location, store", "CurrentUser, NoSuchStore<random>");
+
+        var certificates = new SystemClientCertificateStore().OpenCertificates(ClientCertificateStoreLocation.CurrentUser, storeName);
+
+        Diagnostics.Act("store opened", certificates is not null);
+        Diagnostics.Assert("store opened", false, certificates is not null);
+
+        Assert.IsNull(certificates);
     }
 
     [TestMethod]
@@ -33,6 +53,13 @@ public sealed class SystemClientCertificateStoreTests
     [DataRow(nameof(ClientCertificateStoreLocation.LocalMachineEnterprise))]
     public void OpenCertificates_WithALocationX509StoreCannotReach_ReturnsNull(string location)
     {
-        Assert.IsNull(new SystemClientCertificateStore().OpenCertificates(Enum.Parse<ClientCertificateStoreLocation>(location), "MY"));
+        Diagnostics.Arrange("location, store", $"{location}, MY");
+
+        var certificates = new SystemClientCertificateStore().OpenCertificates(Enum.Parse<ClientCertificateStoreLocation>(location), "MY");
+
+        Diagnostics.Act("store opened", certificates is not null);
+        Diagnostics.Assert("store opened", false, certificates is not null);
+
+        Assert.IsNull(certificates);
     }
 }

@@ -23,6 +23,14 @@ Terms used by `Curl.Cli.UnitLibrary`. How they fit together is in
 | Try-help line | The second standard-error line of every refusal, `curl: try 'curl --help' or 'curl --manual' for more information`. | `CommandLineRefusal.TryHelpLine` |
 | Value option | An option that takes a value, attached (`-ofile`, `--output=file`) or as the next argument. Built with `CommandLineOption.Text`, which refuses an empty value as blank, or with `CommandLineOption.Value`, whose applier decides what an empty value means. | `CommandLineOption.Text`, `CommandLineOption.Value`, `TakesValue == true` |
 
+## Testing
+
+Terms used by the test projects. The method is in [Adversarial testing](Adversarial-Testing.md).
+
+| Term | Meaning | Name in code |
+| --- | --- | --- |
+| Adversarial black-box test | A unit test that attacks a library through its public surface only, with input chosen to break it - a boundary, malformed input, an invalid partition, or an unusual order, timing or concurrency - and checks the answer against an oracle: real curl measured with `Record-CurlExchange.ps1` where the behaviour shows on the command line, otherwise the specification and the library's documented contract. | none (a test written to the method) |
+
 ## The audit office
 
 Terms used by the independent audit office under `Audit/`

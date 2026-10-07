@@ -89,8 +89,13 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public void Constructor_WithNullCertificateStore_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(
+        Diagnostics.Arrange("certificate store", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => new SslStreamTlsProvider(new TlsClientOptions(), SchannelBuild, TimeProvider.System, null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     // A store's certificate has a persisted key, which Schannel signs with; a PKCS#12 round

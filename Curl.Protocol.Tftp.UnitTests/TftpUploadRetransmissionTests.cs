@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Tftp.Fakes;
@@ -232,6 +233,39 @@ public sealed class TftpUploadRetransmissionTests
         Assert.AreEqual("Received too short packet", result.ErrorMessage);
     }
 
+    [TestMethod]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionRefused)]
+    public async Task ExecuteAsync_EveryReceiveRefused_ReportsTooShortResendsAtOnceThenCouldntConnect(SocketError error)
+    {
+        var refusal = FallsSilentDatagramChannel.Refusal(error);
+        var channel = Channel(refusal, refusal, refusal);
+        var events = new RecordingTransferEvents();
+
+        var result = await Run(channel, Context(connectTimeout: TimeSpan.FromSeconds(10), events: events));
+
+        AssertWriteRequestsSentAt(channel, 0, 0, 0);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Received too short packet", result.ErrorMessage);
+        Assert.AreEqual(3, events.Steps.Count(step => step == "Received too short packet"));
+    }
+
+    [TestMethod]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionRefused)]
+    public async Task ExecuteAsync_ReceiveRefusedAfterAck0_ResendsData1AtOnceAndPinsNoEndPoint(SocketError error)
+    {
+        var channel = Channel(FallsSilentDatagramChannel.Refusal(error), Ack(0), FallsSilentDatagramChannel.Refusal(error), Ack(1), Ack(2));
+
+        var result = await Run(channel, Context());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsNull(result.ErrorMessage);
+        CollectionAssert.AreEqual(channel.Sent[0].Datagram, channel.Sent[1].Datagram);
+        Assert.AreEqual(ServerEndPoint, channel.Sent[1].Destination);
+        CollectionAssert.AreEqual(new ushort[] { 1, 1, 2 }, DataBlocksSent(channel));
+    }
+
     private static async Task<TransferResult> Run(FallsSilentDatagramChannel channel, TransferContext context) =>
         await new TftpProtocolHandler(new RecordingDatagramConnector(DatagramOpenResult.Opened(channel)))
             .ExecuteAsync(context);
@@ -305,9 +339,14 @@ public sealed class TftpUploadRetransmissionTests
     private FallsSilentDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script) =>
         new(ServerEndPoint, clock, script);
 
-    private TransferContext Context(TimeSpan? connectTimeout = null, TimeSpan? maxTime = null, long? operationStarted = null) =>
+    private TransferContext Context(
+        TimeSpan? connectTimeout = null,
+        TimeSpan? maxTime = null,
+        long? operationStarted = null,
+        RecordingTransferEvents? events = null) =>
         new()
         {
+            Events = events ?? new RecordingTransferEvents(),
             Url = CurlUrl.Parse("tftp://h/dest.txt"),
             Output = new MemoryStream(),
             Upload = new MemoryStream(Upload),

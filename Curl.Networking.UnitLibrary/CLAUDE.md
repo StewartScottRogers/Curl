@@ -521,7 +521,10 @@ log nothing themselves. Tests record lines through `Fakes/RecordingDiagnosticLog
 Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`,
 `IConnection`, `IDatagramChannel`) or `ITcpDialer`, plus an injected `TimeProvider`, so the tests in
 `Curl.Networking.UnitTests` drive every branch with fakes and no network.
-`StreamConnection` wraps any `Stream`, so it is tested over a `MemoryStream`. `UdpDatagramConnector` opens channels
+`StreamConnection` wraps any `Stream`, so it is tested over a `MemoryStream`. Per ADR-0419
+(BL-1450) on Windows it reports a read failing with `SocketError.ConnectionAborted` as
+`ConnectionReset` (`ReportsAbortedReadAsReset`), since Windows gives a receive issued a few
+milliseconds after a peer's RST WSAECONNABORTED where curl's prompt `recv` sees WSAECONNRESET. `UdpDatagramConnector` opens channels
 through an internal seam, so its tests need no socket. `UdpDatagramChannelTests` opens,
 cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over

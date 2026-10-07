@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -30,12 +31,16 @@ public sealed class CommandLineDefaultConfigFileTests
         "curl: option 'bogus-QRC' is unknown",
     ];
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Parse_DefaultConfigFile_IsAppliedBeforeTheCommandLine()
     {
         // curl -s -w '[%{urlnum}%{url_effective}]' http://127.0.0.1:2/ printed [0http://127.0.0.1:1/][1http://127.0.0.1:2/].
         CommandLineParseResult result = Parse(["http://127.0.0.1:2/"], "url = http://127.0.0.1:1/\n");
 
+        TestDiagnostics.For(TestContext).Assert("default config file", Curlrc, result.Options?.DefaultConfigFile);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "http://127.0.0.1:1/", "http://127.0.0.1:2/" }, result.Options.Urls.ToArray());
         Assert.AreEqual(Curlrc, result.Options.DefaultConfigFile);
@@ -48,6 +53,7 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl (no arguments) with the file's URL tried it: exit 7, not the try-help line.
         CommandLineParseResult result = Parse([], "url = http://127.0.0.1:1/\n");
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "http://127.0.0.1:1/" }, result.Options.Urls.ToArray());
     }
@@ -58,6 +64,9 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl (no arguments): the two error lines, then the try-help line; exit 2.
         CommandLineParseResult result = Parse([], "bogus-QRC\n");
 
+        TestDiagnostics.For(TestContext).Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        AssertWarningLines(BogusLineErrorLines, result);
+        AssertStandardErrorLines([TryHelp], result);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(BogusLineErrorLines, result.WarningLines.ToArray());
         CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal.StandardErrorLines.ToArray());
@@ -69,6 +78,8 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl (no arguments) with help in .curlrc: the usage page, then the try-help line; exit 2 (2026-09-27).
         CommandLineParseResult result = Parse([], "help\n");
 
+        TestDiagnostics.For(TestContext).Assert("config file help subjects", "[null]", CommandLineParseDiagnostics.QuoteEach(result.ConfigFileHelpSubjects));
+        AssertStandardErrorLines([TryHelp], result);
         CollectionAssert.AreEqual(new string?[] { null }, result.ConfigFileHelpSubjects.ToArray());
         CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal!.StandardErrorLines.ToArray());
     }
@@ -78,6 +89,8 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         CommandLineParseResult result = Parse([], new RecordingDataFileReader());
 
+        AssertStandardErrorLines([TryHelp], result);
+        AssertWarningLines([], result);
         CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal!.StandardErrorLines.ToArray());
         Assert.IsEmpty(result.WarningLines);
     }
@@ -88,6 +101,8 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl -s -w ... with url, bogus-QRC and a second url: the two lines, then only the first URL tried; exit 7.
         CommandLineParseResult result = Parse(["-s"], "url = http://127.0.0.1:1/\nbogus-QRC\nurl http://second/\n");
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("default config file", null, result.Options?.DefaultConfigFile);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "http://127.0.0.1:1/" }, result.Options.Urls.ToArray());
         CollectionAssert.AreEqual(
@@ -102,6 +117,8 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl -V with "silent" then "bogus-QRC": nothing on standard error; exit 0.
         CommandLineParseResult result = Parse(["-V"], "silent\nbogus-QRC\n");
 
+        TestDiagnostics.For(TestContext).Assert("version requested", true, result.Options?.VersionRequested);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.Options!.VersionRequested);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -112,6 +129,8 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl -V with "-K missing.cfg": these five lines; exit 0.
         CommandLineParseResult result = Parse([Url], "-K missing.cfg\n");
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("warning line count", 5, result.WarningLines.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -139,6 +158,7 @@ public sealed class CommandLineDefaultConfigFileTests
 
         CommandLineParseResult result = Parse(["-s"], reader);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
     }
@@ -156,6 +176,9 @@ public sealed class CommandLineDefaultConfigFileTests
 
         CommandLineParseResult result = Parse([first, "-V"], reader);
 
+        TestDiagnostics.For(TestContext).Assert("version requested", true, result.Options?.VersionRequested);
+        TestDiagnostics.For(TestContext).Assert("read count", 0, reader.Reads.Count);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.Options!.VersionRequested);
         Assert.IsEmpty(result.WarningLines);
         Assert.IsEmpty(reader.Reads);
@@ -172,6 +195,8 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl --disable=x -V, --no-disable -V, -s -q -V, -Vq and -sq -V printed the file's two error lines.
         CommandLineParseResult result = Parse([.. before, "-V"], "bogus-QRC\n");
 
+        TestDiagnostics.For(TestContext).Assert("version requested", true, result.Options?.VersionRequested);
+        AssertWarningLines(BogusLineErrorLines, result);
         Assert.IsTrue(result.Options!.VersionRequested);
         CollectionAssert.AreEqual(BogusLineErrorLines, result.WarningLines.ToArray());
     }
@@ -182,6 +207,8 @@ public sealed class CommandLineDefaultConfigFileTests
         // curl -V with "disable", "-q" and "bogus-QRC": the third line was still read and refused.
         CommandLineParseResult result = Parse(["-V"], "disable\n-q\nbogus-QRC\n");
 
+        TestDiagnostics.For(TestContext).Assert("version requested", true, result.Options?.VersionRequested);
+        TestDiagnostics.For(TestContext).Assert("warning line count", 2, result.WarningLines.Count);
         Assert.IsTrue(result.Options!.VersionRequested);
         CollectionAssert.AreEqual(
             new[] { @"curl: C:\Users\Stewart Rogers\AppData\Local\Temp\rc\q\.curlrc:3 config file ", "curl: option 'bogus-QRC' is unknown" },
@@ -193,6 +220,7 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         CommandLineParseResult result = Parse(["-V"], $"disable\nurl {Url}\n");
 
+        TestDiagnostics.For(TestContext).Assert("default config file", Curlrc, result.Options?.DefaultConfigFile);
         CollectionAssert.AreEqual(new[] { Url }, result.Options!.Urls.ToArray());
         Assert.AreEqual(Curlrc, result.Options.DefaultConfigFile);
     }
@@ -204,8 +232,10 @@ public sealed class CommandLineDefaultConfigFileTests
     public void Parse_Disable_IsAcceptedAndChangesNothing(string argument)
     {
         // curl -q printed curl: (2) no URL specified; -q --no-disable -V printed nothing.
-        CommandLineParseResult result = CommandLineParser.Parse([argument, "-q", Url]);
+        string[] arguments = [argument, "-q", Url];
+        CommandLineParseResult result = LogParse(arguments, null, () => CommandLineParser.Parse(arguments));
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
     }
@@ -215,6 +245,8 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         CommandLineParseResult result = Parse([null!, Url], "bogus-QRC\n");
 
+        AssertWarningLines(BogusLineErrorLines, result);
+        AssertStandardErrorLines(["curl: option : blank argument where content is expected", TryHelp], result);
         CollectionAssert.AreEqual(BogusLineErrorLines, result.WarningLines.ToArray());
         CollectionAssert.AreEqual(new[] { "curl: option : blank argument where content is expected", TryHelp }, result.Refusal!.StandardErrorLines.ToArray());
     }
@@ -231,8 +263,10 @@ public sealed class CommandLineDefaultConfigFileTests
             null,
             null);
 
-        CommandLineParseResult result = CommandLineParser.Parse(["-s"], _ => true, new UnexpectedPasswordPrompt(), reader, search);
+        TestDiagnostics.For(TestContext).Arrange("environment", "HOME \"C:\\home\", USERPROFILE \"C:\\up\"");
+        CommandLineParseResult result = LogParse(["-s"], reader, () => CommandLineParser.Parse(["-s"], _ => true, new UnexpectedPasswordPrompt(), reader, search));
 
+        TestDiagnostics.For(TestContext).Assert("default config file", @"C:\home\_curlrc", result.Options?.DefaultConfigFile);
         CollectionAssert.AreEqual(new[] { Url }, result.Options!.Urls.ToArray());
         Assert.AreEqual(@"C:\home\_curlrc", result.Options.DefaultConfigFile);
         CollectionAssert.AreEqual(new[] { @"C:\home\.curlrc", @"C:\home\_curlrc" }, reader.Reads);
@@ -243,8 +277,10 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         RecordingDataFileReader reader = new();
 
-        CommandLineParseResult result = CommandLineParser.Parse([Url], _ => true, new UnexpectedPasswordPrompt(), reader);
+        CommandLineParseResult result = LogParse([Url], reader, () => CommandLineParser.Parse([Url], _ => true, new UnexpectedPasswordPrompt(), reader));
 
+        TestDiagnostics.For(TestContext).Assert("default config file", null, result.Options?.DefaultConfigFile);
+        TestDiagnostics.For(TestContext).Assert("read count", 0, reader.Reads.Count);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.DefaultConfigFile);
         Assert.IsEmpty(reader.Reads);
@@ -253,8 +289,15 @@ public sealed class CommandLineDefaultConfigFileTests
     [TestMethod]
     public void Parse_NullSearch_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments([Url]);
+        diagnostics.Arrange("default config file search", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CommandLineParser.Parse([Url], _ => true, new UnexpectedPasswordPrompt(), new RecordingDataFileReader(), null!));
+
+        diagnostics.Act("exception", $"{exception.GetType().Name} for {exception.ParamName}");
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -266,6 +309,7 @@ public sealed class CommandLineDefaultConfigFileTests
         // BL-352: curl -v --bogus and curl -v (no URL) print the note, as an accepted -v does.
         CommandLineParseResult result = Parse(arguments, "silent\n");
 
+        TestDiagnostics.For(TestContext).Assert("noted default config file", Curlrc, result.NotedDefaultConfigFile);
         Assert.AreEqual(Curlrc, result.NotedDefaultConfigFile);
     }
 
@@ -277,6 +321,7 @@ public sealed class CommandLineDefaultConfigFileTests
         // BL-352: curl --bogus -v prints no note; the -v was never read.
         CommandLineParseResult result = Parse(arguments, "silent\n");
 
+        TestDiagnostics.For(TestContext).Assert("noted default config file", null, result.NotedDefaultConfigFile);
         Assert.IsNull(result.NotedDefaultConfigFile);
     }
 
@@ -286,6 +331,8 @@ public sealed class CommandLineDefaultConfigFileTests
         // BL-352: curl (no arguments) with a .curlrc of verbose printed the try-help line alone.
         CommandLineParseResult result = Parse([], "verbose\n");
 
+        TestDiagnostics.For(TestContext).Assert("noted default config file", null, result.NotedDefaultConfigFile);
+        TestDiagnostics.For(TestContext).Assert("found at transfer setup", false, result.Refusal?.FoundAtTransferSetup);
         Assert.IsNull(result.NotedDefaultConfigFile);
         Assert.IsFalse(result.Refusal!.FoundAtTransferSetup);
     }
@@ -295,6 +342,7 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         CommandLineParseResult result = Parse(["-v"], "silent\n");
 
+        TestDiagnostics.For(TestContext).Assert("found at transfer setup", true, result.Refusal?.FoundAtTransferSetup);
         Assert.IsTrue(result.Refusal!.FoundAtTransferSetup);
     }
 
@@ -303,10 +351,11 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         CommandLineParseResult result = Parse(["--bogus"], "silent\n");
 
+        TestDiagnostics.For(TestContext).Assert("found at transfer setup", false, result.Refusal?.FoundAtTransferSetup);
         Assert.IsFalse(result.Refusal!.FoundAtTransferSetup);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, string? curlrc)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, string? curlrc)
     {
         RecordingDataFileReader reader = new();
         if (curlrc is not null)
@@ -317,11 +366,44 @@ public sealed class CommandLineDefaultConfigFileTests
         return Parse(arguments, reader);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, RecordingDataFileReader reader)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, RecordingDataFileReader reader)
     {
         DefaultConfigFileSearch search = new(name => name == "CURL_HOME" ? Home : null, true, null, null);
-        return CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader, search);
+        return LogParse(arguments, reader, () => CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader, search));
     }
+
+    private CommandLineParseResult LogParse(IReadOnlyList<string> arguments, RecordingDataFileReader? reader, Func<CommandLineParseResult> parse)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        foreach (KeyValuePair<string, byte[]> file in reader?.Files ?? [])
+        {
+            diagnostics.Bytes($"file {file.Key}", file.Value);
+        }
+
+        CommandLineParseResult result = parse();
+        diagnostics.ActParse(result);
+        diagnostics.Act("urls", CommandLineParseDiagnostics.QuoteEach(result.Options?.Urls ?? []));
+        diagnostics.Act("default config file", result.Options?.DefaultConfigFile ?? "null");
+        if (reader is not null)
+        {
+            diagnostics.Act("reads", CommandLineParseDiagnostics.QuoteEach(reader.Reads));
+        }
+
+        return result;
+    }
+
+    private void AssertWarningLines(IReadOnlyList<string> expected, CommandLineParseResult result) =>
+        TestDiagnostics.For(TestContext).Assert(
+            "warning lines",
+            CommandLineParseDiagnostics.QuoteEach(expected),
+            CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+
+    private void AssertStandardErrorLines(IReadOnlyList<string> expected, CommandLineParseResult result) =>
+        TestDiagnostics.For(TestContext).Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach(expected),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Core.Multipart;
 
@@ -33,7 +34,10 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
 
         string body = await BuildAsync(nameEscaping, part);
 
-        Assert.AreEqual($"--{Boundary}\r\nContent-Disposition: form-data; name=\"{sentName}\"\r\n\r\n1\r\n--{Boundary}--\r\n", body);
+        string expectedBody = $"--{Boundary}\r\nContent-Disposition: form-data; name=\"{sentName}\"\r\n\r\n1\r\n--{Boundary}--\r\n";
+        TestDiagnostics.For(TestContext).Diff("body", expectedBody, body);
+        TestDiagnostics.For(TestContext).Assert("body", expectedBody, body);
+        Assert.AreEqual(expectedBody, body);
     }
 
     [TestMethod]
@@ -51,6 +55,7 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
         string expected =
             $"--{Boundary}\r\nContent-Disposition: form-data; name=\"f\"; filename=\"{sentFileName}\"\r\n"
             + $"Content-Type: text/plain\r\n\r\nX\r\n--{Boundary}--\r\n";
+        TestDiagnostics.For(TestContext).Diff("body", expected, body);
         Assert.AreEqual(expected, body);
     }
 
@@ -65,6 +70,7 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
         string expected =
             $"--{Boundary}\r\nContent-Disposition: form-data; name=\"f\"; filename=\"q\\\"x\"\r\n"
             + $"Content-Type: application/octet-stream\r\n\r\nQ\r\n--{Boundary}--\r\n";
+        TestDiagnostics.For(TestContext).Diff("body", expected, body);
         Assert.AreEqual(expected, body);
     }
 
@@ -82,6 +88,7 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
             + $"Content-Type: multipart/form-data; boundary={Boundary}\r\n\r\n"
             + $"--{Boundary}\r\nContent-Disposition: form-data; name=\"a\\\"b\"\r\n\r\n1\r\n--{Boundary}--\r\n"
             + $"\r\n--{Boundary}--\r\n";
+        TestDiagnostics.For(TestContext).Diff("body", expected, body);
         Assert.AreEqual(expected, body);
     }
 
@@ -90,10 +97,17 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
     {
         MultipartFormPart part = new("a\"b", MultipartFormPartKind.Text, "1", null, null, NoHeaders, NoParts);
         MultipartFormBodyBuilder builder = new(Files(), Encoding.UTF8, () => Boundary);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("part name", part.Name);
+        diagnostics.Arrange("escaping", "none given");
 
         MultipartFormBuildResult result = await builder.BuildAsync([part], TestContext.CancellationToken);
+        diagnostics.Act("isBuilt", result.IsBuilt);
 
-        Assert.AreEqual($"--{Boundary}\r\nContent-Disposition: form-data; name=\"a%22b\"\r\n\r\n1\r\n--{Boundary}--\r\n", await ReadAsync(result));
+        string expected = $"--{Boundary}\r\nContent-Disposition: form-data; name=\"a%22b\"\r\n\r\n1\r\n--{Boundary}--\r\n";
+        string actual = await ReadAsync(result);
+        diagnostics.Diff("body", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     private static FormFileSystem Files() =>
@@ -101,13 +115,19 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
 
     private async Task<string> BuildAsync(MultipartNameEscaping nameEscaping, MultipartFormPart part)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("part", $"{part.Name}:{part.Kind}:{part.FileName}");
+        diagnostics.Arrange("escaping", nameEscaping);
         MultipartFormBodyBuilder builder = new(Files(), Encoding.UTF8, () => Boundary);
         MultipartFormBuildResult result = await builder.BuildAsync([part], nameEscaping, TestContext.CancellationToken);
+        diagnostics.Act("isBuilt", result.IsBuilt);
         return await ReadAsync(result);
     }
 
     private async Task<string> ReadAsync(MultipartFormBuildResult result)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("isBuilt", true, result.IsBuilt);
         Assert.IsTrue(result.IsBuilt);
         using MemoryStream copy = new();
         await using (result.Body.Content)
@@ -115,6 +135,8 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
             await result.Body.Content.CopyToAsync(copy, TestContext.CancellationToken);
         }
 
+        diagnostics.Bytes("body", copy.ToArray());
+        diagnostics.Assert("length", copy.Length, result.Body.Length);
         Assert.AreEqual(copy.Length, result.Body.Length);
         return Encoding.Latin1.GetString(copy.ToArray());
     }

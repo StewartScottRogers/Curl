@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core;
 
@@ -9,6 +10,8 @@ namespace Curl.Core;
 [TestClass]
 public sealed class ByteRangeParserTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("0-4", 0L, 4L)]
     [DataRow("0-0", 0L, 0L)]
@@ -18,8 +21,12 @@ public sealed class ByteRangeParserTests
     [DataRow("1-9223372036854775807", 1L, long.MaxValue)]
     public void TryParse_FirstAndLast_IsBounded(string rangeText, long first, long last)
     {
-        Assert.IsTrue(ByteRangeParser.TryParse(rangeText, out ByteRange? range));
-        Assert.AreEqual(ByteRange.Bounded(first, last), range);
+        var expected = ByteRange.Bounded(first, last);
+
+        var parsed = Parse(rangeText, out ByteRange? range, true, expected);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(expected, range);
     }
 
     [TestMethod]
@@ -32,8 +39,12 @@ public sealed class ByteRangeParserTests
     [DataRow("-99999999999999999999", 0L)]
     public void TryParse_NoLastPosition_IsFromOffset(string rangeText, long first)
     {
-        Assert.IsTrue(ByteRangeParser.TryParse(rangeText, out ByteRange? range));
-        Assert.AreEqual(ByteRange.FromOffset(first), range);
+        var expected = ByteRange.FromOffset(first);
+
+        var parsed = Parse(rangeText, out ByteRange? range, true, expected);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(expected, range);
     }
 
     [TestMethod]
@@ -42,8 +53,12 @@ public sealed class ByteRangeParserTests
     [DataRow("-20", 20L)]
     public void TryParse_NoFirstPosition_IsSuffix(string rangeText, long suffixLength)
     {
-        Assert.IsTrue(ByteRangeParser.TryParse(rangeText, out ByteRange? range));
-        Assert.AreEqual(ByteRange.Suffix(suffixLength), range);
+        var expected = ByteRange.Suffix(suffixLength);
+
+        var parsed = Parse(rangeText, out ByteRange? range, true, expected);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(expected, range);
     }
 
     [TestMethod]
@@ -60,24 +75,55 @@ public sealed class ByteRangeParserTests
     [DataRow("0-9223372036854775807")]
     public void TryParse_TextNamingNoRange_ReturnsFalseWithoutThrowing(string rangeText)
     {
-        Assert.IsFalse(ByteRangeParser.TryParse(rangeText, out ByteRange? range));
+        var parsed = Parse(rangeText, out ByteRange? range, false, null);
+
+        Assert.IsFalse(parsed);
         Assert.IsNull(range);
     }
 
     [TestMethod]
     public void TryParse_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => ByteRangeParser.TryParse(null!, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("call", "TryParse(null)");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => ByteRangeParser.TryParse(null!, out _));
+
+        diagnostics.Act("exception", exception.GetType().Name + " (" + exception.ParamName + ")");
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void NotDeliveredFailure_IsExit33WithCurlsMessage()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("member", nameof(ByteRangeParser.NotDeliveredFailure));
+
         TransferResult failure = ByteRangeParser.NotDeliveredFailure;
 
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Act("error message", failure.ErrorMessage);
+        diagnostics.Act("bytes transferred", failure.BytesTransferred);
+        diagnostics.Assert("exit code", 33, (int)failure.ExitCode);
+        diagnostics.Assert("error message", "Requested range was not delivered by the server", failure.ErrorMessage);
+        diagnostics.Assert("bytes transferred", 0L, failure.BytesTransferred);
         Assert.AreEqual(CurlExitCode.RangeError, failure.ExitCode);
         Assert.AreEqual(33, (int)failure.ExitCode);
         Assert.AreEqual("Requested range was not delivered by the server", failure.ErrorMessage);
         Assert.AreEqual(0L, failure.BytesTransferred);
+    }
+
+    private bool Parse(string rangeText, out ByteRange? range, bool expectedParsed, ByteRange? expectedRange)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range text", "\"" + rangeText + "\"");
+
+        var parsed = ByteRangeParser.TryParse(rangeText, out range);
+
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("range", range?.ToString() ?? "(null)");
+        diagnostics.Assert("parsed", expectedParsed, parsed);
+        diagnostics.Assert("range", expectedRange?.ToString() ?? "(null)", range?.ToString() ?? "(null)");
+        return parsed;
     }
 }

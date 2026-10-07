@@ -1,4 +1,5 @@
 using Curl.Http2;
+using Curl.Testing;
 using static Curl.Http3.Qpack;
 
 namespace Curl.Http3;
@@ -11,6 +12,8 @@ namespace Curl.Http3;
 [TestClass]
 public sealed class QpackRoundTripTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private static readonly HeaderField[][] Requests =
     [
         [
@@ -49,6 +52,9 @@ public sealed class QpackRoundTripTests
     [DataRow(200L, 200L, 1L, false)]
     public void HeaderLists_RoundTripThroughEncoderAndDecoder(long maximumTableCapacity, long capacity, long maximumBlockedStreams, bool huffman)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("table", $"maximum capacity {maximumTableCapacity}, capacity {capacity}, maximum blocked streams {maximumBlockedStreams}, Huffman {huffman}");
+        diagnostics.Arrange("header lists", string.Join(" | ", Requests.Select(fields => string.Join(", ", fields))));
         var encoder = new QpackEncoder(maximumTableCapacity, maximumBlockedStreams, huffman);
         var decoder = new QpackDecoder(maximumTableCapacity, maximumBlockedStreams);
         encoder.TrySetDynamicTableCapacity(capacity);
@@ -61,11 +67,15 @@ public sealed class QpackRoundTripTests
                 var section = encoder.EncodeFieldSection(streamId, Requests[request]);
                 decoder.ReadEncoderStream(encoder.TakeEncoderStreamBytes());
 
-                CollectionAssert.AreEqual(Requests[request], Decode(decoder, streamId, section));
+                var decoded = Decode(decoder, streamId, section);
+                diagnostics.Act($"stream {streamId} decoded", string.Join(", ", decoded));
+                CollectionAssert.AreEqual(Requests[request], decoded);
                 encoder.ReadDecoderStream(decoder.TakeDecoderStreamBytes());
             }
         }
 
+        diagnostics.Assert("insert count", encoder.InsertCount, decoder.InsertCount);
+        diagnostics.Assert("dynamic table size", encoder.DynamicTableSize, decoder.DynamicTableSize);
         Assert.AreEqual(encoder.InsertCount, decoder.InsertCount);
         Assert.AreEqual(encoder.DynamicTableSize, decoder.DynamicTableSize);
     }
@@ -73,6 +83,9 @@ public sealed class QpackRoundTripTests
     [TestMethod]
     public void DynamicTable_OnceWarm_EncodesARepeatedRequestAsIndexesBelowBaseAndThePathAsALiteral()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("header list", string.Join(", ", Requests[0]));
+        diagnostics.Arrange("table", "capacity 4096, maximum blocked streams 16");
         var encoder = new QpackEncoder(4096, 16);
         var decoder = new QpackDecoder(4096, 16);
         encoder.TrySetDynamicTableCapacity(4096);
@@ -82,7 +95,12 @@ public sealed class QpackRoundTripTests
         encoder.ReadDecoderStream(decoder.TakeDecoderStreamBytes());
 
         var repeat = encoder.EncodeFieldSection(4, Requests[0]);
+        diagnostics.Act("section lengths", $"first {first.Length}, repeated {repeat.Length}");
 
+        diagnostics.Bytes("first section", first);
+        diagnostics.Bytes("repeated section", repeat);
+        diagnostics.Diff("first section", FromHex("0381 d1 d7 10 51 88 60d5485f2bce9a68 11 dd"), first);
+        diagnostics.Diff("repeated section", FromHex("0300 d1 d7 81 51 88 60d5485f2bce9a68 80 dd"), repeat);
         CollectionAssert.AreEqual(FromHex("0381 d1 d7 10 51 88 60d5485f2bce9a68 11 dd"), first);
         CollectionAssert.AreEqual(FromHex("0300 d1 d7 81 51 88 60d5485f2bce9a68 80 dd"), repeat);
         Assert.IsEmpty(encoder.TakeEncoderStreamBytes());
