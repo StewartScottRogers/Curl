@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -11,6 +13,10 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class DefaultConfigFileSearchTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void CandidatePaths_OnWindowsWithEveryVariable_FollowCurlsOrder()
     {
@@ -22,8 +28,7 @@ public sealed class DefaultConfigFileSearchTests
             ("USERPROFILE", @"C:\up"),
             ("APPDATA", @"C:\ad"));
 
-        CollectionAssert.AreEqual(
-            new[]
+        string[] expected = new[]
             {
                 @"C:\ch\.curlrc",
                 @"C:\ch\_curlrc",
@@ -38,8 +43,9 @@ public sealed class DefaultConfigFileSearchTests
                 @"C:\ch/.config\curlrc",
                 @"C:\exe\.curlrc",
                 @"C:\exe\_curlrc",
-            },
-            search.CandidatePaths().ToArray());
+            };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
@@ -54,8 +60,7 @@ public sealed class DefaultConfigFileSearchTests
             ("HOME", @"C:\home"),
             ("USERPROFILE", @"C:\up"));
 
-        CollectionAssert.AreEqual(
-            new[]
+        string[] expected = new[]
             {
                 @"C:\xdg\curlrc",
                 @"C:\home\.curlrc",
@@ -63,8 +68,9 @@ public sealed class DefaultConfigFileSearchTests
                 @"C:\up\Application Data\.curlrc",
                 @"C:\exe\.curlrc",
                 @"C:\exe\_curlrc",
-            },
-            search.CandidatePaths().ToArray());
+            };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
@@ -73,9 +79,9 @@ public sealed class DefaultConfigFileSearchTests
         // Measured: CURL_HOME and HOME set, only HOME/.config\curlrc present: no file was read.
         DefaultConfigFileSearch search = Search(isWindows: true, executableDirectory: null, ("CURL_HOME", @"C:\ch"), ("HOME", @"C:\home"));
 
-        CollectionAssert.AreEqual(
-            new[] { @"C:\ch\.curlrc", @"C:\ch\_curlrc", @"C:\home\.curlrc", @"C:\home\_curlrc", @"C:\ch/.config\curlrc" },
-            search.CandidatePaths().ToArray());
+        string[] expected = new[] { @"C:\ch\.curlrc", @"C:\ch\_curlrc", @"C:\home\.curlrc", @"C:\home\_curlrc", @"C:\ch/.config\curlrc" };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
@@ -84,9 +90,9 @@ public sealed class DefaultConfigFileSearchTests
         // Measured: CURL_HOME= (empty) and HOME set: HOME/.config\curlrc was read.
         DefaultConfigFileSearch search = Search(isWindows: true, executableDirectory: string.Empty, ("CURL_HOME", string.Empty), ("HOME", @"C:\home"));
 
-        CollectionAssert.AreEqual(
-            new[] { @"C:\home\.curlrc", @"C:\home\_curlrc", @"C:\home/.config\curlrc" },
-            search.CandidatePaths().ToArray());
+        string[] expected = new[] { @"C:\home\.curlrc", @"C:\home\_curlrc", @"C:\home/.config\curlrc" };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
@@ -94,7 +100,9 @@ public sealed class DefaultConfigFileSearchTests
     {
         DefaultConfigFileSearch search = Search(isWindows: true, executableDirectory: @"C:\exe");
 
-        CollectionAssert.AreEqual(new[] { @"C:\exe\.curlrc", @"C:\exe\_curlrc" }, search.CandidatePaths().ToArray());
+        string[] expected = new[] { @"C:\exe\.curlrc", @"C:\exe\_curlrc" };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
@@ -108,9 +116,9 @@ public sealed class DefaultConfigFileSearchTests
             ("USERPROFILE", "/up"),
             ("APPDATA", "/ad"));
 
-        CollectionAssert.AreEqual(
-            new[] { "/ch/.curlrc", "/home/u/.curlrc", "/ch/.config/curlrc", "/account/.curlrc" },
-            search.CandidatePaths().ToArray());
+        string[] expected = new[] { "/ch/.curlrc", "/home/u/.curlrc", "/ch/.config/curlrc", "/account/.curlrc" };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
@@ -118,29 +126,51 @@ public sealed class DefaultConfigFileSearchTests
     {
         DefaultConfigFileSearch search = Search(isWindows: false, executableDirectory: null, ("XDG_CONFIG_HOME", "/xdg"), ("HOME", "/home/u"));
 
-        CollectionAssert.AreEqual(
-            new[] { "/xdg/curlrc", "/home/u/.curlrc", "/account/.curlrc" },
-            search.CandidatePaths().ToArray());
+        string[] expected = new[] { "/xdg/curlrc", "/home/u/.curlrc", "/account/.curlrc" };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
     public void CandidatePaths_ElsewhereWithHomeOnly_TryHomeThenItsConfigDirectory()
     {
+        Diagnostics.Arrange("isWindows", false);
+        Diagnostics.Arrange("environment", "HOME=/home/u");
         DefaultConfigFileSearch search = new(name => name == "HOME" ? "/home/u" : null, false, null, null);
 
-        CollectionAssert.AreEqual(new[] { "/home/u/.curlrc", "/home/u/.config/curlrc" }, search.CandidatePaths().ToArray());
+        string[] expected = new[] { "/home/u/.curlrc", "/home/u/.config/curlrc" };
+
+        CollectionAssert.AreEqual(expected, WrittenCandidatePaths(expected, search));
     }
 
     [TestMethod]
     public void ForProcess_ListsAtLeastTheLastDirectory()
     {
+        Diagnostics.Arrange("search", "DefaultConfigFileSearch.ForProcess");
         IReadOnlyList<string> paths = DefaultConfigFileSearch.ForProcess.CandidatePaths();
+        Diagnostics.Act("candidate path count is positive", paths.Count > 0);
 
+        Diagnostics.Assert("candidate paths are listed", true, paths.Count > 0);
         Assert.IsNotEmpty(paths);
     }
 
-    private static DefaultConfigFileSearch Search(bool isWindows, string? executableDirectory, params (string Name, string Value)[] variables)
+    /// <summary>Returns the search's candidate paths, writing them (ACT) and their comparison with <paramref name="expected"/> as diagnostics.</summary>
+    private string[] WrittenCandidatePaths(string[] expected, DefaultConfigFileSearch search)
     {
+        IReadOnlyList<string> actual = search.CandidatePaths();
+        Diagnostics.Act("candidate paths", string.Join(" | ", actual));
+
+        Diagnostics.Diff("candidate paths", string.Join('\n', expected), string.Join('\n', actual));
+        Diagnostics.Assert("candidate path count", expected.Length, actual.Count);
+        return actual.ToArray();
+    }
+
+    /// <summary>Builds a search over the given variables and writes each input as an ARRANGE line.</summary>
+    private DefaultConfigFileSearch Search(bool isWindows, string? executableDirectory, params (string Name, string Value)[] variables)
+    {
+        Diagnostics.Arrange("isWindows", isWindows);
+        Diagnostics.Arrange("executableDirectory", executableDirectory ?? "<null>");
+        Diagnostics.Arrange("environment", variables.Length == 0 ? "<none>" : string.Join(" ", variables.Select(variable => variable.Name + "=" + variable.Value)));
         Dictionary<string, string> environment = variables.ToDictionary(variable => variable.Name, variable => variable.Value, StringComparer.Ordinal);
         return new(environment.GetValueOrDefault, isWindows, executableDirectory, "/account");
     }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -57,14 +59,18 @@ public sealed class LibcurlSourceCodeTests
         "  curl_easy_setopt(curl, CURLOPT_SSLVERSION, (long)CURL_SSLVERSION_TLSv1_2);\n"
         + "  curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);\n";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Generate_OneHttpUrl_IsCurlsSkeletonByteForByte()
     {
         CommandLineOptions options = Parse("--libcurl", "-", "http://127.0.0.1:47652/");
 
-        string source = LibcurlSourceCode.Generate([(options, "http://127.0.0.1:47652/")]);
+        string source = GenerateSource([(options, "http://127.0.0.1:47652/")]);
 
-        Assert.AreEqual(
+        string expected =
             Header
             + "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:47652/\");\n"
@@ -72,8 +78,9 @@ public sealed class LibcurlSourceCodeTests
             + "  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);\n"
             + TlsAndKeepAlive
             + Perform
-            + Footer,
-            source);
+            + Footer;
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
@@ -81,9 +88,11 @@ public sealed class LibcurlSourceCodeTests
     {
         CommandLineOptions options = Parse("-s", "--libcurl", "-", "http://127.0.0.1:47652/a", "http://127.0.0.1:47652/b");
 
-        string source = LibcurlSourceCode.Generate([(options, "http://127.0.0.1:47652/a"), (options, "http://127.0.0.1:47652/b")]);
+        string source = GenerateSource([(options, "http://127.0.0.1:47652/a"), (options, "http://127.0.0.1:47652/b")]);
 
-        Assert.AreEqual(Header + SilentHttpTransfer("a") + SilentHttpTransfer("b") + Footer, source);
+        string expected = Header + SilentHttpTransfer("a") + SilentHttpTransfer("b") + Footer;
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
@@ -91,21 +100,34 @@ public sealed class LibcurlSourceCodeTests
     {
         CommandLineOptions options = Parse("--no-progress-meter", "http://x/");
 
-        string source = LibcurlSourceCode.Generate([(options, "http://x/")]);
+        string source = GenerateSource([(options, "http://x/")]);
 
-        Assert.Contains("  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n", source);
+        const string Expected = "  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n";
+        Diagnostics.Assert("contains NOPROGRESS line", true, source.Contains(Expected, StringComparison.Ordinal));
+        Assert.Contains(Expected, source);
     }
 
     [TestMethod]
     public void Generate_NoTransfers_IsTheHeaderAndFooterAlone()
     {
-        Assert.AreEqual(Header + Footer, LibcurlSourceCode.Generate(Array.Empty<LibcurlTransfer>()));
+        Diagnostics.Arrange("transfers", "[]");
+
+        string source = LibcurlSourceCode.Generate(Array.Empty<LibcurlTransfer>());
+        Diagnostics.Act("source", source);
+
+        Diagnostics.Diff("source", Header + Footer, source);
+        Assert.AreEqual(Header + Footer, source);
     }
 
     [TestMethod]
     public void Generate_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => LibcurlSourceCode.Generate((IReadOnlyList<(CommandLineOptions, string)>)null!));
+        Diagnostics.Arrange("transfers", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => LibcurlSourceCode.Generate((IReadOnlyList<(CommandLineOptions, string)>)null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -122,9 +144,14 @@ public sealed class LibcurlSourceCodeTests
     [DataRow("http://a\u007Fb/", "")]
     public void Generate_Scheme_AddsItsOwnLinesBetweenUserAgentAndTls(string url, string schemeLines)
     {
-        string source = LibcurlSourceCode.Generate([(Parse(url), url)]);
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("scheme lines", schemeLines);
 
-        StringAssert.Contains(source, "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n" + schemeLines + TlsAndKeepAlive);
+        string source = GenerateSource([(Parse(url), url)]);
+
+        string expected = "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/8.21.0\");\n" + schemeLines + TlsAndKeepAlive;
+        Diagnostics.Assert("contains user agent, scheme lines and TLS lines", true, source.Contains(expected, StringComparison.Ordinal));
+        StringAssert.Contains(source, expected);
     }
 
     [TestMethod]
@@ -132,8 +159,10 @@ public sealed class LibcurlSourceCodeTests
     {
         CommandLineOptions options = Parse("--proto-default", "ftp", "127.0.0.1:1/");
 
-        string source = LibcurlSourceCode.Generate([(options, "127.0.0.1:1/")]);
+        string source = GenerateSource([(options, "127.0.0.1:1/")]);
 
+        Diagnostics.Assert("contains CURLOPT_FTP_SKIP_PASV_IP", true, source.Contains("CURLOPT_FTP_SKIP_PASV_IP", StringComparison.Ordinal));
+        Diagnostics.Assert("contains CURLOPT_MAXREDIRS", false, source.Contains("CURLOPT_MAXREDIRS", StringComparison.Ordinal));
         Assert.Contains("CURLOPT_FTP_SKIP_PASV_IP", source);
         Assert.DoesNotContain("CURLOPT_MAXREDIRS", source);
     }
@@ -145,40 +174,75 @@ public sealed class LibcurlSourceCodeTests
     [DataRow("", "\"\"")]
     public void QuoteCString_EscapesAsCurlDoes(string value, string expected)
     {
-        Assert.AreEqual(expected, LibcurlSourceCode.QuoteCString(value));
+        Diagnostics.Arrange("value", value);
+
+        string actual = LibcurlSourceCode.QuoteCString(value);
+        Diagnostics.Act("quoted", actual);
+
+        Diagnostics.Diff("quoted", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void QuoteCString_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => LibcurlSourceCode.QuoteCString(null!));
+        Diagnostics.Arrange("value", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => LibcurlSourceCode.QuoteCString(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void QuoteCString_LongerThanTheLimit_IsCutAndEndsInDots()
     {
-        Assert.AreEqual("\"" + new string('a', 2000) + "...\"", LibcurlSourceCode.QuoteCString(new string('a', 2001)));
-        Assert.AreEqual("\"" + new string('a', 2000) + "\"", LibcurlSourceCode.QuoteCString(new string('a', 2000)));
+        Diagnostics.Arrange("value lengths", "2001 and 2000 characters of 'a'");
+
+        string cut = LibcurlSourceCode.QuoteCString(new string('a', 2001));
+        string whole = LibcurlSourceCode.QuoteCString(new string('a', 2000));
+        Diagnostics.Act("quoted length of 2001 characters", cut.Length);
+        Diagnostics.Act("quoted length of 2000 characters", whole.Length);
+
+        Diagnostics.Assert("2001 characters cut", "\"" + new string('a', 2000) + "...\"", cut);
+        Diagnostics.Assert("2000 characters whole", "\"" + new string('a', 2000) + "\"", whole);
+        Assert.AreEqual("\"" + new string('a', 2000) + "...\"", cut);
+        Assert.AreEqual("\"" + new string('a', 2000) + "\"", whole);
     }
 
     [TestMethod]
     public void Parse_Libcurl_IsGlobalAndTheLastValueWins()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--libcurl", "a.c", "http://x/", "--next", "--libcurl", "b.c", "http://y/"]);
+        string[] arguments = ["--libcurl", "a.c", "http://x/", "--next", "--libcurl", "b.c", "http://y/"];
+        Diagnostics.ArrangeArguments(arguments);
 
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("first group file", "b.c", result.Groups[0].LibcurlFile);
+        Diagnostics.Assert("second group file", "b.c", result.Groups[1].LibcurlFile);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("b.c", result.Groups[0].LibcurlFile);
         Assert.AreEqual("b.c", result.Groups[1].LibcurlFile);
-        Assert.IsNull(Parse("http://x/").LibcurlFile);
+        string? withoutOption = Parse("http://x/").LibcurlFile;
+        Diagnostics.Assert("file without the option", "null", withoutOption ?? "null");
+        Assert.IsNull(withoutOption);
     }
 
     [TestMethod]
     public void AiHelp_Libcurl_NoLongerSaysItIsUnsupported()
     {
-        Assert.IsTrue(CurlAiHelpText.TryGetMarkdown("all", out string markdown));
+        Diagnostics.Arrange("topic", "all");
+
+        bool found = CurlAiHelpText.TryGetMarkdown("all", out string markdown);
+        Diagnostics.Act("found", found);
+        Assert.IsTrue(found);
         string section = markdown[markdown.IndexOf("## --libcurl", StringComparison.Ordinal)..];
         section = section[..section.IndexOf("\n## ", 1, StringComparison.Ordinal)];
+        Diagnostics.Act("section length", section.Length);
 
+        Diagnostics.Assert("contains unsupported text", false, section.Contains("Not supported by this build yet", StringComparison.Ordinal));
         Assert.DoesNotContain("Not supported by this build yet", section);
     }
 
@@ -191,5 +255,18 @@ public sealed class LibcurlSourceCodeTests
         + TlsAndKeepAlive
         + Perform;
 
-    private static CommandLineOptions Parse(params string[] arguments) => CommandLineParser.Parse(arguments).Options!;
+    /// <summary>Writes the arguments as an <c>ARRANGE</c> line, then parses them and returns the options.</summary>
+    private CommandLineOptions Parse(params string[] arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        return CommandLineParser.Parse(arguments).Options!;
+    }
+
+    /// <summary>Generates the source for <paramref name="transfers"/> and writes it as an <c>ACT</c> line.</summary>
+    private string GenerateSource(IReadOnlyList<(CommandLineOptions, string)> transfers)
+    {
+        string source = LibcurlSourceCode.Generate(transfers);
+        Diagnostics.Act("source", source);
+        return source;
+    }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -25,6 +27,10 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     private const string Sftp = Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"sftp://127.0.0.1:1/f\");\n" + NoProgress + Agent;
     private const string After = Tls + KeepAlive;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("--ftp-port|-", Ftp + "  curl_easy_setopt(curl, CURLOPT_FTPPORT, \"-\");\n" + PassiveIp + After)]
     [DataRow("--ftp-port|-|--ftp-pasv", Ftp + PassiveIp + After)]
@@ -50,7 +56,10 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     public void Generate_FtpOption_WritesCurlsLines(string arguments, string transfer)
     {
         string expected = arguments.StartsWith("--limit-rate", StringComparison.Ordinal) ? transfer.Replace("102400L", "100L", StringComparison.Ordinal) : transfer;
-        Assert.AreEqual(expected, SetoptLinesFor(arguments + "|" + FtpUrl));
+        string actual = SetoptLinesFor(arguments + "|" + FtpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -71,8 +80,13 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     [DataRow("--upload-flags|answered", "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 17L);\n")]
     [DataRow("--upload-flags|draft", "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 20L);\n")]
     [DataRow("--upload-flags|-seen", "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 0L);\n")]
-    public void Generate_OptionWrittenLast_FollowsTheKeepaliveLines(string arguments, string lines) =>
-        Assert.AreEqual(Http + After + lines, SetoptLinesFor(arguments + "|" + HttpUrl));
+    public void Generate_OptionWrittenLast_FollowsTheKeepaliveLines(string arguments, string lines)
+    {
+        string actual = SetoptLinesFor(arguments + "|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", Http + After + lines, actual);
+        Assert.AreEqual(Http + After + lines, actual);
+    }
 
     [TestMethod]
     [DataRow("--create-file-mode|0")]
@@ -86,32 +100,52 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     [DataRow("--http2-prior-knowledge")]
     [DataRow("--http3")]
     [DataRow("--http3-only")]
-    public void Generate_OptionTheSchannelBuildWritesNothingFor_WritesNoLine(string arguments) =>
-        Assert.AreEqual(Http + After, SetoptLinesFor(arguments + "|" + HttpUrl));
+    public void Generate_OptionTheSchannelBuildWritesNothingFor_WritesNoLine(string arguments)
+    {
+        string actual = SetoptLinesFor(arguments + "|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", Http + After, actual);
+        Assert.AreEqual(Http + After, actual);
+    }
 
     [TestMethod]
     [DataRow("--limit-rate|1k", "1024L", "1024")]
     [DataRow("--limit-rate|200k", "102400L", "204800")]
     [DataRow("--limit-rate|1G", "102400L", "1073741824")]
-    public void Generate_LimitRate_LowersTheBufferAndCapsBothDirections(string arguments, string buffer, string rate) =>
-        Assert.AreEqual(
-            Http.Replace("102400L", buffer, StringComparison.Ordinal)
+    public void Generate_LimitRate_LowersTheBufferAndCapsBothDirections(string arguments, string buffer, string rate)
+    {
+        string expected = Http.Replace("102400L", buffer, StringComparison.Ordinal)
             + $"  curl_easy_setopt(curl, CURLOPT_MAX_SEND_SPEED_LARGE, (curl_off_t){rate});\n"
             + $"  curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t){rate});\n"
-            + After,
-            SetoptLinesFor(arguments + "|" + HttpUrl));
+            + After;
+        string actual = SetoptLinesFor(arguments + "|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
-    public void Generate_LimitRateZero_WritesNothing() =>
-        Assert.AreEqual(Http + After, SetoptLinesFor("--limit-rate|0|" + HttpUrl));
+    public void Generate_LimitRateZero_WritesNothing()
+    {
+        string actual = SetoptLinesFor("--limit-rate|0|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", Http + After, actual);
+        Assert.AreEqual(Http + After, actual);
+    }
 
     [TestMethod]
     [DataRow("--url-query|a=b|" + HttpUrl, "http://127.0.0.1:1/\\?a=b")]
     [DataRow("--url-query|a=b|--url-query|c=d|http://127.0.0.1:1/?x", "http://127.0.0.1:1/\\?x&a=b&c=d")]
     [DataRow("-G|-d|a=1|--url-query|b=2|" + HttpUrl, "http://127.0.0.1:1/\\?a=1")]
     [DataRow("-G|--url-query|b=2|" + HttpUrl, "http://127.0.0.1:1/\\?b=2")]
-    public void Generate_UrlQuery_IsAppendedToTheUrl(string arguments, string url) =>
-        Assert.Contains($"  curl_easy_setopt(curl, CURLOPT_URL, \"{url}\");\n", SetoptLinesFor(arguments));
+    public void Generate_UrlQuery_IsAppendedToTheUrl(string arguments, string url)
+    {
+        string lines = SetoptLinesFor(arguments);
+        string expectedLine = $"  curl_easy_setopt(curl, CURLOPT_URL, \"{url}\");\n";
+
+        Diagnostics.Assert("contains url line", true, lines.Contains(expectedLine, StringComparison.Ordinal));
+        Assert.Contains(expectedLine, lines);
+    }
 
     [TestMethod]
     [DataRow("-v")]
@@ -119,43 +153,56 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     [DataRow("--trace-ascii|t.txt")]
     public void Generate_Verbose_WritesVerboseFirstAndListsTheDebugCallback(string arguments)
     {
-        string source = LibcurlSourceCode.Generate([(Parse(arguments + "|" + HttpUrl), HttpUrl)]);
+        string source = GenerateSource(arguments + "|" + HttpUrl);
+        const string VerboseFirst = "  curl = curl_easy_init();\n  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);\n" + Buffer;
+        const string DebugCallback = "     them yourself.\n\n  CURLOPT_DEBUGFUNCTION was set to a function pointer\n  CURLOPT_DEBUGDATA was set to an object pointer\n  CURLOPT_WRITEDATA";
 
-        Assert.Contains("  curl = curl_easy_init();\n  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);\n" + Buffer, source);
-        Assert.Contains(
-            "     them yourself.\n\n  CURLOPT_DEBUGFUNCTION was set to a function pointer\n  CURLOPT_DEBUGDATA was set to an object pointer\n  CURLOPT_WRITEDATA",
-            source);
+        Diagnostics.Assert("contains verbose first", true, source.Contains(VerboseFirst, StringComparison.Ordinal));
+        Diagnostics.Assert("contains debug callback list", true, source.Contains(DebugCallback, StringComparison.Ordinal));
+        Assert.Contains(VerboseFirst, source);
+        Assert.Contains(DebugCallback, source);
     }
 
     [TestMethod]
-    public void Generate_SocketCallbacks_AreListedAfterTheStandardOptions() =>
-        Assert.Contains(
-            "  CURLOPT_STDERR was set to an object pointer\n"
+    public void Generate_SocketCallbacks_AreListedAfterTheStandardOptions()
+    {
+        const string Expected = "  CURLOPT_STDERR was set to an object pointer\n"
             + "  CURLOPT_OPENSOCKETFUNCTION was set to a function pointer\n"
             + "  CURLOPT_SOCKOPTFUNCTION was set to a function pointer\n"
-            + "  CURLOPT_SOCKOPTDATA was set to an object pointer\n\n  */\n",
-            LibcurlSourceCode.Generate([(Parse("--mptcp|--ip-tos|1|" + HttpUrl), HttpUrl)]));
+            + "  CURLOPT_SOCKOPTDATA was set to an object pointer\n\n  */\n";
+        string source = GenerateSource("--mptcp|--ip-tos|1|" + HttpUrl);
+
+        Diagnostics.Assert("contains socket callbacks", true, source.Contains(Expected, StringComparison.Ordinal));
+        Assert.Contains(Expected, source);
+    }
 
     [TestMethod]
     [DataRow("--vlan-priority|2")]
     [DataRow("--ip-tos|1")]
     public void Generate_SocketOption_ListsTheSocketOptionCallbackAlone(string arguments)
     {
-        string source = LibcurlSourceCode.Generate([(Parse(arguments + "|" + HttpUrl), HttpUrl)]);
+        string source = GenerateSource(arguments + "|" + HttpUrl);
 
+        Diagnostics.Assert("contains socket option callback", true, source.Contains("  CURLOPT_STDERR was set to an object pointer\n  CURLOPT_SOCKOPTFUNCTION", StringComparison.Ordinal));
+        Diagnostics.Assert("contains open socket callback", false, source.Contains("OPENSOCKETFUNCTION", StringComparison.Ordinal));
         Assert.Contains("  CURLOPT_STDERR was set to an object pointer\n  CURLOPT_SOCKOPTFUNCTION", source);
         Assert.DoesNotContain("OPENSOCKETFUNCTION", source);
     }
 
     [TestMethod]
-    public void Generate_Parallel_WritesNeitherTheListNorThePerformCall() =>
-        Assert.Contains(
-            "  curl = curl_easy_init();\n  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);\n" + Http + After + "  curl_easy_cleanup(curl);\n",
-            LibcurlSourceCode.Generate([(Parse("-Z|-v|--mptcp|" + HttpUrl), HttpUrl)]));
+    public void Generate_Parallel_WritesNeitherTheListNorThePerformCall()
+    {
+        const string Expected = "  curl = curl_easy_init();\n  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);\n" + Http + After + "  curl_easy_cleanup(curl);\n";
+        string source = GenerateSource("-Z|-v|--mptcp|" + HttpUrl);
+
+        Diagnostics.Assert("contains transfer without list", true, source.Contains(Expected, StringComparison.Ordinal));
+        Assert.Contains(Expected, source);
+    }
 
     [TestMethod]
-    public void Generate_SshOptionsOnSftp_FollowTheKeyPasswordAndPrecedeTheCertificate() =>
-        Assert.AreEqual(
+    public void Generate_SshOptionsOnSftp_FollowTheKeyPasswordAndPrecedeTheCertificate()
+    {
+        string expected =
             Sftp
             + "  curl_easy_setopt(curl, CURLOPT_KEYPASSWD, \"pw\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_SSH_PRIVATE_KEYFILE, \"k\");\n"
@@ -165,24 +212,37 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_SSH_COMPRESSION, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_SSLKEY, \"k\");\n"
-            + After,
-            SetoptLinesFor("--pubkey|p|--hostpubmd5|0123456789abcdef0123456789abcdef|--hostpubsha256|abc=|--compressed-ssh|--pass|pw|-E|c.pem|--key|k|" + SftpUrl));
+            + After;
+        string actual = SetoptLinesFor("--pubkey|p|--hostpubmd5|0123456789abcdef0123456789abcdef|--hostpubsha256|abc=|--compressed-ssh|--pass|pw|-E|c.pem|--key|k|" + SftpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
-    public void Generate_SshOptionsOnScp_AreWritten() =>
-        Assert.Contains(
-            "  curl_easy_setopt(curl, CURLOPT_SSH_HOST_PUBLIC_KEY_MD5, \"0123456789abcdef0123456789abcdef\");\n  curl_easy_setopt(curl, CURLOPT_SSH_COMPRESSION, 1L);\n" + Tls,
-            SetoptLinesFor("--compressed-ssh|--hostpubmd5|0123456789abcdef0123456789abcdef|scp://127.0.0.1:1/f"));
+    public void Generate_SshOptionsOnScp_AreWritten()
+    {
+        const string Expected = "  curl_easy_setopt(curl, CURLOPT_SSH_HOST_PUBLIC_KEY_MD5, \"0123456789abcdef0123456789abcdef\");\n  curl_easy_setopt(curl, CURLOPT_SSH_COMPRESSION, 1L);\n" + Tls;
+        string lines = SetoptLinesFor("--compressed-ssh|--hostpubmd5|0123456789abcdef0123456789abcdef|scp://127.0.0.1:1/f");
+
+        Diagnostics.Assert("contains ssh lines", true, lines.Contains(Expected, StringComparison.Ordinal));
+        Assert.Contains(Expected, lines);
+    }
 
     [TestMethod]
-    public void Generate_SshOptionsOnHttp_WriteOnlyTheTlsKey() =>
-        Assert.AreEqual(
-            Http + "  curl_easy_setopt(curl, CURLOPT_SSLKEY, \"k\");\n" + After,
-            SetoptLinesFor("--pubkey|p|--hostpubmd5|0123456789abcdef0123456789abcdef|--compressed-ssh|--key|k|" + HttpUrl));
+    public void Generate_SshOptionsOnHttp_WriteOnlyTheTlsKey()
+    {
+        string expected = Http + "  curl_easy_setopt(curl, CURLOPT_SSLKEY, \"k\");\n" + After;
+        string actual = SetoptLinesFor("--pubkey|p|--hostpubmd5|0123456789abcdef0123456789abcdef|--compressed-ssh|--key|k|" + HttpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
-    public void Generate_FtpOptionsTogether_WriteEveryLineInCurlsOrder() =>
-        Assert.AreEqual(
+    public void Generate_FtpOptionsTogether_WriteEveryLineInCurlsOrder()
+    {
+        string expected =
             "  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 1024L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"ftp://127.0.0.1:1/f\");\n"
@@ -219,28 +279,33 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_MAIL_FROM, \"x\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, \"ftp\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, \"http\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, \"ftp\");\n",
-            SetoptLinesFor(
-                "--ftp-port|-|--ftp-ssl-ccc-mode|active|--ftp-account|acc|--ftp-alternative-to-user|alt|--ftp-pret|--ftp-method|nocwd"
-                + "|--ftp-create-dirs|--ssl-reqd|-Q|a|-Q|-b|-Q|+c|-C|5|-Y|1|--limit-rate|1k|-v|--tftp-blksize|1024|--mail-from|x"
-                + "|--interface|lo|-l|-B|--proto|=ftp|--proto-redir|=http|--proto-default|ftp|--crlf|-z|20200101|--max-filesize|9"
-                + "|--keepalive-cnt|3|" + FtpUrl));
+            + "  curl_easy_setopt(curl, CURLOPT_DEFAULT_PROTOCOL, \"ftp\");\n";
+        string actual = SetoptLinesFor(
+            "--ftp-port|-|--ftp-ssl-ccc-mode|active|--ftp-account|acc|--ftp-alternative-to-user|alt|--ftp-pret|--ftp-method|nocwd"
+            + "|--ftp-create-dirs|--ssl-reqd|-Q|a|-Q|-b|-Q|+c|-C|5|-Y|1|--limit-rate|1k|-v|--tftp-blksize|1024|--mail-from|x"
+            + "|--interface|lo|-l|-B|--proto|=ftp|--proto-redir|=http|--proto-default|ftp|--crlf|-z|20200101|--max-filesize|9"
+            + "|--keepalive-cnt|3|" + FtpUrl);
+
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     [TestMethod]
     public void Generate_QuoteCommands_SplitByPrefixIntoThreeLists()
     {
-        string source = LibcurlSourceCode.Generate([(Parse("-Q||-Q|-|-Q|*x|-Q|+y|" + FtpUrl), FtpUrl)]);
-
-        Assert.Contains(
-            "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"\");\n  slist1 = curl_slist_append(slist1, \"*x\");\n"
+        string source = GenerateSource("-Q||-Q|-|-Q|*x|-Q|+y|" + FtpUrl);
+        const string Expected = "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"\");\n  slist1 = curl_slist_append(slist1, \"*x\");\n"
             + "  slist2 = NULL;\n  slist2 = curl_slist_append(slist2, \"\");\n"
-            + "  slist3 = NULL;\n  slist3 = curl_slist_append(slist3, \"y\");\n",
-            source);
+            + "  slist3 = NULL;\n  slist3 = curl_slist_append(slist3, \"y\");\n";
+
+        Diagnostics.Assert("contains three quote lists", true, source.Contains(Expected, StringComparison.Ordinal));
+        Assert.Contains(Expected, source);
     }
 
     [TestMethod]
-    public void Generate_OptionsOnHttpTogether_WriteEveryLineInCurlsOrder() =>
-        Assert.AreEqual(
+    public void Generate_OptionsOnHttpTogether_WriteEveryLineInCurlsOrder()
+    {
+        string expected =
             Buffer
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n"
             + NoProgress
@@ -285,23 +350,40 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_TFTP_NO_OPTIONS, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS, 300L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_DISALLOW_USERNAME_IN_URL, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 18L);\n",
-            SetoptLinesFor(
-                "--ssl|-I|--path-as-is|--ciphers|x|--no-alpn|--crlf|-Q|q|--telnet-option|A=b|-z|20200101|-X|GET|--interface|lo"
-                + "|--ftp-create-dirs|--connect-timeout|5|--doh-url|https://d/q|--max-filesize|9|-4|--service-name|s"
-                + "|--ignore-content-length|--keepalive-cnt|3|--tftp-blksize|1024|--mail-from|f|--mail-rcpt|r|--mail-rcpt-allowfails"
-                + "|--create-file-mode|0600|--proto|=http|--proto-redir|=http|--resolve|a:1:b|--connect-to|a:1:b:2|--mail-auth|a"
-                + "|--delegation|always|--sasl-authzid|z|--sasl-ir|--unix-socket|/s|--proto-default|http|--tftp-no-options"
-                + "|--happy-eyeballs-timeout-ms|300|--disallow-username-in-url|--upload-flags|deleted|" + HttpUrl));
+            + "  curl_easy_setopt(curl, CURLOPT_UPLOAD_FLAGS, 18L);\n";
+        string actual = SetoptLinesFor(
+            "--ssl|-I|--path-as-is|--ciphers|x|--no-alpn|--crlf|-Q|q|--telnet-option|A=b|-z|20200101|-X|GET|--interface|lo"
+            + "|--ftp-create-dirs|--connect-timeout|5|--doh-url|https://d/q|--max-filesize|9|-4|--service-name|s"
+            + "|--ignore-content-length|--keepalive-cnt|3|--tftp-blksize|1024|--mail-from|f|--mail-rcpt|r|--mail-rcpt-allowfails"
+            + "|--create-file-mode|0600|--proto|=http|--proto-redir|=http|--resolve|a:1:b|--connect-to|a:1:b:2|--mail-auth|a"
+            + "|--delegation|always|--sasl-authzid|z|--sasl-ir|--unix-socket|/s|--proto-default|http|--tftp-no-options"
+            + "|--happy-eyeballs-timeout-ms|300|--disallow-username-in-url|--upload-flags|deleted|" + HttpUrl);
 
-    private static CommandLineOptions Parse(string arguments) =>
-        OpenSslBuildParser.Parse(["-s", .. arguments.Split('|')], _ => true).Options!;
+        Diagnostics.Diff("setopt lines", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
-    /// <summary>The transfer's <c>curl_easy_setopt</c> lines: from after <c>curl_easy_init</c> to the list of options that cannot be generated.</summary>
-    private static string SetoptLinesFor(string arguments)
+    /// <summary>Parses <paramref name="arguments"/> (separated by <c>|</c>, after <c>-s</c>), writing the full argument array first.</summary>
+    private CommandLineOptions Parse(string arguments)
+    {
+        string[] parsedArguments = ["-s", .. arguments.Split('|')];
+        Diagnostics.ArrangeArguments(parsedArguments);
+        return OpenSslBuildParser.Parse(parsedArguments, _ => true).Options!;
+    }
+
+    /// <summary>Generates the libcurl source for <paramref name="arguments"/>, whose last element is the URL, and writes it.</summary>
+    private string GenerateSource(string arguments)
     {
         string url = arguments.Split('|')[^1];
         string source = LibcurlSourceCode.Generate([(Parse(arguments), url)]);
+        Diagnostics.Act("source", source);
+        return source;
+    }
+
+    /// <summary>The transfer's <c>curl_easy_setopt</c> lines: from after <c>curl_easy_init</c> to the list of options that cannot be generated.</summary>
+    private string SetoptLinesFor(string arguments)
+    {
+        string source = GenerateSource(arguments);
         const string Init = "  curl = curl_easy_init();\n";
         int start = source.IndexOf(Init, StringComparison.Ordinal) + Init.Length;
         int end = source.IndexOf("\n  /* Here is a list", StringComparison.Ordinal);
