@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Ntlm;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Curl.Ntlm;
 [TestClass]
 public sealed class NtlmDesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     // All zero bits: every byte gets its parity bit.
     [DataRow("00000000000000", "0101010101010101")]
@@ -16,10 +20,14 @@ public sealed class NtlmDesTests
     [DataRow("50415353574F52", "5120546B34BA3DA4")]
     public void ExpandKey_SevenBytes_GivesTheOddParityDesKey(string sevenByteKey, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] key = new byte[8];
+        diagnostics.Arrange("seven-byte key", sevenByteKey);
 
         NtlmDes.ExpandKey(Convert.FromHexString(sevenByteKey), key);
+        diagnostics.Act("DES key", Convert.ToHexString(key));
 
+        diagnostics.Diff("DES key", Convert.FromHexString(expected), key);
         Assert.AreEqual(expected, Convert.ToHexString(key));
     }
 }
