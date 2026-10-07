@@ -2,6 +2,8 @@ using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Text;
 
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -34,16 +36,24 @@ public sealed class EncryptedPrivateKeyInfoDecryptionTests
 
     private static readonly byte[] PrivateKeyInfo = [.. Enumerable.Range(0, 48).Select(value => (byte)value)];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Decrypt_OfAKeyTheBclEncrypted_GivesItsPrivateKeyInfo()
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var encrypted = key.ExportEncryptedPkcs8PrivateKey(Passphrase, new PbeParameters(PbeEncryptionAlgorithm.Aes256Cbc, HashAlgorithmName.SHA256, 1000));
+        Diagnostics.Arrange("encryption", "BCL PKCS#8, AES-256-CBC, PBKDF2 SHA-256, 1000 iterations");
 
         var decrypted = EncryptedPrivateKeyInfoDecryption.Decrypt(encrypted, Passphrase);
 
+        Diagnostics.Act("decrypted", "a PrivateKeyInfo (its length is the platform's PKCS#8 export's)");
         using var imported = ECDsa.Create();
         imported.ImportPkcs8PrivateKey(decrypted, out var bytesRead);
+        Diagnostics.Assert("import read every decrypted byte", true, bytesRead == decrypted.Length);
+        Diagnostics.Assert("private scalar matches", true, key.ExportParameters(true).D!.AsSpan().SequenceEqual(imported.ExportParameters(true).D));
         Assert.AreEqual(decrypted.Length, bytesRead);
         CollectionAssert.AreEqual(key.ExportParameters(true).D, imported.ExportParameters(true).D);
     }
@@ -57,19 +67,30 @@ public sealed class EncryptedPrivateKeyInfoDecryptionTests
     [DataRow(Aes128Oid, 16, null, false, true)]
     public void Decrypt_OfEachCipherAndPrf_GivesThePrivateKeyInfo(string cipherOid, int keyLength, string? prfOid, bool prfWithNull, bool writeKeyLength)
     {
-        var encrypted = Encrypt(new Encryption(cipherOid, keyLength, prfOid, prfWithNull, writeKeyLength));
+        var encryption = new Encryption(cipherOid, keyLength, prfOid, prfWithNull, writeKeyLength);
+        var encrypted = Encrypt(encryption);
+        Diagnostics.Arrange("encryption", encryption);
+        Diagnostics.Bytes("encrypted", encrypted);
 
         var decrypted = EncryptedPrivateKeyInfoDecryption.Decrypt(encrypted, Passphrase);
 
+        Diagnostics.Act("decrypted length", decrypted.Length);
+        Diagnostics.Diff("PrivateKeyInfo", PrivateKeyInfo, decrypted);
         CollectionAssert.AreEqual(PrivateKeyInfo, decrypted);
     }
 
     [TestMethod]
     public void Decrypt_WithAWrongPassphrase_Throws()
     {
-        var encrypted = Encrypt(new Encryption(Aes256Oid, 32, HmacSha256Oid));
+        var encryption = new Encryption(Aes256Oid, 32, HmacSha256Oid);
+        var encrypted = Encrypt(encryption);
+        Diagnostics.Arrange("encryption", encryption);
+        Diagnostics.Arrange("passphrase", "wrong");
 
-        Assert.ThrowsExactly<CryptographicException>(() => EncryptedPrivateKeyInfoDecryption.Decrypt(encrypted, "wrong"));
+        var exception = Assert.ThrowsExactly<CryptographicException>(() => EncryptedPrivateKeyInfoDecryption.Decrypt(encrypted, "wrong"));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(CryptographicException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -96,8 +117,13 @@ public sealed class EncryptedPrivateKeyInfoDecryptionTests
             "not DER" => [1, 2, 3],
             _ => [.. Encrypt(new Encryption(Aes256Oid, 32, null)), 2, 1, 0],
         };
+        Diagnostics.Arrange("malformation", malformation);
+        Diagnostics.Bytes("encrypted", encrypted);
 
-        Assert.ThrowsExactly<CryptographicException>(() => EncryptedPrivateKeyInfoDecryption.Decrypt(encrypted, Passphrase));
+        var exception = Assert.ThrowsExactly<CryptographicException>(() => EncryptedPrivateKeyInfoDecryption.Decrypt(encrypted, Passphrase));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(CryptographicException), exception.GetType().Name);
     }
 
     /// <summary>Writes <see cref="PrivateKeyInfo" /> encrypted with PBES2 as <paramref name="encryption" /> says.</summary>

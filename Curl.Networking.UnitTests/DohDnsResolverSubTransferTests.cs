@@ -2,6 +2,7 @@ using System.Text;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -17,6 +18,10 @@ public sealed class DohDnsResolverSubTransferTests
 {
     private static readonly Uri DohUrl = new("http://127.0.0.1:47112/dns-query");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ResolveAsync_WithSubTransferEvents_ReportsEachSubTransferWholeInTurn()
     {
@@ -25,7 +30,13 @@ public sealed class DohDnsResolverSubTransferTests
         connector.BytesToRead.Add(Response("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc"));
         connector.BytesToRead.Add(Response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"));
 
+        Diagnostics.Arrange("DoH URL", DohUrl);
+        Diagnostics.Arrange("answers queued", connector.BytesToRead.Count);
+        Diagnostics.Arrange("connect failure", connector.Failure?.ErrorMessage ?? "(none)");
+
         await new DohDnsResolver(connector, DohUrl) { SubTransferEvents = events }.ResolveAsync("example.test", CancellationToken.None);
+
+        WriteEventLinesAndLastLine(events);
 
         CollectionAssert.AreEqual(
             new[]
@@ -51,7 +62,9 @@ public sealed class DohDnsResolverSubTransferTests
                 "* a DoH request is completed, 0 to go",
             },
             events.Lines);
-        Assert.IsTrue(connector.Targets.All(target => ReferenceEquals(events, target.Events)));
+        var everyTargetReports = connector.Targets.All(target => ReferenceEquals(events, target.Events));
+        Diagnostics.Assert("every target reports to the sub-transfer events", true, everyTargetReports);
+        Assert.IsTrue(everyTargetReports);
     }
 
     [TestMethod]
@@ -60,7 +73,13 @@ public sealed class DohDnsResolverSubTransferTests
         var events = new SubTransferRecorder();
         var connector = new FakeConnector { Failure = ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect") };
 
+        Diagnostics.Arrange("DoH URL", DohUrl);
+        Diagnostics.Arrange("answers queued", connector.BytesToRead.Count);
+        Diagnostics.Arrange("connect failure", connector.Failure?.ErrorMessage ?? "(none)");
+
         await new DohDnsResolver(connector, DohUrl) { SubTransferEvents = events }.ResolveAsync("example.test", CancellationToken.None);
+
+        WriteEventLinesAndLastLine(events);
 
         CollectionAssert.AreEqual(new[] { "* a DoH request is completed, 1 to go", "* a DoH request is completed, 0 to go" }, events.Lines);
     }
@@ -71,9 +90,14 @@ public sealed class DohDnsResolverSubTransferTests
         var events = new SubTransferRecorder();
         var connector = new FakeConnector();
         connector.BytesToRead.Add(Response("HTTP/1.1 200 OK\r\n"));
+        Diagnostics.Arrange("DoH URL", DohUrl);
+        Diagnostics.Arrange("address family", System.Net.Sockets.AddressFamily.InterNetwork);
+        Diagnostics.Arrange("answer", "a status line, then the close");
 
         await new DohDnsResolver(connector, DohUrl) { SubTransferEvents = events, AddressFamily = System.Net.Sockets.AddressFamily.InterNetwork }
             .ResolveAsync("example.test", CancellationToken.None);
+
+        WriteEventLinesAndLastLine(events);
 
         CollectionAssert.AreEqual(
             new[]
@@ -89,6 +113,17 @@ public sealed class DohDnsResolverSubTransferTests
     }
 
     private static byte[] Response(string text) => Encoding.Latin1.GetBytes(text);
+
+    private void WriteEventLinesAndLastLine(SubTransferRecorder events)
+    {
+        Diagnostics.Act("event lines", events.Lines.Count);
+        foreach (var line in events.Lines)
+        {
+            Diagnostics.Act("event line", line.Replace("\r\n", "\\r\\n", StringComparison.Ordinal));
+        }
+
+        Diagnostics.Assert("last event line", "* a DoH request is completed, 0 to go", events.Lines.LastOrDefault());
+    }
 
     /// <summary>Records each event as one line: <c>* </c> info, <c>&gt; </c> and <c>&lt; </c> heads, <c>}</c> and <c>{</c> byte counts.</summary>
     private sealed class SubTransferRecorder : ITransferEvents

@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Networking.Fakes;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -15,11 +16,16 @@ public sealed class DohResponseReaderTests
 {
     private static readonly byte[] Body = [0x00, 0x00, 0x81, 0x80, 0x0D, 0x0A, 0x41];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ReadBodyAsync_WithContentLength_ReturnsThatManyBytes()
     {
         var body = await ReadAsync(Head("HTTP/1.1 200 OK", "Content-Type: application/dns-message", "Content-Length: 7"), Body, "trailing"u8.ToArray());
 
+        Diagnostics.Diff("body", Body, body);
         CollectionAssert.AreEqual(Body, body);
     }
 
@@ -33,6 +39,7 @@ public sealed class DohResponseReaderTests
         // Content-Type alike, and resolved the name from it (measured).
         var body = await ReadAsync(Head(statusLine, header, "content-length:  7 "), Body);
 
+        Diagnostics.Diff("body", Body, body);
         CollectionAssert.AreEqual(Body, body);
     }
 
@@ -41,6 +48,7 @@ public sealed class DohResponseReaderTests
     {
         var body = await ReadAsync(Head("HTTP/1.1 500 Internal Server Error", "Content-Length: 0"));
 
+        Diagnostics.Assert("body length", 0, body?.Length);
         Assert.IsNotNull(body);
         Assert.IsEmpty(body);
     }
@@ -50,6 +58,7 @@ public sealed class DohResponseReaderTests
     {
         var body = await ReadAsync(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\nContent-Length: 7\n\n"), Body);
 
+        Diagnostics.Diff("body", Body, body);
         CollectionAssert.AreEqual(Body, body);
     }
 
@@ -61,6 +70,7 @@ public sealed class DohResponseReaderTests
 
         var body = await ReadAsync(Head("HTTP/1.1 200 OK", "Transfer-Encoding: chunked", "Content-Length: 99"), chunked);
 
+        Diagnostics.Diff("body", Body, body);
         CollectionAssert.AreEqual(Body, body);
     }
 
@@ -69,6 +79,7 @@ public sealed class DohResponseReaderTests
     {
         var body = await ReadAsync(Head("HTTP/1.1 200 OK", "Content-Length: 7", "Transfer-Encoding: identity"), Body);
 
+        Diagnostics.Diff("body", Body, body);
         CollectionAssert.AreEqual(Body, body);
     }
 
@@ -79,6 +90,7 @@ public sealed class DohResponseReaderTests
 
         var body = await ReadAsync(Head("HTTP/1.1 200 OK", "Content-Length: 3000"), large);
 
+        Diagnostics.Assert("body length", DohResponseReader.MaximumBodyLength, body?.Length);
         Assert.HasCount(DohResponseReader.MaximumBodyLength, body!);
     }
 
@@ -89,6 +101,7 @@ public sealed class DohResponseReaderTests
 
         var body = await ReadAsync(Head("HTTP/1.1 200 OK", "Transfer-Encoding: chunked"), chunked);
 
+        Diagnostics.Assert("body length", DohResponseReader.MaximumBodyLength, body?.Length);
         Assert.HasCount(DohResponseReader.MaximumBodyLength, body!);
     }
 
@@ -115,27 +128,43 @@ public sealed class DohResponseReaderTests
     public async Task ReadBodyAsync_WithAResponseCurlFailsToReceive_ReturnsNull(string reason, string response)
     {
         // A close-delimited body was "DoH request Failure when receiving data from the peer" (measured).
+        Diagnostics.Arrange("reason", reason);
         var body = await ReadAsync(Encoding.Latin1.GetBytes(response));
 
+        Diagnostics.Assert("body", "null", body is null ? "null" : $"{body.Length} bytes");
         Assert.IsNull(body, reason);
     }
 
     [TestMethod]
     public async Task ReadBodyAsync_WithALineOverTheLimit_ReturnsNull()
     {
+        Diagnostics.Arrange("line limit", DohResponseReader.MaximumLineLength);
         var longLine = "HTTP/1.1 200 OK\r\nX-Long: " + new string('a', DohResponseReader.MaximumLineLength) + "\r\nContent-Length: 0\r\n\r\n";
 
         var body = await ReadAsync(Encoding.Latin1.GetBytes(longLine));
 
+        Diagnostics.Assert("body", "null", body is null ? "null" : $"{body.Length} bytes");
         Assert.IsNull(body);
     }
 
     private static byte[] Head(params string[] lines) =>
         Encoding.Latin1.GetBytes(string.Join("\r\n", lines) + "\r\n\r\n");
 
-    private static async Task<byte[]?> ReadAsync(params byte[][] parts)
+    private async Task<byte[]?> ReadAsync(params byte[][] parts)
     {
-        var connection = new ScriptedConnection([.. parts.SelectMany(part => part)]);
-        return await DohResponseReader.ReadBodyAsync(connection, CancellationToken.None);
+        byte[] response = [.. parts.SelectMany(part => part)];
+        Diagnostics.Arrange("response length", response.Length);
+        Diagnostics.Bytes("response", response);
+        var connection = new ScriptedConnection(response);
+
+        var body = await DohResponseReader.ReadBodyAsync(connection, CancellationToken.None);
+
+        Diagnostics.Act("body", body is null ? "null" : $"{body.Length} bytes");
+        if (body is not null)
+        {
+            Diagnostics.Bytes("body", body);
+        }
+
+        return body;
     }
 }

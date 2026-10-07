@@ -2,6 +2,7 @@ using System.Text;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -41,21 +42,33 @@ public sealed class DohDnsResolverTraceTests
     private const string EmptyAnswerToA = QuestionHeader + "000000000000" + ExampleTest + "0000010001";
     private const string EmptyAnswerToAaaa = QuestionHeader + "000000000000" + ExampleTest + "00001C0001";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Constructor_WithNullTrace_Throws()
     {
+        Diagnostics.Arrange("trace", "null");
+
         var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => new DohDnsResolver(new FakeConnector(), MeasuredDohUrl, null!, DescribeExitCode));
 
+        Diagnostics.Act("exception parameter", exception.ParamName);
+        Diagnostics.Assert("exception parameter", "dohTrace", exception.ParamName);
         Assert.AreEqual("dohTrace", exception.ParamName);
     }
 
     [TestMethod]
     public void Constructor_WithNullExitCodeText_Throws()
     {
+        Diagnostics.Arrange("exit code text", "null");
+
         var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => new DohDnsResolver(new FakeConnector(), MeasuredDohUrl, new RecordingTransferEvents(), null!));
 
+        Diagnostics.Act("exception parameter", exception.ParamName);
+        Diagnostics.Assert("exception parameter", "describeExitCode", exception.ParamName);
         Assert.AreEqual("describeExitCode", exception.ParamName);
     }
 
@@ -64,13 +77,13 @@ public sealed class DohDnsResolverTraceTests
     {
         var lines = await TraceAsync(Response("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"));
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH: Too small type A for example.test",
                 "[DNS] DoH: Too small type AAAA for example.test",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -81,13 +94,13 @@ public sealed class DohDnsResolverTraceTests
 
         var lines = await TraceAsync(Ok(nxdomain));
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH: Bad RCODE type A for example.test",
                 "[DNS] DoH: Bad RCODE type AAAA for example.test",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -98,13 +111,13 @@ public sealed class DohDnsResolverTraceTests
         var answer = Convert.FromHexString(MeasuredAAnswer);
         var lines = await TraceAsync([.. Response($"HTTP/1.1 200 OK\r\nContent-Length: {answer.Length - 1}\r\n\r\n"), .. answer]);
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH: Out of range type A for example.test",
                 "[DNS] DoH: Unexpected TYPE type AAAA for example.test",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -115,13 +128,13 @@ public sealed class DohDnsResolverTraceTests
 
         var lines = await TraceAsync(Ok(noRecord));
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH: No content type A for example.test",
                 "[DNS] DoH: No content type AAAA for example.test",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -131,15 +144,15 @@ public sealed class DohDnsResolverTraceTests
         // with no address and the TTL it starts from, is printed.
         var lines = await TraceAsync([.. Response("HTTP/1.1 200 OK\r\n\r\n"), .. Convert.FromHexString(MeasuredAAnswer)]);
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH request Failure when receiving data from the peer",
                 "[DNS] DoH request Failure when receiving data from the peer",
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 2147483647 seconds",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -153,15 +166,15 @@ public sealed class DohDnsResolverTraceTests
 
         var lines = await TraceAsync(connector);
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH request SSL peer certificate or SSH remote key was not OK",
                 "[DNS] DoH request SSL peer certificate or SSH remote key was not OK",
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 2147483647 seconds",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -170,15 +183,15 @@ public sealed class DohDnsResolverTraceTests
         // The AAAA query was given the A answer too, so it fails with Unexpected TYPE.
         var lines = await TraceAsync(Ok(Convert.FromHexString(MeasuredAAnswer)));
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH: Unexpected TYPE type AAAA for example.test",
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 60 seconds",
                 "[DoH] A: 127.0.0.1",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -188,8 +201,7 @@ public sealed class DohDnsResolverTraceTests
         // AAAA record stopped it, so "CNAME: a.test" is printed twice (BL-958).
         var lines = await TraceAsync(Ok(Convert.FromHexString(MeasuredCnameAndAaaaAnswer)));
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH: Unexpected TYPE type A for example.test",
                 "[DNS] hostname: example.test",
@@ -197,8 +209,9 @@ public sealed class DohDnsResolverTraceTests
                 "[DoH] AAAA: 0000:0000:0000:0000:0000:0000:0000:0001",
                 "CNAME: a.test",
                 "CNAME: a.test",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -212,18 +225,23 @@ public sealed class DohDnsResolverTraceTests
         connector.BytesToRead.Add(Ok(Convert.FromHexString(AaaaAnswerToAaaa)));
         var trace = new RecordingTransferEvents();
 
+        ArrangeAnswers(connector);
+
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
 
-        CollectionAssert.AreEqual(
-            new[]
+        WriteTrace(trace.Info);
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+
+        var expectedLines = new[]
             {
                 "[DNS] DoH: Unexpected TYPE type A for example.test",
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 60 seconds",
                 "[DoH] A: 127.0.0.2",
                 "[DoH] AAAA: 0000:0000:0000:0000:0000:0000:0000:0001",
-            },
-            trace.Info.ToArray());
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", trace.Info.ToArray()));
+        CollectionAssert.AreEqual(expectedLines, trace.Info.ToArray());
         CollectionAssert.AreEqual(new[] { "::1", "127.0.0.2" }, addresses.Select(address => address.ToString()).ToArray());
     }
 
@@ -237,15 +255,20 @@ public sealed class DohDnsResolverTraceTests
         connector.BytesToRead.Add(Ok(Convert.FromHexString(AaaaThenAAnswerToAaaa)));
         var trace = new RecordingTransferEvents();
 
+        ArrangeAnswers(connector);
+
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
 
-        CollectionAssert.AreEqual(
-            new[]
+        WriteTrace(trace.Info);
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+
+        var expectedLines = new[]
             {
                 "[DNS] DoH: Unexpected TYPE type A for example.test",
                 "[DNS] DoH: Unexpected TYPE type AAAA for example.test",
-            },
-            trace.Info.ToArray());
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", trace.Info.ToArray()));
+        CollectionAssert.AreEqual(expectedLines, trace.Info.ToArray());
         Assert.IsEmpty(addresses);
     }
 
@@ -260,9 +283,9 @@ public sealed class DohDnsResolverTraceTests
 
         var lines = await TraceAsync(connector);
 
-        CollectionAssert.AreEqual(
-            new[] { "[DNS] hostname: example.test", "[DoH] TTL: 30 seconds", "CNAME: a.test" },
-            lines);
+        var expectedLines = new[] { "[DNS] hostname: example.test", "[DoH] TTL: 30 seconds", "CNAME: a.test" };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -276,15 +299,15 @@ public sealed class DohDnsResolverTraceTests
 
         var lines = await TraceAsync(connector);
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH: No content type A for example.test",
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 30 seconds",
                 "CNAME: a.test",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -296,15 +319,15 @@ public sealed class DohDnsResolverTraceTests
 
         var lines = await TraceAsync(connector);
 
-        CollectionAssert.AreEqual(
-            new[]
+        var expectedLines = new[]
             {
                 "[DNS] DoH request Failure when receiving data from the peer",
                 "[DNS] hostname: example.test",
                 "[DoH] TTL: 60 seconds",
                 "[DoH] A: 127.0.0.1",
-            },
-            lines);
+            };
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
+        CollectionAssert.AreEqual(expectedLines, lines);
     }
 
     [TestMethod]
@@ -313,8 +336,12 @@ public sealed class DohDnsResolverTraceTests
         var connector = new FakeConnector();
         connector.BytesToRead.Add(Ok(Convert.FromHexString(MeasuredAAnswer)));
 
+        ArrangeAnswers(connector);
+
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl).ResolveAsync("example.test", CancellationToken.None);
 
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+        Diagnostics.Assert("addresses", "127.0.0.1", string.Join(", ", addresses));
         Assert.AreEqual("127.0.0.1", addresses.Single().ToString());
     }
 
@@ -330,15 +357,20 @@ public sealed class DohDnsResolverTraceTests
         connector.BytesToRead.Add(Ok(LimitAnswer(DnsRecordType.Aaaa, 10, [4, 5, 6])));
         var trace = new RecordingTransferEvents();
 
+        ArrangeAnswers(connector);
+
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
 
-        CollectionAssert.AreEqual(
-            new[] { "[DNS] hostname: example.test", "[DoH] TTL: 60 seconds" }
+        WriteTrace(trace.Info);
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+
+        var expectedLines = new[] { "[DNS] hostname: example.test", "[DoH] TTL: 60 seconds" }
                 .Concat(Enumerable.Range(1, 20).Select(n => $"[DoH] A: 127.0.0.{n}"))
                 .Concat(Enumerable.Range(1, 4).Select(n => $"[DoH] AAAA: 0000:0000:0000:0000:0000:0000:0000:000{n}"))
                 .Concat(Enumerable.Range(1, 4).Select(n => $"CNAME: c{n}.test"))
-                .ToArray(),
-            trace.Info.ToArray());
+                .ToArray();
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", trace.Info.ToArray()));
+        CollectionAssert.AreEqual(expectedLines, trace.Info.ToArray());
         CollectionAssert.AreEqual(
             Enumerable.Range(1, 4).Select(n => $"::{n}").Concat(Enumerable.Range(1, 20).Select(n => $"127.0.0.{n}")).ToArray(),
             addresses.Select(address => address.ToString()).ToArray());
@@ -355,14 +387,19 @@ public sealed class DohDnsResolverTraceTests
         connector.BytesToRead.Add(Ok(LimitAnswer(DnsRecordType.Aaaa, 5, [5, 6])));
         var trace = new RecordingTransferEvents();
 
+        ArrangeAnswers(connector);
+
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
 
-        CollectionAssert.AreEqual(
-            new[] { "[DNS] hostname: example.test", "[DoH] TTL: 60 seconds" }
+        WriteTrace(trace.Info);
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+
+        var expectedLines = new[] { "[DNS] hostname: example.test", "[DoH] TTL: 60 seconds" }
                 .Concat(Enumerable.Range(1, 24).Select(n => $"[DoH] A: 127.0.0.{n}"))
                 .Concat(Enumerable.Range(1, 4).Select(n => $"CNAME: c{n}.test"))
-                .ToArray(),
-            trace.Info.ToArray());
+                .ToArray();
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", trace.Info.ToArray()));
+        CollectionAssert.AreEqual(expectedLines, trace.Info.ToArray());
         CollectionAssert.AreEqual(
             Enumerable.Range(1, 24).Select(n => $"127.0.0.{n}").ToArray(),
             addresses.Select(address => address.ToString()).ToArray());
@@ -371,10 +408,16 @@ public sealed class DohDnsResolverTraceTests
     [TestMethod]
     public void FormatAddress_WritesEveryIPv6GroupAsFourHexDigits()
     {
-        Assert.AreEqual("2001:0db8:0000:0000:0000:0000:00ab:ff01", DohTraceLines.FormatAddress(System.Net.IPAddress.Parse("2001:db8::ab:ff01")));
+        Diagnostics.Arrange("address", "2001:db8::ab:ff01");
+
+        var formatted = DohTraceLines.FormatAddress(System.Net.IPAddress.Parse("2001:db8::ab:ff01"));
+
+        Diagnostics.Act("formatted", formatted);
+        Diagnostics.Assert("formatted", "2001:0db8:0000:0000:0000:0000:00ab:ff01", formatted);
+        Assert.AreEqual("2001:0db8:0000:0000:0000:0000:00ab:ff01", formatted);
     }
 
-    private static async Task<string[]> TraceAsync(byte[] response)
+    private async Task<string[]> TraceAsync(byte[] response)
     {
         var connector = new FakeConnector();
         connector.BytesToRead.Add(response);
@@ -382,11 +425,32 @@ public sealed class DohDnsResolverTraceTests
         return await TraceAsync(connector);
     }
 
-    private static async Task<string[]> TraceAsync(FakeConnector connector)
+    private async Task<string[]> TraceAsync(FakeConnector connector)
     {
         var trace = new RecordingTransferEvents();
+        ArrangeAnswers(connector);
         await new DohDnsResolver(connector, MeasuredDohUrl, trace, DescribeExitCode).ResolveAsync("example.test", CancellationToken.None);
+        WriteTrace(trace.Info);
         return [.. trace.Info];
+    }
+
+    private void ArrangeAnswers(FakeConnector connector)
+    {
+        Diagnostics.Arrange("DoH URL", MeasuredDohUrl);
+        Diagnostics.Arrange("answers queued", connector.BytesToRead.Count);
+        Diagnostics.Arrange("connect failure", connector.Failure?.ErrorMessage ?? "(none)");
+        for (var index = 0; index < connector.BytesToRead.Count; index++)
+        {
+            Diagnostics.Bytes($"answer {index + 1}", connector.BytesToRead[index]);
+        }
+    }
+
+    private void WriteTrace(IEnumerable<string> lines)
+    {
+        foreach (var line in lines)
+        {
+            Diagnostics.Act("trace line", line);
+        }
     }
 
     // The two curl_easy_strerror texts the measured runs printed.
