@@ -42,6 +42,11 @@ public sealed class ScriptedConnection(params byte[][] reads) : IConnection
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Sent => [.. sent];
 
+    /// <summary>
+    /// Gets every reply the server was scripted to send, in order, whether or not it has been read yet.
+    /// </summary>
+    public IReadOnlyList<byte[]> Reads => reads;
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

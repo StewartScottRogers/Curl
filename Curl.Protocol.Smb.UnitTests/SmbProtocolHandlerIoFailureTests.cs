@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smb.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smb;
 
@@ -29,6 +30,10 @@ public sealed class SmbProtocolHandlerIoFailureTests
     private const int NegotiateRead = 1;
     private const int SecondReadReplyRead = 6;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     [DataRow(NegotiateWrite, SocketError.ConnectionReset, "Connection was reset")]
@@ -39,6 +44,7 @@ public sealed class SmbProtocolHandlerIoFailureTests
     {
         TransferResult result = await DownloadWithFailingWrite(failingWrite, Broken(error));
 
+        Diagnostics.Diff("error message", "Send failure: " + words, result.ErrorMessage ?? string.Empty);
         Assert.AreEqual("Send failure: " + words, result.ErrorMessage);
     }
 
@@ -52,6 +58,7 @@ public sealed class SmbProtocolHandlerIoFailureTests
     {
         TransferResult result = await DownloadWithFailingWrite(failingWrite, Broken(error));
 
+        Diagnostics.Diff("error message", "Send failure: " + OwnWords(error), result.ErrorMessage ?? string.Empty);
         Assert.AreEqual("Send failure: " + OwnWords(error), result.ErrorMessage);
     }
 
@@ -63,6 +70,7 @@ public sealed class SmbProtocolHandlerIoFailureTests
     {
         TransferResult result = await DownloadWithFailingWrite(failingWrite, Broken());
 
+        Diagnostics.Diff("error message", "Failed sending data to the peer", result.ErrorMessage ?? string.Empty);
         Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
     }
 
@@ -117,28 +125,28 @@ public sealed class SmbProtocolHandlerIoFailureTests
     public async Task ExecuteAsync_ResetBeforeTheSessionOnWindows_ReportsTheTextThenClosing() =>
         CollectionAssert.AreEqual(
             new[] { "* Send failure: Connection was reset", "* closing connection #0" },
-            await TranscriptOfResetWrite(SessionSetupWrite));
+            await TranscriptOfResetWrite(SessionSetupWrite, new[] { "* Send failure: Connection was reset", "* closing connection #0" }));
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ExecuteAsync_ResetBeforeTheSessionOffWindows_ReportsTheTextThenClosing() =>
         CollectionAssert.AreEqual(
             new[] { "* Send failure: " + OwnWords(SocketError.ConnectionReset), "* closing connection #0" },
-            await TranscriptOfResetWrite(SessionSetupWrite));
+            await TranscriptOfResetWrite(SessionSetupWrite, new[] { "* Send failure: " + OwnWords(SocketError.ConnectionReset), "* closing connection #0" }));
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_ResetAfterTheSessionOnWindows_ReportsTheTextThenShuttingDown() =>
         CollectionAssert.AreEqual(
             new[] { "* Send failure: Connection was reset", "* shutting down connection #0" },
-            await TranscriptOfResetWrite(TreeConnectWrite));
+            await TranscriptOfResetWrite(TreeConnectWrite, new[] { "* Send failure: Connection was reset", "* shutting down connection #0" }));
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ExecuteAsync_ResetAfterTheSessionOffWindows_ReportsTheTextThenShuttingDown() =>
         CollectionAssert.AreEqual(
             new[] { "* Send failure: " + OwnWords(SocketError.ConnectionReset), "* shutting down connection #0" },
-            await TranscriptOfResetWrite(TreeConnectWrite));
+            await TranscriptOfResetWrite(TreeConnectWrite, new[] { "* Send failure: " + OwnWords(SocketError.ConnectionReset), "* shutting down connection #0" }));
 
     [TestMethod]
     [DataRow(NegotiateWrite, 0)]
@@ -153,8 +161,10 @@ public sealed class SmbProtocolHandlerIoFailureTests
             Failure = Broken(),
         };
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, events));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, events));
 
+        Diagnostics.ActTranscript(events.Transcript);
+        Diagnostics.Diff("transcript", "* closing connection #0", string.Join(" | ", events.Transcript));
         CollectionAssert.AreEqual(new[] { "* closing connection #0" }, events.Transcript.ToArray());
     }
 
@@ -166,7 +176,11 @@ public sealed class SmbProtocolHandlerIoFailureTests
         var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = NegotiateWrite };
         var context = Context(SmbRecordedExchange.DownloadUrl, cancellationToken: cancellation.Token);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () => await Handler(connection).ExecuteAsync(context));
+        Diagnostics.Arrange("cancellation token", "cancelled before the transfer");
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(async () => await RunAsync(connection, context));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("thrown", nameof(OperationCanceledException) + " or a subclass", thrown.GetType().Name);
     }
 
     private static IOException Broken(SocketError error) =>
@@ -177,19 +191,22 @@ public sealed class SmbProtocolHandlerIoFailureTests
     // The words curl's OpenSSL build takes from strerror, which SocketException.Message is off Windows.
     private static string OwnWords(SocketError error) => new SocketException((int)error).Message;
 
-    private static async Task<TransferResult> DownloadWithFailingWrite(int failingWrite, IOException failure)
+    private async Task<TransferResult> DownloadWithFailingWrite(int failingWrite, IOException failure)
     {
         var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = failingWrite, Failure = failure };
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl));
 
+        Diagnostics.AssertResult(CurlExitCode.SendError, null, result);
+        Diagnostics.Assert("bytes transferred", 0L, result.BytesTransferred);
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(0L, result.BytesTransferred);
         Assert.IsTrue(connection.IsDisposed);
         return result;
     }
 
-    private static async Task AssertUploadWriteRequestFails(IOException failure, string message)
+    private async Task AssertUploadWriteRequestFails(IOException failure, string message)
     {
         var connection = new ScriptedConnection(
             SmbRecordedExchange.NegotiateResponse,
@@ -202,26 +219,31 @@ public sealed class SmbProtocolHandlerIoFailureTests
         { FailingWrite = UploadWriteRequestWrite, Failure = failure };
         var context = Context(SmbRecordedExchange.UploadUrl, upload: new MemoryStream(Encoding.ASCII.GetBytes(SmbRecordedExchange.FileContent)));
 
-        TransferResult result = await Handler(connection).ExecuteAsync(context);
+        TransferResult result = await RunAsync(connection, context);
 
+        Diagnostics.AssertResult(CurlExitCode.SendError, message, result);
+        Diagnostics.Assert("report upload size", 0L, result.Report?.UploadSize);
+        Diagnostics.DiffSentEnding(SmbRecordedExchange.UploadOpenRequest, connection.Sent);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         Assert.AreEqual(0L, result.Report!.UploadSize);
         Assert.IsTrue(connection.Sent.AsSpan().EndsWith(SmbRecordedExchange.UploadOpenRequest));
     }
 
-    private static async Task AssertNegotiateReplyReadFails(IOException failure, string message)
+    private async Task AssertNegotiateReplyReadFails(IOException failure, string message)
     {
         var connection = new ScriptedConnection(DownloadReplies()) { FailingRead = NegotiateRead, Failure = failure };
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl));
 
+        Diagnostics.AssertResult(CurlExitCode.RecvError, message, result);
+        Diagnostics.DiffSent(SmbRecordedExchange.NegotiateRequest, connection.Sent);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         CollectionAssert.AreEqual(SmbRecordedExchange.NegotiateRequest, connection.Sent);
     }
 
-    private static async Task AssertReadReplyFailsAfterAFullRead(IOException failure, string message)
+    private async Task AssertReadReplyFailsAfterAFullRead(IOException failure, string message)
     {
         byte[] first = new byte[SmbReadRequest.MaxPayloadSize];
         var output = new MemoryStream();
@@ -234,21 +256,27 @@ public sealed class SmbProtocolHandlerIoFailureTests
             SmbRecordedExchange.ReadAccepted)
         { FailingRead = SecondReadReplyRead, Failure = failure };
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, output: output));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, output: output));
 
+        Diagnostics.Act("output length", output.Length);
+        Diagnostics.AssertResult(CurlExitCode.RecvError, message, result);
+        Diagnostics.Assert("bytes transferred", (long)SmbReadRequest.MaxPayloadSize, result.BytesTransferred);
+        Diagnostics.Assert("output length", (long)SmbReadRequest.MaxPayloadSize, output.Length);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         Assert.AreEqual((long)SmbReadRequest.MaxPayloadSize, result.BytesTransferred);
         Assert.AreEqual((long)SmbReadRequest.MaxPayloadSize, output.Length);
     }
 
-    private static async Task<string[]> TranscriptOfResetWrite(int failingWrite)
+    private async Task<string[]> TranscriptOfResetWrite(int failingWrite, string[] expected)
     {
         var events = new TranscriptTransferEvents();
         var connection = new ScriptedConnection(DownloadReplies()) { FailingWrite = failingWrite, Failure = Broken(SocketError.ConnectionReset) };
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, events));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, events));
 
+        Diagnostics.ActTranscript(events.Transcript);
+        Diagnostics.Diff("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         return events.Transcript.ToArray();
     }
 
@@ -265,6 +293,22 @@ public sealed class SmbProtocolHandlerIoFailureTests
 
     private static SmbProtocolHandler Handler(ScriptedConnection connection) =>
         new(new RecordingConnector(ConnectResult.Connected(connection)), SmbCurlOperatingSystem.Linux);
+
+    // Runs the handler over the scripted connection, writing the context and replies before and the result and bytes sent after.
+    private async Task<TransferResult> RunAsync(ScriptedConnection connection, TransferContext context)
+    {
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReplies(connection);
+        TransferResult result;
+        using (Diagnostics.Phase("execute"))
+        {
+            result = await Handler(connection).ExecuteAsync(context);
+        }
+
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection);
+        return result;
+    }
 
     private static TransferContext Context(
         string url,

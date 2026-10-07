@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smb.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smb;
 
@@ -15,14 +16,19 @@ public sealed class SmbTransferLogTests
 {
     private static readonly NetworkCredential User = new("User", "Password");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_Download_LogsEachStepAtInfo()
     {
         var log = new RecordingDiagnosticLog();
 
-        await Handler(FileDownload()).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(FileDownload(), Context(SmbRecordedExchange.DownloadUrl, User, log));
 
         string[] info = log.MessagesAt(DiagnosticLogLevel.Info);
+        Diagnostics.Assert("info lines", 5, info.Length);
         Assert.AreEqual(5, info.Length);
         Assert.AreEqual("negotiate done: dialect NT LM 0.12", info[0]);
         Assert.AreEqual("session setup done: UID 100", info[1]);
@@ -38,8 +44,9 @@ public sealed class SmbTransferLogTests
     {
         var log = new RecordingDiagnosticLog();
 
-        await Handler(FileDownload()).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(FileDownload(), Context(SmbRecordedExchange.DownloadUrl, User, log));
 
+        Diagnostics.Assert("verbose lines", 7, log.MessagesAt(DiagnosticLogLevel.Verbose).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -75,8 +82,9 @@ public sealed class SmbTransferLogTests
             DiagnosticLog = log,
         };
 
-        await Handler(connection).ExecuteAsync(context);
+        await RunAsync(connection, context);
 
+        Diagnostics.Assert("verbose lines include the write reply", true, log.MessagesAt(DiagnosticLogLevel.Verbose).Contains("received SMB_COM_WRITE_ANDX status 0x00000000"));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Verbose), "received SMB_COM_WRITE_ANDX status 0x00000000");
     }
 
@@ -86,8 +94,12 @@ public sealed class SmbTransferLogTests
         var log = new RecordingDiagnosticLog();
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
 
+        Diagnostics.Arrange("url", "smb://h/s/f, a connected connection with no replies");
+
         await new SmbProtocolHandler(connector).ExecuteAsync(Context("smb://h/s/f", null, log));
 
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
+        Diagnostics.Assert("target log is the context log", true, ReferenceEquals(log, connector.Targets.SingleOrDefault()?.DiagnosticLog));
         Assert.AreSame(log, connector.Targets.Single().DiagnosticLog);
     }
 
@@ -100,8 +112,9 @@ public sealed class SmbTransferLogTests
             SmbRecordedExchange.SessionSetupAccepted,
             SmbRecordedExchange.TreeConnectMissingShare);
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User, log));
 
+        Diagnostics.Diff("error lines", "tree connect refused: status 0xC00000CC | transfer failed with RemoteFileNotFound (exit 78): Remote file not found", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Error)));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -122,8 +135,9 @@ public sealed class SmbTransferLogTests
             SmbRecordedExchange.OpenMissingFile,
             SmbRecordedExchange.TreeDisconnectAccepted);
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User, log));
 
+        Diagnostics.Diff("first error line", "open refused: status 0xC0000034", log.MessagesAt(DiagnosticLogLevel.Error).FirstOrDefault() ?? string.Empty);
         Assert.AreEqual("open refused: status 0xC0000034", log.MessagesAt(DiagnosticLogLevel.Error)[0]);
     }
 
@@ -133,8 +147,9 @@ public sealed class SmbTransferLogTests
         var log = new RecordingDiagnosticLog();
         var connection = new ScriptedConnection(SmbRecordedExchange.NegotiateResponse, SmbRecordedExchange.SessionSetupRefused);
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User, log));
 
+        Diagnostics.Diff("error lines", "session setup refused: status 0xC000006D | transfer failed with LoginDenied (exit 67): Login denied", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Error)));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -150,8 +165,9 @@ public sealed class SmbTransferLogTests
         var log = new RecordingDiagnosticLog();
         var connection = new ScriptedConnection(SmbRecordedExchange.NegotiateRefused);
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User, log));
 
+        Diagnostics.Diff("first error line", "negotiate refused: status 0xC0000022", log.MessagesAt(DiagnosticLogLevel.Error).FirstOrDefault() ?? string.Empty);
         Assert.AreEqual("negotiate refused: status 0xC0000022", log.MessagesAt(DiagnosticLogLevel.Error)[0]);
     }
 
@@ -164,8 +180,10 @@ public sealed class SmbTransferLogTests
             SmbRecordedExchange.SessionSetupAccepted,
             SmbRecordedExchange.TreeConnectMissingShare);
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User, log));
 
+        Diagnostics.Assert("log lines", 2, log.Lines.Count);
+        Diagnostics.Assert("non-error lines", 0, log.Lines.Count(line => line.Level != DiagnosticLogLevel.Error));
         Assert.HasCount(2, log.Lines);
         Assert.IsTrue(log.Lines.All(line => line.Level == DiagnosticLogLevel.Error));
     }
@@ -175,8 +193,9 @@ public sealed class SmbTransferLogTests
     {
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Error);
 
-        await Handler(FileDownload()).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, log));
+        await RunAsync(FileDownload(), Context(SmbRecordedExchange.DownloadUrl, User, log));
 
+        Diagnostics.Assert("log lines", 0, log.Lines.Count);
         Assert.IsEmpty(log.Lines);
     }
 
@@ -185,9 +204,11 @@ public sealed class SmbTransferLogTests
     {
         var log = new RecordingDiagnosticLog();
 
-        await Handler(FileDownload()).ExecuteAsync(
+        await RunAsync(
+            FileDownload(),
             Context("smb://user:s3cret@" + SmbRecordedExchange.Host + "/share/dir/x.txt", new NetworkCredential("user", "s3cret"), log));
 
+        Diagnostics.Assert("lines carrying the password", 0, log.Lines.Count(line => line.Message.Contains("s3cret", StringComparison.Ordinal)));
         Assert.IsNotEmpty(log.Lines);
         Assert.IsFalse(log.Lines.Any(line => line.Message.Contains("s3cret", StringComparison.Ordinal)));
     }
@@ -197,11 +218,34 @@ public sealed class SmbTransferLogTests
     {
         var log = new RecordingDiagnosticLog();
         byte[] message = SmbRecordedExchange.NegotiateResponse;
+        Diagnostics.Arrange("message", "the negotiate response with its command byte set to 0x99");
+        Diagnostics.Bytes("message with command 0x99", message);
         message[8] = 0x99;
 
         new SmbTransferLog(log).Received(message);
 
+        Diagnostics.ActLog(log);
+        Diagnostics.Diff("line", "received command 0x99 status 0x00000000", log.Lines.SingleOrDefault().Message ?? string.Empty);
         Assert.AreEqual("received command 0x99 status 0x00000000", log.Lines.Single().Message);
+    }
+
+    // Runs the handler over the scripted connection, writing the context and replies before and the result, bytes sent and log lines after.
+    private async Task RunAsync(ScriptedConnection connection, TransferContext context)
+    {
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReplies(connection);
+        TransferResult result;
+        using (Diagnostics.Phase("execute"))
+        {
+            result = await Handler(connection).ExecuteAsync(context);
+        }
+
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection);
+        if (context.DiagnosticLog is RecordingDiagnosticLog log)
+        {
+            Diagnostics.ActLog(log);
+        }
     }
 
     private static SmbProtocolHandler Handler(ScriptedConnection connection) =>

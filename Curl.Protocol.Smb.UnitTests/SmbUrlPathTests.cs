@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smb;
 
@@ -8,6 +9,10 @@ namespace Curl.Protocol.Smb;
 [TestClass]
 public sealed class SmbUrlPathTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("/share/x.txt", "share", "x.txt")]
     [DataRow("/share/dir/x.txt", "share", @"dir\x.txt")]
@@ -18,7 +23,14 @@ public sealed class SmbUrlPathTests
     [DataRow("s/x", "s", "x")]
     public void TryParse_SplitsShareAndFileAsCurl(string absolutePath, string share, string filePath)
     {
-        Assert.IsNull(SmbUrlPath.TryParse(absolutePath, out SmbUrlPath? path));
+        Diagnostics.Arrange("absolute path", absolutePath);
+
+        string? refusal = SmbUrlPath.TryParse(absolutePath, out SmbUrlPath? path);
+
+        Diagnostics.Act("parsed", path is null ? $"refused: {refusal}" : $"share \"{Encoding.UTF8.GetString(path.Share)}\", file \"{Encoding.UTF8.GetString(path.FilePath)}\"");
+        Diagnostics.Diff("share", share, path is null ? string.Empty : Encoding.UTF8.GetString(path.Share));
+        Diagnostics.Diff("file path", filePath, path is null ? string.Empty : Encoding.UTF8.GetString(path.FilePath));
+        Assert.IsNull(refusal);
 
         Assert.AreEqual(share, Encoding.UTF8.GetString(path!.Share));
         Assert.AreEqual(filePath, Encoding.UTF8.GetString(path.FilePath));
@@ -30,7 +42,13 @@ public sealed class SmbUrlPathTests
     [DataRow("/s/a%01b", "URL using bad/illegal format or missing URL")]
     public void TryParse_RefusesAsCurl(string absolutePath, string expected)
     {
-        Assert.AreEqual(expected, SmbUrlPath.TryParse(absolutePath, out SmbUrlPath? path));
+        Diagnostics.Arrange("absolute path", absolutePath);
+
+        string? refusal = SmbUrlPath.TryParse(absolutePath, out SmbUrlPath? path);
+
+        Diagnostics.Act("refusal", refusal);
+        Diagnostics.Diff("refusal", expected, refusal ?? string.Empty);
+        Assert.AreEqual(expected, refusal);
         Assert.IsNull(path);
     }
 
