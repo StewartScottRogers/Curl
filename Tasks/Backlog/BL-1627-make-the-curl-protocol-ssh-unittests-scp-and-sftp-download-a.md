@@ -36,3 +36,4 @@ Every test in these files of `Curl.Protocol.Ssh.UnitTests` writes, through BL-14
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Lane 7 could not integrate: fast tests failed twice (Curl.Http2.UnitTests failed; then Curl.Cookies.UnitTests: EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother) after rebasing onto the other lanes' work. The work is on branch factory/BL-1627-lane-7-20261007-111121; start with git cherry-pick --no-commit factory/BL-1627-lane-7-20261007-111121 and fix it.
