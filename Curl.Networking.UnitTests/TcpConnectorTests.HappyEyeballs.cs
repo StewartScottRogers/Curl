@@ -33,15 +33,20 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.FromMilliseconds(50), IPAddress.IPv6Loopback, Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
         time.Advance(49);
+        Diagnostics.Act("clock advanced to ms", 49);
+        Diagnostics.Assert("dials before the timeout", 1, dialer.Dials.Count);
         Assert.HasCount(1, dialer.Dials);
         time.Advance(1);
         await dialer.WaitForDialsAsync(2);
         var winner = new StallingConnection();
         dialer.Connect(IPv4Attempt, winner);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
 
+        Diagnostics.Assert("winning connection", winner, result.Connection);
         Assert.AreSame(winner, result.Connection);
         CollectionAssert.AreEqual(new[] { (IPv6Attempt, 0L), (IPv4Attempt, 50L) }, dialer.Dials);
         CollectionAssert.AreEqual(new[] { "  Trying [::1]:18644...", "  Trying 127.0.0.1:18644..." }, DialLines(events));
@@ -55,13 +60,16 @@ public sealed partial class TcpConnectorTests
         var dialer = new GatedTcpDialer(time);
         var connector = HappyEyeballsConnector(dialer, time, null, IPAddress.IPv6Loopback, Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(new RecordingTransferEvents()), CancellationToken.None).AsTask();
         time.Advance(199);
         var winner = new StallingConnection();
         dialer.Connect(IPv6Attempt, winner);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
         time.Advance(1);
 
+        Diagnostics.Assert("winning connection", winner, result.Connection);
         Assert.AreSame(winner, result.Connection);
         CollectionAssert.AreEqual(new[] { (IPv6Attempt, 0L) }, dialer.Dials);
         Assert.AreEqual(0, time.PendingTimerCount);
@@ -75,6 +83,7 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.FromMilliseconds(5000), IPAddress.IPv6Loopback, Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
         time.Advance(2000);
         dialer.Refuse(IPv6Attempt);
@@ -82,7 +91,9 @@ public sealed partial class TcpConnectorTests
         var winner = new StallingConnection();
         dialer.Connect(IPv4Attempt, winner);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
 
+        Diagnostics.Assert("winning connection", winner, result.Connection);
         Assert.AreSame(winner, result.Connection);
         CollectionAssert.AreEqual(new[] { (IPv6Attempt, 0L), (IPv4Attempt, 2000L) }, dialer.Dials);
         CollectionAssert.AreEqual(
@@ -97,12 +108,15 @@ public sealed partial class TcpConnectorTests
         var dialer = new GatedTcpDialer(time);
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.Zero, IPAddress.IPv6Loopback, Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(new RecordingTransferEvents()), CancellationToken.None).AsTask();
         await dialer.WaitForDialsAsync(2);
         var winner = new StallingConnection();
         dialer.Connect(IPv6Attempt, winner);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
 
+        Diagnostics.Assert("winning connection", winner, result.Connection);
         Assert.AreSame(winner, result.Connection);
         CollectionAssert.AreEqual(new[] { (IPv6Attempt, 0L), (IPv4Attempt, 0L) }, dialer.Dials);
     }
@@ -114,13 +128,16 @@ public sealed partial class TcpConnectorTests
         var dialer = new GatedTcpDialer(time);
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.FromMilliseconds(50), Loopback, IPAddress.IPv6Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(new RecordingTransferEvents()), CancellationToken.None).AsTask();
         time.Advance(50);
         await dialer.WaitForDialsAsync(2);
         var winner = new StallingConnection();
         dialer.Connect(IPv6Attempt, winner);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
 
+        Diagnostics.Assert("winning connection", winner, result.Connection);
         Assert.AreSame(winner, result.Connection);
         CollectionAssert.AreEqual(new[] { (IPv4Attempt, 0L), (IPv6Attempt, 50L) }, dialer.Dials);
     }
@@ -132,6 +149,7 @@ public sealed partial class TcpConnectorTests
         var dialer = new GatedTcpDialer(time);
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.FromMilliseconds(200), IPAddress.IPv6Loopback, Loopback, IPAddress.Parse("::2"));
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(new RecordingTransferEvents()), CancellationToken.None).AsTask();
         time.Advance(10);
         dialer.Refuse(IPv6Attempt);
@@ -141,7 +159,9 @@ public sealed partial class TcpConnectorTests
         var winner = new StallingConnection();
         dialer.Connect(SecondIPv6Attempt, winner);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
 
+        Diagnostics.Assert("winning connection", winner, result.Connection);
         Assert.AreSame(winner, result.Connection);
         CollectionAssert.AreEqual(new[] { (IPv6Attempt, 0L), (SecondIPv6Attempt, 10L), (IPv4Attempt, 200L) }, dialer.Dials);
     }
@@ -153,6 +173,7 @@ public sealed partial class TcpConnectorTests
         var dialer = new GatedTcpDialer(time) { IgnoresCancellation = true };
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.Zero, IPAddress.IPv6Loopback, Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(new RecordingTransferEvents()), CancellationToken.None).AsTask();
         await dialer.WaitForDialsAsync(2);
         var winner = new StallingConnection();
@@ -160,7 +181,9 @@ public sealed partial class TcpConnectorTests
         dialer.Connect(IPv4Attempt, winner);
         dialer.Connect(IPv6Attempt, loser);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
 
+        Diagnostics.Assert("winning connection", winner, result.Connection);
         Assert.AreSame(winner, result.Connection);
         Assert.IsTrue(loser.IsDisposed);
         Assert.IsFalse(winner.IsDisposed);
@@ -174,6 +197,7 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.FromMilliseconds(50), IPAddress.IPv6Loopback, Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(events), CancellationToken.None).AsTask();
         time.Advance(50);
         await dialer.WaitForDialsAsync(2);
@@ -181,7 +205,9 @@ public sealed partial class TcpConnectorTests
         time.Advance(1950);
         dialer.Refuse(IPv6Attempt);
         var result = await connecting;
+        Diagnostics.Act("connected", result.Connection is not null);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsTrue(result.IsConnectionRefused);
         Assert.AreEqual("Failed to connect to dual.example:18644 after 2000 ms: Could not connect to server", result.ErrorMessage);
@@ -204,9 +230,12 @@ public sealed partial class TcpConnectorTests
         var dialer = new GatedTcpDialer(time);
         var connector = HappyEyeballsConnector(dialer, time, TimeSpan.FromMilliseconds(200), IPAddress.IPv6Loopback, Loopback);
 
+        Diagnostics.Arrange("happy eyeballs timeout", connector.HappyEyeballsTimeout);
         var connecting = connector.ConnectAsync(DualTarget(new RecordingTransferEvents()), caller.Token).AsTask();
         await caller.CancelAsync();
 
+        Diagnostics.Act("caller cancelled the token", caller.IsCancellationRequested);
+        Diagnostics.Assert("exception type", nameof(OperationCanceledException), nameof(OperationCanceledException));
         await Assert.ThrowsAsync<OperationCanceledException>(async () => await connecting);
         CollectionAssert.AreEqual(new[] { (IPv6Attempt, 0L) }, dialer.Dials);
         Assert.AreEqual(0, time.PendingTimerCount);
@@ -217,6 +246,9 @@ public sealed partial class TcpConnectorTests
     {
         var connector = new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), TimeProvider.System);
 
+        Diagnostics.Arrange("happy eyeballs timeout given", "none");
+        Diagnostics.Act("connector timeout", connector.HappyEyeballsTimeout);
+        Diagnostics.Assert("default timeout", TimeSpan.FromMilliseconds(200), TcpConnector.DefaultHappyEyeballsTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(200), TcpConnector.DefaultHappyEyeballsTimeout);
         Assert.AreEqual(TcpConnector.DefaultHappyEyeballsTimeout, connector.HappyEyeballsTimeout);
     }
@@ -232,6 +264,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(
             new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), TimeProvider.System, happyEyeballsTimeout: TimeSpan.FromMilliseconds(givenMilliseconds));
 
+        Diagnostics.Arrange("given milliseconds", givenMilliseconds);
+        Diagnostics.Act("connector timeout", connector.HappyEyeballsTimeout);
+        Diagnostics.Assert("timeout", TimeSpan.FromMilliseconds(expectedMilliseconds), connector.HappyEyeballsTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), connector.HappyEyeballsTimeout);
     }
 

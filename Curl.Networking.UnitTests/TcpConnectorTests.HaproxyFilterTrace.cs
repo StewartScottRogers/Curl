@@ -21,8 +21,9 @@ public sealed partial class TcpConnectorTests
         var events = new CountingTransferEvents();
         var connector = HaproxyConnector(new ScriptedConnection([]), tracesSetup: true, tracesHaproxy: true);
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18475, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18475, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("last call", "[HAPROXY] destroy", events.Calls[^1]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -47,8 +48,9 @@ public sealed partial class TcpConnectorTests
         var connection = new ScriptedConnection([]);
         var connector = HaproxyConnector(connection, tracesSetup: false, tracesHaproxy: true);
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18471, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18471, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("call count", 4, events.Calls.Count);
         CollectionAssert.AreEqual(
             new[] { "  Trying 127.0.0.1:18471...", "opened", "[HAPROXY] removing connected setup filter", "[HAPROXY] destroy" },
             events.Calls);
@@ -62,8 +64,9 @@ public sealed partial class TcpConnectorTests
         var events = new CountingTransferEvents();
         var connector = HaproxyConnector(new ScriptedConnection([]), tracesSetup: true, tracesHaproxy: false);
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18472, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18472, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("last call", "[SETUP] destroy", events.Calls[^1]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -84,8 +87,9 @@ public sealed partial class TcpConnectorTests
         var events = new CountingTransferEvents();
         var connector = HaproxyConnector(new ScriptedConnection([]), tracesSetup: false, tracesHaproxy: true);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18478, UseTls: true) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18478, UseTls: true) { Events = events });
 
+        Diagnostics.Assert("connection returned", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(
             new[] { "opened", "[HAPROXY] removing connected setup filter", "[HAPROXY] destroy" },
@@ -102,8 +106,9 @@ public sealed partial class TcpConnectorTests
             TracesHaproxyFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18474, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18474, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("any haproxy line", false, events.Calls.Any(line => line.Contains("HAPROXY", StringComparison.Ordinal)));
         Assert.IsFalse(events.Calls.Any(line => line.Contains("HAPROXY", StringComparison.Ordinal)));
     }
 
@@ -120,8 +125,9 @@ public sealed partial class TcpConnectorTests
             TracesHaproxyFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsFalse(events.Calls.Any(line => line.Contains("HAPROXY", StringComparison.Ordinal)));
     }
@@ -138,8 +144,9 @@ public sealed partial class TcpConnectorTests
             TracesHaproxyFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18476, UseTls: false) { Events = events, IsForwardProxy = true }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18476, UseTls: false) { Events = events, IsForwardProxy = true });
 
+        Diagnostics.Assert("last call", "[SETUP] destroy", events.Calls[^1]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -167,10 +174,13 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18531, useTls) { Events = events, PoolScheme = poolScheme }, CancellationToken.None);
+        Diagnostics.Arrange("use TLS", useTls);
+        Diagnostics.Arrange("pool scheme", poolScheme);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18531, useTls) { Events = events, PoolScheme = poolScheme });
 
         int length = connection.Written.Count;
         int sendIndex = events.Calls.IndexOf($"[TCP] send(len={length}) -> 0, {length}");
+        Diagnostics.Assert("send index", events.Calls.IndexOf("[TCP] connected on fd=3") + 1, sendIndex);
         Assert.AreEqual(events.Calls.IndexOf("[TCP] connected on fd=3") + 1, sendIndex);
         Assert.IsTrue(sendIndex < events.Calls.IndexOf("opened"));
     }

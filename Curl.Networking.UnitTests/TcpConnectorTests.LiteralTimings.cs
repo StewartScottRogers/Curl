@@ -17,8 +17,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = endPoint => new FakeConnection { RemoteEndPoint = endPoint } };
         var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 80, UseTls: false));
 
+        Diagnostics.Assert("resolved hosts", "127.0.0.1", string.Join(" | ", resolver.ResolvedHosts));
         CollectionAssert.AreEqual(new[] { "127.0.0.1" }, resolver.ResolvedHosts);
         Assert.AreEqual(110L, result.Timings!.NameResolved);
         Assert.IsTrue(result.Timings.NameResolved > result.Timings.Started, "time_namelookup is not zero.");

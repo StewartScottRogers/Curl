@@ -22,6 +22,7 @@ public sealed partial class TcpConnectorTests
         // http://example.test/x, without curl's [SSL-PROXY] lines (BL-1255 Notes).
         var (events, result) = await TraceThroughHttpsProxyAsync(TunnelEstablishedReply, tracesSetup: true);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         AssertTunnelLines(
             new[]
@@ -64,6 +65,7 @@ public sealed partial class TcpConnectorTests
     {
         var (events, _) = await TraceThroughHttpsProxyAsync(TunnelEstablishedReply, agreed: "http/1.1");
 
+        Diagnostics.Assert("first traced line", "[HTTP-PROXY] CONNECT", events.Info[1]);
         AssertTunnelLines(
             new[]
             {
@@ -86,8 +88,9 @@ public sealed partial class TcpConnectorTests
         var connector = HttpsProxyTunnelConnector(new SequencedTlsProvider(ConnectResult.Connected(secured, null)), tracesSetup: true);
         var target = new ConnectTarget("example.test", 443, UseTls: true) { Proxy = TunnelHttpsProxy, PoolScheme = "https", Events = events };
 
-        await connector.ConnectAsync(target, CancellationToken.None);
+        await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("setup added line written", false, events.Info.Contains(SetupFilterTraceEvents.AddedLine));
         Assert.DoesNotContain(SetupFilterTraceEvents.AddedLine, events.Info);
         Assert.AreEqual("[SETUP] happy eyeballing to proxy 192.0.2.10:3128", events.Info[0]);
         var failed = events.Info.IndexOf("[H1-PROXY] new tunnel state 'failed'");
@@ -99,6 +102,7 @@ public sealed partial class TcpConnectorTests
     {
         var (events, result) = await TraceThroughHttpsProxyAsync(TunnelEstablishedReply, tracesHttpProxy: false, tracesH1Proxy: false);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith('[')));
     }
@@ -108,6 +112,7 @@ public sealed partial class TcpConnectorTests
     {
         var (events, _) = await TraceThroughHttpsProxyAsync(TunnelEstablishedReply, tracesHttpProxy: false, tracesH1Proxy: false, tracesSetup: true);
 
+        Diagnostics.Assert("all bracketed lines are setup lines", true, events.Info.Where(line => line.StartsWith('[')).All(line => line.StartsWith("[SETUP] ", StringComparison.Ordinal)));
         Assert.IsTrue(events.Info.Where(line => line.StartsWith('[')).All(line => line.StartsWith("[SETUP] ", StringComparison.Ordinal)));
         Assert.Contains(TcpConnector.HttpsProxySslFilterAddedLine, events.Info);
     }
@@ -121,8 +126,9 @@ public sealed partial class TcpConnectorTests
             new SequencedTlsProvider(ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake failed")),
             tracesSetup: true);
 
-        var result = await connector.ConnectAsync(HttpsProxyTunnelTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsProxyTunnelTarget with { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         AssertTunnelLines(
             new[] { TcpConnector.HttpsProxySslFilterAddedLine, TcpConnector.HttpProxyTunnelFilterAddedLine, "[HTTP-PROXY] CONNECT", "[HTTP-PROXY] CONNECT" },
@@ -146,8 +152,9 @@ public sealed partial class TcpConnectorTests
             TracesH1ProxyFilter = true,
         };
 
-        var result = await connector.ConnectAsync(HttpsProxyTunnelTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsProxyTunnelTarget with { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         AssertTunnelLines(
             new[] { SetupFilterTraceEvents.AddedLine, "[SETUP] happy eyeballing to proxy 192.0.2.10:3128" },
@@ -173,7 +180,7 @@ public sealed partial class TcpConnectorTests
 
     // Connects to example.test:80 through an HTTPS proxy whose handshake agrees on the ALPN protocol
     // given and whose CONNECT reply is proxyReply.
-    private static async Task<(RecordingTransferEvents Events, ConnectResult Result)> TraceThroughHttpsProxyAsync(
+    private async Task<(RecordingTransferEvents Events, ConnectResult Result)> TraceThroughHttpsProxyAsync(
         string proxyReply,
         bool tracesHttpProxy = true,
         bool tracesH1Proxy = true,
@@ -184,7 +191,7 @@ public sealed partial class TcpConnectorTests
         var secured = new ScriptedConnection(Encoding.Latin1.GetBytes(proxyReply));
         var proxyTls = new SequencedTlsProvider(ConnectResult.Connected(secured, null, applicationProtocol: agreed));
         var connector = HttpsProxyTunnelConnector(proxyTls, tracesHttpProxy, tracesH1Proxy, tracesSetup);
-        var result = await connector.ConnectAsync(HttpsProxyTunnelTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, HttpsProxyTunnelTarget with { Events = events });
         Assert.AreEqual(TunnelConnectHead, Encoding.Latin1.GetString(secured.Written.ToArray()));
         return (events, result);
     }

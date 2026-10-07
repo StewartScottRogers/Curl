@@ -23,8 +23,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(
             new FakeDnsResolver(Loopback), dialer, tls, new ManualTimeProvider(), haproxyProtocol: new HaproxyProtocolHeader(null));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 48637, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 48637, UseTls: true));
 
+        Diagnostics.Assert("connection returned", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual("PROXY TCP4 127.0.0.1 127.0.0.1 55520 48637\r\n", tls.WrittenBeforeHandshake);
     }
@@ -37,8 +38,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(
             new FakeDnsResolver(IPAddress.IPv6Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(), haproxyProtocol: new HaproxyProtocolHeader(null));
 
-        await connector.ConnectAsync(new ConnectTarget("::1", 48617, UseTls: false), CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("::1", 48617, UseTls: false));
 
+        Diagnostics.Assert("written line", "PROXY TCP6 ::1 ::1 52934 48617\r\n", Encoding.ASCII.GetString(connection.Written.ToArray()));
         Assert.AreEqual("PROXY TCP6 ::1 ::1 52934 48617\r\n", Encoding.ASCII.GetString(connection.Written.ToArray()));
     }
 
@@ -51,8 +53,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(
             new FakeDnsResolver(Loopback), dialer, tls, new ManualTimeProvider(), haproxyProtocol: new HaproxyProtocolHeader("1.2.3.4"));
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 48618, UseTls: true), CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 48618, UseTls: true));
 
+        Diagnostics.Assert("written before handshake", "PROXY TCP4 1.2.3.4 1.2.3.4 52946 48618\r\n", tls.WrittenBeforeHandshake);
         Assert.AreEqual("PROXY TCP4 1.2.3.4 1.2.3.4 52946 48618\r\n", tls.WrittenBeforeHandshake);
     }
 
@@ -65,8 +68,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(
             new FakeDnsResolver(ProxyAddress), dialer, tls, new ManualTimeProvider(), haproxyProtocol: new HaproxyProtocolHeader(null));
 
-        await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy });
 
+        Diagnostics.Assert("written before handshake ends with", true, tls.WrittenBeforeHandshake!.EndsWith("\r\n\r\nPROXY TCP4 127.0.0.1 192.0.2.10 50000 3128\r\n", StringComparison.Ordinal));
         Assert.EndsWith("\r\n\r\nPROXY TCP4 127.0.0.1 192.0.2.10 50000 3128\r\n", tls.WrittenBeforeHandshake);
         Assert.StartsWith("CONNECT example.com:443 HTTP/1.1\r\n", tls.WrittenBeforeHandshake);
     }
@@ -80,8 +84,9 @@ public sealed partial class TcpConnectorTests
             new FakeDnsResolver(), dialer, new FakeTlsProvider(), new ManualTimeProvider(),
             unixSocket: new UnixSocketAddress("/run/app.sock", IsAbstract: false), haproxyProtocol: new HaproxyProtocolHeader(null));
 
-        await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false), CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false));
 
+        Diagnostics.Assert("written line", "PROXY UNKNOWN\r\n", Encoding.ASCII.GetString(connection.Written.ToArray()));
         Assert.AreEqual("PROXY UNKNOWN\r\n", Encoding.ASCII.GetString(connection.Written.ToArray()));
     }
 
@@ -92,8 +97,9 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(
             new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => connection }, new FakeTlsProvider(), new ManualTimeProvider());
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 80, UseTls: false), CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 80, UseTls: false));
 
+        Diagnostics.Assert("written byte count", 0, connection.Written.Count);
         Assert.IsEmpty(connection.Written);
         Assert.IsNull(connector.HaproxyProtocol);
     }
@@ -103,6 +109,10 @@ public sealed partial class TcpConnectorTests
     {
         var header = new HaproxyProtocolHeader("1.2.3.4");
 
+        Diagnostics.Arrange("haproxy client ip", "1.2.3.4");
+        var given = new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider(), haproxyProtocol: header).HaproxyProtocol;
+        Diagnostics.Act("header read back", given is not null);
+        Diagnostics.Assert("same header", true, ReferenceEquals(header, given));
         Assert.AreSame(header, new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider(), haproxyProtocol: header).HaproxyProtocol);
     }
 

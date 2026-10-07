@@ -24,8 +24,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection(), LocalEndPoint = localEndPoint };
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18441, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18441, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("info lines", "  Trying 127.0.0.1:18441...", string.Join(" | ", events.Info));
         CollectionAssert.AreEqual(new[] { "  Trying 127.0.0.1:18441..." }, events.Info);
         Assert.HasCount(1, events.Opened);
         Assert.AreEqual(
@@ -48,9 +49,10 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
         var target = new ConnectTarget("localhost", 80, UseTls: false) { Events = events };
 
-        await connector.ConnectAsync(target, CancellationToken.None);
-        var second = await connector.ConnectAsync(target, CancellationToken.None);
+        await ConnectLoggedAsync(connector, target);
+        var second = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("second connection number", 1L, second.ConnectionNumber);
         Assert.AreEqual(1, second.ConnectionNumber);
         Assert.AreEqual(1, events.Opened[1].ConnectionNumber);
         Assert.AreEqual("localhost", events.Opened[1].HostName);
@@ -74,8 +76,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), timeProvider);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("info line count", 3, events.Info.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -101,9 +104,10 @@ public sealed partial class TcpConnectorTests
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
         var target = new ConnectTarget("127.0.0.1", 1, UseTls: false);
 
-        var first = await connector.ConnectAsync(target, CancellationToken.None);
-        var refused = await connector.ConnectAsync(target, CancellationToken.None);
+        var first = await ConnectLoggedAsync(connector, target);
+        var refused = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("first connection number", 0L, first.ConnectionNumber);
         Assert.AreEqual(0L, first.ConnectionNumber);
         Assert.AreEqual(1L, refused.ConnectionNumber);
         Assert.IsTrue(refused.IsConnectionRefused);
@@ -118,9 +122,10 @@ public sealed partial class TcpConnectorTests
         // 2026-09-27, curl 8.21.0, ADR-0109).
         var connector = new TcpConnector(new LoopbackOnlyDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
 
-        var unresolved = await connector.ConnectAsync(new ConnectTarget("nohost.invalid", 80, UseTls: false), CancellationToken.None);
-        var refused = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false), CancellationToken.None);
+        var unresolved = await ConnectLoggedAsync(connector, new ConnectTarget("nohost.invalid", 80, UseTls: false));
+        var refused = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false));
 
+        Diagnostics.Assert("unresolved exit code", CurlExitCode.CouldntResolveHost, unresolved.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, unresolved.ExitCode);
         Assert.AreEqual("Could not resolve host: nohost.invalid", unresolved.ErrorMessage);
         Assert.AreEqual(0L, unresolved.ConnectionNumber);
@@ -140,9 +145,10 @@ public sealed partial class TcpConnectorTests
             resolveOverrides: ResolveOverrides.Parse(["garbage"]));
         var target = new ConnectTarget("a", 80, UseTls: false);
 
-        var first = await connector.ConnectAsync(target, CancellationToken.None);
-        var second = await connector.ConnectAsync(target, CancellationToken.None);
+        var first = await ConnectLoggedAsync(connector, target);
+        var second = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("first exit code", CurlExitCode.SetoptOptionSyntax, first.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, first.ExitCode);
         Assert.AreEqual(0L, first.ConnectionNumber);
         Assert.AreEqual(0L, second.ConnectionNumber);
@@ -161,8 +167,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = CreateConnector(new FakeDnsResolver(IPAddress.IPv6Loopback), new FakeTcpDialer(), new FakeTlsProvider());
 
-        await connector.ConnectAsync(new ConnectTarget("localhost", 1, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 1, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("trying line", "  Trying [::1]:1...", events.Info[3]);
         Assert.AreEqual("  Trying [::1]:1...", events.Info[3]);
         Assert.AreEqual("connect to ::1 port 1 from :: port 0 failed: Connection refused", events.Info[4]);
     }
@@ -175,8 +182,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, tlsProvider);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 443, UseTls: true) { Events = events });
 
+        Diagnostics.Assert("connection is the secured one", true, ReferenceEquals(tlsProvider.SecuredConnection, result.Connection));
         Assert.AreSame(tlsProvider.SecuredConnection, result.Connection);
         Assert.HasCount(1, events.Opened);
         Assert.AreEqual(new IPEndPoint(Loopback, 443), events.Opened[0].RemoteEndPoint);
@@ -190,8 +198,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, tlsProvider);
 
-        await connector.ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 443, UseTls: true) { Events = events });
 
+        Diagnostics.Assert("info line count", 4, events.Info.Count);
         CollectionAssert.AreEqual(new[] { "Host localhost:443 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", "  Trying 127.0.0.1:443..." }, events.Info);
         Assert.IsEmpty(events.Opened);
     }
@@ -211,10 +220,12 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             HttpProxyTunnelOptions.Default with { MatchesSchannelBuild = matchesSchannelBuild });
 
-        await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
+        Diagnostics.Arrange("matches Schannel build", matchesSchannelBuild);
+        await ConnectLoggedAsync(connector, PlainTarget with { Events = events });
 
         // curl -v -p -x http://127.0.0.1:18964 http://example.test/ (8.21.0 Schannel; 8.18.0 OpenSSL
         // and 8.21.0's source for the OpenSSL build, BL-964 Notes).
+        Diagnostics.Assert("info line count", 4 + beforeEstablishing.Length + 3, events.Info.Count);
         CollectionAssert.AreEqual(
             new[] { "Host proxy.example:3128 was resolved.", "IPv6: (none)", "IPv4: 192.0.2.10", "  Trying 192.0.2.10:3128..." }
                 .Concat(beforeEstablishing)
@@ -231,8 +242,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = CreateConnector(new FakeDnsResolver(ProxyAddress), new FakeTcpDialer(), new FakeTlsProvider());
 
-        await connector.ConnectAsync(PlainTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, PlainTarget with { Events = events });
 
+        Diagnostics.Assert("last info line", "Failed to connect to example.com:80 over proxy proxy.example after 0 ms: Could not connect to server", events.Info[^1]);
         Assert.AreEqual(
             "Failed to connect to example.com:80 over proxy proxy.example after 0 ms: Could not connect to server",
             events.Info[^1]);

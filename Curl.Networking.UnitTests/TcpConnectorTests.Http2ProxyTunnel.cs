@@ -24,8 +24,9 @@ public sealed partial class TcpConnectorTests
         var tlsProvider = new AlpnRecordingTlsProvider(new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply)), "http/1.1");
         var connector = CreateHttp2ProxyConnector(tlsProvider, proxyHttp2: false);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.test", 443, UseTls: false) { Proxy = HttpsProxy }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: false) { Proxy = HttpsProxy });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "http/1.1" }, tlsProvider.ReceivedApplicationProtocols.ToArray());
     }
@@ -38,8 +39,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = CreateHttp2ProxyConnector(tlsProvider, proxyHttp2: true);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.test", 443, UseTls: false) { Events = events, Proxy = HttpsProxy }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: false) { Events = events, Proxy = HttpsProxy });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "h2", "http/1.1" }, tlsProvider.ReceivedApplicationProtocols.ToArray());
         CollectionAssert.AreEqual(
@@ -76,8 +78,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = CreateHttp2ProxyConnector(new AlpnRecordingTlsProvider(proxyTls, "h2"), proxyHttp2: true);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.test", 443, UseTls: false) { Events = events, Proxy = HttpsProxy }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: false) { Events = events, Proxy = HttpsProxy });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Could not connect to server", result.ErrorMessage);
         Assert.IsNull(result.Connection);
@@ -92,9 +95,12 @@ public sealed partial class TcpConnectorTests
         var proxyTls = new ScriptedConnection(truncated);
         var connector = CreateHttp2ProxyConnector(new AlpnRecordingTlsProvider(proxyTls, "h2"), proxyHttp2: true);
 
-        await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () =>
-            await connector.ConnectAsync(new ConnectTarget("example.test", 443, UseTls: false) { Proxy = HttpsProxy }, CancellationToken.None));
+        Diagnostics.Arrange("proxy", "h2 proxy whose reply breaks off mid frame");
+        var thrown = await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () =>
+            await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: false) { Proxy = HttpsProxy }));
 
+        Diagnostics.Act("exception", thrown.GetType().Name);
+        Diagnostics.Assert("proxy connection disposed", true, proxyTls.IsDisposed);
         Assert.IsTrue(proxyTls.IsDisposed);
     }
 
@@ -106,8 +112,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = CreateHttp2ProxyConnector(tlsProvider, proxyHttp2: true);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.test", 80, UseTls: false) { Events = events, Proxy = HttpsProxy }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 80, UseTls: false) { Events = events, Proxy = HttpsProxy });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "h2", "http/1.1" }, tlsProvider.ReceivedApplicationProtocols.ToArray());
         CollectionAssert.AreEqual(

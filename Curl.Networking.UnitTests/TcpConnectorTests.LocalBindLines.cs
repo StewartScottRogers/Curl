@@ -22,8 +22,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding("127.0.0.1", "127.0.0.1", null, 40010, 3));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("connection established", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(
             new[] { "  Trying 127.0.0.1:47599...", "Name '127.0.0.1' family 2 resolved to '127.0.0.1' family 2" },
@@ -39,8 +40,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding(null, null, null, 40020, 1));
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("first info line", "  Trying 127.0.0.1:47599...", events.Info[0]);
         Assert.AreEqual("  Trying 127.0.0.1:47599...", events.Info[0]);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("Name ", StringComparison.Ordinal)));
         Assert.AreSame(events, dialer.BoundDialEvents.Single());
@@ -53,6 +55,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.21.0 Windows, --interface 127.0.0.1 http://localhost:47601/.
         var lines = await LocalhostWithIPv4InterfaceLinesAsync();
 
+        Diagnostics.Assert("trace line count", 5, lines.Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -72,6 +75,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.18.0 Linux, --interface 127.0.0.1 http://localhost:47601/: AF_INET6 is 10 there.
         var lines = await LocalhostWithIPv4InterfaceLinesAsync();
 
+        Diagnostics.Assert("trace line count", 5, lines.Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -93,6 +97,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.21.0 Windows, --interface ::1 and host!localhost to http://127.0.0.1:47601/ -> exit 7.
         var lines = await IPv6HostToIPv4AddressLinesAsync(hostName);
 
+        Diagnostics.Assert("trace line count", 3, lines.Length);
         CollectionAssert.AreEqual(
             new[] { "  Trying 127.0.0.1:47599...", nameLine, "connect to 127.0.0.1 port 47599 from  port 0 failed: No error" },
             lines);
@@ -107,6 +112,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.18.0 Linux, --interface ::1 and host!localhost to http://127.0.0.1:47601/ -> exit 7.
         var lines = await IPv6HostToIPv4AddressLinesAsync(hostName);
 
+        Diagnostics.Assert("name line", nameLine, lines[1]);
         Assert.AreEqual(nameLine, lines[1]);
     }
 
@@ -117,6 +123,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.21.0 Windows, --interface bogus0 http://127.0.0.1:47601/ -> exit 45.
         var lines = await UnresolvableHostLinesAsync();
 
+        Diagnostics.Assert("trace line count", 4, lines.Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -135,6 +142,10 @@ public sealed partial class TcpConnectorTests
         // curl 8.18.0 Linux, --interface bogus0 and host!nosuch.invalid -> "with errno 22: Invalid argument".
         var lines = await UnresolvableHostLinesAsync();
 
+        Diagnostics.Assert(
+            "resolve and bind failure lines",
+            "Could not resolve host: bogus0 | Could not bind to 'bogus0' with errno 22: Invalid argument",
+            string.Join(" | ", lines.Skip(1).Take(2)));
         CollectionAssert.AreEqual(
             new[] { "Could not resolve host: bogus0", "Could not bind to 'bogus0' with errno 22: Invalid argument" },
             lines.Skip(1).Take(2).ToArray());
@@ -147,6 +158,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.21.0 Windows, --interface if!Ethernet http://127.0.0.1:47601/ -> exit 45.
         var lines = await MissingInterfaceLinesAsync();
 
+        Diagnostics.Assert("trace line count", 3, lines.Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -164,10 +176,11 @@ public sealed partial class TcpConnectorTests
         // curl 8.18.0 Linux, --interface if!bogus0 -> "Could not bind to interface 'bogus0' with errno 19: No such device".
         var lines = await MissingInterfaceLinesAsync();
 
+        Diagnostics.Assert("bind failure line", "Could not bind to interface 'Ethernet' with errno 19: No such device", lines[1]);
         Assert.AreEqual("Could not bind to interface 'Ethernet' with errno 19: No such device", lines[1]);
     }
 
-    private static async Task<string[]> LocalhostWithIPv4InterfaceLinesAsync()
+    private async Task<string[]> LocalhostWithIPv4InterfaceLinesAsync()
     {
         var events = new RecordingTransferEvents();
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
@@ -179,40 +192,40 @@ public sealed partial class TcpConnectorTests
             localBinding: new LocalBinding("127.0.0.1", "127.0.0.1", null, 0, 1),
             networkInterfaceLookup: Interfaces());
 
-        await connector.ConnectAsync(new ConnectTarget("localhost", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 47599, UseTls: false) { Events = events });
 
         return LinesFromTheFirstTrying(events).Take(5).ToArray();
     }
 
-    private static async Task<string[]> IPv6HostToIPv4AddressLinesAsync(string hostName)
+    private async Task<string[]> IPv6HostToIPv4AddressLinesAsync(string hostName)
     {
         var events = new RecordingTransferEvents();
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding(null, hostName, null, 0, 1));
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events });
 
         return LinesFromTheFirstTrying(events).Take(3).ToArray();
     }
 
-    private static async Task<string[]> UnresolvableHostLinesAsync()
+    private async Task<string[]> UnresolvableHostLinesAsync()
     {
         var events = new RecordingTransferEvents();
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding("bogus0", "bogus0", null, 0, 1));
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events });
 
         return LinesFromTheFirstTrying(events).Take(4).ToArray();
     }
 
-    private static async Task<string[]> MissingInterfaceLinesAsync()
+    private async Task<string[]> MissingInterfaceLinesAsync()
     {
         var events = new RecordingTransferEvents();
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding("Ethernet", null, null, 0, 1));
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events });
 
         return LinesFromTheFirstTrying(events).Take(3).ToArray();
     }

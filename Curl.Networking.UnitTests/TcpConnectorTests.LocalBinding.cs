@@ -25,8 +25,9 @@ public sealed partial class TcpConnectorTests
         var binding = new LocalBinding("127.0.0.1", "127.0.0.1", null, 40000, 11);
         var connector = LocalBindingConnector(dialer, binding);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("connection established", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreSame(binding, connector.LocalBinding);
         Assert.AreEqual((BindTarget, new IPEndPoint(IPAddress.Loopback, 40000), 11), dialer.BoundDials.Single());
@@ -41,8 +42,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding(null, null, null, 40000, 3));
 
-        var result = await connector.ConnectAsync(new ConnectTarget(host, 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, 47599, UseTls: false));
 
+        Diagnostics.Assert("connection established", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual(new IPEndPoint(IPAddress.Parse(localAddress), 40000), dialer.BoundDials.Single().LocalEndPoint);
         Assert.AreEqual(3, dialer.BoundDials.Single().LocalPortCount);
@@ -62,11 +64,12 @@ public sealed partial class TcpConnectorTests
         };
         var connector = LocalBindingConnector(dialer, new LocalBinding(null, null, null, 40000, 3));
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("127.0.0.1", 47599, UseTls: false) { Events = events });
 
         const string message = "Failed to connect to 127.0.0.1:47599 after 0 ms: Failed binding local connection end";
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -86,8 +89,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding("bogus0", null, null, 0, 1), Interfaces(("lo", [IPAddress.Loopback])));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1:47599 after 0 ms: Failed binding local connection end", result.ErrorMessage);
         Assert.IsEmpty(dialer.BoundDials);
@@ -104,8 +108,9 @@ public sealed partial class TcpConnectorTests
             new LocalBinding("lo", "lo", null, 0, 1),
             Interfaces(("eth0", [IPAddress.Parse("192.0.2.1")]), ("lo", [IPAddress.IPv6Loopback, IPAddress.Loopback])));
 
-        var result = await connector.ConnectAsync(new ConnectTarget(host, 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, 47599, UseTls: false));
 
+        Diagnostics.Assert("connection established", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual(new IPEndPoint(IPAddress.Parse(localAddress), 0), dialer.BoundDials.Single().LocalEndPoint);
     }
@@ -117,8 +122,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding("lo", null, null, 0, 1), Interfaces(("lo", [IPAddress.IPv6Loopback])));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1:47599 after 0 ms: Could not connect to server", result.ErrorMessage);
     }
@@ -137,8 +143,9 @@ public sealed partial class TcpConnectorTests
             localBinding: new LocalBinding("me.test", "me.test", null, 0, 1),
             networkInterfaceLookup: Interfaces());
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("connection established", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual(new IPEndPoint(IPAddress.Parse("127.0.0.2"), 0), dialer.BoundDials.Single().LocalEndPoint);
     }
@@ -159,8 +166,9 @@ public sealed partial class TcpConnectorTests
             localBinding: new LocalBinding(null, hostName, null, 0, 1),
             networkInterfaceLookup: Interfaces());
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
     }
 
@@ -173,8 +181,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding(null, "localhost", null, 0, 1));
 
-        var result = await connector.ConnectAsync(new ConnectTarget(host, 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, 47599, UseTls: false));
 
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual(exitCode == CurlExitCode.Ok ? 1 : 0, dialer.BoundDials.Count);
     }
@@ -189,8 +198,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = LocalBindingConnector(dialer, new LocalBinding(null, "127.0.0.1", new string('a', deviceLength), 0, 1));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
         Assert.AreEqual(exitCode, result.ExitCode);
         if (exitCode == CurlExitCode.Ok)
         {
@@ -215,8 +225,9 @@ public sealed partial class TcpConnectorTests
             localBinding: new LocalBinding("127.0.0.1", "127.0.0.1", null, 0, 1),
             networkInterfaceLookup: Interfaces());
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 47599, UseTls: false));
 
+        Diagnostics.Assert("connection established", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual(BindTarget, dialer.BoundDials.Single().EndPoint);
     }
@@ -238,8 +249,9 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             localBinding: new LocalBinding(null, null, null, 0, 1));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 47599, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual("Failed to connect to localhost:47599 after 0 ms: Failed binding local connection end", result.ErrorMessage);
         Assert.HasCount(2, dialer.BoundDials);
@@ -265,8 +277,9 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             localBinding: new LocalBinding(null, null, null, 0, 1));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 47599, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsTrue(result.IsConnectionRefused);
         Assert.AreEqual("Failed to connect to localhost:47599 after 0 ms: Could not connect to server", result.ErrorMessage);
@@ -282,10 +295,11 @@ public sealed partial class TcpConnectorTests
         };
         var connector = LocalBindingConnector(dialer, new LocalBinding(null, null, null, 40000, 1));
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.com", 443, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 3128, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 443, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 3128, null) });
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual("Failed to connect to example.com:443 over proxy 127.0.0.1 after 0 ms: Failed binding local connection end", result.ErrorMessage);
     }
@@ -303,8 +317,9 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             localBinding: new LocalBinding(LoopbackInterfaceName(), null, null, 0, 1));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.IsEmpty(dialer.BoundDials);
     }
@@ -322,8 +337,9 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             localBinding: new LocalBinding(LoopbackInterfaceName(), null, null, 0, 1));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47599, UseTls: false));
 
+        Diagnostics.Assert("connection established", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual(IPAddress.Loopback, dialer.BoundDials.Single().LocalEndPoint.Address);
     }
