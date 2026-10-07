@@ -2,6 +2,7 @@ using System.Text;
 
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -45,6 +46,10 @@ public sealed class CurlCommandRunnerNextGroupTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
@@ -56,11 +61,15 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(server, ["-s", "-d", "a", A, "--next", B]);
 
+        string expectedRequests = $"POST /a HTTP/1.1\r\n{Head}Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\na"
+            + $"GET /b HTTP/1.1\r\n{Head}\r\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hihi", StandardOutputText);
+        Diagnostics.Diff("requests written", expectedRequests, Latin1(server.Written));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hihi", StandardOutputText);
         Assert.AreEqual(
-            $"POST /a HTTP/1.1\r\n{Head}Content-Length: 1\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\na"
-            + $"GET /b HTTP/1.1\r\n{Head}\r\n",
+            expectedRequests,
             Latin1(server.Written));
     }
 
@@ -71,6 +80,11 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(http, ["-s", "-S", Unreachable, "--next", B]);
 
+        Diagnostics.Act("transfers handled", http.Contexts.Count);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hi", StandardOutputText);
+        Diagnostics.Diff("stderr", $"curl: (7) {CouldNotConnect}\n", Lf(StandardErrorText));
+        Diagnostics.Assert("transfers handled", 2, http.Contexts.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi", StandardOutputText);
         Assert.AreEqual($"curl: (7) {CouldNotConnect}{NewLine}", StandardErrorText);
@@ -86,6 +100,11 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(http, arguments);
 
+        Diagnostics.Act("transfers handled", http.Contexts.Count);
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
+        Diagnostics.Diff("stderr", $"curl: (7) {CouldNotConnect}\n", Lf(StandardErrorText));
+        Diagnostics.Assert("transfers handled", 1, http.Contexts.Count);
         Assert.AreEqual(7, exitCode);
         Assert.AreEqual(string.Empty, StandardOutputText);
         Assert.AreEqual($"curl: (7) {CouldNotConnect}{NewLine}", StandardErrorText);
@@ -99,6 +118,9 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(http, ["-s", "-S", A, "--next", Unreachable]);
 
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Diagnostics.Diff("stdout", "hi", StandardOutputText);
+        Diagnostics.Diff("stderr", $"curl: (7) {CouldNotConnect}\n", Lf(StandardErrorText));
         Assert.AreEqual(7, exitCode);
         Assert.AreEqual("hi", StandardOutputText);
         Assert.AreEqual($"curl: (7) {CouldNotConnect}{NewLine}", StandardErrorText);
@@ -111,6 +133,12 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(http, ["-s", "-S", Unreachable, "--next", "nosuch://h/", "--next", A]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hi", StandardOutputText);
+        Diagnostics.Diff(
+            "stderr",
+            $"curl: (7) {CouldNotConnect}\ncurl: (1) Protocol \"nosuch\" not supported\n",
+            Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi", StandardOutputText);
         Assert.AreEqual(
@@ -122,9 +150,12 @@ public sealed class CurlCommandRunnerNextGroupTests
     public async Task RunAsync_WriteOutInEachGroup_CountsUrlsTransfersAndConnectionsAcrossGroups()
     {
         const string Template = "%{urlnum} %{xfer_id} %{conn_id}\\n";
+        Diagnostics.Arrange("write-out template", Template);
 
         int exitCode = await RunAsync(ConnectingHttp(), ["-s", "-w", Template, A, B, "--next", "-w", Template, C]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hi0 0 0\nhi1 1 1\nhi2 2 2\n", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi0 0 0\nhi1 1 1\nhi2 2 2\n", StandardOutputText);
     }
@@ -134,6 +165,8 @@ public sealed class CurlCommandRunnerNextGroupTests
     {
         int exitCode = await RunAsync(ConnectingHttp(), ["-s", "-w", "[w]", A, "--next", B]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hi[w]hi", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi[w]hi", StandardOutputText);
     }
@@ -143,6 +176,11 @@ public sealed class CurlCommandRunnerNextGroupTests
     {
         int exitCode = await RunAsync(ConnectingHttp(), ["-s", "-o", "f", A, "--next", B]);
 
+        string writtenFile = Latin1(fileSystem.Written["f"].ToArray());
+        Diagnostics.Act("file f", writtenFile);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hi", StandardOutputText);
+        Diagnostics.Diff("file f", "hi", writtenFile);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi", StandardOutputText);
         Assert.AreEqual("hi", Latin1(fileSystem.Written["f"].ToArray()));
@@ -155,8 +193,12 @@ public sealed class CurlCommandRunnerNextGroupTests
         string[] secondGroupOutput,
         string expectedStandardOutput)
     {
+        Diagnostics.Arrange("second group output options", string.Join(' ', secondGroupOutput));
+
         int exitCode = await RunAsync(ConnectingHttp(), ["-s", "-o", "NUL", "-w", "%{exitcode}\\n", A, "--next", .. secondGroupOutput, B]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", expectedStandardOutput, StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(expectedStandardOutput, StandardOutputText);
     }
@@ -168,6 +210,13 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(http, ["--no-progress-meter", "-o", "nul", "-o", "nul2", A, "--next", B]);
 
+        Diagnostics.Act("transfers handled", http.Contexts.Count);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("transfers handled", 1, http.Contexts.Count);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Got more output options than URLs\nWarning: Got more output options than URLs\n",
+            Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.HasCount(1, http.Contexts);
         string warning = "Warning: Got more output options than URLs" + NewLine;
@@ -181,12 +230,18 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(http, [A, "--next", "-I", "-d", "x", B, "--next", A]);
 
+        string expectedStandardError = "Warning: You can only select one HTTP request method! You asked for both POST " + NewLine
+            + "Warning: (-d, --data) and HEAD (-I, --head)." + NewLine;
+        Diagnostics.Act("transfers handled", http.Contexts.Count);
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Diff("stdout", "hi", StandardOutputText);
+        Diagnostics.Assert("transfers handled", 1, http.Contexts.Count);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(2, exitCode);
         Assert.AreEqual("hi", StandardOutputText);
         Assert.HasCount(1, http.Contexts);
         Assert.AreEqual(
-            "Warning: You can only select one HTTP request method! You asked for both POST " + NewLine
-            + "Warning: (-d, --data) and HEAD (-I, --head)." + NewLine,
+            expectedStandardError,
             StandardErrorText);
     }
 
@@ -199,8 +254,13 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(server, ["-s", "-D", "h1", A, "--next", "-D", "h1", B]);
 
+        const string ExpectedHead = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nX-N: 2\r\n\r\n";
+        string writtenHead = Latin1(fileSystem.Written["h1"].ToArray());
+        Diagnostics.Act("file h1", writtenHead);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("file h1", ExpectedHead, writtenHead);
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nX-N: 2\r\n\r\n", Latin1(fileSystem.Written["h1"].ToArray()));
+        Assert.AreEqual(ExpectedHead, Latin1(fileSystem.Written["h1"].ToArray()));
     }
 
     [TestMethod]
@@ -212,9 +272,15 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         int exitCode = await RunAsync(server, ["-s", "-D", "h2", A, "--next", B]);
 
+        const string ExpectedHead = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nX-N: 1\r\n\r\n";
+        string writtenHead = Latin1(fileSystem.Written["h2"].ToArray());
+        Diagnostics.Act("file h2", writtenHead);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hihi", StandardOutputText);
+        Diagnostics.Diff("file h2", ExpectedHead, writtenHead);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hihi", StandardOutputText);
-        Assert.AreEqual("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nX-N: 1\r\n\r\n", Latin1(fileSystem.Written["h2"].ToArray()));
+        Assert.AreEqual(ExpectedHead, Latin1(fileSystem.Written["h2"].ToArray()));
     }
 
     [TestMethod]
@@ -224,7 +290,12 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         await RunAsync(server, ["-s", "-c", "jar1", A, "--next", B]);
 
-        Assert.AreEqual($"GET /a HTTP/1.1\r\n{Head}\r\nGET /b HTTP/1.1\r\n{Head}\r\n", Latin1(server.Written));
+        string expectedRequests = $"GET /a HTTP/1.1\r\n{Head}\r\nGET /b HTTP/1.1\r\n{Head}\r\n";
+        string writtenJar = Latin1(fileSystem.Written["jar1"].ToArray());
+        Diagnostics.Act("file jar1", Lf(writtenJar));
+        Diagnostics.Diff("requests written", expectedRequests, Latin1(server.Written));
+        Diagnostics.Diff("file jar1", JarHeader + K1Line, Lf(writtenJar));
+        Assert.AreEqual(expectedRequests, Latin1(server.Written));
         Assert.AreEqual(NativeLines(JarHeader + K1Line), Latin1(fileSystem.Written["jar1"].ToArray()));
     }
 
@@ -233,6 +304,9 @@ public sealed class CurlCommandRunnerNextGroupTests
     {
         await RunAsync(ServeCookies(), ["-s", A, "--next", "-c", "jar2", B]);
 
+        string writtenJar = Latin1(fileSystem.Written["jar2"].ToArray());
+        Diagnostics.Act("file jar2", Lf(writtenJar));
+        Diagnostics.Diff("file jar2", JarHeader + K2Line, Lf(writtenJar));
         Assert.AreEqual(NativeLines(JarHeader + K2Line), Latin1(fileSystem.Written["jar2"].ToArray()));
     }
 
@@ -243,7 +317,15 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         await RunAsync(server, ["-s", "-c", "jar4", A, "--next", "-c", "jar5", B]);
 
-        Assert.AreEqual($"GET /a HTTP/1.1\r\n{Head}\r\nGET /b HTTP/1.1\r\n{Head}Cookie: k1=v1\r\n\r\n", Latin1(server.Written));
+        string expectedRequests = $"GET /a HTTP/1.1\r\n{Head}\r\nGET /b HTTP/1.1\r\n{Head}Cookie: k1=v1\r\n\r\n";
+        string writtenFirstJar = Latin1(fileSystem.Written["jar4"].ToArray());
+        string writtenSecondJar = Latin1(fileSystem.Written["jar5"].ToArray());
+        Diagnostics.Act("file jar4", Lf(writtenFirstJar));
+        Diagnostics.Act("file jar5", Lf(writtenSecondJar));
+        Diagnostics.Diff("requests written", expectedRequests, Latin1(server.Written));
+        Diagnostics.Diff("file jar4", JarHeader + K1Line, Lf(writtenFirstJar));
+        Diagnostics.Diff("file jar5", JarHeader + K2Line + K1Line, Lf(writtenSecondJar));
+        Assert.AreEqual(expectedRequests, Latin1(server.Written));
         Assert.AreEqual(NativeLines(JarHeader + K1Line), Latin1(fileSystem.Written["jar4"].ToArray()));
         Assert.AreEqual(NativeLines(JarHeader + K2Line + K1Line), Latin1(fileSystem.Written["jar5"].ToArray()));
     }
@@ -255,7 +337,12 @@ public sealed class CurlCommandRunnerNextGroupTests
 
         await RunAsync(server, ["-s", "-c", "jar6", A, "--next", "-b", "x=y", B]);
 
-        Assert.AreEqual($"GET /a HTTP/1.1\r\n{Head}\r\nGET /b HTTP/1.1\r\n{Head}Cookie: x=y\r\n\r\n", Latin1(server.Written));
+        string expectedRequests = $"GET /a HTTP/1.1\r\n{Head}\r\nGET /b HTTP/1.1\r\n{Head}Cookie: x=y\r\n\r\n";
+        string writtenJar = Latin1(fileSystem.Written["jar6"].ToArray());
+        Diagnostics.Act("file jar6", Lf(writtenJar));
+        Diagnostics.Diff("requests written", expectedRequests, Latin1(server.Written));
+        Diagnostics.Diff("file jar6", JarHeader + K1Line, Lf(writtenJar));
+        Assert.AreEqual(expectedRequests, Latin1(server.Written));
         Assert.AreEqual(NativeLines(JarHeader + K1Line), Latin1(fileSystem.Written["jar6"].ToArray()));
     }
 
@@ -285,15 +372,38 @@ public sealed class CurlCommandRunnerNextGroupTests
         });
 
     /// <summary>Runs <paramref name="arguments" /> as on Windows through <paramref name="handler" /> alone.</summary>
-    private Task<int> RunAsync(IProtocolHandler handler, string[] arguments) =>
-        CreateRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler]))).RunAsync(arguments);
+    private Task<int> RunAsync(IProtocolHandler handler, string[] arguments)
+    {
+        Diagnostics.Arrange("handler", "recording http handler: port 1 fails with exit 7, any other port writes hi");
+        return RunAndReportAsync(CreateRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler]))), arguments);
+    }
 
     /// <summary>
     /// Runs <paramref name="arguments" /> as on Windows through the production handler set over
     /// <paramref name="connector" />, every option group's cookies sharing the run's store.
     /// </summary>
-    private Task<int> RunAsync(IConnector connector, string[] arguments) =>
-        CreateRunner(CurlComposition.SharingRunCookies((_, cookies) => CreateTransferDispatch(connector, cookies))).RunAsync(arguments);
+    private Task<int> RunAsync(IConnector connector, string[] arguments)
+    {
+        Diagnostics.Arrange("handler", "production handlers over a scripted connector, cookies shared across groups");
+        return RunAndReportAsync(
+            CreateRunner(CurlComposition.SharingRunCookies((_, cookies) => CreateTransferDispatch(connector, cookies))),
+            arguments);
+    }
+
+    private async Task<int> RunAndReportAsync(CurlCommandRunner runner, string[] arguments)
+    {
+        Diagnostics.Arrange("command line", string.Join(' ', arguments));
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await runner.RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
+    }
 
     private CurlCommandRunner CreateRunner(Func<Cli.CommandLineOptions, TransferDispatch> createTransferDispatch) =>
         new(createTransferDispatch, fileSystem, fileSystem, standardOutput, standardError, new MemoryStream(), runsOnWindows: true);
@@ -313,6 +423,8 @@ public sealed class CurlCommandRunnerNextGroupTests
 
     /// <summary>The jar-file lines as <see cref="Cookies.CookieStore.SaveCookieJarAsync" /> ends them: CR LF on Windows, as measured.</summary>
     private static string NativeLines(string text) => text.Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);
 }
