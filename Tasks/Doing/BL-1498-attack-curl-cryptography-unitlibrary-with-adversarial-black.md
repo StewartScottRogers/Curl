@@ -37,3 +37,4 @@ completed:
 
 - 2026-10-06: Created.
 - 2026-10-06: Now depends on BL-1525, which speeds up X25519, X448 and CAST-128, so the attacks run against the final code.
+- 2026-10-07: Backlog -> Doing.
