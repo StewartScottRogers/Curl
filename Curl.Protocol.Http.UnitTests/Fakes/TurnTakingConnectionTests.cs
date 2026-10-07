@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http.Fakes;
 
@@ -8,11 +9,17 @@ namespace Curl.Protocol.Http.Fakes;
 [TestClass]
 public sealed class TurnTakingConnectionTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ReadAsync_ServesEachResponseOnlyAfterTheNextWrite()
     {
         await using TurnTakingConnection connection = new(2, "abc", "d");
         byte[] buffer = new byte[8];
+        Diagnostics.Arrange("responses", "abc, d");
+        Diagnostics.Arrange("chunk size", 2);
 
         Assert.AreEqual(0, await connection.ReadAsync(buffer, CancellationToken.None));
         await connection.WriteAsync("r1"u8.ToArray(), CancellationToken.None);
@@ -28,6 +35,8 @@ public sealed class TurnTakingConnectionTests
         await connection.WriteAsync("r3"u8.ToArray(), CancellationToken.None);
         Assert.AreEqual(0, await connection.ReadAsync(buffer, CancellationToken.None));
 
+        Diagnostics.Act("written", connection.Written);
+        Diagnostics.Assert("written", "r1+earlyr2r3", connection.Written);
         Assert.AreEqual("r1+earlyr2r3", connection.Written);
         Assert.IsFalse(connection.IsSecure);
         Assert.IsNull(connection.RemoteEndPoint);
@@ -38,9 +47,12 @@ public sealed class TurnTakingConnectionTests
     {
         TurnTakingConnection connection = new(1);
         await connection.WriteAsync(Encoding.Latin1.GetBytes("x"), CancellationToken.None);
+        Diagnostics.Arrange("written before dispose", "x");
 
         await connection.DisposeAsync();
 
+        Diagnostics.Act("disposed and written", $"{connection.IsDisposed}, {connection.Written}");
+        Diagnostics.Assert("written", "x", connection.Written);
         Assert.IsTrue(connection.IsDisposed);
         Assert.AreEqual("x", connection.Written);
     }

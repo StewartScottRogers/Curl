@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -10,10 +11,20 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class AltSvcApplicationProtocolsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Of_NoRoute_IsNullForTheConnectorsOwnList()
     {
-        Assert.IsNull(AltSvcApplicationProtocols.Of(null));
+        Diagnostics.Arrange("route", "none");
+
+        IReadOnlyList<string>? protocols = AltSvcApplicationProtocols.Of(null);
+
+        Diagnostics.Act("offered protocols", Describe(protocols));
+        Diagnostics.Assert("offered protocols", "null (the connector's own list)", Describe(protocols));
+        Assert.IsNull(protocols);
     }
 
     [TestMethod]
@@ -23,8 +34,13 @@ public sealed class AltSvcApplicationProtocolsTests
     [DataRow("h3", "h1", "http/1.1", DisplayName = "an h3 origin switching to h1 offers http/1.1 alone")]
     public void Of_AnAlternativeThatSwitchesVersion_OffersItsVersionAlone(string originAlpn, string alternativeAlpn, string offered)
     {
+        Diagnostics.Arrange("origin ALPN", originAlpn);
+        Diagnostics.Arrange("alternative ALPN", alternativeAlpn);
+
         IReadOnlyList<string>? protocols = AltSvcApplicationProtocols.Of(new AltSvcRoute(originAlpn, new AltSvcAlternative(alternativeAlpn, "localhost", 18444)));
 
+        Diagnostics.Act("offered protocols", Describe(protocols));
+        Diagnostics.Assert("offered protocols", offered, Describe(protocols));
         CollectionAssert.AreEqual(new[] { offered }, protocols!.ToArray());
     }
 
@@ -34,6 +50,16 @@ public sealed class AltSvcApplicationProtocolsTests
     [DataRow("h1", "h3", DisplayName = "an h3 alternative, which QUIC carries")]
     public void Of_AnAlternativeThatDoesNotSwitchToTcpVersion_IsNullForTheConnectorsOwnList(string originAlpn, string alternativeAlpn)
     {
-        Assert.IsNull(AltSvcApplicationProtocols.Of(new AltSvcRoute(originAlpn, new AltSvcAlternative(alternativeAlpn, "localhost", 18444))));
+        Diagnostics.Arrange("origin ALPN", originAlpn);
+        Diagnostics.Arrange("alternative ALPN", alternativeAlpn);
+
+        IReadOnlyList<string>? protocols = AltSvcApplicationProtocols.Of(new AltSvcRoute(originAlpn, new AltSvcAlternative(alternativeAlpn, "localhost", 18444)));
+
+        Diagnostics.Act("offered protocols", Describe(protocols));
+        Diagnostics.Assert("offered protocols", "null (the connector's own list)", Describe(protocols));
+        Assert.IsNull(protocols);
     }
+
+    private static string Describe(IReadOnlyList<string>? protocols) =>
+        protocols is null ? "null (the connector's own list)" : string.Join(", ", protocols);
 }
