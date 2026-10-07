@@ -158,8 +158,8 @@ auditors, each reading `Audit/Instructions/Auditor-Rules.md` and its own method 
 `audit-seeder` (Sonnet) plants known defects from the encoded catalogue in
 `Audit/PlantedDefects/` before each audit, at least one per auditor, so each auditor's
 catch rate is measured. An auditor that misses a defect planted for it, returns no report
-block, or changes the audited tree is **unreliable** on that audit's scorecard: its
-re-audits close nothing and its numbers are marked.
+block, or changes the audited tree is **unreliable** on that audit's scorecard: its numbers
+are marked, and its re-audits close nothing on its word alone (ADR-0422).
 
 Audit paths are `Audit/` and `.claude/agents/audit-*`; the guard files that protect them -
 `.claude/hooks/guard-audit-paths.ps1`, `.claude/settings.json`, `.github/workflows/ci.yml`
@@ -174,20 +174,30 @@ in "Git and GitHub"). A lane that meets an audit path stops and leaves it to an 
 session.
 
 Run an audit with `Audit\RunAudit.cmd -NewTab` (in herdr, like the factory; never with
-`Start-Process`). `-Auditors` picks some of the six, `-Planted` the defect count (default
+`Start-Process`). `-Auditors` picks some of the six (and warns about any left out that have
+accepted findings, which go un-re-audited), `-Planted` the defect count (default
 8), `-Ref` the commit (default `origin/work/dark-factory`), `-DryRun` prints the plan. It
 refuses inside a factory process and while a shift runs; `-AlongsideShift` runs it anyway,
 sharing the Claude budget, since `-Continuous` shifts leave no gap. It writes findings and a
 scorecard on the `audit` branch and opens its pull request, which it never merges.
 
 Cadence: on demand, before each roadmap-milestone merge to `master`, and after changes to
-`RunDarkFactory.ps1`. `Audit\Tools\Test-AuditDue.ps1` says when one is due; a shift's end
-announces it, and holds a milestone's merge until the audit has run (BL-1022).
+`RunDarkFactory.ps1`. `Audit\Tools\Test-AuditDue.ps1` says when one is due - also when
+accepted findings wait on a re-audit (`reaudit-pending:<n>`) or on a task no lane will take
+(`interactive-stuck:<n>`); a shift's end announces it, and holds a milestone's merge until the
+audit has run (BL-1022).
 
 Findings are `Audit/Findings/AF-####-*.md`, arriving `proposed`. Only Stewart sets
 `accepted` or `rejected`; `Audit/Triage.md` and `Audit\Tools\New-TasksFromAcceptedFindings.ps1`
-turn accepted ones into lane-eligible Curl tasks. A finding closes only when a re-audit by
-its own, reliable auditor confirms the fix - never because its task reached Done.
+turn accepted ones into lane-eligible Curl tasks, and a `Re-fix` task when a re-audit finds
+one still reproducing after its tasks are Done. A finding closes only on evidence, never
+because its task reached Done (ADR-0422): its own auditor's re-audit says it no longer
+reproduces and the audit run's own rerun of its mechanical reproduction on the clean commit
+agrees (whatever the auditor's reliability), or, with no mechanical answer, that auditor is
+reliable or says so on two audits running. Duplicates close as `duplicate`, and Stewart alone
+may close an accepted finding himself (`closed-how: stewart`); the scorecard lists findings
+stuck open after more than 3 audits. Re-audit verdicts that overlap a planted defect are set
+aside.
 
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.

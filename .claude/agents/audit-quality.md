@@ -14,6 +14,12 @@ bind you: audit only that tree, never change a tracked file in it, judge the cod
 reading ADRs, tasks or history, give every finding evidence and a reproduction, and never
 open `Audit/PlantedDefects/`, `Audit/Findings/` or `Audit/Scorecards/`.
 
+Every surviving-mutant finding carries `reproduction.mutation` (`<file>:<line>:<operator>`) and
+the targeted `Invoke-MutationTest.ps1 -Site` command as its reproduction, so the audit run can
+rerun that one mutant. Re-audit a surviving mutant by running its `-Site` command, never by a
+new sample; when you could not run the site, report `"reproduces": null` ("not re-audited"),
+never `false`.
+
 You read and report; you never edit. End your reply with exactly one fenced `json` report
 block in the format of `Audit/Instructions/Report-Format.md`, with `"auditor": "quality"`
 and the `commit` and `fingerprint` the prompt gives you.
