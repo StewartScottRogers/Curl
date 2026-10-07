@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md, Documentation/Planning/Decisions, Documentation/Wiki/Glossary.md, Documentation/Product/Product-Overview.md, MSTestSettings.cs, .claude/skills/new-project, .claude/skills/verify, .claude/agents/coverage-auditor.md]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1598 — Record the IntegrationTests project rule in an ADR, CLAUDE.md, the glossary and the project skills
 
@@ -45,16 +45,23 @@ Out of scope, each its own task: `Measure-CodeQuality.ps1` (BL-1605), `RunDarkFa
 
 ## Acceptance criteria
 
-- [ ] A new ADR under `Documentation/Planning/Decisions/` states the rule, decisions 1-4 above each with its reason, the CI measurement in decision 2 with the SDK and MSTest versions, and the "Decided by Claude under Stewart's delegation" line; ADR-0083 and ADR-0118 each carry a "Superseded in part by" line naming it.
-- [ ] Root `CLAUDE.md` "Repository layout", "Project naming", "Build and test commands" and "Quality gates" each state the part of the rule listed in Context, and the project count in "Repository layout" matches the number of `<Project` entries in `Curl.slnx`.
-- [ ] `Documentation/Wiki/Glossary.md` has entries "Integration test", "IntegrationTests project" and "LongRunning test".
-- [ ] `Documentation/Product/Product-Overview.md`, root `MSTestSettings.cs` (comment only), `.claude/skills/new-project/SKILL.md` and `.claude/skills/verify/SKILL.md` state where Integration tests live; `grep -rn "Integration" CLAUDE.md Documentation/Product .claude/skills` finds no statement that Integration tests sit in a `*.UnitTests` project.
-- [ ] Notes record whether `.claude/agents/coverage-auditor.md` changed and why, and, if decision 4 makes more tests Integration tests, the IDs of the move tasks filed for them.
-- [ ] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green after the `MSTestSettings.cs` comment change.
+- [x] A new ADR under `Documentation/Planning/Decisions/` states the rule, decisions 1-4 above each with its reason, the CI measurement in decision 2 with the SDK and MSTest versions, and the "Decided by Claude under Stewart's delegation" line; ADR-0083 and ADR-0118 each carry a "Superseded in part by" line naming it.
+- [x] Root `CLAUDE.md` "Repository layout", "Project naming", "Build and test commands" and "Quality gates" each state the part of the rule listed in Context, and the project count in "Repository layout" matches the number of `<Project` entries in `Curl.slnx`.
+- [x] `Documentation/Wiki/Glossary.md` has entries "Integration test", "IntegrationTests project" and "LongRunning test".
+- [x] `Documentation/Product/Product-Overview.md`, root `MSTestSettings.cs` (comment only), `.claude/skills/new-project/SKILL.md` and `.claude/skills/verify/SKILL.md` state where Integration tests live; `grep -rn "Integration" CLAUDE.md Documentation/Product .claude/skills` finds no statement that Integration tests sit in a `*.UnitTests` project.
+- [x] Notes record whether `.claude/agents/coverage-auditor.md` changed and why, and, if decision 4 makes more tests Integration tests, the IDs of the move tasks filed for them.
+- [x] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green after the `MSTestSettings.cs` comment change.
 
 ## Notes
+
+- ADR-0421 records the rule (Stewart, 2026-10-07) and decisions 1-4. Done directly rather than through align-and-document: every edit was wording the task spelled out place by place, and one hand kept the ADR and the eight documents in step.
+- Decision 4 (decided by Claude under Stewart's delegation): a test whose only real resources are files in a temporary directory it creates and deletes, or a loopback socket opened and closed without a byte sent, is a unit test. Why: these tests are deterministic and platform-neutral, and they are the only fast tests that reach the thin adapters; moving them out would need a seam that only moves the uncovered lines or `[ExcludeFromCodeCoverage]` on reachable code, both rejected by ADR-0083. So no move tasks were filed. Bytes on a socket, files or devices the test did not create (NUL, the source tree), extended attributes, native APIs and agents stay Integration.
+- `.claude/agents/coverage-auditor.md` changed: it said nothing about which run coverage comes from, so it gained a paragraph saying coverage comes from the fast run only, IntegrationTests projects contribute nothing, and a line only an Integration test reaches is a gap unless ADR-0083 excludes it.
+- CLAUDE.md's project count is 71, the number of `<Project` entries in `Curl.slnx` on 2026-10-07; the layout tree's example is now the Networking trio.
+- Verified: `dotnet build -warnaserror` 0 warnings, 0 errors; `dotnet test --no-build --filter "TestCategory!=Integration"` exit 0, 26,517 passed across 33 test assemblies (Curl.Networking.IntegrationTests filtered out entirely, as decision 2 measured).
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. ADR-0421 records the IntegrationTests rule; CLAUDE.md, glossary, product overview, MSTestSettings.cs, skills and coverage-auditor state it
