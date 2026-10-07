@@ -87,7 +87,7 @@ internal static class SshAuthenticationDiagnostics
         }
     }
 
-    /// <summary>Names a payload by its message number, as RFC 4250 and RFC 4252 do.</summary>
+    /// <summary>Names a payload by its message number, as RFC 4250, RFC 4252, RFC 4253 and RFC 4254 do.</summary>
     /// <param name="payload">The payload.</param>
     /// <returns>For example <c>51 USERAUTH_FAILURE</c>, or <c>(empty)</c>.</returns>
     public static string MessageName(byte[] payload) =>
@@ -154,6 +154,22 @@ internal static class SshAuthenticationDiagnostics
         53 => "USERAUTH_BANNER",
         60 => "USERAUTH_PK_OK/PASSWD_CHANGEREQ/INFO_REQUEST",
         61 => "USERAUTH_INFO_RESPONSE",
+        30 => "KEXDH_INIT/KEX_ECDH_INIT",
+        31 => "KEXDH_REPLY/KEX_ECDH_REPLY",
+        80 => "GLOBAL_REQUEST",
+        81 => "REQUEST_SUCCESS",
+        82 => "REQUEST_FAILURE",
+        90 => "CHANNEL_OPEN",
+        91 => "CHANNEL_OPEN_CONFIRMATION",
+        92 => "CHANNEL_OPEN_FAILURE",
+        93 => "CHANNEL_WINDOW_ADJUST",
+        94 => "CHANNEL_DATA",
+        95 => "CHANNEL_EXTENDED_DATA",
+        96 => "CHANNEL_EOF",
+        97 => "CHANNEL_CLOSE",
+        98 => "CHANNEL_REQUEST",
+        99 => "CHANNEL_SUCCESS",
+        100 => "CHANNEL_FAILURE",
         _ => "unknown",
     };
 }

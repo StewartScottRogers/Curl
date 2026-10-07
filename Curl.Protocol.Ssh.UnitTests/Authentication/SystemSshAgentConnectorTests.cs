@@ -1,5 +1,6 @@
 using System.IO.Pipes;
 using System.Net.Sockets;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Authentication;
 
@@ -12,13 +13,21 @@ namespace Curl.Protocol.Ssh.Authentication;
 [TestClass]
 public sealed class SystemSshAgentConnectorTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(@"\\.\pipe\openssh-ssh-agent", ".", "openssh-ssh-agent", DisplayName = "Win32-OpenSSH's agent")]
     [DataRow(@"\\host\PIPE\agent", "host", "agent", DisplayName = "another server, any letter case")]
     public void PipeNameOf_PipePath_SplitsTheServerAndName(string path, string server, string name)
     {
+        Diagnostics.Arrange("path", path);
+
         (string Server, string Name)? pipe = SystemSshAgentConnector.PipeNameOf(path);
 
+        Diagnostics.Act("pipe", pipe?.ToString() ?? "null");
+        Diagnostics.Assert("pipe", (server, name).ToString(), pipe?.ToString() ?? "null");
         Assert.AreEqual((server, name), pipe);
     }
 
@@ -34,7 +43,13 @@ public sealed class SystemSshAgentConnectorTests
     [DataRow(@"\x\.\pipe\agent", DisplayName = "one leading backslash")]
     public void PipeNameOf_NoPipePath_ReturnsNull(string path)
     {
-        Assert.IsNull(SystemSshAgentConnector.PipeNameOf(path));
+        Diagnostics.Arrange("path", path);
+
+        (string Server, string Name)? pipe = SystemSshAgentConnector.PipeNameOf(path);
+
+        Diagnostics.Act("pipe", pipe?.ToString() ?? "null");
+        Diagnostics.Assert("pipe", "null", pipe?.ToString() ?? "null");
+        Assert.IsNull(pipe);
     }
 
     [TestMethod]
@@ -43,32 +58,37 @@ public sealed class SystemSshAgentConnectorTests
     public async Task ConnectAsync_UnixWithoutASocketPath_FindsNoAgent(string? authSocket)
     {
         SystemSshAgentConnector connector = new(_ => authSocket, isWindows: false);
+        Diagnostics.Arrange("SSH_AUTH_SOCK", authSocket ?? "(unset)");
 
-        Assert.IsNull(await connector.ConnectAsync(CancellationToken.None));
+        Assert.IsNull(await ConnectExpectingNoAgentAsync(connector));
     }
 
     [TestMethod]
     public async Task ConnectAsync_UnixSocketNotThere_FindsNoAgent()
     {
-        SystemSshAgentConnector connector = new(_ => Path.Combine(Path.GetTempPath(), $"bl902-{Guid.NewGuid():N}.sock"), isWindows: false);
+        string path = Path.Combine(Path.GetTempPath(), $"bl902-{Guid.NewGuid():N}.sock");
+        SystemSshAgentConnector connector = new(_ => path, isWindows: false);
+        Diagnostics.Arrange("SSH_AUTH_SOCK", "a socket path in the temporary folder that does not exist");
 
-        Assert.IsNull(await connector.ConnectAsync(CancellationToken.None));
+        Assert.IsNull(await ConnectExpectingNoAgentAsync(connector));
     }
 
     [TestMethod]
     public async Task ConnectAsync_WindowsPathNamingNoPipe_FindsNoAgent()
     {
         SystemSshAgentConnector connector = new(_ => "/tmp/agent.sock", isWindows: true);
+        Diagnostics.Arrange("SSH_AUTH_SOCK on Windows", "/tmp/agent.sock");
 
-        Assert.IsNull(await connector.ConnectAsync(CancellationToken.None));
+        Assert.IsNull(await ConnectExpectingNoAgentAsync(connector));
     }
 
     [TestMethod]
     public async Task ConnectAsync_WindowsPipeNotThere_FindsNoAgent()
     {
         SystemSshAgentConnector connector = new(_ => null, isWindows: true, windowsDefaultPipe: $@"\\.\pipe\bl902-{Guid.NewGuid():N}");
+        Diagnostics.Arrange("default pipe on Windows", "a pipe name nobody serves");
 
-        Assert.IsNull(await connector.ConnectAsync(CancellationToken.None));
+        Assert.IsNull(await ConnectExpectingNoAgentAsync(connector));
     }
 
     [TestMethod]
@@ -83,10 +103,13 @@ public sealed class SystemSshAgentConnectorTests
         Task accepted = server.WaitForConnectionAsync();
         string path = $@"\\.\pipe\{name}";
         SystemSshAgentConnector connector = named ? new(_ => path, isWindows: true) : new(_ => null, isWindows: true, windowsDefaultPipe: path);
+        Diagnostics.Arrange("pipe", named ? "named by SSH_AUTH_SOCK" : "the default");
 
         Stream? connection = await connector.ConnectAsync(CancellationToken.None);
 
         await accepted;
+        Diagnostics.Act("connected", connection is not null);
+        Diagnostics.Assert("connected", true, connection is not null);
         Assert.IsNotNull(connection);
         await using (connection)
         {
@@ -106,10 +129,13 @@ public sealed class SystemSshAgentConnectorTests
         {
             Task<Socket> accepted = listener.AcceptAsync();
             SystemSshAgentConnector connector = new(_ => path, isWindows: false);
+            Diagnostics.Arrange("SSH_AUTH_SOCK", "a Unix socket served here");
 
             Stream? connection = await connector.ConnectAsync(CancellationToken.None);
 
             using Socket peer = await accepted;
+            Diagnostics.Act("connected", connection is not null);
+            Diagnostics.Assert("connected", true, connection is not null);
             Assert.IsNotNull(connection);
             await using (connection)
             {
@@ -120,6 +146,15 @@ public sealed class SystemSshAgentConnectorTests
         {
             File.Delete(path);
         }
+    }
+
+    // Connects where no agent is, writing what it got.
+    private async Task<Stream?> ConnectExpectingNoAgentAsync(SystemSshAgentConnector connector)
+    {
+        Stream? connection = await connector.ConnectAsync(CancellationToken.None);
+        Diagnostics.Act("connection", connection is null ? "none" : connection.GetType().Name);
+        Diagnostics.Assert("connection", "none", connection is null ? "none" : connection.GetType().Name);
+        return connection;
     }
 
     // The read starts before the write is awaited: the test's pipe has no buffer, so a
