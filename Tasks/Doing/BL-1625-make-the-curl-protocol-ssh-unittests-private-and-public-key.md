@@ -35,3 +35,4 @@ Every test in these files of `Curl.Protocol.Ssh.UnitTests` writes, through BL-14
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
