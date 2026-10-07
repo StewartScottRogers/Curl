@@ -1,5 +1,5 @@
 ---
-id: BL-1539
+id: BL-1556
 title: Make Curl.Networking.UnitTests' other Ha and Http tests write descriptive diagnostic output
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1539 — Make Curl.Networking.UnitTests' other Ha and Http tests write descriptive diagnostic output
+# BL-1556 — Make Curl.Networking.UnitTests' other Ha and Http tests write descriptive diagnostic output
 
 ## Goal
 

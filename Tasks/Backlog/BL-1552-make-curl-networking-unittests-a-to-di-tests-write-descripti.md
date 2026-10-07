@@ -1,5 +1,5 @@
 ---
-id: BL-1535
+id: BL-1552
 title: Make Curl.Networking.UnitTests' A to Di tests write descriptive diagnostic output
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1535 — Make Curl.Networking.UnitTests' A to Di tests write descriptive diagnostic output
+# BL-1552 — Make Curl.Networking.UnitTests' A to Di tests write descriptive diagnostic output
 
 ## Goal
 

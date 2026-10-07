@@ -1,5 +1,5 @@
 ---
-id: BL-1537
+id: BL-1554
 title: Make Curl.Networking.UnitTests' Doh, E and F tests write descriptive diagnostic output
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1537 — Make Curl.Networking.UnitTests' Doh, E and F tests write descriptive diagnostic output
+# BL-1554 — Make Curl.Networking.UnitTests' Doh, E and F tests write descriptive diagnostic output
 
 ## Goal
 
