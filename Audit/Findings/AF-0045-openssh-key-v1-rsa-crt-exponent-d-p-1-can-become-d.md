@@ -3,8 +3,8 @@ id: AF-0045
 title: openssh-key-v1 RSA CRT exponent `d % (p - 1)` can become `d % (p + 1)` with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs:FromComponents-minus1:surviving-mutant
 reproduction: mutation Curl.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs:99:-1
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
