@@ -8,33 +8,61 @@ namespace Curl.Conformance;
 /// </summary>
 /// <remarks>
 /// sws keeps one monitor flag for the whole server: a request's <c>&lt;servercmd&gt;</c> sets it,
-/// and the next connection close records the line and clears it.
+/// and the next connection close records the line and clears it. Connections are written on many
+/// threads at once when curl runs transfers in parallel, so every member takes one lock, and the
+/// bytes of one write stay together (BL-1647).
 /// </remarks>
 internal sealed class SwsServerRecording
 {
     private static readonly byte[] DisconnectLine = Encoding.Latin1.GetBytes("[DISCONNECT]\n");
+
+    private readonly Lock gate = new();
 
     private readonly List<byte> bytes = [];
 
     private bool monitorArmed;
 
     /// <summary>Every byte recorded so far.</summary>
-    public byte[] Bytes => [.. bytes];
+    public byte[] Bytes
+    {
+        get
+        {
+            lock (gate)
+            {
+                return [.. bytes];
+            }
+        }
+    }
 
     /// <summary>Records bytes a client wrote.</summary>
     /// <param name="received">The bytes.</param>
-    public void Record(ReadOnlySpan<byte> received) => bytes.AddRange(received);
+    public void Record(ReadOnlySpan<byte> received)
+    {
+        lock (gate)
+        {
+            bytes.AddRange(received);
+        }
+    }
 
     /// <summary>Arms the monitor, as sws does when it reads <c>connection-monitor</c> for a request.</summary>
-    public void ArmDisconnectMonitor() => monitorArmed = true;
+    public void ArmDisconnectMonitor()
+    {
+        lock (gate)
+        {
+            monitorArmed = true;
+        }
+    }
 
     /// <summary>Records <c>[DISCONNECT]</c> for a closing connection when the monitor is armed, and disarms it.</summary>
     public void RecordDisconnect()
     {
-        if (monitorArmed)
+        lock (gate)
         {
-            bytes.AddRange(DisconnectLine);
-            monitorArmed = false;
+            if (monitorArmed)
+            {
+                bytes.AddRange(DisconnectLine);
+                monitorArmed = false;
+            }
         }
     }
 }

@@ -140,7 +140,7 @@ public sealed partial class SwsHttpServerConnectorTests
     [TestMethod]
     public async Task ManyConnectionsWithInterleavedHalfRequests_EachIsAnsweredAndEveryByteIsRecorded()
     {
-        // One thread on purpose: writes on many threads at once lose recorded bytes (BL-1645).
+        // One thread on purpose: writes on many threads at once lose recorded bytes (BL-1647 tests them on many threads).
         const int Connections = 16;
         int half = Get.Length / 2;
         SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
@@ -160,5 +160,31 @@ public sealed partial class SwsHttpServerConnectorTests
         Assert.IsTrue(replies.All(reply => reply == "first\n"), Observe("replies", "first\\n each", string.Join("|", replies)));
         string expectedRecording = string.Concat(Enumerable.Repeat(Get[..half], Connections)) + string.Concat(Enumerable.Repeat(Get[half..], Connections));
         Assert.AreEqual(expectedRecording, Observe("recorded", expectedRecording, Text(server.ReceivedBytes)));
+    }
+
+    [TestMethod]
+    public async Task ThirtyTwoConnectionsWrittenOneBytePerWriteOnThirtyTwoThreads_RecordEveryByte()
+    {
+        const int Connections = 32;
+        const int Rounds = 100;
+        int expectedLength = Connections * Get.Length;
+        Diagnostics.Arrange("request", $"{Get} on {Connections} connections, one byte per write, each on its own thread, {Rounds} rounds");
+
+        for (int round = 0; round < Rounds; round++)
+        {
+            SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+            await Task.WhenAll(Enumerable.Range(0, Connections).Select(_ => Task.Run(async () =>
+            {
+                IConnection connection = await ConnectAsync(server);
+                for (int index = 0; index < Get.Length; index++)
+                {
+                    await WriteAsync(connection, Get[index..(index + 1)]);
+                }
+            })));
+
+            Assert.AreEqual(expectedLength, server.ReceivedBytes.Length, $"recorded length in round {round + 1}");
+        }
+
+        Diagnostics.Assert("recorded length each round", expectedLength, expectedLength);
     }
 }
