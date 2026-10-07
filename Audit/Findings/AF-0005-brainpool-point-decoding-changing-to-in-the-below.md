@@ -41,6 +41,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Cr
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Mutation run on Curl.Cryptography.UnitLibrary with seed 0 and 40 mutants: 34 killed, 2 timed out, 4 survived, score 0.9. No mutant was sampled at BrainpoolPoint.cs:161 (the || check is still in the source). The only Brainpool mutants sampled (BrainpoolPoint.cs:163 and others) were killed. Survivors were in SortingNetwork.cs, MlDsaPolynomial.cs, MontgomeryModulus.cs and AeadAesCcm.cs. The site was not sampled, so the finding is neither confirmed nor shown fixed.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Cryptography run, seed 0: killed 19, timedOut 4, survived 0, score 1. BrainpoolPoint.cs:163 mutant timed out (counted as killed).
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run sampled BrainpoolPoint.cs:163 (the || below-modulus check) and it was killed.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | The seed-0 tool run at this commit did not sample BrainpoolPoint.cs:161, so the mutant was applied by hand in a scratch export (git archive HEAD): ' || ' -> ' && ' in 'if (!domain.Field.IsBelowModulus(x) || !domain.Field.IsBelowModulus(y))'. Killed: 3 failures, TryComputeSharedSecret_PeerPointWithOnlyYRaisedByThePrime_ReturnsFalseAndZeroesTheSecret for BrainpoolP256r1, P384r1 and P512r1.
 
 ## Log
 

@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Cr
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Not in the seed-0 tool sample at this commit, so applied by hand in a scratch export: AeadAesCcm.cs:168 'lengthFieldSize < sizeof(int)' -> '<='. Killed by EncryptAndTryDecrypt_ElevenByteNonce_MatchTheBclCiphertextAndTag.
+
 ## Log
 
 - 2026-10-03: filed proposed.

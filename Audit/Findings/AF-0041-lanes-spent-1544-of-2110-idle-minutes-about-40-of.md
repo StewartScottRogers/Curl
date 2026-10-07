@@ -3,15 +3,15 @@ id: AF-0041
 title: Lanes spent 1544 of 2110 idle minutes (about 40% of lane time) waiting on overlapping touches
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: process:logs:logs:overlap-wait
 task: BL-1384
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0041 - Lanes spent 1544 of 2110 idle minutes (about 40% of lane time) waiting on overlapping touches
 
@@ -38,7 +38,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: laneIdleMinutes 837, waitOverlapMinutes 782 of 4135.32 lane minutes (18.9%), not the 1544 of 2110 (about 40%) the finding reports. Same caveat as AF-0032: the 2026-10-03 06:12 shift's logs are no longer in the folder.
+
 ## Log
 
 - 2026-10-03: filed proposed.
 - 2026-10-03: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Same site as AF-0030: TcpPendingConnection.cs:77 'accepted.NoDelay = true' -> 'false', applied by hand with the ECH failures filtered out. Killed by TurnOffNagle_SetsNoDelayOnTheAcceptedSocket.
+
 ## Log
 
 - 2026-10-03: filed proposed.

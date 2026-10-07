@@ -39,6 +39,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | Seed-0 mutation run: TlsFailureMessages.cs:320 `forIssuer: false` to true survived.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | Two sites match the description. By hand, same method as AF-0006: TlsFailureMessages.cs:320 'forIssuer: false' -> 'true' is killed by OpenSslPeerFailedVerification_WithANameMismatchOnAnIssuedCertificate_NamesTheSubjectNotTheIssuer. SchannelCommonNameCheck.cs:30 'certificate.GetNameInfo(X509NameType.DnsName, forIssuer: false)' -> 'forIssuer: true' survived ('Passed! - Failed: 0, Passed: 2996'). Every SchannelCommonNameCheckTests certificate is made by CreateSelfSigned, so issuer and subject are the same and the mutant cannot be seen. A CA-issued certificate would be matched against its issuer's name, so the --cacert accept or refuse decision (exit 60) goes untested.
 
 ## Log
 
