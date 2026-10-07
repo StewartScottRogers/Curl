@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ldap;
 
@@ -9,10 +10,17 @@ namespace Curl.Protocol.Ldap;
 [TestClass]
 public sealed class WinLdapUrlReaderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Read_NoQuery_IsTheDnWithBaseScopeAllAttributesAndTheDefaultFilter()
     {
         LdapSearchParameters search = Read("dc=example").Search!;
+
+        Diagnostics.Assert("scope", 0, search.Scope);
+        Diagnostics.Assert("attribute count", 0, search.Attributes.Count());
 
         Assert.AreEqual("dc=example", search.BaseObject);
         Assert.IsEmpty(search.Attributes);
@@ -24,6 +32,10 @@ public sealed class WinLdapUrlReaderTests
     public void Read_EveryPart_IsDecodedExceptTheScope()
     {
         LdapSearchParameters search = Read("dc%3dexample?c%6e,mail?SUB?(cn=a%20b)?!ext").Search!;
+
+        Diagnostics.Assert("base DN", "dc=example", search.BaseObject);
+        Diagnostics.Assert("scope", 2, search.Scope);
+        Diagnostics.Assert("filter", "(cn=a b)", search.Filter);
 
         Assert.AreEqual("dc=example", search.BaseObject);
         CollectionAssert.AreEqual(new[] { "cn", "mail" }, search.Attributes.ToArray());
@@ -40,12 +52,16 @@ public sealed class WinLdapUrlReaderTests
     [DataRow("", 0)]
     public void Read_Scope_IsStr2scopes(string scope, int expected)
     {
+        int actual = Read("x??" + scope).Search!.Scope;
+        Diagnostics.Assert("scope", expected, actual);
         Assert.AreEqual(expected, Read("x??" + scope).Search!.Scope);
     }
 
     [TestMethod]
     public void Read_InvalidPercentEscape_StaysAsItIs()
     {
+        string baseObject = Read("dc=example%zz%4").Search!.BaseObject;
+        Diagnostics.Assert("base DN", "dc=example%zz%4", baseObject);
         Assert.AreEqual("dc=example%zz%4", Read("dc=example%zz%4").Search!.BaseObject);
     }
 
@@ -54,18 +70,24 @@ public sealed class WinLdapUrlReaderTests
     [DataRow("x?")]
     public void Read_AttributesStartingEmpty_AreNone(string path)
     {
+        int count = Read(path).Search!.Attributes.Count();
+        Diagnostics.Assert("attribute count", 0, count);
         Assert.IsEmpty(Read(path).Search!.Attributes);
     }
 
     [TestMethod]
     public void Read_Attributes_StopAtTheFirstEmptyOne()
     {
+        string[] actual = Read("x?a,,b").Search!.Attributes.ToArray();
+        Diagnostics.Assert("attributes", "a", string.Join(",", actual));
         CollectionAssert.AreEqual(new[] { "a" }, Read("x?a,,b").Search!.Attributes.ToArray());
     }
 
     [TestMethod]
     public void Read_AttributeLongerThan1024_EndsTheList()
     {
+        string[] actual = Read("x?a," + new string('b', 1025) + ",c").Search!.Attributes.ToArray();
+        Diagnostics.Assert("attributes", "a", string.Join(",", actual));
         CollectionAssert.AreEqual(new[] { "a" }, Read("x?a," + new string('b', 1025) + ",c").Search!.Attributes.ToArray());
     }
 
@@ -74,6 +96,9 @@ public sealed class WinLdapUrlReaderTests
     {
         LdapSearchParameters search = Read("dc=example?a?base?(cn=a)?x?y").Search!;
 
+        Diagnostics.Assert("attributes", "a", string.Join(",", search.Attributes));
+        Diagnostics.Assert("filter", "(cn=a)", search.Filter);
+
         CollectionAssert.AreEqual(new[] { "a" }, search.Attributes.ToArray());
         Assert.AreEqual("(cn=a)", search.Filter);
     }
@@ -81,6 +106,9 @@ public sealed class WinLdapUrlReaderTests
     [TestMethod]
     public void Read_NonAsciiPath_IsHeldAsItsUtf8Bytes()
     {
+        string baseObject = Read("é").Search!.BaseObject;
+        Diagnostics.Act("base DN UTF-16 units", string.Join(' ', baseObject.Select(c => ((int)c).ToString("x4", System.Globalization.CultureInfo.InvariantCulture))));
+        Diagnostics.Assert("base DN length", 2, baseObject.Length);
         Assert.AreEqual("Ã©", Read("é").Search!.BaseObject);
     }
 
@@ -96,9 +124,21 @@ public sealed class WinLdapUrlReaderTests
     {
         LdapUrlReading reading = Read(path);
 
+        Diagnostics.Assert("failure", TransferResult.Failure(CurlExitCode.UrlMalformat, message), reading.Failure);
         Assert.IsNull(reading.Search);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, message), reading.Failure);
     }
 
-    private static LdapUrlReading Read(string path) => WinLdapUrlReader.Read(CurlUrl.Parse("ldap://h/" + path));
+    private LdapUrlReading Read(string path)
+    {
+        Diagnostics.Arrange("url", "ldap://h/" + path);
+        LdapUrlReading reading = WinLdapUrlReader.Read(CurlUrl.Parse("ldap://h/" + path));
+        LdapSearchParameters? search = reading.Search;
+        Diagnostics.Act("base DN", search?.BaseObject);
+        Diagnostics.Act("scope", search?.Scope);
+        Diagnostics.Act("filter", search?.Filter);
+        Diagnostics.Act("attributes", search is null ? null : string.Join(",", search.Attributes.Select(a => a.Length > 64 ? a[..64] + "..." : a)));
+        Diagnostics.Act("failure", reading.Failure);
+        return reading;
+    }
 }

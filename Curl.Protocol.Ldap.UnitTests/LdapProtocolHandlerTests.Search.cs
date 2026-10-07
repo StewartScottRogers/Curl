@@ -1,3 +1,4 @@
+using Curl.Testing;
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ldap.Fakes;
@@ -45,6 +46,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.WinLdap, path, BindSuccess1, SearchSuccess);
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Diff("sent", Hex.Bytes(WinLdapBindCnU + " " + search + " " + WinLdapUnbind3), sent);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindCnU + " " + search + " " + WinLdapUnbind3), sent);
     }
@@ -68,6 +71,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.OpenLdap, path, BindSuccess1, SearchSuccess);
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Diff("sent", Hex.Bytes(OpenLdapBindCnU + " " + search + " " + OpenLdapUnbind3), sent);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBindCnU + " " + search + " " + OpenLdapUnbind3), sent);
     }
@@ -85,6 +90,9 @@ public sealed partial class LdapProtocolHandlerTests
 
         TransferResult result = await new LdapProtocolHandler(connector, LdapDialect.WinLdap).ExecuteAsync(SearchContext(path));
 
+        Diagnostics.Act("connect targets", connector.Targets.Count);
+        Diagnostics.Act("sent byte count", connection.Sent.Length);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UrlMalformat, message), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, message), result);
         Assert.HasCount(1, connector.Targets);
         Assert.IsEmpty(connection.Sent);
@@ -103,6 +111,9 @@ public sealed partial class LdapProtocolHandlerTests
 
         TransferResult result = await new LdapProtocolHandler(connector, LdapDialect.OpenLdap).ExecuteAsync(SearchContext(path));
 
+        Diagnostics.Act("result", result);
+        Diagnostics.Assert("connect targets", 0, connector.Targets.Count);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UrlMalformat, message), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, message), result);
         Assert.IsEmpty(connector.Targets);
     }
@@ -112,8 +123,12 @@ public sealed partial class LdapProtocolHandlerTests
     {
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
         var context = new TransferContext { Url = CurlUrl.Parse("ldap://u:p@127.0.0.1:38901/x"), Output = new MemoryStream() };
+        Diagnostics.Arrange("url", "ldap://u:p@127.0.0.1:38901/x");
 
         TransferResult result = await new LdapProtocolHandler(connector, LdapDialect.OpenLdap).ExecuteAsync(context);
+
+        Diagnostics.Act("result", result);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UrlMalformat, "LDAP local: bad URL"), result);
 
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, "LDAP local: bad URL"), result);
         Assert.IsEmpty(connector.Targets);
@@ -128,6 +143,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.WinLdap, path, BindSuccess1);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: Filter Error"), result);
+        Diagnostics.Diff("sent", Hex.Bytes(WinLdapBindCnU + " " + WinLdapUnbind3), sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: Filter Error"), result);
         CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindCnU + " " + WinLdapUnbind3), sent);
     }
@@ -141,6 +158,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.OpenLdap, path, BindSuccess1);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP local: ldap_search_ext Bad search filter"), result);
+        Diagnostics.Diff("sent", Hex.Bytes(OpenLdapBindCnU + " " + OpenLdapUnbind3), sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP local: ldap_search_ext Bad search filter"), result);
         CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBindCnU + " " + OpenLdapUnbind3), sent);
     }
@@ -150,6 +169,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.WinLdap, "x", BindSuccess1, "30 10 02 01 02 65 0b 0a 01 20 04 00 04 04 6f 6f 70 73");
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: No Such Object"), result);
+        Diagnostics.Diff("sent", Hex.Bytes(WinLdapBindCnU + " " + WinLdapSearchX + " " + WinLdapUnbind3), sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: No Such Object"), result);
         CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindCnU + " " + WinLdapSearchX + " " + WinLdapUnbind3), sent);
     }
@@ -162,6 +183,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.OpenLdap, "x", BindSuccess1, done);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapSearchFailed, message), result);
+        Diagnostics.Diff("sent", Hex.Bytes(OpenLdapBindCnU + " " + OpenLdapSearchX + " " + OpenLdapUnbind3), sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapSearchFailed, message), result);
         CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBindCnU + " " + OpenLdapSearchX + " " + OpenLdapUnbind3), sent);
     }
@@ -173,6 +196,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, _) = await RunSearchAsync(dialect, "x", BindSuccess1, "30 0c 02 01 02 65 07 0a 01 04 04 00 04 00");
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
@@ -189,6 +213,7 @@ public sealed partial class LdapProtocolHandlerTests
             "30 0c 02 01 07 65 07 0a 01 20 04 00 04 00",
             SearchNoSuchObject);
 
+        Diagnostics.Assert("exit code", CurlExitCode.LdapSearchFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.LdapSearchFailed, result.ExitCode);
     }
 
@@ -203,6 +228,8 @@ public sealed partial class LdapProtocolHandlerTests
             ? await RunSearchAsync(LdapDialect.WinLdap, "x", BindSuccess1)
             : await RunSearchAsync(LdapDialect.WinLdap, "x", BindSuccess1, reply);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: Server Down"), result);
+        Diagnostics.Diff("sent", Hex.Bytes(WinLdapBindCnU + " " + WinLdapSearchX), sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: Server Down"), result);
         CollectionAssert.AreEqual(Hex.Bytes(WinLdapBindCnU + " " + WinLdapSearchX), sent);
     }
@@ -218,6 +245,8 @@ public sealed partial class LdapProtocolHandlerTests
             ? await RunSearchAsync(LdapDialect.OpenLdap, "x", BindSuccess1)
             : await RunSearchAsync(LdapDialect.OpenLdap, "x", BindSuccess1, reply);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.RecvError, "LDAP local: search ldap_result Can't contact LDAP server"), result);
+        Diagnostics.Diff("sent", Hex.Bytes(OpenLdapBindCnU + " " + OpenLdapSearchX), sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "LDAP local: search ldap_result Can't contact LDAP server"), result);
         CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBindCnU + " " + OpenLdapSearchX), sent);
     }
@@ -227,25 +256,35 @@ public sealed partial class LdapProtocolHandlerTests
     {
         (TransferResult result, byte[] sent) = await RunSearchAsync(LdapDialect.OpenLdap, "x", BindSuccess1, "30 05 02 01 02 04 00");
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(Hex.Bytes(OpenLdapBindCnU + " " + OpenLdapSearchX + " 30 06 02 01 03 50 01 02 30 05 02 01 04 42 00"), sent);
     }
 
     /// <summary>Runs <paramref name="dialect" />'s handler with <c>-u cn=u:p</c> on <c>ldap://127.0.0.1:38901/</c> and <paramref name="path" />.</summary>
-    private static async Task<(TransferResult Result, byte[] Sent)> RunSearchAsync(LdapDialect dialect, string path, params string[] replies)
+    private async Task<(TransferResult Result, byte[] Sent)> RunSearchAsync(LdapDialect dialect, string path, params string[] replies)
     {
         var connection = new ScriptedConnection([.. replies.Select(Hex.Bytes)]);
         var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), dialect);
 
+        Diagnostics.Arrange("dialect", dialect);
+        Diagnostics.Arrange("replies", string.Join(" | ", replies));
+
         TransferResult result = await handler.ExecuteAsync(SearchContext(path));
 
+        Diagnostics.Act("result", result);
+        Diagnostics.Bytes("sent", connection.Sent);
         return (result, connection.Sent);
     }
 
-    private static TransferContext SearchContext(string path) => new()
+    private TransferContext SearchContext(string path)
     {
-        Url = CurlUrl.Parse("ldap://127.0.0.1:38901/" + path),
-        Output = new MemoryStream(),
-        Credentials = new NetworkCredential("cn=u", "p"),
-    };
+        Diagnostics.Arrange("url path", path);
+        return new()
+        {
+            Url = CurlUrl.Parse("ldap://127.0.0.1:38901/" + path),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential("cn=u", "p"),
+        };
+    }
 }

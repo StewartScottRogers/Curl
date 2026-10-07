@@ -1,3 +1,4 @@
+using Curl.Testing;
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ldap.Fakes;
@@ -21,6 +22,8 @@ public sealed partial class LdapProtocolHandlerTests
 
         (TransferResult result, byte[] output, List<string> lines) = await RunWithMaxFileSizeAsync(dialect, 10, EntryDcA);
 
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.FilesizeExceeded, 10, "Exceeded the maximum allowed file size (10) with 10 bytes"), result);
+        Diagnostics.Diff("output", whole[..10], output);
         Assert.IsGreaterThan(10, whole.Length);
         Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 10, "Exceeded the maximum allowed file size (10) with 10 bytes"), result);
         CollectionAssert.AreEqual(whole[..10], output);
@@ -38,6 +41,8 @@ public sealed partial class LdapProtocolHandlerTests
 
         (TransferResult result, byte[] output, _) = await RunWithMaxFileSizeAsync(dialect, limit, EntryDcA, EntryF);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Diff("output", both[..(int)limit], output);
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual($"Exceeded the maximum allowed file size ({limit}) with {limit} bytes", result.ErrorMessage);
         CollectionAssert.AreEqual(first, output[..first.Length]);
@@ -55,6 +60,8 @@ public sealed partial class LdapProtocolHandlerTests
 
         (TransferResult result, byte[] output, _) = await RunWithMaxFileSizeAsync(dialect, maxFileSize, EntryDcA, EntryF);
 
+        Diagnostics.Assert("result", TransferResult.Success(whole.Length), result);
+        Diagnostics.Diff("output", whole, output);
         Assert.AreEqual(TransferResult.Success(whole.Length), result);
         CollectionAssert.AreEqual(whole, output);
     }
@@ -68,12 +75,14 @@ public sealed partial class LdapProtocolHandlerTests
 
         (TransferResult result, byte[] output, _) = await RunWithMaxFileSizeAsync(dialect, whole.Length, EntryDcA, EntryF);
 
+        Diagnostics.Assert("result", TransferResult.Success(whole.Length), result);
+        Diagnostics.Diff("output", whole, output);
         Assert.AreEqual(TransferResult.Success(whole.Length), result);
         CollectionAssert.AreEqual(whole, output);
     }
 
     /// <summary>Runs a search whose replies are <paramref name="entries" /> then a success, with <paramref name="maxFileSize" /> as the limit.</summary>
-    private static async Task<(TransferResult Result, byte[] Output, List<string> Lines)> RunWithMaxFileSizeAsync(LdapDialect dialect, long? maxFileSize, params string[] entries)
+    private async Task<(TransferResult Result, byte[] Output, List<string> Lines)> RunWithMaxFileSizeAsync(LdapDialect dialect, long? maxFileSize, params string[] entries)
     {
         var connection = new ScriptedConnection([Hex.Bytes(BindSuccess1), Hex.Bytes(string.Join(" ", entries) + " " + SearchSuccess)]);
         var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), dialect);
@@ -88,8 +97,14 @@ public sealed partial class LdapProtocolHandlerTests
             MaxFileSize = maxFileSize,
         };
 
+        Diagnostics.Arrange("dialect", dialect);
+        Diagnostics.Arrange("max file size", maxFileSize);
+        Diagnostics.Arrange("entries", string.Join(" | ", entries));
+
         TransferResult result = await handler.ExecuteAsync(context);
 
+        Diagnostics.Act("result", result);
+        Diagnostics.Bytes("output", output.ToArray());
         return (result, output.ToArray(), events.Lines);
     }
 }

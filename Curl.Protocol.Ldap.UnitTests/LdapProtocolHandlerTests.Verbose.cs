@@ -1,3 +1,4 @@
+using Curl.Testing;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ldap.Fakes;
 
@@ -24,6 +25,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.WinLdap, Url, BindSuccess1, EntryOuX2, SearchDone2);
 
+        Diagnostics.Assert("vendor line", LdapVerboseLines.WinLdapVendor, lines[0]);
+        Diagnostics.Assert("last line", "shutting down connection #0", lines[^1]);
         Assert.AreEqual(LdapVerboseLines.WinLdapVendor, lines[0]);
         Assert.AreEqual("LDAP local: ldap://127.0.0.1:18389/dc=example", lines[1]);
         Assert.AreEqual("LDAP local: trying to establish cleartext connection", lines[2]);
@@ -37,6 +40,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.WinLdap, "ldaps://127.0.0.1:18636/dc=example", BindSuccess1, SearchDone2);
 
+        Diagnostics.Assert("line count", 4, lines.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -53,6 +57,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.WinLdap, Url, BindInvalidCredentials1, "30 0c 02 01 02 61 07 0a 01 31 04 00 04 00");
 
+        Diagnostics.Assert("line count", 5, lines.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -70,6 +75,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.WinLdap, "ldap://127.0.0.1:18389/dc=example??bogus");
 
+        Diagnostics.Assert("line count", 4, lines.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -86,6 +92,8 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.OpenLdap, Url, BindSuccess1, EntryOuX2, SearchDone2);
 
+        Diagnostics.Assert("first line", "LDAP local: ldap://127.0.0.1:18389/dc=example", lines[0]);
+        Diagnostics.Assert("last line", "Connection #0 to host 127.0.0.1:18389 left intact", lines[^1]);
         Assert.AreEqual("LDAP local: ldap://127.0.0.1:18389/dc=example", lines[0]);
         Assert.AreEqual("{ [4 bytes data]", lines[1]);
         Assert.IsTrue(lines[1..^1].All(line => line.StartsWith('{')));
@@ -97,6 +105,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.OpenLdap, Url, BindInvalidCredentials1);
 
+        Diagnostics.Assert("line count", 1, lines.Count);
         CollectionAssert.AreEqual(new[] { "closing connection #0" }, lines);
     }
 
@@ -105,6 +114,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.OpenLdap, Url, BindSuccess1, "30 0c 02 01 02 65 07 0a 01 20 04 00 04 00");
 
+        Diagnostics.Assert("line count", 3, lines.Count);
         CollectionAssert.AreEqual(
             new[] { "LDAP local: ldap://127.0.0.1:18389/dc=example", "LDAP remote: search failed No such object ", "closing connection #0" },
             lines);
@@ -115,6 +125,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(LdapDialect.OpenLdap, "ldap://127.0.0.1:18389/dc=x?a?bogus");
 
+        Diagnostics.Assert("line count", 2, lines.Count);
         CollectionAssert.AreEqual(new[] { "LDAP local: bad or missing scope", "closing connection #-1" }, lines);
     }
 
@@ -126,6 +137,8 @@ public sealed partial class LdapProtocolHandlerTests
         List<string> lines = await VerboseLinesAsync(dialect, Url, BindSuccess1, EntryOuX2, EntryOuX2, SearchSizeLimitExceeded2);
 
         int moreThan = lines.IndexOf("There are more than 2 entries");
+        Diagnostics.Act("more-than line index", moreThan);
+        Diagnostics.Assert("more-than lines", 1, lines.Count(line => line.StartsWith("There are more than", StringComparison.Ordinal)));
         Assert.IsTrue(moreThan > lines.FindLastIndex(line => line.StartsWith('{')), string.Join(" | ", lines));
         Assert.AreEqual(1, lines.Count(line => line.StartsWith("There are more than", StringComparison.Ordinal)));
     }
@@ -137,6 +150,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(dialect, Url, BindSuccess1, SearchSizeLimitExceeded2);
 
+        Diagnostics.Assert("contains more-than-zero line", true, lines.Contains("There are more than 0 entries"));
         CollectionAssert.Contains(lines, "There are more than 0 entries");
     }
 
@@ -147,6 +161,7 @@ public sealed partial class LdapProtocolHandlerTests
     {
         List<string> lines = await VerboseLinesAsync(dialect, Url, BindSuccess1, EntryOuX2, SearchDone2);
 
+        Diagnostics.Assert("has more-than line", false, lines.Any(line => line.StartsWith("There are more than", StringComparison.Ordinal)));
         Assert.IsFalse(lines.Any(line => line.StartsWith("There are more than", StringComparison.Ordinal)), string.Join(" | ", lines));
     }
 
@@ -158,6 +173,8 @@ public sealed partial class LdapProtocolHandlerTests
 
         await new LdapProtocolHandler(connector, LdapDialect.OpenLdap).ExecuteAsync(VerboseContext(Url, events));
 
+        Diagnostics.Act("target", connector.Targets.Single());
+        Diagnostics.Assert("events is the transfer's", true, ReferenceEquals(events, connector.Targets.Single().Events));
         Assert.AreSame(events, connector.Targets.Single().Events);
     }
 
@@ -170,24 +187,35 @@ public sealed partial class LdapProtocolHandlerTests
     [DataRow("ldap.example.com/dc=x", "ldap://ldap.example.com/dc=x")]
     public void Url_TypedUrl_IsTheUrlAsCurlHoldsIt(string typed, string held)
     {
+        Diagnostics.Arrange("typed", typed);
+        Diagnostics.Act("url line", LdapVerboseLines.Url(CurlUrl.Parse(typed)));
+        Diagnostics.Assert("url line", "LDAP local: " + held, LdapVerboseLines.Url(CurlUrl.Parse(typed)));
         Assert.AreEqual("LDAP local: " + held, LdapVerboseLines.Url(CurlUrl.Parse(typed)));
     }
 
-    private static async Task<List<string>> VerboseLinesAsync(LdapDialect dialect, string url, params string[] replies)
+    private async Task<List<string>> VerboseLinesAsync(LdapDialect dialect, string url, params string[] replies)
     {
         var events = new RecordingTransferEvents();
         var connection = new ScriptedConnection([.. replies.Select(Hex.Bytes)]);
 
+        Diagnostics.Arrange("dialect", dialect);
+        Diagnostics.Arrange("replies", string.Join(" | ", replies));
+
         await new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), dialect).ExecuteAsync(VerboseContext(url, events));
 
+        Diagnostics.Act("verbose lines", string.Join(" | ", events.Lines));
         return events.Lines;
     }
 
-    private static TransferContext VerboseContext(string url, RecordingTransferEvents events) => new()
+    private TransferContext VerboseContext(string url, RecordingTransferEvents events)
     {
-        Url = CurlUrl.Parse(url),
-        Output = new MemoryStream(),
-        Credentials = User,
-        Events = events,
-    };
+        Diagnostics.Arrange("url", url);
+        return new()
+        {
+            Url = CurlUrl.Parse(url),
+            Output = new MemoryStream(),
+            Credentials = User,
+            Events = events,
+        };
+    }
 }

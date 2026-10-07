@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Ldap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ldap;
 
@@ -11,6 +12,10 @@ namespace Curl.Protocol.Ldap;
 [TestClass]
 public sealed class LdapEntryFormatterTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(LdapDialect.WinLdap, "08", "\tv:: YQhi\n\n")]
     [DataRow(LdapDialect.WinLdap, "0e", "\tv:: YQ5i\n\n")]
@@ -19,10 +24,15 @@ public sealed class LdapEntryFormatterTests
     [DataRow(LdapDialect.OpenLdap, "1f", "\tv:: YR9i\n\n\n")]
     public void Format_ValueWithAControlByte_IsBase64(LdapDialect dialect, string control, string expectedAfterDn)
     {
+        Diagnostics.Arrange("dialect", dialect);
+        Diagnostics.Arrange("control byte", control);
         var entry = new LdapSearchEntry(Hex.Bytes("78"), [new LdapEntryAttribute(Hex.Bytes("76"), [Hex.Bytes("61 " + control + " 62")])]);
 
         byte[] text = [.. LdapEntryFormatter.FormatPieces(dialect, entry).SelectMany(piece => piece)];
 
+        Diagnostics.Bytes("formatted text", text);
+        Diagnostics.Act("formatted length", text.Length);
+        Diagnostics.Diff("formatted text", Encoding.Latin1.GetBytes("DN: x\n" + expectedAfterDn), text);
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes("DN: x\n" + expectedAfterDn), text);
     }
 }

@@ -1,4 +1,5 @@
 using Curl.Protocol.Ldap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ldap;
 
@@ -10,6 +11,10 @@ namespace Curl.Protocol.Ldap;
 [TestClass]
 public sealed class LdapFilterEncoderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("(cn=*)", "87 02 63 6e")]
     [DataRow("(cn=a*)", "a4 84 00 00 00 0d 04 02 63 6e 30 84 00 00 00 03 80 01 61")]
@@ -37,7 +42,15 @@ public sealed class LdapFilterEncoderTests
     [DataRow("(cn>=*)", "a5 84 00 00 00 07 04 02 63 6e 04 01 2a")]
     public void Encode_WinLdap_WritesWhatWinLdapWrites(string filter, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), Encoder(LdapDialect.WinLdap).Encode(filter));
+        Diagnostics.Arrange("filter", filter);
+        Diagnostics.Arrange("dialect", LdapDialect.WinLdap);
+
+        byte[]? actual = Encoder(LdapDialect.WinLdap).Encode(filter);
+
+        Diagnostics.Act("encoded length", actual?.Length);
+        Diagnostics.Bytes("encoded filter", actual ?? []);
+        Diagnostics.Diff("encoded filter", Hex.Bytes(expected), actual ?? []);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 
     [TestMethod]
@@ -55,7 +68,14 @@ public sealed class LdapFilterEncoderTests
     [DataRow("(~=a)")]
     public void Encode_FilterWinLdapRefuses_ReturnsNull(string filter)
     {
-        Assert.IsNull(Encoder(LdapDialect.WinLdap).Encode(filter));
+        Diagnostics.Arrange("filter", filter);
+        Diagnostics.Arrange("dialect", LdapDialect.WinLdap);
+
+        byte[]? actual = Encoder(LdapDialect.WinLdap).Encode(filter);
+
+        Diagnostics.Act("encoded filter", actual is null ? "null" : Convert.ToHexString(actual));
+        Diagnostics.Assert("refused", true, actual is null);
+        Assert.IsNull(actual);
     }
 
     [TestMethod]
@@ -88,7 +108,15 @@ public sealed class LdapFilterEncoderTests
     [DataRow("(cn=Ã©)", "a3 08 04 02 63 6e 04 02 c3 a9")]
     public void Encode_OpenLdap_WritesWhatLibLdapWrites(string filter, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), Encoder(LdapDialect.OpenLdap).Encode(filter));
+        Diagnostics.Arrange("filter", filter);
+        Diagnostics.Arrange("dialect", LdapDialect.OpenLdap);
+
+        byte[]? actual = Encoder(LdapDialect.OpenLdap).Encode(filter);
+
+        Diagnostics.Act("encoded length", actual?.Length);
+        Diagnostics.Bytes("encoded filter", actual ?? []);
+        Diagnostics.Diff("encoded filter", Hex.Bytes(expected), actual ?? []);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 
     [TestMethod]
@@ -118,28 +146,58 @@ public sealed class LdapFilterEncoderTests
     [DataRow("cn=a(")]
     public void Encode_FilterLibLdapRefuses_ReturnsNull(string filter)
     {
-        Assert.IsNull(Encoder(LdapDialect.OpenLdap).Encode(filter));
+        Diagnostics.Arrange("filter", filter);
+        Diagnostics.Arrange("dialect", LdapDialect.OpenLdap);
+
+        byte[]? actual = Encoder(LdapDialect.OpenLdap).Encode(filter);
+
+        Diagnostics.Act("encoded filter", actual is null ? "null" : Convert.ToHexString(actual));
+        Diagnostics.Assert("refused", true, actual is null);
+        Assert.IsNull(actual);
     }
 
     [TestMethod]
     public void Encode_WinLdapNonAsciiByte_IsSentAsWindows1252ThenUtf8()
     {
-        CollectionAssert.AreEqual(Hex.Bytes("a3 84 00 00 00 0a 04 02 63 6e 04 04 c3 83 c2 a9"), Encoder(LdapDialect.WinLdap).Encode("(cn=Ã©)"));
+        Diagnostics.Arrange("filter", "(cn=Ã©)");
+        Diagnostics.Arrange("dialect", LdapDialect.WinLdap);
+
+        byte[]? actual = Encoder(LdapDialect.WinLdap).Encode("(cn=Ã©)");
+
+        Diagnostics.Act("encoded length", actual?.Length);
+        Diagnostics.Bytes("encoded filter", actual ?? []);
+        Diagnostics.Diff("encoded filter", Hex.Bytes("a3 84 00 00 00 0a 04 02 63 6e 04 04 c3 83 c2 a9"), actual ?? []);
+        CollectionAssert.AreEqual(Hex.Bytes("a3 84 00 00 00 0a 04 02 63 6e 04 04 c3 83 c2 a9"), actual);
     }
 
     [TestMethod]
     public void Encode_WinLdapHexEscape_IsSentAsTheRawByte()
     {
-        CollectionAssert.AreEqual(Hex.Bytes("a3 84 00 00 00 08 04 02 63 6e 04 02 c3 a9"), Encoder(LdapDialect.WinLdap).Encode(@"(cn=\c3\a9)"));
+        Diagnostics.Arrange("filter", @"(cn=\c3\a9)");
+        Diagnostics.Arrange("dialect", LdapDialect.WinLdap);
+
+        byte[]? actual = Encoder(LdapDialect.WinLdap).Encode(@"(cn=\c3\a9)");
+
+        Diagnostics.Act("encoded length", actual?.Length);
+        Diagnostics.Bytes("encoded filter", actual ?? []);
+        Diagnostics.Diff("encoded filter", Hex.Bytes("a3 84 00 00 00 08 04 02 63 6e 04 02 c3 a9"), actual ?? []);
+        CollectionAssert.AreEqual(Hex.Bytes("a3 84 00 00 00 08 04 02 63 6e 04 02 c3 a9"), actual);
     }
 
     [TestMethod]
     public void Encode_CalledTwice_ParsesEachFilterFromItsStart()
     {
+        Diagnostics.Arrange("first filter", "(a=b)");
+        Diagnostics.Arrange("second filter", "(c=d)");
         LdapFilterEncoder encoder = Encoder(LdapDialect.OpenLdap);
         encoder.Encode("(a=b)");
 
-        CollectionAssert.AreEqual(Hex.Bytes("a3 06 04 01 63 04 01 64"), encoder.Encode("(c=d)"));
+        byte[]? actual = encoder.Encode("(c=d)");
+
+        Diagnostics.Act("encoded length", actual?.Length);
+        Diagnostics.Bytes("encoded second filter", actual ?? []);
+        Diagnostics.Diff("encoded second filter", Hex.Bytes("a3 06 04 01 63 04 01 64"), actual ?? []);
+        CollectionAssert.AreEqual(Hex.Bytes("a3 06 04 01 63 04 01 64"), actual);
     }
 
     [TestMethod]
@@ -147,7 +205,14 @@ public sealed class LdapFilterEncoderTests
     [DataRow(LdapDialect.OpenLdap, "87 0b 6f 62 6a 65 63 74 63 6c 61 73 73")]
     public void EncodeDefault_IsObjectClassPresentAsTheBuildSpellsIt(LdapDialect dialect, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), Encoder(dialect).EncodeDefault());
+        Diagnostics.Arrange("dialect", dialect);
+
+        byte[] actual = Encoder(dialect).EncodeDefault();
+
+        Diagnostics.Act("default filter length", actual.Length);
+        Diagnostics.Bytes("default filter", actual);
+        Diagnostics.Diff("default filter", Hex.Bytes(expected), actual);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 
     private static LdapFilterEncoder Encoder(LdapDialect dialect) => new(dialect, new LdapBerWriter(dialect));

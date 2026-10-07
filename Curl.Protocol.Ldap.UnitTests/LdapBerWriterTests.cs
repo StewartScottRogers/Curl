@@ -1,6 +1,7 @@
 using System.Formats.Asn1;
 using System.Numerics;
 using Curl.Protocol.Ldap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ldap;
 
@@ -12,6 +13,10 @@ namespace Curl.Protocol.Ldap;
 [TestClass]
 public sealed class LdapBerWriterTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(0, "02 01 00")]
     [DataRow(1, "02 01 01")]
@@ -20,7 +25,14 @@ public sealed class LdapBerWriterTests
     [DataRow(-1, "02 01 ff")]
     public void Integer_WritesTheShortestTwosComplement(int value, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapBerWriter.Integer(value));
+        Diagnostics.Arrange("value", value);
+
+        byte[] actual = LdapBerWriter.Integer(value);
+
+        Diagnostics.Bytes("integer", actual);
+        Diagnostics.Act("encoded", Convert.ToHexString(actual));
+        Diagnostics.Diff("integer", Hex.Bytes(expected), actual);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 
     [TestMethod]
@@ -31,9 +43,16 @@ public sealed class LdapBerWriterTests
     [DataRow(int.MaxValue)]
     public void Integer_RoundTripsThroughAsnReader(int value)
     {
-        var reader = new AsnReader(LdapBerWriter.Integer(value), AsnEncodingRules.BER);
+        Diagnostics.Arrange("value", value);
+        byte[] encoded = LdapBerWriter.Integer(value);
+        Diagnostics.Bytes("integer", encoded);
+        var reader = new AsnReader(encoded, AsnEncodingRules.BER);
 
-        Assert.AreEqual(new BigInteger(value), reader.ReadInteger());
+        BigInteger decoded = reader.ReadInteger();
+
+        Diagnostics.Act("decoded", decoded);
+        Diagnostics.Assert("decoded", new BigInteger(value), decoded);
+        Assert.AreEqual(new BigInteger(value), decoded);
         Assert.IsFalse(reader.HasData);
     }
 
@@ -41,9 +60,13 @@ public sealed class LdapBerWriterTests
     public void OctetString_UniversalTag_RoundTripsThroughAsnReader()
     {
         byte[] content = [.. "cn=u,dc=x"u8];
+        Diagnostics.Arrange("content", "cn=u,dc=x");
 
         byte[] element = LdapBerWriter.OctetString(Asn1Tag.PrimitiveOctetString, content);
 
+        Diagnostics.Bytes("element", element);
+        Diagnostics.Act("encoded", Convert.ToHexString(element));
+        Diagnostics.Diff("element", Hex.Bytes("04 09 63 6e 3d 75 2c 64 63 3d 78"), element);
         CollectionAssert.AreEqual(Hex.Bytes("04 09 63 6e 3d 75 2c 64 63 3d 78"), element);
         CollectionAssert.AreEqual(content, new AsnReader(element, AsnEncodingRules.BER).ReadOctetString());
     }
@@ -52,9 +75,13 @@ public sealed class LdapBerWriterTests
     public void OctetString_ContextTagZero_WritesSimpleAuthenticationAndRoundTrips()
     {
         var tag = new Asn1Tag(TagClass.ContextSpecific, 0);
+        Diagnostics.Arrange("tag", tag);
 
         byte[] element = LdapBerWriter.OctetString(tag, "secret"u8);
 
+        Diagnostics.Bytes("element", element);
+        Diagnostics.Act("encoded", Convert.ToHexString(element));
+        Diagnostics.Diff("element", Hex.Bytes("80 06 73 65 63 72 65 74"), element);
         CollectionAssert.AreEqual(Hex.Bytes("80 06 73 65 63 72 65 74"), element);
         CollectionAssert.AreEqual("secret"u8.ToArray(), new AsnReader(element, AsnEncodingRules.BER).ReadOctetString(tag));
     }
@@ -62,8 +89,13 @@ public sealed class LdapBerWriterTests
     [TestMethod]
     public void OctetString_LongContent_WritesTheShortestLongFormLength()
     {
+        Diagnostics.Arrange("content length", 200);
+
         byte[] element = LdapBerWriter.OctetString(Asn1Tag.PrimitiveOctetString, new byte[200]);
 
+        Diagnostics.Bytes("element", element);
+        Diagnostics.Act("header", Convert.ToHexString(element[..3]));
+        Diagnostics.Diff("header", Hex.Bytes("04 81 c8"), element[..3]);
         CollectionAssert.AreEqual(Hex.Bytes("04 81 c8"), element[..3]);
     }
 
@@ -71,9 +103,13 @@ public sealed class LdapBerWriterTests
     public void Null_ApplicationTagTwo_WritesTheUnbindRequestAndRoundTrips()
     {
         var tag = new Asn1Tag(TagClass.Application, 2);
+        Diagnostics.Arrange("tag", tag);
 
         byte[] element = LdapBerWriter.Null(tag);
 
+        Diagnostics.Bytes("element", element);
+        Diagnostics.Act("encoded", Convert.ToHexString(element));
+        Diagnostics.Diff("element", Hex.Bytes("42 00"), element);
         CollectionAssert.AreEqual(Hex.Bytes("42 00"), element);
         var reader = new AsnReader(element, AsnEncodingRules.BER);
         reader.ReadNull(tag);
@@ -83,24 +119,39 @@ public sealed class LdapBerWriterTests
     [TestMethod]
     public void Constructed_WinLdap_WritesAFiveByteLength()
     {
+        Diagnostics.Arrange("dialect", LdapDialect.WinLdap);
+
         byte[] element = new LdapBerWriter(LdapDialect.WinLdap).Constructed(Asn1Tag.Sequence, LdapBerWriter.Integer(1));
 
+        Diagnostics.Bytes("element", element);
+        Diagnostics.Act("encoded", Convert.ToHexString(element));
+        Diagnostics.Diff("element", Hex.Bytes("30 84 00 00 00 03 02 01 01"), element);
         CollectionAssert.AreEqual(Hex.Bytes("30 84 00 00 00 03 02 01 01"), element);
     }
 
     [TestMethod]
     public void Constructed_OpenLdap_WritesTheShortestLength()
     {
+        Diagnostics.Arrange("dialect", LdapDialect.OpenLdap);
+
         byte[] element = new LdapBerWriter(LdapDialect.OpenLdap).Constructed(Asn1Tag.Sequence, LdapBerWriter.Integer(1));
 
+        Diagnostics.Bytes("element", element);
+        Diagnostics.Act("encoded", Convert.ToHexString(element));
+        Diagnostics.Diff("element", Hex.Bytes("30 03 02 01 01"), element);
         CollectionAssert.AreEqual(Hex.Bytes("30 03 02 01 01"), element);
     }
 
     [TestMethod]
     public void Constructed_ApplicationTag_IsWrittenConstructed()
     {
+        Diagnostics.Arrange("dialect", LdapDialect.OpenLdap);
+
         byte[] element = new LdapBerWriter(LdapDialect.OpenLdap).Constructed(new Asn1Tag(TagClass.Application, 0));
 
+        Diagnostics.Bytes("element", element);
+        Diagnostics.Act("encoded", Convert.ToHexString(element));
+        Diagnostics.Diff("element", Hex.Bytes("60 00"), element);
         CollectionAssert.AreEqual(Hex.Bytes("60 00"), element);
     }
 
@@ -109,18 +160,27 @@ public sealed class LdapBerWriterTests
     [DataRow(LdapDialect.OpenLdap)]
     public void Constructed_RoundTripsThroughAsnReader(LdapDialect dialect)
     {
+        Diagnostics.Arrange("dialect", dialect);
         var writer = new LdapBerWriter(dialect);
         byte[] element = writer.Constructed(
             Asn1Tag.Sequence,
             LdapBerWriter.Integer(7),
             writer.Constructed(new Asn1Tag(TagClass.Application, 0), LdapBerWriter.OctetString(Asn1Tag.PrimitiveOctetString, new byte[300])));
+        Diagnostics.Bytes("element", element);
 
         var reader = new AsnReader(element, AsnEncodingRules.BER);
         AsnReader sequence = reader.ReadSequence();
         Assert.IsFalse(reader.HasData);
-        Assert.AreEqual(new BigInteger(7), sequence.ReadInteger());
+        BigInteger id = sequence.ReadInteger();
         AsnReader inner = sequence.ReadSequence(new Asn1Tag(TagClass.Application, 0));
-        Assert.HasCount(300, inner.ReadOctetString());
+        byte[] octets = inner.ReadOctetString();
+
+        Diagnostics.Act("message id", id);
+        Diagnostics.Act("octet count", octets.Length);
+        Diagnostics.Assert("message id", new BigInteger(7), id);
+        Diagnostics.Assert("octet count", 300, octets.Length);
+        Assert.AreEqual(new BigInteger(7), id);
+        Assert.HasCount(300, octets);
         Assert.IsFalse(sequence.HasData);
     }
 
@@ -134,7 +194,14 @@ public sealed class LdapBerWriterTests
     [DataRow(0x1000000, "84 01 00 00 00")]
     public void ShortestLengthOf_WritesTheFewestOctets(int length, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapBerWriter.ShortestLengthOf(length));
+        Diagnostics.Arrange("length", length);
+
+        byte[] actual = LdapBerWriter.ShortestLengthOf(length);
+
+        Diagnostics.Bytes("length octets", actual);
+        Diagnostics.Act("encoded", Convert.ToHexString(actual));
+        Diagnostics.Diff("length octets", Hex.Bytes(expected), actual);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 
     [TestMethod]
@@ -143,7 +210,14 @@ public sealed class LdapBerWriterTests
     [DataRow(128, "0a 02 00 80")]
     public void Enumerated_WritesAnIntegersContentUnderTagTen(int value, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapBerWriter.Enumerated(value));
+        Diagnostics.Arrange("value", value);
+
+        byte[] actual = LdapBerWriter.Enumerated(value);
+
+        Diagnostics.Bytes("enumerated", actual);
+        Diagnostics.Act("encoded", Convert.ToHexString(actual));
+        Diagnostics.Diff("enumerated", Hex.Bytes(expected), actual);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 
     [TestMethod]
@@ -151,13 +225,27 @@ public sealed class LdapBerWriterTests
     [DataRow(true, "01 01 ff")]
     public void Boolean_WritesZeroOrFf(bool value, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapBerWriter.Boolean(value));
+        Diagnostics.Arrange("value", value);
+
+        byte[] actual = LdapBerWriter.Boolean(value);
+
+        Diagnostics.Bytes("boolean", actual);
+        Diagnostics.Act("encoded", Convert.ToHexString(actual));
+        Diagnostics.Diff("boolean", Hex.Bytes(expected), actual);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 
     [TestMethod]
     public void Integer_ApplicationTagSixteen_WritesAnAbandonRequestsContent()
     {
-        CollectionAssert.AreEqual(Hex.Bytes("50 01 02"), LdapBerWriter.Integer(2, new Asn1Tag(TagClass.Application, 16)));
+        Diagnostics.Arrange("value", 2);
+
+        byte[] actual = LdapBerWriter.Integer(2, new Asn1Tag(TagClass.Application, 16));
+
+        Diagnostics.Bytes("integer", actual);
+        Diagnostics.Act("encoded", Convert.ToHexString(actual));
+        Diagnostics.Diff("integer", Hex.Bytes("50 01 02"), actual);
+        CollectionAssert.AreEqual(Hex.Bytes("50 01 02"), actual);
     }
 
     [TestMethod]
@@ -166,6 +254,13 @@ public sealed class LdapBerWriterTests
     [DataRow(0x01020304, "84 01 02 03 04")]
     public void FourOctetLengthOf_AlwaysWritesFourLengthOctets(int length, string expected)
     {
-        CollectionAssert.AreEqual(Hex.Bytes(expected), LdapBerWriter.FourOctetLengthOf(length));
+        Diagnostics.Arrange("length", length);
+
+        byte[] actual = LdapBerWriter.FourOctetLengthOf(length);
+
+        Diagnostics.Bytes("length octets", actual);
+        Diagnostics.Act("encoded", Convert.ToHexString(actual));
+        Diagnostics.Diff("length octets", Hex.Bytes(expected), actual);
+        CollectionAssert.AreEqual(Hex.Bytes(expected), actual);
     }
 }
