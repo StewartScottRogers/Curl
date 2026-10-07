@@ -1,4 +1,5 @@
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Negotiation;
 
@@ -29,11 +30,17 @@ public sealed class SshAlgorithmNegotiatorTests
         CompressionServerToClient = ["zlib", "none"],
     });
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Negotiate_PicksTheClientsFirstNameTheServerAlsoHas_EachDirectionApart()
     {
-        SshNegotiatedAlgorithms? algorithms = SshAlgorithmNegotiator.Negotiate(Client, Server, []);
+        SshNegotiatedAlgorithms? algorithms = Negotiate(Client, Server, []);
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        SshNegotiatedAlgorithms expected = new(
+            "curve25519-sha256", "ssh-ed25519", "aes256-ctr", "aes128-ctr", "hmac-sha2-512", "hmac-sha2-256", "zlib", "none", IsStrictKeyExchange: true, DiscardServerGuess: false);
+        diagnostics.Assert("negotiated", expected, algorithms);
         Assert.IsNotNull(algorithms);
         Assert.AreEqual("curve25519-sha256", algorithms.KeyExchange, "ext-info-c is a signal, never a method");
         Assert.AreEqual("ssh-ed25519", algorithms.ServerHostKey);
@@ -70,15 +77,20 @@ public sealed class SshAlgorithmNegotiatorTests
             "compression-out" => Server with { CompressionClientToServer = nothing },
             _ => Server with { CompressionServerToClient = nothing },
         };
+        TestDiagnostics.For(TestContext).Arrange("list sharing nothing", list);
 
-        Assert.IsNull(SshAlgorithmNegotiator.Negotiate(Client, server, []));
+        SshNegotiatedAlgorithms? algorithms = Negotiate(Client, server, []);
+
+        AssertNothingAgreed(algorithms);
+        Assert.IsNull(algorithms);
     }
 
     [TestMethod]
     public void Negotiate_HostKeyNeverAgreed_PassesOverItToTheNextSharedName()
     {
-        SshNegotiatedAlgorithms? algorithms = SshAlgorithmNegotiator.Negotiate(Client, Server, ["ssh-ed25519"]);
+        SshNegotiatedAlgorithms? algorithms = Negotiate(Client, Server, ["ssh-ed25519"]);
 
+        TestDiagnostics.For(TestContext).Assert("server host key", "rsa-sha2-512", algorithms?.ServerHostKey);
         Assert.AreEqual("rsa-sha2-512", algorithms!.ServerHostKey);
     }
 
@@ -87,7 +99,10 @@ public sealed class SshAlgorithmNegotiatorTests
     {
         SshKexInit server = Server with { ServerHostKey = ["ssh-ed25519"] };
 
-        Assert.IsNull(SshAlgorithmNegotiator.Negotiate(Client, server, ["ssh-ed25519"]));
+        SshNegotiatedAlgorithms? algorithms = Negotiate(Client, server, ["ssh-ed25519"]);
+
+        AssertNothingAgreed(algorithms);
+        Assert.IsNull(algorithms);
     }
 
     [TestMethod]
@@ -99,8 +114,12 @@ public sealed class SshAlgorithmNegotiatorTests
         SshKexInit client = Client with { CipherClientToServer = [cipher], CipherServerToClient = [cipher], MacClientToServer = [], MacServerToClient = [] };
         SshKexInit server = Server with { CipherClientToServer = [cipher], CipherServerToClient = [cipher] };
 
-        SshNegotiatedAlgorithms? algorithms = SshAlgorithmNegotiator.Negotiate(client, server, []);
+        SshNegotiatedAlgorithms? algorithms = Negotiate(client, server, []);
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("agreed", true, algorithms is not null);
+        diagnostics.Assert("mac c2s", "(null)", algorithms?.MacClientToServer ?? "(null)");
+        diagnostics.Assert("mac s2c", "(null)", algorithms?.MacServerToClient ?? "(null)");
         Assert.IsNotNull(algorithms);
         Assert.IsNull(algorithms.MacClientToServer);
         Assert.IsNull(algorithms.MacServerToClient);
@@ -111,7 +130,10 @@ public sealed class SshAlgorithmNegotiatorTests
     {
         SshKexInit server = Server with { KeyExchange = ["curve25519-sha256"] };
 
-        Assert.IsFalse(SshAlgorithmNegotiator.Negotiate(Client, server, [])!.IsStrictKeyExchange);
+        SshNegotiatedAlgorithms? algorithms = Negotiate(Client, server, []);
+
+        TestDiagnostics.For(TestContext).Assert("strict key exchange", false, algorithms?.IsStrictKeyExchange);
+        Assert.IsFalse(algorithms!.IsStrictKeyExchange);
     }
 
     [TestMethod]
@@ -119,7 +141,10 @@ public sealed class SshAlgorithmNegotiatorTests
     {
         SshKexInit client = Client with { KeyExchange = ["curve25519-sha256"] };
 
-        Assert.IsFalse(SshAlgorithmNegotiator.Negotiate(client, Server, [])!.IsStrictKeyExchange);
+        SshNegotiatedAlgorithms? algorithms = Negotiate(client, Server, []);
+
+        TestDiagnostics.For(TestContext).Assert("strict key exchange", false, algorithms?.IsStrictKeyExchange);
+        Assert.IsFalse(algorithms!.IsStrictKeyExchange);
     }
 
     [TestMethod]
@@ -135,6 +160,25 @@ public sealed class SshAlgorithmNegotiatorTests
             FirstKexPacketFollows = true,
         };
 
-        Assert.AreEqual(discard, SshAlgorithmNegotiator.Negotiate(Client, server, [])!.DiscardServerGuess);
+        SshNegotiatedAlgorithms? algorithms = Negotiate(Client, server, []);
+
+        TestDiagnostics.For(TestContext).Assert("discard server guess", discard, algorithms?.DiscardServerGuess);
+        Assert.AreEqual(discard, algorithms!.DiscardServerGuess);
     }
+
+    private SshNegotiatedAlgorithms? Negotiate(SshKexInit client, SshKexInit server, IReadOnlyCollection<string> hostKeysNeverAgreed)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeKexInit("client", client);
+        diagnostics.ArrangeKexInit("server", server);
+        diagnostics.Arrange("host keys never agreed", SshNegotiationDiagnostics.Join(hostKeysNeverAgreed));
+
+        SshNegotiatedAlgorithms? algorithms = SshAlgorithmNegotiator.Negotiate(client, server, hostKeysNeverAgreed);
+
+        diagnostics.ActAlgorithms(algorithms);
+        return algorithms;
+    }
+
+    private void AssertNothingAgreed(SshNegotiatedAlgorithms? algorithms) =>
+        TestDiagnostics.For(TestContext).Assert("negotiated", "(nothing agreed)", algorithms?.ToString() ?? "(nothing agreed)");
 }

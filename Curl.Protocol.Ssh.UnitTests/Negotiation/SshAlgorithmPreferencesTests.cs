@@ -1,4 +1,6 @@
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Negotiation;
 
@@ -10,6 +12,8 @@ namespace Curl.Protocol.Ssh.Negotiation;
 [TestClass]
 public sealed partial class SshAlgorithmPreferencesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void WindowsReference_IsCurl8210WinCngKexInit()
     {
@@ -58,15 +62,28 @@ public sealed partial class SshAlgorithmPreferencesTests
             "OpenSSL" => SshAlgorithmPreferences.OpenSslReference,
             _ => SshAlgorithmPreferences.Full,
         };
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", preset);
 
-        Assert.AreEqual(expected, string.Join(',', preferences.HostKeysNeverAgreed));
+        string actual = string.Join(',', preferences.HostKeysNeverAgreed);
+
+        diagnostics.Act("host keys never agreed", actual);
+        diagnostics.Diff("host keys never agreed", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void WithCompression_True_OffersZlibThenZlibOpenSshThenNone_AsMeasured()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", "WindowsReference");
+        diagnostics.Arrange("compression", true);
+
         SshAlgorithmPreferences compressed = SshAlgorithmPreferences.WindowsReference.WithCompression(true);
 
+        diagnostics.Act("compression", string.Join(',', compressed.Compression));
+        diagnostics.DiffList("compression", "zlib,zlib@openssh.com,none", compressed.Compression);
+        diagnostics.Assert("same key exchange list", true, ReferenceEquals(SshAlgorithmPreferences.WindowsReference.KeyExchange, compressed.KeyExchange));
         Assert.AreEqual("zlib,zlib@openssh.com,none", string.Join(',', compressed.Compression));
         Assert.AreSame(SshAlgorithmPreferences.WindowsReference.KeyExchange, compressed.KeyExchange);
     }
@@ -74,14 +91,23 @@ public sealed partial class SshAlgorithmPreferencesTests
     [TestMethod]
     public void WithCompression_False_ChangesNothing()
     {
-        Assert.AreSame(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmPreferences.OpenSslReference.WithCompression(false));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", "OpenSslReference");
+        diagnostics.Arrange("compression", false);
+
+        SshAlgorithmPreferences result = SshAlgorithmPreferences.OpenSslReference.WithCompression(false);
+
+        diagnostics.Act("compression", string.Join(',', result.Compression));
+        diagnostics.Assert("same preferences", true, ReferenceEquals(SshAlgorithmPreferences.OpenSslReference, result));
+        Assert.AreSame(SshAlgorithmPreferences.OpenSslReference, result);
     }
 
     [TestMethod]
     public void NarrowHostKeysTo_SshRsaOnWindows_IsRsaSha2256ThenRsaSha2512ThenSshRsa_AsMeasured()
     {
-        SshAlgorithmPreferences narrowed = SshAlgorithmPreferences.WindowsReference.NarrowHostKeysTo("ssh-rsa");
+        SshAlgorithmPreferences narrowed = NarrowAndWrite("WindowsReference", SshAlgorithmPreferences.WindowsReference, "ssh-rsa");
 
+        TestDiagnostics.For(TestContext).DiffList("server host key", "rsa-sha2-256,rsa-sha2-512,ssh-rsa", narrowed.ServerHostKey);
         Assert.AreEqual("rsa-sha2-256,rsa-sha2-512,ssh-rsa", string.Join(',', narrowed.ServerHostKey));
     }
 
@@ -92,15 +118,19 @@ public sealed partial class SshAlgorithmPreferencesTests
     [DataRow("ecdsa-sha2-nistp521")]
     public void NarrowHostKeysTo_TypeTheOpenSslBuildHolds_IsThatTypeAlone(string keyType)
     {
-        SshAlgorithmPreferences narrowed = SshAlgorithmPreferences.OpenSslReference.NarrowHostKeysTo(keyType);
+        SshAlgorithmPreferences narrowed = NarrowAndWrite("OpenSslReference", SshAlgorithmPreferences.OpenSslReference, keyType);
 
+        TestDiagnostics.For(TestContext).DiffList("server host key", keyType, narrowed.ServerHostKey);
         Assert.AreEqual(keyType, string.Join(',', narrowed.ServerHostKey));
     }
 
     [TestMethod]
     public void NarrowHostKeysTo_SshDssInTheFullSet_IsSshDssAlone()
     {
-        Assert.AreEqual("ssh-dss", string.Join(',', SshAlgorithmPreferences.Full.NarrowHostKeysTo("ssh-dss").ServerHostKey));
+        SshAlgorithmPreferences narrowed = NarrowAndWrite("Full", SshAlgorithmPreferences.Full, "ssh-dss");
+
+        TestDiagnostics.For(TestContext).DiffList("server host key", "ssh-dss", narrowed.ServerHostKey);
+        Assert.AreEqual("ssh-dss", string.Join(',', narrowed.ServerHostKey));
     }
 
     [TestMethod]
@@ -109,9 +139,16 @@ public sealed partial class SshAlgorithmPreferencesTests
     [DataRow("ssh-dss")]
     public void NarrowHostKeysTo_TypeTheWindowsBuildLacks_FailsWithExit79(string keyType)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", "WindowsReference");
+        diagnostics.Arrange("known host key type", keyType);
+
         SshTransferException failure = Assert.ThrowsExactly<SshTransferException>(
             () => SshAlgorithmPreferences.WindowsReference.NarrowHostKeysTo(keyType));
 
+        string expectedMessage = $"libssh2 method '{keyType}' failed: The requested method(s) are not currently supported";
+        diagnostics.ActFailure(failure);
+        diagnostics.AssertFailure(CurlExitCode.Ssh, expectedMessage, failure);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual($"libssh2 method '{keyType}' failed: The requested method(s) are not currently supported", failure.Message);
     }
@@ -119,10 +156,25 @@ public sealed partial class SshAlgorithmPreferencesTests
     [TestMethod]
     public void NarrowHostKeysTo_UnknownType_ChangesNothing()
     {
-        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, SshAlgorithmPreferences.WindowsReference.NarrowHostKeysTo("ssh-foo"));
+        SshAlgorithmPreferences narrowed = NarrowAndWrite("WindowsReference", SshAlgorithmPreferences.WindowsReference, "ssh-foo");
+
+        TestDiagnostics.For(TestContext).Assert("same preferences", true, ReferenceEquals(SshAlgorithmPreferences.WindowsReference, narrowed));
+        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, narrowed);
     }
 
-    private static void AssertLists(
+    private SshAlgorithmPreferences NarrowAndWrite(string presetName, SshAlgorithmPreferences preset, string keyType)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", presetName);
+        diagnostics.Arrange("known host key type", keyType);
+
+        SshAlgorithmPreferences narrowed = preset.NarrowHostKeysTo(keyType);
+
+        diagnostics.Act("server host key", string.Join(',', narrowed.ServerHostKey));
+        return narrowed;
+    }
+
+    private void AssertLists(
         SshAlgorithmPreferences preferences,
         string keyExchange,
         string hostKey,
@@ -130,6 +182,18 @@ public sealed partial class SshAlgorithmPreferencesTests
         string mac,
         string compression)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("backend", preferences.CryptographyBackend ?? "(none)");
+        diagnostics.Act("kex", string.Join(',', preferences.KeyExchange));
+        diagnostics.Act("host key", string.Join(',', preferences.ServerHostKey));
+        diagnostics.Act("cipher", string.Join(',', preferences.Cipher));
+        diagnostics.Act("mac", string.Join(',', preferences.Mac));
+        diagnostics.Act("compression", string.Join(',', preferences.Compression));
+        diagnostics.DiffList("kex", keyExchange, preferences.KeyExchange);
+        diagnostics.DiffList("host key", hostKey, preferences.ServerHostKey);
+        diagnostics.DiffList("cipher", cipher, preferences.Cipher);
+        diagnostics.DiffList("mac", mac, preferences.Mac);
+        diagnostics.DiffList("compression", compression, preferences.Compression);
         Assert.AreEqual(keyExchange, string.Join(',', preferences.KeyExchange));
         Assert.AreEqual(hostKey, string.Join(',', preferences.ServerHostKey));
         Assert.AreEqual(cipher, string.Join(',', preferences.Cipher));

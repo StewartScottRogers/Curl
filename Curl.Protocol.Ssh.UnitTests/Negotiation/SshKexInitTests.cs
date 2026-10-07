@@ -1,4 +1,6 @@
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Negotiation;
 
@@ -12,13 +14,28 @@ public sealed class SshKexInitTests
             .Concat(SshAlgorithmPreferences.Full.Mac)
             .Concat(["zlib", "zlib@openssh.com", "none"]));
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void ForClient_EverythingImplemented_OffersThePresetBothWaysWithNoLanguagesAndNoGuess()
     {
         SshAlgorithmPreferences preset = SshAlgorithmPreferences.WindowsReference;
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", "WindowsReference");
+        diagnostics.Arrange("catalogue", "everything implemented");
+        diagnostics.Arrange("random byte", "0x42");
+
         SshKexInit kexInit = SshKexInit.ForClient(preset, EverythingImplemented, new RepeatingRandomSource(0x42));
 
+        diagnostics.ActKexInit("client", kexInit);
+        diagnostics.Diff("cookie", Enumerable.Repeat((byte)0x42, 16).ToArray(), kexInit.Cookie);
+        diagnostics.DiffList("kex", string.Join(',', preset.KeyExchange), kexInit.KeyExchange);
+        diagnostics.DiffList("host key", string.Join(',', preset.ServerHostKey), kexInit.ServerHostKey);
+        diagnostics.DiffList("cipher c2s", string.Join(',', preset.Cipher), kexInit.CipherClientToServer);
+        diagnostics.DiffList("mac c2s", string.Join(',', preset.Mac), kexInit.MacClientToServer);
+        diagnostics.DiffList("compression c2s", "none", kexInit.CompressionClientToServer);
+        diagnostics.Assert("first kex packet follows", false, kexInit.FirstKexPacketFollows);
         CollectionAssert.AreEqual(Enumerable.Repeat((byte)0x42, 16).ToArray(), kexInit.Cookie);
         CollectionAssert.AreEqual(preset.KeyExchange.ToArray(), kexInit.KeyExchange.ToArray());
         CollectionAssert.AreEqual(preset.ServerHostKey.ToArray(), kexInit.ServerHostKey.ToArray());
@@ -38,8 +55,16 @@ public sealed class SshKexInitTests
     {
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.WindowsReference, EverythingImplemented, new RepeatingRandomSource(0));
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeKexInit("client", kexInit);
+
         byte[] payload = kexInit.ToPayload();
 
+        diagnostics.Act("message", SshAuthenticationDiagnostics.MessageName(payload));
+        diagnostics.Bytes("payload", payload);
+        diagnostics.Assert("payload length", 1072, payload.Length);
+        diagnostics.Assert("message number", 20, payload[0]);
+        diagnostics.Diff("last five bytes", new byte[] { 0, 0, 0, 0, 0 }, payload[^5..]);
         Assert.AreEqual(1072, payload.Length, "the reference build's KEXINIT payload measured 1072 bytes");
         Assert.AreEqual((byte)20, payload[0]);
         CollectionAssert.AreEqual(new byte[] { 0, 0, 0, 0, 0 }, payload[^5..], "first_kex_packet_follows false, reserved 0");
@@ -48,8 +73,15 @@ public sealed class SshKexInitTests
     [TestMethod]
     public void ForClient_TodaysCatalogue_OffersCurve25519NistAndFiniteFieldExchangesEveryMeasuredHostKeyCipherAndMac()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", "OpenSslReference");
+        diagnostics.Arrange("catalogue", "implemented today");
+
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
+        diagnostics.ActKexInit("client", kexInit);
+        diagnostics.DiffList("host key", string.Join(',', SshAlgorithmPreferences.OpenSslReference.ServerHostKey), kexInit.ServerHostKey);
+        diagnostics.DiffList("compression c2s", "none", kexInit.CompressionClientToServer);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -75,12 +107,21 @@ public sealed class SshKexInitTests
     [TestMethod]
     public void ForClient_TodaysCatalogueOnWindows_OffersTheMeasuredWinCngCiphersAndMacs()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset", "WindowsReference");
+        diagnostics.Arrange("catalogue", "implemented today");
+
         SshKexInit kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.WindowsReference, SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
+        diagnostics.ActKexInit("client", kexInit);
         string[] ciphers = "chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr,aes256-cbc,rijndael-cbc@lysator.liu.se,aes192-cbc,aes128-cbc,arcfour128,arcfour,3des-cbc".Split(',');
+        diagnostics.DiffList("cipher c2s", string.Join(',', ciphers), kexInit.CipherClientToServer);
+        diagnostics.DiffList("cipher s2c", string.Join(',', ciphers), kexInit.CipherServerToClient);
         CollectionAssert.AreEqual(ciphers, kexInit.CipherClientToServer.ToArray());
         CollectionAssert.AreEqual(ciphers, kexInit.CipherServerToClient.ToArray());
         string[] macs = "hmac-sha2-256,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-512-etm@openssh.com,hmac-sha1,hmac-sha1-etm@openssh.com,hmac-sha1-96,hmac-md5,hmac-md5-96".Split(',');
+        diagnostics.DiffList("mac c2s", string.Join(',', macs), kexInit.MacClientToServer);
+        diagnostics.DiffList("mac s2c", string.Join(',', macs), kexInit.MacServerToClient);
         CollectionAssert.AreEqual(macs, kexInit.MacClientToServer.ToArray());
         CollectionAssert.AreEqual(macs, kexInit.MacServerToClient.ToArray());
     }
@@ -94,8 +135,16 @@ public sealed class SshKexInitTests
     {
         SshAlgorithmPreferences preset = platform == "Windows" ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("platform", platform);
+        diagnostics.Arrange("--compressed-ssh", compressedSsh);
+
         SshKexInit kexInit = SshKexInit.ForClient(preset.WithCompression(compressedSsh), SshAlgorithmCatalogue.Implemented, new RepeatingRandomSource(0));
 
+        diagnostics.Act("compression c2s", string.Join(',', kexInit.CompressionClientToServer));
+        diagnostics.Act("compression s2c", string.Join(',', kexInit.CompressionServerToClient));
+        diagnostics.DiffList("compression c2s", expected, kexInit.CompressionClientToServer);
+        diagnostics.DiffList("compression s2c", expected, kexInit.CompressionServerToClient);
         Assert.AreEqual(expected, string.Join(',', kexInit.CompressionClientToServer));
         Assert.AreEqual(expected, string.Join(',', kexInit.CompressionServerToClient));
     }
@@ -111,8 +160,18 @@ public sealed class SshKexInitTests
             Reserved = 7,
         });
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeKexInit("sent", sent);
+        diagnostics.Bytes("payload", sent.ToPayload());
+
         SshKexInit read = SshKexInit.Parse(sent.ToPayload());
 
+        diagnostics.ActKexInit("read", read);
+        diagnostics.Diff("cookie", sent.Cookie, read.Cookie);
+        diagnostics.DiffList("kex", string.Join(',', sent.KeyExchange), read.KeyExchange);
+        diagnostics.DiffList("languages c2s", "en", read.LanguagesClientToServer);
+        diagnostics.Assert("first kex packet follows", true, read.FirstKexPacketFollows);
+        diagnostics.Assert("reserved", 7u, read.Reserved);
         CollectionAssert.AreEqual(sent.Cookie, read.Cookie);
         CollectionAssert.AreEqual(sent.KeyExchange.ToArray(), read.KeyExchange.ToArray());
         CollectionAssert.AreEqual(sent.ServerHostKey.ToArray(), read.ServerHostKey.ToArray());
@@ -128,8 +187,14 @@ public sealed class SshKexInitTests
     [TestMethod]
     public void Parse_TruncatedPayload_ThrowsInvalidData()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] payload = SshServerScript.OpenSshKexInit().ToPayload();
+        diagnostics.Bytes("truncated payload", payload[..^1]);
+        diagnostics.Arrange("truncated length", $"{payload.Length - 1} of {payload.Length} bytes");
 
-        Assert.ThrowsExactly<InvalidDataException>(() => SshKexInit.Parse(payload[..^1]));
+        InvalidDataException failure = Assert.ThrowsExactly<InvalidDataException>(() => SshKexInit.Parse(payload[..^1]));
+
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Assert("exception type", nameof(InvalidDataException), failure.GetType().Name);
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Ssh.Negotiation;
 
 /// <summary>
@@ -10,14 +12,34 @@ public sealed partial class SshAlgorithmPreferencesTests
     [TestMethod]
     public void CryptographyBackend_IsThePlatformBuildsBackend()
     {
-        Assert.AreEqual("WinCNG", SshAlgorithmPreferences.WindowsReference.CryptographyBackend);
-        Assert.AreEqual("OpenSSL", SshAlgorithmPreferences.OpenSslReference.CryptographyBackend);
-        Assert.IsNull(SshAlgorithmPreferences.Full.CryptographyBackend);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("presets", "WindowsReference, OpenSslReference, Full");
+
+        string? windows = SshAlgorithmPreferences.WindowsReference.CryptographyBackend;
+        string? openSsl = SshAlgorithmPreferences.OpenSslReference.CryptographyBackend;
+        string? full = SshAlgorithmPreferences.Full.CryptographyBackend;
+
+        diagnostics.Act("backends", $"{windows ?? "(null)"}, {openSsl ?? "(null)"}, {full ?? "(null)"}");
+        diagnostics.Assert("WindowsReference backend", "WinCNG", windows);
+        diagnostics.Assert("OpenSslReference backend", "OpenSSL", openSsl);
+        diagnostics.Assert("Full backend", "(null)", full ?? "(null)");
+        Assert.AreEqual("WinCNG", windows);
+        Assert.AreEqual("OpenSSL", openSsl);
+        Assert.IsNull(full);
     }
 
     [TestMethod]
     [DataRow("ssh-rsa", "rsa-sha2-256,rsa-sha2-512,ssh-rsa")]
     [DataRow("ssh-ed25519", "ssh-ed25519")]
-    public void NarrowedHostKeyNames_AreTheNamesCurlSets(string keyType, string expected) =>
-        Assert.AreEqual(expected, SshAlgorithmPreferences.NarrowedHostKeyNames(keyType));
+    public void NarrowedHostKeyNames_AreTheNamesCurlSets(string keyType, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("known host key type", keyType);
+
+        string actual = SshAlgorithmPreferences.NarrowedHostKeyNames(keyType);
+
+        diagnostics.Act("narrowed names", actual);
+        diagnostics.Diff("narrowed names", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 }
