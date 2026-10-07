@@ -1,5 +1,5 @@
 ---
-id: BL-1610
+id: BL-1621
 title: Make Curl.Protocol.Http.UnitTests' AltSvcApplicationProtocolsTests to HttpAuthUsingLinesTests tests write descriptive diagnostic output
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1610 — Make Curl.Protocol.Http.UnitTests' AltSvcApplicationProtocolsTests to HttpAuthUsingLinesTests tests write descriptive diagnostic output
+# BL-1621 — Make Curl.Protocol.Http.UnitTests' AltSvcApplicationProtocolsTests to HttpAuthUsingLinesTests tests write descriptive diagnostic output
 
 ## Goal
 
