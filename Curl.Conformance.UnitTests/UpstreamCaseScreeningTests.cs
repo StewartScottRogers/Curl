@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Testing;
 
 namespace Curl.Conformance;
 
@@ -9,6 +10,8 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamCaseScreeningTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string RunnableClient = "<client>\n<server>\nhttp\nfile\nnone\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n";
 
     private static readonly HashSet<string> Features = ["http", "SSL"];
@@ -23,31 +26,48 @@ public sealed class UpstreamCaseScreeningTests
             + "<client>\n<features>\nhttp\n!Debug\n</features>\n</client>\n"
             + $"<verify>\n<file name=\"{Rooted("out")}\">\n</file>\n<strip>\n^Date:\n</strip>\n<strippart>\n# comment\ns/a/b/\n</strippart>\n<errorcode>\n 7 \n</errorcode>\n</verify>\n";
 
-        Assert.IsNull(Screen(sections));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", Neutral(sections));
+        string? reason = Screen(sections);
+        diagnostics.Act("skip reason", reason ?? "(none)");
+        diagnostics.Assert("skip reason", "(none)", reason ?? "(none)");
+        Assert.IsNull(reason);
     }
 
     [TestMethod]
     public void FindSkipReason_ConditionError_IsTheReason()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamTestFileExpansion expansion = new(ReadOnlyMemory<byte>.Empty, [], [], "stray %endif");
-
-        Assert.AreEqual("stray %endif", UpstreamCaseScreening.FindSkipReason(expansion, ParsedTestCase.From(RunnableClient), Features));
+        diagnostics.Arrange("expansion", """new(ReadOnlyMemory<byte>.Empty, [], [], "stray %endif")""");
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, ParsedTestCase.From(RunnableClient), Features);
+        diagnostics.Act("skip reason", reason);
+        diagnostics.Assert("skip reason", "stray %endif", reason);
+        Assert.AreEqual("stray %endif", reason);
     }
 
     [TestMethod]
     public void FindSkipReason_UnknownVariables_AreTheReason()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamTestFileExpansion expansion = new(ReadOnlyMemory<byte>.Empty, ["%FTPPORT", "%USER"], [], null);
-
-        Assert.AreEqual("the harness has no value for %FTPPORT, %USER", UpstreamCaseScreening.FindSkipReason(expansion, ParsedTestCase.From(RunnableClient), Features));
+        diagnostics.Arrange("expansion", """new(ReadOnlyMemory<byte>.Empty, ["%FTPPORT", "%USER"], [], null)""");
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, ParsedTestCase.From(RunnableClient), Features);
+        diagnostics.Act("skip reason", reason);
+        diagnostics.Assert("skip reason", "the harness has no value for %FTPPORT, %USER", reason);
+        Assert.AreEqual("the harness has no value for %FTPPORT, %USER", reason);
     }
 
     [TestMethod]
     public void FindSkipReason_UnsupportedInstructions_AreTheReason()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamTestFileExpansion expansion = new(ReadOnlyMemory<byte>.Empty, [], ["%include"], null);
-
-        Assert.AreEqual("the harness does not carry out %include", UpstreamCaseScreening.FindSkipReason(expansion, ParsedTestCase.From(RunnableClient), Features));
+        diagnostics.Arrange("expansion", """new(ReadOnlyMemory<byte>.Empty, [], ["%include"], null)""");
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, ParsedTestCase.From(RunnableClient), Features);
+        diagnostics.Act("skip reason", reason);
+        diagnostics.Assert("skip reason", "the harness does not carry out %include", reason);
+        Assert.AreEqual("the harness does not carry out %include", reason);
     }
 
     [TestMethod]
@@ -63,7 +83,12 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
     {
-        Assert.AreEqual(expected, Screen(RunnableClient + sections));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", sections);
+        string? reason = Screen(RunnableClient + sections);
+        diagnostics.Act("skip reason", reason);
+        diagnostics.Assert("skip reason", expected, reason);
+        Assert.AreEqual(expected, reason);
     }
 
     [TestMethod]
@@ -73,7 +98,12 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its |")]
     public void FindSkipReason_ClientTheHarnessCannotRun_IsTheReason(string sections, string expected)
     {
-        Assert.AreEqual(expected, Screen(sections));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", sections);
+        string? reason = Screen(sections);
+        diagnostics.Act("skip reason", reason);
+        diagnostics.Assert("skip reason", expected, reason);
+        Assert.AreEqual(expected, reason);
     }
 
     [TestMethod]
@@ -82,7 +112,13 @@ public sealed class UpstreamCaseScreeningTests
         string logDirectory = Rooted("log");
         string sections = $"<client>\n<file name=\"{logDirectory}/in\">\n</file>\n</client>\n<verify>\n<file1 name=\"{logDirectory}/sub/out\">\n</file1>\n</verify>\n";
 
-        Assert.IsNull(UpstreamCaseScreening.FindFileOutsideLogDirectory(ParsedTestCase.From(sections), logDirectory));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", Neutral(sections));
+        diagnostics.Arrange("log directory", Neutral(logDirectory));
+        string? reason = UpstreamCaseScreening.FindFileOutsideLogDirectory(ParsedTestCase.From(sections), logDirectory);
+        diagnostics.Act("outside-file reason", reason ?? "(none)");
+        diagnostics.Assert("outside-file reason", "(none)", reason ?? "(none)");
+        Assert.IsNull(reason);
     }
 
     [TestMethod]
@@ -91,15 +127,23 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<file name=\"{0}/logs/out\">\n</file>\n</verify>\n", "<verify><file> names {0}/logs/out, outside the case's log directory")]
     public void FindFileOutsideLogDirectory_FileOutside_IsTheReason(string sections, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string parent = Rooted("parent");
 
+        diagnostics.Arrange("sections template", sections);
         string? reason = UpstreamCaseScreening.FindFileOutsideLogDirectory(ParsedTestCase.From(string.Format(CultureInfo.InvariantCulture, sections, parent)), parent + "/log");
 
-        Assert.AreEqual(string.Format(CultureInfo.InvariantCulture, expected, parent), reason);
+        string expectedReason = string.Format(CultureInfo.InvariantCulture, expected, parent);
+        diagnostics.Act("outside-file reason", reason);
+        diagnostics.Assert("outside-file reason", Neutral(expectedReason), Neutral(reason));
+        Assert.AreEqual(expectedReason, reason);
     }
 
     private static string? Screen(string sections) =>
         UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features);
+
+    private static string Neutral(string? text) =>
+        (text ?? "(none)").Replace(Path.GetTempPath().Replace('\\', '/'), "<temp>/");
 
     private static string Rooted(string name) =>
         Path.Combine(Path.GetTempPath(), name).Replace('\\', '/');

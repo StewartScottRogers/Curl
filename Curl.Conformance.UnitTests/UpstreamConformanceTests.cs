@@ -1,5 +1,6 @@
 using System.Globalization;
 using Curl.Console;
+using Curl.Testing;
 
 namespace Curl.Conformance;
 
@@ -12,6 +13,8 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamConformanceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     // Every case passes in well under a second; the headroom is for a cold, busy CI runner
     // compiling curl's code paths for the first time while other test assemblies run (BL-1056).
     private static readonly TimeSpan TimeLimit = TimeSpan.FromSeconds(20);
@@ -44,13 +47,20 @@ public sealed class UpstreamConformanceTests
     [DynamicData(nameof(UpstreamCases))]
     public async Task UpstreamCase_RunThroughCurl_HoldsTheRatchet(int testNumber)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        bool isListed = PassingCases.Contains(testNumber);
+        diagnostics.Arrange("upstream case number", testNumber);
+        diagnostics.Arrange("case is on the passing list", isListed);
         byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         UpstreamCaseOutcome outcome;
         try
         {
             UpstreamCaseRunner runner = new(RunCurlAsync, OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeLimit);
-            outcome = await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName)).WaitAsync(CaseHangLimit);
+            using (diagnostics.Phase("run case through curl"))
+            {
+                outcome = await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName)).WaitAsync(CaseHangLimit);
+            }
         }
         catch (TimeoutException)
         {
@@ -64,7 +74,10 @@ public sealed class UpstreamConformanceTests
             DeleteLogDirectory(logDirectory);
         }
 
-        UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(testNumber, outcome, PassingCases.Contains(testNumber));
+        UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(testNumber, outcome, isListed);
+        diagnostics.Act("verdict kind", verdict.Kind);
+        diagnostics.Act("verdict message", verdict.Message);
+        diagnostics.Assert("verdict kind is not Fail", true, verdict.Kind != UpstreamCaseVerdictKind.Fail);
         switch (verdict.Kind)
         {
             case UpstreamCaseVerdictKind.Fail:

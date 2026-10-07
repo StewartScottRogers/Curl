@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Conformance;
 
 /// <summary>
@@ -14,21 +16,33 @@ public sealed class UpstreamTestDataTests
 
     private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void UpstreamTestData_CopiedBesideTheTests_HoldsEveryTestFileFromTheTag()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("pattern", "UpstreamTestData/test*.rawhttp");
+        diagnostics.Arrange("expected file count", VendoredTestFileCount);
+
         string[] testFiles = Directory.GetFiles(UpstreamTestDataFolder, "test*.rawhttp");
 
+        diagnostics.Act("file count", testFiles.Length);
+        diagnostics.Assert("file count", VendoredTestFileCount, testFiles.Length);
         Assert.HasCount(VendoredTestFileCount, testFiles);
     }
 
     [TestMethod]
     public void UpstreamTestData_CopiedBesideTheTests_CarriesCurlsCopyingNotice()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string copyingPath = Path.Combine(UpstreamTestDataFolder, "COPYING");
+        diagnostics.Arrange("file", "UpstreamTestData/COPYING");
 
         string copying = File.ReadAllText(copyingPath);
 
+        diagnostics.Act("length in characters", copying.Length);
+        diagnostics.Assert("mentions Daniel Stenberg", true, copying.Contains("Daniel Stenberg", StringComparison.Ordinal));
         Assert.Contains("Daniel Stenberg", copying);
     }
 }

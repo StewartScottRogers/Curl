@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Conformance;
 
 /// <summary>Pins the features and null device <see cref="UpstreamCurlPlatform"/> reports per platform.</summary>
@@ -15,21 +17,39 @@ public sealed class UpstreamCurlPlatformTests
         "large_file", "local-http",
     ];
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Windows_ReportsTheSchannelBuildAndWin32()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("platform", "Windows");
+
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Windows;
 
-        Assert.IsTrue(platform.Features.SetEquals([.. CommonFeatures, "win32", "Schannel"]));
+        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "win32", "Schannel"]);
+        diagnostics.Act("feature count", platform.Features.Count);
+        diagnostics.Act("null device", platform.NullDevice);
+        diagnostics.Assert("features equal common + win32 + Schannel", true, featuresMatch);
+        diagnostics.Assert("null device", "NUL", platform.NullDevice);
+        Assert.IsTrue(featuresMatch);
         Assert.AreEqual("NUL", platform.NullDevice);
     }
 
     [TestMethod]
     public void Unix_ReportsTheOpenSslBuildAndExtendedAttributes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("platform", "Unix");
+
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Unix;
 
-        Assert.IsTrue(platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr"]));
+        bool featuresMatch = platform.Features.SetEquals([.. CommonFeatures, "OpenSSL", "xattr"]);
+        diagnostics.Act("feature count", platform.Features.Count);
+        diagnostics.Act("null device", platform.NullDevice);
+        diagnostics.Assert("features equal common + OpenSSL + xattr", true, featuresMatch);
+        diagnostics.Assert("null device", "/dev/null", platform.NullDevice);
+        Assert.IsTrue(featuresMatch);
         Assert.AreEqual("/dev/null", platform.NullDevice);
     }
 
@@ -43,6 +63,16 @@ public sealed class UpstreamCurlPlatformTests
     [DataRow("codeset-utf8")]
     public void BothPlatforms_LeaveOffWhatCurlLacks(string feature)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("feature", feature);
+
+        bool onWindows = UpstreamCurlPlatform.Windows.Features.Contains(feature);
+        bool onUnix = UpstreamCurlPlatform.Unix.Features.Contains(feature);
+
+        diagnostics.Act("listed on Windows", onWindows);
+        diagnostics.Act("listed on Unix", onUnix);
+        diagnostics.Assert("listed on Windows", false, onWindows);
+        diagnostics.Assert("listed on Unix", false, onUnix);
         Assert.IsFalse(UpstreamCurlPlatform.Windows.Features.Contains(feature));
         Assert.IsFalse(UpstreamCurlPlatform.Unix.Features.Contains(feature));
     }

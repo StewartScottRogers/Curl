@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Conformance;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamPerlSubstitutionTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("", true)]
     [DataRow("   ", true)]
@@ -14,7 +18,14 @@ public sealed class UpstreamPerlSubstitutionTests
     [DataRow("s/a/b/", false)]
     public void DoesNothing_IsTrueForBlankAndCommentLines(string line, bool expected)
     {
-        Assert.AreEqual(expected, UpstreamPerlSubstitution.DoesNothing(line));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("line", line);
+
+        bool actual = UpstreamPerlSubstitution.DoesNothing(line);
+
+        diagnostics.Act("does nothing", actual);
+        diagnostics.Assert("does nothing", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -30,10 +41,19 @@ public sealed class UpstreamPerlSubstitutionTests
     [DataRow("s/a b/X/x", "ab", "X")]
     public void Parse_RunsTheSubstitutionAsPerlDoes(string code, string line, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("code", code);
+        diagnostics.Arrange("line", line);
+
         UpstreamPerlSubstitution? substitution = UpstreamPerlSubstitution.Parse(code);
 
+        diagnostics.Act("parsed", substitution is not null);
+        diagnostics.Assert("parsed", true, substitution is not null);
         Assert.IsNotNull(substitution);
-        Assert.AreEqual(expected, substitution.Apply(line));
+        string actual = substitution.Apply(line);
+        diagnostics.Act("applied", actual);
+        diagnostics.Diff("applied", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -48,6 +68,13 @@ public sealed class UpstreamPerlSubstitutionTests
     [DataRow("s/a/b/\\")]
     public void Parse_ReturnsNullForOtherPerl(string code)
     {
-        Assert.IsNull(UpstreamPerlSubstitution.Parse(code));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("code", code);
+
+        UpstreamPerlSubstitution? substitution = UpstreamPerlSubstitution.Parse(code);
+
+        diagnostics.Act("parsed", substitution is not null);
+        diagnostics.Assert("parsed", false, substitution is not null);
+        Assert.IsNull(substitution);
     }
 }

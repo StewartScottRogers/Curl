@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Conformance;
 
@@ -10,6 +11,8 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamTestSectionLineEndingsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("a\nb\n", "a\nb")]
     [DataRow("a\r\n", "a\r")]
@@ -17,7 +20,10 @@ public sealed class UpstreamTestSectionLineEndingsTests
     [DataRow("", "")]
     public void CutFinalNewline_Body_DropsOneFinalLineFeedLikeChomp(string body, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input bytes (hex)", Hex(body));
         byte[] result = UpstreamTestSectionLineEndings.CutFinalNewline(Latin1(body));
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
 
         AssertBytes(expected, result);
     }
@@ -29,7 +35,10 @@ public sealed class UpstreamTestSectionLineEndingsTests
     [DataRow("", "")]
     public void ForceCrlf_Body_EndsEveryLineWithOneCrlf(string body, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input bytes (hex)", Hex(body));
         byte[] result = UpstreamTestSectionLineEndings.ForceCrlf(Latin1(body));
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
 
         AssertBytes(expected, result);
     }
@@ -37,15 +46,23 @@ public sealed class UpstreamTestSectionLineEndingsTests
     [TestMethod]
     public void ForceCrlf_BodyWithHighBytes_KeepsEveryByte()
     {
-        byte[] result = UpstreamTestSectionLineEndings.ForceCrlf([0xE9, 0xFF, 0x0A]);
-
-        CollectionAssert.AreEqual(new byte[] { 0xE9, 0xFF, 0x0D, 0x0A }, result);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] input = [0xE9, 0xFF, 0x0A];
+        byte[] expected = [0xE9, 0xFF, 0x0D, 0x0A];
+        diagnostics.Arrange("input bytes (hex)", Convert.ToHexString(input));
+        byte[] result = UpstreamTestSectionLineEndings.ForceCrlf(input);
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
+        diagnostics.Diff("result", expected, result);
+        CollectionAssert.AreEqual(expected, result);
     }
 
     [TestMethod]
     public void ForceHeaderCrlf_HttpResponse_EndsHeadersAndTheBlankLineAfterThemWithCrlf()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input bytes (hex)", Hex("HTTP/1.1 200 OK\nContent-Length: 4\n\nbody\n\n"));
         byte[] result = UpstreamTestSectionLineEndings.ForceHeaderCrlf(Latin1("HTTP/1.1 200 OK\nContent-Length: 4\n\nbody\n\n"));
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
 
         AssertBytes("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nbody\n\n", result);
     }
@@ -53,7 +70,10 @@ public sealed class UpstreamTestSectionLineEndingsTests
     [TestMethod]
     public void ForceHeaderCrlf_FinalHeaderWithoutLineFeed_IsUnchanged()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input bytes (hex)", Hex("A: b"));
         byte[] result = UpstreamTestSectionLineEndings.ForceHeaderCrlf(Latin1("A: b"));
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
 
         AssertBytes("A: b", result);
     }
@@ -61,7 +81,10 @@ public sealed class UpstreamTestSectionLineEndingsTests
     [TestMethod]
     public void ForceHeaderCrlf_BlankCrlfLineAfterHeader_IsUnchanged()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input bytes (hex)", Hex("A: b\n\r\n"));
         byte[] result = UpstreamTestSectionLineEndings.ForceHeaderCrlf(Latin1("A: b\n\r\n"));
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
 
         AssertBytes("A: b\r\n\r\n", result);
     }
@@ -103,7 +126,10 @@ public sealed class UpstreamTestSectionLineEndingsTests
     [DataRow("plain text\n", false)]
     public void ForceHeaderCrlf_OneLine_EndsItWithCrlfOnlyWhenUpstreamGuessesAHeader(string line, bool isHeader)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input bytes (hex)", Hex(line));
         byte[] result = UpstreamTestSectionLineEndings.ForceHeaderCrlf(Latin1(line));
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
 
         string expected = isHeader ? line.TrimEnd('\n').TrimEnd('\r') + "\r\n" : line;
         AssertBytes(expected, result);
@@ -112,13 +138,22 @@ public sealed class UpstreamTestSectionLineEndingsTests
     [TestMethod]
     public void NormalizeText_MixedLineEndings_MakesEveryLineFeedCrlf()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input bytes (hex)", Hex("a\r\nb\nc"));
         byte[] result = UpstreamTestSectionLineEndings.NormalizeText(Latin1("a\r\nb\nc"));
+        diagnostics.Act("result bytes (hex)", Convert.ToHexString(result));
 
         AssertBytes("a\r\nb\r\nc", result);
     }
 
     private static byte[] Latin1(string text) => Encoding.Latin1.GetBytes(text);
 
-    private static void AssertBytes(string expected, byte[] actual) =>
-        CollectionAssert.AreEqual(Encoding.Latin1.GetBytes(expected), actual);
+    private static string Hex(string text) => Convert.ToHexString(Latin1(text));
+
+    private void AssertBytes(string expected, byte[] actual)
+    {
+        byte[] expectedBytes = Latin1(expected);
+        TestDiagnostics.For(TestContext).Diff("result", expectedBytes, actual);
+        CollectionAssert.AreEqual(expectedBytes, actual);
+    }
 }

@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1460 — Make every test in Curl.Conformance.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,21 @@ Every test in `Curl.Conformance.UnitTests` writes, through BL-1457's shared `Tes
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Conformance.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Conformance.UnitTests -warnaserror` is clean and `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Conformance.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Conformance.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Conformance.UnitTests -warnaserror` is clean and `dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Conformance.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 238 test methods in 20 files.
+- Done by four parallel editors, one per group of files, each test writing ARRANGE (upstream case number, command line, case data), ACT (outcome, stdout, exception) and ASSERT or DIFF lines before its unchanged asserts. Shared helpers (`Expand`, `ParseSuccessfully`, `AssertBytes`, `Verify`, `RunAsync`, `Observe`) became instance methods that write the lines for the tests using them. The five parser failure tests now parse through a logging `ParseFile` helper with the same input text.
+- Counts before -> after (Select-String -AllMatches, excluding obj and bin): `Assert.` 390 -> 390, `[TestMethod` 239 -> 239, `[DataRow(` 304 -> 304. Total tests 2502 -> 2502 (1048 passed, 1454 skipped, as before). 2502 `END` lines; none with a zero count.
+- SLOW: only `UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet (test3035)`, 4026 ms, `PHASE run case through curl: 4025 ms`. Case 3035 runs `--retry 4 --retry-delay 1` on the real clock, so its four one-second retry waits are what the case specifies (already known from BL-1359), not a performance problem in Curl. No follow-up filed.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Conformance.UnitTests test writes ARRANGE, ACT and ASSERT or DIFF diagnostics; 2502 tests pass

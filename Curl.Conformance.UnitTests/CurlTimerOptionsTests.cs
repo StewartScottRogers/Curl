@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Conformance;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class CurlTimerOptionsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("--max-time")]
     [DataRow("--connect-timeout")]
@@ -20,7 +24,14 @@ public sealed class CurlTimerOptionsTests
     [DataRow("-m2")]
     public void AnyIn_ATimerOption_IsTrue(string option)
     {
-        Assert.IsTrue(CurlTimerOptions.AnyIn(["http://127.0.0.1/1", option, "2"]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("option", option);
+
+        bool actual = CurlTimerOptions.AnyIn(["http://127.0.0.1/1", option, "2"]);
+
+        diagnostics.Act("any timer option", actual);
+        diagnostics.Assert("any timer option", true, actual);
+        Assert.IsTrue(actual);
     }
 
     [TestMethod]
@@ -32,18 +43,38 @@ public sealed class CurlTimerOptionsTests
     [DataRow("http://127.0.0.1/my")]
     public void AnyIn_NoTimerOption_IsFalse(string argument)
     {
-        Assert.IsFalse(CurlTimerOptions.AnyIn(["--include", argument]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("argument", argument);
+
+        bool actual = CurlTimerOptions.AnyIn(["--include", argument]);
+
+        diagnostics.Act("any timer option", actual);
+        diagnostics.Assert("any timer option", false, actual);
+        Assert.IsFalse(actual);
     }
 
     [TestMethod]
     public void AnyIn_NoArguments_IsFalse()
     {
-        Assert.IsFalse(CurlTimerOptions.AnyIn([]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("arguments", "(none)");
+
+        bool actual = CurlTimerOptions.AnyIn([]);
+
+        diagnostics.Act("any timer option", actual);
+        diagnostics.Assert("any timer option", false, actual);
+        Assert.IsFalse(actual);
     }
 
     [TestMethod]
     public void AnyIn_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CurlTimerOptions.AnyIn(null!));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("arguments", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => CurlTimerOptions.AnyIn(null!));
+
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 }
