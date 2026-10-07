@@ -21,10 +21,12 @@ public sealed partial class SslStreamTlsProviderTests
     {
         using var certificate = CreateIpAddressOnlyCertificate();
         var caFile = WriteCaFile("ip-only.pem", certificate.ExportCertificatePem());
+        Diagnostics.Arrange("TLS settings", "CA file holding the server certificate, Schannel build");
 
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), SchannelBuild), certificate);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -34,10 +36,13 @@ public sealed partial class SslStreamTlsProviderTests
     {
         using var certificate = CreateIpAddressOnlyCertificate();
         var caFile = WriteCaFile("ip-only.pem", certificate.ExportCertificatePem());
+        Diagnostics.Arrange("TLS settings", "CA file holding the server certificate, Schannel build");
 
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), SchannelBuild), certificate, "wrong.example");
 
+        Diagnostics.Act("plaintext disposed", result.PlaintextDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "schannel: CertGetNameString() failed to match connection hostname (wrong.example) against server certificate names",
@@ -53,9 +58,12 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: "ip-only.pem"), SchannelBuild);
         using var certificate = CreateIpAddressOnlyCertificate();
         using var chain = BuildSelfTrustedChain(certificate);
+        ArrangeVerifyPeer(SslPolicyErrors.RemoteCertificateNameMismatch, "CA file set, Schannel build", certificate);
 
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateNameMismatch, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("failure", null, failure);
         Assert.IsNull(failure);
     }
 
@@ -65,9 +73,12 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), SchannelBuild);
         using var certificate = CreateIpAddressOnlyCertificate();
         using var chain = BuildSelfTrustedChain(certificate);
+        ArrangeVerifyPeer(SslPolicyErrors.RemoteCertificateNameMismatch, "no CA file, Schannel build", certificate);
 
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateNameMismatch, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(
             "schannel: SNI or certificate check failed: SEC_E_WRONG_PRINCIPAL (0x80090322) - The target principal name is incorrect.",
@@ -80,9 +91,13 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: "ip-only.pem"), OpenSslBuild);
         using var certificate = CreateIpAddressOnlyCertificate();
         using var chain = BuildSelfTrustedChain(certificate);
+        ArrangeVerifyPeer(SslPolicyErrors.RemoteCertificateNameMismatch, "CA file set, OpenSSL build", certificate);
 
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateNameMismatch, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert(
+            "message", "SSL: no alternative certificate subject name matches target hostname 'localhost'", failure?.Message);
         Assert.AreEqual(
             "SSL: no alternative certificate subject name matches target hostname 'localhost'",
             failure?.Message);
@@ -95,10 +110,13 @@ public sealed partial class SslStreamTlsProviderTests
     {
         using var certificate = CreateIpAddressOnlyCertificate();
         var caFile = WriteCaFile("ip-only.pem", certificate.ExportCertificatePem());
+        Diagnostics.Arrange("TLS settings", "CA file holding the server certificate, OpenSSL build");
 
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), OpenSslBuild), certificate);
 
+        Diagnostics.Act("plaintext disposed", result.PlaintextDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(
             "SSL: no alternative certificate subject name matches target hostname 'localhost'",
@@ -112,9 +130,12 @@ public sealed partial class SslStreamTlsProviderTests
         var provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: "ip-only.pem"), OpenSslBuild);
         using var certificate = CreateIpAddressOnlyCertificate();
         using var chain = BuildSelfTrustedChain(certificate);
+        ArrangeVerifyPeer(SslPolicyErrors.None, "CA file set, OpenSSL build", certificate);
 
         var failure = provider.VerifyPeer(SslPolicyErrors.None, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
         Assert.AreEqual(
             "SSL: no alternative certificate subject name matches target hostname 'localhost'",
@@ -126,10 +147,22 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(), OpenSslBuild);
         using var chain = new X509Chain();
+        Diagnostics.Arrange("policy errors", SslPolicyErrors.None);
+        Diagnostics.Arrange("TLS settings", "no CA file, OpenSSL build");
+        Diagnostics.Arrange("chain", "unbuilt");
 
         var failure = provider.VerifyPeer(SslPolicyErrors.None, chain, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("failure", null, failure);
         Assert.IsNull(failure);
+    }
+
+    private void ArrangeVerifyPeer(SslPolicyErrors errors, string settings, X509Certificate2 certificate)
+    {
+        Diagnostics.Arrange("policy errors", errors);
+        Diagnostics.Arrange("TLS settings", settings);
+        Diagnostics.Arrange("chain", $"self-trusted {certificate.Subject} {certificate.Thumbprint}");
     }
 
     private static X509Chain BuildSelfTrustedChain(X509Certificate2 certificate)

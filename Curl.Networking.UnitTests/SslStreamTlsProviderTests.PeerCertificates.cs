@@ -19,11 +19,21 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.None);
-        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true));
+        var options = new TlsClientOptions(Insecure: true);
+        var provider = new SslStreamTlsProvider(options);
+        ArrangeOptions(options);
+        ArrangeCertificate("server certificate", s_serverCertificate);
 
-        var result = await provider.AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
 
+        ActResult(result);
+        Diagnostics.Act("peer certificate count", result.PeerCertificates.Count);
+        Diagnostics.Assert("peer certificate count", 1, result.PeerCertificates.Count);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.HasCount(1, result.PeerCertificates);
         CollectionAssert.AreEqual(s_serverCertificate.RawData, result.PeerCertificates[0].ToArray());
@@ -34,14 +44,26 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public void ListPeerCertificates_WithNoCertificate_ReturnsNone()
     {
-        Assert.IsEmpty(SslStreamTlsProvider.ListPeerCertificates(null, null));
+        Diagnostics.Arrange("server certificate", "none");
+        Diagnostics.Arrange("chain", "none");
+
+        var listed = SslStreamTlsProvider.ListPeerCertificates(null, null);
+
+        Diagnostics.Act("listed count", listed.Length);
+        Diagnostics.Assert("listed count", 0, listed.Length);
+        Assert.IsEmpty(listed);
     }
 
     [TestMethod]
     public void ListPeerCertificates_WithNoChain_ReturnsTheServersCertificateAlone()
     {
+        ArrangeCertificate("server certificate", s_serverCertificate);
+        Diagnostics.Arrange("chain", "none");
+
         var listed = SslStreamTlsProvider.ListPeerCertificates(s_serverCertificate, null);
 
+        Diagnostics.Act("listed count", listed.Length);
+        Diagnostics.Assert("listed count", 1, listed.Length);
         Assert.HasCount(1, listed);
         CollectionAssert.AreEqual(s_serverCertificate.RawData, listed[0].ToArray());
     }
@@ -53,13 +75,21 @@ public sealed partial class SslStreamTlsProviderTests
         using var chain = new X509Chain();
         chain.ChainPolicy.ExtraStore.Add(other);
         chain.ChainPolicy.ExtraStore.Add(s_serverCertificate);
+        ArrangeCertificate("server certificate", s_serverCertificate);
+        ArrangeCertificate("extra store", other);
+        Diagnostics.Arrange("extra store", "and the server certificate, unbuilt chain");
 
         var listed = SslStreamTlsProvider.ListPeerCertificates(s_serverCertificate, chain);
 
+        Diagnostics.Act("listed count", listed.Length);
+        Diagnostics.Assert("listed count", 2, listed.Length);
         Assert.HasCount(2, listed);
         CollectionAssert.AreEqual(s_serverCertificate.RawData, listed[0].ToArray());
         CollectionAssert.AreEqual(other.RawData, listed[1].ToArray());
     }
+
+    private void ArrangeCertificate(string label, X509Certificate2 certificate) =>
+        Diagnostics.Arrange(label, $"{certificate.Subject} {certificate.Thumbprint}");
 
     private static X509Certificate2 CreateAuthority(string subject, ECDsa key, X509Certificate2? issuer, ECDsa? issuerKey)
     {

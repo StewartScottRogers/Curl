@@ -24,8 +24,9 @@ public sealed partial class SslStreamTlsProviderTests
         TlsVersion minimum, TlsVersion maximum, SslProtocols expected)
     {
         SslClientAuthenticationOptions? handshakeOptions = null;
-        var provider = new SslStreamTlsProvider(
-            new TlsClientOptions(Insecure: true, MinimumVersion: minimum, MaximumVersion: maximum), SchannelBuild)
+        var options = new TlsClientOptions(Insecure: true, MinimumVersion: minimum, MaximumVersion: maximum);
+        ArrangeOptions(options);
+        var provider = new SslStreamTlsProvider(options, SchannelBuild)
         {
             AuthenticateSslStreamAsClientAsync = (_, authenticationOptions, _) =>
             {
@@ -37,6 +38,8 @@ public sealed partial class SslStreamTlsProviderTests
 
         await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
 
+        Diagnostics.Act("offered versions", handshakeOptions?.EnabledSslProtocols);
+        Diagnostics.Assert("offered versions", expected, handshakeOptions?.EnabledSslProtocols);
         Assert.AreEqual(expected, handshakeOptions!.EnabledSslProtocols);
     }
 
@@ -44,8 +47,12 @@ public sealed partial class SslStreamTlsProviderTests
     public void Constructor_MinimumAboveTheCeiling_ThrowsArgumentException()
     {
         var options = new TlsClientOptions(MinimumVersion: TlsVersion.Tls13, MaximumVersion: TlsVersion.Tls12);
+        ArrangeOptions(options);
 
-        Assert.ThrowsExactly<ArgumentException>(() => new SslStreamTlsProvider(options, SchannelBuild));
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => new SslStreamTlsProvider(options, SchannelBuild));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -66,6 +73,7 @@ public sealed partial class SslStreamTlsProviderTests
             SslProtocols.Tls12,
             SchannelBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual("schannel: failed to receive handshake, SSL/TLS connection failed", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -89,6 +97,7 @@ public sealed partial class SslStreamTlsProviderTests
             SslProtocols.Tls12,
             OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual("TLS connect error: error:0A0000BF:SSL routines::no protocols available", result.Result.ErrorMessage);
     }
@@ -102,6 +111,7 @@ public sealed partial class SslStreamTlsProviderTests
             CertificateHost,
             SslProtocols.Tls12);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode);
         await result.Result.Connection!.DisposeAsync();
     }

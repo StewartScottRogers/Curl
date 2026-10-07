@@ -22,6 +22,8 @@ public sealed partial class SslStreamTlsProviderTests
 
         var (messages, echoed) = await EchoOverAsync(matchesSchannelBuild: true, SslProtocols.Tls13);
 
+        Diagnostics.Assert("echoed", "hello", echoed);
+        Diagnostics.Assert("all received NewSessionTicket", true, messages.TrueForAll(message => !message.Sent && message.Bytes.Span[0] == 4));
         Assert.AreEqual("hello", echoed);
         Assert.IsTrue(messages.TrueForAll(message => !message.Sent && message.Bytes.Span[0] == 4));
     }
@@ -31,6 +33,8 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var (messages, echoed) = await EchoOverAsync(matchesSchannelBuild: true, SslProtocols.Tls12);
 
+        Diagnostics.Assert("echoed", "hello", echoed);
+        Diagnostics.Assert("TLS message count", 0, messages.Count);
         Assert.AreEqual("hello", echoed);
         Assert.AreEqual(0, messages.Count);
     }
@@ -42,6 +46,8 @@ public sealed partial class SslStreamTlsProviderTests
 
         var (messages, echoed) = await EchoOverAsync(matchesSchannelBuild: false, SslProtocols.Tls13);
 
+        Diagnostics.Assert("echoed", "hello", echoed);
+        Diagnostics.Assert("TLS message count", 0, messages.Count);
         Assert.AreEqual("hello", echoed);
         Assert.AreEqual(0, messages.Count);
     }
@@ -50,8 +56,15 @@ public sealed partial class SslStreamTlsProviderTests
     public void FollowTicketRecordsAfterHandshake_Tls12_DropsTheDetector()
     {
         var transport = new ConnectionStream(new StreamConnection(new MemoryStream(), ServerEndPoint)) { TicketRecords = new SessionTicketRecordDetector() };
+        Diagnostics.Arrange("negotiated protocol", SslProtocols.Tls12);
+        Diagnostics.Arrange("ticket detector", "set");
 
-        Assert.IsNull(SslStreamTlsProvider.FollowTicketRecordsAfterHandshake(transport, SslProtocols.Tls12));
+        var followed = SslStreamTlsProvider.FollowTicketRecordsAfterHandshake(transport, SslProtocols.Tls12);
+
+        Diagnostics.Act("detector returned", followed is not null);
+        Diagnostics.Act("detector kept on transport", transport.TicketRecords is not null);
+        Diagnostics.Assert("detector kept on transport", false, transport.TicketRecords is not null);
+        Assert.IsNull(followed);
         Assert.IsNull(transport.TicketRecords);
     }
 
@@ -60,18 +73,39 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var detector = new SessionTicketRecordDetector();
         var transport = new ConnectionStream(new StreamConnection(new MemoryStream(), ServerEndPoint)) { TicketRecords = detector };
+        Diagnostics.Arrange("negotiated protocol", SslProtocols.Tls13);
+        Diagnostics.Arrange("ticket detector", "set");
 
-        Assert.AreSame(detector, SslStreamTlsProvider.FollowTicketRecordsAfterHandshake(transport, SslProtocols.Tls13));
+        var followed = SslStreamTlsProvider.FollowTicketRecordsAfterHandshake(transport, SslProtocols.Tls13);
+
+        Diagnostics.Act("same detector returned", ReferenceEquals(detector, followed));
+        Diagnostics.Assert("same detector returned", true, ReferenceEquals(detector, followed));
+        Assert.AreSame(detector, followed);
     }
 
-    private static async Task<(List<TlsMessageEvent> Messages, string Echoed)> EchoOverAsync(bool matchesSchannelBuild, SslProtocols serverProtocols)
+    /// <summary>
+    /// Writes the TLS settings, build and server protocols as ARRANGE, runs the handshake inside
+    /// a <c>handshake</c> PHASE, echoes <c>hello</c>, and writes the echo and the TLS messages
+    /// reported as ACT.
+    /// </summary>
+    private async Task<(List<TlsMessageEvent> Messages, string Echoed)> EchoOverAsync(bool matchesSchannelBuild, SslProtocols serverProtocols)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, serverProtocols);
         var events = new RecordingTransferEvents();
-        var provider = new SslStreamTlsProvider(new TlsClientOptions(Insecure: true, MinimumVersion: serverProtocols == SslProtocols.Tls13 ? TlsVersion.Tls13 : TlsVersion.Tls12), matchesSchannelBuild);
+        var options = new TlsClientOptions(Insecure: true, MinimumVersion: serverProtocols == SslProtocols.Tls13 ? TlsVersion.Tls13 : TlsVersion.Tls12);
+        var provider = new SslStreamTlsProvider(options, matchesSchannelBuild);
+        ArrangeOptions(options);
+        Diagnostics.Arrange("build", BuildName(matchesSchannelBuild));
+        Diagnostics.Arrange("server protocols", serverProtocols);
 
-        var result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+        }
+
+        ActResult(result);
         Assert.IsNotNull(result.Connection, result.ErrorMessage);
         await using var connection = result.Connection;
         await connection.WriteAsync("hello"u8.ToArray(), CancellationToken.None);
@@ -79,6 +113,10 @@ public sealed partial class SslStreamTlsProviderTests
 
         await connection.DisposeAsync();
         await IgnoreFailureAsync(serverTask);
+        Diagnostics.Act("echoed", echoed);
+        Diagnostics.Act(
+            "TLS messages",
+            string.Join(", ", events.TlsMessages.Select(message => $"{(message.Sent ? "sent" : "received")} type {message.Bytes.Span[0]}")));
         return (events.TlsMessages, echoed);
     }
 }
