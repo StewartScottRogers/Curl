@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 
 namespace Curl.Networking;
 
@@ -73,5 +74,60 @@ public sealed class StreamConnectionTests
         await connection.DisposeAsync();
 
         Assert.IsFalse(stream.CanRead);
+    }
+
+    // BL-1450: Windows answers a receive issued a few milliseconds after a peer's RST with
+    // WSAECONNABORTED; curl's recv sees WSAECONNRESET, so the read reports the reset.
+    [TestMethod]
+    public async Task ReadAsync_WhenTheReadIsAbortedAndAbortsAreReportedAsResets_FailsWithConnectionReset()
+    {
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadFailingStream(aborted), null) { ReportsAbortedReadAsReset = true };
+
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Assert.AreEqual(SocketError.ConnectionReset, ((SocketException)failure.InnerException!).SocketErrorCode);
+        Assert.AreEqual("Unable to read data.", failure.Message);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WhenTheReadIsAbortedAndAbortsAreNotReportedAsResets_FailsWithTheAbort()
+    {
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        await using var connection = new StreamConnection(new ReadFailingStream(aborted), null) { ReportsAbortedReadAsReset = false };
+
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Assert.AreSame(aborted, failure);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WhenTheFirstReceiveIsReset_FailsWithConnectionReset()
+    {
+        var reset = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionReset));
+        await using var connection = new StreamConnection(new ReadFailingStream(reset), null) { ReportsAbortedReadAsReset = true };
+
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Assert.AreSame(reset, failure);
+        Assert.AreEqual(SocketError.ConnectionReset, ((SocketException)failure.InnerException!).SocketErrorCode);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_WhenTheFailureIsNoSocketError_FailsWithItUnchanged()
+    {
+        var other = new IOException("Disk gone.");
+        await using var connection = new StreamConnection(new ReadFailingStream(other), null) { ReportsAbortedReadAsReset = true };
+
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+
+        Assert.AreSame(other, failure);
+    }
+
+    /// <summary>A stream whose every read fails with the given exception.</summary>
+    private sealed class ReadFailingStream(IOException failure) : MemoryStream
+    {
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            ValueTask.FromException<int>(failure);
     }
 }

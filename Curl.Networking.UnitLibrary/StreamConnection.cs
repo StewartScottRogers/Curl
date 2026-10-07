@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 
 using Curl.Protocol.Abstractions;
 
@@ -31,9 +32,34 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// <inheritdoc />
     public EndPoint? LocalEndPoint { get; } = localEndPoint;
 
+    /// <summary>
+    /// Gets whether a read failing with <see cref="SocketError.ConnectionAborted" /> is reported as
+    /// <see cref="SocketError.ConnectionReset" />: <see langword="true" /> on Windows, set by tests on any
+    /// platform (ADR-0419, BL-1450).
+    /// </summary>
+    /// <remarks>
+    /// Windows answers a receive issued more than a few milliseconds after a peer's RST with
+    /// WSAECONNABORTED, and one issued sooner, or already waiting, with WSAECONNRESET (measured,
+    /// BL-1450). curl's <c>recv</c> runs inside that window and reports the reset; Curl's first read
+    /// after a request comes later, so it reports the RST as the reset it was.
+    /// </remarks>
+    internal bool ReportsAbortedReadAsReset { get; init; } = OperatingSystem.IsWindows();
+
     /// <inheritdoc />
-    public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
-        _stream.ReadAsync(buffer, cancellationToken);
+    public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException failure) when (ReportsAbortedReadAsReset && IsConnectionAborted(failure))
+        {
+            throw new IOException(failure.Message, new SocketException((int)SocketError.ConnectionReset));
+        }
+    }
+
+    private static bool IsConnectionAborted(IOException failure) =>
+        failure.InnerException is SocketException { SocketErrorCode: SocketError.ConnectionAborted };
 
     /// <inheritdoc />
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
