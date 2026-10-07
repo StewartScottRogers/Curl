@@ -41,12 +41,19 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(connection);
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "417, then 200 ok");
 
             TransferResult result = await Handler(connector).ExecuteAsync(ExpectContext(BigBodyOptions(), output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("written length", ExpectingHead.Length + ResentHead.Length + BigBody.Length, connection.Written.Length);
             Assert.AreEqual(ExpectingHead + ResentHead + BigBody, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("header output", ExpectationFailedHead + OkHead, Latin1(headerOutput.ToArray()));
             Assert.AreEqual(ExpectationFailedHead + OkHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(200, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(1048909L, result.Report.RequestSize, $"Chunk size {chunkSize}");
@@ -70,13 +77,19 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, failedWithBody + "nope", OkHead + "ok");
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "417 with 4-byte body, then 200 ok");
 
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(ExpectContext(BigBodyOptions(), output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ExpectingHead + ResentHead + BigBody, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("header output", failedWithBody + OkHead, Latin1(headerOutput.ToArray()));
             Assert.AreEqual(failedWithBody + OkHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(92L, result.Report!.HeaderSize, $"Chunk size {chunkSize}");
         }
@@ -95,13 +108,19 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, ExpectationFailedHead, ExpectationFailedHead, OkHead + "ok");
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "417, 417, 200 ok");
 
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(ExpectContext(BigBodyOptions(), output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ExpectingHead + ResentHead + BigBody, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("header output", ExpectationFailedHead + ExpectationFailedHead, Latin1(headerOutput.ToArray()));
             Assert.AreEqual(ExpectationFailedHead + ExpectationFailedHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("output length", 0L, output.Length);
             Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
             Assert.AreEqual(417, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(1048909L, result.Report.RequestSize, $"Chunk size {chunkSize}");
@@ -123,11 +142,17 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, closingFailed, OkHead + "ok");
             QueueConnector connector = QueueConnector.For(connection);
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "417 with Connection: close, then 200 ok");
 
             TransferResult result = await Handler(connector).ExecuteAsync(ExpectContext(BigBodyOptions(), new MemoryStream(), headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("written length", ExpectingHead.Length, connection.Written.Length);
             Assert.AreEqual(ExpectingHead, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("header output", closingFailed, Latin1(headerOutput.ToArray()));
             Assert.AreEqual(closingFailed, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(417, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(177L, result.Report.RequestSize, $"Chunk size {chunkSize}");
@@ -152,11 +177,16 @@ public sealed partial class HttpProtocolHandlerTests
         {
             TurnTakingConnection connection = new(chunkSize, ExpectationFailedHead, ExpectationFailedHead);
             HttpRequestOptions options = BigBodyOptions() with { Fail = fail };
+            Diagnostics.Arrange("url, fail mode, chunk size", $"{ExpectUrl}, {fail}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "417, 417");
 
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(ExpectContext(options, new MemoryStream(), new MemoryStream()));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
             Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("error message", "The requested URL returned error: 417", result.ErrorMessage ?? "(none)");
             Assert.AreEqual("The requested URL returned error: 417", result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual(requestSize, result.Report!.RequestSize, $"Chunk size {chunkSize}");
         }
@@ -181,11 +211,17 @@ public sealed partial class HttpProtocolHandlerTests
                 Headers = ["Expect: 100-continue"],
                 Body = new BytesBody("hi"u8.ToArray(), "application/x-www-form-urlencoded"),
             };
+            Diagnostics.Arrange("url, header, chunk size", $"{ExpectUrl}, Expect: 100-continue, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "417, then 200 ok");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(ExpectContext(options, output, null));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("written length", 2 * head.Length + 2, connection.Written.Length);
             Assert.AreEqual(head + head + "hi", connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(344L, result.Report!.RequestSize, $"Chunk size {chunkSize}");
             Assert.AreEqual(2L, result.Report.UploadSize, $"Chunk size {chunkSize}");

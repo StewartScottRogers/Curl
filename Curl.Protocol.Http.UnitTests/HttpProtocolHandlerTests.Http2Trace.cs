@@ -22,8 +22,12 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateHeaders(1, headerBlock, isEndStream: false, isEndHeaders: true),
             Http2FrameFactory.CreateData(1, "hello"u8.ToArray(), isEndStream: true));
 
+        Diagnostics.Arrange("url, traces http2 frames", $"{LogUrl}, true");
+        Diagnostics.Arrange("response frames", $"HEADERS 200 length 5 ({headerBlock.Length} byte block), DATA hello (end stream)");
+
         List<string> lines = await Http2TraceLinesAsync(new HttpProtocolHandler(QueueConnector.For(new ScriptedConnection(response, 65536)), new SilentAuthenticator()) { TracesHttp2Frames = true });
 
+        WriteEvents("http2 lines", lines);
         string[] frameLines = [.. lines.Where(line => !line.Contains("] [:", StringComparison.Ordinal) && !line.Contains("[user-agent:", StringComparison.Ordinal) && !line.Contains("[accept:", StringComparison.Ordinal))];
         int sentHeaders = Array.FindIndex(frameLines, line => line.StartsWith("[HTTP/2] [1] -> FRAME[HEADERS, len=", StringComparison.Ordinal));
         string[] expected =
@@ -46,17 +50,28 @@ public sealed partial class HttpProtocolHandlerTests
             "[HTTP/2] [1] <- FRAME[DATA, len=5, eos=1, padlen=0]",
             "[HTTP/2] [1] CLOSED",
         ];
+        WriteExpectedLines("frame lines", expected, frameLines);
         CollectionAssert.AreEqual(expected, frameLines, string.Join('\n', frameLines));
+        Diagnostics.Assert("sent headers line ends with", true, frameLines[sentHeaders].EndsWith(", hend=1, eos=1]", StringComparison.Ordinal));
         StringAssert.EndsWith(frameLines[sentHeaders], ", hend=1, eos=1]");
+        Diagnostics.Assert("method line precedes sent headers", true, lines.IndexOf("[HTTP/2] [1] [:method: GET]") < lines.IndexOf(frameLines[sentHeaders]));
         Assert.IsTrue(lines.IndexOf("[HTTP/2] [1] [:method: GET]") < lines.IndexOf(frameLines[sentHeaders]));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Http2GetNotTracingFrames_WritesOnlyTheOpenedStreamLines()
     {
+        Diagnostics.Arrange("url, traces http2 frames", $"{LogUrl}, false");
+
         List<string> lines = await Http2TraceLinesAsync(Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536))));
 
+        WriteEvents("http2 lines", lines);
+        Diagnostics.Assert(
+            "every line is an opened or header line",
+            true,
+            lines.All(line => line.StartsWith("[HTTP/2] [1] OPENED", StringComparison.Ordinal) || line.StartsWith("[HTTP/2] [1] [", StringComparison.Ordinal)));
         Assert.IsTrue(lines.All(line => line.StartsWith("[HTTP/2] [1] OPENED", StringComparison.Ordinal) || line.StartsWith("[HTTP/2] [1] [", StringComparison.Ordinal)), string.Join('\n', lines));
+        Diagnostics.Assert("default traces http2 frames", false, new HttpProtocolHandler(QueueConnector.For(), new SilentAuthenticator()).TracesHttp2Frames);
         Assert.IsFalse(new HttpProtocolHandler(QueueConnector.For(), new SilentAuthenticator()).TracesHttp2Frames);
     }
 
@@ -72,10 +87,14 @@ public sealed partial class HttpProtocolHandlerTests
             .. Convert.FromHexString("000000040000000000" + "000000040100000000" + "000004010400000001885C0132" + "00000200010000000168 69".Replace(" ", string.Empty, StringComparison.Ordinal)),
         ];
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url, traces http2 frames", "http://127.0.0.1:48717/, true");
+        Diagnostics.Arrange("response", "101 then SETTINGS, SETTINGS ack, HEADERS 200 length 2, DATA hi (end stream)");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new ScriptedConnection(response, 65536)), new SilentAuthenticator()) { TracesHttp2Frames = true }
             .ExecuteAsync(UpgradeContext("http://127.0.0.1:48717/", new MemoryStream(), null, events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         string[] lines = [.. events.Events.SkipWhile(line => !line.StartsWith("* Received 101", StringComparison.Ordinal)).Where(line => !line.StartsWith("* Connection", StringComparison.Ordinal))];
         string[] expected =
@@ -103,6 +122,8 @@ public sealed partial class HttpProtocolHandlerTests
             "* [HTTP/2] [1] CLOSED",
             "{ hi",
         ];
+        WriteEvents("lines after 101", lines);
+        WriteExpectedLines("lines after 101", expected, lines);
         CollectionAssert.AreEqual(expected, lines, string.Join('\n', lines));
     }
 
@@ -120,16 +141,29 @@ public sealed partial class HttpProtocolHandlerTests
                 Http2FrameFactory.CreateData(3, "ok"u8.ToArray(), isEndStream: true)),
         ];
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url, traces http2 frames, authorization on retry", "http://127.0.0.1:48973/a, true, Basic YTpi");
+        Diagnostics.Arrange("response", "101 then HEADERS 401 www-authenticate, DATA no, HEADERS 200 length 2 on 3, DATA ok");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new ScriptedConnection(response, 65536)), new ScriptedAuthenticator(null, "Basic YTpi")) { TracesHttp2Frames = true }
             .ExecuteAsync(UpgradeContext("http://127.0.0.1:48973/a", new MemoryStream(), null, events));
 
+        WriteResult(result);
+        WriteEvents("info", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         int settings = events.Info.IndexOf("[HTTP/2] [0] -> FRAME[SETTINGS, len=6]");
+        int status401 = events.Info.IndexOf("[HTTP/2] [1] status: HTTP/2 401");
+        int stream3Headers = events.Info.FindIndex(line => line.StartsWith("[HTTP/2] [3] -> FRAME[HEADERS", StringComparison.Ordinal));
+        Diagnostics.Act("settings index, 401 status index, stream 3 headers index", $"{settings}, {status401}, {stream3Headers}");
+        Diagnostics.Assert("settings index is above", status401, settings);
         Assert.IsGreaterThan(events.Info.IndexOf("[HTTP/2] [1] status: HTTP/2 401"), settings, string.Join('\n', events.Info));
+        Diagnostics.Assert("settings index is below", stream3Headers, settings);
         Assert.IsLessThan(events.Info.FindIndex(line => line.StartsWith("[HTTP/2] [3] -> FRAME[HEADERS", StringComparison.Ordinal)), settings);
+        Diagnostics.Assert("contains 401 header", true, events.Info.Contains("[HTTP/2] [1] header: www-authenticate: Basic realm=\"x\""));
         CollectionAssert.Contains(events.Info, "[HTTP/2] [1] header: www-authenticate: Basic realm=\"x\"");
+        Diagnostics.Assert("contains 200 status", true, events.Info.Contains("[HTTP/2] [3] status: HTTP/2 200"));
         CollectionAssert.Contains(events.Info, "[HTTP/2] [3] status: HTTP/2 200");
+        Diagnostics.Assert("contains content-length header", true, events.Info.Contains("[HTTP/2] [3] header: content-length: 2"));
         CollectionAssert.Contains(events.Info, "[HTTP/2] [3] header: content-length: 2");
     }
 

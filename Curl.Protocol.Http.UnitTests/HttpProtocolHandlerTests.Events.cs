@@ -22,12 +22,33 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = Connection(
             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nhello\n", 65536, EventsGetHead);
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url, chunk size", "http://127.0.0.1:18441/f.txt, 65536");
+        Diagnostics.Arrange("request head", OneLine(EventsGetHead));
+        Diagnostics.Arrange("response", "HTTP/1.1 200 OK, Content-Type: text/plain, Content-Length: 6, body hello");
 
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
             .ExecuteAsync(EventsContext("http://127.0.0.1:18441/f.txt", events));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("request head length", 84, EventsGetHead.Length);
         Assert.AreEqual(84, EventsGetHead.Length);
+        WriteExpectedLines(
+            "events",
+            [
+                "* using HTTP/1.x",
+                "> " + EventsGetHead,
+                "* Request completely sent off",
+                "< HTTP/1.1 200 OK\r\n",
+                "< Content-Type: text/plain\r\n",
+                "< Content-Length: 6\r\n",
+                "< \r\n",
+                "{ hello\n",
+                "* Connection #0 to host 127.0.0.1:18441 left intact",
+            ],
+            events.Events);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -49,9 +70,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc", 1);
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url, chunk size", "http://127.0.0.1:18441/f.txt, 1");
+        Diagnostics.Arrange("response", "HTTP/1.1 200 OK, Content-Length: 3, body abc");
 
-        await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18441/f.txt", events));
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18441/f.txt", events));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        WriteExpectedLines("data events", ["{ a", "{ b", "{ c"], events.Events.Where(e => e.StartsWith('{')).ToArray());
         CollectionAssert.AreEqual(new[] { "{ a", "{ b", "{ c" }, events.Events.Where(e => e.StartsWith('{')).ToArray());
     }
 
@@ -66,10 +92,30 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
         HttpRequestOptions options = new() { Body = new BytesBody("hi"u8.ToArray(), "application/x-www-form-urlencoded") };
 
+        Diagnostics.Arrange("url, body", "http://127.0.0.1:18473/p, hi");
+        Diagnostics.Arrange("request head", OneLine(head));
+
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
             .ExecuteAsync(EventsContext("http://127.0.0.1:18473/p", events, options));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        WriteExpectedLines(
+            "events",
+            [
+                "* using HTTP/1.x",
+                "> " + head,
+                "} hi",
+                "* upload completely sent off: 2 bytes",
+                "< HTTP/1.1 200 OK\r\n",
+                "< Content-Length: 2\r\n",
+                "< \r\n",
+                "{ ok",
+                "* Connection #0 to host 127.0.0.1:18473 left intact",
+            ],
+            events.Events);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -97,10 +143,20 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
         HttpRequestOptions options = new() { Body = new BytesBody(ReadOnlyMemory<byte>.Empty, "application/x-www-form-urlencoded") };
 
+        Diagnostics.Arrange("url, body", "http://127.0.0.1:18216/p, (empty)");
+        Diagnostics.Arrange("request head", OneLine(head));
+
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
             .ExecuteAsync(EventsContext("http://127.0.0.1:18216/p", events, options));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        WriteExpectedLines(
+            "first 4 events",
+            ["* using HTTP/1.x", "> " + head, "* Request completely sent off", "< HTTP/1.1 200 OK\r\n"],
+            events.Events.Take(4).ToArray());
         CollectionAssert.AreEqual(
             new[] { "* using HTTP/1.x", "> " + head, "* Request completely sent off", "< HTTP/1.1 200 OK\r\n" },
             events.Events.Take(4).ToArray(),
@@ -123,9 +179,19 @@ public sealed partial class HttpProtocolHandlerTests
             Events = events,
         };
 
+        Diagnostics.Arrange("url, upload", "http://127.0.0.1:18217/u, (empty stream)");
+        Diagnostics.Arrange("request head", OneLine(head));
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        WriteExpectedLines(
+            "first 4 events",
+            ["* using HTTP/1.x", "> " + head, "* Request completely sent off", "< HTTP/1.1 200 OK\r\n"],
+            events.Events.Take(4).ToArray());
         CollectionAssert.AreEqual(
             new[] { "* using HTTP/1.x", "> " + head, "* Request completely sent off", "< HTTP/1.1 200 OK\r\n" },
             events.Events.Take(4).ToArray(),
@@ -152,12 +218,23 @@ public sealed partial class HttpProtocolHandlerTests
             Events = events,
         };
 
+        Diagnostics.Arrange("url, upload", "http://127.0.0.1:18475/u, abcde");
+        Diagnostics.Arrange("request head", OneLine(head));
+        Diagnostics.Arrange("continue wait", HttpRequestOptions.DefaultContinueWait);
+
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
         await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
         time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        WriteExpectedLines(
+            "events 1 to 5",
+            ["> " + head, "* Done waiting for 100-continue", "} 5\r\nabcde\r\n", "} 0\r\n\r\n", "* upload completely sent off: 15 bytes"],
+            events.Events.Skip(1).Take(5).ToArray());
         CollectionAssert.AreEqual(
             new[] { "> " + head, "* Done waiting for 100-continue", "} 5\r\nabcde\r\n", "} 0\r\n\r\n", "* upload completely sent off: 15 bytes" },
             events.Events.Skip(1).Take(5).ToArray());
@@ -177,8 +254,16 @@ public sealed partial class HttpProtocolHandlerTests
             Events = events,
         };
 
-        await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+        Diagnostics.Arrange("url, upload, headers", "http://127.0.0.1:18475/u, abcde, Expect:");
 
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        WriteExpectedLines(
+            "events 2 to 4",
+            ["} 5\r\nabcde\r\n", "} 0\r\n\r\n", "* upload completely sent off: 15 bytes"],
+            events.Events.Skip(2).Take(3).ToArray());
         CollectionAssert.AreEqual(
             new[] { "} 5\r\nabcde\r\n", "} 0\r\n\r\n", "* upload completely sent off: 15 bytes" },
             events.Events.Skip(2).Take(3).ToArray());
@@ -193,8 +278,17 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nTrailer: X-T\r\n\r\n" + body, 65536);
         RecordingTransferEvents events = new();
 
-        await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18471/c", events));
+        Diagnostics.Arrange("url, chunk size", "http://127.0.0.1:18471/c, 65536");
+        Diagnostics.Arrange("chunked body with trailer", OneLine(body));
 
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18471/c", events));
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        WriteExpectedLines(
+            "events 5 to 7",
+            ["< Trailer: X-T\r\n", "< \r\n", "{ " + body],
+            events.Events.Skip(5).Take(3).ToArray());
         CollectionAssert.AreEqual(
             new[] { "< Trailer: X-T\r\n", "< \r\n", "{ " + body },
             events.Events.Skip(5).Take(3).ToArray());
@@ -207,8 +301,14 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" + body, 1);
         RecordingTransferEvents events = new();
 
-        await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18471/c", events));
+        Diagnostics.Arrange("url, chunk size", "http://127.0.0.1:18471/c, 1");
+        Diagnostics.Arrange("chunked body", OneLine(body));
 
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18471/c", events));
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Diff("concatenated data events", OneLine(body), OneLine(string.Concat(events.Events.Where(e => e.StartsWith('{')).Select(e => e[2..]))));
         Assert.AreEqual(body, string.Concat(events.Events.Where(e => e.StartsWith('{')).Select(e => e[2..])));
     }
 
@@ -218,8 +318,17 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = Connection("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 204 No Content\r\n\r\n", 65536);
         RecordingTransferEvents events = new();
 
-        await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18441/f.txt", events));
+        Diagnostics.Arrange("url, chunk size", "http://127.0.0.1:18441/f.txt, 65536");
+        Diagnostics.Arrange("response", "HTTP/1.1 100 Continue, then HTTP/1.1 204 No Content");
 
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18441/f.txt", events));
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        WriteExpectedLines(
+            "head events",
+            ["< HTTP/1.1 100 Continue\r\n", "< \r\n", "< HTTP/1.1 204 No Content\r\n", "< \r\n"],
+            events.Events.Where(e => e.StartsWith('<')).ToArray());
         CollectionAssert.AreEqual(
             new[] { "< HTTP/1.1 100 Continue\r\n", "< \r\n", "< HTTP/1.1 204 No Content\r\n", "< \r\n" },
             events.Events.Where(e => e.StartsWith('<')).ToArray());
@@ -234,9 +343,16 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
         TransferContext context = EventsContext("http://127.0.0.1:18472/a", events, new HttpRequestOptions { FollowRedirects = true });
 
+        Diagnostics.Arrange("url, follow redirects", "http://127.0.0.1:18472/a, True");
+        Diagnostics.Arrange("response", "HTTP/1.1 302 Found, Location: /b, Content-Length: 4, body move");
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("any data event", false, events.Events.Any(e => e.StartsWith('{')));
         Assert.IsFalse(events.Events.Any(e => e.StartsWith('{')));
     }
 
