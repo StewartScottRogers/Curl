@@ -52,10 +52,10 @@ Every test in all 33 `.UnitTests` projects writes a `START` line, an `END` line 
 
 - The 33 per-project tasks that depend on this one touch only their own test project, so they can run in parallel lanes once this is Done. Do not start adding diagnostics to tests in other projects here; that is their work. Adding output to `TestDiagnosticsTests` itself is enough in `Curl.Core.UnitTests`.
 - If `TestContext.CurrentTestOutcome` is not yet final when `[GlobalTestCleanup]` runs, record what MSTest 4.4.1 actually reports in the ADR and write that, rather than guessing the outcome.
-- 2026-10-07 (lane 1): delivered directly rather than through the full `/feature` agent chain, to fit the run's budget; the design is recorded in ADR-0416.
+- 2026-10-07 (lane 1): delivered directly rather than through the full `/feature` agent chain, to fit the run's budget; the design is recorded in ADR-0417.
 - The hooks live in a second type, `TestDiagnosticsHooks`, which is `public`: MSTest's MSTEST0002, MSTEST0063 and MSTEST0050 analyzers reject an internal test class and its global fixture methods (tried with `[assembly: DiscoverInternals]` too). The helper `TestDiagnostics` stays `internal`.
 - `Curl.Console.UnitTests` references `Curl.Protocol.Ssh.UnitTests`, which shows it its internals, so the two linked copies clash as CS0436. `Directory.Build.props` suppresses CS0436 for that one project only; the compiler uses the project's own copy, which is correct.
-- Measured: `CurrentTestOutcome` is final in `[GlobalTestCleanup]` under MSTest 4.4.1 - a throwaway `Assert.Fail` test logged `END ...: Failed in 34 ms`. Recorded in ADR-0416.
+- Measured: `CurrentTestOutcome` is final in `[GlobalTestCleanup]` under MSTest 4.4.1 - a throwaway `Assert.Fail` test logged `END ...: Failed in 34 ms`. Recorded in ADR-0417.
 - Slow means whole milliseconds (truncated) greater than 3000, so 3000.9 ms is not slow and its END and SLOW lines never disagree.
 - `BYTES` and `PHASE` lines are not counted on the END line; `DIFF` counts as an assert, as the Context says.
 - No `Measure-CodeQuality.ps1` run: the change is to test projects only, and the quality gates cover `*.UnitLibrary` and `Curl.Console`.
