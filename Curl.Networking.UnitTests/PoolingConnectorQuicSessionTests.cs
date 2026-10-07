@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -16,16 +17,30 @@ public sealed class PoolingConnectorQuicSessionTests
     private readonly QuicOpeningConnector _inner = new();
     private readonly ManualTimeProvider _time = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_ForThreeTransfers_CarriesThemAllOnOneQuicConnection()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("transfers", 3);
         await using var pool = CreatePool();
         var events = new RecordingTransferEvents();
 
-        var first = await ConnectAsync(pool, Target());
-        var second = await ConnectAsync(pool, Target() with { Events = events });
-        var third = await ConnectAsync(pool, Target() with { Events = events });
+        ConnectResult first, second, third;
+        using (diagnostics.Phase("connect"))
+        {
+            first = await ConnectAsync(pool, Target());
+            second = await ConnectAsync(pool, Target() with { Events = events });
+            third = await ConnectAsync(pool, Target() with { Events = events });
+        }
 
+        diagnostics.Act("quic connect count", _inner.QuicConnectCount);
+        diagnostics.Act("connection numbers", $"{first.ConnectionNumber},{second.ConnectionNumber},{third.ConnectionNumber}");
+        diagnostics.Assert("quic connect count", 1, _inner.QuicConnectCount);
+        diagnostics.Assert("first connection number", 0L, first.ConnectionNumber);
         Assert.AreEqual(1, _inner.QuicConnectCount);
         Assert.IsFalse(first.IsReused);
         Assert.AreEqual(0L, first.ConnectionNumber);
@@ -44,14 +59,23 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_WhenTheStreamLimitIsReached_ReportsTheSkipAndOpensAnotherConnection()
     {
+        var diagnostics = Diagnostics;
         _inner.StreamLimit = 2;
+        diagnostics.Arrange("stream limit", _inner.StreamLimit);
         await using var pool = CreatePool();
         await ConnectAsync(pool, Target());
         await ConnectAsync(pool, Target());
         var events = new RecordingTransferEvents();
 
-        var third = await ConnectAsync(pool, Target() with { Events = events });
+        ConnectResult third;
+        using (diagnostics.Phase("third connect"))
+        {
+            third = await ConnectAsync(pool, Target() with { Events = events });
+        }
 
+        diagnostics.Act("quic connect count", _inner.QuicConnectCount);
+        diagnostics.Act("third connection number", third.ConnectionNumber);
+        diagnostics.Assert("quic connect count", 2, _inner.QuicConnectCount);
         Assert.AreEqual(2, _inner.QuicConnectCount);
         Assert.IsFalse(third.IsReused);
         Assert.AreEqual(1L, third.ConnectionNumber);
@@ -61,13 +85,22 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_NeverSharesATcpConnectionToTheSameOrigin()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("target", "https://origin.example:443");
         await using var pool = CreatePool();
         var tcp = await pool.ConnectAsync(Target(), CancellationToken.None);
         tcp.Connection!.MarkReusable();
         await tcp.Connection.DisposeAsync();
 
-        var quic = await ConnectAsync(pool, Target());
+        ConnectResult quic;
+        using (diagnostics.Phase("quic connect"))
+        {
+            quic = await ConnectAsync(pool, Target());
+        }
 
+        diagnostics.Act("quic reused", quic.IsReused);
+        diagnostics.Act("quic connection number", quic.ConnectionNumber);
+        diagnostics.Assert("quic connect count", 1, _inner.QuicConnectCount);
         Assert.IsFalse(quic.IsReused);
         Assert.AreEqual(1, _inner.QuicConnectCount);
         Assert.AreEqual(1L, quic.ConnectionNumber);
@@ -76,13 +109,22 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_AfterTheLastTransferLeftItIntact_ReusesTheIdleSession()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("target", "https://origin.example:443");
         await using var pool = CreatePool();
         var first = await ConnectAsync(pool, Target());
         first.Connection!.MarkReusable();
         await first.Connection.DisposeAsync();
 
-        var second = await ConnectAsync(pool, Target());
+        ConnectResult second;
+        using (diagnostics.Phase("second connect"))
+        {
+            second = await ConnectAsync(pool, Target());
+        }
 
+        diagnostics.Act("second reused", second.IsReused);
+        diagnostics.Act("session disposed", _inner.Sessions[0].IsDisposed);
+        diagnostics.Assert("quic connect count", 1, _inner.QuicConnectCount);
         Assert.IsTrue(second.IsReused);
         Assert.AreEqual(1, _inner.QuicConnectCount);
         Assert.IsFalse(_inner.Sessions[0].IsDisposed);
@@ -91,25 +133,42 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task DisposeAsync_OfThePool_ClosesAnIdleSession()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("target", "https://origin.example:443");
         var pool = CreatePool();
         var first = await ConnectAsync(pool, Target());
         first.Connection!.MarkReusable();
         await first.Connection.DisposeAsync();
 
-        await pool.DisposeAsync();
+        using (diagnostics.Phase("dispose pool"))
+        {
+            await pool.DisposeAsync();
+        }
 
+        diagnostics.Act("session disposed", _inner.Sessions[0].IsDisposed);
+        diagnostics.Assert("session disposed", true, _inner.Sessions[0].IsDisposed);
         Assert.IsTrue(_inner.Sessions[0].IsDisposed);
     }
 
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_WhenTheQuicConnectFails_GivesTheFailureUnnumbered()
     {
+        var diagnostics = Diagnostics;
         _inner.Failure = MultiplexedConnectResult.Failed(CurlExitCode.QuicConnectError, "QUIC connect failed");
+        diagnostics.Arrange("failure", "QUIC connect failed");
         await using var pool = CreatePool();
 
-        var failed = await ConnectAsync(pool, Target());
-        var tcp = await pool.ConnectAsync(Target(), CancellationToken.None);
+        ConnectResult failed, tcp;
+        using (diagnostics.Phase("connect"))
+        {
+            failed = await ConnectAsync(pool, Target());
+            tcp = await pool.ConnectAsync(Target(), CancellationToken.None);
+        }
 
+        diagnostics.Act("failed exit code", failed.ExitCode);
+        diagnostics.Act("failed error message", failed.ErrorMessage);
+        diagnostics.Act("tcp connection number", tcp.ConnectionNumber);
+        diagnostics.Assert("failed error message", "QUIC connect failed", failed.ErrorMessage);
         Assert.IsNull(failed.Connection);
         Assert.AreEqual(CurlExitCode.QuicConnectError, failed.ExitCode);
         Assert.AreEqual("QUIC connect failed", failed.ErrorMessage);
@@ -120,16 +179,25 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_WaitingForMultiplexing_SharesTheConnectionOnceItsHandshakeEnds()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("waits for multiplexing", true);
         await using var pool = CreatePool(waits: true);
         var gate = _inner.GateNext();
         var opening = ConnectAsync(pool, Target());
         var waiting = ConnectAsync(pool, Target());
+        diagnostics.Act("waiting completed before gate", waiting.IsCompleted);
         Assert.IsFalse(waiting.IsCompleted);
 
-        gate.SetResult();
-        await opening;
-        var second = await waiting;
+        ConnectResult second;
+        using (diagnostics.Phase("open gate"))
+        {
+            gate.SetResult();
+            await opening;
+            second = await waiting;
+        }
 
+        diagnostics.Act("second reused", second.IsReused);
+        diagnostics.Assert("quic connect count", 1, _inner.QuicConnectCount);
         Assert.IsTrue(second.IsReused);
         Assert.AreEqual(1, _inner.QuicConnectCount);
     }
@@ -137,6 +205,8 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_WaitingForAQuicConnectThatThrows_OpensItsOwnAndTheOpenerSeesTheException()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("exception", "boom");
         await using var pool = CreatePool(waits: true);
         var gate = _inner.GateNext();
         _inner.Exception = new InvalidOperationException("boom");
@@ -145,19 +215,37 @@ public sealed class PoolingConnectorQuicSessionTests
 
         gate.SetResult();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => opening);
-        Assert.IsFalse((await waiting).IsReused);
+        InvalidOperationException thrown;
+        using (diagnostics.Phase("opener"))
+        {
+            thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => opening);
+        }
+
+        var waited = await waiting;
+        diagnostics.Act("opener exception", thrown.Message);
+        diagnostics.Act("waiter reused", waited.IsReused);
+        diagnostics.Assert("opener exception", "boom", thrown.Message);
+        Assert.IsFalse(waited.IsReused);
     }
 
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_ForATargetThatIsNeverPooled_NeverShares()
     {
+        var diagnostics = Diagnostics;
         await using var pool = CreatePool();
         var unpooled = Target() with { PoolScheme = null };
+        diagnostics.Arrange("pool scheme", unpooled.PoolScheme ?? "(none)");
 
-        await ConnectAsync(pool, unpooled);
-        var second = await ConnectAsync(pool, unpooled);
+        ConnectResult second;
+        using (diagnostics.Phase("connect twice"))
+        {
+            await ConnectAsync(pool, unpooled);
+            second = await ConnectAsync(pool, unpooled);
+        }
 
+        diagnostics.Act("second reused", second.IsReused);
+        diagnostics.Act("quic connect count", _inner.QuicConnectCount);
+        diagnostics.Assert("quic connect count", 2, _inner.QuicConnectCount);
         Assert.IsFalse(second.IsReused);
         Assert.AreEqual(2, _inner.QuicConnectCount);
     }
@@ -165,11 +253,20 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_ForASessionThatIsNoConnectionSession_DoesNotShareIt()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("session builder", "scripted connection without a session");
         await using var pool = CreatePool();
         var first = await pool.ConnectMultiplexedSessionAsync(Target(), _ => new ScriptedConnection([]), CancellationToken.None);
 
-        var second = await pool.ConnectMultiplexedSessionAsync(Target(), _ => new ScriptedConnection([]), CancellationToken.None);
+        ConnectResult second;
+        using (diagnostics.Phase("second connect"))
+        {
+            second = await pool.ConnectMultiplexedSessionAsync(Target(), _ => new ScriptedConnection([]), CancellationToken.None);
+        }
 
+        diagnostics.Act("first session is null", first.Connection!.Session is null);
+        diagnostics.Act("second reused", second.IsReused);
+        diagnostics.Assert("second reused", false, second.IsReused);
         Assert.IsNull(first.Connection!.Session);
         Assert.IsFalse(second.IsReused);
     }
@@ -177,21 +274,40 @@ public sealed class PoolingConnectorQuicSessionTests
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_WhenCancelled_Throws()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("cancellation", "already cancelled");
         await using var pool = CreatePool();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await pool.ConnectMultiplexedSessionAsync(Target(), _inner.OpenSession, new CancellationToken(canceled: true)));
+        OperationCanceledException thrown;
+        using (diagnostics.Phase("cancelled connect"))
+        {
+            thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+                async () => await pool.ConnectMultiplexedSessionAsync(Target(), _inner.OpenSession, new CancellationToken(canceled: true)));
+        }
+
+        diagnostics.Act("exception type", thrown.GetType().Name);
+        diagnostics.Assert("exception type", nameof(OperationCanceledException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public async Task ConnectMultiplexedSessionAsync_WithoutATargetOrSessionBuilder_Throws()
     {
+        var diagnostics = Diagnostics;
+        diagnostics.Arrange("arguments", "null target, then null session builder");
         await using var pool = CreatePool();
 
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            async () => await pool.ConnectMultiplexedSessionAsync(null!, _inner.OpenSession, CancellationToken.None));
-        await Assert.ThrowsAsync<ArgumentNullException>(
-            async () => await pool.ConnectMultiplexedSessionAsync(Target(), null!, CancellationToken.None));
+        ArgumentNullException noTarget, noBuilder;
+        using (diagnostics.Phase("null arguments"))
+        {
+            noTarget = await Assert.ThrowsAsync<ArgumentNullException>(
+                async () => await pool.ConnectMultiplexedSessionAsync(null!, _inner.OpenSession, CancellationToken.None));
+            noBuilder = await Assert.ThrowsAsync<ArgumentNullException>(
+                async () => await pool.ConnectMultiplexedSessionAsync(Target(), null!, CancellationToken.None));
+        }
+
+        diagnostics.Act("null target parameter", noTarget.ParamName);
+        diagnostics.Act("null builder parameter", noBuilder.ParamName);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), noTarget.GetType().Name);
     }
 
     private static ConnectTarget Target() => new("origin.example", 443, true) { PoolScheme = "https" };

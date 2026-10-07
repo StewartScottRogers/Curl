@@ -2,6 +2,7 @@ using System.Net;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -17,6 +18,10 @@ public sealed class PoolingConnectorTests
     private readonly FakeConnector _inner = new();
     private readonly ManualTimeProvider _time = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ConnectAsync_WithNullTarget_ThrowsArgumentNullException()
     {
@@ -24,6 +29,10 @@ public sealed class PoolingConnectorTests
 
         var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
             async () => await pool.ConnectAsync(null!, CancellationToken.None));
+
+        Diagnostics.Arrange("target", "null");
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "target", exception.ParamName);
 
         Assert.AreEqual("target", exception.ParamName);
     }
@@ -35,6 +44,10 @@ public sealed class PoolingConnectorTests
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await pool.ConnectAsync(Target(), new CancellationToken(canceled: true)));
+
+        Diagnostics.Arrange("token", "already cancelled");
+        Diagnostics.Act("inner connect count", _inner.Targets.Count);
+        Diagnostics.Assert("inner connect count", 0, _inner.Targets.Count);
 
         Assert.IsEmpty(_inner.Targets);
     }
@@ -48,6 +61,11 @@ public sealed class PoolingConnectorTests
 
         var first = await pool.ConnectAsync(Target(), CancellationToken.None);
         var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("inner failure", "CouldntResolveHost, connection number 9");
+        Diagnostics.Act("first connection number", first.ConnectionNumber);
+        Diagnostics.Act("second connection number", second.ConnectionNumber);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, first.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, first.ExitCode);
         Assert.AreEqual("Could not resolve host: x", first.ErrorMessage);
@@ -66,6 +84,10 @@ public sealed class PoolingConnectorTests
 
         var result = await pool.ConnectAsync(Target(), CancellationToken.None);
 
+        Diagnostics.Arrange("inner failure", "refused");
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("connection refused", true, result.IsConnectionRefused);
+
         Assert.IsTrue(result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(0L, result.ConnectionNumber);
@@ -79,6 +101,11 @@ public sealed class PoolingConnectorTests
 
         var first = await pool.ConnectAsync(target, CancellationToken.None);
         var second = await pool.ConnectAsync(target, CancellationToken.None);
+
+        Diagnostics.Arrange("target", "origin.example:80");
+        Diagnostics.Act("first connection number", first.ConnectionNumber);
+        Diagnostics.Act("second connection number", second.ConnectionNumber);
+        Diagnostics.Assert("first reused", false, first.IsReused);
 
         Assert.IsInstanceOfType<PooledConnection>(first.Connection);
         Assert.IsFalse(first.IsReused);
@@ -99,6 +126,10 @@ public sealed class PoolingConnectorTests
         await ReturnToPoolAsync(pool, Target());
 
         var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Diagnostics.Arrange("pooled", "origin.example:80 marked reusable");
+        Diagnostics.Act("inner connects", _inner.Targets.Count);
+        Diagnostics.Assert("inner connects", 1, _inner.Targets.Count);
 
         Assert.HasCount(1, _inner.Targets);
         Assert.IsFalse(_inner.Opened[0].IsDisposed);
@@ -132,6 +163,11 @@ public sealed class PoolingConnectorTests
         await opened.Connection.DisposeAsync();
         var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
 
+        Diagnostics.Arrange("unix socket path", "/run/app.sock");
+        Diagnostics.Act("opened path", opened.UnixSocketPath);
+        Diagnostics.Act("reused path", reused.UnixSocketPath);
+        Diagnostics.Assert("opened path", "/run/app.sock", opened.UnixSocketPath);
+
         Assert.AreEqual("/run/app.sock", opened.UnixSocketPath);
         Assert.IsTrue(reused.IsReused);
         Assert.AreEqual("/run/app.sock", reused.UnixSocketPath);
@@ -149,6 +185,11 @@ public sealed class PoolingConnectorTests
         await opened.Connection.DisposeAsync();
         var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
 
+        Diagnostics.Arrange("mapped destination", "127.0.0.1:18499");
+        Diagnostics.Act("opened mapping", $"{opened.MappedHost}:{opened.MappedPort}");
+        Diagnostics.Act("reused mapping", $"{reused.MappedHost}:{reused.MappedPort}");
+        Diagnostics.Assert("opened mapping", "127.0.0.1:18499", $"{opened.MappedHost}:{opened.MappedPort}");
+
         Assert.AreEqual(("127.0.0.1", 18499), (opened.MappedHost, opened.MappedPort));
         Assert.IsTrue(reused.IsReused);
         Assert.AreEqual(("127.0.0.1", 18499), (reused.MappedHost, reused.MappedPort));
@@ -163,6 +204,10 @@ public sealed class PoolingConnectorTests
         await ReturnToPoolAsync(pool, forwardProxy);
 
         await pool.ConnectAsync(forwardProxy with { Events = events }, CancellationToken.None);
+
+        Diagnostics.Arrange("forward proxy", "proxy.example:3128");
+        Diagnostics.Act("reused events", events.Reused.Count);
+        Diagnostics.Assert("reused events", 1, events.Reused.Count);
 
         Assert.AreEqual(
             new ConnectionReusedEvent
@@ -186,6 +231,10 @@ public sealed class PoolingConnectorTests
 
         await pool.ConnectAsync(tunnelled with { Events = events }, CancellationToken.None);
 
+        Diagnostics.Arrange("tunnelling proxy", "proxy.example:3128");
+        Diagnostics.Act("reused events", events.Reused.Count);
+        Diagnostics.Assert("reused events", 1, events.Reused.Count);
+
         Assert.AreEqual(
             new ConnectionReusedEvent
             {
@@ -206,6 +255,10 @@ public sealed class PoolingConnectorTests
 
         var reused = await pool.ConnectAsync(Target(host: "origin.example", scheme: "http"), CancellationToken.None);
 
+        Diagnostics.Arrange("pooled", "Origin.Example HTTP, asked as origin.example http");
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
         Assert.IsTrue(reused.IsReused);
     }
 
@@ -218,6 +271,10 @@ public sealed class PoolingConnectorTests
         var reused = await pool.ConnectAsync(
             Target(proxy: Proxy("PROXY.example", "user", "secret")),
             CancellationToken.None);
+
+        Diagnostics.Arrange("proxy", "proxy.example, asked as PROXY.example, same credential");
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Assert("reused", true, reused.IsReused);
 
         Assert.IsTrue(reused.IsReused);
     }
@@ -246,6 +303,10 @@ public sealed class PoolingConnectorTests
 
         var other = await pool.ConnectAsync(Differing(pooled, difference), CancellationToken.None);
 
+        Diagnostics.Arrange("difference", difference);
+        Diagnostics.Act("connection number", other.ConnectionNumber);
+        Diagnostics.Assert("reused", false, other.IsReused);
+
         Assert.IsFalse(other.IsReused);
         Assert.AreEqual(1L, other.ConnectionNumber);
         Assert.HasCount(2, _inner.Targets);
@@ -261,6 +322,10 @@ public sealed class PoolingConnectorTests
             Target() with { AltSvcRoute = new AltSvcRoute("h1", new AltSvcAlternative("h1", "ALT.example", 443)) },
             CancellationToken.None);
 
+        Diagnostics.Arrange("alt-svc", "alt.example:443, asked as ALT.example:443");
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
         Assert.IsTrue(reused.IsReused);
     }
 
@@ -271,6 +336,10 @@ public sealed class PoolingConnectorTests
         var inUse = await pool.ConnectAsync(Target(), CancellationToken.None);
 
         var other = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("first connection", "still in use");
+        Diagnostics.Act("second reused", other.IsReused);
+        Diagnostics.Assert("second reused", false, other.IsReused);
 
         Assert.IsFalse(other.IsReused);
         Assert.AreNotSame(inUse.Connection, other.Connection);
@@ -284,6 +353,10 @@ public sealed class PoolingConnectorTests
         await first.Connection!.DisposeAsync();
 
         var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("first connection", "disposed without MarkReusable");
+        Diagnostics.Act("first disposed", _inner.Opened[0].IsDisposed);
+        Diagnostics.Assert("first disposed", true, _inner.Opened[0].IsDisposed);
 
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
         Assert.IsFalse(second.IsReused);
@@ -299,6 +372,10 @@ public sealed class PoolingConnectorTests
 
         var second = await pool.ConnectAsync(target, CancellationToken.None);
 
+        Diagnostics.Arrange("target", "origin.example:21, no pool scheme");
+        Diagnostics.Act("first disposed", _inner.Opened[0].IsDisposed);
+        Diagnostics.Assert("first disposed", true, _inner.Opened[0].IsDisposed);
+
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
         Assert.IsFalse(second.IsReused);
     }
@@ -313,6 +390,10 @@ public sealed class PoolingConnectorTests
         first.Connection.MarkReusable();
         await first.Connection.DisposeAsync();
         var second = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("connection", "ClearTlsAsync then MarkReusable");
+        Diagnostics.Act("plaintext is null", plaintext is null);
+        Diagnostics.Assert("first disposed", true, _inner.Opened[0].IsDisposed);
 
         Assert.IsNull(plaintext, "The fake underneath is not TLS, so it cannot be cleared.");
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
@@ -331,6 +412,11 @@ public sealed class PoolingConnectorTests
         var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
         var other = await pool.ConnectAsync(Target(), CancellationToken.None);
 
+        Diagnostics.Arrange("connection", "marked reusable, disposed twice");
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Act("other reused", other.IsReused);
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
         Assert.IsTrue(reused.IsReused);
         Assert.IsFalse(other.IsReused);
     }
@@ -343,6 +429,10 @@ public sealed class PoolingConnectorTests
         var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
 
         await reused.Connection!.DisposeAsync();
+
+        Diagnostics.Arrange("reused connection", "not marked again");
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Assert("first disposed", true, _inner.Opened[0].IsDisposed);
 
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
     }
@@ -358,6 +448,10 @@ public sealed class PoolingConnectorTests
 
         var events = new RecordingTransferEvents();
         await ReturnToPoolAsync(pool, Target(port: 6) with { Events = events });
+
+        Diagnostics.Arrange("idle connections", "ports 1 to 6");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("oldest disposed", true, _inner.Opened[0].IsDisposed);
 
         CollectionAssert.AreEqual(
             new[] { "Connection pool is full, closing the oldest of 6/5", "shutting down connection #0" },
@@ -378,6 +472,10 @@ public sealed class PoolingConnectorTests
             await ReturnToPoolAsync(pool, Target(port: port) with { Events = events });
         }
 
+        Diagnostics.Arrange("idle connections", PoolingConnector.MaximumIdleConnections);
+        Diagnostics.Act("info count", events.Info.Count);
+        Diagnostics.Assert("info count", 0, events.Info.Count);
+
         Assert.IsEmpty(events.Info);
         Assert.IsFalse(_inner.Opened.Exists(connection => connection.IsDisposed));
     }
@@ -392,6 +490,10 @@ public sealed class PoolingConnectorTests
         await ReturnToPoolAsync(pool, Target(), readsToTheClose: true);
 
         var fresh = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Diagnostics.Arrange("pooled", "read to the close");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("fresh reused", false, fresh.IsReused);
 
         CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
         Assert.IsEmpty(events.Reused);
@@ -416,6 +518,10 @@ public sealed class PoolingConnectorTests
 
         var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
 
+        Diagnostics.Arrange("pooled", "dead connection then live connection");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
         CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
         Assert.IsTrue(reused.IsReused);
         Assert.AreEqual(1L, reused.ConnectionNumber);
@@ -436,6 +542,10 @@ public sealed class PoolingConnectorTests
 
         var next = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
 
+        Diagnostics.Arrange("read failure", "missing close_notify");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("next reused", false, next.IsReused);
+
         CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
         Assert.IsFalse(next.IsReused);
     }
@@ -452,6 +562,10 @@ public sealed class PoolingConnectorTests
 
         var reused = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
 
+        Diagnostics.Arrange("read", "empty buffer");
+        Diagnostics.Act("info count", events.Info.Count);
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
         Assert.IsTrue(reused.IsReused);
         Assert.IsEmpty(events.Info);
     }
@@ -465,6 +579,10 @@ public sealed class PoolingConnectorTests
 
         var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
 
+        Diagnostics.Arrange("idle milliseconds", 118_000);
+        Diagnostics.Act("reused", reused.IsReused);
+        Diagnostics.Assert("reused", true, reused.IsReused);
+
         Assert.IsTrue(reused.IsReused);
     }
 
@@ -476,6 +594,10 @@ public sealed class PoolingConnectorTests
         _time.Advance(118_001);
 
         var other = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("idle milliseconds", 118_001);
+        Diagnostics.Act("other reused", other.IsReused);
+        Diagnostics.Assert("other reused", false, other.IsReused);
 
         Assert.IsFalse(other.IsReused);
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
@@ -489,6 +611,10 @@ public sealed class PoolingConnectorTests
         _time.Advance(118_001);
 
         await ReturnToPoolAsync(pool, Target(port: 2));
+
+        Diagnostics.Arrange("idle milliseconds", 118_001);
+        Diagnostics.Act("first disposed", _inner.Opened[0].IsDisposed);
+        Diagnostics.Assert("first disposed", true, _inner.Opened[0].IsDisposed);
 
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
         Assert.IsFalse(_inner.Opened[1].IsDisposed);
@@ -505,6 +631,10 @@ public sealed class PoolingConnectorTests
         inUse.Connection!.MarkReusable();
         await inUse.Connection.DisposeAsync();
 
+        Diagnostics.Arrange("connections", "one idle, one in use at pool disposal");
+        Diagnostics.Act("opened count", _inner.Opened.Count);
+        Diagnostics.Assert("idle disposed", true, _inner.Opened[0].IsDisposed);
+
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
         Assert.IsTrue(_inner.Opened[1].IsDisposed);
     }
@@ -516,6 +646,10 @@ public sealed class PoolingConnectorTests
         var session = await ReturnWithSessionAsync(pool, Target());
 
         var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("pooled", "connection holding a session");
+        Diagnostics.Act("shut down count", session.ShutDownCount);
+        Diagnostics.Assert("reused", true, reused.IsReused);
 
         Assert.IsTrue(reused.IsReused);
         Assert.AreSame(session, reused.Connection!.Session);
@@ -532,6 +666,10 @@ public sealed class PoolingConnectorTests
 
         await first.Connection.DisposeAsync();
 
+        Diagnostics.Arrange("session", "held, connection not marked reusable");
+        Diagnostics.Act("shut down count", session.ShutDownCount);
+        Diagnostics.Assert("shut down count", 1, session.ShutDownCount);
+
         Assert.AreEqual(1, session.ShutDownCount);
         Assert.IsTrue(session.WasConnectionOpenAtShutDown);
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
@@ -544,6 +682,10 @@ public sealed class PoolingConnectorTests
         var session = await ReturnWithSessionAsync(pool, Target());
 
         await pool.DisposeAsync();
+
+        Diagnostics.Arrange("idle connection", "holding a session");
+        Diagnostics.Act("shut down count", session.ShutDownCount);
+        Diagnostics.Assert("shut down count", 1, session.ShutDownCount);
 
         Assert.AreEqual(1, session.ShutDownCount);
         Assert.IsTrue(session.WasConnectionOpenAtShutDown);
@@ -560,6 +702,10 @@ public sealed class PoolingConnectorTests
             await ReturnToPoolAsync(pool, Target(port: port));
         }
 
+        Diagnostics.Arrange("idle connections", "ports 1 to 6, the first holds a session");
+        Diagnostics.Act("shut down count", session.ShutDownCount);
+        Diagnostics.Assert("shut down count", 1, session.ShutDownCount);
+
         Assert.AreEqual(1, session.ShutDownCount);
         Assert.IsTrue(_inner.Opened[0].IsDisposed);
     }
@@ -572,6 +718,10 @@ public sealed class PoolingConnectorTests
         _time.Advance(118_001);
 
         _ = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("idle milliseconds", 118_001);
+        Diagnostics.Act("shut down count", session.ShutDownCount);
+        Diagnostics.Assert("shut down count", 1, session.ShutDownCount);
 
         Assert.AreEqual(1, session.ShutDownCount);
     }

@@ -1,5 +1,6 @@
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -12,6 +13,10 @@ public sealed class PooledConnectionTests
 {
     private readonly FakeConnector _inner = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ReadWriteAndFlush_ForwardToTheUnderlyingConnection()
     {
@@ -23,6 +28,11 @@ public sealed class PooledConnectionTests
         await connection.WriteAsync(new byte[] { 7, 8 }, CancellationToken.None);
         await connection.FlushAsync(CancellationToken.None);
         var read = await connection.ReadAsync(new byte[4], CancellationToken.None);
+
+        Diagnostics.Arrange("target", "origin.example:80, TLS False");
+        Diagnostics.Bytes("written", underlying.Written.ToArray());
+        Diagnostics.Act("bytes read", read);
+        Diagnostics.Assert("flush count", 1, underlying.FlushCount);
 
         CollectionAssert.AreEqual(new byte[] { 7, 8 }, underlying.Written);
         Assert.AreEqual(1, underlying.FlushCount);
