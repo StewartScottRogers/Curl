@@ -35,3 +35,4 @@ Every test in `Curl.Tls.UnitTests`' `KeyShareKnownAnswerTests`, `KeyShareTests`,
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Lane 6 could not integrate: fast tests failed twice (Curl.Protocol.Smtp.UnitTests failed; then no test named) after rebasing onto the other lanes' work. The work is on branch factory/BL-1632-lane-6-20261007-111121; start with git cherry-pick --no-commit factory/BL-1632-lane-6-20261007-111121 and fix it.
