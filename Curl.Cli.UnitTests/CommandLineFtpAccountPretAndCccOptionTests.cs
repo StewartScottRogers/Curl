@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -16,11 +17,20 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoneOfTheOptions_LeavesThemNotGiven()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp account", null, result.Options?.FtpAccount);
+        Diagnostics.Assert("ftp alternative to user", null, result.Options?.FtpAlternativeToUser);
+        Diagnostics.Assert("ftp send pret", false, result.Options?.FtpSendPret);
+        Diagnostics.Assert("ftp clear command channel", FtpClearCommandChannel.Off, result.Options?.FtpClearCommandChannel);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.FtpAccount);
         Assert.IsNull(result.Options.FtpAlternativeToUser);
@@ -31,8 +41,11 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [TestMethod]
     public void Parse_FtpAccount_RecordsTheLastValueVerbatim()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-account", "first", "--ftp-account", "my account", Url]);
+        CommandLineParseResult result = Parse(["--ftp-account", "first", "--ftp-account", "my account", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp account", "my account", result.Options?.FtpAccount);
+        Diagnostics.Assert("ftp alternative to user", null, result.Options?.FtpAlternativeToUser);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("my account", result.Options.FtpAccount);
         Assert.IsNull(result.Options.FtpAlternativeToUser);
@@ -41,9 +54,12 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [TestMethod]
     public void Parse_FtpAlternativeToUser_RecordsTheLastValueVerbatim()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--ftp-alternative-to-user", "first", "--ftp-alternative-to-user", "SITE AUTH x", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp alternative to user", "SITE AUTH x", result.Options?.FtpAlternativeToUser);
+        Diagnostics.Assert("ftp account", null, result.Options?.FtpAccount);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("SITE AUTH x", result.Options.FtpAlternativeToUser);
         Assert.IsNull(result.Options.FtpAccount);
@@ -54,8 +70,10 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [DataRow("--ftp-alternative-to-user")]
     public void Parse_EmptyTextOption_RefusesAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, string.Empty, Url]);
+        CommandLineParseResult result = Parse([spelledOption, string.Empty, Url]);
 
+        string[] expectedLines = [$"curl: option {spelledOption}: blank argument where content is expected", TryHelp];
+        AssertRefusalDiagnostics(result, expectedLines);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: blank argument where content is expected", TryHelp },
@@ -67,8 +85,10 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [DataRow("--ftp-alternative-to-user")]
     public void Parse_TextOptionBeforeTheUrl_TakesTheUrlAsItsValueAndFindsNoUrl(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
+        string[] expectedLines = ["curl: (2) no URL specified", TryHelp];
+        AssertRefusalDiagnostics(result, expectedLines);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "curl: (2) no URL specified", TryHelp },
@@ -82,8 +102,10 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [DataRow(new[] { "--no-ftp-pret", "--ftp-pret" }, true)]
     public void Parse_FtpPretAndItsNegation_TheLaterWins(string[] flags, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. flags, Url]);
+        CommandLineParseResult result = Parse([.. flags, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp send pret", expected, result.Options?.FtpSendPret);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpSendPret);
     }
@@ -100,8 +122,11 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [DataRow(new[] { "--no-ftp-ssl-ccc", "--ftp-ssl-ccc-mode", "passive" }, FtpClearCommandChannel.Passive)]
     public void Parse_FtpSslCccAndItsMode_CombineAsCurlKeepsThem(string[] arguments, FtpClearCommandChannel expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp clear command channel", expected, result.Options?.FtpClearCommandChannel);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpClearCommandChannel);
         Assert.IsEmpty(result.WarningLines);
@@ -114,8 +139,11 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [DataRow("Passive", FtpClearCommandChannel.Passive)]
     public void Parse_FtpSslCccModeCurlRecognises_SetsItWithoutWarning(string value, FtpClearCommandChannel expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-ssl-ccc-mode", value, Url]);
+        CommandLineParseResult result = Parse(["--ftp-ssl-ccc-mode", value, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp clear command channel", expected, result.Options?.FtpClearCommandChannel);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.FtpClearCommandChannel);
         Assert.IsEmpty(result.WarningLines);
@@ -126,8 +154,12 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [DataRow("")]
     public void Parse_FtpSslCccModeCurlDoesNotRecognise_WarnsAndUsesPassive(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ftp-ssl-ccc-mode", "active", "--ftp-ssl-ccc-mode", value, Url]);
+        CommandLineParseResult result = Parse(["--ftp-ssl-ccc-mode", "active", "--ftp-ssl-ccc-mode", value, Url]);
 
+        string[] expectedWarnings = [$"Warning: unrecognized ftp CCC method '{value}', using default"];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp clear command channel", FtpClearCommandChannel.Passive, result.Options?.FtpClearCommandChannel);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expectedWarnings), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(FtpClearCommandChannel.Passive, result.Options.FtpClearCommandChannel);
         CollectionAssert.AreEqual(
@@ -138,9 +170,17 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [TestMethod]
     public void Parse_FtpSslCccModeLongEnoughToWrap_WarnsOnThreeLinesAsCurlDoes()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--ftp-ssl-ccc-mode", "a-very-long-bogus-value-that-should-make-the-warning-wrap-past-seventy-nine-columns", Url]);
 
+        string[] expectedWarnings =
+        [
+            "Warning: unrecognized ftp CCC method ",
+            "Warning: 'a-very-long-bogus-value-that-should-make-the-warning-wrap-past-sevent",
+            "Warning: y-nine-columns', using default",
+        ];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expectedWarnings), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
@@ -155,8 +195,11 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [TestMethod]
     public void Parse_SilentBeforeUnrecognisedFtpSslCccMode_DropsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--ftp-ssl-ccc-mode", "bogus", Url]);
+        CommandLineParseResult result = Parse(["-s", "--ftp-ssl-ccc-mode", "bogus", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ftp clear command channel", FtpClearCommandChannel.Passive, result.Options?.FtpClearCommandChannel);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(FtpClearCommandChannel.Passive, result.Options.FtpClearCommandChannel);
         Assert.IsEmpty(result.WarningLines);
@@ -169,11 +212,30 @@ public sealed class CommandLineFtpAccountPretAndCccOptionTests
     [DataRow("--no-ftp-ssl-ccc-mode=x")]
     public void Parse_NegatedTextOption_IsRefusedAsNotReversible(string argument)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, "x", Url]);
+        CommandLineParseResult result = Parse([argument, "x", Url]);
 
+        string[] expectedLines = [$"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp];
+        AssertRefusalDiagnostics(result, expectedLines);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private CommandLineParseResult Parse(string[] arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertRefusalDiagnostics(CommandLineParseResult result, string[] expectedLines)
+    {
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach(expectedLines),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
     }
 }
