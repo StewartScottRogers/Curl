@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -22,17 +24,41 @@ public sealed class CommandLineRateOptionTests
 
     private const string TooLargeUnit = "curl: too large --rate unit";
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
         Assert.IsTrue(result.IsAccepted, result.IsAccepted ? string.Empty : result.Refusal.StandardErrorLines[0]);
         return result.Options;
     }
 
-    private static void AssertRefused(string[] arguments, params string[] expectedLinesBeforeTryHelp)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
     {
+        Diagnostics.ArrangeArguments(arguments);
         CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
 
+    private long? ActInterval(CommandLineOptions options, long? expected)
+    {
+        Diagnostics.Act("milliseconds between transfer starts", options.MillisecondsBetweenTransferStarts?.ToString() ?? "null");
+        Diagnostics.Assert("milliseconds between transfer starts", expected?.ToString() ?? "null", options.MillisecondsBetweenTransferStarts?.ToString() ?? "null");
+        return options.MillisecondsBetweenTransferStarts;
+    }
+
+    private void AssertRefused(string[] arguments, params string[] expectedLinesBeforeTryHelp)
+    {
+        CommandLineParseResult result = Parse(arguments);
+
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach(expectedLinesBeforeTryHelp.Append(TryHelpLine)),
+            CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         CollectionAssert.AreEqual(expectedLinesBeforeTryHelp.Append(TryHelpLine).ToArray(), result.Refusal.StandardErrorLines.ToArray());
     }
@@ -40,7 +66,7 @@ public sealed class CommandLineRateOptionTests
     [TestMethod]
     public void Parse_NoRate_LeavesTheIntervalUnset()
     {
-        Assert.IsNull(Accept(Url).MillisecondsBetweenTransferStarts);
+        Assert.IsNull(ActInterval(Accept(Url), null));
     }
 
     [TestMethod]
@@ -71,21 +97,23 @@ public sealed class CommandLineRateOptionTests
     [DataRow("1/106751991167d", 9223372036828800000L)]
     public void Parse_Rate_SetsTheLeastTimeBetweenStarts(string rate, long milliseconds)
     {
-        Assert.AreEqual(milliseconds, Accept("--rate", rate, Url).MillisecondsBetweenTransferStarts);
+        Assert.AreEqual(milliseconds, ActInterval(Accept("--rate", rate, Url), milliseconds));
     }
 
     [TestMethod]
     public void Parse_TwoRates_LastOneWins()
     {
-        Assert.AreEqual(500L, Accept("--rate", "1/s", "--rate", "2/s", Url).MillisecondsBetweenTransferStarts);
+        Assert.AreEqual(500L, ActInterval(Accept("--rate", "1/s", "--rate", "2/s", Url), 500L));
     }
 
     [TestMethod]
     public void Parse_RateInTheFirstGroup_ReachesTheNext()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--rate", "2/s", Url, "--next", Url]);
+        CommandLineParseResult result = Parse(["--rate", "2/s", Url, "--next", Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
+        ActInterval(result.Groups[^1], 500L);
         Assert.AreEqual(500L, result.Groups[^1].MillisecondsBetweenTransferStarts);
     }
 

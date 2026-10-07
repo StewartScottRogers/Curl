@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -14,6 +15,8 @@ namespace Curl.Cli;
 public sealed class CommandLineRedirectAndFailOptionTests
 {
     private const string Url = "http://127.0.0.1:1/";
+
+    public TestContext TestContext { get; set; } = null!;
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
@@ -208,7 +211,7 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("99999999999999999999")]
     public void Parse_MaxRedirsUnreadable_IsRefusedAsNotProperNumber(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--max-redirs", value, Url]);
+        CommandLineParseResult result = Parse(["--max-redirs", value, Url]);
 
         AssertRefused(result, "curl: option --max-redirs: " + ProperNumber, TryHelp);
     }
@@ -217,7 +220,7 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [OSCondition(OperatingSystems.Windows)]
     public void Parse_OnWindows_MaxRedirsPastTwoToThe31_IsRefusedAsNotProperNumber()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--max-redirs", "2147483648", Url]);
+        CommandLineParseResult result = Parse(["--max-redirs", "2147483648", Url]);
 
         AssertRefused(result, "curl: option --max-redirs: " + ProperNumber, TryHelp);
     }
@@ -237,7 +240,7 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void Parse_OnLinuxOrMacOS_MaxRedirsPastTwoToThe63_IsRefusedAsNotProperNumber()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--max-redirs", "9223372036854775808", Url]);
+        CommandLineParseResult result = Parse(["--max-redirs", "9223372036854775808", Url]);
 
         AssertRefused(result, "curl: option --max-redirs: " + ProperNumber, TryHelp);
     }
@@ -245,7 +248,7 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [TestMethod]
     public void Parse_MaxRedirsLast_IsRefusedAsNeedingParameter()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--max-redirs"]);
+        CommandLineParseResult result = Parse([Url, "--max-redirs"]);
 
         AssertRefused(result, "curl: option --max-redirs: requires parameter", TryHelp);
     }
@@ -255,7 +258,7 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("--no-max-redirs=x")]
     public void Parse_NoMaxRedirs_IsRefusedAsNotReversible(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = Parse([spelling, Url]);
 
         AssertRefused(result, $"curl: option {spelling}: the given option cannot be reversed with a --no- prefix", TryHelp);
     }
@@ -379,9 +382,10 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("--no-head=x")]
     public void Parse_HeadThenNoHead_WarnsAndIsRefused(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-I", spelling, Url]);
+        CommandLineParseResult result = Parse(["-I", spelling, Url]);
 
         AssertRefused(result, $"curl: option {spelling}: is badly used here", TryHelp);
+        AssertWarnings(GetAfterHeadWarning, result);
         CollectionAssert.AreEqual(GetAfterHeadWarning, result.WarningLines.ToArray());
     }
 
@@ -392,18 +396,20 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("-Is")]
     public void Parse_NoHeadThenHead_WarnsAndIsRefused(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-head", spelling, Url]);
+        CommandLineParseResult result = Parse(["--no-head", spelling, Url]);
 
         AssertRefused(result, $"curl: option {spelling}: is badly used here", TryHelp);
+        AssertWarnings(HeadAfterGetWarning, result);
         CollectionAssert.AreEqual(HeadAfterGetWarning, result.WarningLines.ToArray());
     }
 
     [TestMethod]
     public void Parse_NoHeadThenSilentHeadBundle_IsRefusedWithoutWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-head", "-sI", Url]);
+        CommandLineParseResult result = Parse(["--no-head", "-sI", Url]);
 
         AssertRefused(result, "curl: option -sI: is badly used here", TryHelp);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -413,9 +419,10 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("-sI", "--no-head")]
     public void Parse_SilentThenConflictingHead_IsRefusedWithoutWarning(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
         AssertRefused(result, "curl: option --no-head: is badly used here", TryHelp);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -426,36 +433,44 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("--fail")]
     public void Parse_Fail_FailsWithoutBody(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = Parse([spelling, Url]);
 
+        Diagnostics.Assert("fail mode", HttpFailMode.Fail, result.Options!.FailMode);
         Assert.AreEqual(HttpFailMode.Fail, result.Options!.FailMode);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
     public void Parse_FailWithBody_FailsWithBody()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--fail-with-body", Url]);
+        CommandLineParseResult result = Parse(["--fail-with-body", Url]);
 
+        Diagnostics.Assert("fail mode", HttpFailMode.FailWithBody, result.Options!.FailMode);
         Assert.AreEqual(HttpFailMode.FailWithBody, result.Options!.FailMode);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
     public void Parse_FailThenFailWithBody_WarnsAndFailsWithBody()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-f", "--fail-with-body", Url]);
+        CommandLineParseResult result = Parse(["-f", "--fail-with-body", Url]);
 
+        Diagnostics.Assert("fail mode", HttpFailMode.FailWithBody, result.Options!.FailMode);
         Assert.AreEqual(HttpFailMode.FailWithBody, result.Options!.FailMode);
+        AssertWarnings(new[] { "Warning: --fail-with-body deselects --fail here" }, result);
         CollectionAssert.AreEqual(new[] { "Warning: --fail-with-body deselects --fail here" }, result.WarningLines.ToArray());
     }
 
     [TestMethod]
     public void Parse_FailWithBodyThenFail_WarnsAndFailsWithoutBody()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--fail-with-body", "-f", Url]);
+        CommandLineParseResult result = Parse(["--fail-with-body", "-f", Url]);
 
+        Diagnostics.Assert("fail mode", HttpFailMode.Fail, result.Options!.FailMode);
         Assert.AreEqual(HttpFailMode.Fail, result.Options!.FailMode);
+        AssertWarnings(new[] { "Warning: --fail deselects --fail-with-body here" }, result);
         CollectionAssert.AreEqual(new[] { "Warning: --fail deselects --fail-with-body here" }, result.WarningLines.ToArray());
     }
 
@@ -465,17 +480,20 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("-S", "-s", "--fail-with-body", "-f")]
     public void Parse_SilentThenBothFailModes_DoesNotWarn(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
     public void Parse_BothFailModesThenSilent_StillWarns()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--fail-with-body", "-f", "-s", Url]);
+        CommandLineParseResult result = Parse(["--fail-with-body", "-f", "-s", Url]);
 
+        AssertWarnings(new[] { "Warning: --fail deselects --fail-with-body here" }, result);
         CollectionAssert.AreEqual(new[] { "Warning: --fail deselects --fail-with-body here" }, result.WarningLines.ToArray());
     }
 
@@ -484,9 +502,11 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("--fail-with-body", "--fail-with-body")]
     public void Parse_SameFailModeTwice_DoesNotWarn(string first, string second)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+        CommandLineParseResult result = Parse([first, second, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -509,9 +529,11 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("--fail-with-body", "--no-fail-with-body", "-f")]
     public void Parse_NegationBetweenFailModes_DoesNotWarn(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
     }
 
@@ -545,24 +567,66 @@ public sealed class CommandLineRedirectAndFailOptionTests
     [DataRow("--no-fail=x")]
     public void Parse_NoSpellingAlone_IsAcceptedAndLeavesDefault(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = Parse([spelling, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertWarnings([], result);
         Assert.IsEmpty(result.WarningLines);
+        Diagnostics.Assert("follow redirects", false, result.Options!.FollowRedirects);
         Assert.IsFalse(result.Options.FollowRedirects);
+        Diagnostics.Assert("fail mode", HttpFailMode.None, result.Options!.FailMode);
         Assert.AreEqual(HttpFailMode.None, result.Options.FailMode);
     }
 
-    private static CommandLineOptions Accept(params string[] arguments)
-    {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            ActRedirectAndFailOptions(result.Options);
+        }
+
+        return result;
+    }
+
+    private void ActRedirectAndFailOptions(CommandLineOptions options)
+    {
+        Diagnostics.Act("follow redirects", options.FollowRedirects);
+        Diagnostics.Act("follow redirects per spec", options.FollowRedirectsPerSpec);
+        Diagnostics.Act("send credentials to redirect hosts", options.SendCredentialsToRedirectHosts);
+        Diagnostics.Act("max redirects", options.MaxRedirects);
+        Diagnostics.Act("keep post after 301/302/303", $"{options.KeepPostAfter301}/{options.KeepPostAfter302}/{options.KeepPostAfter303}");
+        Diagnostics.Act("show headers", options.ShowHeaders);
+        Diagnostics.Act("no body", options.NoBody);
+        Diagnostics.Act("fail mode", options.FailMode);
+        Diagnostics.Act("fail early", options.FailEarly);
+    }
+
+    private CommandLineOptions Accept(params string[] arguments)
+    {
+        CommandLineParseResult result = Parse(arguments);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
     }
 
-    private static void AssertRefused(CommandLineParseResult result, params string[] standardErrorLines)
+    private void AssertWarnings(string[] expected, CommandLineParseResult result) =>
+        Diagnostics.Assert("warnings", CommandLineParseDiagnostics.QuoteEach(expected), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+
+    private void AssertRefused(CommandLineParseResult result, params string[] standardErrorLines)
     {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach(standardErrorLines),
+            CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(standardErrorLines, result.Refusal.StandardErrorLines.ToArray());
