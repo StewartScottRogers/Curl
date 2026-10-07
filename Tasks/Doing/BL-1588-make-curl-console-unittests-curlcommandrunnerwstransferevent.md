@@ -36,3 +36,4 @@ Every test in these `Curl.Console.UnitTests` files (11 files, 90 test methods, c
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Lane 8 could not integrate: fast tests failed twice (no test named; then no test named) after rebasing onto the other lanes' work. The work is on branch factory/BL-1588-lane-8-20261007-111121; start with git cherry-pick --no-commit factory/BL-1588-lane-8-20261007-111121 and fix it.
+- 2026-10-07: Backlog -> Doing.
