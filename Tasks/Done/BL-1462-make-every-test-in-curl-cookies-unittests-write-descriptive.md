@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Cookies.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1462 — Make every test in Curl.Cookies.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,21 @@ Every test in `Curl.Cookies.UnitTests` writes, through BL-1457's shared `TestDia
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Cookies.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Cookies.UnitTests -warnaserror` is clean and `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Cookies.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Cookies.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Cookies.UnitTests -warnaserror` is clean and `dotnet test Curl.Cookies.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Cookies.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 127 test methods in 10 files.
+- Counts (Select-String -AllMatches, excluding obj and bin), before -> after: `Assert.` 180 -> 180, `[TestMethod` 127 -> 127, `[DataRow(` 281 -> 281. The fast run's total is 371 (unchanged: no test method or data row was added or removed): 370 run and pass, 1 is skipped by its `OSCondition` (`LoadCookieFileAsync_Directory_OffWindows_ReportsPointsToADirectory` on Windows), so the run prints 370 `END` lines, one per test run; the `arrange 0`/`act 0`/`assert 0` filter prints nothing.
+- Choice: the project-local `CookieTestDiagnostics.cs` escapes control characters and caps text at 200 characters and lists at 20 items, so long headers (4000-character cookies, 200-cookie jars) stay readable and every platform logs the same text. Every real assertion stays inline in its test, so helpers (`CompareHeader`, `LogThrown`) only write lines; the test asserts what they return.
+- SLOW: none. No test printed a `SLOW:` line, so no follow-up task.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Cookies.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF lines; 370 END lines, none with a zero count
