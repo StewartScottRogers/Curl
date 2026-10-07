@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -6,10 +8,22 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class TlsClientOptionsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Constructor_WithNoArguments_VerifiesAgainstTheSystemStoreAtTheSystemDefaultVersionWithNoClientCertificate()
     {
+        Diagnostics.Arrange("options", "new TlsClientOptions()");
+
         var options = new TlsClientOptions();
+
+        Diagnostics.Act("insecure", options.Insecure);
+        Diagnostics.Act("minimum version", options.MinimumVersion);
+        Diagnostics.Act("options", options);
+        Diagnostics.Assert("insecure", false, options.Insecure);
+        Diagnostics.Assert("minimum version", TlsVersion.SystemDefault, options.MinimumVersion);
 
         Assert.IsFalse(options.Insecure);
         Assert.AreEqual(TlsVersion.SystemDefault, options.MinimumVersion);
@@ -25,6 +39,8 @@ public sealed class TlsClientOptionsTests
     public void With_EveryProperty_CopiesTheOptionsWithTheNewValues()
     {
         var original = new TlsClientOptions();
+        Diagnostics.Arrange("original", original);
+        Diagnostics.Arrange("changed values", "Insecure, Tls13, ca.pem, certs, client.p12:secret, key.pem, two cipher lists");
 
         var changed = original with
         {
@@ -37,6 +53,12 @@ public sealed class TlsClientOptionsTests
             Ciphers = "ECDHE-RSA-AES128-GCM-SHA256",
             Tls13Ciphers = "TLS_AES_128_GCM_SHA256",
         };
+
+        Diagnostics.Act("changed", changed);
+        Diagnostics.Act("original", original);
+        Diagnostics.Assert("changed insecure", true, changed.Insecure);
+        Diagnostics.Assert("changed minimum version", TlsVersion.Tls13, changed.MinimumVersion);
+        Diagnostics.Assert("original unchanged", new TlsClientOptions(), original);
 
         Assert.IsTrue(changed.Insecure);
         Assert.AreEqual(TlsVersion.Tls13, changed.MinimumVersion);
@@ -52,7 +74,15 @@ public sealed class TlsClientOptionsTests
     [TestMethod]
     public void Constructor_WithNoArguments_LeavesTheTenOptionsOfAdr0151NotGiven()
     {
+        Diagnostics.Arrange("options", "new TlsClientOptions()");
+
         var options = new TlsClientOptions();
+
+        Diagnostics.Act("allow early data", options.AllowEarlyData);
+        Diagnostics.Act("curves", options.Curves ?? "null");
+        Diagnostics.Act("tls user", options.TlsUser ?? "null");
+        Diagnostics.Assert("allow early data", false, options.AllowEarlyData);
+        Diagnostics.Assert("curves", "null", options.Curves ?? "null");
 
         Assert.IsNull(options.Curves);
         Assert.IsNull(options.SignatureAlgorithms);
@@ -70,6 +100,8 @@ public sealed class TlsClientOptionsTests
     [TestMethod]
     public void With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues()
     {
+        Diagnostics.Arrange("changed values", "X25519, ECDSA+SHA256, early data, hard, example.com, AEX+DQ==, sess.bin, pkcs11, user, secret, SRP");
+
         var changed = new TlsClientOptions() with
         {
             Curves = "X25519",
@@ -84,6 +116,12 @@ public sealed class TlsClientOptionsTests
             TlsPassword = "secret",
             TlsAuthType = "SRP",
         };
+
+        Diagnostics.Act("curves", changed.Curves);
+        Diagnostics.Act("ech", changed.Ech);
+        Diagnostics.Act("tls auth type", changed.TlsAuthType);
+        Diagnostics.Assert("curves", "X25519", changed.Curves);
+        Diagnostics.Assert("allow early data", true, changed.AllowEarlyData);
 
         Assert.AreEqual("X25519", changed.Curves);
         Assert.AreEqual("ECDSA+SHA256", changed.SignatureAlgorithms);

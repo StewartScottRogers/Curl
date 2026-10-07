@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using Curl.Tls;
 using CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
 
@@ -31,6 +32,10 @@ public sealed class TlsConnectionCloseNotifyTests
     private static readonly IPEndPoint ServerEndPoint = new(IPAddress.Loopback, 443);
 
     private static X509Certificate2 s_serverCertificate = null!;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     /// <summary>How the test server ends the connection after its application data.</summary>
     public enum ServerEnding
@@ -77,13 +82,23 @@ public sealed class TlsConnectionCloseNotifyTests
     [TestMethod]
     [DataRow(ProviderKind.SslStream)]
     [DataRow(ProviderKind.HandBuiltTls12)]
-    public Task ReadAsync_AfterCloseNotify_ReturnsZero(ProviderKind kind) =>
-        AssertEndsQuietlyAsync(kind);
+    public async Task ReadAsync_AfterCloseNotify_ReturnsZero(ProviderKind kind)
+    {
+        Diagnostics.Arrange("provider", kind);
+        Diagnostics.Arrange("server ending", ServerEnding.CloseNotify);
+
+        await AssertEndsQuietlyAsync(kind);
+    }
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)]
-    public Task ReadAsync_AfterCloseNotifyOverTls13_ReturnsZero() =>
-        AssertEndsQuietlyAsync(ProviderKind.HandBuiltTls13);
+    public async Task ReadAsync_AfterCloseNotifyOverTls13_ReturnsZero()
+    {
+        Diagnostics.Arrange("provider", ProviderKind.HandBuiltTls13);
+        Diagnostics.Arrange("server ending", ServerEnding.CloseNotify);
+
+        await AssertEndsQuietlyAsync(ProviderKind.HandBuiltTls13);
+    }
 
     [TestMethod]
     [DataRow(ProviderKind.SslStream, ServerEnding.BareEnd, true, SchannelText)]
@@ -93,63 +108,108 @@ public sealed class TlsConnectionCloseNotifyTests
     [DataRow(ProviderKind.HandBuiltTls12, ServerEnding.BareEnd, true, SchannelText)]
     [DataRow(ProviderKind.HandBuiltTls12, ServerEnding.BareEnd, false, OpenSslText)]
     [DataRow(ProviderKind.HandBuiltTls12, ServerEnding.EndInsideARecord, false, OpenSslText)]
-    public Task ReadAsync_WhenTheTransportEndsWithoutCloseNotify_ThrowsMissingCloseNotifyWithTheBuildsText(
-        ProviderKind kind, ServerEnding ending, bool matchesSchannelBuild, string expected) =>
-        AssertMissingCloseNotifyAsync(kind, ending, matchesSchannelBuild, expected);
+    public async Task ReadAsync_WhenTheTransportEndsWithoutCloseNotify_ThrowsMissingCloseNotifyWithTheBuildsText(
+        ProviderKind kind, ServerEnding ending, bool matchesSchannelBuild, string expected)
+    {
+        Diagnostics.Arrange("provider, server ending, matches Schannel build", $"{kind}, {ending}, {matchesSchannelBuild}");
+        Diagnostics.Arrange("expected message", expected);
+
+        await AssertMissingCloseNotifyAsync(kind, ending, matchesSchannelBuild, expected);
+    }
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)]
     [DataRow(ServerEnding.BareEnd)]
     [DataRow(ServerEnding.EndInsideARecord)]
-    public Task ReadAsync_WhenTheTransportEndsWithoutCloseNotifyOverTls13_ThrowsMissingCloseNotify(ServerEnding ending) =>
-        AssertMissingCloseNotifyAsync(ProviderKind.HandBuiltTls13, ending, false, OpenSslText);
+    public async Task ReadAsync_WhenTheTransportEndsWithoutCloseNotifyOverTls13_ThrowsMissingCloseNotify(ServerEnding ending)
+    {
+        Diagnostics.Arrange("provider, server ending, matches Schannel build", $"{ProviderKind.HandBuiltTls13}, {ending}, False");
+        Diagnostics.Arrange("expected message", OpenSslText);
+
+        await AssertMissingCloseNotifyAsync(ProviderKind.HandBuiltTls13, ending, false, OpenSslText);
+    }
 
     [TestMethod]
     public async Task ReadAsync_WhenTheTransportIsResetBeforeItEnds_ThrowsTheResetNotMissingCloseNotify()
     {
+        Diagnostics.Arrange("provider, protocols", "SslStream, Tls12");
+        Diagnostics.Arrange("transport", "reset before the server ends it");
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunServerAsync(server, SslProtocols.Tls12, ending: null);
         var plaintext = new ResetOnDemandConnection(new StreamConnection(client, ServerEndPoint));
 
-        var result = await Provider(ProviderKind.SslStream, true).AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await Provider(ProviderKind.SslStream, true).AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
+        }
+
         await using var connection = result.Connection!;
         await ReadHelloAsync(connection);
         plaintext.Reset();
 
-        var exception = await Assert.ThrowsAsync<IOException>(() => connection.ReadAsync(new byte[16], CancellationToken.None).AsTask());
+        IOException exception;
+        using (Diagnostics.Phase("read after reset"))
+        {
+            exception = await Assert.ThrowsAsync<IOException>(() => connection.ReadAsync(new byte[16], CancellationToken.None).AsTask());
+        }
 
+        Diagnostics.Act("exception type", exception.GetType().Name);
+        Diagnostics.Assert("is a missing close_notify", false, exception is MissingCloseNotifyException);
         Assert.IsNotInstanceOfType<MissingCloseNotifyException>(exception);
         await client.DisposeAsync(); // Ends the server's waiting read.
         await IgnoreFailureAsync(serverTask);
     }
 
-    private static async Task AssertEndsQuietlyAsync(ProviderKind kind)
+    private async Task AssertEndsQuietlyAsync(ProviderKind kind)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunServerAsync(server, ProtocolsFor(kind), ServerEnding.CloseNotify);
 
-        var result = await Provider(kind, true).AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await Provider(kind, true).AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
+
         await using var connection = result.Connection!;
         await ReadHelloAsync(connection);
 
-        Assert.AreEqual(0, await connection.ReadAsync(new byte[16], CancellationToken.None));
+        Diagnostics.Act("server ending", ServerEnding.CloseNotify);
+        Diagnostics.Assert("bytes read after close_notify", 0, "checked by the next assertion");
+        using (Diagnostics.Phase("read after close_notify"))
+        {
+            Assert.AreEqual(0, await connection.ReadAsync(new byte[16], CancellationToken.None));
+        }
+
         await IgnoreFailureAsync(serverTask);
     }
 
-    private static async Task AssertMissingCloseNotifyAsync(ProviderKind kind, ServerEnding ending, bool matchesSchannelBuild, string expected)
+    private async Task AssertMissingCloseNotifyAsync(ProviderKind kind, ServerEnding ending, bool matchesSchannelBuild, string expected)
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunServerAsync(server, ProtocolsFor(kind), ending);
 
-        var result = await Provider(kind, matchesSchannelBuild).AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await Provider(kind, matchesSchannelBuild).AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
+
         await using var connection = result.Connection!;
         await ReadHelloAsync(connection);
 
-        var exception = await Assert.ThrowsExactlyAsync<MissingCloseNotifyException>(
-            () => connection.ReadAsync(new byte[16], CancellationToken.None).AsTask());
+        MissingCloseNotifyException exception;
+        using (Diagnostics.Phase("read after transport end"))
+        {
+            exception = await Assert.ThrowsExactlyAsync<MissingCloseNotifyException>(
+                () => connection.ReadAsync(new byte[16], CancellationToken.None).AsTask());
+        }
 
+        Diagnostics.Act("exception message", exception.Message);
+        Diagnostics.Assert("exception message", expected, exception.Message);
         Assert.AreEqual(expected, exception.Message);
         await IgnoreFailureAsync(serverTask);
     }

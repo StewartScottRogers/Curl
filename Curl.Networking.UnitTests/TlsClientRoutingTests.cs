@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -8,6 +10,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class TlsClientRoutingTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     public static IEnumerable<object[]> PlainOptionSets =>
     [
         [new TlsClientOptions()],
@@ -54,23 +60,62 @@ public sealed class TlsClientRoutingTests
 
     [TestMethod]
     [DynamicData(nameof(CurvesAndSigalgsOptionSets))]
-    public void Choose_WithCurvesOrSigalgs_IsTheHandBuiltClient(TlsClientOptions options) =>
+    public void Choose_WithCurvesOrSigalgs_IsTheHandBuiltClient(TlsClientOptions options)
+    {
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
+    }
 
     // ADR-0319's row: --ssl-sessions, since SslStream can neither export nor import a session.
     // The --tls-earlydata row (BL-1105): SslStream sends no 0-RTT early data.
     [TestMethod]
-    public void Choose_WithTlsEarlyData_IsTheHandBuiltClient() =>
+    public void Choose_WithTlsEarlyData_IsTheHandBuiltClient()
+    {
+        var options = new TlsClientOptions(AllowEarlyData: true);
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(AllowEarlyData: true)));
+    }
 
     [TestMethod]
-    public void Choose_WithSslSessions_IsTheHandBuiltClient() =>
+    public void Choose_WithSslSessions_IsTheHandBuiltClient()
+    {
+        var options = new TlsClientOptions(SslSessionsFile: "sessions.txt");
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(SslSessionsFile: "sessions.txt")));
+    }
 
     // ADR-0151's --no-sessionid row (BL-713): SslStream cannot stop the system's session cache.
     [TestMethod]
-    public void Choose_WithNoSessionId_IsTheHandBuiltClient() =>
+    public void Choose_WithNoSessionId_IsTheHandBuiltClient()
+    {
+        var options = new TlsClientOptions(NoSessionId: true);
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(NoSessionId: true)));
+    }
 
     // ADR-0151's --ssl-allow-beast row (BL-713): only a range reaching TLS 1.0 can split, and a
     // TLS 1.0 or 1.1 ceiling is hand-built already, so a TLS 1.0 minimum below a higher one routes.
@@ -78,8 +123,18 @@ public sealed class TlsClientRoutingTests
     [DataRow(TlsVersion.Tls10, TlsClientRoute.HandBuilt)]
     [DataRow(TlsVersion.SystemDefault, TlsClientRoute.SslStream)]
     [DataRow(TlsVersion.Tls12, TlsClientRoute.SslStream)]
-    public void Choose_WithSslAllowBeast_IsTheHandBuiltClientOnlyWhenTheRangeReachesTls10(TlsVersion minimum, TlsClientRoute expected) =>
+    public void Choose_WithSslAllowBeast_IsTheHandBuiltClientOnlyWhenTheRangeReachesTls10(TlsVersion minimum, TlsClientRoute expected)
+    {
+        var options = new TlsClientOptions(MinimumVersion: minimum, AllowBeast: true);
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", expected, actual);
+
         Assert.AreEqual(expected, TlsClientRouting.Choose(new TlsClientOptions(MinimumVersion: minimum, AllowBeast: true)));
+    }
 
     // ADR-0360's row (BL-1143): a TLS 1.0 or 1.1 minimum, alone or under a modern ceiling, since an
     // operating-system stack may refuse those versions.
@@ -88,8 +143,18 @@ public sealed class TlsClientRoutingTests
     [DataRow(TlsVersion.Tls11, TlsVersion.SystemDefault)]
     [DataRow(TlsVersion.Tls10, TlsVersion.Tls12)]
     [DataRow(TlsVersion.Tls11, TlsVersion.Tls13)]
-    public void Choose_WithATls10OrTls11Minimum_IsTheHandBuiltClient(TlsVersion minimum, TlsVersion maximum) =>
+    public void Choose_WithATls10OrTls11Minimum_IsTheHandBuiltClient(TlsVersion minimum, TlsVersion maximum)
+    {
+        var options = new TlsClientOptions(MinimumVersion: minimum, MaximumVersion: maximum);
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(MinimumVersion: minimum, MaximumVersion: maximum)));
+    }
 
     // ADR-0327's row: --ech in any mode but false, since SslStream offers no Encrypted Client Hello.
     [TestMethod]
@@ -98,47 +163,121 @@ public sealed class TlsClientRoutingTests
     [DataRow("hard", null)]
     [DataRow(null, "AAA=")]
     [DataRow("false", "AAA=")]
-    public void Choose_WithEch_IsTheHandBuiltClient(string? mode, string? configList) =>
+    public void Choose_WithEch_IsTheHandBuiltClient(string? mode, string? configList)
+    {
+        var options = new TlsClientOptions(Ech: mode, EchConfigList: configList);
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(Ech: mode, EchConfigList: configList)));
+    }
 
     // ADR-0359: pn: alone is hard, as libcurl's setopt_ech makes it.
     [TestMethod]
-    public void Choose_WithOnlyAnEchPublicName_IsTheHandBuiltClient() =>
+    public void Choose_WithOnlyAnEchPublicName_IsTheHandBuiltClient()
+    {
+        var options = new TlsClientOptions(EchPublicName: "pn.test");
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(new TlsClientOptions(EchPublicName: "pn.test")));
+    }
 
     [TestMethod]
     [DataRow("false")]
     [DataRow("bogus")]
     [DataRow(null)]
-    public void Choose_WithEchOff_IsSslStream(string? mode) =>
+    public void Choose_WithEchOff_IsSslStream(string? mode)
+    {
+        var options = new TlsClientOptions(Ech: mode);
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.SslStream, actual);
+
         Assert.AreEqual(TlsClientRoute.SslStream, TlsClientRouting.Choose(new TlsClientOptions(Ech: mode)));
+    }
 
     [TestMethod]
     [DynamicData(nameof(PlainOptionSets))]
-    public void Choose_WithAPlainOptionSet_IsSslStream(TlsClientOptions options) =>
+    public void Choose_WithAPlainOptionSet_IsSslStream(TlsClientOptions options)
+    {
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.SslStream, actual);
+
         Assert.AreEqual(TlsClientRoute.SslStream, TlsClientRouting.Choose(options));
+    }
 
     [TestMethod]
     [DynamicData(nameof(LegacyVersionOptionSets))]
-    public void Choose_WithACeilingOfTls10OrTls11_IsTheHandBuiltClient(TlsClientOptions options) =>
+    public void Choose_WithACeilingOfTls10OrTls11_IsTheHandBuiltClient(TlsClientOptions options)
+    {
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
+    }
 
     [TestMethod]
     [DynamicData(nameof(CertificateStatusOptionSets))]
-    public void Choose_WithCertStatus_IsTheHandBuiltClient(TlsClientOptions options) =>
+    public void Choose_WithCertStatus_IsTheHandBuiltClient(TlsClientOptions options)
+    {
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", TlsClientRoute.HandBuilt, actual);
+
         Assert.AreEqual(TlsClientRoute.HandBuilt, TlsClientRouting.Choose(options));
+    }
 
     // ADR-0328's row: --tlsuser, since SslStream has no TLS-SRP; --tlspassword alone turns nothing on.
     [TestMethod]
     [DataRow("alice", "secret", TlsClientRoute.HandBuilt)]
     [DataRow("alice", null, TlsClientRoute.HandBuilt)]
     [DataRow(null, "secret", TlsClientRoute.SslStream)]
-    public void Choose_WithTlsSrpOptions_IsTheHandBuiltClientOnlyWithATlsUser(string? user, string? password, TlsClientRoute expected) =>
+    public void Choose_WithTlsSrpOptions_IsTheHandBuiltClientOnlyWithATlsUser(string? user, string? password, TlsClientRoute expected)
+    {
+        var options = new TlsClientOptions(TlsUser: user, TlsPassword: password);
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Choose(options);
+
+        Diagnostics.Act("route", actual);
+        Diagnostics.Assert("route", expected, actual);
+
         Assert.AreEqual(expected, TlsClientRouting.Choose(new TlsClientOptions(TlsUser: user, TlsPassword: password)));
+    }
 
     [TestMethod]
-    public void Choose_WithNullOptions_ThrowsArgumentNullException() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => TlsClientRouting.Choose(null!));
+    public void Choose_WithNullOptions_ThrowsArgumentNullException()
+    {
+        Diagnostics.Arrange("options", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => TlsClientRouting.Choose(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 
     // BL-968: each row of ADR-0140's table names its option, the first row that holds winning.
     public static IEnumerable<object[]> ReasonsByRow =>
@@ -157,15 +296,40 @@ public sealed class TlsClientRoutingTests
 
     [TestMethod]
     [DynamicData(nameof(ReasonsByRow))]
-    public void Reason_WhenARowHolds_NamesItsOption(TlsClientOptions options, string expected) =>
+    public void Reason_WhenARowHolds_NamesItsOption(TlsClientOptions options, string expected)
+    {
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Reason(options);
+
+        Diagnostics.Act("reason", actual);
+        Diagnostics.Assert("reason", expected, actual);
+
         Assert.AreEqual(expected, TlsClientRouting.Reason(options));
+    }
 
     [TestMethod]
     [DynamicData(nameof(PlainOptionSets))]
-    public void Reason_WithAPlainOptionSet_IsNull(TlsClientOptions options) =>
+    public void Reason_WithAPlainOptionSet_IsNull(TlsClientOptions options)
+    {
+        Diagnostics.Arrange("options", options);
+
+        var actual = TlsClientRouting.Reason(options);
+
+        Diagnostics.Act("reason", actual ?? "null");
+        Diagnostics.Assert("reason", "null", actual ?? "null");
+
         Assert.IsNull(TlsClientRouting.Reason(options));
+    }
 
     [TestMethod]
-    public void Reason_WithNullOptions_ThrowsArgumentNullException() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => TlsClientRouting.Reason(null!));
+    public void Reason_WithNullOptions_ThrowsArgumentNullException()
+    {
+        Diagnostics.Arrange("options", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => TlsClientRouting.Reason(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 }
