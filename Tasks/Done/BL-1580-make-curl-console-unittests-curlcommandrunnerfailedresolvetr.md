@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1580 — Make Curl.Console.UnitTests' CurlCommandRunnerFailedResolveTraceTests to CurlCommandRunnerImapTransferEventTests tests write descriptive diagnostic output
 
@@ -24,15 +24,22 @@ Every test in these `Curl.Console.UnitTests` files (12 files, 91 test methods, c
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Console.UnitTests --filter "<these classes' filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
-- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Console.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+- [x] `dotnet test Curl.Console.UnitTests --filter "<these classes' filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Console.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
 
 ## Notes
+
+- Counts in the 12 files, before -> after: `Assert.` 267 -> 267 (`Diagnostics.Assert(` does not match the pattern), `[TestMethod` 91 -> 91, `[DataRow(` 53 -> 53. Existing assertions are untouched; a few inline expected values moved into locals or constants so `Diagnostics.Diff`/`Assert` and the real assertion share them, and some private `RunAsync` helpers became `async` so the run sits inside `Phase("run")`.
+- The filtered detailed run: 125 tests, 124 passed, 1 skipped (`RunAsync_VerboseUidFetchWithStartTlsOffWindows_...`, off-Windows only); 124 `END` lines, none with a zero arrange, act or assert count.
+- `CurlCommandRunnerFileConnectionNumberTests` no longer writes its temp directory with a raw `TestContext.WriteLine`; it writes `ARRANGE temporary file` and prints the file URL as `file:///<temporary>/a.txt`, so nothing printed depends on the OS.
+- No test printed a `SLOW:` line.
+- `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"`: 2661 passed, 24 skipped, 0 failed.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. All 91 tests in the 12 Curl.Console.UnitTests files write ARRANGE, ACT and ASSERT diagnostics
