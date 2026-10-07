@@ -33,9 +33,12 @@ public sealed partial class CookieStoreTests
     public void LoadCookieFile_SetCookieLineWithInvalidOctetsInValue_ReportsTheDrop()
     {
         RecordingTransferEvents events = new();
+        Diagnostics.ArrangeText("cookie file", "Set-Cookie: g=v; X=\u0001\n");
 
         new CookieStore().LoadCookieFile(new StringReader("Set-Cookie: g=v; X=\u0001\n"), discardSessionCookies: false, Now, events);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.AssertTexts("-v lines reported", new[] { "invalid octets in value, cookie dropped" }, events.Info);
         CollectionAssert.AreEqual(new[] { "invalid octets in value, cookie dropped" }, events.Info);
     }
 
@@ -43,13 +46,16 @@ public sealed partial class CookieStoreTests
     public void LoadCookieFile_CleanFile_ReportsNothing()
     {
         RecordingTransferEvents events = new();
+        Diagnostics.ArrangeText("cookie file", "Set-Cookie: f=v\n127.0.0.1\tFALSE\t/\tFALSE\t0\tn\tv\n");
 
         new CookieStore().LoadCookieFile(
             new StringReader("Set-Cookie: f=v\n127.0.0.1\tFALSE\t/\tFALSE\t0\tn\tv\n"),
             discardSessionCookies: false,
             Now,
             events);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.Assert("-v line count", 0, events.Info.Count);
         Assert.IsEmpty(events.Info);
     }
 
@@ -58,10 +64,14 @@ public sealed partial class CookieStoreTests
     public void LoadCookieFile_RefusingFile_ReportsEachRefusedHeaderLineInFileOrder()
     {
         RecordingTransferEvents events = new();
+        Diagnostics.ArrangeText("cookie file", RefusingCookieFile);
         CookieStore store = new();
 
         store.LoadCookieFile(new StringReader(RefusingCookieFile), discardSessionCookies: false, Now, events);
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.AssertTexts("-v lines reported", ["invalid octets in value, cookie dropped", "invalid octets in name, cookie dropped", "invalid cookie, dropped", "invalid octets in value, cookie dropped"], events.Info);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -71,7 +81,8 @@ public sealed partial class CookieStoreTests
                 "invalid octets in value, cookie dropped",
             },
             events.Info);
-        Assert.AreEqual("s=v", store.GetCookieHeader(Loopback, secure: false, Now));
+        HeaderCheck check = CompareHeader("s=v", store, Loopback, secure: false, Now);
+        Assert.AreEqual(check.Expected, check.Actual);
     }
 
     /// <summary>
@@ -96,11 +107,15 @@ public sealed partial class CookieStoreTests
     public void LoadCookieFile_RefusedSetCookieLine_ReportsWhatCurlPrinted(string line, string? expected)
     {
         RecordingTransferEvents events = new();
+        Diagnostics.ArrangeText("cookie file line", line);
         CookieStore store = new();
 
         store.LoadCookieFile(new StringReader(line + "\n"), discardSessionCookies: false, Now, events);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.AssertTexts("-v lines reported", expected is null ? Array.Empty<string>() : new[] { expected }, events.Info);
         CollectionAssert.AreEqual(expected is null ? Array.Empty<string>() : new[] { expected }, events.Info);
+        Diagnostics.Assert("stored cookie count", 0, store.Cookies.Count);
         Assert.IsEmpty(store.Cookies);
     }
 
@@ -109,10 +124,14 @@ public sealed partial class CookieStoreTests
     {
         FakeFileSystem fileSystem = new() { ReadContent = Encoding.Latin1.GetBytes("Set-Cookie: c\nSet-Cookie: f=v\n") };
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("cookie file path", "cf.txt");
+        Diagnostics.Bytes("cookie file cf.txt", fileSystem.ReadContent);
         CookieStore store = new();
 
         await store.LoadCookieFileAsync(fileSystem, "cf.txt", discardSessionCookies: false, Now, events, CancellationToken.None);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.AssertTexts("-v lines reported", new[] { "invalid cookie, dropped" }, events.Info);
         CollectionAssert.AreEqual(new[] { "invalid cookie, dropped" }, events.Info);
         Assert.AreEqual("f=v", store.GetCookieHeader(Loopback, secure: false, Now));
     }
@@ -128,11 +147,15 @@ public sealed partial class CookieStoreTests
     public async Task LoadCookieFileAsync_CannotOpen_ReportsTheWarning(string path)
     {
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("cookie file that cannot be opened", path);
         CookieStore store = new();
 
         await store.LoadCookieFileAsync(new FakeFileSystem(), path, discardSessionCookies: false, Now, events, CancellationToken.None);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.AssertTexts("-v lines reported", new[] { $"WARNING: failed to open cookie file \"{path}\"" }, events.Info);
         CollectionAssert.AreEqual(new[] { $"WARNING: failed to open cookie file \"{path}\"" }, events.Info);
+        Diagnostics.Assert("stored cookie count", 0, store.Cookies.Count);
         Assert.IsEmpty(store.Cookies);
     }
 
@@ -145,12 +168,16 @@ public sealed partial class CookieStoreTests
     public async Task LoadCookieFileAsync_Directory_OnWindows_ReportsFailedToOpen()
     {
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("cookie file", "/dir/cookies, a directory, read on Windows");
         CookieStore store = new();
 
         await store.LoadCookieFileAsync(
             new FakeFileSystem { ReadFailure = FileAccessStatus.IsDirectory }, "/dir/cookies", discardSessionCookies: false, Now, events, CancellationToken.None);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.AssertTexts("-v lines reported", new[] { "WARNING: failed to open cookie file \"/dir/cookies\"" }, events.Info);
         CollectionAssert.AreEqual(new[] { "WARNING: failed to open cookie file \"/dir/cookies\"" }, events.Info);
+        Diagnostics.Assert("stored cookie count", 0, store.Cookies.Count);
         Assert.IsEmpty(store.Cookies);
     }
 
@@ -163,12 +190,16 @@ public sealed partial class CookieStoreTests
     public async Task LoadCookieFileAsync_Directory_OffWindows_ReportsPointsToADirectory()
     {
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("cookie file", "/dir/cookies, a directory, read off Windows");
         CookieStore store = new();
 
         await store.LoadCookieFileAsync(
             new FakeFileSystem { ReadFailure = FileAccessStatus.IsDirectory }, "/dir/cookies", discardSessionCookies: false, Now, events, CancellationToken.None);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
 
+        Diagnostics.AssertTexts("-v lines reported", new[] { "WARNING: cookie filename points to a directory: \"/dir/cookies\"" }, events.Info);
         CollectionAssert.AreEqual(new[] { "WARNING: cookie filename points to a directory: \"/dir/cookies\"" }, events.Info);
+        Diagnostics.Assert("stored cookie count", 0, store.Cookies.Count);
         Assert.IsEmpty(store.Cookies);
     }
 
@@ -179,20 +210,38 @@ public sealed partial class CookieStoreTests
     [DataRow(FileAccessStatus.NotFound, true, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Not found, Windows")]
     [DataRow(FileAccessStatus.AccessDenied, false, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Access denied, off Windows")]
     [DataRow(FileAccessStatus.AccessDenied, true, "WARNING: failed to open cookie file \"/dir/cookies\"", DisplayName = "Access denied, Windows")]
-    public void DescribeCookieFileOpenFailure_GivesEachPlatformsLine(FileAccessStatus status, bool isWindows, string expected) =>
-        Assert.AreEqual(expected, CookieStore.DescribeCookieFileOpenFailure("/dir/cookies", status, isWindows));
+    public void DescribeCookieFileOpenFailure_GivesEachPlatformsLine(FileAccessStatus status, bool isWindows, string expected)
+    {
+        Diagnostics.Arrange("status", status);
+        Diagnostics.Arrange("isWindows", isWindows);
+
+        string line = CookieStore.DescribeCookieFileOpenFailure("/dir/cookies", status, isWindows);
+        Diagnostics.ActText("line", line);
+
+        Diagnostics.AssertText("line", expected, line);
+        Assert.AreEqual(expected, line);
+    }
 
     [TestMethod]
-    public void DescribeCookieFileOpenFailure_NullPath_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => CookieStore.DescribeCookieFileOpenFailure(null!, FileAccessStatus.NotFound, isWindows: true));
+    public void DescribeCookieFileOpenFailure_NullPath_Throws()
+    {
+        ArrangeNullArgument("path");
+
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => CookieStore.DescribeCookieFileOpenFailure(null!, FileAccessStatus.NotFound, isWindows: true));
+
+        LogThrown(thrown);
+    }
 
     [TestMethod]
     public async Task LoadCookieFile_NullEvents_Throw()
     {
         CookieStore store = new();
+        ArrangeNullArgument("events, of LoadCookieFile and then LoadCookieFileAsync");
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => store.LoadCookieFile(new StringReader(string.Empty), false, Now, null!));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => store.LoadCookieFile(new StringReader(string.Empty), false, Now, null!));
+        LogThrown(thrown);
+        thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
             () => store.LoadCookieFileAsync(new FakeFileSystem(), "p", false, Now, null!, CancellationToken.None));
+        LogThrown(thrown);
     }
 }

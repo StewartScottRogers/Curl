@@ -15,9 +15,11 @@ public sealed partial class CookieStoreTests
     public void GetCookieHeader_CookieStringOnly_SendsItVerbatim()
     {
         CookieStore store = new();
+        Diagnostics.ArrangeText("-b string", "x=1; y=2");
         store.AddCookieString("x=1; y=2");
 
-        Assert.AreEqual("x=1; y=2", store.GetCookieHeader(Loopback, secure: false, Now));
+        HeaderCheck check = CompareHeader("x=1; y=2", store, Loopback, secure: false, Now);
+        Assert.AreEqual(check.Expected, check.Actual);
     }
 
     /// <summary>Measured: <c>curl -b '  spaced = v ;;'</c> sends the string untouched.</summary>
@@ -25,9 +27,11 @@ public sealed partial class CookieStoreTests
     public void GetCookieHeader_CookieStringWithSpaces_SendsItUntouched()
     {
         CookieStore store = new();
+        Diagnostics.ArrangeText("-b string", "  spaced = v ;;");
         store.AddCookieString("  spaced = v ;;");
 
-        Assert.AreEqual("  spaced = v ;;", store.GetCookieHeader(Loopback, secure: false, Now));
+        HeaderCheck check = CompareHeader("  spaced = v ;;", store, Loopback, secure: false, Now);
+        Assert.AreEqual(check.Expected, check.Actual);
     }
 
     /// <summary>
@@ -41,8 +45,10 @@ public sealed partial class CookieStoreTests
         store.AddCookieString("x=1");
         store.LoadCookieFile(new StringReader("127.0.0.1\tFALSE\t/\tFALSE\t0\tz\t1\n"), discardSessionCookies: false, Now);
         store.AddCookieString("w=3");
+        Diagnostics.Arrange("-b in order", "string x=1, file line 127.0.0.1|/|z=1, string w=3");
 
-        Assert.AreEqual("z=1; x=1; w=3", store.GetCookieHeader(Loopback, secure: false, Now));
+        HeaderCheck check = CompareHeader("z=1; x=1; w=3", store, Loopback, secure: false, Now);
+        Assert.AreEqual(check.Expected, check.Actual);
     }
 
     /// <summary>
@@ -67,9 +73,13 @@ public sealed partial class CookieStoreTests
             discardSessionCookies: false,
             Now);
         uncapped.AddCookieString("y=" + q400);
+        Diagnostics.Arrange("capped", "file aaa and bb of 4000 characters, c of 165, dd=1, then -b x=1");
+        Diagnostics.Arrange("uncapped", "file aaa and bb of 4000 characters, then -b y= and 400 characters");
 
-        Assert.AreEqual($"aaa={x4000}; dd=1; bb={x4000}", capped.GetCookieHeader(Loopback, secure: false, Now));
-        Assert.AreEqual($"aaa={x4000}; bb={x4000}; y={q400}", uncapped.GetCookieHeader(Loopback, secure: false, Now));
+        HeaderCheck check = CompareHeader($"aaa={x4000}; dd=1; bb={x4000}", capped, Loopback, secure: false, Now);
+        Assert.AreEqual(check.Expected, check.Actual);
+        check = CompareHeader($"aaa={x4000}; bb={x4000}; y={q400}", uncapped, Loopback, secure: false, Now);
+        Assert.AreEqual(check.Expected, check.Actual);
     }
 
     /// <summary>Measured: <c>curl -b x=1 -c s5jar.txt</c>, the response setting <c>a=1</c>, writes only <c>a</c> to the jar.</summary>
@@ -77,12 +87,16 @@ public sealed partial class CookieStoreTests
     public void WriteCookieJar_CookieString_IsNotWritten()
     {
         CookieStore store = new();
+        Diagnostics.ArrangeText("-b string", "x=1");
+        Diagnostics.ArrangeSetCookies(Loopback, ["a=1"], Now);
         store.AddCookieString("x=1");
         store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
         StringWriter writer = new() { NewLine = "\n" };
 
         store.WriteCookieJar(writer, Now);
+        Diagnostics.ActText("jar written", writer.ToString());
 
+        Diagnostics.Assert("jar ends with the a=1 line", true, writer.ToString().EndsWith("\n\n127.0.0.1\tFALSE\t/\tFALSE\t0\ta\t1\n", StringComparison.Ordinal));
         Assert.EndsWith("\n\n127.0.0.1\tFALSE\t/\tFALSE\t0\ta\t1\n", writer.ToString());
     }
 
@@ -91,11 +105,16 @@ public sealed partial class CookieStoreTests
     {
         FakeFileSystem fileSystem = new() { ReadContent = Encoding.Latin1.GetBytes("127.0.0.1\tFALSE\t/\tFALSE\t0\tc\taéb\n") };
         CookieStore store = new();
+        Diagnostics.Arrange("cookie file path", "in.txt");
+        Diagnostics.Bytes("cookie file in.txt", fileSystem.ReadContent);
 
         await store.LoadCookieFileAsync(fileSystem, "in.txt", discardSessionCookies: false, Now, CancellationToken.None);
+        Diagnostics.Act("path opened", fileSystem.OpenedPath);
 
+        Diagnostics.Assert("path opened", "in.txt", fileSystem.OpenedPath);
+        HeaderCheck check = CompareHeader("c=aéb", store, Loopback, secure: false, Now);
         Assert.AreEqual("in.txt", fileSystem.OpenedPath);
-        Assert.AreEqual("c=aéb", store.GetCookieHeader(Loopback, secure: false, Now));
+        Assert.AreEqual(check.Expected, check.Actual);
     }
 
     /// <summary>Measured with BL-220's <c>-b none.txt</c>: a cookie file that does not exist loads nothing, silently.</summary>
@@ -103,9 +122,12 @@ public sealed partial class CookieStoreTests
     public async Task LoadCookieFileAsync_MissingFile_LoadsNothing()
     {
         CookieStore store = new();
+        Diagnostics.Arrange("cookie file", "none.txt, which does not exist");
 
         await store.LoadCookieFileAsync(new FakeFileSystem(), "none.txt", discardSessionCookies: false, Now, CancellationToken.None);
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
 
+        Diagnostics.Assert("stored cookie count", 0, store.Cookies.Count);
         Assert.IsEmpty(store.Cookies);
     }
 
@@ -115,12 +137,20 @@ public sealed partial class CookieStoreTests
         MemoryStream written = new();
         FakeFileSystem fileSystem = new() { WriteTarget = written };
         CookieStore store = new();
+        Diagnostics.ArrangeSetCookies(Loopback, ["a=é"], Now);
         store.StoreFromResponse(Loopback, ["a=é"], Now, NoTransferEvents.Instance);
 
         bool saved = await store.SaveCookieJarAsync(fileSystem, "jar.txt", Now, CancellationToken.None);
+        Diagnostics.Act("saved", saved);
+        Diagnostics.Act("path opened", fileSystem.OpenedPath);
+        Diagnostics.Act("create mode", fileSystem.CreateMode);
+        Diagnostics.Bytes("jar written", written.ToArray());
 
         string newLine = Environment.NewLine;
         string expected = string.Join(newLine, NetscapeCookieFile.HeaderLines) + newLine + "127.0.0.1\tFALSE\t/\tFALSE\t0\ta\té" + newLine;
+        Diagnostics.Assert("saved", true, saved);
+        Diagnostics.Assert("create mode", CookieStore.JarCreateMode, fileSystem.CreateMode);
+        Diagnostics.Diff("jar written", Encoding.Latin1.GetBytes(expected), written.ToArray());
         Assert.IsTrue(saved);
         Assert.AreEqual("jar.txt", fileSystem.OpenedPath);
         Assert.AreEqual(CookieStore.JarCreateMode, fileSystem.CreateMode);
@@ -141,16 +171,27 @@ public sealed partial class CookieStoreTests
         FakeFileSystem fileSystem = new() { WriteFailure = status };
         CookieStore store = new();
         store.StoreFromResponse(Loopback, ["a=1"], Now, NoTransferEvents.Instance);
+        Diagnostics.Arrange("write failure", status);
+        Diagnostics.ArrangeSetCookies(Loopback, ["a=1"], Now);
 
-        Assert.IsFalse(await store.SaveCookieJarAsync(fileSystem, "nodir\\x.txt", Now, CancellationToken.None));
+        bool saved = await store.SaveCookieJarAsync(fileSystem, "nodir\\x.txt", Now, CancellationToken.None);
+        Diagnostics.Act("saved", saved);
+
+        Diagnostics.Assert("saved", false, saved);
+        Assert.IsFalse(saved);
     }
 
     [TestMethod]
     public async Task SaveCookieJarAsync_WriteFails_ReturnsFalseSilently()
     {
         FakeFileSystem fileSystem = new() { WriteTarget = new FailingStream() };
+        Diagnostics.Arrange("jar stream", "every write fails with IOException");
 
-        Assert.IsFalse(await new CookieStore().SaveCookieJarAsync(fileSystem, "jar.txt", Now, CancellationToken.None));
+        bool saved = await new CookieStore().SaveCookieJarAsync(fileSystem, "jar.txt", Now, CancellationToken.None);
+        Diagnostics.Act("saved", saved);
+
+        Diagnostics.Assert("saved", false, saved);
+        Assert.IsFalse(saved);
     }
 
     [TestMethod]
@@ -158,6 +199,7 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
         FakeFileSystem fileSystem = new();
+        ArrangeNullArgument("each argument of AddCookieString, LoadCookieFile, WriteCookieJar, LoadCookieFileAsync and SaveCookieJarAsync in turn");
 
         Assert.ThrowsExactly<ArgumentNullException>(() => store.AddCookieString(null!));
         Assert.ThrowsExactly<ArgumentNullException>(() => store.LoadCookieFile(null!, discardSessionCookies: false, Now));
@@ -166,6 +208,8 @@ public sealed partial class CookieStoreTests
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => store.LoadCookieFileAsync(fileSystem, null!, false, Now, CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => store.SaveCookieJarAsync(null!, "p", Now, CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => store.SaveCookieJarAsync(fileSystem, null!, Now, CancellationToken.None));
+        Diagnostics.Act("calls made", 7);
+        Diagnostics.Assert("calls that threw ArgumentNullException", 7, 7);
     }
 
     /// <summary>An <see cref="IFileSystem"/> that serves one file to read and one stream to write, or fails.</summary>

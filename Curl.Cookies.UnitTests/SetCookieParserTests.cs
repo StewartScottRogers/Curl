@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cookies;
 
@@ -14,6 +15,10 @@ namespace Curl.Cookies;
 public sealed class SetCookieParserTests
 {
     private const long Now = 1_790_458_978;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     /// <summary>curl's 400-day cap for <see cref="Now"/>: <c>(Now + 34560000 + 30) / 60 * 60</c>.</summary>
     private const long CappedExpiry = 1_825_018_980;
@@ -159,8 +164,13 @@ public sealed class SetCookieParserTests
     [DataRow("n18=v; Max-Age=99999999999999999999999", CappedExpiry)]
     [DataRow("n19=v; Max-Age=", 0L)]
     [DataRow("t5=v; Max\t-Age=100", 0L)]
-    public void Parse_MaxAge_CountsFromNow(string header, long expectedExpiry) =>
-        Assert.AreEqual(expectedExpiry, Parse("http://localhost/", header)!.ExpiresUnixSeconds);
+    public void Parse_MaxAge_CountsFromNow(string header, long expectedExpiry)
+    {
+        long actualExpiry = Parse("http://localhost/", header)!.ExpiresUnixSeconds;
+
+        Diagnostics.Assert("expiry (Unix seconds)", expectedExpiry, actualExpiry);
+        Assert.AreEqual(expectedExpiry, actualExpiry);
+    }
 
     /// <summary>curl wrote no cookie for these: it kept an already expired one, which a store deletes.</summary>
     [TestMethod]
@@ -177,8 +187,13 @@ public sealed class SetCookieParserTests
     [DataRow("n14=v; Expires=Thu, 01 Jan 1970 00:00:00 GMT")]
     [DataRow("n15=v; Expires=Thu, 01 Jan 1970 00:00:01 GMT")]
     [DataRow("w4=v; Expires=Wed, 09 Jun 1583 10:18:14 GMT")]
-    public void Parse_AlreadyExpired_ExpiresAtOne(string header) =>
-        Assert.AreEqual(1L, Parse("http://localhost/", header)!.ExpiresUnixSeconds);
+    public void Parse_AlreadyExpired_ExpiresAtOne(string header)
+    {
+        long actualExpiry = Parse("http://localhost/", header)!.ExpiresUnixSeconds;
+
+        Diagnostics.Assert("expiry (Unix seconds)", 1L, actualExpiry);
+        Assert.AreEqual(1L, actualExpiry);
+    }
 
     [TestMethod]
     [DataRow("o=15; Expires=Wed, 09 Jun 2027 10:18:14 GMT", 1_812_536_294L)]
@@ -196,29 +211,59 @@ public sealed class SetCookieParserTests
     [DataRow("w5=v; Expires=Wed, 09 Jun 1582 10:18:14 GMT", 0L)]
     [DataRow("n=14; Expires=Wed, 09 Jun 2100 10:18:14 GMT", CappedExpiry)]
     [DataRow("n25=v; Expires=Wed, 09 Jun 10000 10:18:14 GMT", CappedExpiry)]
-    public void Parse_Expires_MatchesCurl(string header, long expectedExpiry) =>
-        Assert.AreEqual(expectedExpiry, Parse("http://localhost/", header)!.ExpiresUnixSeconds);
+    public void Parse_Expires_MatchesCurl(string header, long expectedExpiry)
+    {
+        long actualExpiry = Parse("http://localhost/", header)!.ExpiresUnixSeconds;
+
+        Diagnostics.Assert("expiry (Unix seconds)", expectedExpiry, actualExpiry);
+        Assert.AreEqual(expectedExpiry, actualExpiry);
+    }
 
     /// <summary>curl wrote no cookie for this past date: it kept one already expired at 1994-11-06T08:49:37Z.</summary>
     [TestMethod]
-    public void Parse_PastExpires_KeepsThePastInstant() =>
-        Assert.AreEqual(784_111_777L, Parse("http://localhost/", "n23=v; Expires=Sunday, 06-Nov-94 08:49:37 GMT")!.ExpiresUnixSeconds);
+    public void Parse_PastExpires_KeepsThePastInstant()
+    {
+        long actualExpiry = Parse("http://localhost/", "n23=v; Expires=Sunday, 06-Nov-94 08:49:37 GMT")!.ExpiresUnixSeconds;
+
+        Diagnostics.Assert("expiry (Unix seconds)", 784_111_777L, actualExpiry);
+        Assert.AreEqual(784_111_777L, actualExpiry);
+    }
 
     [TestMethod]
-    public void Parse_ExpiryOneSecondPastTheCap_IsCapped() =>
-        Assert.AreEqual(CappedExpiry, Parse("http://localhost/", "c=v; Max-Age=34560001")!.ExpiresUnixSeconds);
+    public void Parse_ExpiryOneSecondPastTheCap_IsCapped()
+    {
+        long actualExpiry = Parse("http://localhost/", "c=v; Max-Age=34560001")!.ExpiresUnixSeconds;
+
+        Diagnostics.Assert("expiry (Unix seconds)", CappedExpiry, actualExpiry);
+        Assert.AreEqual(CappedExpiry, actualExpiry);
+    }
 
     [TestMethod]
-    public void Parse_ExpiryAtTheCap_IsKept() =>
-        Assert.AreEqual(Now + 34_560_000, Parse("http://localhost/", "c=v; Max-Age=34560000")!.ExpiresUnixSeconds);
+    public void Parse_ExpiryAtTheCap_IsKept()
+    {
+        long actualExpiry = Parse("http://localhost/", "c=v; Max-Age=34560000")!.ExpiresUnixSeconds;
+
+        Diagnostics.Assert("expiry (Unix seconds)", Now + 34_560_000, actualExpiry);
+        Assert.AreEqual(Now + 34_560_000, actualExpiry);
+    }
 
     [TestMethod]
-    public void Parse_MaxAgeThatOverflowsWhenAddedToNow_IsCapped() =>
-        Assert.AreEqual(CappedExpiry, Parse("http://localhost/", "c=v; Max-Age=" + long.MaxValue)!.ExpiresUnixSeconds);
+    public void Parse_MaxAgeThatOverflowsWhenAddedToNow_IsCapped()
+    {
+        long actualExpiry = Parse("http://localhost/", "c=v; Max-Age=" + long.MaxValue)!.ExpiresUnixSeconds;
+
+        Diagnostics.Assert("expiry (Unix seconds)", CappedExpiry, actualExpiry);
+        Assert.AreEqual(CappedExpiry, actualExpiry);
+    }
 
     [TestMethod]
-    public void Parse_SpacesAroundAttributeNamesAndValues_AreTrimmed() =>
-        Assert.AreEqual("localhost|FALSE|/p|FALSE|1790459078|m19|v", JarLine(Parse("http://localhost/", "m19= v; Path = /p ; Max-Age = 100")!));
+    public void Parse_SpacesAroundAttributeNamesAndValues_AreTrimmed()
+    {
+        string jarLine = JarLine(Parse("http://localhost/", "m19= v; Path = /p ; Max-Age = 100")!);
+
+        Diagnostics.AssertText("jar line", "localhost|FALSE|/p|FALSE|1790459078|m19|v", jarLine);
+        Assert.AreEqual("localhost|FALSE|/p|FALSE|1790459078|m19|v", jarLine);
+    }
 
     /// <summary>
     /// Measured with <c>Set-Cookie:x=v; Path=/&lt;p × n&gt;</c> (no space after the colon): a header value of
@@ -234,9 +279,15 @@ public sealed class SetCookieParserTests
     public void Parse_HeaderLength_IsLimitedTo4998(string leadingSpace, int pathLength, bool kept)
     {
         string header = leadingSpace + "x=v; Path=/" + new string('p', pathLength);
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        CurlUrl url = CurlUrl.Parse("http://localhost/");
+        Diagnostics.ArrangeSetCookies(url, [header], now);
+        Diagnostics.Arrange("header length", header.Length);
 
-        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://localhost/"), DateTimeOffset.FromUnixTimeSeconds(Now));
+        Cookie? cookie = SetCookieParser.Parse(header, url, now);
 
+        Diagnostics.Act("cookie stored", cookie is not null);
+        Diagnostics.Assert("cookie stored", kept, cookie is not null);
         Assert.AreEqual(kept, cookie is not null);
     }
 
@@ -252,8 +303,12 @@ public sealed class SetCookieParserTests
     public void Parse_NameAndValueLength_IsLimitedTo4096(int nameLength, int valueLength, bool kept)
     {
         string header = new string('a', nameLength) + "=" + new string('b', valueLength);
+        Diagnostics.Arrange("name length, value length", nameLength + ", " + valueLength);
 
-        Assert.AreEqual(kept, Parse("http://localhost/", header) is not null);
+        bool stored = Parse("http://localhost/", header) is not null;
+
+        Diagnostics.Assert("cookie stored", kept, stored);
+        Assert.AreEqual(kept, stored);
     }
 
     /// <summary>Measured on curl 8.21.0, 2026-10-02 (BL-1225): a 4000-byte name with a 97-byte value is dropped with this line.</summary>
@@ -261,9 +316,16 @@ public sealed class SetCookieParserTests
     public void Parse_OversizedNameAndValue_RefusesWithOversizedLine()
     {
         string header = new string('a', 4000) + "=" + new string('b', 97);
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        CurlUrl url = CurlUrl.Parse("http://127.0.0.1/");
+        Diagnostics.ArrangeSetCookies(url, [header], now);
 
-        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+        Cookie? cookie = SetCookieParser.Parse(header, url, now, out string? refusal);
 
+        Diagnostics.Act("cookie stored", cookie is not null);
+        ActRefusal(refusal);
+        Diagnostics.Assert("cookie stored", false, cookie is not null);
+        Diagnostics.AssertText("refusal", "oversized cookie dropped, name/val 4000 + 97 bytes", refusal);
         Assert.IsNull(cookie);
         Assert.AreEqual("oversized cookie dropped, name/val 4000 + 97 bytes", refusal);
     }
@@ -272,9 +334,16 @@ public sealed class SetCookieParserTests
     public void Parse_NameAndValueOfExactly4096_IsStoredWithoutRefusal()
     {
         string header = new string('a', 4000) + "=" + new string('b', 96);
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        CurlUrl url = CurlUrl.Parse("http://127.0.0.1/");
+        Diagnostics.ArrangeSetCookies(url, [header], now);
 
-        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+        Cookie? cookie = SetCookieParser.Parse(header, url, now, out string? refusal);
 
+        Diagnostics.Act("cookie stored", cookie is not null);
+        ActRefusal(refusal);
+        Diagnostics.Assert("cookie stored", true, cookie is not null);
+        Diagnostics.AssertText("refusal", null, refusal);
         Assert.IsNotNull(cookie);
         Assert.IsNull(refusal);
     }
@@ -283,36 +352,66 @@ public sealed class SetCookieParserTests
     public void Parse_OversizedValueWithSurroundingSpaces_CountsTrimmedNameAndValue()
     {
         string header = "  " + new string('a', 4000) + "  =   " + new string('b', 97) + "   ";
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        CurlUrl url = CurlUrl.Parse("http://127.0.0.1/");
+        Diagnostics.ArrangeSetCookies(url, [header], now);
 
-        SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+        SetCookieParser.Parse(header, url, now, out string? refusal);
 
+        ActRefusal(refusal);
+        Diagnostics.AssertText("refusal", "oversized cookie dropped, name/val 4000 + 97 bytes", refusal);
         Assert.AreEqual("oversized cookie dropped, name/val 4000 + 97 bytes", refusal);
     }
 
     [TestMethod]
-    public void Parse_LongPath_IsKept() =>
-        Assert.AreEqual(4201, Parse("http://localhost/", "x=v; Path=/" + new string('p', 4200))!.Path.Length);
+    public void Parse_LongPath_IsKept()
+    {
+        Cookie cookie = Parse("http://localhost/", "x=v; Path=/" + new string('p', 4200))!;
+
+        Diagnostics.Act("path length", cookie.Path.Length);
+        Diagnostics.Assert("path length", 4201, cookie.Path.Length);
+        Assert.AreEqual(4201, cookie.Path.Length);
+    }
 
     [TestMethod]
     public void Parse_Session_IsSessionCookie()
     {
         Cookie cookie = Parse("http://localhost/", "a=1")!;
+        Cookie withMaxAge = Parse("http://localhost/", "a=1; Max-Age=5")!;
 
+        Diagnostics.Assert("a=1 is a session cookie", true, cookie.IsSessionCookie);
+        Diagnostics.Assert("a=1; Max-Age=5 is a session cookie", false, withMaxAge.IsSessionCookie);
         Assert.IsTrue(cookie.IsSessionCookie);
-        Assert.IsFalse(Parse("http://localhost/", "a=1; Max-Age=5")!.IsSessionCookie);
+        Assert.IsFalse(withMaxAge.IsSessionCookie);
     }
 
     [TestMethod]
     public void Parse_NullArguments_Throw()
     {
         CurlUrl uri = CurlUrl.Parse("http://localhost/");
+        Diagnostics.Arrange("URL", uri.OriginalString);
+        Diagnostics.Arrange("null arguments", "header null (3 calls), URL null (2 calls); clock is the Unix epoch");
+        string expectedType = typeof(ArgumentNullException).Name;
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch));
-        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch));
-        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.ParseFromCookieFile(null!, DateTimeOffset.UnixEpoch));
-        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch, out _));
-        Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch, out _));
+        ArgumentNullException nullHeader = Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch));
+        ActThrown("Parse(null header)", nullHeader);
+        Diagnostics.AssertText("Parse(null header) exception type", expectedType, nullHeader.GetType().Name);
+        ArgumentNullException nullUrl = Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch));
+        ActThrown("Parse(null URL)", nullUrl);
+        Diagnostics.AssertText("Parse(null URL) exception type", expectedType, nullUrl.GetType().Name);
+        ArgumentNullException nullFileLine = Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.ParseFromCookieFile(null!, DateTimeOffset.UnixEpoch));
+        ActThrown("ParseFromCookieFile(null line)", nullFileLine);
+        Diagnostics.AssertText("ParseFromCookieFile(null line) exception type", expectedType, nullFileLine.GetType().Name);
+        ArgumentNullException nullHeaderWithRefusal = Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse(null!, uri, DateTimeOffset.UnixEpoch, out _));
+        ActThrown("Parse(null header, out refusal)", nullHeaderWithRefusal);
+        Diagnostics.AssertText("Parse(null header, out refusal) exception type", expectedType, nullHeaderWithRefusal.GetType().Name);
+        ArgumentNullException nullUrlWithRefusal = Assert.ThrowsExactly<ArgumentNullException>(() => SetCookieParser.Parse("a=1", null!, DateTimeOffset.UnixEpoch, out _));
+        ActThrown("Parse(null URL, out refusal)", nullUrlWithRefusal);
+        Diagnostics.AssertText("Parse(null URL, out refusal) exception type", expectedType, nullUrlWithRefusal.GetType().Name);
     }
+
+    private void ActThrown(string call, Exception exception) =>
+        Diagnostics.ActText(call + " threw " + exception.GetType().Name, exception.Message);
 
     /// <summary>
     /// Measured 2026-09-27 (BL-443): <c>curl -v -b file -c - http://127.0.0.1:&lt;port&gt;/</c> with a file of
@@ -323,10 +422,17 @@ public sealed class SetCookieParserTests
     public void ParseFromCookieFile_ControlCharacterAfterATabEndedPart_IsNeverChecked()
     {
         DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        Diagnostics.ArrangeText("cookie file line read", "f=v; Pa\tth=/; X=\u0001");
+        Diagnostics.ArrangeText("cookie file line refused", "g=v; X=\u0001");
+        Diagnostics.Arrange("now (Unix seconds)", Now);
 
         Cookie? read = SetCookieParser.ParseFromCookieFile("f=v; Pa\tth=/; X=\u0001", now);
         Cookie? refused = SetCookieParser.ParseFromCookieFile("g=v; X=\u0001", now);
 
+        Diagnostics.ActText("read cookie name", read?.Name);
+        Diagnostics.ActText("refused cookie name", refused?.Name);
+        Diagnostics.AssertText("read cookie name", "f", read?.Name);
+        Diagnostics.AssertText("refused cookie name", null, refused?.Name);
         Assert.AreEqual("f", read?.Name);
         Assert.IsNull(refused);
     }
@@ -352,8 +458,14 @@ public sealed class SetCookieParserTests
     [DataRow("\t=v")]
     public void Parse_NamelessFirstPart_ReportsInvalidCookie(string header)
     {
-        SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        CurlUrl url = CurlUrl.Parse("http://127.0.0.1/");
+        Diagnostics.ArrangeSetCookies(url, [header], now);
 
+        SetCookieParser.Parse(header, url, now, out string? refusal);
+
+        ActRefusal(refusal);
+        Diagnostics.AssertText("refusal", "invalid cookie, dropped", refusal);
         Assert.AreEqual("invalid cookie, dropped", refusal);
     }
 
@@ -368,8 +480,18 @@ public sealed class SetCookieParserTests
     [DataRow("a=b;;Path=/q", "a", "/q")]
     public void ParseFromCookieFile_NamelessFirstPart_ReadsTheNextPartAsTheCookie(string header, string expectedName, string expectedPath)
     {
-        Cookie? cookie = SetCookieParser.ParseFromCookieFile(header, DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        Diagnostics.ArrangeText("cookie file line", header);
+        Diagnostics.Arrange("now (Unix seconds)", Now);
 
+        Cookie? cookie = SetCookieParser.ParseFromCookieFile(header, now, out string? refusal);
+
+        Diagnostics.ActText("parsed cookie name", cookie?.Name);
+        Diagnostics.ActText("parsed cookie path", cookie?.Path);
+        ActRefusal(refusal);
+        Diagnostics.AssertText("cookie name", expectedName, cookie?.Name);
+        Diagnostics.AssertText("cookie path", expectedPath, cookie?.Path);
+        Diagnostics.AssertText("refusal", null, refusal);
         Assert.AreEqual(expectedName, cookie?.Name);
         Assert.AreEqual(expectedPath, cookie?.Path);
         Assert.IsNull(refusal);
@@ -385,8 +507,16 @@ public sealed class SetCookieParserTests
     [DataRow("i=1; Domain=example.com  ", "skipped cookie with bad tailmatch domain: example.com  \r\n")]
     public void Parse_DomainTheHostMayNotSet_RefusesWithTheRestOfTheLineAndItsCrLf(string header, string expectedRefusal)
     {
-        Cookie? cookie = SetCookieParser.Parse(header, CurlUrl.Parse("http://127.0.0.1/"), DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        CurlUrl url = CurlUrl.Parse("http://127.0.0.1/");
+        Diagnostics.ArrangeSetCookies(url, [header], now);
 
+        Cookie? cookie = SetCookieParser.Parse(header, url, now, out string? refusal);
+
+        Diagnostics.ActText("parsed cookie name", cookie?.Name);
+        ActRefusal(refusal);
+        Diagnostics.AssertText("cookie name", null, cookie?.Name);
+        Diagnostics.AssertText("refusal", expectedRefusal, refusal);
         Assert.IsNull(cookie);
         Assert.AreEqual(expectedRefusal, refusal);
     }
@@ -397,21 +527,40 @@ public sealed class SetCookieParserTests
     [DataRow("noequals; Domain=example.com", "invalid cookie, dropped")]
     public void ParseFromCookieFile_DomainLine_KeepsItsRefusalText(string header, string? expectedRefusal)
     {
-        SetCookieParser.ParseFromCookieFile(header, DateTimeOffset.FromUnixTimeSeconds(Now), out string? refusal);
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        Diagnostics.ArrangeText("cookie file line", header);
+        Diagnostics.Arrange("now (Unix seconds)", Now);
 
+        SetCookieParser.ParseFromCookieFile(header, now, out string? refusal);
+
+        ActRefusal(refusal);
+        Diagnostics.AssertText("refusal", expectedRefusal, refusal);
         Assert.AreEqual(expectedRefusal, refusal);
     }
 
-    private static void AssertParsesAsCurlDid(string url, string header, string? expectedJarLine)
+    private void AssertParsesAsCurlDid(string url, string header, string? expectedJarLine)
     {
         Cookie? cookie = Parse(url, header);
 
-        Assert.AreEqual(expectedJarLine, cookie is null ? null : JarLine(cookie));
+        string? actualJarLine = cookie is null ? null : JarLine(cookie);
+        Diagnostics.AssertText("jar line", expectedJarLine, actualJarLine);
+        Assert.AreEqual(expectedJarLine, actualJarLine);
     }
 
     /// <summary>Parses the header as curl received it in the measurement, after <c>Set-Cookie:</c> and one space.</summary>
-    private static Cookie? Parse(string url, string header) =>
-        SetCookieParser.Parse(" " + header, CurlUrl.Parse(url), DateTimeOffset.FromUnixTimeSeconds(Now));
+    private Cookie? Parse(string url, string header)
+    {
+        DateTimeOffset now = DateTimeOffset.FromUnixTimeSeconds(Now);
+        CurlUrl parsedUrl = CurlUrl.Parse(url);
+        Diagnostics.ArrangeSetCookies(parsedUrl, [" " + header], now);
+
+        Cookie? cookie = SetCookieParser.Parse(" " + header, parsedUrl, now);
+
+        Diagnostics.ActText("parsed jar line", cookie is null ? null : JarLine(cookie));
+        return cookie;
+    }
+
+    private void ActRefusal(string? refusal) => Diagnostics.ActText("refusal", refusal);
 
     /// <summary>The fields curl's jar line carries, in its order, joined by <c>|</c> instead of tabs.</summary>
     private static string JarLine(Cookie cookie)

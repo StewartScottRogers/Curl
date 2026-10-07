@@ -118,21 +118,28 @@ public sealed partial class CookieStoreTests
     public void StoreFromResponse_RefusalAfterATabEndedPart_IsNeverReached(string header) =>
         AssertReportsOnly(CoUk, header, "Added cookie n=\"v\" for domain www.example.co.uk, path /, expire 0");
 
-    private static void AssertReportsOnly(CurlUrl url, string header, string expectedLine)
+    private void AssertReportsOnly(CurlUrl url, string header, string expectedLine)
     {
         RecordingTransferEvents events = new();
+        Diagnostics.ArrangeSetCookies(url, [header], Now);
 
         new CookieStore().StoreFromResponse(url, [header], Now, events);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
+        Diagnostics.AssertTexts("-v lines reported", [expectedLine], events.Info);
 
         CollectionAssert.AreEqual(new[] { expectedLine }, events.Info);
     }
 
-    private static void AssertReportsNothing(string header)
+    private void AssertReportsNothing(string header)
     {
+        Diagnostics.ArrangeSetCookies(CoUk, [header], Now);
         RecordingTransferEvents events = new();
         CookieStore store = new();
 
         store.StoreFromResponse(CoUk, [header], Now, events);
+        Diagnostics.Act("-v lines reported", CookieTestDiagnostics.Shown(events.Info));
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
+        Diagnostics.Assert("-v lines and stored cookies", "0 lines, 0 cookies", $"{events.Info.Count} lines, {store.Cookies.Count} cookies");
 
         Assert.IsEmpty(events.Info);
         Assert.IsEmpty(store.Cookies);

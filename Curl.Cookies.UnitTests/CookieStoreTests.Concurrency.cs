@@ -17,6 +17,7 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
         ConcurrentBag<string> reported = [];
+        Diagnostics.Arrange("concurrent callers", ConcurrentCallers);
 
         await Parallel.ForEachAsync(
             Enumerable.Range(0, ConcurrentCallers),
@@ -27,7 +28,11 @@ public sealed partial class CookieStoreTests
                 return ValueTask.CompletedTask;
             });
 
+        Diagnostics.ActCookies("stored cookies", store.Cookies);
+        Diagnostics.Act("counts reported", string.Join(",", reported.Distinct().Order(StringComparer.Ordinal)));
+
         string[] expected = [.. Enumerable.Range(0, ConcurrentCallers).Select(number => string.Create(CultureInfo.InvariantCulture, $"c{number}=v{number}")).Order(StringComparer.Ordinal)];
+        Diagnostics.AssertTexts("stored name=value, sorted", expected, store.Cookies.Select(cookie => $"{cookie.Name}={cookie.Value}").Order(StringComparer.Ordinal));
         CollectionAssert.AreEqual(expected, store.Cookies.Select(cookie => $"{cookie.Name}={cookie.Value}").Order(StringComparer.Ordinal).ToArray());
         CollectionAssert.AreEqual(expected, store.GetCookieHeader(Loopback, secure: false, Now)!.Split("; ").Order(StringComparer.Ordinal).ToArray());
         Assert.IsTrue(reported.All(stored => stored == "1"));
@@ -38,6 +43,8 @@ public sealed partial class CookieStoreTests
     {
         CookieStore store = new();
         store.AddCookieString("given=1");
+        Diagnostics.Arrange("-b string", "given=1");
+        Diagnostics.Arrange("cookies stored while reading", ConcurrentCallers);
         using CancellationTokenSource storingDone = new();
 
         Task storing = Task.Run(() =>
@@ -67,6 +74,9 @@ public sealed partial class CookieStoreTests
         });
 
         await Task.WhenAll(storing, reading);
+        Diagnostics.Act("reads while storing", await reading);
+        Diagnostics.Act("stored cookie count", store.Cookies.Count);
+        Diagnostics.Assert("stored cookie count", ConcurrentCallers, store.Cookies.Count);
 
         Assert.IsGreaterThan(0, await reading);
         Assert.HasCount(ConcurrentCallers, store.Cookies);
@@ -84,6 +94,7 @@ public sealed partial class CookieStoreTests
     public async Task AddCookieStringAndLoadCookieFile_ManyConcurrentCallers_KeepEveryOne()
     {
         CookieStore store = new();
+        Diagnostics.Arrange("concurrent callers, each adding a -b string and loading a one-line file", ConcurrentCallers);
 
         await Parallel.ForEachAsync(
             Enumerable.Range(0, ConcurrentCallers),
@@ -96,6 +107,9 @@ public sealed partial class CookieStoreTests
             });
 
         string[] sent = store.GetCookieHeader(Loopback, secure: false, Now)!.Split("; ");
+        Diagnostics.Act("distinct cookies sent", sent.Distinct().Count());
+        Diagnostics.Assert("distinct cookies sent", 2 * ConcurrentCallers, sent.Distinct().Count());
+        Diagnostics.Assert("stored cookie count", ConcurrentCallers, store.Cookies.Count);
         Assert.HasCount(2 * ConcurrentCallers, sent.Distinct());
         Assert.HasCount(ConcurrentCallers, store.Cookies);
     }
