@@ -8,7 +8,7 @@ depends-on: [BL-1457, BL-1621, BL-1611, BL-1612, BL-1613, BL-1614, BL-1615, BL-1
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1476 — Make every test in Curl.Protocol.Http.UnitTests write descriptive diagnostic output
 
@@ -27,16 +27,20 @@ Every test in `Curl.Protocol.Http.UnitTests` writes, through BL-1457's shared `T
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Protocol.Http.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Http.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Large: 1034 test methods in 119 files is probably more than one `/task-run` can finish. Stewart asked for one task per project, so it is filed whole. If the runner judges it too big, it splits it before changing any test: it files tasks that each cover a range of the project's files by name (each `-Pipeline direct -DependsOn BL-1457 -Touches Curl.Protocol.Http.UnitTests`, with these criteria limited to its files' classes through `--filter "FullyQualifiedName~<class>"`), adds them to this task's `depends-on`, and moves this task back to `Backlog`; this task then only runs the whole-project checks above.
 - 2026-10-07 (lane 3): split before any test changed. Recounted: 119 test files, 1042 `[TestMethod`/`[DataTestMethod` matches. Filed BL-1621 to BL-1620, eleven contiguous ranges of the files in path order, 50 to 128 test methods each (the size of BL-1580's ranges, which finish in one run). `HttpRequestHeadFormatterTests`'s four partial files stay in one task (BL-1619). `HttpProtocolHandlerTests` is one partial class of 563 test methods in the 55 of its 61 files that declare tests, too big for one run, so its files are spread over BL-1612 to BL-1618; each of those checks its whole-class filter's `END` lines only for the methods declared in its own files. This task now waits on all eleven and then only runs the whole-project checks.
+- 2026-10-07 (lane 1): whole-project checks after BL-1611 to BL-1621. `dotnet build Curl.Protocol.Http.UnitTests -warnaserror`: 0 warnings, 0 errors. The detailed fast run: 1864 tests, 1846 passed, 18 skipped (the `[OSCondition]` tests for other platforms, which never run so write no lines), 0 failed; 1846 `END` lines, one per executed test, and the `arrange 0`/`act 0`/`assert 0` pattern matches nothing.
+- Counts (excluding `obj` and `bin`), before = the tree before BL-1611's commit fc9fc87b8, the first of the split tasks: `Assert.` 2526 before, 2526 after; `[TestMethod` 1042 before, 1042 after; `[DataRow(` 1053 before, 1053 after. Total test count unchanged.
+- No test printed a `SLOW:` line (the whole run took 4.7 s), so no follow-up task is filed.
+- This task's own commit changes only this task file; the test changes landed under the split tasks, each confined to `Curl.Protocol.Http.UnitTests/`.
 
 ## Log
 
@@ -44,3 +48,4 @@ Every test in `Curl.Protocol.Http.UnitTests` writes, through BL-1457's shared `T
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1621 to BL-1620 by test file range (1042 test methods is too many for one run); waits on them, then runs the whole-project checks
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every executed test in Curl.Protocol.Http.UnitTests (1846) writes START/END with ARRANGE, ACT and ASSERT lines; counts unchanged, no SLOW tests
