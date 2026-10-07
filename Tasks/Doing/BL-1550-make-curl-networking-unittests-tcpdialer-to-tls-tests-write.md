@@ -33,3 +33,4 @@ Every test in `Curl.Networking.UnitTests`' test files `TcpDialerTests.cs` throug
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
