@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -33,14 +35,22 @@ public sealed class ChaCha20Tests
     private const string JabberwockyCiphertext =
         "62e6347f95ed87a45ffae7426f27a1df5fb69110044c0d73118effa95b01e5cf166d3df2d721caf9b21e5fb14c616871fd84c54f9d65b283196c7fe4f60553ebf39c6402c42234e32a356b3e764312a61a5532055716ead6962568f87d3f3f7704c6a8d1bcd1bf4d50d6154b6da731b187b58dfd728afa36757a797ac188d1";
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     // RFC 8439 section 2.1.1.
     [TestMethod]
     public void QuarterRound_Rfc8439Section211Words_GivesThePublishedWords()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         uint a = 0x11111111, b = 0x01020304, c = 0x9b8d6f43, d = 0x01234567;
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.1.1");
+        diagnostics.Arrange("a, b, c, d", $"0x{a:x8}, 0x{b:x8}, 0x{c:x8}, 0x{d:x8}");
 
         ChaCha20.QuarterRound(ref a, ref b, ref c, ref d);
+        diagnostics.Act("a, b, c, d", $"0x{a:x8}, 0x{b:x8}, 0x{c:x8}, 0x{d:x8}");
 
+        diagnostics.Assert("a, b, c, d", "0xea2a92f4, 0xcb1cf8ce, 0x4581472e, 0x5881c4bb", $"0x{a:x8}, 0x{b:x8}, 0x{c:x8}, 0x{d:x8}");
         Assert.AreEqual(0xea2a92f4u, a);
         Assert.AreEqual(0xcb1cf8ceu, b);
         Assert.AreEqual(0x4581472eu, c);
@@ -51,6 +61,7 @@ public sealed class ChaCha20Tests
     [TestMethod]
     public void QuarterRound_Rfc8439Section221State_ChangesOnlyTheFourNamedWords()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         uint[] state =
         [
             0x879531e0, 0xc5ecf37d, 0x516461b1, 0xc9a62f8a,
@@ -65,9 +76,14 @@ public sealed class ChaCha20Tests
             0xe46bea80, 0xb00a5631, 0x974c541a, 0x359e9963,
             0x5c971061, 0xccc07c79, 0x2098d9d6, 0x91dbd320,
         ];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.2.1");
+        diagnostics.Arrange("state", FormatWords(state));
+        diagnostics.Arrange("indices", "2, 7, 8, 13");
 
         ChaCha20.QuarterRound(state, 2, 7, 8, 13);
+        diagnostics.Act("state", FormatWords(state));
 
+        diagnostics.Diff("state", FormatWords(expected), FormatWords(state));
         CollectionAssert.AreEqual(expected, state);
     }
 
@@ -87,10 +103,18 @@ public sealed class ChaCha20Tests
         "c2c64d378cd536374ae204b9ef933fcd1a8b2288b3dfa49672ab765b54ee27c78a970e0e955c14f3a88e741b97c286f75f8fc299e8148362fa198a39531bed6d")]
     public void ComputeBlock_Rfc8439Vector_GivesThePublishedBlock(string key, string nonce, ulong counter, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] block = new byte[ChaCha20.BlockSize];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.3.2 and Appendix A.1");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("nonce", Convert.FromHexString(nonce));
+        diagnostics.Arrange("counter", counter);
 
         ChaCha20.ComputeBlock(Convert.FromHexString(key), Convert.FromHexString(nonce), counter, block);
+        diagnostics.Bytes("block", block);
+        diagnostics.Act("block", Convert.ToHexStringLower(block));
 
+        diagnostics.Diff("block", Convert.FromHexString(expected), block);
         Assert.AreEqual(expected, Convert.ToHexStringLower(block));
     }
 
@@ -104,10 +128,17 @@ public sealed class ChaCha20Tests
     [DataRow(JabberwockyKey, TwoNonce, "965e3bc6f9ec7ed9560808f4d229f94b137ff275ca9b3fcbdd59deaad23310ae")]
     public void ComputeBlock_Rfc8439Poly1305KeyGenerationVector_StartsWithThePublishedKey(string key, string nonce, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] block = new byte[ChaCha20.BlockSize];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.6.2 and Appendix A.4");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("nonce", Convert.FromHexString(nonce));
+        diagnostics.Arrange("counter", 0);
 
         ChaCha20.ComputeBlock(Convert.FromHexString(key), Convert.FromHexString(nonce), 0, block);
+        diagnostics.Act("one-time Poly1305 key", Convert.ToHexStringLower(block.AsSpan(0, Poly1305.KeySize)));
 
+        diagnostics.Diff("one-time Poly1305 key", Convert.FromHexString(expected), block.AsSpan(0, Poly1305.KeySize));
         Assert.AreEqual(expected, Convert.ToHexStringLower(block.AsSpan(0, Poly1305.KeySize)));
     }
 
@@ -126,13 +157,24 @@ public sealed class ChaCha20Tests
         string plaintext,
         string ciphertext)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] keyBytes = Convert.FromHexString(key);
         byte[] nonceBytes = Convert.FromHexString(nonce);
         byte[] encrypted = new byte[plaintext.Length / 2];
         byte[] decrypted = new byte[encrypted.Length];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.4.2 and Appendix A.2");
+        diagnostics.Bytes("key", keyBytes);
+        diagnostics.Bytes("nonce", nonceBytes);
+        diagnostics.Arrange("initial counter", initialCounter);
+        diagnostics.Bytes("plaintext", Convert.FromHexString(plaintext));
 
         ChaCha20.ApplyKeyStream(keyBytes, nonceBytes, initialCounter, Convert.FromHexString(plaintext), encrypted);
         ChaCha20.ApplyKeyStream(keyBytes, nonceBytes, initialCounter, encrypted, decrypted);
+        diagnostics.Bytes("encrypted", encrypted);
+        diagnostics.Act("encrypted length", encrypted.Length);
+
+        diagnostics.Diff("encrypted", Convert.FromHexString(ciphertext), encrypted);
+        diagnostics.Diff("decrypted", Convert.FromHexString(plaintext), decrypted);
 
         Assert.AreEqual(ciphertext, Convert.ToHexStringLower(encrypted));
         Assert.AreEqual(plaintext, Convert.ToHexStringLower(decrypted));
@@ -141,20 +183,35 @@ public sealed class ChaCha20Tests
     [TestMethod]
     public void ApplyKeyStream_DestinationIsTheSource_EncryptsInPlace()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] buffer = Convert.FromHexString(SunscreenPlaintext);
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.4.2");
+        diagnostics.Bytes("key", Convert.FromHexString(SequentialKey));
+        diagnostics.Bytes("nonce", Convert.FromHexString("000000000000004a00000000"));
+        diagnostics.Arrange("initial counter", 1);
+        diagnostics.Bytes("plaintext", buffer);
 
         ChaCha20.ApplyKeyStream(Convert.FromHexString(SequentialKey), Convert.FromHexString("000000000000004a00000000"), 1, buffer, buffer);
+        diagnostics.Bytes("buffer", buffer);
+        diagnostics.Act("buffer length", buffer.Length);
 
+        diagnostics.Diff("buffer", Convert.FromHexString(SunscreenCiphertext), buffer);
         Assert.AreEqual(SunscreenCiphertext, Convert.ToHexStringLower(buffer));
     }
 
     [TestMethod]
     public void ApplyKeyStream_EmptySource_WritesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] buffer = [0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5, 0xA5];
+        diagnostics.Arrange("source length", 0);
+        diagnostics.Arrange("initial counter", uint.MaxValue);
+        diagnostics.Bytes("buffer before", buffer);
 
         ChaCha20.ApplyKeyStream(Convert.FromHexString(ZeroKey), Convert.FromHexString(ZeroNonce), uint.MaxValue, [], buffer.AsSpan(0, 0));
+        diagnostics.Act("buffer after", Convert.ToHexString(buffer));
 
+        diagnostics.Diff("buffer", Convert.FromHexString("A5A5A5A5A5A5A5A5"), buffer);
         Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer));
     }
 
@@ -164,12 +221,20 @@ public sealed class ChaCha20Tests
     [TestMethod]
     public void ComputeBlock_OriginalNonce_UsesWordsTwelveAndThirteenAsA64BitCounter()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] key = Convert.FromHexString(SequentialKey);
         byte[] original = new byte[ChaCha20.BlockSize];
         byte[] ietf = new byte[ChaCha20.BlockSize];
+        diagnostics.Bytes("key", key);
+        diagnostics.Arrange("original nonce and counter", "0001020304050607, 0x0000000a0000000b");
+        diagnostics.Arrange("RFC 8439 nonce and counter", "0a0000000001020304050607, 0x0000000b");
 
         ChaCha20.ComputeBlock(key, Convert.FromHexString("0001020304050607"), 0x0000000a_0000000bUL, original);
         ChaCha20.ComputeBlock(key, Convert.FromHexString("0a0000000001020304050607"), 0x0000000b, ietf);
+        diagnostics.Bytes("original block", original);
+        diagnostics.Act("original block length", original.Length);
+
+        diagnostics.Diff("block", ietf, original);
 
         CollectionAssert.AreEqual(ietf, original);
     }
@@ -177,13 +242,21 @@ public sealed class ChaCha20Tests
     [TestMethod]
     public void ApplyKeyStream_OriginalNonceCounterCrosses32Bits_CarriesIntoTheHighWord()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] key = Convert.FromHexString(SequentialKey);
         byte[] nonce = Convert.FromHexString("0001020304050607");
         byte[] keyStream = new byte[2 * ChaCha20.BlockSize];
         byte[] expectedSecondBlock = new byte[ChaCha20.BlockSize];
+        diagnostics.Bytes("key", key);
+        diagnostics.Bytes("nonce", nonce);
+        diagnostics.Arrange("initial counter", uint.MaxValue);
 
         ChaCha20.ApplyKeyStream(key, nonce, uint.MaxValue, new byte[keyStream.Length], keyStream);
         ChaCha20.ComputeBlock(key, nonce, 0x1_0000_0000UL, expectedSecondBlock);
+        diagnostics.Bytes("second key stream block", keyStream.AsSpan(ChaCha20.BlockSize));
+        diagnostics.Act("key stream length", keyStream.Length);
+
+        diagnostics.Diff("second block against counter 0x100000000", expectedSecondBlock, keyStream.AsSpan(ChaCha20.BlockSize));
 
         CollectionAssert.AreEqual(expectedSecondBlock, keyStream[ChaCha20.BlockSize..]);
     }
@@ -191,11 +264,18 @@ public sealed class ChaCha20Tests
     [TestMethod]
     public void ApplyKeyStream_RfcNonceLastBlockAtTheCounterLimit_Succeeds()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] output = new byte[ChaCha20.BlockSize];
+        diagnostics.Arrange("initial counter", uint.MaxValue);
+        diagnostics.Arrange("message length", output.Length);
 
         ChaCha20.ApplyKeyStream(Convert.FromHexString(ZeroKey), Convert.FromHexString(ZeroNonce), uint.MaxValue, new byte[output.Length], output);
+        bool allZero = output.All(value => value == 0);
+        diagnostics.Bytes("output", output);
+        diagnostics.Act("output all zero", allZero);
 
-        Assert.IsFalse(output.All(value => value == 0));
+        diagnostics.Assert("output all zero", false, allZero);
+        Assert.IsFalse(allZero);
     }
 
     [TestMethod]
@@ -204,10 +284,17 @@ public sealed class ChaCha20Tests
     [DataRow("0000000000000000", ulong.MaxValue, ChaCha20.BlockSize + 1)]
     public void ApplyKeyStream_MessageRunsPastTheCounter_Throws(string nonce, ulong initialCounter, int length)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] source = new byte[length];
+        diagnostics.Arrange("nonce", nonce);
+        diagnostics.Arrange("initial counter", initialCounter);
+        diagnostics.Arrange("message length", length);
 
-        Assert.ThrowsExactly<ArgumentException>(
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => ChaCha20.ApplyKeyStream(Convert.FromHexString(ZeroKey), Convert.FromHexString(nonce), initialCounter, source, source));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -216,14 +303,30 @@ public sealed class ChaCha20Tests
     [DataRow(ChaCha20.KeySize, ChaCha20.NonceSize, 16, 15)]
     public void ApplyKeyStream_WrongLength_Throws(int keyLength, int nonceLength, int sourceLength, int destinationLength)
     {
-        Assert.ThrowsExactly<ArgumentException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", keyLength);
+        diagnostics.Arrange("nonce length", nonceLength);
+        diagnostics.Arrange("source and destination lengths", $"{sourceLength}, {destinationLength}");
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => ChaCha20.ApplyKeyStream(new byte[keyLength], new byte[nonceLength], 0, new byte[sourceLength], new byte[destinationLength]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void ComputeBlock_BlockIsNot64Bytes_Throws()
     {
-        Assert.ThrowsExactly<ArgumentException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("block length", ChaCha20.BlockSize - 1);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => ChaCha20.ComputeBlock(new byte[ChaCha20.KeySize], new byte[ChaCha20.NonceSize], 0, new byte[ChaCha20.BlockSize - 1]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
+
+    private static string FormatWords(uint[] words) => string.Join(" ", words.Select(word => word.ToString("x8", System.Globalization.CultureInfo.InvariantCulture)));
 }

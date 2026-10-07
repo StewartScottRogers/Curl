@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -56,6 +57,9 @@ public sealed class BrainpoolEcdsaTests
         "AADD9DB8DBE9C48B3FD4E6AE33C9FC07CB308DB3B3C9D20ED6639CCA70330870553E5C414CA92619418661197FAC10471DB1D381085DDADDB58796829CA90069",
     ];
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void VerifyHash_EveryWycheproofP256r1Vector_GivesItsExpectedResult()
     {
@@ -72,11 +76,30 @@ public sealed class BrainpoolEcdsaTests
         AssertEveryWycheproofVector(curve, resourceName, hashName, testCount);
     }
 
-    private static void AssertEveryWycheproofVector(BrainpoolCurve curve, string resourceName, string hashName, int testCount)
+    private void AssertEveryWycheproofVector(BrainpoolCurve curve, string resourceName, string hashName, int testCount)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", $"C2SP/wycheproof testvectors_v1, KnownAnswers/{resourceName}");
+        diagnostics.Arrange("curve and hash", $"{curve}, {hashName}");
         List<string> failures = [];
         int tests = 0;
         byte[] publicKey = [];
+        using (diagnostics.Phase("verify every vector"))
+        {
+            VerifyEveryLine(curve, resourceName, hashName, failures, ref tests, ref publicKey);
+        }
+
+        diagnostics.Act("tests run", tests);
+        diagnostics.Act("tcIds with the wrong result", string.Join(", ", failures));
+
+        diagnostics.Assert("tests run", testCount, tests);
+        diagnostics.Assert("tcIds with the wrong result", string.Empty, string.Join(", ", failures));
+        Assert.AreEqual(testCount, tests);
+        Assert.AreEqual(string.Empty, string.Join(", ", failures), "tcIds with the wrong result");
+    }
+
+    private static void VerifyEveryLine(BrainpoolCurve curve, string resourceName, string hashName, List<string> failures, ref int tests, ref byte[] publicKey)
+    {
         foreach (string line in ReadLines(resourceName))
         {
             string[] fields = line.Split(' ');
@@ -94,9 +117,6 @@ public sealed class BrainpoolEcdsaTests
                 failures.Add(fields[0]);
             }
         }
-
-        Assert.AreEqual(testCount, tests);
-        Assert.AreEqual(string.Empty, string.Join(", ", failures), "tcIds with the wrong result");
     }
 
     [TestMethod]
@@ -109,6 +129,7 @@ public sealed class BrainpoolEcdsaTests
     [DataRow(BrainpoolCurve.BrainpoolP512r1, "SHA512")]
     public void SignHash_ThenVerifyHash_AcceptsTheSignatureAndRejectsAnyOtherMessage(BrainpoolCurve curve, string hashName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HashAlgorithmName hashAlgorithm = new(hashName);
         using BrainpoolEcdsa key = new(curve, Convert.FromHexString(PrivateKeys[(int)curve]));
         byte[] publicKey = Convert.FromHexString(PublicKeys[(int)curve]);
@@ -116,28 +137,43 @@ public sealed class BrainpoolEcdsaTests
         byte[] otherHash = DsaSignature.HashData(Encoding.ASCII.GetBytes("test"), hashAlgorithm);
         byte[] signature = new byte[key.SignatureLength];
         byte[] again = new byte[key.SignatureLength];
+        diagnostics.Arrange("key source", $"RFC 7027 Appendix A.{(int)curve + 1} dA, {curve}");
+        diagnostics.Arrange("hash and messages", $"{hashName}, \"sample\" signed, \"test\" checked");
+        diagnostics.Bytes("hash", hash);
 
         key.SignHash(hash, hashAlgorithm, signature);
         key.SignHash(hash, hashAlgorithm, again);
+        bool verified = BrainpoolEcdsa.VerifyHash(curve, publicKey, hash, signature);
+        bool otherVerified = BrainpoolEcdsa.VerifyHash(curve, publicKey, otherHash, signature);
+        diagnostics.Bytes("signature", signature);
+        diagnostics.Act("verified (sample, test)", $"{verified}, {otherVerified}");
 
+        diagnostics.Diff("second signature", signature, again);
+        diagnostics.Assert("verified (sample, test)", "True, False", $"{verified}, {otherVerified}");
         CollectionAssert.AreEqual(signature, again);
-        Assert.IsTrue(BrainpoolEcdsa.VerifyHash(curve, publicKey, hash, signature));
-        Assert.IsFalse(BrainpoolEcdsa.VerifyHash(curve, publicKey, otherHash, signature));
+        Assert.IsTrue(verified);
+        Assert.IsFalse(otherVerified);
     }
 
     [TestMethod]
     public void SignHash_ManyMessages_EachVerifies()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using BrainpoolEcdsa key = new(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(PrivateKeys[0]));
         byte[] publicKey = Convert.FromHexString(PublicKeys[0]);
         byte[] signature = new byte[64];
+        diagnostics.Arrange("key source", "RFC 7027 Appendix A.1 dA, brainpoolP256r1");
+        diagnostics.Arrange("messages", "the single bytes 0 to 7, SHA-256");
         for (int message = 0; message < 8; message++)
         {
             byte[] hash = SHA256.HashData([(byte)message]);
 
             key.SignHash(hash, HashAlgorithmName.SHA256, signature);
+            bool verified = BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, signature);
+            diagnostics.Act($"message {message} verified", verified);
 
-            Assert.IsTrue(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, signature), $"message {message}");
+            diagnostics.Assert($"message {message} verified", true, verified);
+            Assert.IsTrue(verified, $"message {message}");
         }
     }
 
@@ -147,11 +183,16 @@ public sealed class BrainpoolEcdsaTests
     [DataRow(BrainpoolCurve.BrainpoolP512r1)]
     public void ExportPublicKey_Rfc7027Key_GivesItsPublicKey(BrainpoolCurve curve)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using BrainpoolEcdsa key = new(curve, Convert.FromHexString(PrivateKeys[(int)curve]));
         byte[] publicKey = new byte[BrainpoolEcdh.GetPublicKeyLength(curve)];
+        diagnostics.Arrange("vector source", $"RFC 7027 Appendix A.{(int)curve + 1}, {curve}");
+        diagnostics.Bytes("dA", Convert.FromHexString(PrivateKeys[(int)curve]));
 
         key.ExportPublicKey(publicKey);
+        diagnostics.Act("public key length", publicKey.Length);
 
+        diagnostics.Diff("public key", Convert.FromHexString(PublicKeys[(int)curve]), publicKey);
         Assert.AreEqual(PublicKeys[(int)curve], Convert.ToHexString(publicKey));
     }
 
@@ -161,10 +202,17 @@ public sealed class BrainpoolEcdsaTests
     [DataRow(BrainpoolCurve.BrainpoolP512r1, 128)]
     public void SignatureLength_EachCurve_IsTwiceTheOrderLength(BrainpoolCurve curve, int length)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using BrainpoolEcdsa key = new(curve, Convert.FromHexString(PrivateKeys[(int)curve]));
+        diagnostics.Arrange("curve", curve);
 
-        Assert.AreEqual(length, key.SignatureLength);
-        Assert.AreEqual(length, BrainpoolEcdsa.GetSignatureLength(curve));
+        int instanceLength = key.SignatureLength;
+        int staticLength = BrainpoolEcdsa.GetSignatureLength(curve);
+        diagnostics.Act("signature lengths (instance, static)", $"{instanceLength}, {staticLength}");
+
+        diagnostics.Assert("signature lengths (instance, static)", $"{length}, {length}", $"{instanceLength}, {staticLength}");
+        Assert.AreEqual(length, instanceLength);
+        Assert.AreEqual(length, staticLength);
     }
 
     [TestMethod]
@@ -176,8 +224,16 @@ public sealed class BrainpoolEcdsaTests
         byte[] signature = new byte[64];
         signature[31] = 1;
         signature[63] = 1;
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("public key", "brainpoolP256r1 generator G from RFC 5639 section 3.4 (d = 1)");
+        diagnostics.Bytes("hash (q - 1)", hash);
+        diagnostics.Bytes("signature (r = 1, s = 1)", signature);
 
-        Assert.IsFalse(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(Generators[0]), hash, signature));
+        bool verified = BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(Generators[0]), hash, signature);
+        diagnostics.Act("verified", verified);
+
+        diagnostics.Assert("verified", false, verified);
+        Assert.IsFalse(verified);
     }
 
     [TestMethod]
@@ -194,47 +250,87 @@ public sealed class BrainpoolEcdsaTests
         Convert.FromHexString(Orders[0]).CopyTo(sAtOrder, 32);
         byte[] offCurve = (byte[])publicKey.Clone();
         offCurve[^1] ^= 1;
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key source", "RFC 7027 Appendix A.1 dA, brainpoolP256r1, SHA-256 of \"sample\"");
+        diagnostics.Bytes("signature", signature);
+        diagnostics.Arrange("cases", "valid, truncated signature, r = 0, s = q, public key off curve, one-byte public key");
 
-        Assert.IsTrue(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, signature));
-        Assert.IsFalse(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, signature[..^1]));
-        Assert.IsFalse(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, zeroR));
-        Assert.IsFalse(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, sAtOrder));
-        Assert.IsFalse(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, offCurve, hash, signature));
-        Assert.IsFalse(BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, [0x00], hash, signature));
+        bool[] verified =
+        [
+            BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, signature),
+            BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, signature[..^1]),
+            BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, zeroR),
+            BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, publicKey, hash, sAtOrder),
+            BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, offCurve, hash, signature),
+            BrainpoolEcdsa.VerifyHash(BrainpoolCurve.BrainpoolP256r1, [0x00], hash, signature),
+        ];
+        diagnostics.Act("verified per case", string.Join(", ", verified));
+
+        diagnostics.Assert("verified per case", "True, False, False, False, False, False", string.Join(", ", verified));
+        Assert.IsTrue(verified[0]);
+        Assert.IsFalse(verified[1]);
+        Assert.IsFalse(verified[2]);
+        Assert.IsFalse(verified[3]);
+        Assert.IsFalse(verified[4]);
+        Assert.IsFalse(verified[5]);
     }
 
     [TestMethod]
     public void Constructor_PrivateKeyOutOfRange_ThrowsArgument()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => new BrainpoolEcdsa(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(Orders[0])));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key", "q, the brainpoolP256r1 order from RFC 5639 section 3.4");
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new BrainpoolEcdsa(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(Orders[0])));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void Constructor_UnknownCurve_ThrowsArgumentOutOfRange()
     {
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new BrainpoolEcdsa((BrainpoolCurve)(-1), new byte[32]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("curve", -1);
+
+        ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new BrainpoolEcdsa((BrainpoolCurve)(-1), new byte[32]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentOutOfRangeException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void SignHash_WrongLengthsOrHash_ThrowArgument()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using BrainpoolEcdsa key = new(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(PrivateKeys[0]));
+        diagnostics.Arrange("cases", "31-byte hash, 63-byte signature, MD5 hash, 64-byte public key destination");
 
-        Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[31], HashAlgorithmName.SHA256, new byte[64]));
-        Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[32], HashAlgorithmName.SHA256, new byte[63]));
-        Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[16], HashAlgorithmName.MD5, new byte[64]));
-        Assert.ThrowsExactly<ArgumentException>(() => key.ExportPublicKey(new byte[64]));
+        ArgumentException shortHash = Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[31], HashAlgorithmName.SHA256, new byte[64]));
+        ArgumentException shortSignature = Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[32], HashAlgorithmName.SHA256, new byte[63]));
+        ArgumentException md5 = Assert.ThrowsExactly<ArgumentException>(() => key.SignHash(new byte[16], HashAlgorithmName.MD5, new byte[64]));
+        ArgumentException shortPublicKey = Assert.ThrowsExactly<ArgumentException>(() => key.ExportPublicKey(new byte[64]));
+        string thrown = string.Join(", ", shortHash.GetType().Name, shortSignature.GetType().Name, md5.GetType().Name, shortPublicKey.GetType().Name);
+        diagnostics.Act("exceptions", thrown);
+
+        diagnostics.Assert("exceptions", string.Join(", ", Enumerable.Repeat(nameof(ArgumentException), 4)), thrown);
     }
 
     [TestMethod]
     public void Dispose_ThenUse_ThrowsObjectDisposed()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         BrainpoolEcdsa key = new(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(PrivateKeys[0]));
+        diagnostics.Arrange("key source", "RFC 7027 Appendix A.1 dA, brainpoolP256r1");
 
         key.Dispose();
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => key.SignHash(new byte[32], HashAlgorithmName.SHA256, new byte[64]));
-        Assert.ThrowsExactly<ObjectDisposedException>(() => key.ExportPublicKey(new byte[65]));
+        ObjectDisposedException signing = Assert.ThrowsExactly<ObjectDisposedException>(() => key.SignHash(new byte[32], HashAlgorithmName.SHA256, new byte[64]));
+        ObjectDisposedException exporting = Assert.ThrowsExactly<ObjectDisposedException>(() => key.ExportPublicKey(new byte[65]));
+        string thrown = string.Join(", ", signing.GetType().Name, exporting.GetType().Name);
+        diagnostics.Act("exceptions (SignHash, ExportPublicKey)", thrown);
+
+        diagnostics.Assert("exceptions", $"{nameof(ObjectDisposedException)}, {nameof(ObjectDisposedException)}", thrown);
     }
 
     [TestMethod]
@@ -262,9 +358,17 @@ public sealed class BrainpoolEcdsaTests
         byte[] hash = CryptographicOperations.HashData(hashAlgorithm, "sample"u8);
         byte[] signature = new byte[key.SignatureLength];
 
-        key.SignHash(hash, hashAlgorithm, signature);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key source", $"RFC 7027 Appendix A.{(int)curve + 1} dA, {curve}");
+        diagnostics.Arrange("hash", $"{hashName} of \"sample\"");
 
-        Assert.IsTrue(cng.VerifyHash(hash, signature, DSASignatureFormat.IeeeP1363FixedFieldConcatenation));
+        key.SignHash(hash, hashAlgorithm, signature);
+        bool verified = cng.VerifyHash(hash, signature, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        diagnostics.Bytes("signature", signature);
+        diagnostics.Act("verified by CNG", verified);
+
+        diagnostics.Assert("verified by CNG", true, verified);
+        Assert.IsTrue(verified);
     }
 
     private static byte[] FromHexOrEmpty(string hex) => hex == "-" ? [] : Convert.FromHexString(hex);

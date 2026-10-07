@@ -1,4 +1,5 @@
 using System.Numerics;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -57,16 +58,31 @@ public sealed class BrainpoolEcdhTests
         "AADD9DB8DBE9C48B3FD4E6AE33C9FC07CB308DB3B3C9D20ED6639CCA70330870553E5C414CA92619418661197FAC10471DB1D381085DDADDB58796829CA90069",
     ];
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(BrainpoolCurve.BrainpoolP256r1)]
     [DataRow(BrainpoolCurve.BrainpoolP384r1)]
     [DataRow(BrainpoolCurve.BrainpoolP512r1)]
     public void ComputePublicKey_Rfc7027AppendixA_GivesBothPublicKeys(BrainpoolCurve curve)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string[] vector = Rfc7027Vectors[(int)curve];
+        diagnostics.Arrange("vector source", $"RFC 7027 Appendix A.{(int)curve + 1}, {curve}");
+        diagnostics.Bytes("dA", Convert.FromHexString(vector[0]));
+        diagnostics.Bytes("dB", Convert.FromHexString(vector[3]));
 
-        Assert.AreEqual("04" + vector[1] + vector[2], Hex(PublicKey(curve, vector[0])));
-        Assert.AreEqual("04" + vector[4] + vector[5], Hex(PublicKey(curve, vector[3])));
+        byte[] publicA = PublicKey(curve, vector[0]);
+        byte[] publicB = PublicKey(curve, vector[3]);
+        diagnostics.Bytes("qA", publicA);
+        diagnostics.Bytes("qB", publicB);
+        diagnostics.Act("public key lengths", $"{publicA.Length}, {publicB.Length}");
+
+        diagnostics.Diff("qA", Convert.FromHexString("04" + vector[1] + vector[2]), publicA);
+        diagnostics.Diff("qB", Convert.FromHexString("04" + vector[4] + vector[5]), publicB);
+        Assert.AreEqual("04" + vector[1] + vector[2], Hex(publicA));
+        Assert.AreEqual("04" + vector[4] + vector[5], Hex(publicB));
     }
 
     [TestMethod]
@@ -75,13 +91,22 @@ public sealed class BrainpoolEcdhTests
     [DataRow(BrainpoolCurve.BrainpoolP512r1)]
     public void TryComputeSharedSecret_Rfc7027AppendixA_GivesXzFromEitherSide(BrainpoolCurve curve)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string[] vector = Rfc7027Vectors[(int)curve];
         byte[] fromA = new byte[BrainpoolEcdh.GetSharedSecretLength(curve)];
         byte[] fromB = new byte[BrainpoolEcdh.GetSharedSecretLength(curve)];
+        diagnostics.Arrange("vector source", $"RFC 7027 Appendix A.{(int)curve + 1}, {curve}");
+        diagnostics.Bytes("dA", Convert.FromHexString(vector[0]));
+        diagnostics.Bytes("dB", Convert.FromHexString(vector[3]));
+        diagnostics.Bytes("qA", Convert.FromHexString("04" + vector[1] + vector[2]));
+        diagnostics.Bytes("qB", Convert.FromHexString("04" + vector[4] + vector[5]));
 
         bool agreedA = BrainpoolEcdh.TryComputeSharedSecret(curve, Convert.FromHexString(vector[0]), Convert.FromHexString("04" + vector[4] + vector[5]), fromA);
         bool agreedB = BrainpoolEcdh.TryComputeSharedSecret(curve, Convert.FromHexString(vector[3]), Convert.FromHexString("04" + vector[1] + vector[2]), fromB);
+        diagnostics.Act("agreed (A, B)", $"{agreedA}, {agreedB}");
 
+        diagnostics.Diff("shared secret from A", Convert.FromHexString(vector[6]), fromA);
+        diagnostics.Diff("shared secret from B", Convert.FromHexString(vector[6]), fromB);
         Assert.IsTrue(agreedA);
         Assert.IsTrue(agreedB);
         Assert.AreEqual(vector[6], Hex(fromA));
@@ -94,15 +119,30 @@ public sealed class BrainpoolEcdhTests
     [DataRow(BrainpoolCurve.BrainpoolP512r1, 64, 129)]
     public void Lengths_EachCurve_AreItsFieldLengthAndUncompressedPoint(BrainpoolCurve curve, int keyLength, int publicKeyLength)
     {
-        Assert.AreEqual(keyLength, BrainpoolEcdh.GetPrivateKeyLength(curve));
-        Assert.AreEqual(keyLength, BrainpoolEcdh.GetSharedSecretLength(curve));
-        Assert.AreEqual(publicKeyLength, BrainpoolEcdh.GetPublicKeyLength(curve));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("curve", curve);
+
+        int privateKeyLength = BrainpoolEcdh.GetPrivateKeyLength(curve);
+        int sharedSecretLength = BrainpoolEcdh.GetSharedSecretLength(curve);
+        int actualPublicKeyLength = BrainpoolEcdh.GetPublicKeyLength(curve);
+        diagnostics.Act("private key, shared secret, public key lengths", $"{privateKeyLength}, {sharedSecretLength}, {actualPublicKeyLength}");
+
+        diagnostics.Assert("private key, shared secret, public key lengths", $"{keyLength}, {keyLength}, {publicKeyLength}", $"{privateKeyLength}, {sharedSecretLength}, {actualPublicKeyLength}");
+        Assert.AreEqual(keyLength, privateKeyLength);
+        Assert.AreEqual(keyLength, sharedSecretLength);
+        Assert.AreEqual(publicKeyLength, actualPublicKeyLength);
     }
 
     [TestMethod]
     public void GetPrivateKeyLength_UnknownCurve_ThrowsArgumentOutOfRange()
     {
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => BrainpoolEcdh.GetPrivateKeyLength((BrainpoolCurve)3));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("curve", 3);
+
+        ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => BrainpoolEcdh.GetPrivateKeyLength((BrainpoolCurve)3));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentOutOfRangeException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -111,6 +151,8 @@ public sealed class BrainpoolEcdhTests
     [DataRow(BrainpoolCurve.BrainpoolP512r1)]
     public void GeneratePrivateKey_TwoParties_AgreeOnTheSecret(BrainpoolCurve curve)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("curve", curve);
         byte[] alice = new byte[BrainpoolEcdh.GetPrivateKeyLength(curve)];
         byte[] bob = new byte[alice.Length];
         BrainpoolEcdh.GeneratePrivateKey(curve, alice);
@@ -121,9 +163,18 @@ public sealed class BrainpoolEcdhTests
         BrainpoolEcdh.ComputePublicKey(curve, bob, bobPublic);
         byte[] aliceSecret = new byte[alice.Length];
         byte[] bobSecret = new byte[alice.Length];
+        diagnostics.Arrange("private key length", alice.Length);
+        diagnostics.Bytes("alice public key", alicePublic);
+        diagnostics.Bytes("bob public key", bobPublic);
 
-        Assert.IsTrue(BrainpoolEcdh.TryComputeSharedSecret(curve, alice, bobPublic, aliceSecret));
-        Assert.IsTrue(BrainpoolEcdh.TryComputeSharedSecret(curve, bob, alicePublic, bobSecret));
+        bool aliceAgreed = BrainpoolEcdh.TryComputeSharedSecret(curve, alice, bobPublic, aliceSecret);
+        bool bobAgreed = BrainpoolEcdh.TryComputeSharedSecret(curve, bob, alicePublic, bobSecret);
+        diagnostics.Act("agreed (alice, bob)", $"{aliceAgreed}, {bobAgreed}");
+
+        diagnostics.Diff("shared secret", aliceSecret, bobSecret);
+        diagnostics.Assert("private keys differ", true, !alice.AsSpan().SequenceEqual(bob));
+        Assert.IsTrue(aliceAgreed);
+        Assert.IsTrue(bobAgreed);
         CollectionAssert.AreEqual(aliceSecret, bobSecret);
         CollectionAssert.AreNotEqual(alice, bob);
     }
@@ -131,21 +182,34 @@ public sealed class BrainpoolEcdhTests
     [TestMethod]
     public void GeneratePrivateKey_WrongLength_ThrowsArgument()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.GeneratePrivateKey(BrainpoolCurve.BrainpoolP256r1, new byte[31]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("curve and destination length", "BrainpoolP256r1, 31");
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.GeneratePrivateKey(BrainpoolCurve.BrainpoolP256r1, new byte[31]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void DerivePrivateKey_RandomThatReducesToZero_GivesOne()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         BrainpoolDomainParameters domain = BrainpoolDomainParameters.For(BrainpoolCurve.BrainpoolP256r1);
         byte[] random = new byte[40];
         Convert.FromHexString(Orders[0]).CopyTo(random, 8);
         byte[] fromOrder = new byte[32];
         byte[] fromZero = new byte[32];
+        diagnostics.Arrange("curve order source", "RFC 5639 section 3.4, brainpoolP256r1 q");
+        diagnostics.Bytes("random equal to q", random);
 
         BrainpoolEcdh.DerivePrivateKey(domain, random, fromOrder);
         BrainpoolEcdh.DerivePrivateKey(domain, new byte[40], fromZero);
+        diagnostics.Act("from q", Hex(fromOrder));
+        diagnostics.Act("from zero", Hex(fromZero));
 
+        diagnostics.Diff("from q", Convert.FromHexString("0000000000000000000000000000000000000000000000000000000000000001"), fromOrder);
+        diagnostics.Diff("from zero", Convert.FromHexString("0000000000000000000000000000000000000000000000000000000000000001"), fromZero);
         Assert.AreEqual("0000000000000000000000000000000000000000000000000000000000000001", Hex(fromOrder));
         Assert.AreEqual("0000000000000000000000000000000000000000000000000000000000000001", Hex(fromZero));
     }
@@ -153,14 +217,19 @@ public sealed class BrainpoolEcdhTests
     [TestMethod]
     public void DerivePrivateKey_RandomAboveTheOrder_GivesItsResidue()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         BrainpoolDomainParameters domain = BrainpoolDomainParameters.For(BrainpoolCurve.BrainpoolP256r1);
         byte[] random = new byte[40];
         Convert.FromHexString(Orders[0]).CopyTo(random, 8);
         random[^1] += 5;
         byte[] privateKey = new byte[32];
+        diagnostics.Arrange("curve order source", "RFC 5639 section 3.4, brainpoolP256r1 q");
+        diagnostics.Bytes("random equal to q + 5", random);
 
         BrainpoolEcdh.DerivePrivateKey(domain, random, privateKey);
+        diagnostics.Act("private key", Hex(privateKey));
 
+        diagnostics.Diff("private key", Convert.FromHexString("0000000000000000000000000000000000000000000000000000000000000005"), privateKey);
         Assert.AreEqual("0000000000000000000000000000000000000000000000000000000000000005", Hex(privateKey));
     }
 
@@ -170,6 +239,7 @@ public sealed class BrainpoolEcdhTests
     [DataRow(BrainpoolCurve.BrainpoolP512r1)]
     public void TryComputeSharedSecret_InvalidPeerPoints_ReturnsFalseAndZeroesTheSecret(BrainpoolCurve curve)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string[] vector = Rfc7027Vectors[(int)curve];
         byte[] valid = Convert.FromHexString("04" + vector[4] + vector[5]);
         int length = BrainpoolEcdh.GetPrivateKeyLength(curve);
@@ -183,6 +253,9 @@ public sealed class BrainpoolEcdhTests
         byte[] yNotBelowPrime = Convert.FromHexString("04" + vector[4] + Primes[(int)curve]);
         byte[] origin = new byte[valid.Length];
         origin[0] = 0x04;
+        diagnostics.Arrange("vector source", $"RFC 7027 Appendix A.{(int)curve + 1} qB, altered; RFC 5639 section 3 p");
+        diagnostics.Arrange("peers", "one byte, compressed, wrong prefix, off curve, x = p, y = p, origin, truncated");
+        diagnostics.Bytes("dA", Convert.FromHexString(vector[0]));
 
         foreach (byte[] peer in new[] { [0x00], compressed, wrongPrefix, offCurve, xNotBelowPrime, yNotBelowPrime, origin, valid[..^1] })
         {
@@ -190,7 +263,10 @@ public sealed class BrainpoolEcdhTests
             Array.Fill(secret, (byte)0xFF);
 
             bool agreed = BrainpoolEcdh.TryComputeSharedSecret(curve, Convert.FromHexString(vector[0]), peer, secret);
+            diagnostics.Bytes("peer", peer);
+            diagnostics.Act("agreed", agreed);
 
+            diagnostics.Diff("secret", new byte[length], secret);
             Assert.IsFalse(agreed, Hex(peer));
             Assert.IsTrue(secret.All(value => value == 0), Hex(peer));
         }
@@ -204,6 +280,7 @@ public sealed class BrainpoolEcdhTests
     {
         // x is the peer's own coordinate and y + p (or (p - y) + p, the point's negation)
         // still reduces to a point of the curve, so only the check that y is below p refuses it.
+        var diagnostics = TestDiagnostics.For(TestContext);
         string[] vector = Rfc7027Vectors[(int)curve];
         int length = BrainpoolEcdh.GetPrivateKeyLength(curve);
         BigInteger prime = Unsigned(Primes[(int)curve]);
@@ -213,9 +290,13 @@ public sealed class BrainpoolEcdhTests
         byte[] peer = Convert.FromHexString("04" + vector[4] + Convert.ToHexString(raised.ToByteArray(isUnsigned: true, isBigEndian: true)).PadLeft(2 * length, '0'));
         byte[] secret = new byte[length];
         Array.Fill(secret, (byte)0xFF);
+        diagnostics.Arrange("vector source", $"RFC 7027 Appendix A.{(int)curve + 1} qB with y raised by RFC 5639's p");
+        diagnostics.Bytes("peer", peer);
 
         bool agreed = BrainpoolEcdh.TryComputeSharedSecret(curve, Convert.FromHexString(vector[0]), peer, secret);
+        diagnostics.Act("agreed", agreed);
 
+        diagnostics.Diff("secret", new byte[length], secret);
         Assert.IsFalse(agreed);
         Assert.IsTrue(secret.All(value => value == 0));
     }
@@ -228,35 +309,59 @@ public sealed class BrainpoolEcdhTests
     [DataRow("0000000000000000000000000000000000000000000000000000000000000000")]
     public void ComputePublicKey_PrivateKeyOfWrongLengthOrOutOfRange_ThrowsArgument(string privateKey)
     {
-        Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.ComputePublicKey(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(privateKey), new byte[65]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Bytes("private key", Convert.FromHexString(privateKey));
+        diagnostics.Arrange("curve", BrainpoolCurve.BrainpoolP256r1);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.ComputePublicKey(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(privateKey), new byte[65]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void ComputePublicKey_DestinationOfWrongLength_ThrowsArgument()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.ComputePublicKey(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(Rfc7027Vectors[0][0]), new byte[64]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("curve and destination length", "BrainpoolP256r1, 64");
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.ComputePublicKey(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(Rfc7027Vectors[0][0]), new byte[64]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void TryComputeSharedSecret_DestinationOfWrongLength_ThrowsArgument()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string[] vector = Rfc7027Vectors[0];
+        diagnostics.Arrange("curve and destination length", "BrainpoolP256r1, 33");
 
-        Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.TryComputeSharedSecret(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(vector[0]), Convert.FromHexString("04" + vector[4] + vector[5]), new byte[33]));
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.TryComputeSharedSecret(BrainpoolCurve.BrainpoolP256r1, Convert.FromHexString(vector[0]), Convert.FromHexString("04" + vector[4] + vector[5]), new byte[33]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void TryComputeSharedSecret_PrivateKeyOutOfRange_ThrowsArgument()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string[] vector = Rfc7027Vectors[0];
+        diagnostics.Arrange("private key", "32 zero bytes, below the range [1, q)");
 
-        Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.TryComputeSharedSecret(BrainpoolCurve.BrainpoolP256r1, new byte[32], Convert.FromHexString("04" + vector[4] + vector[5]), new byte[32]));
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => BrainpoolEcdh.TryComputeSharedSecret(BrainpoolCurve.BrainpoolP256r1, new byte[32], Convert.FromHexString("04" + vector[4] + vector[5]), new byte[32]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void TryComputeSharedSecret_AgainstWindowsCng_GivesTheSameSecret()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using System.Security.Cryptography.ECDiffieHellman cng = System.Security.Cryptography.ECDiffieHellman.Create(System.Security.Cryptography.ECCurve.NamedCurves.brainpoolP384r1);
         System.Security.Cryptography.ECParameters parameters = cng.ExportParameters(false);
         byte[] peer = [0x04, .. parameters.Q.X!, .. parameters.Q.Y!];
@@ -272,9 +377,16 @@ public sealed class BrainpoolEcdhTests
                 Y = Convert.FromHexString(Rfc7027Vectors[1][2]),
             },
         });
+        diagnostics.Arrange("vector source", "RFC 7027 Appendix A.2 dA against a fresh Windows CNG brainpoolP384r1 key");
+        diagnostics.Bytes("peer", peer);
 
-        Assert.IsTrue(BrainpoolEcdh.TryComputeSharedSecret(BrainpoolCurve.BrainpoolP384r1, privateKey, peer, ours));
-        CollectionAssert.AreEqual(mine.DeriveRawSecretAgreement(cng.PublicKey), ours);
+        bool agreed = BrainpoolEcdh.TryComputeSharedSecret(BrainpoolCurve.BrainpoolP384r1, privateKey, peer, ours);
+        byte[] theirs = mine.DeriveRawSecretAgreement(cng.PublicKey);
+        diagnostics.Act("agreed", agreed);
+
+        diagnostics.Diff("shared secret", theirs, ours);
+        Assert.IsTrue(agreed);
+        CollectionAssert.AreEqual(theirs, ours);
     }
 
     private static byte[] PublicKey(BrainpoolCurve curve, string privateKey)
