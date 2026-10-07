@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Rtsp.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1481 — Make every test in Curl.Protocol.Rtsp.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,22 @@ Every test in `Curl.Protocol.Rtsp.UnitTests` writes, through BL-1457's shared `T
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Rtsp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Protocol.Rtsp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Protocol.Rtsp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Rtsp.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Rtsp.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Rtsp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Rtsp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Rtsp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Rtsp.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Rtsp.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 138 test methods in 6 files.
+- 2026-10-07: Done. A new `RtspDiagnostics.cs` (extension methods on `TestDiagnostics`) writes the URL and options, the scripted reply or reads (text and `BYTES`), the request sent, the event transcript, the result (exit code name and number, error text, bytes, reply status), and ASSERT/DIFF lines with control characters escaped (`\r`, `\n`, `\0`) and values capped at 200 characters. The shared helpers in each class (`Server`, `Context`, `Handler`, `RunAsync`, `Format`) became instance methods that write the ARRANGE and ACT lines for the tests using them; each test adds its own ASSERT or DIFF before its first assertion. Default taken: in `RtspRequestFormatterTests` the expected head moved into a local `expected` and the formatted head into a local `head` so the DIFF line and the assertion compare the same two values; what each assertion checks is unchanged.
+- Counts (`Select-String -AllMatches`, excluding `obj`/`bin`): before `Assert.` 285, `[TestMethod` 138, `[DataRow(` 109; after 285, 138, 109. Test run total 219 before and after (no test attribute or data row changed): 213 run and pass on Windows, 6 skipped by `OSCondition` (the non-Windows socket-error variants).
+- Detailed run: 213 `END` lines for 213 tests run; the zero-count pattern prints nothing.
+- No test printed a `SLOW:` line, so no follow-up task.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Protocol.Rtsp.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF diagnostics through TestDiagnostics

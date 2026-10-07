@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Rtsp.Fakes;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Rtsp;
@@ -23,6 +24,11 @@ public sealed class RtspProtocolHandlerVerboseTests
 
     private const string LeftIntact = "* Connection #0 to host 127.0.0.1:47950 left intact";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_OkReply_ReportsRequestHeadAndLeftIntactAndMarksReusable()
     {
@@ -30,6 +36,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "> " + Request, RequestSent, "< RTSP/1.0 200 OK\r\n", "< CSeq: 1\r\n", "< Public: OPTIONS, DESCRIBE\r\n", "< \r\n", LeftIntact },
@@ -45,6 +52,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(reused);
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 0\r\nUser-Agent: curl/8.21.0\r\n\r\n", Encoding.Latin1.GetString(server.Sent));
         Assert.AreEqual("* Connection #3 to host 127.0.0.1:47950 left intact", transcript[^1]);
@@ -56,8 +64,11 @@ public sealed class RtspProtocolHandlerVerboseTests
     {
         var connector = new RecordingConnector(ConnectResult.Connected(Server("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n")));
 
-        await new RtspProtocolHandler(connector, new RecordingAuthenticator()).ExecuteAsync(Context(new RecordingTransferEvents()));
+        TransferResult result = await new RtspProtocolHandler(connector, new RecordingAuthenticator()).ExecuteAsync(Context(new RecordingTransferEvents()));
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("connect target", connector.Targets.Single());
+        Diagnostics.Assert("pool scheme", "rtsp", connector.Targets.Single().PoolScheme);
         Assert.AreEqual("rtsp", connector.Targets.Single().PoolScheme);
     }
 
@@ -68,6 +79,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "< \r\n", "{ 1", "{ 1", "* shutting down connection #0" }, transcript[^4..]);
         Assert.IsFalse(server.IsMarkedReusable);
@@ -80,6 +92,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server, new HttpRequestOptions { Fail = HttpFailMode.Fail });
 
+        Diagnostics.AssertExitCode(CurlExitCode.HttpReturnedError, result);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "< CSeq: 1\r\n", "* The requested URL returned error: 404", "< \r\n", "* closing connection #0" },
@@ -94,6 +107,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.UnsupportedProtocol, result);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "< \r\n", "* Unsupported response code in HTTP response", "* closing connection #0" },
@@ -107,6 +121,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "< \r\n", "* The CSeq of this request 1 did not match the response 7", LeftIntact },
@@ -121,6 +136,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         Assert.AreEqual("* shutting down connection #0", transcript[^1]);
         Assert.IsFalse(server.IsMarkedReusable);
@@ -133,6 +149,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
         Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { RequestSent, "< RTSP/1.0 200 OK\r\n", "< CSeq: 1\r\n", "* The CSeq of this request 1 did not match the response 0", LeftIntact },
@@ -146,6 +163,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.GotNothing, result);
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "> " + Request, RequestSent, "* Empty reply from server", "* shutting down connection #0" },
@@ -160,6 +178,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server);
 
+        Diagnostics.AssertExitCode(CurlExitCode.RtspSessionError, result);
         Assert.AreEqual(CurlExitCode.RtspSessionError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "< Session: a\r\n", "* Got RTSP Session ID Line [b\r\n], but wanted ID [a]", "* closing connection #0" },
@@ -175,6 +194,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(server, new HttpRequestOptions { Headers = [header] });
 
+        Diagnostics.AssertExitCode(exitCode, result);
         Assert.AreEqual(exitCode, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "* " + message, LeftIntact }, transcript);
         Assert.IsTrue(server.IsMarkedReusable);
@@ -190,6 +210,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(ConnectResult.Connected(new FailingConnection(writeFailure: failure)));
 
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -209,6 +230,7 @@ public sealed class RtspProtocolHandlerVerboseTests
         (TransferResult result, List<string> transcript) = await RunAsync(
             ConnectResult.Connected(new FailingConnection(writeFailure: new IOException("send", socketError))));
 
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -223,6 +245,7 @@ public sealed class RtspProtocolHandlerVerboseTests
 
         (TransferResult result, List<string> transcript) = await RunAsync(ConnectResult.Connected(new FailingConnection(writeFailure: broken)));
 
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, result);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("Failed sending data to the peer", result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -230,27 +253,44 @@ public sealed class RtspProtocolHandlerVerboseTests
             transcript);
     }
 
-    private static Task<(TransferResult Result, List<string> Transcript)> RunAsync(ScriptedConnection server, HttpRequestOptions? http = null) =>
+    private Task<(TransferResult Result, List<string> Transcript)> RunAsync(ScriptedConnection server, HttpRequestOptions? http = null) =>
         RunAsync(ConnectResult.Connected(server), http);
 
-    private static async Task<(TransferResult Result, List<string> Transcript)> RunAsync(ConnectResult connect, HttpRequestOptions? http = null)
+    private async Task<(TransferResult Result, List<string> Transcript)> RunAsync(ConnectResult connect, HttpRequestOptions? http = null)
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("connection", $"{connect.Connection?.GetType().Name}, reused {connect.IsReused}, number {connect.ConnectionNumber}");
         TransferResult result = await new RtspProtocolHandler(new RecordingConnector(connect), new RecordingAuthenticator())
             .ExecuteAsync(Context(events, http));
+        Diagnostics.ActResult(result);
+        if (connect.Connection is ScriptedConnection server)
+        {
+            Diagnostics.ActSent(server.Sent);
+            Diagnostics.Act("marked reusable", server.IsMarkedReusable);
+        }
+
+        Diagnostics.ActTranscript(events.Transcript);
         return (result, events.Transcript);
     }
 
-    private static TransferContext Context(ITransferEvents events, HttpRequestOptions? http = null) =>
-        new()
+    private TransferContext Context(ITransferEvents events, HttpRequestOptions? http = null)
+    {
+        TransferContext context = new()
         {
             Url = CurlUrl.Parse("rtsp://127.0.0.1:47950/media"),
             Output = new MemoryStream(),
             Http = http,
             Events = events,
         };
+        Diagnostics.ArrangeContext(context);
+        return context;
+    }
 
-    private static ScriptedConnection Server(string reply) => new(Bytes(reply));
+    private ScriptedConnection Server(string reply)
+    {
+        Diagnostics.ArrangeReply(reply);
+        return new(Bytes(reply));
+    }
 
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 }
