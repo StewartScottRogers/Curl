@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Http2.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1465 — Make every test in Curl.Http2.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,22 @@ Every test in `Curl.Http2.UnitTests` writes, through BL-1457's shared `TestDiagn
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Http2.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Http2.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Http2.UnitTests -warnaserror` is clean and `dotnet test Curl.Http2.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Http2.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Http2.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Http2.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Http2.UnitTests -warnaserror` is clean and `dotnet test Curl.Http2.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Http2.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 210 test methods in 13 files.
+- Counts (Select-String -AllMatches, excluding obj and bin), before -> after: `Assert.` 356 -> 356, `[TestMethod` 210 -> 210, `[DataRow(` 25 -> 25. Run total 230 -> 230, all passing, 230 `END` lines, none with a zero arrange, act or assert count.
+- No test printed a `SLOW:` line (the slowest took well under 3000 ms), so no follow-up task was filed.
+- Approach: each test class gained a `TestContext` property; each test writes ARRANGE (inputs, header lists, wire or block lengths), ACT (decoded frame type, flags, stream ID and payload length, decoded header lists, error codes), BYTES for wire bytes and HPACK blocks, and ASSERT or DIFF before its MSTest assertion. Results that were asserted inline are now captured in locals first, so the log can show them; each assertion checks the same thing as before. Class-private helpers (`RoundTrip`, `AssertRequestSequence`, `AssertResponseSequence`, `AssertFrameWithDiagnostics`) take the diagnostics and write lines for the tests that use them; the shared `Hpack.cs` and `Http2Test.cs` are unchanged.
+- `dotnet format --verify-no-changes` is clean for this project's files; it still reports ENDOFLINE in the shared root `TestDiagnostics.cs` (BL-1457's file, outside this task's touches).
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Http2.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF diagnostics; 230 tests pass, none slow
