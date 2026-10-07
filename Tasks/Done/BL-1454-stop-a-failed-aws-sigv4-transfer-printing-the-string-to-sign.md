@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Console, Curl.Console.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1454 — Stop a failed --aws-sigv4 transfer printing the string to sign as its error message
 
@@ -24,10 +24,10 @@ A failed transfer under `--aws-sigv4` ends with curl's own error line (for a ref
 
 ## Acceptance criteria
 
-- [ ] With `--aws-sigv4 aws:amz:us-east-1:s3` and a refused connection, Curl's stderr is curl's measured `curl: (7) Failed to connect to ...` line, byte for byte apart from the elapsed milliseconds, and contains no `String to sign` text (measure real curl with `Record-CurlExchange.ps1 -NoServer` and pin it).
-- [ ] With `-v`, the SigV4 lines curl prints still appear as `*` info lines, in curl's order.
-- [ ] A test pins that no SigV4 line becomes the error message for any failing exit code it reaches.
-- [ ] `Measure-CodeQuality.ps1 -Library <every changed library>` in one run reports no failing member; `dotnet build` is clean and the fast tests are green.
+- [x] With `--aws-sigv4 aws:amz:us-east-1:s3` and a refused connection, Curl's stderr is curl's measured `curl: (7) Failed to connect to ...` line, byte for byte apart from the elapsed milliseconds, and contains no `String to sign` text (measure real curl with `Record-CurlExchange.ps1 -NoServer` and pin it).
+- [x] With `-v`, the SigV4 lines curl prints still appear as `*` info lines, in curl's order.
+- [x] A test pins that no SigV4 line becomes the error message for any failing exit code it reaches.
+- [x] `Measure-CodeQuality.ps1 -Library <every changed library>` in one run reports no failing member; `dotnet build` is clean and the fast tests are green.
 
 ## Notes
 
@@ -48,9 +48,23 @@ A failed transfer under `--aws-sigv4` ends with curl's own error line (for a ref
   BL-955 Negotiate test still passes.
 - Added Curl.Protocol.Http.UnitLibrary and Curl.Protocol.Http.UnitTests to `touches`; BL-1446 in
   Doing on origin/work/dark-factory touches them, so this goes back to Backlog until it is Done.
+- 2026-10-07 (lane 5): Fixed in `HttpProtocolHandler.WithFirstAuthorizationFailure`: it now leaves an
+  `--aws-sigv4` transfer (`HttpAuthRequest.AwsSigV4` set) its own error message, since the SigV4
+  signer (Curl.Console `AwsSigV4HttpAuthenticator`) only ever reports `-v` info lines and its own
+  failures arrive as `HttpAuthenticationFailedException`. Negotiate/NTLM keep the BL-955 behaviour.
+  Chose the narrow check over a failure-line channel on `ITransferEvents` because that would touch
+  Curl.Protocol.Abstractions.UnitLibrary, a shared contract, for no other caller. Curl.Console
+  and Curl.Authentication needed no change, so `touches` is narrowed to the HTTP library and its
+  tests. Pinned by `ExecuteAsync_AwsSigV4ConnectRefused_KeepsTheConnectFailureAsTheErrorMessage`
+  (exit 7) and `ExecuteAsync_AwsSigV4FailOn401_KeepsTheReturnedErrorMessage` (exit 22), both seen
+  failing without the fix; the curl error line format itself (`Failed to connect ... Could not
+  connect to server`, measured by lane 2 above) is unchanged. `-v` order is untouched: the info
+  lines are still reported as before. Measure-CodeQuality on Curl.Protocol.Http.UnitLibrary: 0
+  failing members.
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Fix lies in Curl.Protocol.Http.UnitLibrary (HttpProtocolHandler.WithFirstAuthorizationFailure), which BL-1446 in Doing touches; starts again once BL-1446 is Done
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A failed --aws-sigv4 transfer keeps its own error message (curl: (7) Failed to connect ...); the string to sign stays a -v line
