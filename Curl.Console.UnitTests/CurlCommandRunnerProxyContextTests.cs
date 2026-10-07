@@ -1,5 +1,6 @@
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -12,6 +13,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCommandRunnerProxyContextTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_HttpProxyForADictUrl_ContextCarriesTheProxy()
     {
@@ -19,8 +24,13 @@ public sealed class CurlCommandRunnerProxyContextTests
 
         int exitCode = await RunAsync(["-sS", "-x", "http://127.0.0.1:1", "dict://example.com/d:x"], dict);
 
-        Assert.AreEqual(0, exitCode);
         ProxyEndpoint? proxy = dict.Contexts.Single().Proxy;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("proxy is present", true, proxy is not null);
+        Diagnostics.Assert("proxy host", "127.0.0.1", proxy?.Host);
+        Diagnostics.Assert("proxy port", 1, proxy?.Port);
+        Diagnostics.Assert("proxy kind", ProxyKind.Http, proxy?.Kind);
+        Assert.AreEqual(0, exitCode);
         Assert.IsNotNull(proxy);
         Assert.AreEqual("127.0.0.1", proxy.Host);
         Assert.AreEqual(1, proxy.Port);
@@ -35,6 +45,8 @@ public sealed class CurlCommandRunnerProxyContextTests
         await RunAsync(["-sS", "-x", "http://127.0.0.1:1", "-U", "u:p", "dict://example.com/d:x"], dict);
 
         ITransferContext context = dict.Contexts.Single();
+        Diagnostics.Assert("proxy credential user name", "u", context.Proxy?.Credential?.UserName);
+        Diagnostics.Assert("http forward proxy is the proxy", context.Proxy, context.Http?.ForwardProxy);
         Assert.AreEqual("u", context.Proxy?.Credential?.UserName);
         Assert.AreEqual(context.Http?.ForwardProxy, context.Proxy);
     }
@@ -48,24 +60,35 @@ public sealed class CurlCommandRunnerProxyContextTests
 
         int exitCode = await RunAsync(["-sS", "-x", proxyText, "file:///source.txt"], file);
 
-        Assert.AreEqual(0, exitCode);
         ITransferContext context = file.Contexts.Single();
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("proxy", null, context.Proxy);
+        Diagnostics.Assert("http forward proxy", null, context.Http?.ForwardProxy);
+        Assert.AreEqual(0, exitCode);
         Assert.IsNull(context.Proxy);
         Assert.IsNull(context.Http?.ForwardProxy);
     }
 
-    private static Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler)
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler)
     {
         InMemoryFileSystem outputFiles = new();
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([handler])),
-                outputFiles,
-                outputFiles,
-                new MemoryStream(),
-                new MemoryStream(),
-                new MemoryStream(),
-                runsOnWindows: false)
-            .RunAsync(arguments);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([handler])),
+                    outputFiles,
+                    outputFiles,
+                    new MemoryStream(),
+                    new MemoryStream(),
+                    new MemoryStream(),
+                    runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        return exitCode;
     }
 }

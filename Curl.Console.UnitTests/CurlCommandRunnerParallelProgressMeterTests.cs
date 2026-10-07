@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -33,6 +34,10 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
 
     private readonly ManualTimerTimeProvider clock = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -42,8 +47,11 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
     {
         int exitCode = await RunAsync([.. options, "http://a.test/1", "http://b.test/2"]);
 
+        string expectedStandardError = Header + NewLine + FirstLine + SecondLine + FinalLine + NewLine;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(Header + NewLine + FirstLine + SecondLine + FinalLine + NewLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
@@ -53,12 +61,18 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
     {
         int exitCode = await RunAsync(["-Z", option, "http://a.test/1", "http://b.test/2"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments)
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments)
     {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("clock advance per transfer (ms)", 600);
         RecordingProtocolHandler handler = new("http", context =>
         {
             context.Progress.ReportTransferStarted();
@@ -68,16 +82,24 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
             return ValueTask.FromResult(TransferResult.Success(10));
         });
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([handler])),
-                fileSystem,
-                fileSystem,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                writesProgressMeter: true,
-                timeProvider: clock)
-            .RunAsync(arguments);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([handler])),
+                    fileSystem,
+                    fileSystem,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    writesProgressMeter: true,
+                    timeProvider: clock)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
     }
 }
