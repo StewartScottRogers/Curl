@@ -35,3 +35,4 @@ completed:
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Lane 5 could not integrate: fast tests failed twice (Curl.Cookies.UnitTests: EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother; then Curl.Cookies.UnitTests failed) after rebasing onto the other lanes' work. The work is on branch factory/BL-1649-lane-5-20261007-111121; start with git cherry-pick --no-commit factory/BL-1649-lane-5-20261007-111121 and fix it.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Lane 1 could not integrate: fast tests failed twice (no test named; then no test named) after rebasing onto the other lanes' work. The work is on branch factory/BL-1649-lane-1-20261007-111121; start with git cherry-pick --no-commit factory/BL-1649-lane-1-20261007-111121 and fix it.
