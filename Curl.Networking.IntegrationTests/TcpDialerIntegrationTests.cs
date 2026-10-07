@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-
+using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;

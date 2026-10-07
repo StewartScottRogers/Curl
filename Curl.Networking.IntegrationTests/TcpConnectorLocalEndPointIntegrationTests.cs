@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
@@ -42,36 +43,34 @@ public sealed class TcpConnectorLocalEndPointIntegrationTests
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var serverCertificate = CreateLoopbackServerCertificate();
-        var listened = await new TcpConnectionListener().ListenAsync(
-            new ListenTarget(IPAddress.Loopback, 0, 0), cancellation.Token);
-        await using var pending = listened.PendingConnection!;
-        var port = ((IPEndPoint)pending.LocalEndPoint).Port;
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         var connector = new TcpConnector(
             new SystemDnsResolver(),
             new TcpDialer(),
             new SslStreamTlsProvider(new TlsClientOptions(Insecure: true)),
             TimeProvider.System);
-        var server = AcceptTlsAsync(pending, serverCertificate, cancellation.Token);
+        var server = AcceptTlsAsync(listener, serverCertificate, cancellation.Token);
 
         var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: true), cancellation.Token);
 
         await using var connection = result.Connection!;
         var (serverSide, serverStream) = await server;
-        await using var serverConnection = serverSide;
+        using var serverConnection = serverSide;
         await using var serverTls = serverStream;
 
         Assert.IsTrue(connection.IsSecure);
         Assert.IsNotNull(connection.LocalEndPoint);
         Assert.AreEqual(result.LocalEndPoint, connection.LocalEndPoint);
-        Assert.AreEqual(serverSide.RemoteEndPoint, connection.LocalEndPoint);
+        Assert.AreEqual(serverSide.Client.RemoteEndPoint, connection.LocalEndPoint);
     }
 
-    private static async Task<(IConnection Connection, SslStream Stream)> AcceptTlsAsync(
-        IPendingConnection pending, X509Certificate2 certificate, CancellationToken cancellationToken)
+    private static async Task<(TcpClient Connection, SslStream Stream)> AcceptTlsAsync(
+        TcpListener listener, X509Certificate2 certificate, CancellationToken cancellationToken)
     {
-        var accepted = await pending.AcceptAsync(cancellationToken);
-        var serverSide = accepted.Connection!;
-        var sslStream = new SslStream(new ConnectionStream(serverSide), leaveInnerStreamOpen: true);
+        var serverSide = await listener.AcceptTcpClientAsync(cancellationToken);
+        var sslStream = new SslStream(serverSide.GetStream(), leaveInnerStreamOpen: true);
         await sslStream.AuthenticateAsServerAsync(
             new SslServerAuthenticationOptions { ServerCertificate = certificate }, cancellationToken);
         return (serverSide, sslStream);
