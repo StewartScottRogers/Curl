@@ -35,6 +35,14 @@ internal static class CommandLineParseDiagnostics
         }
     }
 
+    /// <summary>
+    /// Returns <paramref name="value"/> unchanged, so a diagnostic line can read a nullable member such as
+    /// <see cref="CommandLineParseResult.Refusal"/> with <c>?.</c> without making the compiler treat it as
+    /// possibly null in the assertions after it.
+    /// </summary>
+    public static T? Peek<T>(T? value)
+        where T : class => value;
+
     /// <summary>Formats <paramref name="values"/> as a bracketed list, each value in double quotes, so spaces and empty values show.</summary>
     public static string QuoteEach(IEnumerable<string?> values) =>
         "[" + string.Join(", ", values.Select(value => value is null ? "null" : "\"" + value + "\"")) + "]";
