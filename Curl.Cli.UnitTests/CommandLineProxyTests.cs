@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -10,6 +11,10 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class CommandLineProxyTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("http://p:1", ProxyKind.Socks5, ProxyKind.Http)]
     [DataRow("HTTP://p:1", ProxyKind.Http, ProxyKind.Http)]
@@ -25,8 +30,9 @@ public sealed class CommandLineProxyTests
     [DataRow("socks5://p:1", ProxyKind.Http10, ProxyKind.Socks5)]
     public void TryGetKind_SupportedScheme_OutranksTheOptionsKind(string address, ProxyKind kindWithoutScheme, ProxyKind expected)
     {
-        bool supported = new CommandLineProxy(address, kindWithoutScheme).TryGetKind(out ProxyKind kind, out TransferResult? failure);
+        bool supported = TryGetKind(address, kindWithoutScheme, out ProxyKind kind, out TransferResult? failure);
 
+        Diagnostics.Assert("kind", expected, kind);
         Assert.IsTrue(supported);
         Assert.AreEqual(expected, kind);
         Assert.IsNull(failure);
@@ -41,8 +47,9 @@ public sealed class CommandLineProxyTests
     [DataRow("p:1", ProxyKind.Http10)]
     public void TryGetKind_NoScheme_IsTheOptionsKind(string address, ProxyKind kindWithoutScheme)
     {
-        bool supported = new CommandLineProxy(address, kindWithoutScheme).TryGetKind(out ProxyKind kind, out TransferResult? failure);
+        bool supported = TryGetKind(address, kindWithoutScheme, out ProxyKind kind, out TransferResult? failure);
 
+        Diagnostics.Assert("kind", kindWithoutScheme, kind);
         Assert.IsTrue(supported);
         Assert.AreEqual(kindWithoutScheme, kind);
         Assert.IsNull(failure);
@@ -52,10 +59,16 @@ public sealed class CommandLineProxyTests
     public void With_BothMembersReplaced_ReadsTheNewScheme()
     {
         CommandLineProxy proxy = new("socks5://p:1", ProxyKind.Http);
+        Diagnostics.Arrange("proxy", proxy);
 
         CommandLineProxy replaced = proxy with { Address = "p:1", KindWithoutScheme = ProxyKind.Socks4a };
+        Diagnostics.Act("replaced", replaced);
 
-        Assert.IsTrue(replaced.TryGetKind(out ProxyKind kind, out _));
+        bool supported = replaced.TryGetKind(out ProxyKind kind, out _);
+        Diagnostics.Act("supported", supported);
+        Diagnostics.Assert("kind", ProxyKind.Socks4a, kind);
+        Diagnostics.Assert("original address", "socks5://p:1", proxy.Address);
+        Assert.IsTrue(supported);
         Assert.AreEqual(ProxyKind.Socks4a, kind);
         Assert.AreEqual("socks5://p:1", proxy.Address);
     }
@@ -66,12 +79,25 @@ public sealed class CommandLineProxyTests
     [DataRow("ftp://127.0.0.1:1")]
     public void TryGetKind_UnsupportedScheme_FailsWithExit7(string address)
     {
-        bool supported = new CommandLineProxy(address, ProxyKind.Http).TryGetKind(out _, out TransferResult? failure);
+        bool supported = TryGetKind(address, ProxyKind.Http, out _, out TransferResult? failure);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, failure?.ExitCode);
+        Diagnostics.Assert("error message", $"Unsupported proxy scheme for '{address}'", failure?.ErrorMessage);
         Assert.IsFalse(supported);
         Assert.IsNotNull(failure);
         Assert.AreEqual(CurlExitCode.CouldntConnect, failure.ExitCode);
         Assert.AreEqual($"Unsupported proxy scheme for '{address}'", failure.ErrorMessage);
         Assert.AreEqual(0, failure.BytesTransferred);
+    }
+
+    private bool TryGetKind(string address, ProxyKind kindWithoutScheme, out ProxyKind kind, out TransferResult? failure)
+    {
+        Diagnostics.Arrange("address", $"\"{address}\"");
+        Diagnostics.Arrange("kind without scheme", kindWithoutScheme);
+        bool supported = new CommandLineProxy(address, kindWithoutScheme).TryGetKind(out kind, out failure);
+        Diagnostics.Act("supported", supported);
+        Diagnostics.Act("kind", kind);
+        Diagnostics.Act("failure", failure is null ? "null" : $"exit {(int)failure.ExitCode} ({failure.ExitCode}), \"{failure.ErrorMessage}\", {failure.BytesTransferred} bytes");
+        return supported;
     }
 }
