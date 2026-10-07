@@ -31,14 +31,25 @@ internal static class UpstreamTestInstructions
     public static string ReplaceCharacterMacros(string line) =>
         CharacterMacros.Aggregate(line, (text, macro) => text.Replace(macro.Macro, macro.Replacement, StringComparison.Ordinal));
 
-    /// <summary>Replaces every <c>%b64[…]b64%</c>, then every <c>%hex[…]hex%</c>, then every <c>%repeat[N x …]%</c>.</summary>
+    /// <summary>
+    /// The most characters one <c>%repeat[N x …]%</c> may produce: 16 MiB. Upstream sets no limit,
+    /// but the largest repeat in the vendored tests produces about 1 MiB (ADR-0423).
+    /// </summary>
+    public const long MaximumRepeatLength = 16L * 1024 * 1024;
+
+    /// <summary>
+    /// Replaces every <c>%b64[…]b64%</c>, then every <c>%hex[…]hex%</c>, then every <c>%repeat[N x …]%</c>,
+    /// except that a repeat which would produce more than <see cref="MaximumRepeatLength"/> characters
+    /// is left as written and <c>%repeat</c> is added to <paramref name="unsupported"/>, once.
+    /// </summary>
     /// <param name="line">The line, one character per byte.</param>
+    /// <param name="unsupported">The names of the instructions not carried out so far.</param>
     /// <returns>The line with every instruction replaced.</returns>
-    public static string Apply(string line)
+    public static string Apply(string line, List<string> unsupported)
     {
         string text = ReplaceEach(line, "%b64[", "]b64%", content => Convert.ToBase64String(Encoding.Latin1.GetBytes(DecodePercentPairs(content))));
         text = ReplaceEach(text, "%hex[", "]hex%", DecodePercentPairs);
-        return ReplaceRepeats(text);
+        return ReplaceRepeats(text, unsupported);
     }
 
     /// <summary>
@@ -53,10 +64,18 @@ internal static class UpstreamTestInstructions
     {
         foreach ((string marker, string name, StringComparison comparison) in UnsupportedMarkers)
         {
-            if (line.Contains(marker, comparison) && !unsupported.Contains(name))
+            if (line.Contains(marker, comparison))
             {
-                unsupported.Add(name);
+                AddOnce(unsupported, name);
             }
+        }
+    }
+
+    private static void AddOnce(List<string> names, string name)
+    {
+        if (!names.Contains(name))
+        {
+            names.Add(name);
         }
     }
 
@@ -82,7 +101,7 @@ internal static class UpstreamTestInstructions
         }
     }
 
-    private static string ReplaceRepeats(string text)
+    private static string ReplaceRepeats(string text, List<string> unsupported)
     {
         int searchFrom = 0;
         while (true)
@@ -93,13 +112,13 @@ internal static class UpstreamTestInstructions
                 return text;
             }
 
-            string? replaced = TryReplaceRepeatAt(text, start);
+            string? replaced = TryReplaceRepeatAt(text, start, unsupported);
             searchFrom = replaced is null ? start + 1 : 0;
             text = replaced ?? text;
         }
     }
 
-    private static string? TryReplaceRepeatAt(string text, int start)
+    private static string? TryReplaceRepeatAt(string text, int start, List<string> unsupported)
     {
         int countStart = start + "%repeat[".Length;
         int countEnd = countStart;
@@ -115,7 +134,14 @@ internal static class UpstreamTestInstructions
             return null;
         }
 
-        string repeated = string.Concat(Enumerable.Repeat(DecodePercentPairs(text[contentStart..end]), count));
+        string content = DecodePercentPairs(text[contentStart..end]);
+        if ((long)content.Length * count > MaximumRepeatLength)
+        {
+            AddOnce(unsupported, "%repeat");
+            return null;
+        }
+
+        string repeated = string.Concat(Enumerable.Repeat(content, count));
         return string.Concat(text.AsSpan(0, start), repeated, text.AsSpan(end + 2));
     }
 

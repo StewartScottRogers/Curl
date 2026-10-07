@@ -32,6 +32,30 @@ public sealed partial class UpstreamTestFileExpanderTests
     }
 
     [TestMethod]
+    public void Expand_RepeatLongerThanTheLimit_IsLeftAsWrittenAndListedAsUnsupported()
+    {
+        // Twice two billion characters is past the CLR's string limit (BL-1648); twice the 8 MiB
+        // count is one past 16 MiB, and the doubled %repeat is listed once.
+        const string Line = "%repeat[2000000000 x ab]% %repeat[8388609 x ab]%\n";
+
+        UpstreamTestFileExpansion expansion = Expand(Line, NoVariables);
+
+        Diagnostics.Assert("expanded text", Line, Text(expansion));
+        Assert.AreEqual(Line, Text(expansion));
+        CollectionAssert.AreEqual(new[] { "%repeat" }, expansion.UnsupportedInstructions.ToArray());
+    }
+
+    [TestMethod]
+    public void Expand_RepeatExactlyAtTheLimit_IsExpanded()
+    {
+        UpstreamTestFileExpansion expansion = Expand("%repeat[8388608 x ab]%\n", NoVariables);
+
+        Diagnostics.Assert("expanded length", (16 * 1024 * 1024) + 1, Text(expansion).Length);
+        Assert.AreEqual((16 * 1024 * 1024) + 1, Text(expansion).Length);
+        Assert.IsEmpty(expansion.UnsupportedInstructions);
+    }
+
+    [TestMethod]
     [DataRow("%hex[%4]hex%\n", "%4\n", DisplayName = "pair cut short")]
     [DataRow("%hex[%zz41]hex%\n", "%zz41\n", DisplayName = "pair that is not hexadecimal")]
     [DataRow("%hex[%]hex%\n", "%\n", DisplayName = "lone percent")]
