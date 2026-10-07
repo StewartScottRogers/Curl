@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -11,15 +12,24 @@ namespace Curl.Console;
 [TestClass]
 public sealed class ConnectReplyHeadWritingEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task WriteConnectReplyHeadAsync_WritesTheHeadToTheHeaderOutput()
     {
         using MemoryStream headerOutput = new();
         CallRecordingEvents inner = new();
         ConnectReplyHeadWritingEvents events = new(inner, headerOutput);
+        Diagnostics.Arrange("reply head", "HTTP/1.1 200 OK, blank line");
 
         await events.WriteConnectReplyHeadAsync(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\n"), CancellationToken.None);
 
+        Diagnostics.Act("header output length", headerOutput.Length);
+        Diagnostics.Bytes("header output", headerOutput.ToArray());
+        Diagnostics.Assert("header output length", 19, headerOutput.Length);
+        Diagnostics.Assert("inner calls", 0, inner.Calls.Count);
         Assert.AreEqual("HTTP/1.1 200 OK\r\n\r\n", Encoding.Latin1.GetString(headerOutput.ToArray()));
         Assert.IsEmpty(inner.Calls);
     }
@@ -30,6 +40,7 @@ public sealed class ConnectReplyHeadWritingEventsTests
         using MemoryStream headerOutput = new();
         CallRecordingEvents inner = new();
         ITransferEvents events = new ConnectReplyHeadWritingEvents(inner, headerOutput);
+        Diagnostics.Arrange("events to report", 13);
 
         events.ReportInfo("text");
         events.ReportConnectionOpened(null!);
@@ -45,6 +56,9 @@ public sealed class ConnectReplyHeadWritingEventsTests
         events.ReportDataSent([4]);
         events.ReportDataReceived([5]);
 
+        Diagnostics.Act("inner calls", string.Join(", ", inner.Calls));
+        Diagnostics.Assert("inner call count", 13, inner.Calls.Count);
+        Diagnostics.Assert("header output length", 0L, headerOutput.Length);
         CollectionAssert.AreEqual(
             new[]
             {

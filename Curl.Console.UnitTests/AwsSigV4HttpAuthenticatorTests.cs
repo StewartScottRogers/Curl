@@ -3,6 +3,7 @@ using System.Text;
 
 using Curl.Authentication;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -16,6 +17,8 @@ namespace Curl.Console;
 [TestClass]
 public sealed class AwsSigV4HttpAuthenticatorTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Signature = "65b76dcb57fed633eed53e8515f9b2e6a53bbe4d8d5c792def45eebd25da8846";
 
     private static readonly CurlUrl Url = CurlUrl.Parse("http://127.0.0.1:18633/x");
@@ -28,7 +31,10 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         RecordingEvents events = new();
         HttpAuthRequest request = SignedRequest() with { Events = events };
 
+        Diagnostics.Arrange("url", Url);
         string? value = await Authenticator().CreateAuthorizationAsync(request, [], CancellationToken.None);
+        Diagnostics.Act("authorization", value);
+        Diagnostics.Assert("event line count", 3, events.Lines.Count);
 
         Assert.AreEqual(
             $"AWS4-HMAC-SHA256 Credential=AKID/20260929/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature={Signature}\r\n"
@@ -52,7 +58,11 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         HttpAuthRequest request = SignedRequest() with { Url = CurlUrl.Parse("http://s3.eu-west-1.localhost:18644/"), Events = events };
         request = request with { AwsSigV4 = request.AwsSigV4! with { Parameter = "aws:amz" } };
 
+        Diagnostics.Arrange("parameter", request.AwsSigV4!.Parameter);
         Authenticator().CreateAuthorization(request, []);
+        Diagnostics.Act("event line count", events.Lines.Count);
+        Diagnostics.Assert("first line", "aws_sigv4: picked service s3 from host", events.Lines[0]);
+        Diagnostics.Assert("second line", "aws_sigv4: picked region eu-west-1 from host", events.Lines[1]);
 
         Assert.AreEqual("aws_sigv4: picked service s3 from host", events.Lines[0]);
         Assert.AreEqual("aws_sigv4: picked region eu-west-1 from host", events.Lines[1]);
@@ -62,7 +72,10 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     [TestMethod]
     public void CreateAuthorization_AwsSigV4_SignsAsTheAsynchronousCallDoes()
     {
+        Diagnostics.Arrange("url", Url);
         string? value = Authenticator().CreateAuthorization(SignedRequest(), []);
+        Diagnostics.Act("authorization", value);
+        Diagnostics.Assert("starts with", "AWS4-HMAC-SHA256 Credential=AKID/", value?.Substring(0, Math.Min(value.Length, 33)));
 
         StringAssert.StartsWith(value, "AWS4-HMAC-SHA256 Credential=AKID/", StringComparison.Ordinal);
     }
@@ -77,7 +90,10 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         RecordingEvents events = new();
         HttpAuthRequest request = SignedRequest(["Authorization: mine"]) with { Events = events };
 
+        Diagnostics.Arrange("custom header", "Authorization: mine");
         string? value = Authenticator().CreateAuthorization(request, []);
+        Diagnostics.Act("authorization", value ?? "(null)");
+        Diagnostics.Assert("authorization", "(null)", value ?? "(null)");
 
         Assert.IsNull(value);
         CollectionAssert.AreEqual(new[] { "Server auth using AWS_SIGV4 with user 'AKID'" }, events.Lines);
@@ -86,12 +102,20 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     [TestMethod]
     public void CreateAuthorization_AwsSigV4AnsweringAChallenge_SendsNothing()
     {
+        Diagnostics.Arrange("challenge", "AWS4-HMAC-SHA256");
+        string? value = Authenticator().CreateAuthorization(SignedRequest(), ["AWS4-HMAC-SHA256"]);
+        Diagnostics.Act("authorization", value ?? "(null)");
+        Diagnostics.Assert("authorization", "(null)", value ?? "(null)");
         Assert.IsNull(Authenticator().CreateAuthorization(SignedRequest(), ["AWS4-HMAC-SHA256"]));
     }
 
     [TestMethod]
     public void CreateAuthorization_AwsSigV4WithoutACredential_SendsNothing()
     {
+        Diagnostics.Arrange("credential", "(null)");
+        string? value = Authenticator().CreateAuthorization(SignedRequest() with { Credential = null }, []);
+        Diagnostics.Act("authorization", value ?? "(null)");
+        Diagnostics.Assert("authorization", "(null)", value ?? "(null)");
         Assert.IsNull(Authenticator().CreateAuthorization(SignedRequest() with { Credential = null }, []));
     }
 
@@ -101,7 +125,10 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         HttpAuthRequest request = SignedRequest() with { Url = CurlUrl.Parse("http://localhost:18631/x") };
         request = request with { AwsSigV4 = request.AwsSigV4! with { Parameter = "aws" } };
 
+        Diagnostics.Arrange("parameter", request.AwsSigV4!.Parameter);
         HttpAuthenticationFailedException failure = Assert.ThrowsExactly<HttpAuthenticationFailedException>(() => Authenticator().CreateAuthorization(request, []));
+        Diagnostics.Act("exit code", failure.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, failure.ExitCode);
 
         Assert.AreEqual(CurlExitCode.UrlMalformat, failure.ExitCode);
         Assert.AreEqual("aws-sigv4: service missing in parameters and hostname", failure.Message);
@@ -110,12 +137,20 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     [TestMethod]
     public async Task ContinueAuthorizationAsync_AwsSigV4_AnswersNothing()
     {
+        Diagnostics.Arrange("sent authorization", "x");
+        string? value = await Authenticator().ContinueAuthorizationAsync(SignedRequest(), "x", true, ["y"], CancellationToken.None);
+        Diagnostics.Act("authorization", value ?? "(null)");
+        Diagnostics.Assert("authorization", "(null)", value ?? "(null)");
         Assert.IsNull(await Authenticator().ContinueAuthorizationAsync(SignedRequest(), "x", true, ["y"], CancellationToken.None));
     }
 
     [TestMethod]
     public void RepeatAuthorization_AwsSigV4_SendsTheValueAsSent()
     {
+        Diagnostics.Arrange("sent authorization", "sent");
+        string repeated = Authenticator().RepeatAuthorization(SignedRequest(), "sent");
+        Diagnostics.Act("repeated", repeated);
+        Diagnostics.Assert("repeated", "sent", repeated);
         Assert.AreEqual("sent", Authenticator().RepeatAuthorization(SignedRequest(), "sent"));
     }
 
@@ -125,6 +160,9 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         HttpAuthRequest request = SignedRequest() with { AwsSigV4 = null };
         AwsSigV4HttpAuthenticator authenticator = Authenticator();
 
+        Diagnostics.Arrange("aws sigv4", "(null)");
+        Diagnostics.Act("create", authenticator.CreateAuthorization(request, []));
+        Diagnostics.Assert("create", "sync", authenticator.CreateAuthorization(request, []));
         Assert.AreEqual("sync", authenticator.CreateAuthorization(request, []));
         Assert.AreEqual("async", await authenticator.CreateAuthorizationAsync(request, [], CancellationToken.None));
         Assert.AreEqual("continued", await authenticator.ContinueAuthorizationAsync(request, "x", true, ["y"], CancellationToken.None));
@@ -137,7 +175,10 @@ public sealed class AwsSigV4HttpAuthenticatorTests
         var otherSchemes = new OtherSchemes();
         var authenticator = new AwsSigV4HttpAuthenticator(otherSchemes, new AwsSigV4Signer(new FixedUtcClock(Measured), Encoding.Latin1));
 
+        Diagnostics.Arrange("kept value", "Negotiate YQ==");
         authenticator.EndAuthorization("Negotiate YQ==");
+        Diagnostics.Act("ended count", otherSchemes.Ended.Count);
+        Diagnostics.Assert("ended count", 1, otherSchemes.Ended.Count);
 
         CollectionAssert.AreEqual(new[] { "Negotiate YQ==" }, otherSchemes.Ended);
     }
@@ -147,11 +188,16 @@ public sealed class AwsSigV4HttpAuthenticatorTests
     {
         AwsSigV4HttpAuthenticator authenticator = Authenticator();
 
+        Diagnostics.Arrange("request", "(null)");
+        Diagnostics.Act("calls", 4);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), nameof(ArgumentNullException));
         Assert.ThrowsExactly<ArgumentNullException>(() => authenticator.CreateAuthorization(null!, []));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await authenticator.CreateAuthorizationAsync(null!, [], CancellationToken.None));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await authenticator.ContinueAuthorizationAsync(null!, "x", true, ["y"], CancellationToken.None));
         Assert.ThrowsExactly<ArgumentNullException>(() => authenticator.RepeatAuthorization(null!, "x"));
     }
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private static AwsSigV4HttpAuthenticator Authenticator() =>
         new(new OtherSchemes(), new AwsSigV4Signer(new FixedUtcClock(Measured), Encoding.Latin1));

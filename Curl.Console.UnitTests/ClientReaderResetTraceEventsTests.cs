@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -10,6 +11,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class ClientReaderResetTraceEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("Connection #0 to host 127.0.0.1:47811 left intact")]
     [DataRow("shutting down connection #0")]
@@ -17,7 +22,10 @@ public sealed class ClientReaderResetTraceEventsTests
     {
         CallRecordingEvents inner = new();
 
+        Diagnostics.Arrange("info line", line);
         new ClientReaderResetTraceEvents(inner).ReportInfo(line);
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 2, inner.Calls.Count);
 
         CollectionAssert.AreEqual(new[] { "Info [READ] client_reset, clear readers", $"Info {line}" }, inner.Calls);
     }
@@ -28,7 +36,10 @@ public sealed class ClientReaderResetTraceEventsTests
         // curl -v --trace-config read -L on a 302 to /b: the next hop's reset comes straight after (BL-1189 Notes).
         CallRecordingEvents inner = new();
 
+        Diagnostics.Arrange("info line", "Issue another request to this URL: 'http://127.0.0.1:47811/b'");
         new ClientReaderResetTraceEvents(inner).ReportInfo("Issue another request to this URL: 'http://127.0.0.1:47811/b'");
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 2, inner.Calls.Count);
 
         CollectionAssert.AreEqual(
             new[] { "Info Issue another request to this URL: 'http://127.0.0.1:47811/b'", "Info [READ] client_reset, clear readers" },
@@ -44,10 +55,13 @@ public sealed class ClientReaderResetTraceEventsTests
         CallRecordingEvents inner = new();
         ClientReaderResetTraceEvents events = new(inner);
 
+        Diagnostics.Arrange("connection last line", connectionsLastLine);
         events.ReportInfo("Need to rewind upload for next request");
         events.ReportInfo(connectionsLastLine);
         events.ReportInfo("Issue another request to this URL: 'http://127.0.0.1:47811/b'");
         events.ReportInfo("Connection #1 to host 127.0.0.1:47811 left intact");
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 9, inner.Calls.Count);
 
         CollectionAssert.AreEqual(
             new[]
@@ -73,7 +87,10 @@ public sealed class ClientReaderResetTraceEventsTests
     {
         CallRecordingEvents inner = new();
 
+        Diagnostics.Arrange("info line", line);
         new ClientReaderResetTraceEvents(inner).ReportInfo(line);
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 1, inner.Calls.Count);
 
         CollectionAssert.AreEqual(new[] { $"Info {line}" }, inner.Calls);
     }
@@ -83,6 +100,7 @@ public sealed class ClientReaderResetTraceEventsTests
     {
         CallRecordingEvents inner = new();
         ITransferEvents events = new ClientReaderResetTraceEvents(inner);
+        Diagnostics.Arrange("event kinds", 12);
 
         events.ReportConnectionOpened(null!);
         events.ReportConnectionReused(null!);
@@ -96,6 +114,8 @@ public sealed class ClientReaderResetTraceEventsTests
         events.ReportResponseHeader([3]);
         events.ReportDataSent([4]);
         events.ReportDataReceived([5]);
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 12, inner.Calls.Count);
 
         CollectionAssert.AreEqual(
             new[]
