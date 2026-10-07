@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -28,6 +29,10 @@ public sealed class CurlCommandRunnerTlsFailureTests
         + "establish a secure connection to it. To learn more about this situation and" + Environment.NewLine
         + "how to fix it, please visit the webpage mentioned above." + Environment.NewLine;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -35,7 +40,9 @@ public sealed class CurlCommandRunnerTlsFailureTests
     {
         int exitCode = await RunAsync(["https://self-signed.example/"], CurlExitCode.PeerFailedVerification, VerificationMessage);
 
+        Diagnostics.Assert("exit code", 60, exitCode);
         Assert.AreEqual(60, exitCode);
+        DiffStandardError("curl: (60) " + VerificationMessage + Environment.NewLine + ExpectedHelpBlock);
         Assert.AreEqual("curl: (60) " + VerificationMessage + Environment.NewLine + ExpectedHelpBlock, StandardErrorText);
     }
 
@@ -44,7 +51,9 @@ public sealed class CurlCommandRunnerTlsFailureTests
     {
         int exitCode = await RunAsync(["https://tls.example/"], CurlExitCode.SslConnectError, "schannel: failed to receive handshake");
 
+        Diagnostics.Assert("exit code", 35, exitCode);
         Assert.AreEqual(35, exitCode);
+        DiffStandardError("curl: (35) schannel: failed to receive handshake" + Environment.NewLine);
         Assert.AreEqual("curl: (35) schannel: failed to receive handshake" + Environment.NewLine, StandardErrorText);
     }
 
@@ -53,7 +62,9 @@ public sealed class CurlCommandRunnerTlsFailureTests
     {
         int exitCode = await RunAsync(["https://tls.example/"], CurlExitCode.SslCacertBadfile, "schannel: failed to open CA file");
 
+        Diagnostics.Assert("exit code", 77, exitCode);
         Assert.AreEqual(77, exitCode);
+        DiffStandardError("curl: (77) schannel: failed to open CA file" + Environment.NewLine);
         Assert.AreEqual("curl: (77) schannel: failed to open CA file" + Environment.NewLine, StandardErrorText);
     }
 
@@ -62,7 +73,9 @@ public sealed class CurlCommandRunnerTlsFailureTests
     {
         int exitCode = await RunAsync(["-s", "https://self-signed.example/"], CurlExitCode.PeerFailedVerification, VerificationMessage);
 
+        Diagnostics.Assert("exit code", 60, exitCode);
         Assert.AreEqual(60, exitCode);
+        DiffStandardError(string.Empty);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
@@ -71,20 +84,40 @@ public sealed class CurlCommandRunnerTlsFailureTests
     {
         int exitCode = await RunAsync(["-sS", "https://self-signed.example/"], CurlExitCode.PeerFailedVerification, VerificationMessage);
 
+        Diagnostics.Assert("exit code", 60, exitCode);
         Assert.AreEqual(60, exitCode);
+        DiffStandardError("curl: (60) " + VerificationMessage + Environment.NewLine + ExpectedHelpBlock);
         Assert.AreEqual("curl: (60) " + VerificationMessage + Environment.NewLine + ExpectedHelpBlock, StandardErrorText);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, CurlExitCode failure, string message) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher([RecordingProtocolHandler.Failing("https", failure, message)]),
-                    []),
-                fileSystem,
-                fileSystem,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false)
-            .RunAsync(arguments);
+    private void DiffStandardError(string expected) =>
+        Diagnostics.Diff("stderr", Normalized(expected), Normalized(StandardErrorText));
+
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, CurlExitCode failure, string message)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("scripted failure", (int)failure + " " + message);
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher([RecordingProtocolHandler.Failing("https", failure, message)]),
+                        []),
+                    fileSystem,
+                    fileSystem,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Normalized(StandardErrorText));
+        return exitCode;
+    }
 }

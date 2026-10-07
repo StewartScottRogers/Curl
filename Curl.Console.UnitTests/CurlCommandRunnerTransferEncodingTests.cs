@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -32,6 +33,10 @@ public sealed class CurlCommandRunnerTransferEncodingTests
 
     private ScriptedConnector server = new([]);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
@@ -45,9 +50,13 @@ public sealed class CurlCommandRunnerTransferEncodingTests
 
         int exitCode = await RunAsync(response, "-sS", "--compressed", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("request", Http11RequestLine + DefaultHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n", RequestText);
         Assert.AreEqual(Http11RequestLine + DefaultHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n", RequestText);
+        Diagnostics.Diff("stdout", "hello", StandardOutputText);
         Assert.AreEqual("hello", StandardOutputText);
+        Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
@@ -58,8 +67,11 @@ public sealed class CurlCommandRunnerTransferEncodingTests
 
         int exitCode = await RunAsync(response, "-sS", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("request", DefaultRequest, RequestText);
         Assert.AreEqual(DefaultRequest, RequestText);
+        Diagnostics.Diff("stdout bytes", GzippedHello, standardOutput.ToArray());
         CollectionAssert.AreEqual(GzippedHello, standardOutput.ToArray());
     }
 
@@ -70,8 +82,11 @@ public sealed class CurlCommandRunnerTransferEncodingTests
     {
         int exitCode = await RunAsync(Latin1("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello"), "-sS", option, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("request", "GET /a HTTP/1.0\r\n" + DefaultHeaders + "\r\n", RequestText);
         Assert.AreEqual("GET /a HTTP/1.0\r\n" + DefaultHeaders + "\r\n", RequestText);
+        Diagnostics.Diff("stdout", "hello", StandardOutputText);
         Assert.AreEqual("hello", StandardOutputText);
     }
 
@@ -80,8 +95,11 @@ public sealed class CurlCommandRunnerTransferEncodingTests
     {
         int exitCode = await RunAsync(Latin1("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"), "-s", "-0", "--http1.1", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("request", DefaultRequest, RequestText);
         Assert.AreEqual(DefaultRequest, RequestText);
+        Diagnostics.Diff("stdout", "hello", StandardOutputText);
         Assert.AreEqual("hello", StandardOutputText);
     }
 
@@ -92,8 +110,11 @@ public sealed class CurlCommandRunnerTransferEncodingTests
 
         int exitCode = await RunAsync(Latin1("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" + chunked), "-sS", "--raw", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("request", DefaultRequest, RequestText);
         Assert.AreEqual(DefaultRequest, RequestText);
+        Diagnostics.Diff("stdout", chunked, StandardOutputText);
         Assert.AreEqual(chunked, StandardOutputText);
     }
 
@@ -104,8 +125,11 @@ public sealed class CurlCommandRunnerTransferEncodingTests
 
         int exitCode = await RunAsync(response, "-sS", "--tr-encoding", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("request", Http11RequestLine + DefaultHeaders + "TE: gzip\r\nConnection: TE\r\n\r\n", RequestText);
         Assert.AreEqual(Http11RequestLine + DefaultHeaders + "TE: gzip\r\nConnection: TE\r\n\r\n", RequestText);
+        Diagnostics.Diff("stdout", "hello", StandardOutputText);
         Assert.AreEqual("hello", StandardOutputText);
     }
 
@@ -118,8 +142,11 @@ public sealed class CurlCommandRunnerTransferEncodingTests
             "--ignore-content-length",
             Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("request", DefaultRequest, RequestText);
         Assert.AreEqual(DefaultRequest, RequestText);
+        Diagnostics.Diff("stdout", "hello", StandardOutputText);
         Assert.AreEqual("hello", StandardOutputText);
     }
 
@@ -129,20 +156,32 @@ public sealed class CurlCommandRunnerTransferEncodingTests
     /// Runs <paramref name="arguments" /> with <see cref="HttpProtocolHandler" /> over a
     /// <see cref="ScriptedConnector" /> answering <paramref name="response" /> and then closing.
     /// </summary>
-    private Task<int> RunAsync(byte[] response, params string[] arguments)
+    private async Task<int> RunAsync(byte[] response, params string[] arguments)
     {
         server = new ScriptedConnector([response]);
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Bytes("scripted response", response);
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                writesProgressMeter: false)
-            .RunAsync(arguments);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    writesProgressMeter: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("request bytes", server.Written);
+        Diagnostics.Bytes("stdout bytes", standardOutput.ToArray());
+        Diagnostics.Act("stderr", StandardErrorText.Replace("\r\n", "\n", StringComparison.Ordinal));
+        return exitCode;
     }
 }
