@@ -309,7 +309,7 @@ public sealed class HttpProtocolHandler(
         TransferResult result = Http3RefusalOf(plan) is { } refusal
             ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
-        return WithFirstAuthorizationFailure(result, authorizationLines.Lines);
+        return WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines);
     }
 
     /// <summary>
@@ -319,8 +319,13 @@ public sealed class HttpProtocolHandler(
     /// one, so <c>curl: (22)</c> after <c>-f</c> meets the 401 carries it rather than
     /// <c>The requested URL returned error: 401</c> (measured, BL-955 Notes; ADR-0344).
     /// </summary>
-    private static TransferResult WithFirstAuthorizationFailure(TransferResult result, IReadOnlyList<string> authorizationLines) =>
-        result.ExitCode != CurlExitCode.Ok && authorizationLines.Count > 0
+    /// <remarks>
+    /// An <c>--aws-sigv4</c> transfer keeps its own message: every line its signer reports is a
+    /// <c>-v</c> info line, never a failure, so the string to sign never becomes the error
+    /// message (BL-1454).
+    /// </remarks>
+    private static TransferResult WithFirstAuthorizationFailure(TransferResult result, HttpAuthRequest request, IReadOnlyList<string> authorizationLines) =>
+        result.ExitCode != CurlExitCode.Ok && request.AwsSigV4 is null && authorizationLines.Count > 0
             ? result with { ErrorMessage = authorizationLines[0] }
             : result;
 

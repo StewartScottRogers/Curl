@@ -137,4 +137,52 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(string.Empty, connection.Written);
         Assert.AreEqual(1, authenticator.Calls);
     }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AwsSigV4ConnectRefused_KeepsTheConnectFailureAsTheErrorMessage()
+    {
+        const string connectFailure = "Failed to connect to 127.0.0.1 port 18183 after 0 ms: Could not connect to server";
+        QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, connectFailure));
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { AwsSigV4 = "aws:amz:us-east-1:s3" },
+        };
+
+        TransferResult result = await new HttpProtocolHandler(connector, SigV4LineReporter()).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(connectFailure, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_AwsSigV4FailOn401_KeepsTheReturnedErrorMessage()
+    {
+        TurnTakingConnection connection = new(65536, NegotiateDenied);
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { AwsSigV4 = "aws:amz:us-east-1:s3", Fail = HttpFailMode.Fail },
+        };
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), SigV4LineReporter()).ExecuteAsync(context);
+
+        Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
+        Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage);
+    }
+
+    /// <summary>
+    /// An authenticator that signs as <c>--aws-sigv4</c> does, reporting the signer's <c>-v</c>
+    /// lines, the string to sign among them, before it gives its value.
+    /// </summary>
+    private static LineReportingAuthenticator SigV4LineReporter() => new(
+        SignedValue,
+        "aws_sigv4: picked service s3 from host",
+        "aws_sigv4: String to sign (enclosed in []) - [AWS4-HMAC-SHA256\n20260929T165340Z]",
+        "aws_sigv4: Signature - 0123",
+        "Server auth using AWS_SIGV4 with user 'u'");
 }
