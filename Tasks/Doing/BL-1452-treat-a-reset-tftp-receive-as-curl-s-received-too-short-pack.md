@@ -34,3 +34,4 @@ A TFTP transfer to a port where nothing listens ends as curl 8.21.0's does on Wi
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
