@@ -1,5 +1,6 @@
 using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core;
 
@@ -17,12 +18,25 @@ public sealed class TransferRetrierTests
 
     private static readonly DateTimeOffset Start = new(2026, 9, 27, 5, 26, 14, TimeSpan.Zero);
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task RunAsync_503FourRetries_BacksOffOneTwoFourEightSecondsWithMeasuredWarnings()
     {
         Run run = await Retry(new RetryPolicy { Retries = 4 }, Http(503), Http(503), Http(503), Http(503), Http(503));
 
+        Expect("run.Waits", Seconds(1, 2, 4, 8), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2, 4, 8), run.Waits);
+        Expect(
+            "run.Warnings",
+            new[]
+            {
+                "Warning: Problem : HTTP error. Retrying in 1 second. 4 retries left.",
+                "Warning: Problem : HTTP error. Retrying in 2 seconds. 3 retries left.",
+                "Warning: Problem : HTTP error. Retrying in 4 seconds. 2 retries left.",
+                "Warning: Problem : HTTP error. Retrying in 8 seconds. 1 retry left.",
+            },
+            run.Warnings);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -32,7 +46,9 @@ public sealed class TransferRetrierTests
                 "Warning: Problem : HTTP error. Retrying in 8 seconds. 1 retry left.",
             },
             run.Warnings);
+        Expect("run.Attempts", 5, run.Attempts);
         Assert.AreEqual(5, run.Attempts);
+        Expect("run.Result.ExitCode", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
     }
 
@@ -51,8 +67,11 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Http(status), ok);
 
+        Expect("run.Result", ok, run.Result);
         Assert.AreSame(ok, run.Result);
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
+        Expect("run.Waits", Seconds(1), run.Waits);
         CollectionAssert.AreEqual(Seconds(1), run.Waits);
     }
 
@@ -65,8 +84,11 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Http(status), Http(200));
 
+        Expect("run.Result.Report!.ResponseCode", status, run.Result.Report!.ResponseCode);
         Assert.AreEqual(status, run.Result.Report!.ResponseCode);
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
+        Expect("run.Waits", "[]", run.Waits);
         Assert.IsEmpty(run.Waits);
     }
 
@@ -75,7 +97,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy(), Http(503), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
+        Expect("run.Result.Report!.ResponseCode", 503, run.Result.Report!.ResponseCode);
         Assert.AreEqual(503, run.Result.Report!.ResponseCode);
     }
 
@@ -86,7 +110,9 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Http(503), last, Http(200));
 
+        Expect("run.Result", last, run.Result);
         Assert.AreSame(last, run.Result);
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
     }
 
@@ -95,7 +121,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Failed(CurlExitCode.HttpReturnedError, 503), Failed(CurlExitCode.HttpReturnedError, 503));
 
+        Expect("run.Result.ExitCode", CurlExitCode.HttpReturnedError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, run.Result.ExitCode);
+        Expect("run.Warnings", new[] { "Warning: Problem : HTTP error. Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem : HTTP error. Retrying in 1 second. 1 retry left." }, run.Warnings);
     }
 
@@ -104,6 +132,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Failed(CurlExitCode.HttpReturnedError, 404), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -116,7 +145,16 @@ public sealed class TransferRetrierTests
             Failed(CurlExitCode.OperationTimedOut),
             Failed(CurlExitCode.OperationTimedOut));
 
+        Expect("run.Waits", Seconds(1, 2), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2), run.Waits);
+        Expect(
+            "run.Warnings",
+            new[]
+            {
+                "Warning: Problem : timeout. Retrying in 1 second. 2 retries left.",
+                "Warning: Problem : timeout. Retrying in 2 seconds. 1 retry left.",
+            },
+            run.Warnings);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -124,6 +162,7 @@ public sealed class TransferRetrierTests
                 "Warning: Problem : timeout. Retrying in 2 seconds. 1 retry left.",
             },
             run.Warnings);
+        Expect("run.Result.ExitCode", CurlExitCode.OperationTimedOut, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, run.Result.ExitCode);
     }
 
@@ -135,7 +174,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Failed(exitCode), Http(200));
 
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
+        Expect("run.Warnings", new[] { "Warning: Problem : timeout. Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem : timeout. Retrying in 1 second. 1 retry left." }, run.Warnings);
     }
 
@@ -146,7 +187,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Failed(exitCode), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
+        Expect("run.Result.ExitCode", exitCode, run.Result.ExitCode);
         Assert.AreEqual(exitCode, run.Result.ExitCode);
     }
 
@@ -157,6 +200,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, timeout, Http(200));
 
+        Expect("run.Waits", Seconds(1), run.Waits);
         CollectionAssert.AreEqual(Seconds(1), run.Waits);
     }
 
@@ -167,6 +211,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 12 }, attempts);
 
+        Expect("run.Waits", Seconds(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 600, 600), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 600, 600), run.Waits);
     }
 
@@ -175,7 +220,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 3, Delay = TimeSpan.FromSeconds(3) }, Http(503), Http(503), Http(503), Http(503));
 
+        Expect("run.Waits", Seconds(3, 3, 3), run.Waits);
         CollectionAssert.AreEqual(Seconds(3, 3, 3), run.Waits);
+        Expect("run.Warnings[2]", "Warning: Problem : HTTP error. Retrying in 3 seconds. 1 retry left.", run.Warnings[2]);
         Assert.AreEqual("Warning: Problem : HTTP error. Retrying in 3 seconds. 1 retry left.", run.Warnings[2]);
     }
 
@@ -184,7 +231,16 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 2, Delay = TimeSpan.FromMilliseconds(1500) }, Http(503), Http(503), Http(503));
 
+        Expect("run.Waits", new[] { TimeSpan.FromMilliseconds(1500), TimeSpan.FromMilliseconds(1500) }, run.Waits);
         CollectionAssert.AreEqual(new[] { TimeSpan.FromMilliseconds(1500), TimeSpan.FromMilliseconds(1500) }, run.Waits);
+        Expect(
+            "run.Warnings",
+            new[]
+            {
+                "Warning: Problem : HTTP error. Retrying in 1.500 seconds. 2 retries left.",
+                "Warning: Problem : HTTP error. Retrying in 1.500 seconds. 1 retry left.",
+            },
+            run.Warnings);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -199,6 +255,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 3 }, Http(503, "3"), Http(503, "3"), Http(503, "3"), Http(503, "3"));
 
+        Expect("run.Waits", Seconds(3, 3, 3), run.Waits);
         CollectionAssert.AreEqual(Seconds(3, 3, 3), run.Waits);
     }
 
@@ -209,6 +266,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 4 }, attempts);
 
+        Expect("run.Waits", Seconds(1, 1, 1, 1), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 1, 1, 1), run.Waits);
     }
 
@@ -217,7 +275,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 3 }, Http(503, "5"), Http(503), Http(503), Http(503));
 
+        Expect("run.Waits", Seconds(5, 1, 2), run.Waits);
         CollectionAssert.AreEqual(Seconds(5, 1, 2), run.Waits);
+        Expect("run.Warnings[0]", "Warning: Problem : HTTP error. Retrying in 5 seconds. 3 retries left.", run.Warnings[0]);
         Assert.AreEqual("Warning: Problem : HTTP error. Retrying in 5 seconds. 3 retries left.", run.Warnings[0]);
     }
 
@@ -226,6 +286,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 2 }, Http(429, "0"), Http(429, "0"), Http(429, "0"));
 
+        Expect("run.Waits", Seconds(1, 2), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2), run.Waits);
     }
 
@@ -235,7 +296,9 @@ public sealed class TransferRetrierTests
         Run longer = await Retry(new RetryPolicy { Retries = 2, Delay = TimeSpan.FromSeconds(1) }, Http(503, "3"), Http(503, "3"), Http(503, "3"));
         Run shorter = await Retry(new RetryPolicy { Retries = 1, Delay = TimeSpan.FromSeconds(3) }, Http(503, "1"), Http(503, "1"));
 
+        Expect("longer.Waits", Seconds(3, 3), longer.Waits);
         CollectionAssert.AreEqual(Seconds(3, 3), longer.Waits);
+        Expect("shorter.Waits", Seconds(1), shorter.Waits);
         CollectionAssert.AreEqual(Seconds(1), shorter.Waits);
     }
 
@@ -244,6 +307,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Http(503, "Sun, 27 Sep 2026 05:26:19 GMT"), Http(200));
 
+        Expect("run.Waits", Seconds(5), run.Waits);
         CollectionAssert.AreEqual(Seconds(5), run.Waits);
     }
 
@@ -257,6 +321,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, attempt, Http(200));
 
+        Expect("run.Waits", Seconds(4), run.Waits);
         CollectionAssert.AreEqual(Seconds(4), run.Waits);
     }
 
@@ -265,6 +330,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, TransferResult.Success(0), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -275,6 +341,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse(url), Http(503), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -285,6 +352,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse("ftp://127.0.0.1/f"), redirected, Http(200));
 
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
     }
 
@@ -295,6 +363,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, redirected, Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -305,6 +374,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, attempt, Http(200));
 
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
     }
 
@@ -315,9 +385,13 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 10, MaxTime = TimeSpan.FromSeconds(5) }, attempts);
 
+        Expect("run.Waits", Seconds(1, 2, 4), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2, 4), run.Waits);
+        Expect("run.Attempts", 4, run.Attempts);
         Assert.AreEqual(4, run.Attempts);
+        Expect("run.Warnings[2]", "Warning: Problem : HTTP error. Retrying in 4 seconds. 8 retries left.", run.Warnings[2]);
         Assert.AreEqual("Warning: Problem : HTTP error. Retrying in 4 seconds. 8 retries left.", run.Warnings[2]);
+        Expect("run.Abandoned", "[]", run.Abandoned);
         Assert.IsEmpty(run.Abandoned);
     }
 
@@ -328,7 +402,9 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 5, Delay = TimeSpan.FromSeconds(2), MaxTime = TimeSpan.FromSeconds(3) }, attempts);
 
+        Expect("run.Waits", Seconds(2, 2), run.Waits);
         CollectionAssert.AreEqual(Seconds(2, 2), run.Waits);
+        Expect("run.Attempts", 3, run.Attempts);
         Assert.AreEqual(3, run.Attempts);
     }
 
@@ -342,7 +418,9 @@ public sealed class TransferRetrierTests
             Failed(CurlExitCode.OperationTimedOut),
             Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
+        Expect("run.Warnings", "[]", run.Warnings);
         Assert.IsEmpty(run.Warnings);
     }
 
@@ -353,10 +431,18 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 3, MaxTime = TimeSpan.FromSeconds(5) }, first, Http(200));
 
+        Expect("run.Result", first, run.Result);
         Assert.AreSame(first, run.Result);
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
+        Expect("run.Waits", "[]", run.Waits);
         Assert.IsEmpty(run.Waits);
+        Expect("run.Warnings", "[]", run.Warnings);
         Assert.IsEmpty(run.Warnings);
+        Expect(
+            "run.Abandoned",
+            new[] { "Warning: The Retry-After: time would make this command line exceed the maximum allowed time for retries." },
+            run.Abandoned);
         CollectionAssert.AreEqual(
             new[] { "Warning: The Retry-After: time would make this command line exceed the maximum allowed time for retries." },
             run.Abandoned);
@@ -367,9 +453,13 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 3, MaxTime = TimeSpan.FromSeconds(5) }, Http(503, "3"), Http(503, "3"), Http(200));
 
+        Expect("run.Waits", Seconds(3), run.Waits);
         CollectionAssert.AreEqual(Seconds(3), run.Waits);
+        Expect("run.Warnings", new[] { "Warning: Problem : HTTP error. Retrying in 3 seconds. 3 retries left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem : HTTP error. Retrying in 3 seconds. 3 retries left." }, run.Warnings);
+        Expect("run.Abandoned", new[] { TransferRetryWarning.RetryAfterExceedsMaxTime }, run.Abandoned);
         CollectionAssert.AreEqual(new[] { TransferRetryWarning.RetryAfterExceedsMaxTime }, run.Abandoned);
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
     }
 
@@ -378,7 +468,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1, MaxTime = TimeSpan.FromSeconds(5) }, Http(503, "5"), Http(200));
 
+        Expect("run.Waits", Seconds(5), run.Waits);
         CollectionAssert.AreEqual(Seconds(5), run.Waits);
+        Expect("run.Abandoned", "[]", run.Abandoned);
         Assert.IsEmpty(run.Abandoned);
     }
 
@@ -387,7 +479,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Http(503, "21600"), Http(200));
 
+        Expect("run.Waits", Seconds(21600), run.Waits);
         CollectionAssert.AreEqual(Seconds(21600), run.Waits);
+        Expect("run.Abandoned", "[]", run.Abandoned);
         Assert.IsEmpty(run.Abandoned);
     }
 
@@ -400,7 +494,16 @@ public sealed class TransferRetrierTests
             Failed(CurlExitCode.CouldntConnect),
             Failed(CurlExitCode.CouldntConnect));
 
+        Expect("run.Waits", Seconds(1, 2), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2), run.Waits);
+        Expect(
+            "run.Warnings",
+            new[]
+            {
+                "Warning: Problem (retrying all errors). Retrying in 1 second. 2 retries left.",
+                "Warning: Problem (retrying all errors). Retrying in 2 seconds. 1 retry left.",
+            },
+            run.Warnings);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -408,6 +511,7 @@ public sealed class TransferRetrierTests
                 "Warning: Problem (retrying all errors). Retrying in 2 seconds. 1 retry left.",
             },
             run.Warnings);
+        Expect("run.Result.ExitCode", CurlExitCode.CouldntConnect, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, run.Result.ExitCode);
     }
 
@@ -420,7 +524,16 @@ public sealed class TransferRetrierTests
             Refused(),
             Refused());
 
+        Expect("run.Waits", Seconds(1, 2), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2), run.Waits);
+        Expect(
+            "run.Warnings",
+            new[]
+            {
+                "Warning: Problem : connection refused. Retrying in 1 second. 2 retries left.",
+                "Warning: Problem : connection refused. Retrying in 2 seconds. 1 retry left.",
+            },
+            run.Warnings);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -428,7 +541,9 @@ public sealed class TransferRetrierTests
                 "Warning: Problem : connection refused. Retrying in 2 seconds. 1 retry left.",
             },
             run.Warnings);
+        Expect("run.Attempts", 3, run.Attempts);
         Assert.AreEqual(3, run.Attempts);
+        Expect("run.Result.ExitCode", CurlExitCode.CouldntConnect, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, run.Result.ExitCode);
     }
 
@@ -437,7 +552,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 2, RetryConnectionRefused = true }, Refused(), Http(200));
 
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
+        Expect("run.Result.IsSuccess", true, run.Result.IsSuccess);
         Assert.IsTrue(run.Result.IsSuccess);
     }
 
@@ -449,8 +566,11 @@ public sealed class TransferRetrierTests
             Failed(CurlExitCode.CouldntConnect),
             Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
+        Expect("run.Warnings", "[]", run.Warnings);
         Assert.IsEmpty(run.Warnings);
+        Expect("run.Result.ExitCode", CurlExitCode.CouldntConnect, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, run.Result.ExitCode);
     }
 
@@ -459,7 +579,9 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 2 }, Refused(), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
+        Expect("run.Warnings", "[]", run.Warnings);
         Assert.IsEmpty(run.Warnings);
     }
 
@@ -471,6 +593,7 @@ public sealed class TransferRetrierTests
             Failed(CurlExitCode.SslConnectError) with { IsConnectionRefused = true },
             Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -482,6 +605,7 @@ public sealed class TransferRetrierTests
             Failed(CurlExitCode.CouldntConnect),
             Http(200));
 
+        Expect("run.Warnings", new[] { "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." }, run.Warnings);
     }
 
@@ -493,6 +617,7 @@ public sealed class TransferRetrierTests
             Refused(),
             Http(200));
 
+        Expect("run.Warnings", new[] { "Warning: Problem : connection refused. Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem : connection refused. Retrying in 1 second. 1 retry left." }, run.Warnings);
     }
 
@@ -504,7 +629,9 @@ public sealed class TransferRetrierTests
             Failed(CurlExitCode.HttpReturnedError, 404),
             Failed(CurlExitCode.HttpReturnedError, 404));
 
+        Expect("run.Warnings", new[] { "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." }, run.Warnings);
+        Expect("run.Attempts", 2, run.Attempts);
         Assert.AreEqual(2, run.Attempts);
     }
 
@@ -513,6 +640,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1, RetryAllErrors = true }, Http(404), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -521,6 +649,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1, RetryAllErrors = true }, Failed(CurlExitCode.OperationTimedOut), Http(200));
 
+        Expect("run.Warnings", new[] { "Warning: Problem : timeout. Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem : timeout. Retrying in 1 second. 1 retry left." }, run.Warnings);
     }
 
@@ -536,7 +665,16 @@ public sealed class TransferRetrierTests
             Ftp(CurlExitCode.LoginDenied, 430),
             Ftp(CurlExitCode.LoginDenied, 430));
 
+        Expect("run.Waits", Seconds(1, 2), run.Waits);
         CollectionAssert.AreEqual(Seconds(1, 2), run.Waits);
+        Expect(
+            "run.Warnings",
+            new[]
+            {
+                "Warning: Problem : FTP error. Retrying in 1 second. 2 retries left.",
+                "Warning: Problem : FTP error. Retrying in 2 seconds. 1 retry left.",
+            },
+            run.Warnings);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -544,6 +682,7 @@ public sealed class TransferRetrierTests
                 "Warning: Problem : FTP error. Retrying in 2 seconds. 1 retry left.",
             },
             run.Warnings);
+        Expect("run.Result.ExitCode", CurlExitCode.LoginDenied, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
     }
 
@@ -555,6 +694,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse("ftp://127.0.0.1/f"), Ftp(CurlExitCode.LoginDenied, reply), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -563,6 +703,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse("ftp://127.0.0.1/f"), Failed(CurlExitCode.LoginDenied), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -571,6 +712,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1 }, Ftp(CurlExitCode.RecvError, 430), Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -581,6 +723,7 @@ public sealed class TransferRetrierTests
 
         Run run = await Retry(new RetryPolicy { Retries = 1 }, CurlUrl.Parse("ftp://127.0.0.1/f"), attempt, Http(200));
 
+        Expect("run.Attempts", 1, run.Attempts);
         Assert.AreEqual(1, run.Attempts);
     }
 
@@ -589,6 +732,7 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1, RetryAllErrors = true }, CurlUrl.Parse("ftp://127.0.0.1/f"), Ftp(CurlExitCode.LoginDenied, 430), Http(200));
 
+        Expect("run.Warnings", new[] { "Warning: Problem : FTP error. Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem : FTP error. Retrying in 1 second. 1 retry left." }, run.Warnings);
     }
 
@@ -597,56 +741,76 @@ public sealed class TransferRetrierTests
     {
         Run run = await Retry(new RetryPolicy { Retries = 1, RetryAllErrors = true }, CurlUrl.Parse("ftp://127.0.0.1/f"), Ftp(CurlExitCode.RemoteFileNotFound, 550), Http(200));
 
+        Expect("run.Warnings", new[] { "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." }, run.Warnings);
         CollectionAssert.AreEqual(new[] { "Warning: Problem (retrying all errors). Retrying in 1 second. 1 retry left." }, run.Warnings);
     }
 
     [TestMethod]
     public async Task RunAsync_Retrying_ReceivesTheAttemptBeingRetried()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         TransferResult first = Failed(CurlExitCode.OperationTimedOut);
         List<TransferResult> retried = [];
         FakeTimeProvider clock = new(Start);
         TransferRetrier retrier = new(Script([first, Http(200)], out _));
+        diagnostics.Arrange("attempts", string.Join(" | ", new[] { first, Http(200) }.Select(Describe)));
 
         await retrier.RunAsync(Context(CurlUrl.Parse(Url), clock), new RetryPolicy { Retries = 1 }, (attempt, _) => retried.Add(attempt), (_, _) => { });
 
+        diagnostics.Act("retried", string.Join(" | ", retried.Select(Describe)));
+        Expect("retried count", 1, retried.Count);
         Assert.HasCount(1, retried);
+        Expect("retried[0] is the first attempt", true, ReferenceEquals(first, retried[0]));
         Assert.AreSame(first, retried[0]);
     }
 
     [TestMethod]
     public async Task RunAsync_CancelledBeforeTheWait_Throws()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using CancellationTokenSource cancel = new();
         await cancel.CancelAsync();
         TransferRetrier retrier = new(Script([Http(503), Http(200)], out Func<int> attempts));
         TransferContext context = new() { Url = CurlUrl.Parse(Url), Output = Stream.Null, TimeProvider = new FakeTimeProvider(Start), CancellationToken = cancel.Token };
+        diagnostics.Arrange("cancellation", "cancelled before the first attempt; attempts 503 then 200, --retry 1");
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () => await retrier.RunAsync(context, new RetryPolicy { Retries = 1 }, (_, _) => { }, (_, _) => { }));
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(async () => await retrier.RunAsync(context, new RetryPolicy { Retries = 1 }, (_, _) => { }, (_, _) => { }));
 
+        diagnostics.Act("exception", exception.GetType().Name);
+        Expect("attempts()", 1, attempts());
         Assert.AreEqual(1, attempts());
     }
 
     [TestMethod]
     public async Task RunAsync_NullArguments_Throw()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         TransferRetrier retrier = new(Script([Http(200)], out _));
         TransferContext context = Context(CurlUrl.Parse(Url), new FakeTimeProvider(Start));
+        diagnostics.Arrange("calls", "RunAsync with each of context, policy, retrying and abandoning null in turn");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(null!, new RetryPolicy(), (_, _) => { }, (_, _) => { }));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(context, null!, (_, _) => { }, (_, _) => { }));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(context, new RetryPolicy(), null!, (_, _) => { }));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(context, new RetryPolicy(), (_, _) => { }, null!));
+        var contextNull = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(null!, new RetryPolicy(), (_, _) => { }, (_, _) => { }));
+        var policyNull = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(context, null!, (_, _) => { }, (_, _) => { }));
+        var retryingNull = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(context, new RetryPolicy(), null!, (_, _) => { }));
+        var abandoningNull = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await retrier.RunAsync(context, new RetryPolicy(), (_, _) => { }, null!));
+
+        diagnostics.Act("parameter names", Show(new[] { contextNull, policyNull, retryingNull, abandoningNull }.Select(exception => exception.ParamName)));
+        Expect("ArgumentNullException count", 4, new[] { contextNull, policyNull, retryingNull, abandoningNull }.Length);
     }
 
-    private static Task<Run> Retry(RetryPolicy policy, params TransferResult[] attempts) =>
+    private Task<Run> Retry(RetryPolicy policy, params TransferResult[] attempts) =>
         Retry(policy, CurlUrl.Parse(Url), attempts);
 
-    private static Task<Run> Retry(RetryPolicy policy, CurlUrl url, params TransferResult[] attempts) =>
+    private Task<Run> Retry(RetryPolicy policy, CurlUrl url, params TransferResult[] attempts) =>
         Retry(policy, url, TimeSpan.Zero, attempts);
 
-    private static async Task<Run> Retry(RetryPolicy policy, CurlUrl url, TimeSpan attemptDuration, params TransferResult[] attempts)
+    private async Task<Run> Retry(RetryPolicy policy, CurlUrl url, TimeSpan attemptDuration, params TransferResult[] attempts)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("policy", policy);
+        diagnostics.Arrange("url", url.OriginalString);
+        diagnostics.Arrange("clock advance per attempt", attemptDuration);
+        diagnostics.Arrange("attempts", string.Join(" | ", attempts.Select(Describe)));
         FakeTimeProvider clock = new(Start);
         List<string> warnings = [];
         List<string> abandoned = [];
@@ -663,8 +827,28 @@ public sealed class TransferRetrierTests
             (_, warning) => warnings.Add(warning),
             (_, warning) => abandoned.Add(warning));
 
-        return new Run(result, count(), [.. clock.Waits], warnings, abandoned);
+        Run run = new(result, count(), [.. clock.Waits], warnings, abandoned);
+        diagnostics.Act("result", Describe(result));
+        diagnostics.Act("attempts run", run.Attempts);
+        diagnostics.Act("waits", Show(run.Waits));
+        diagnostics.Act("warnings", Show(run.Warnings));
+        diagnostics.Act("abandoned", Show(run.Abandoned));
+        return run;
     }
+
+    private void Expect(string label, object? expected, object? actual) =>
+        TestDiagnostics.For(TestContext).Assert(label, Show(expected), Show(actual));
+
+    private static string? Show(object? value) =>
+        value is System.Collections.IEnumerable items and not string
+            ? "[" + string.Join(", ", items.Cast<object?>()) + "]"
+            : value?.ToString();
+
+    private static string Describe(TransferResult attempt) =>
+        $"exit {(int)attempt.ExitCode} ({attempt.ExitCode}), status {attempt.Report?.ResponseCode.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none"}"
+        + (attempt.IsConnectionRefused ? ", refused" : string.Empty)
+        + (attempt.Report?.EffectiveUrl is { } effective ? $", effective {effective}" : string.Empty)
+        + (attempt.Report?.ResponseHeaders is { Count: > 0 } headers ? $", headers {string.Join("; ", headers.Select(header => $"{header.Key}: {header.Value}"))}" : string.Empty);
 
     private static Func<ITransferContext, ValueTask<TransferResult>> Script(TransferResult[] attempts, out Func<int> count)
     {

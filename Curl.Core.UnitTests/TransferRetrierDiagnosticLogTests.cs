@@ -1,5 +1,6 @@
 using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core;
 
@@ -16,6 +17,8 @@ public sealed class TransferRetrierDiagnosticLogTests
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task RunAsync_RetriedTransfer_LogsAWarningWithTheAttemptAndTheDelayInMilliseconds()
     {
@@ -23,9 +26,12 @@ public sealed class TransferRetrierDiagnosticLogTests
 
         await RetryAsync(log, new RetryPolicy { Retries = 2 }, Http(503), Http(200));
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("warning line", "attempt 1 failed (HttpError); retrying in 1000 ms, 2 retries left", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
         Assert.AreEqual(
             (DiagnosticLogLevel.Warning, DiagnosticLogComponents.Retry, "attempt 1 failed (HttpError); retrying in 1000 ms, 2 retries left"),
             log.Lines.Single(line => line.Level == DiagnosticLogLevel.Warning));
+        diagnostics.Assert("verbose line count", 2, log.At(DiagnosticLogLevel.Verbose).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -33,6 +39,7 @@ public sealed class TransferRetrierDiagnosticLogTests
                 "attempt 2 ended with exit 0 (Ok); 1 retries left, 1000 ms since the first attempt began",
             },
             log.At(DiagnosticLogLevel.Verbose));
+        diagnostics.Assert("error line count", 0, log.At(DiagnosticLogLevel.Error).Length);
         Assert.IsEmpty(log.At(DiagnosticLogLevel.Error));
     }
 
@@ -43,6 +50,7 @@ public sealed class TransferRetrierDiagnosticLogTests
 
         await RetryAsync(log, new RetryPolicy { Retries = 1 }, Timeout(), Timeout());
 
+        TestDiagnostics.For(TestContext).Assert("lines", "Error retry: --retry 1 exhausted after 2 attempts; the last ended with exit 28 (OperationTimedOut)", Describe(log));
         CollectionAssert.AreEqual(
             new[] { (DiagnosticLogLevel.Error, DiagnosticLogComponents.Retry, "--retry 1 exhausted after 2 attempts; the last ended with exit 28 (OperationTimedOut)") },
             log.Lines);
@@ -55,6 +63,7 @@ public sealed class TransferRetrierDiagnosticLogTests
 
         await RetryAsync(log, new RetryPolicy(), Timeout());
 
+        TestDiagnostics.For(TestContext).Assert("line count", 0, log.Lines.Count);
         Assert.IsEmpty(log.Lines);
     }
 
@@ -65,6 +74,7 @@ public sealed class TransferRetrierDiagnosticLogTests
 
         await RetryAsync(log, new RetryPolicy { Retries = 3, MaxTime = TimeSpan.FromSeconds(2) }, Http(503), Http(503), Http(503));
 
+        TestDiagnostics.For(TestContext).Assert("last warning", "--retry-max-time 2000 ms reached after attempt 3; not retrying", log.At(DiagnosticLogLevel.Warning)[^1]);
         Assert.AreEqual("--retry-max-time 2000 ms reached after attempt 3; not retrying", log.At(DiagnosticLogLevel.Warning)[^1]);
     }
 
@@ -75,6 +85,7 @@ public sealed class TransferRetrierDiagnosticLogTests
 
         await RetryAsync(log, new RetryPolicy { Retries = 3, MaxTime = TimeSpan.FromSeconds(5) }, Http(503, "10"));
 
+        TestDiagnostics.For(TestContext).Assert("warnings", "--retry-max-time 5000 ms reached after attempt 1; not retrying", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
         CollectionAssert.AreEqual(new[] { "--retry-max-time 5000 ms reached after attempt 1; not retrying" }, log.At(DiagnosticLogLevel.Warning));
     }
 
@@ -85,11 +96,21 @@ public sealed class TransferRetrierDiagnosticLogTests
 
         await RetryAsync(log, new RetryPolicy { Retries = 2 }, Http(503), Http(200));
 
+        TestDiagnostics.For(TestContext).Assert("line count", 0, log.Lines.Count);
         Assert.IsEmpty(log.Lines);
     }
 
-    private static async Task RetryAsync(IDiagnosticLog log, RetryPolicy policy, params TransferResult[] attempts)
+    private static string Describe(RecordingDiagnosticLog log) =>
+        string.Join(" | ", log.Lines.Select(line => $"{line.Level} {line.Component}: {line.Message}"));
+
+    private static string Describe(TransferResult attempt) =>
+        $"exit {(int)attempt.ExitCode} ({attempt.ExitCode}), response {attempt.Report?.ResponseCode}";
+
+    private async Task RetryAsync(RecordingDiagnosticLog log, RetryPolicy policy, params TransferResult[] attempts)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("policy", policy);
+        diagnostics.Arrange("attempts", string.Join(" | ", attempts.Select(Describe)));
         FakeTimeProvider clock = new(Start);
         int next = 0;
         TransferRetrier retrier = new(_ => ValueTask.FromResult(attempts[next++]));
@@ -99,6 +120,9 @@ public sealed class TransferRetrierDiagnosticLogTests
             policy,
             (_, _) => { },
             (_, _) => { });
+
+        diagnostics.Act("attempts run", next);
+        diagnostics.Act("log lines", Describe(log));
     }
 
     private static TransferResult Http(int status, string? retryAfter = null) =>

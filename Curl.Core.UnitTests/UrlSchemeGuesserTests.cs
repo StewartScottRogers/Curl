@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Core;
 
 /// <summary>
@@ -8,6 +10,8 @@ namespace Curl.Core;
 [TestClass]
 public sealed class UrlSchemeGuesserTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("example.localhost:1", "http://example.localhost:1")]
     [DataRow("ftp.localhost:1", "ftp://ftp.localhost:1")]
@@ -21,7 +25,7 @@ public sealed class UrlSchemeGuesserTests
     [DataRow("ftp.:1", "ftp://ftp.:1")]
     public void AddGuessedScheme_HostPrefix_PicksItsScheme(string url, string expected)
     {
-        Assert.AreEqual(expected, UrlSchemeGuesser.AddGuessedScheme(url));
+        Assert.AreEqual(expected, Guess(url, expected));
     }
 
     [TestMethod]
@@ -33,7 +37,7 @@ public sealed class UrlSchemeGuesserTests
     [DataRow("a:b@c:1")]
     public void AddGuessedScheme_NoPrefix_IsHttp(string url)
     {
-        Assert.AreEqual("http://" + url, UrlSchemeGuesser.AddGuessedScheme(url));
+        Assert.AreEqual("http://" + url, Guess(url, "http://" + url));
     }
 
     [TestMethod]
@@ -46,7 +50,7 @@ public sealed class UrlSchemeGuesserTests
     [DataRow("imap.localhost/ftp.x", "imap://imap.localhost/ftp.x")]
     public void AddGuessedScheme_UserInfoPathQueryFragment_ReadsOnlyTheHost(string url, string expected)
     {
-        Assert.AreEqual(expected, UrlSchemeGuesser.AddGuessedScheme(url));
+        Assert.AreEqual(expected, Guess(url, expected));
     }
 
     [TestMethod]
@@ -57,7 +61,7 @@ public sealed class UrlSchemeGuesserTests
     [DataRow("a+b.c-d://x")]
     public void AddGuessedScheme_UrlNamesAScheme_IsUnchanged(string url)
     {
-        Assert.AreEqual(url, UrlSchemeGuesser.AddGuessedScheme(url));
+        Assert.AreEqual(url, Guess(url, url));
     }
 
     [TestMethod]
@@ -69,13 +73,22 @@ public sealed class UrlSchemeGuesserTests
     [DataRow("")]
     public void HasScheme_NoSchemeThenColonSlash_IsFalse(string url)
     {
-        Assert.IsFalse(UrlSchemeGuesser.HasScheme(url));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+
+        var hasScheme = UrlSchemeGuesser.HasScheme(url);
+
+        diagnostics.Act("has scheme", hasScheme);
+        diagnostics.Assert("has scheme", false, hasScheme);
+        Assert.IsFalse(hasScheme);
     }
 
     [TestMethod]
     public void AddGuessedScheme_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.AddGuessedScheme(null!));
+        WriteNullCall("AddGuessedScheme(null)");
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.AddGuessedScheme(null!));
+        WriteException(exception);
     }
 
     // --proto-default cases measured with Record-CurlExchange.ps1, curl 8.21.0, Windows, 2026-09-28 (BL-524).
@@ -87,36 +100,76 @@ public sealed class UrlSchemeGuesserTests
     [DataRow("u:p@dict.localhost:1/x", "ftp", "ftp://u:p@dict.localhost:1/x")]
     public void AddScheme_DefaultScheme_ReplacesTheGuess(string url, string defaultScheme, string expected)
     {
-        Assert.AreEqual(expected, UrlSchemeGuesser.AddScheme(url, defaultScheme));
+        Assert.AreEqual(expected, Add(url, defaultScheme, expected));
     }
 
     [TestMethod]
     public void AddScheme_DefaultSchemeAndUrlNamesAScheme_IsUnchanged()
     {
-        Assert.AreEqual("http://127.0.0.1:1/", UrlSchemeGuesser.AddScheme("http://127.0.0.1:1/", "ftp"));
+        Assert.AreEqual("http://127.0.0.1:1/", Add("http://127.0.0.1:1/", "ftp", "http://127.0.0.1:1/"));
     }
 
     [TestMethod]
     public void AddScheme_NoDefaultScheme_Guesses()
     {
-        Assert.AreEqual("ftp://ftp.localhost:1/", UrlSchemeGuesser.AddScheme("ftp.localhost:1/", null));
+        Assert.AreEqual("ftp://ftp.localhost:1/", Add("ftp.localhost:1/", null, "ftp://ftp.localhost:1/"));
     }
 
     [TestMethod]
     public void AddScheme_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.AddScheme(null!, "https"));
+        WriteNullCall("AddScheme(null, \"https\")");
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.AddScheme(null!, "https"));
+        WriteException(exception);
     }
 
     [TestMethod]
     public void HasScheme_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.HasScheme(null!));
+        WriteNullCall("HasScheme(null)");
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.HasScheme(null!));
+        WriteException(exception);
     }
 
     [TestMethod]
     public void GuessScheme_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.GuessScheme(null!));
+        WriteNullCall("GuessScheme(null)");
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.GuessScheme(null!));
+        WriteException(exception);
+    }
+
+    private string Guess(string url, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+
+        var actual = UrlSchemeGuesser.AddGuessedScheme(url);
+
+        diagnostics.Act("with scheme", actual);
+        diagnostics.Assert("with scheme", expected, actual);
+        return actual;
+    }
+
+    private string Add(string url, string? defaultScheme, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+        diagnostics.Arrange("default scheme", defaultScheme ?? "(none)");
+
+        var actual = UrlSchemeGuesser.AddScheme(url, defaultScheme);
+
+        diagnostics.Act("with scheme", actual);
+        diagnostics.Assert("with scheme", expected, actual);
+        return actual;
+    }
+
+    private void WriteNullCall(string call) => TestDiagnostics.For(TestContext).Arrange("call", call);
+
+    private void WriteException(ArgumentNullException exception)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Act("exception", exception.GetType().Name + " (" + exception.ParamName + ")");
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 }
