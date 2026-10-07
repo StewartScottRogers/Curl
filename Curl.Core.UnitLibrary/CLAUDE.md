@@ -115,7 +115,7 @@ range) is exit 3, `too many {} sets`, and every glob message is cut to curl's 51
 characters, caret line and all (BL-1437).
 `Expand()` yields each URL lazily, rightmost glob fastest, and `UrlGlobMatch.SubstituteGlobValues`
 replaces `#N` and `#<name>` in an `-o` name; `UrlGlobMatch.TryResolveOutputFileName` also
-fails a `#<name>` naming no glob as curl does (exit 43, `no glob exists with this name`). `UrlGlobMatch.ResolveOutputFileName` is the name curl
+fails a `#<name>` naming no glob as curl does (exit 43, `no glob exists with this name`); its overload taking the `-T` upload match looks a name up there too, after the URL's globs, and `Curl.Console` calls it for every transfer (BL-1443). `UrlGlobMatch.ResolveOutputFileName` is the name curl
 writes to: as written under `-g`, otherwise substituted and, when the caller passes
 `OperatingSystem.IsWindows()`, sanitized by `WindowsOutputFileNameSanitizer` as curl's
 Windows build does (control characters and `| < > " ? *` become `_`; BL-283). It is not

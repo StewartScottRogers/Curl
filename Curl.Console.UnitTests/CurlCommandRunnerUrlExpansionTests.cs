@@ -171,6 +171,44 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OutputNameReferencesANamedGlob_SavesEachUrlUnderItsValue()
+    {
+        int exitCode = await RunAsync(["http://h/hello[<test>7-8]", "-o", "dump-#<test>"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("/hello7", WrittenText("dump-7"));
+        Assert.AreEqual("/hello8", WrittenText("dump-8"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OutputNameReferencesNoGlobWithThatName_Exits43BeforeAnyTransfer()
+    {
+        int exitCode = await RunAsync(["http://h/{<test>A,B}{<moo>C,D}", "-o", "somewhere/#<foo>"]);
+
+        Assert.AreEqual((int)CurlExitCode.BadFunctionArgument, exitCode);
+        Assert.IsEmpty(http.Contexts);
+        Assert.IsEmpty(fileSystem.Written);
+        Assert.AreEqual(
+            "curl: (43) no glob exists with this name in position 16:" + NewLine
+                + "somewhere/#<foo>" + NewLine
+                + "               ^" + NewLine,
+            StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OutputNameReferencesAnUploadGlobName_SavesEachUploadUnderItsValue()
+    {
+        fileSystem.ExistingContent["a"] = Encoding.ASCII.GetBytes("A");
+        fileSystem.ExistingContent["b"] = Encoding.ASCII.GetBytes("B");
+
+        int exitCode = await RunAsync(["-T", "{<f>a,b}", "-o", "up-#<f>", "http://h/g/"]);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual("/g/a", WrittenText("up-a"));
+        Assert.AreEqual("/g/b", WrittenText("up-b"));
+    }
+
+    [TestMethod]
     public async Task RunAsync_GlobbingOnWindows_SanitizesTheOutputName()
     {
         int exitCode = await RunAsync(["-o", "q?y", "http://h/a"], runsOnWindows: true);

@@ -39,7 +39,7 @@ public sealed class UrlGlobMatch
     /// as does a <c>#</c> with no digit after it, and a malformed <c>#&lt;</c> with no
     /// <c>&gt;</c> or a name over 64 characters. A well-formed <c>#&lt;name&gt;</c> naming no
     /// glob, which curl refuses, is also left as written here;
-    /// <see cref="TryResolveOutputFileName" /> reports it as curl does.
+    /// <see cref="TryResolveOutputFileName(string, bool, out string?, out TransferResult?)" /> reports it as curl does.
     /// </remarks>
     /// <param name="outputFileName">The <c>-o</c> file name as given.</param>
     /// <returns>The file name with every reference that names a glob replaced.</returns>
@@ -47,7 +47,7 @@ public sealed class UrlGlobMatch
     public string SubstituteGlobValues(string outputFileName)
     {
         ArgumentNullException.ThrowIfNull(outputFileName);
-        return Substitute(outputFileName, unknownNameFails: false, out _);
+        return Substitute(outputFileName, uploadMatch: null, unknownNameFails: false, out _);
     }
 
     /// <summary>
@@ -91,7 +91,8 @@ public sealed class UrlGlobMatch
     /// That failure is exit 43, <see cref="CurlExitCode.BadFunctionArgument" />, with curl's
     /// <c>no glob exists with this name in position N:</c> message, the file name, and a
     /// caret under column N, where N is the offset just past the reference's <c>&gt;</c>.
-    /// Names are looked up in this URL's globs only, not in a <c>-T</c> upload glob.
+    /// Names are looked up in this URL's globs only; the overload taking an upload match also
+    /// looks in the <c>-T</c> upload glob.
     /// </remarks>
     /// <param name="outputFileName">The <c>-o</c> file name as given.</param>
     /// <param name="sanitizesForWindows">
@@ -106,6 +107,34 @@ public sealed class UrlGlobMatch
         string outputFileName,
         bool sanitizesForWindows,
         [NotNullWhen(true)] out string? fileName,
+        [NotNullWhen(false)] out TransferResult? failure) =>
+        TryResolveOutputFileName(outputFileName, uploadMatch: null, sanitizesForWindows, out fileName, out failure);
+
+    /// <summary>
+    /// Gets the file name curl 8.21.0 writes this URL to, as the overload without
+    /// <paramref name="uploadMatch" /> does, except that a <c>#&lt;name&gt;</c> naming no glob of
+    /// this URL takes the value of the glob with that name in the <c>-T</c> upload glob, as
+    /// curl's <c>glob_match_url</c> does; only a name in neither fails.
+    /// </summary>
+    /// <remarks><c>#N</c> numbers count this URL's globs only.</remarks>
+    /// <param name="outputFileName">The <c>-o</c> file name as given.</param>
+    /// <param name="uploadMatch">
+    /// The upload file the <c>-T</c> glob expanded to for this transfer; <see langword="null" />
+    /// for no upload.
+    /// </param>
+    /// <param name="sanitizesForWindows">
+    /// <see langword="true" /> to sanitize as curl's Windows build does; pass
+    /// <see cref="OperatingSystem.IsWindows" />.
+    /// </param>
+    /// <param name="fileName">The file name curl writes to; <see langword="null" /> on failure.</param>
+    /// <param name="failure">The exit 43 failure; <see langword="null" /> on success.</param>
+    /// <returns><see langword="true" /> when <paramref name="fileName" /> was produced.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="outputFileName" /> is <see langword="null" />.</exception>
+    public bool TryResolveOutputFileName(
+        string outputFileName,
+        UrlGlobMatch? uploadMatch,
+        bool sanitizesForWindows,
+        [NotNullWhen(true)] out string? fileName,
         [NotNullWhen(false)] out TransferResult? failure)
     {
         ArgumentNullException.ThrowIfNull(outputFileName);
@@ -117,7 +146,7 @@ public sealed class UrlGlobMatch
             return true;
         }
 
-        string substituted = Substitute(outputFileName, unknownNameFails: true, out UrlGlobError? error);
+        string substituted = Substitute(outputFileName, uploadMatch, unknownNameFails: true, out UrlGlobError? error);
         if (error is not null)
         {
             fileName = null;
@@ -129,14 +158,14 @@ public sealed class UrlGlobMatch
         return true;
     }
 
-    private string Substitute(string outputFileName, bool unknownNameFails, out UrlGlobError? error)
+    private string Substitute(string outputFileName, UrlGlobMatch? uploadMatch, bool unknownNameFails, out UrlGlobError? error)
     {
         error = null;
         var result = new System.Text.StringBuilder(outputFileName.Length);
         int index = 0;
         while (index < outputFileName.Length && error is null)
         {
-            index = AppendNext(outputFileName, index, result, unknownNameFails, ref error);
+            index = AppendNext(outputFileName, index, result, uploadMatch, unknownNameFails, ref error);
         }
 
         return result.ToString();
@@ -150,6 +179,7 @@ public sealed class UrlGlobMatch
         string outputFileName,
         int index,
         System.Text.StringBuilder result,
+        UrlGlobMatch? uploadMatch,
         bool unknownNameFails,
         ref UrlGlobError? error)
     {
@@ -158,7 +188,7 @@ public sealed class UrlGlobMatch
             string? name = UrlGlobName.Read(outputFileName, index + 1);
             int end = name is null
                 ? AppendNumberedValue(outputFileName, index, result)
-                : AppendNamedValue(name, index, result);
+                : AppendNamedValue(name, index, result, uploadMatch);
             if (end >= 0)
             {
                 return end;
@@ -178,18 +208,25 @@ public sealed class UrlGlobMatch
     /// <summary>
     /// Appends the value of the glob named <paramref name="name" /> and returns the index past
     /// the <c>#&lt;name&gt;</c> at <paramref name="index" />, or returns -1 when no glob has
-    /// that name.
+    /// that name, here or in <paramref name="uploadMatch" />: curl 8.21.0's
+    /// <c>glob_match_url</c> looks a name up in the URL glob first, then in the <c>-T</c> glob.
     /// </summary>
-    private int AppendNamedValue(string name, int index, System.Text.StringBuilder result)
+    private int AppendNamedValue(string name, int index, System.Text.StringBuilder result, UrlGlobMatch? uploadMatch)
     {
-        int globIndex = globNames.IndexOf(name);
-        if (globIndex < 0)
+        if ((FindNamedValue(name) ?? uploadMatch?.FindNamedValue(name)) is not { } value)
         {
             return -1;
         }
 
-        result.Append(GlobValues[globIndex]);
+        result.Append(value);
         return index + name.Length + 3;
+    }
+
+    /// <summary>Gets the value the glob named <paramref name="name" /> took; <see langword="null" /> when no glob has that name.</summary>
+    private string? FindNamedValue(string name)
+    {
+        int globIndex = globNames.IndexOf(name);
+        return globIndex < 0 ? null : GlobValues[globIndex];
     }
 
     /// <summary>

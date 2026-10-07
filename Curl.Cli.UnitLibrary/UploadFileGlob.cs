@@ -67,11 +67,19 @@ public sealed class UploadFileGlob
     /// <returns>The file names, rightmost glob fastest.</returns>
     public IEnumerable<string> ExpandUploadFiles()
     {
-        foreach (UrlGlobMatch match in glob.Expand())
+        foreach (UrlGlobMatch match in ExpandUploadMatches())
         {
             yield return match.Url;
         }
     }
+
+    /// <summary>
+    /// Produces every upload file the argument stands for, in curl's order, with the value each
+    /// of its globs took, which a <c>#&lt;name&gt;</c> in an <c>-o</c> name can refer to
+    /// (<see cref="UrlGlobMatch.TryResolveOutputFileName(string, UrlGlobMatch?, bool, out string?, out TransferResult?)" />).
+    /// </summary>
+    /// <returns>The matches, rightmost glob fastest; each match's <see cref="UrlGlobMatch.Url" /> is the file name.</returns>
+    public IEnumerable<UrlGlobMatch> ExpandUploadMatches() => glob.Expand();
 
     /// <summary>
     /// Produces, for each upload file in curl's order, the URL it is sent to when the URL given for
