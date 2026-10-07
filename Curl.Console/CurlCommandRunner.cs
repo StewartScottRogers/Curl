@@ -3511,8 +3511,8 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The accepted command line.</param>
     /// <param name="url">The transfer's URL.</param>
     /// <param name="transfer">
-    /// The transfer, whose events get curl's <c>-v</c> info line for credentials refused for a control
-    /// character (BL-1411).
+    /// The transfer, whose events get curl's <c>-v</c> info line for every credential failure: credentials
+    /// refused for a control character (BL-1411) and a required netrc file missing or malformed (BL-1447).
     /// </param>
     /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
     /// <param name="failure">The proxy's, the credentials' or the netrc file's failure, when one refuses the transfer.</param>
@@ -3541,7 +3541,7 @@ internal sealed class CurlCommandRunner(
         bool looked = CredentialLookup.TryLookUp(
             options, url, out NetworkCredential? lookedUpCredentials, out failure, EventsBeforeConnecting(transfer).ReportInfo);
         Running.LookedUpCredentials = lookedUpCredentials;
-        if (failure is not null && TransferCredentialLookup.IsControlCodeRefusal(failure))
+        if (failure is not null)
         {
             EventsBeforeConnecting(transfer).ReportInfo(failure.ErrorMessage!);
         }
