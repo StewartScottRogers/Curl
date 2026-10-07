@@ -1,5 +1,5 @@
 ---
-id: BL-1655
+id: BL-1658
 title: Style a header line StyledHeaderStream receives across several writes as one line
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1655 — Style a header line StyledHeaderStream receives across several writes as one line
+# BL-1658 — Style a header line StyledHeaderStream receives across several writes as one line
 
 ## Goal
 

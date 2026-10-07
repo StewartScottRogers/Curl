@@ -1,5 +1,5 @@
 ---
-id: BL-1654
+id: BL-1657
 title: Cut ParallelProgressMeterText Size to five columns and Time to eight as curl's msnprintf buffers do
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1654 — Cut ParallelProgressMeterText Size to five columns and Time to eight as curl's msnprintf buffers do
+# BL-1657 — Cut ParallelProgressMeterText Size to five columns and Time to eight as curl's msnprintf buffers do
 
 ## Goal
 
