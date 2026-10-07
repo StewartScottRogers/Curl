@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Mqtt.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Mqtt;
 
@@ -25,18 +26,29 @@ public sealed class MqttProtocolHandlerKeepAliveTests
 
     private static readonly TimeSpan PingDue = TimeSpan.FromMilliseconds(60001);
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_IdleAfterSuback_SendsPingRequestOnlyPastSixtySeconds()
     {
         Subscription subscription = await SubscribeAsync();
 
-        subscription.Clock.Advance(TimeSpan.FromSeconds(60));
+        Advance(subscription.Clock, TimeSpan.FromSeconds(60));
         CollectionAssert.AreEqual(Hex(Connect + Subscribe), subscription.Connection.Written);
         CollectionAssert.DoesNotContain(subscription.Events.Transcript, PingSentLine);
 
-        subscription.Clock.Advance(TimeSpan.FromMilliseconds(1));
+        Advance(subscription.Clock, TimeSpan.FromMilliseconds(1));
         await WaitUntilAsync(() => subscription.Connection.Written.Length == Hex(Connect + Subscribe + PingRequest).Length);
 
+        ActSent(subscription);
+        Diagnostics.DiffSent(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
+        Diagnostics.Assert(
+            "last 3 transcript lines",
+            MqttDiagnostics.Lines(["> " + Latin1(PingRequest), PingSentLine, "* mqtt_doing: state [0]"]),
+            MqttDiagnostics.Lines(subscription.Events.Transcript.TakeLast(3)));
         CollectionAssert.AreEqual(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
         CollectionAssert.AreEqual(
             new[] { "> " + Latin1(PingRequest), PingSentLine, "* mqtt_doing: state [0]" },
@@ -48,20 +60,23 @@ public sealed class MqttProtocolHandlerKeepAliveTests
     public async Task ExecuteAsync_PingRequestOutstanding_SendsNoSecondUntilPingResponseThenSixtySecondsMore()
     {
         Subscription subscription = await SubscribeAsync();
-        subscription.Clock.Advance(PingDue);
+        Advance(subscription.Clock, PingDue);
         await WaitUntilAsync(() => subscription.Connection.Written.Length == Hex(Connect + Subscribe + PingRequest).Length);
 
-        subscription.Clock.Advance(TimeSpan.FromSeconds(300));
+        Advance(subscription.Clock, TimeSpan.FromSeconds(300));
         Assert.IsNull(subscription.Clock.NextTimerDueAt);
         CollectionAssert.AreEqual(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
 
-        subscription.Connection.Send(Hex("D0 00"));
+        Send(subscription.Connection, Hex("D0 00"));
         await subscription.WaitForPingDueAsync();
-        subscription.Clock.Advance(TimeSpan.FromSeconds(60));
+        Advance(subscription.Clock, TimeSpan.FromSeconds(60));
         CollectionAssert.AreEqual(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
-        subscription.Clock.Advance(TimeSpan.FromMilliseconds(1));
+        Advance(subscription.Clock, TimeSpan.FromMilliseconds(1));
         await WaitUntilAsync(() => subscription.Connection.Written.Length == Hex(Connect + Subscribe + PingRequest + PingRequest).Length);
 
+        ActSent(subscription);
+        Diagnostics.DiffSent(Hex(Connect + Subscribe + PingRequest + PingRequest), subscription.Connection.Written);
+        Diagnostics.Assert("ping request lines", 2, subscription.Events.Transcript.Count(line => line == PingSentLine));
         CollectionAssert.AreEqual(Hex(Connect + Subscribe + PingRequest + PingRequest), subscription.Connection.Written);
         Assert.AreEqual(2, subscription.Events.Transcript.Count(line => line == PingSentLine));
         await subscription.CloseAsync();
@@ -71,16 +86,22 @@ public sealed class MqttProtocolHandlerKeepAliveTests
     public async Task ExecuteAsync_PublishWhilePingRequestOutstanding_SendsNoSecondPingRequest()
     {
         Subscription subscription = await SubscribeAsync();
-        subscription.Clock.Advance(PingDue);
+        Advance(subscription.Clock, PingDue);
         await WaitUntilAsync(() => subscription.Connection.Written.Length == Hex(Connect + Subscribe + PingRequest).Length);
 
-        subscription.Connection.Send(Hex("30 08 00 01 74 68 65 6C 6C 6F"));
+        Send(subscription.Connection, Hex("30 08 00 01 74 68 65 6C 6C 6F"));
         await WaitUntilAsync(() => subscription.Output.ToArray().Length == 8);
-        subscription.Clock.Advance(TimeSpan.FromSeconds(300));
+        Advance(subscription.Clock, TimeSpan.FromSeconds(300));
 
         Assert.IsNull(subscription.Clock.NextTimerDueAt);
         CollectionAssert.AreEqual(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
         TransferResult result = await subscription.CloseAsync();
+        Diagnostics.ActResult(result);
+        ActSent(subscription);
+        Diagnostics.ActOutput(subscription.Output);
+        Diagnostics.DiffSent(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
+        Diagnostics.DiffOutput(Hex("00 01 74 68 65 6C 6C 6F"), subscription.Output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         CollectionAssert.AreEqual(Hex("00 01 74 68 65 6C 6C 6F"), subscription.Output.ToArray());
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
     }
@@ -89,17 +110,23 @@ public sealed class MqttProtocolHandlerKeepAliveTests
     public async Task ExecuteAsync_PublishArrivingAtFiftyNineSeconds_RestartsTheSixtySecondCount()
     {
         Subscription subscription = await SubscribeAsync();
-        subscription.Clock.Advance(TimeSpan.FromSeconds(59));
+        Advance(subscription.Clock, TimeSpan.FromSeconds(59));
 
-        subscription.Connection.Send(Hex("30 08 00 01 74 68 65 6C 6C 6F"));
+        Send(subscription.Connection, Hex("30 08 00 01 74 68 65 6C 6C 6F"));
         await subscription.WaitForPingDueAsync();
-        subscription.Clock.Advance(TimeSpan.FromSeconds(60));
+        Advance(subscription.Clock, TimeSpan.FromSeconds(60));
         CollectionAssert.AreEqual(Hex(Connect + Subscribe), subscription.Connection.Written);
-        subscription.Clock.Advance(TimeSpan.FromMilliseconds(1));
+        Advance(subscription.Clock, TimeSpan.FromMilliseconds(1));
         await WaitUntilAsync(() => subscription.Connection.Written.Length == Hex(Connect + Subscribe + PingRequest).Length);
 
         CollectionAssert.AreEqual(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
         TransferResult result = await subscription.CloseAsync();
+        Diagnostics.ActResult(result);
+        ActSent(subscription);
+        Diagnostics.ActOutput(subscription.Output);
+        Diagnostics.DiffSent(Hex(Connect + Subscribe + PingRequest), subscription.Connection.Written);
+        Diagnostics.DiffOutput(Hex("00 01 74 68 65 6C 6C 6F"), subscription.Output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         CollectionAssert.AreEqual(Hex("00 01 74 68 65 6C 6C 6F"), subscription.Output.ToArray());
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
     }
@@ -109,10 +136,16 @@ public sealed class MqttProtocolHandlerKeepAliveTests
     {
         ManualTimeProvider clock = new();
         GatedConnection connection = new();
-        connection.Send(Hex("20 02 00 00"));
+        Diagnostics.Arrange("url", "mqtt://h/t, post data \"payload\", manual clock at 0 ms");
+        Send(connection, Hex("20 02 00 00"));
 
         TransferResult result = await Handler(connection).ExecuteAsync(Context(clock, new TranscriptTransferEvents(), new RecordingStream(), "payload"u8.ToArray()));
-        clock.Advance(TimeSpan.FromSeconds(300));
+        Advance(clock, TimeSpan.FromSeconds(300));
+
+        Diagnostics.ActResult(result);
+        Diagnostics.ActPackets("sent", connection.Written);
+        Diagnostics.Assert("next timer", "none", clock.NextTimerDueAt?.ToString() ?? "none");
+        Diagnostics.DiffSent(Hex(Connect + "30 0A 00 01 74 70 61 79 6C 6F 61 64 E0 00"), connection.Written);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(clock.NextTimerDueAt);
@@ -120,18 +153,45 @@ public sealed class MqttProtocolHandlerKeepAliveTests
     }
 
     /// <summary>Starts a subscribe to <c>t</c> and waits until it is subscribed and idle.</summary>
-    private static async Task<Subscription> SubscribeAsync()
+    private async Task<Subscription> SubscribeAsync()
     {
         ManualTimeProvider clock = new();
         GatedConnection connection = new();
         TranscriptTransferEvents events = new();
         RecordingStream output = new();
-        connection.Send(Hex("20 02 00 00"));
-        connection.Send(Hex("90 03 00 01 00"));
+        Diagnostics.Arrange("url", "mqtt://h/t, subscribing, manual clock at 0 ms");
+        Send(connection, Hex("20 02 00 00"));
+        Send(connection, Hex("90 03 00 01 00"));
         Task<TransferResult> transfer = Handler(connection).ExecuteAsync(Context(clock, events, output, null)).AsTask();
         Subscription subscription = new(clock, connection, events, output, transfer);
-        await subscription.WaitForPingDueAsync();
+        using (Diagnostics.Phase("subscribe until idle"))
+        {
+            await subscription.WaitForPingDueAsync();
+        }
+
+        Diagnostics.Arrange("subscribed and idle", $"next timer {clock.NextTimerDueAt?.TotalMilliseconds} ms");
         return subscription;
+    }
+
+    /// <summary>Has the gated peer send <paramref name="chunk" />, writing it as an ARRANGE line.</summary>
+    private void Send(GatedConnection connection, byte[] chunk)
+    {
+        Diagnostics.ArrangeSent(chunk);
+        connection.Send(chunk);
+    }
+
+    /// <summary>Advances the manual clock, writing the advance as an ARRANGE line.</summary>
+    private void Advance(ManualTimeProvider clock, TimeSpan duration)
+    {
+        clock.Advance(duration);
+        Diagnostics.ArrangeAdvance(clock, duration);
+    }
+
+    /// <summary>Writes what the transfer has sent and the last lines of its transcript.</summary>
+    private void ActSent(Subscription subscription)
+    {
+        Diagnostics.ActPackets("sent", subscription.Connection.Written);
+        Diagnostics.ActTranscript(subscription.Events.Transcript);
     }
 
     private static TransferContext Context(ManualTimeProvider clock, TranscriptTransferEvents events, RecordingStream output, byte[]? postData) => new()

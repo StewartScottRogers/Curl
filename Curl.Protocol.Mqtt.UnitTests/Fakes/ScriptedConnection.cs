@@ -15,6 +15,11 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
 {
     private readonly Queue<byte[]?> pendingReads = new(reads);
 
+    /// <summary>
+    /// Gets every read the peer was scripted to send, in order, whether or not it has been read yet.
+    /// </summary>
+    public IReadOnlyList<byte[]?> Reads { get; } = reads;
+
     private readonly MemoryStream written = new();
 
     private int writeCount;

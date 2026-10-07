@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Mqtt.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Mqtt;
 
@@ -16,12 +17,18 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
 {
     private const string ReceiveFailed = "Failure when receiving data from the peer";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_ConnackReadAborted_IsWinsockRecvFailure()
     {
         Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = Failing(SocketError.ConnectionAborted) });
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, "Recv failure: Connection was aborted"), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, "Recv failure: Connection was aborted"), run.Result);
         CollectionAssert.Contains(run.Transcript, "* Recv failure: Connection was aborted");
     }
@@ -35,6 +42,7 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
         Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = failure });
 
         string expected = "Recv failure: " + failure.InnerException!.Message;
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, expected), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, expected), run.Result);
         CollectionAssert.Contains(run.Transcript, "* " + expected);
     }
@@ -44,6 +52,7 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
     {
         Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = new IOException("The read failed.") });
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
         CollectionAssert.DoesNotContain(run.Transcript, "* " + ReceiveFailed);
     }
@@ -53,13 +62,30 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
     {
         Run run = await RunAsync(new ScriptedConnection([0x20, 0x02, 0x00]));
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
     }
 
     private static IOException Failing(SocketError error) =>
         new("The read failed.", new SocketException((int)error));
 
-    private static async Task<Run> RunAsync(ScriptedConnection connection)
+    /// <summary>Runs <c>mqtt://h/t</c> against <paramref name="connection" />, writing what it arranged and got.</summary>
+    private async Task<Run> RunAsync(ScriptedConnection connection)
+    {
+        Diagnostics.Arrange("url", "mqtt://h/t");
+        Diagnostics.ArrangeReads(connection.Reads);
+        Diagnostics.Arrange(
+            "read failure",
+            connection.ReadFailure is { } failure
+                ? $"{failure.Message} (socket error {(failure.InnerException as SocketException)?.SocketErrorCode.ToString() ?? "none"})"
+                : "none");
+        Run run = await TransferAsync(connection);
+        Diagnostics.ActResult(run.Result);
+        Diagnostics.ActTranscript(run.Transcript);
+        return run;
+    }
+
+    private static async Task<Run> TransferAsync(ScriptedConnection connection)
     {
         TranscriptTransferEvents events = new();
         TransferContext context = new()
