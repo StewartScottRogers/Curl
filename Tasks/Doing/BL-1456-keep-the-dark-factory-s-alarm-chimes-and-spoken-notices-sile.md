@@ -32,3 +32,4 @@ While `%LOCALAPPDATA%\Curl\audio-off` exists, a running shift plays no chime, si
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
