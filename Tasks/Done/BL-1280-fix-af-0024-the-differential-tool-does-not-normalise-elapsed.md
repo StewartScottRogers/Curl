@@ -9,7 +9,7 @@ touches: [Audit/Tools/Invoke-DifferentialConformance.ps1]
 lane: no
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-07
 ---
 # BL-1280 — Fix AF-0024: The differential tool does not normalise elapsed milliseconds in error text or the -v source port, so identical behaviour is counted as a difference
 
@@ -42,10 +42,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-07 (interactive, audit branch): `Get-Normalised` in `Audit/Tools/Invoke-DifferentialConformance.ps1` now masks `after N ms` / `after N milliseconds`, the `-v` "Established connection ... from <addr> port N" source port (as SOURCEPORT, before the server port), and a meter row run into the start of a message line (case 299). The reproduction counts 5 (it was 0). A 16-case run over `--interface`/`-v`/`-G`/`--mptcp` gives same 16, different 0, while the raw stderr differs in 12 cases. Build and fast tests are green. Commit 6442ca469 on `audit`. AF-0024 closes only on a re-audit by the conformance auditor.
 
 - 2026-10-03 (dark factory lane 1): the whole fix is in `Audit/Tools/Invoke-DifferentialConformance.ps1`,
   an audit path (ADR-0267) that a factory lane may neither read nor change, but the task was
@@ -58,3 +60,5 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-03: Created.
 - 2026-10-03: Backlog -> Doing.
 - 2026-10-03: Doing -> Backlog. The fix is in the audit office's differential tool, which only an interactive session may change; marked lane: no
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Fixed interactively on the audit branch; see Notes.
