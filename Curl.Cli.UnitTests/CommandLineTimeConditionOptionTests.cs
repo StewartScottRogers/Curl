@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -13,11 +14,18 @@ public sealed class CommandLineTimeConditionOptionTests
 {
     private const string Url = "http://127.0.0.1:1/";
 
+    private const string IllegalDateLine = "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoTimeCond_HasNoTimeCondition()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        AssertTimeCondition(null, result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.TimeCondition);
     }
@@ -25,8 +33,9 @@ public sealed class CommandLineTimeConditionOptionTests
     [TestMethod]
     public void Parse_TimeCondDate_IsIfModifiedSinceThatDate()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-z", "1 Jan 2030", Url]);
+        CommandLineParseResult result = Parse(["-z", "1 Jan 2030", Url]);
 
+        AssertTimeCondition(new TimeCondition(new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfModifiedSince), result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(
             new TimeCondition(new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfModifiedSince),
@@ -37,8 +46,9 @@ public sealed class CommandLineTimeConditionOptionTests
     [TestMethod]
     public void Parse_TimeCondDashDate_IsIfUnmodifiedSinceThatDate()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--time-cond", "-1 Jan 2000", Url]);
+        CommandLineParseResult result = Parse(["--time-cond", "-1 Jan 2000", Url]);
 
+        AssertTimeCondition(new TimeCondition(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfUnmodifiedSince), result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(
             new TimeCondition(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfUnmodifiedSince),
@@ -48,8 +58,9 @@ public sealed class CommandLineTimeConditionOptionTests
     [TestMethod]
     public void Parse_TimeCondRfc1123Date_ReadsThatInstant()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-z", "Sun, 06 Nov 1994 08:49:37 GMT", Url]);
+        CommandLineParseResult result = Parse(["-z", "Sun, 06 Nov 1994 08:49:37 GMT", Url]);
 
+        AssertTimeCondition(new TimeCondition(new DateTimeOffset(1994, 11, 6, 8, 49, 37, TimeSpan.Zero), TimeConditionKind.IfModifiedSince), result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new DateTimeOffset(1994, 11, 6, 8, 49, 37, TimeSpan.Zero), result.Options.TimeCondition?.Value);
     }
@@ -61,8 +72,9 @@ public sealed class CommandLineTimeConditionOptionTests
     [DataRow("=1 Jan 2030")]
     public void Parse_TimeCondPlusOrEqualsDate_IsIfModifiedSinceThatDate(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([$"--time-cond={value}", Url]);
+        CommandLineParseResult result = Parse([$"--time-cond={value}", Url]);
 
+        AssertTimeCondition(new TimeCondition(new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfModifiedSince), result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(
             new TimeCondition(new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfModifiedSince),
@@ -85,6 +97,8 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
 
+        AssertTimeCondition(TimeCondition.FromUnixSeconds(unixSeconds, TimeConditionKind.IfModifiedSince), result);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TimeCondition.FromUnixSeconds(unixSeconds, TimeConditionKind.IfModifiedSince), result.Options.TimeCondition);
         Assert.AreEqual(DateTimeOffset.MaxValue, result.Options.TimeCondition?.Value);
@@ -106,6 +120,8 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
 
+        AssertTimeCondition(TimeCondition.FromUnixSeconds(1200110860800L, kind), result);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(1200110860800L, result.Options.TimeCondition?.ValueUnixSeconds);
         Assert.AreEqual(kind, result.Options.TimeCondition?.Kind);
@@ -124,6 +140,8 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
 
+        AssertTimeCondition(null, result);
+        AssertWarningLines([IllegalDateLine], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.TimeCondition);
         CollectionAssert.AreEqual(
@@ -147,6 +165,8 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         CommandLineParseResult result = Parse(["-z", value, Url], new RecordingDataFileReader());
 
+        AssertTimeCondition(null, result);
+        AssertWarningLines([IllegalDateLine], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.TimeCondition);
         CollectionAssert.AreEqual(
@@ -160,8 +180,10 @@ public sealed class CommandLineTimeConditionOptionTests
     [TestMethod]
     public void Parse_TimeCondYear1583_IsIfModifiedSinceThatDate()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-z", "1 Jan 1583", Url]);
+        CommandLineParseResult result = Parse(["-z", "1 Jan 1583", Url]);
 
+        AssertTimeCondition(new TimeCondition(new DateTimeOffset(1583, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfModifiedSince), result);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new DateTimeOffset(1583, 1, 1, 0, 0, 0, TimeSpan.Zero), result.Options.TimeCondition?.Value);
         Assert.IsEmpty(result.WarningLines);
@@ -183,9 +205,13 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         DateTimeOffset modified = new(2026, 9, 26, 21, 5, 24, TimeSpan.Zero);
         RecordingDataFileReader reader = new() { ModificationTimes = { ["CLAUDE.md"] = modified } };
+        Diagnostics.Arrange("CLAUDE.md modified", modified.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
 
         CommandLineParseResult result = Parse(["-z", value, Url], reader);
 
+        AssertTimeCondition(new TimeCondition(modified, expectedKind), result);
+        AssertWarningLines([], result);
+        Diagnostics.Assert("file reads", CommandLineParseDiagnostics.QuoteEach(["CLAUDE.md"]), CommandLineParseDiagnostics.QuoteEach(reader.Reads));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new TimeCondition(modified, expectedKind), result.Options.TimeCondition);
         Assert.IsEmpty(result.WarningLines);
@@ -199,6 +225,7 @@ public sealed class CommandLineTimeConditionOptionTests
 
         Parse(["-z", "1 Jan 2030", Url], reader);
 
+        Diagnostics.Assert("file reads", "[]", CommandLineParseDiagnostics.QuoteEach(reader.Reads));
         Assert.IsEmpty(reader.Reads);
     }
 
@@ -213,9 +240,12 @@ public sealed class CommandLineTimeConditionOptionTests
     public void Parse_TimeCondFileLookupFails_WarnsWithTheFiletimeLineFirst(string value)
     {
         RecordingDataFileReader reader = new() { ModificationTimeFailures = { [""] = "CreateFile failed: GetLastError 0x00000003" } };
+        Diagnostics.Arrange("modification time failure for \"\"", "CreateFile failed: GetLastError 0x00000003");
 
         CommandLineParseResult result = Parse(["-z", value, Url], reader);
 
+        AssertTimeCondition(null, result);
+        AssertWarningLines(["Warning: Failed to get filetime: CreateFile failed: GetLastError 0x00000003", IllegalDateLine], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.TimeCondition);
         CollectionAssert.AreEqual(
@@ -251,9 +281,12 @@ public sealed class CommandLineTimeConditionOptionTests
             _ => new UnauthorizedAccessException(),
         };
         DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw failure, reportsWindowsErrors: false);
+        Diagnostics.Arrange("stat throws", failure.GetType().Name);
 
         CommandLineParseResult result = Parse(["-z", value, Url], reader);
 
+        AssertTimeCondition(null, result);
+        AssertWarningLines([expectedFirstLine, IllegalDateLine], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.TimeCondition);
         CollectionAssert.AreEqual(
@@ -274,9 +307,12 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         DateTime modified = new(2026, 9, 27, 14, 19, 38, DateTimeKind.Utc);
         DiskDataFileReader reader = new(_ => throw new UnauthorizedAccessException(), () => Stream.Null, _ => modified, reportsWindowsErrors: false);
+        Diagnostics.Arrange("unreadable file modified", modified.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
 
         CommandLineParseResult result = Parse(["-z", "unreadable", Url], reader);
 
+        AssertTimeCondition(new TimeCondition(new DateTimeOffset(modified), TimeConditionKind.IfModifiedSince), result);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(new TimeCondition(new DateTimeOffset(modified), TimeConditionKind.IfModifiedSince), result.Options.TimeCondition);
         Assert.IsEmpty(result.WarningLines);
@@ -287,9 +323,11 @@ public sealed class CommandLineTimeConditionOptionTests
     public void Parse_SilentThenTimeCondFileLookupFails_DoesNotWarn()
     {
         RecordingDataFileReader reader = new() { ModificationTimeFailures = { [""] = "CreateFile failed: GetLastError 0x00000003" } };
+        Diagnostics.Arrange("modification time failure for \"\"", "CreateFile failed: GetLastError 0x00000003");
 
         CommandLineParseResult result = Parse(["-s", "-z", "", Url], reader);
 
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -299,6 +337,7 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         CommandLineParseResult result = Parse(["-z", "1 Jan 2030", "-z", "notadate", Url], new RecordingDataFileReader());
 
+        AssertTimeCondition(null, result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.TimeCondition);
     }
@@ -308,6 +347,8 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         CommandLineParseResult result = Parse(["-z", "notadate", "-z", "-1 Jan 2000", Url], new RecordingDataFileReader());
 
+        AssertTimeCondition(new TimeCondition(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfUnmodifiedSince), result);
+        Diagnostics.Assert("warning line count", 1, result.WarningLines.Count);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TimeConditionKind.IfUnmodifiedSince, result.Options.TimeCondition?.Kind);
         Assert.HasCount(1, result.WarningLines);
@@ -319,6 +360,7 @@ public sealed class CommandLineTimeConditionOptionTests
     {
         CommandLineParseResult result = Parse(["-s", "-z", "notadate", Url], new RecordingDataFileReader());
 
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -326,8 +368,10 @@ public sealed class CommandLineTimeConditionOptionTests
     [TestMethod]
     public void Parse_TimeCondAsLastArgument_RequiresAParameter()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "-z"]);
+        CommandLineParseResult result = Parse([Url, "-z"]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("first stderr line", "curl: option -z: requires parameter", CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines[0]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual("curl: option -z: requires parameter", result.Refusal.StandardErrorLines[0]);
     }
@@ -336,16 +380,49 @@ public sealed class CommandLineTimeConditionOptionTests
     [TestMethod]
     public void Parse_NoTimeCond_CannotBeReversed()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-time-cond", "x", Url]);
+        CommandLineParseResult result = Parse(["--no-time-cond", "x", Url]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert(
+            "first stderr line",
+            "curl: option --no-time-cond: the given option cannot be reversed with a --no- prefix",
+            CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines[0]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(
             "curl: option --no-time-cond: the given option cannot be reversed with a --no- prefix",
             result.Refusal.StandardErrorLines[0]);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+    /// <summary>Formats <paramref name="condition"/> by its kind, Unix seconds and instant, the same on every machine.</summary>
+    private static string Describe(TimeCondition? condition) =>
+        condition is null
+            ? "none"
+            : FormattableString.Invariant($"{condition.Kind} at {condition.ValueUnixSeconds} Unix seconds ({condition.Value:O})");
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
+        WriteDiagnostics(arguments, () => CommandLineParser.Parse(arguments));
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
+        WriteDiagnostics(arguments, () => CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader));
+
+    private CommandLineParseResult WriteDiagnostics(IReadOnlyList<string> arguments, Func<CommandLineParseResult> parse)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = parse();
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            Diagnostics.Act("time condition", Describe(result.Options.TimeCondition));
+        }
+
+        return result;
+    }
+
+    private void AssertTimeCondition(TimeCondition? expected, CommandLineParseResult result) =>
+        Diagnostics.Assert("time condition", Describe(expected), Describe(CommandLineParseDiagnostics.Peek(result.Options)?.TimeCondition));
+
+    private void AssertWarningLines(IEnumerable<string> expected, CommandLineParseResult result) =>
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expected), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {
