@@ -8,7 +8,7 @@ depends-on: [BL-1597]
 touches: [Curl.Cli.UnitTests, Curl.Cli.IntegrationTests, Curl.slnx]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1599 — Move Curl.Cli.UnitTests' two Integration tests into a new Curl.Cli.IntegrationTests project
 
@@ -28,16 +28,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj` exists, matches the template's shape, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Cli.UnitLibrary`.
-- [ ] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Cli.UnitTests --include=*.cs` finds nothing, and every `[TestMethod]` in `Curl.Cli.IntegrationTests` carries `[TestCategory("Integration")]`.
-- [ ] `dotnet build -warnaserror` at the repository root is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `dotnet test Curl.Cli.IntegrationTests --filter "TestCategory=Integration"` runs `Parse_DefaultCheckGivenAnExistingFile_RecordsIt` and `Parse_DefaultCheckGivenAnExistingDirectory_RecordsIt` and both pass.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Cli.UnitLibrary`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
+- [x] `Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj` exists, matches the template's shape, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Cli.UnitLibrary`.
+- [x] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Cli.UnitTests --include=*.cs` finds nothing, and every `[TestMethod]` in `Curl.Cli.IntegrationTests` carries `[TestCategory("Integration")]`.
+- [x] `dotnet build -warnaserror` at the repository root is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet test Curl.Cli.IntegrationTests --filter "TestCategory=Integration"` runs `Parse_DefaultCheckGivenAnExistingFile_RecordsIt` and `Parse_DefaultCheckGivenAnExistingDirectory_RecordsIt` and both pass.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Cli.UnitLibrary`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
 
 ## Notes
+
+- The two tests use `CommandLineParseDiagnostics` (internal, in `Curl.Cli.UnitTests`) for their `ArrangeArguments` and `ActParse` diagnostics lines. Rather than reference the unit test project and add `InternalsVisibleTo`, the new project links that one file (`<Compile Include="..\Curl.Cli.UnitTests\CommandLineParseDiagnostics.cs" Link=... />`); the diagnostics stay identical and no unit test project gains a dependant. The moved tests write only the CA certificate file as their `ACT` option line, the one value they assert.
+- Coverage of `Curl.Cli.UnitLibrary` (Measure-CodeQuality, fast run only): 100% line, 100% branch, 0 failing members after the move. Before was the same by construction: the fast run already excluded both tests, and the set of fast tests did not change.
+- `CommandLineTlsOptionTests`' summary now points at `CommandLineTlsOptionIntegrationTests` for the real-path check.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Curl.Cli.UnitTests holds no Integration test; its two real-path --cacert tests run from the new Curl.Cli.IntegrationTests project

@@ -49,6 +49,7 @@
   </Folder>
   <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
   <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
+  <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
   <Project Path="Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj" />
   <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
   <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />

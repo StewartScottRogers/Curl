@@ -11,8 +11,8 @@ namespace Curl.Cli;
 /// <c>--tlsv1.2</c> and <c>--tlsv1.3</c> (the last one given wins), <c>--tls-max</c>, <c>--proxy-tlsv1</c>,
 /// <c>--ciphers</c> and <c>--tls13-ciphers</c>, and the refusals curl
 /// 8.21.0 prints for them, measured against the local curl 8.21.0 on 2026-09-26. The
-/// <c>--cacert</c> existence check runs against a fake, never the disk, except in the two
-/// <c>Integration</c> tests that pin the production check against real paths.
+/// <c>--cacert</c> existence check runs against a fake, never the disk; the production check against real
+/// paths is pinned by <c>CommandLineTlsOptionIntegrationTests</c> in <c>Curl.Cli.IntegrationTests</c>.
 /// </summary>
 [TestClass]
 public sealed class CommandLineTlsOptionTests
@@ -158,32 +158,6 @@ public sealed class CommandLineTlsOptionTests
         Diagnostics.Assert("stderr line count", 3, CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines.Count);
         Assert.IsFalse(result.IsAccepted);
         Assert.HasCount(3, result.Refusal.StandardErrorLines);
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public void Parse_DefaultCheckGivenAnExistingFile_RecordsIt()
-    {
-        string existingFile = typeof(CommandLineTlsOptionTests).Assembly.Location;
-
-        CommandLineParseResult result = Parse(["--cacert", existingFile, Url], pathExists: null);
-
-        Diagnostics.Assert("CA certificate file", existingFile, Recorded(result)?.CaCertificateFile);
-        Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual(existingFile, result.Options.CaCertificateFile);
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public void Parse_DefaultCheckGivenAnExistingDirectory_RecordsIt()
-    {
-        string existingDirectory = AppContext.BaseDirectory;
-
-        CommandLineParseResult result = Parse(["--cacert", existingDirectory, Url], pathExists: null);
-
-        Diagnostics.Assert("CA certificate file", existingDirectory, Recorded(result)?.CaCertificateFile);
-        Assert.IsTrue(result.IsAccepted);
-        Assert.AreEqual(existingDirectory, result.Options.CaCertificateFile);
     }
 
     [TestMethod]
