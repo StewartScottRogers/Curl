@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3.Fakes;
 
@@ -16,6 +17,25 @@ public sealed record Pop3Run(
 {
     /// <summary>Gets every byte written to the plaintext connection, as Latin-1 text.</summary>
     public string Sent => Encoding.Latin1.GetString(Connection.Sent);
+
+    /// <summary>
+    /// Runs <paramref name="url" /> against <paramref name="connection" />, writing the URL,
+    /// the script, the security level and the handshakes as ARRANGE lines and the run's
+    /// result, commands and output as ACT lines.
+    /// </summary>
+    internal static async Task<Pop3Run> ExecuteAsync(
+        TestDiagnostics diagnostics,
+        string url,
+        ScriptedConnection connection,
+        TransportSecurityLevel sslLevel = TransportSecurityLevel.None,
+        params ConnectResult[] handshakes)
+    {
+        diagnostics.ArrangeRun(url, connection.Script, sslLevel);
+        diagnostics.Arrange("handshakes", string.Join(", ", handshakes.Select(handshake => handshake.Connection is null ? $"failed {handshake.ExitCode}" : "connected")));
+        Pop3Run run = await ExecuteAsync(url, connection, sslLevel, handshakes);
+        diagnostics.ActRun(run);
+        return run;
+    }
 
     public static async Task<Pop3Run> ExecuteAsync(
         string url,

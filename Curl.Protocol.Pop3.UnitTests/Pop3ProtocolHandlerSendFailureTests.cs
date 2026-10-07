@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -15,6 +16,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerSendFailureTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/1";
 
     private const string Greeting = "+OK POP3 ready\r\n";
@@ -42,8 +48,11 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
 
         TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
 
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", sent, Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual(sent, Encoding.Latin1.GetString(connection.Sent));
+        Diagnostics.AssertValues("connection.ReadCount", reads, connection.ReadCount);
         Assert.AreEqual(reads, connection.ReadCount);
     }
 
@@ -58,8 +67,11 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
 
         TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
 
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + ResetMessage()), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + ResetMessage()), result);
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", sent, Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual(sent, Encoding.Latin1.GetString(connection.Sent));
+        Diagnostics.AssertValues("connection.ReadCount", reads, connection.ReadCount);
         Assert.AreEqual(reads, connection.ReadCount);
     }
 
@@ -69,6 +81,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
     {
         TransferResult result = await ExecuteAsync(Conversation(1, Aborted()), new RecordingTransferEvents());
 
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
     }
 
@@ -93,8 +106,11 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
 
         TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
 
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", sent, Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual(sent, Encoding.Latin1.GetString(connection.Sent));
+        Diagnostics.AssertValues("connection.ReadCount", reads, connection.ReadCount);
         Assert.AreEqual(reads, connection.ReadCount);
     }
 
@@ -109,6 +125,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
         CollectionAssert.AreEqual(
             (string[])["* Send failure: Connection was reset", "* closing connection #0"],
             events.Transcript[^2..]);
+        Diagnostics.AssertValues("events.Transcript[^4]", "> PASS secret\r\n", events.Transcript[^4]);
         Assert.AreEqual("> PASS secret\r\n", events.Transcript[^4]);
     }
 
@@ -123,6 +140,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
         CollectionAssert.AreEqual(
             (string[])["* Send failure: " + ResetMessage(), "* closing connection #0"],
             events.Transcript[^2..]);
+        Diagnostics.AssertValues("events.Transcript[^4]", "> PASS secret\r\n", events.Transcript[^4]);
         Assert.AreEqual("> PASS secret\r\n", events.Transcript[^4]);
     }
 
@@ -133,7 +151,9 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
 
         await ExecuteAsync(Conversation(1, new IOException("The pipe is broken.")), events);
 
+        Diagnostics.AssertValues("events.Transcript[^1]", "* closing connection #0", events.Transcript[^1]);
         Assert.AreEqual("* closing connection #0", events.Transcript[^1]);
+        Diagnostics.AssertValues("events.Transcript[^2]", "< .\r\n", events.Transcript[^2]);
         Assert.AreEqual("< .\r\n", events.Transcript[^2]);
     }
 
@@ -144,7 +164,9 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
 
         TransferResult result = await ExecuteAsync(connection, new RecordingTransferEvents());
 
+        Diagnostics.AssertValues("result", TransferResult.Success(4), result);
         Assert.AreEqual(TransferResult.Success(4), result);
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", Capa + UserAndPass + "RETR 1\r\n", Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual(Capa + UserAndPass + "RETR 1\r\n", Encoding.Latin1.GetString(connection.Sent));
     }
 
@@ -155,8 +177,10 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
         await cancellation.CancelAsync();
         ScriptedConnection connection = Conversation(1, new OperationCanceledException(cancellation.Token));
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+        OperationCanceledException thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             () => ExecuteAsync(connection, new RecordingTransferEvents(), cancellation.Token).AsTask());
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name}: {thrown.Message}");
+        Diagnostics.AssertValues("thrown for the cancelled token", true, thrown.CancellationToken == cancellation.Token);
     }
 
     private static IOException Reset() =>
@@ -175,7 +199,7 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
             WriteFailure = failure,
         };
 
-    private static ValueTask<TransferResult> ExecuteAsync(ScriptedConnection connection, RecordingTransferEvents events, CancellationToken cancellationToken = default)
+    private async ValueTask<TransferResult> ExecuteAsync(ScriptedConnection connection, RecordingTransferEvents events, CancellationToken cancellationToken = default)
     {
         var context = new TransferContext
         {
@@ -185,6 +209,10 @@ public sealed class Pop3ProtocolHandlerSendFailureTests
             Credentials = new NetworkCredential("user", "secret"),
             CancellationToken = cancellationToken,
         };
-        return new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        Diagnostics.ArrangeRun(Url, connection.Script);
+        Diagnostics.Arrange("writes before failure", $"{connection.WritesBeforeFailure}, then {connection.WriteFailure.GetType().Name}: {connection.WriteFailure.Message} ({connection.WriteFailure.InnerException?.Message ?? "no inner exception"})");
+        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        Diagnostics.ActTransfer(result, events, connection.Sent);
+        return result;
     }
 }
