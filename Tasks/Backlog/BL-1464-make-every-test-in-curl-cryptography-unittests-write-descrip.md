@@ -4,7 +4,7 @@ title: Make every test in Curl.Cryptography.UnitTests write descriptive diagnost
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1457]
+depends-on: [BL-1457, BL-1535, BL-1536, BL-1537, BL-1538, BL-1539, BL-1540]
 touches: [Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-04
@@ -36,8 +36,11 @@ Every test in `Curl.Cryptography.UnitTests` writes, through BL-1457's shared `Te
 ## Notes
 
 - Sized for one run: 416 test methods in 50 files.
+- 2026-10-07 (lane 9): split before changing any test, as BL-1463 was. 416 test methods in 50 files is far more than one run's two hours and token budget. Six tasks cover every test file, in alphabetical groups of 64 to 75 tests: BL-1535 (AEAD, AES, ARIA, bcrypt-pbkdf, Blowfish), BL-1536 (Brainpool, Camellia, CAST-128, ChaCha20, ConstantTime), BL-1537 (DES, DSA, Ed25519, Ed448, Edwards25519, Field25519), BL-1538 (finite-field DH, fixed-block hash, GCM, HMAC-RIPEMD-160, HPKE, MD4), BL-1539 (ML-DSA, ML-KEM, Montgomery, Poly1305, RC4, RIPEMD-160, RSA-CRT), BL-1540 (Scalar25519 to X448). Their filters use namespace `Curl.Cryptography`. Once they are Done, this task runs only the whole-project checks.
+- Before counts (2026-10-07, `Select-String -AllMatches` over `Curl.Cryptography.UnitTests` excluding `obj` and `bin`): `Assert.` 756, `[TestMethod`/`[DataTestMethod` 416, `[DataRow(` 1018.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Split into BL-1535..BL-1540 (one per range of test files); waits on them, then runs only the whole-project checks
