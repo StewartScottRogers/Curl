@@ -22,8 +22,10 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions(), new NetworkCredential("u", "p"), AuthUrl);
 
+        string[] expectedHead = ["< HTTP/1.1 401 Unauthorized", BasicProblem, "< WWW-Authenticate: Basic realm=\"x\"", "< Content-Length: 4"];
+        WriteExpectedLines("last head lines", expectedHead, LastHeadLines(lines));
         CollectionAssert.AreEqual(
-            new[] { "< HTTP/1.1 401 Unauthorized", BasicProblem, "< WWW-Authenticate: Basic realm=\"x\"", "< Content-Length: 4" },
+            expectedHead,
             LastHeadLines(lines));
         Assert.AreEqual(1, lines.Count(line => line.StartsWith("> GET", StringComparison.Ordinal)));
     }
@@ -35,8 +37,10 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions { BearerToken = "tok", AuthSchemes = HttpAuthSchemes.Bearer }, credential: null, AuthUrl);
 
+        string[] expectedHead = ["< HTTP/1.1 401 Unauthorized", "* Bearer authentication problem, ignoring.", "< WWW-Authenticate: Bearer realm=\"x\", basic x", "< Content-Length: 4"];
+        WriteExpectedLines("last head lines", expectedHead, LastHeadLines(lines));
         CollectionAssert.AreEqual(
-            new[] { "< HTTP/1.1 401 Unauthorized", "* Bearer authentication problem, ignoring.", "< WWW-Authenticate: Bearer realm=\"x\", basic x", "< Content-Length: 4" },
+            expectedHead,
             LastHeadLines(lines));
     }
 
@@ -48,8 +52,10 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions { Headers = ["Authorization: Foo"] }, new NetworkCredential("u", "p"), AuthUrl);
 
+        string[] expectedHead = ["< HTTP/1.1 401 U", BasicProblem, BasicProblem, "< WWW-Authenticate: Basic realm=\"x\", Basic y", BasicProblem, "< www-authenticate: basic z", "< Content-Length: 4"];
+        WriteExpectedLines("last head lines", expectedHead, LastHeadLines(lines));
         CollectionAssert.AreEqual(
-            new[] { "< HTTP/1.1 401 U", BasicProblem, BasicProblem, "< WWW-Authenticate: Basic realm=\"x\", Basic y", BasicProblem, "< www-authenticate: basic z", "< Content-Length: 4" },
+            expectedHead,
             LastHeadLines(lines));
     }
 
@@ -60,6 +66,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions(), new NetworkCredential("u", "p"), AuthUrl);
 
+        Diagnostics.Assert("authentication problem lines", 0, lines.Count(line => line.Contains("authentication problem", StringComparison.Ordinal)));
         Assert.IsFalse(lines.Any(line => line.Contains("authentication problem", StringComparison.Ordinal)));
     }
 
@@ -77,9 +84,12 @@ public sealed partial class HttpProtocolHandlerTests
             connection, new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Any }, new NetworkCredential("u", "p"), AuthUrl);
 
         int firstStatus = lines.IndexOf("< HTTP/1.1 401 Unauthorized");
+        Diagnostics.Assert("line after the first status", "< WWW-Authenticate: Basic realm=\"x\"", lines[firstStatus + 1]);
         Assert.AreEqual("< WWW-Authenticate: Basic realm=\"x\"", lines[firstStatus + 1]);
+        string[] expectedHead = ["< HTTP/1.1 401 Unauthorized", BasicProblem, "< WWW-Authenticate: Basic realm=\"x\"", "< Content-Length: 4"];
+        WriteExpectedLines("last head lines", expectedHead, LastHeadLines(lines));
         CollectionAssert.AreEqual(
-            new[] { "< HTTP/1.1 401 Unauthorized", BasicProblem, "< WWW-Authenticate: Basic realm=\"x\"", "< Content-Length: 4" },
+            expectedHead,
             LastHeadLines(lines));
     }
 
@@ -90,6 +100,7 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions(), new NetworkCredential("u", "p"), AuthUrl);
 
+        Diagnostics.Assert("authentication problem lines", 0, lines.Count(line => line.Contains("authentication problem", StringComparison.Ordinal)));
         Assert.IsFalse(lines.Any(line => line.Contains("authentication problem", StringComparison.Ordinal)));
     }
 
@@ -98,10 +109,13 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, "HTTP/1.1 407 Proxy Auth\r\nProxy-Authenticate: Basic realm=\"x\", Basic y\r\nContent-Length: 4\r\n\r\nnope");
 
+
         List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions { ForwardProxy = ChallengingProxy }, credential: null, ProxyAuthUrl);
 
+        string[] expectedHead = ["< HTTP/1.1 407 Proxy Auth", BasicProblem, BasicProblem, "< Proxy-Authenticate: Basic realm=\"x\", Basic y", "< Content-Length: 4"];
+        WriteExpectedLines("last head lines", expectedHead, LastHeadLines(lines));
         CollectionAssert.AreEqual(
-            new[] { "< HTTP/1.1 407 Proxy Auth", BasicProblem, BasicProblem, "< Proxy-Authenticate: Basic realm=\"x\", Basic y", "< Content-Length: 4" },
+            expectedHead,
             LastHeadLines(lines));
     }
 
@@ -118,14 +132,16 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await AuthProblemLinesAsync(connection, new HttpRequestOptions { ForwardProxy = proxyWithoutCredential }, credential: null, ProxyAuthUrl);
 
+        string[] expectedHead =
+        [
+            "< HTTP/1.1 407 Proxy Authentication Required",
+            "* Ignoring duplicate digest auth header.",
+            "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"a\", Digest realm=\"s\", nonce=\"c\"",
+            "< Content-Length: 0",
+        ];
+        WriteExpectedLines("last head lines", expectedHead, LastHeadLines(lines));
         CollectionAssert.AreEqual(
-            new[]
-            {
-                "< HTTP/1.1 407 Proxy Authentication Required",
-                "* Ignoring duplicate digest auth header.",
-                "< Proxy-Authenticate: Digest realm=\"r\", nonce=\"a\", Digest realm=\"s\", nonce=\"c\"",
-                "< Content-Length: 0",
-            },
+            expectedHead,
             LastHeadLines(lines));
     }
 
@@ -143,15 +159,17 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await DigestVerboseLinesAsync(first, second);
 
+        string[] expectedHead =
+        [
+            "< HTTP/1.1 401 Unauthorized",
+            "* Digest authentication problem, ignoring.",
+            "* Ignoring duplicate digest auth header.",
+            "< WWW-Authenticate: Digest realm=\"r\", nonce=\"b\", qop=\"auth\", Digest realm=\"s\", nonce=\"c\"",
+            "< Content-Length: 0",
+        ];
+        WriteExpectedLines("last head lines", expectedHead, LastHeadLines(lines));
         CollectionAssert.AreEqual(
-            new[]
-            {
-                "< HTTP/1.1 401 Unauthorized",
-                "* Digest authentication problem, ignoring.",
-                "* Ignoring duplicate digest auth header.",
-                "< WWW-Authenticate: Digest realm=\"r\", nonce=\"b\", qop=\"auth\", Digest realm=\"s\", nonce=\"c\"",
-                "< Content-Length: 0",
-            },
+            expectedHead,
             LastHeadLines(lines));
         Assert.AreEqual(1, lines.Count(line => line.Contains("Digest authentication problem", StringComparison.Ordinal)));
     }
@@ -166,31 +184,38 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> lines = await DigestVerboseLinesAsync(first, second, third);
 
+        Diagnostics.Assert("authentication problem lines", 0, lines.Count(line => line.Contains("authentication problem", StringComparison.Ordinal)));
         Assert.IsFalse(lines.Any(line => line.Contains("authentication problem", StringComparison.Ordinal)));
         Assert.Contains("< HTTP/1.1 200 OK", lines);
     }
 
     /// <summary>Runs one <c>-v --digest -u u:p</c> transfer on <paramref name="connections" />, checks it succeeds, and gives its events by first line.</summary>
-    private static async Task<List<string>> DigestVerboseLinesAsync(params TurnTakingConnection[] connections)
+    private async Task<List<string>> DigestVerboseLinesAsync(params TurnTakingConnection[] connections)
     {
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse(StaleUrl), Output = new MemoryStream(), Credentials = new NetworkCredential("u", "p"), Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest }, Events = events };
+        Diagnostics.Arrange("url, user, connections", $"{StaleUrl} --digest, u, {connections.Length}");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connections), StaleAuthenticator("370cf856b91684edfd74ca6d21b5bebb", "fa452aa0c29c5f74b6287443cc695e23"))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events by first line", FirstLinesOf(events));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         return FirstLinesOf(events);
     }
 
     /// <summary>Runs one <c>-v</c> transfer of <paramref name="url" /> on <paramref name="connection" />, checks it succeeds, and gives its events by first line.</summary>
-    private static async Task<List<string>> AuthProblemLinesAsync(TurnTakingConnection connection, HttpRequestOptions options, NetworkCredential? credential, string url)
+    private async Task<List<string>> AuthProblemLinesAsync(TurnTakingConnection connection, HttpRequestOptions options, NetworkCredential? credential, string url)
     {
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse(url), Output = new MemoryStream(), Credentials = credential, Http = options, Events = events };
+        Diagnostics.Arrange("url, user, auth schemes", $"{url}, {credential?.UserName ?? "(none)"}, {options.AuthSchemes}");
 
         TransferResult result = await NegotiateHandler(QueueConnector.For(connection), new ScriptedTokenSource()).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events by first line", FirstLinesOf(events));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         return FirstLinesOf(events);
     }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Http;
@@ -25,6 +26,10 @@ public sealed partial class HttpProtocolHandlerTests
     private const string NoContent = "HTTP/1.1 204 No Content\r\n\r\n";
 
     private static readonly int[] ChunkSizes = [1, 65536];
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     public void SupportedSchemes_AreHttpAndHttps()
@@ -896,4 +901,19 @@ public sealed partial class HttpProtocolHandlerTests
         new(Encoding.Latin1.GetBytes(response), chunkSize, expectedRequest is null ? null : Encoding.Latin1.GetBytes(expectedRequest));
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);
+
+    /// <summary>Shows CR and LF as <c>\r</c> and <c>\n</c>, so a diagnostic stays on one line.</summary>
+    private static string OneLine(string text) => text.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
+
+    /// <summary>Writes the ACT line for a transfer's exit code and error text.</summary>
+    private void WriteResult(TransferResult result) =>
+        Diagnostics.Act("exit code", $"{result.ExitCode} ({(int)result.ExitCode}), error: {result.ErrorMessage ?? "(none)"}");
+
+    /// <summary>Writes an ACT line with every recorded event, CR and LF shown escaped.</summary>
+    private void WriteEvents(string label, IEnumerable<string> lines) =>
+        Diagnostics.Act(label, OneLine(string.Join(" | ", lines)));
+
+    /// <summary>Writes the ASSERT line for two sequences of lines, CR and LF shown escaped.</summary>
+    private void WriteExpectedLines(string label, IEnumerable<string> expected, IEnumerable<string> actual) =>
+        Diagnostics.Assert(label, OneLine(string.Join(" | ", expected)), OneLine(string.Join(" | ", actual)));
 }

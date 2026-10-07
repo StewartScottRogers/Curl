@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -10,17 +11,25 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpPrefixedStreamTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ReadAsync_ReadsThePrefixThenTheRest()
     {
         using HttpPrefixedStream stream = new("abc"u8.ToArray(), new MemoryStream("de"u8.ToArray()));
         byte[] buffer = new byte[2];
+        Diagnostics.Arrange("prefix, rest, buffer size", "abc, de, 2");
 
         Assert.AreEqual(2, await stream.ReadAsync(buffer.AsMemory(), CancellationToken.None));
+        Diagnostics.Act("first read", Encoding.Latin1.GetString(buffer));
         Assert.AreEqual("ab", Encoding.Latin1.GetString(buffer));
         Assert.AreEqual(1, await stream.ReadAsync(buffer, 0, 2, CancellationToken.None));
         Assert.AreEqual((byte)'c', buffer[0]);
         Assert.AreEqual(2, await stream.ReadAsync(buffer.AsMemory(), CancellationToken.None));
+        Diagnostics.Act("third read", Encoding.Latin1.GetString(buffer));
+        Diagnostics.Assert("third read", "de", Encoding.Latin1.GetString(buffer));
         Assert.AreEqual("de", Encoding.Latin1.GetString(buffer));
         Assert.AreEqual(0, await stream.ReadAsync(buffer.AsMemory(), CancellationToken.None));
     }
@@ -30,9 +39,12 @@ public sealed class HttpPrefixedStreamTests
     {
         using HttpPrefixedStream stream = new("ab"u8.ToArray(), new MemoryStream("cd"u8.ToArray()));
         byte[] buffer = new byte[4];
+        Diagnostics.Arrange("prefix, rest, buffer size", "ab, cd, 4");
 
         Assert.AreEqual(2, stream.Read(buffer, 0, 4));
         Assert.AreEqual(2, stream.Read(buffer, 2, 2));
+        Diagnostics.Act("buffer", Encoding.Latin1.GetString(buffer));
+        Diagnostics.Assert("buffer", "abcd", Encoding.Latin1.GetString(buffer));
         Assert.AreEqual("abcd", Encoding.Latin1.GetString(buffer));
         Assert.AreEqual(0, stream.Read(buffer.AsSpan()));
     }
@@ -41,9 +53,12 @@ public sealed class HttpPrefixedStreamTests
     public void Members_ReadOnlyAndForwardOnly()
     {
         using HttpPrefixedStream stream = new(ReadOnlyMemory<byte>.Empty, new MemoryStream());
+        Diagnostics.Arrange("prefix, rest", "empty, empty stream");
 
         stream.Flush();
 
+        Diagnostics.Act("capabilities", $"read {stream.CanRead}, seek {stream.CanSeek}, write {stream.CanWrite}");
+        Diagnostics.Assert("capabilities", "read True, seek False, write False", $"read {stream.CanRead}, seek {stream.CanSeek}, write {stream.CanWrite}");
         Assert.IsTrue(stream.CanRead);
         Assert.IsFalse(stream.CanSeek);
         Assert.IsFalse(stream.CanWrite);
