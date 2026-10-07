@@ -1,4 +1,5 @@
 using System.Net;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -9,15 +10,23 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class ITlsProviderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithEventsNotOverridden_RunsTheThreeArgumentHandshake()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var provider = new HostRecordingTlsProvider();
         var plaintext = new UnusedConnection();
+        diagnostics.Arrange("target host", "mail.example");
 
         ConnectResult secured = await ((ITlsProvider)provider)
             .AuthenticateAsClientAsync(plaintext, "mail.example", new StubTransferEvents(), CancellationToken.None);
 
+        diagnostics.Act("provider target host", provider.TargetHost);
+        diagnostics.Act("connection is the plaintext one", ReferenceEquals(plaintext, secured.Connection));
+        diagnostics.Assert("connection", plaintext, secured.Connection);
+        diagnostics.Diff("target host", "mail.example", provider.TargetHost ?? string.Empty);
         Assert.AreSame(plaintext, secured.Connection);
         Assert.AreEqual("mail.example", provider.TargetHost);
     }

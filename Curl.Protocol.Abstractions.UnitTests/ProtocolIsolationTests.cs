@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -10,6 +11,8 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class ProtocolIsolationTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Abstractions = "Curl.Protocol.Abstractions.UnitLibrary";
     private const string Cryptography = "Curl.Cryptography.UnitLibrary";
     private const string Tls = "Curl.Tls.UnitLibrary";
@@ -36,16 +39,23 @@ public sealed class ProtocolIsolationTests
     [TestMethod]
     public void ProtocolLibrary_References_OnlyAbstractionsAndHandBuiltLibraries()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var violations = new List<string>();
+        diagnostics.Arrange("allowed protocol references", Abstractions + " and the ADR-0120 hand-built libraries");
 
-        foreach (var project in ProtocolLibraries())
+        using (diagnostics.Phase("scan protocol projects"))
         {
-            foreach (var referenced in ForbiddenProtocolReferences(ProjectReferences(project)))
+            foreach (var project in ProtocolLibraries())
             {
-                violations.Add($"{ProjectName(project)} -> {referenced}");
+                foreach (var referenced in ForbiddenProtocolReferences(ProjectReferences(project)))
+                {
+                    violations.Add($"{ProjectName(project)} -> {referenced}");
+                }
             }
         }
 
+        diagnostics.Act("violations", violations.Count + ": " + string.Join(", ", violations));
+        diagnostics.Assert("violation count", 0, violations.Count);
         Assert.IsEmpty(
             violations,
             $"A protocol library may reference only {Abstractions} and the hand-built "
@@ -55,24 +65,31 @@ public sealed class ProtocolIsolationTests
     [TestMethod]
     public void HandBuiltLibrary_References_OnlyItsAdrRow()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var root = RepositoryRoot();
         var violations = new List<string>();
+        diagnostics.Arrange("hand-built libraries in ADR-0120", HandBuiltLibraries.Count);
 
-        foreach (var library in HandBuiltLibraries.Keys)
+        using (diagnostics.Phase("scan hand-built projects"))
         {
-            var project = Path.Combine(root, library, library + ".csproj");
-
-            if (!File.Exists(project))
+            foreach (var library in HandBuiltLibraries.Keys)
             {
-                continue;
-            }
+                var project = Path.Combine(root, library, library + ".csproj");
 
-            foreach (var referenced in ForbiddenHandBuiltReferences(library, ProjectReferences(project)))
-            {
-                violations.Add($"{library} -> {referenced}");
+                if (!File.Exists(project))
+                {
+                    continue;
+                }
+
+                foreach (var referenced in ForbiddenHandBuiltReferences(library, ProjectReferences(project)))
+                {
+                    violations.Add($"{library} -> {referenced}");
+                }
             }
         }
 
+        diagnostics.Act("violations", violations.Count + ": " + string.Join(", ", violations));
+        diagnostics.Assert("violation count", 0, violations.Count);
         Assert.IsEmpty(
             violations,
             "A hand-built library may reference only its row of ADR-0120: "
@@ -91,7 +108,14 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Zstandard.UnitLibrary")]
     public void ForbiddenProtocolReferences_AllowedLibrary_IsNotForbidden(string referenced)
     {
-        Assert.IsEmpty(ForbiddenProtocolReferences([referenced]));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("referenced project", referenced);
+
+        var forbidden = ForbiddenProtocolReferences([referenced]);
+
+        diagnostics.Act("forbidden references", forbidden.Count + ": " + string.Join(", ", forbidden));
+        diagnostics.Assert("forbidden count", 0, forbidden.Count);
+        Assert.IsEmpty(forbidden);
     }
 
     [TestMethod]
@@ -104,8 +128,13 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Cli.UnitLibrary")]
     public void ForbiddenProtocolReferences_OtherProject_IsForbidden(string referenced)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("referenced project", referenced);
+
         var forbidden = ForbiddenProtocolReferences([Abstractions, referenced]);
 
+        diagnostics.Act("forbidden references", forbidden.Count + ": " + string.Join(", ", forbidden));
+        diagnostics.Assert("forbidden count", 1, forbidden.Count);
         Assert.HasCount(1, forbidden);
         Assert.AreEqual(referenced, forbidden[0]);
     }
@@ -121,7 +150,15 @@ public sealed class ProtocolIsolationTests
     public void ForbiddenHandBuiltReferences_ReferenceInItsRow_IsNotForbidden(
         string library, string referenced)
     {
-        Assert.IsEmpty(ForbiddenHandBuiltReferences(library, [referenced]));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("library", library);
+        diagnostics.Arrange("referenced project", referenced);
+
+        var forbidden = ForbiddenHandBuiltReferences(library, [referenced]);
+
+        diagnostics.Act("forbidden references", forbidden.Count + ": " + string.Join(", ", forbidden));
+        diagnostics.Assert("forbidden count", 0, forbidden.Count);
+        Assert.IsEmpty(forbidden);
     }
 
     [TestMethod]
@@ -138,8 +175,14 @@ public sealed class ProtocolIsolationTests
     public void ForbiddenHandBuiltReferences_ReferenceOutsideItsRow_IsForbidden(
         string library, string referenced)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("library", library);
+        diagnostics.Arrange("referenced project", referenced);
+
         var forbidden = ForbiddenHandBuiltReferences(library, [referenced]);
 
+        diagnostics.Act("forbidden references", forbidden.Count + ": " + string.Join(", ", forbidden));
+        diagnostics.Assert("forbidden count", 1, forbidden.Count);
         Assert.HasCount(1, forbidden);
         Assert.AreEqual(referenced, forbidden[0]);
     }
@@ -147,10 +190,14 @@ public sealed class ProtocolIsolationTests
     [TestMethod]
     public void Abstractions_References_Nothing()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("project", Abstractions + ".csproj");
         var project = Path.Combine(RepositoryRoot(), Abstractions, Abstractions + ".csproj");
 
         var references = ProjectReferences(project);
 
+        diagnostics.Act("references", references.Count + ": " + string.Join(", ", references));
+        diagnostics.Assert("reference count", 0, references.Count);
         Assert.IsEmpty(
             references,
             $"{Abstractions} must reference nothing: " + string.Join(", ", references));
@@ -159,8 +206,19 @@ public sealed class ProtocolIsolationTests
     [TestMethod]
     public void ProtocolLibraries_FindsTheProjectsUnderTheRepositoryRoot()
     {
-        var names = ProtocolLibraries().Select(ProjectName).ToList();
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("expected present", "Curl.Protocol.Http.UnitLibrary");
+        diagnostics.Arrange("expected absent", Abstractions);
 
+        List<string> names;
+        using (diagnostics.Phase("list protocol projects"))
+        {
+            names = ProtocolLibraries().Select(ProjectName).ToList();
+        }
+
+        diagnostics.Act("protocol library count", names.Count);
+        diagnostics.Assert("contains Http", true, names.Contains("Curl.Protocol.Http.UnitLibrary"));
+        diagnostics.Assert("contains Abstractions", false, names.Contains(Abstractions));
         CollectionAssert.Contains(names, "Curl.Protocol.Http.UnitLibrary");
         CollectionAssert.DoesNotContain(names, Abstractions);
     }
@@ -168,7 +226,25 @@ public sealed class ProtocolIsolationTests
     [TestMethod]
     public void EveryProtocolLibrary_HasAMatchingTestProject()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var root = RepositoryRoot();
+        var checkedTests = new List<string>();
+        var missing = new List<string>();
+
+        foreach (var project in ProtocolLibraries())
+        {
+            var tests = ProjectName(project).Replace(".UnitLibrary", ".UnitTests");
+            checkedTests.Add(tests);
+
+            if (!File.Exists(Path.Combine(root, tests, tests + ".csproj")))
+            {
+                missing.Add(tests);
+            }
+        }
+
+        diagnostics.Arrange("test projects checked", checkedTests.Count);
+        diagnostics.Act("missing test projects", missing.Count + ": " + string.Join(", ", missing));
+        diagnostics.Assert("missing count", 0, missing.Count);
 
         foreach (var project in ProtocolLibraries())
         {

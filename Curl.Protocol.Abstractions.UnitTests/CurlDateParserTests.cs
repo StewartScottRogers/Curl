@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -16,6 +17,8 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class CurlDateParserTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("1 Jan 2030", "2030-01-01T00:00:00Z")]
     [DataRow("Sun, 06 Nov 1994 08:49:37 GMT", "1994-11-06T08:49:37Z")]
@@ -43,8 +46,17 @@ public sealed class CurlDateParserTests
     [DataRow("Sun, 06 Nov 1994 08:49:37 GMT 12:00", "1994-11-06T08:49:37Z")]
     public void TryParse_DateCurlAccepts_ReadsTheInstantCurlReads(string text, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+        diagnostics.Arrange("expected instant", expected);
+
         bool parsed = CurlDateParser.TryParse(text, out long unixSeconds);
 
+        long expectedSeconds = DateTimeOffset.Parse(expected, CultureInfo.InvariantCulture).ToUnixTimeSeconds();
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("unix seconds", unixSeconds);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("unix seconds", expectedSeconds, unixSeconds);
         Assert.IsTrue(parsed);
         Assert.AreEqual(DateTimeOffset.Parse(expected, CultureInfo.InvariantCulture).ToUnixTimeSeconds(), unixSeconds);
     }
@@ -81,8 +93,15 @@ public sealed class CurlDateParserTests
     [DataRow("20300101 5")]
     public void TryParse_TextCurlRefuses_IsRefused(string text)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+
         bool parsed = CurlDateParser.TryParse(text, out long unixSeconds);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("unix seconds", unixSeconds);
+        diagnostics.Assert("parsed", false, parsed);
+        diagnostics.Assert("unix seconds", 0L, unixSeconds);
         Assert.IsFalse(parsed);
         Assert.AreEqual(0, unixSeconds);
     }
@@ -94,8 +113,16 @@ public sealed class CurlDateParserTests
     [DataRow("1 Jan 099999999", 3_155_633_001_244_800L)]
     public void TryParse_YearsOutsideDateTimeOffset_AreRead(string text, long expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+        diagnostics.Arrange("expected unix seconds", expected);
+
         bool parsed = CurlDateParser.TryParse(text, out long unixSeconds);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("unix seconds", unixSeconds);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("unix seconds", expected, unixSeconds);
         Assert.IsTrue(parsed);
         Assert.AreEqual(expected, unixSeconds);
     }
@@ -104,23 +131,47 @@ public sealed class CurlDateParserTests
     [TestMethod]
     public void TryParse_OneSecondBeforeTheEpoch_ReadsTheEpoch()
     {
-        Assert.IsTrue(CurlDateParser.TryParse("31 Dec 1969 23:59:59 GMT", out long unixSeconds));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "31 Dec 1969 23:59:59 GMT");
+
+        bool parsed = CurlDateParser.TryParse("31 Dec 1969 23:59:59 GMT", out long unixSeconds);
+
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("unix seconds", unixSeconds);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("unix seconds", 0L, unixSeconds);
+        Assert.IsTrue(parsed);
         Assert.AreEqual(0, unixSeconds);
     }
 
     [TestMethod]
     public void TryParse_TwoSecondsBeforeTheEpoch_ReadsThatInstant()
     {
-        Assert.IsTrue(CurlDateParser.TryParse("31 Dec 1969 23:59:58 GMT", out long unixSeconds));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "31 Dec 1969 23:59:58 GMT");
+
+        bool parsed = CurlDateParser.TryParse("31 Dec 1969 23:59:58 GMT", out long unixSeconds);
+
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("unix seconds", unixSeconds);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("unix seconds", -2L, unixSeconds);
+        Assert.IsTrue(parsed);
         Assert.AreEqual(-2, unixSeconds);
     }
 
     [TestMethod]
     public void TryParse_Null_ThrowsArgumentNull()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "null");
+
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CurlDateParser.TryParse(null!, out _));
 
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+        diagnostics.Assert("parameter name", "text", exception.ParamName);
         Assert.AreEqual("text", exception.ParamName);
     }
 }

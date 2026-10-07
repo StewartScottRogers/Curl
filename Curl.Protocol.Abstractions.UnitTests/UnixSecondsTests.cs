@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -7,38 +9,87 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class UnixSecondsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void ToTimeInRange_ForNull_ReturnsNull()
     {
-        Assert.IsNull(UnixSeconds.ToTimeInRange(null));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("seconds", "null");
+
+        DateTimeOffset? result = UnixSeconds.ToTimeInRange(null);
+
+        diagnostics.Act("time", result);
+        diagnostics.Assert("time", null, result);
+        Assert.IsNull(result);
     }
 
     [TestMethod]
     public void ToTimeInRange_AtBothEndsOfTheRange_ReturnsTheTime()
     {
-        Assert.AreEqual(DateTimeOffset.MinValue, UnixSeconds.ToTimeInRange(UnixSeconds.MinDateTimeOffsetSeconds));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("min seconds", UnixSeconds.MinDateTimeOffsetSeconds);
+        diagnostics.Arrange("max seconds", UnixSeconds.MaxDateTimeOffsetSeconds);
+
+        DateTimeOffset? minTime = UnixSeconds.ToTimeInRange(UnixSeconds.MinDateTimeOffsetSeconds);
+        DateTimeOffset? maxTime = UnixSeconds.ToTimeInRange(UnixSeconds.MaxDateTimeOffsetSeconds);
+
+        diagnostics.Act("min time", minTime);
+        diagnostics.Act("max time", maxTime);
+        diagnostics.Assert("min time", DateTimeOffset.MinValue, minTime);
+        diagnostics.Assert("max time", new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero), maxTime);
+        Assert.AreEqual(DateTimeOffset.MinValue, minTime);
         Assert.AreEqual(
             new DateTimeOffset(9999, 12, 31, 23, 59, 59, TimeSpan.Zero),
-            UnixSeconds.ToTimeInRange(UnixSeconds.MaxDateTimeOffsetSeconds));
+            maxTime);
     }
 
     [TestMethod]
     public void ToTimeInRange_JustOutsideEitherEnd_ReturnsNull()
     {
-        Assert.IsNull(UnixSeconds.ToTimeInRange(UnixSeconds.MinDateTimeOffsetSeconds - 1));
-        Assert.IsNull(UnixSeconds.ToTimeInRange(UnixSeconds.MaxDateTimeOffsetSeconds + 1));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("below min seconds", UnixSeconds.MinDateTimeOffsetSeconds - 1);
+        diagnostics.Arrange("above max seconds", UnixSeconds.MaxDateTimeOffsetSeconds + 1);
+
+        DateTimeOffset? below = UnixSeconds.ToTimeInRange(UnixSeconds.MinDateTimeOffsetSeconds - 1);
+        DateTimeOffset? above = UnixSeconds.ToTimeInRange(UnixSeconds.MaxDateTimeOffsetSeconds + 1);
+
+        diagnostics.Act("below time", below);
+        diagnostics.Act("above time", above);
+        diagnostics.Assert("below time", null, below);
+        diagnostics.Assert("above time", null, above);
+        Assert.IsNull(below);
+        Assert.IsNull(above);
     }
 
     [TestMethod]
     public void ToTimeClamped_InRange_ReturnsTheTime()
     {
-        Assert.AreEqual(DateTimeOffset.UnixEpoch, UnixSeconds.ToTimeClamped(0));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("seconds", 0);
+
+        DateTimeOffset result = UnixSeconds.ToTimeClamped(0);
+
+        diagnostics.Act("time", result);
+        diagnostics.Assert("time", DateTimeOffset.UnixEpoch, result);
+        Assert.AreEqual(DateTimeOffset.UnixEpoch, result);
     }
 
     [TestMethod]
     public void ToTimeClamped_PastEitherEnd_ReturnsThatEnd()
     {
-        Assert.AreEqual(DateTimeOffset.MaxValue, UnixSeconds.ToTimeClamped(UnixSeconds.MaxDateTimeOffsetSeconds + 1));
-        Assert.AreEqual(DateTimeOffset.MinValue, UnixSeconds.ToTimeClamped(UnixSeconds.MinDateTimeOffsetSeconds - 1));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("above max seconds", UnixSeconds.MaxDateTimeOffsetSeconds + 1);
+        diagnostics.Arrange("below min seconds", UnixSeconds.MinDateTimeOffsetSeconds - 1);
+
+        DateTimeOffset above = UnixSeconds.ToTimeClamped(UnixSeconds.MaxDateTimeOffsetSeconds + 1);
+        DateTimeOffset below = UnixSeconds.ToTimeClamped(UnixSeconds.MinDateTimeOffsetSeconds - 1);
+
+        diagnostics.Act("above time", above);
+        diagnostics.Act("below time", below);
+        diagnostics.Assert("above time", DateTimeOffset.MaxValue, above);
+        diagnostics.Assert("below time", DateTimeOffset.MinValue, below);
+        Assert.AreEqual(DateTimeOffset.MaxValue, above);
+        Assert.AreEqual(DateTimeOffset.MinValue, below);
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -8,6 +10,8 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class CurlUrlRejectionTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("http://h/a b", CurlUrlRejection.MalformedInput)]
     [DataRow("http://h/\x7f", CurlUrlRejection.MalformedInput)]
@@ -49,8 +53,16 @@ public sealed class CurlUrlRejectionTests
     [DataRow("file://localhost", CurlUrlRejection.BadFileUrl)]
     public void TryParse_WithAUrlCurlRejects_SaysWhy(string text, CurlUrlRejection expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", text);
+        diagnostics.Arrange("expected rejection", expected);
+
         bool parsed = CurlUrl.TryParse(text, pathAsIs: false, driveLetters: true, out CurlUrl? url, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", false, parsed);
+        diagnostics.Assert("rejection", expected, rejection);
         Assert.IsFalse(parsed);
         Assert.IsNull(url);
         Assert.AreEqual(expected, rejection);
@@ -59,10 +71,14 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     public void TryParse_WithTextLongerThanCurlAccepts_SaysTheInputIsMalformed()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         string text = "http://h/" + new string('a', 8_000_000);
+        diagnostics.Arrange("url text length", text.Length);
 
         CurlUrl.TryParse(text, pathAsIs: false, driveLetters: true, out _, out CurlUrlRejection rejection);
 
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("rejection", CurlUrlRejection.MalformedInput, rejection);
         Assert.AreEqual(CurlUrlRejection.MalformedInput, rejection);
     }
 
@@ -71,8 +87,14 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     public void TryParse_WithADriveLetterWhereCurlRefusesOne_SaysTheFileUrlIsBad()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "file:///C:/x");
+        diagnostics.Arrange("drive letters", false);
+
         CurlUrl.TryParse("file:///C:/x", pathAsIs: false, driveLetters: false, out _, out CurlUrlRejection rejection);
 
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("rejection", CurlUrlRejection.BadFileUrl, rejection);
         Assert.AreEqual(CurlUrlRejection.BadFileUrl, rejection);
     }
 
@@ -83,8 +105,15 @@ public sealed class CurlUrlRejectionTests
     [DataRow("file:///C:/x")]
     public void TryParse_WithAUrlCurlAccepts_SaysNone(string text)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", text);
+
         bool parsed = CurlUrl.TryParse(text, pathAsIs: false, driveLetters: true, out CurlUrl? url, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("rejection", CurlUrlRejection.None, rejection);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(url);
         Assert.AreEqual(CurlUrlRejection.None, rejection);
@@ -97,8 +126,15 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     public void TryParse_WithADriveLetterPathEscapingANul_AcceptsIt()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "file:///C:/dir/f.txt%00x");
+
         bool parsed = CurlUrl.TryParse("file:///C:/dir/f.txt%00x", pathAsIs: false, driveLetters: true, out _, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("rejection", CurlUrlRejection.None, rejection);
         Assert.IsTrue(parsed);
         Assert.AreEqual(CurlUrlRejection.None, rejection);
     }
@@ -106,8 +142,15 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     public void TryParse_WithADriveLetterPathHoldingASpace_SaysTheInputIsMalformed()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "file:///C:/Users/Stewart Rogers/f.txt%00x");
+
         bool parsed = CurlUrl.TryParse("file:///C:/Users/Stewart Rogers/f.txt%00x", pathAsIs: false, driveLetters: true, out _, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", false, parsed);
+        diagnostics.Assert("rejection", CurlUrlRejection.MalformedInput, rejection);
         Assert.IsFalse(parsed);
         Assert.AreEqual(CurlUrlRejection.MalformedInput, rejection);
     }
@@ -115,8 +158,15 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     public void TryParse_OnThePublicOverloadWithAReason_SaysWhy()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http:////h/");
+
         bool parsed = CurlUrl.TryParse("http:////h/", pathAsIs: false, out CurlUrl? url, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", false, parsed);
+        diagnostics.Assert("rejection", CurlUrlRejection.BadSlashes, rejection);
         Assert.IsFalse(parsed);
         Assert.IsNull(url);
         Assert.AreEqual(CurlUrlRejection.BadSlashes, rejection);
@@ -136,8 +186,15 @@ public sealed class CurlUrlRejectionTests
     [DataRow("foo://u@h/")]
     public void TryParseDisallowingUser_WithUserInformation_SaysTheUserIsNotAllowed(string text)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", text);
+
         bool parsed = CurlUrl.TryParseDisallowingUser(text, pathAsIs: false, out CurlUrl? url, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", false, parsed);
+        diagnostics.Assert("rejection", CurlUrlRejection.UserNotAllowed, rejection);
         Assert.IsFalse(parsed);
         Assert.IsNull(url);
         Assert.AreEqual(CurlUrlRejection.UserNotAllowed, rejection);
@@ -149,8 +206,16 @@ public sealed class CurlUrlRejectionTests
     [DataRow("http://u@h/a b", CurlUrlRejection.MalformedInput)]
     public void TryParseDisallowingUser_WithARejectionBeforeOrWithoutALogin_SaysThatRejection(string text, CurlUrlRejection expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", text);
+        diagnostics.Arrange("expected rejection", expected);
+
         bool parsed = CurlUrl.TryParseDisallowingUser(text, pathAsIs: false, out _, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", false, parsed);
+        diagnostics.Assert("rejection", expected, rejection);
         Assert.IsFalse(parsed);
         Assert.AreEqual(expected, rejection);
     }
@@ -161,8 +226,15 @@ public sealed class CurlUrlRejectionTests
     [DataRow("file:///x")]
     public void TryParseDisallowingUser_WithoutUserInformation_Parses(string text)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", text);
+
         bool parsed = CurlUrl.TryParseDisallowingUser(text, pathAsIs: false, out CurlUrl? url, out CurlUrlRejection rejection);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("rejection", rejection);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("rejection", CurlUrlRejection.None, rejection);
         Assert.IsTrue(parsed);
         Assert.IsNotNull(url);
         Assert.AreEqual(text, url.OriginalString);
@@ -172,11 +244,16 @@ public sealed class CurlUrlRejectionTests
     [TestMethod]
     public void TryParse_OnThePublicOverloadWithAReasonAndNullText_ThrowsArgumentNullException()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         string? text = null;
+        diagnostics.Arrange("url text", "null");
 
         var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CurlUrl.TryParse(text!, pathAsIs: false, out _, out _));
 
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+        diagnostics.Assert("parameter name", "text", exception.ParamName);
         Assert.AreEqual("text", exception.ParamName);
     }
 
@@ -191,6 +268,14 @@ public sealed class CurlUrlRejectionTests
     [DataRow(CurlUrlRejection.UserNotAllowed, "Credentials was passed in the URL when prohibited")]
     public void ToCurlMessage_ForEachRejection_ReturnsCurlsText(CurlUrlRejection rejection, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("rejection", rejection);
+
+        string message = rejection.ToCurlMessage();
+
+        diagnostics.Act("message", message);
+        diagnostics.Diff("message", expected, message);
+        diagnostics.Assert("message", expected, message);
         Assert.AreEqual(expected, rejection.ToCurlMessage());
     }
 
@@ -199,8 +284,14 @@ public sealed class CurlUrlRejectionTests
     [DataRow((CurlUrlRejection)99)]
     public void ToCurlMessage_ForNoRejection_ThrowsArgumentOutOfRangeException(CurlUrlRejection rejection)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("rejection", rejection);
+
         var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => rejection.ToCurlMessage());
 
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Assert("exception type", nameof(ArgumentOutOfRangeException), exception.GetType().Name);
+        diagnostics.Assert("parameter name", "rejection", exception.ParamName);
         Assert.AreEqual("rejection", exception.ParamName);
     }
 }

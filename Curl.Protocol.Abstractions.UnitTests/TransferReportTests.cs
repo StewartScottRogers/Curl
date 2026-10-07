@@ -1,4 +1,5 @@
 using System.Net;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -9,11 +10,19 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class TransferReportTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void New_WithNoMembersSet_ReportsNothingKnown()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("members set", "none");
         var report = new TransferReport();
 
+        diagnostics.Act("ResponseCode", report.ResponseCode);
+        diagnostics.Act("ConnectionCount", report.ConnectionCount);
+        diagnostics.Act("Timings", report.Timings);
+        diagnostics.Assert("ResponseCode", 0, report.ResponseCode);
         Assert.AreEqual(0, report.ResponseCode);
         Assert.AreEqual(0, report.ProxyConnectResponseCode);
         Assert.IsFalse(report.UsedProxy);
@@ -40,16 +49,21 @@ public sealed class TransferReportTests
     [TestMethod]
     public void New_WithPeerCertificates_CarriesThem()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         ReadOnlyMemory<byte>[] certificates = [new byte[] { 0x30, 0x00 }];
+        diagnostics.Arrange("PeerCertificates count", certificates.Length);
 
         var report = new TransferReport { PeerCertificates = certificates };
 
+        diagnostics.Act("PeerCertificates same array", ReferenceEquals(certificates, report.PeerCertificates));
+        diagnostics.Assert("PeerCertificates same array", true, ReferenceEquals(certificates, report.PeerCertificates));
         Assert.AreSame(certificates, report.PeerCertificates);
     }
 
     [TestMethod]
     public void New_WithEveryMemberSet_CarriesEachOne()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         KeyValuePair<string, string>[] headers =
         [
             new("Set-Cookie", "a=1"),
@@ -59,6 +73,7 @@ public sealed class TransferReportTests
         var localEndPoint = new IPEndPoint(IPAddress.Loopback, 54321);
         var remoteEndPoint = new IPEndPoint(IPAddress.Loopback, 80);
         var timings = new TransferTimings(0, null, 1, 2, 3, 4);
+        diagnostics.Arrange("members set", "every TransferReport member");
 
         var report = new TransferReport
         {
@@ -83,6 +98,10 @@ public sealed class TransferReportTests
             Timings = timings,
         };
 
+        diagnostics.Act("ResponseCode", report.ResponseCode);
+        diagnostics.Act("Method", report.Method);
+        diagnostics.Act("EffectiveUrl", report.EffectiveUrl);
+        diagnostics.Assert("ResponseCode", 302, report.ResponseCode);
         Assert.AreEqual(302, report.ResponseCode);
         Assert.AreEqual(200, report.ProxyConnectResponseCode);
         Assert.IsTrue(report.UsedProxy);
@@ -107,18 +126,28 @@ public sealed class TransferReportTests
     [TestMethod]
     public void New_WithUnixSocketRemoteIp_CarriesIt()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("UnixSocketRemoteIp", "/tmp/curl.sock");
         var report = new TransferReport { UnixSocketRemoteIp = "/tmp/curl.sock" };
 
+        diagnostics.Act("UnixSocketRemoteIp", report.UnixSocketRemoteIp);
+        diagnostics.Assert("UnixSocketRemoteIp", "/tmp/curl.sock", report.UnixSocketRemoteIp);
         Assert.AreEqual("/tmp/curl.sock", report.UnixSocketRemoteIp);
     }
 
     [TestMethod]
     public void With_SettingEffectiveUrlAndRedirectCount_KeepsTheHandlersMembers()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var fromHandler = new TransferReport { ResponseCode = 200, Method = "GET" };
+        diagnostics.Arrange("handler report", "ResponseCode 200, Method GET");
 
         var fromFollower = fromHandler with { EffectiveUrl = "http://example.com/last", RedirectCount = 1 };
 
+        diagnostics.Act("ResponseCode", fromFollower.ResponseCode);
+        diagnostics.Act("EffectiveUrl", fromFollower.EffectiveUrl);
+        diagnostics.Act("RedirectCount", fromFollower.RedirectCount);
+        diagnostics.Assert("EffectiveUrl", "http://example.com/last", fromFollower.EffectiveUrl);
         Assert.AreEqual(200, fromFollower.ResponseCode);
         Assert.AreEqual("GET", fromFollower.Method);
         Assert.AreEqual("http://example.com/last", fromFollower.EffectiveUrl);

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -7,9 +9,12 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class HttpVersionPreferenceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Values_StartAtHttp11WithHttp3AndHttp2Appended()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         HttpVersionPreference[] expected =
         [
             HttpVersionPreference.Http11,
@@ -19,8 +24,15 @@ public sealed class HttpVersionPreferenceTests
             HttpVersionPreference.Http2PriorKnowledge,
             HttpVersionPreference.Http2,
         ];
+        diagnostics.Arrange("expected order", string.Join(",", expected));
 
-        CollectionAssert.AreEqual(expected, Enum.GetValues<HttpVersionPreference>());
+        HttpVersionPreference[] actual = Enum.GetValues<HttpVersionPreference>();
+
+        diagnostics.Act("defined order", string.Join(",", actual));
+        diagnostics.Act("Http3 value", (int)HttpVersionPreference.Http3);
+        diagnostics.Act("Http2 value", (int)HttpVersionPreference.Http2);
+        diagnostics.Assert("defined order", string.Join(",", expected), string.Join(",", actual));
+        CollectionAssert.AreEqual(expected, actual);
         Assert.AreEqual(0, (int)HttpVersionPreference.Http11);
         Assert.AreEqual(2, (int)HttpVersionPreference.Http3);
         Assert.AreEqual(3, (int)HttpVersionPreference.Http3Only);

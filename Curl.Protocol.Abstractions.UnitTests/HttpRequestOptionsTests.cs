@@ -1,4 +1,5 @@
 using System.Net;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -9,11 +10,25 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class HttpRequestOptionsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void HttpRequestOptions_NothingSet_HoldsCurlsDefaults()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "new HttpRequestOptions()");
+
         var options = new HttpRequestOptions();
 
+        diagnostics.Act("max redirects", options.MaxRedirects);
+        diagnostics.Act("fail mode", options.Fail);
+        diagnostics.Act("version", options.Version);
+        diagnostics.Act("happy eyeballs timeout", options.HappyEyeballsTimeout);
+        diagnostics.Act("continue wait", options.ContinueWait);
+        diagnostics.Act("auth schemes", options.AuthSchemes);
+        diagnostics.Assert("max redirects", 50, options.MaxRedirects);
+        diagnostics.Assert("version", HttpVersionPreference.Http11, options.Version);
+        diagnostics.Assert("auth schemes", HttpAuthSchemes.Basic, options.AuthSchemes);
         Assert.IsNull(options.CustomMethod);
         Assert.IsEmpty(options.Headers);
         Assert.IsEmpty(options.ProxyHeaders);
@@ -44,10 +59,15 @@ public sealed class HttpRequestOptionsTests
     [TestMethod]
     public void HttpRequestOptions_EveryMemberSet_RoundTripsEveryValue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         string[] headers = ["X-One: 1", "Accept:"];
         string[] proxyHeaders = ["X-Proxy: 1"];
         var body = new BytesBody(new byte[] { 0x61 }, "application/x-www-form-urlencoded");
         var proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "proxy.example", 1080, new NetworkCredential("u", "p"));
+        diagnostics.Arrange("headers", string.Join("|", headers));
+        diagnostics.Arrange("proxy headers", string.Join("|", proxyHeaders));
+        diagnostics.Arrange("body", body);
+        diagnostics.Arrange("forward proxy host", proxy.Host);
 
         var options = new HttpRequestOptions
         {
@@ -77,6 +97,14 @@ public sealed class HttpRequestOptionsTests
             OverUnixSocket = true,
         };
 
+        diagnostics.Act("custom method", options.CustomMethod);
+        diagnostics.Act("max redirects", options.MaxRedirects);
+        diagnostics.Act("fail mode", options.Fail);
+        diagnostics.Act("version", options.Version);
+        diagnostics.Act("auth schemes", options.AuthSchemes);
+        diagnostics.Assert("custom method", "PATCH", options.CustomMethod);
+        diagnostics.Assert("version", HttpVersionPreference.Http10, options.Version);
+        diagnostics.Assert("auth schemes", HttpAuthSchemes.Any | HttpAuthSchemes.Bearer, options.AuthSchemes);
         Assert.AreEqual("PATCH", options.CustomMethod);
         Assert.AreSame(headers, options.Headers);
         Assert.AreSame(proxyHeaders, options.ProxyHeaders);
@@ -106,9 +134,16 @@ public sealed class HttpRequestOptionsTests
     [TestMethod]
     public void Equals_ForTwoDefaultInstances_ReturnsTrue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var first = new HttpRequestOptions();
         var second = new HttpRequestOptions();
+        diagnostics.Arrange("instances", "two default HttpRequestOptions");
 
+        bool equal = first.Equals(second);
+
+        diagnostics.Act("equal", equal);
+        diagnostics.Act("hash codes equal", first.GetHashCode() == second.GetHashCode());
+        diagnostics.Assert("equal", true, equal);
         Assert.AreEqual(first, second);
         Assert.AreEqual(first.GetHashCode(), second.GetHashCode());
     }
@@ -116,22 +151,44 @@ public sealed class HttpRequestOptionsTests
     [TestMethod]
     public void TriesTcpBeforeQuic_ByDefault_IsFalseSoHttp3StartsWithQuic()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("tcp first attempt version", null);
+
+        bool triesTcpFirst = new HttpRequestOptions().TriesTcpBeforeQuic;
+
+        diagnostics.Act("tries tcp before quic", triesTcpFirst);
+        diagnostics.Assert("tries tcp before quic", false, triesTcpFirst);
         Assert.IsFalse(new HttpRequestOptions().TriesTcpBeforeQuic);
     }
 
     [TestMethod]
     public void TriesTcpBeforeQuic_WithATcpFirstAttemptVersion_IsTrue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("tcp first attempt version", "h1");
+
+        bool triesTcpFirst = new HttpRequestOptions { TcpFirstAttemptVersion = "h1" }.TriesTcpBeforeQuic;
+
+        diagnostics.Act("tries tcp before quic", triesTcpFirst);
+        diagnostics.Assert("tries tcp before quic", true, triesTcpFirst);
         Assert.IsTrue(new HttpRequestOptions { TcpFirstAttemptVersion = "h1" }.TriesTcpBeforeQuic);
     }
 
     [TestMethod]
     public void With_ChangingOneMember_KeepsTheRest()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var get = new HttpRequestOptions { UserAgent = "agent/1", FollowRedirects = true };
+        diagnostics.Arrange("user agent", get.UserAgent);
+        diagnostics.Arrange("follow redirects", get.FollowRedirects);
 
         var post = get with { CustomMethod = "POST" };
 
+        diagnostics.Act("custom method", post.CustomMethod);
+        diagnostics.Act("user agent", post.UserAgent);
+        diagnostics.Act("follow redirects", post.FollowRedirects);
+        diagnostics.Assert("custom method", "POST", post.CustomMethod);
+        diagnostics.Assert("user agent", "agent/1", post.UserAgent);
         Assert.AreEqual("POST", post.CustomMethod);
         Assert.AreEqual("agent/1", post.UserAgent);
         Assert.IsTrue(post.FollowRedirects);

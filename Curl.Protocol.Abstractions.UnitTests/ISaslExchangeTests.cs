@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -7,13 +9,19 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class ISaslExchangeTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void CancelReason_WhenNotOverridden_ReturnsNull()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         ISaslExchange exchange = new MinimalSaslExchange();
+        diagnostics.Arrange("mechanism", exchange.Mechanism);
 
         var cancelReason = exchange.CancelReason;
 
+        diagnostics.Act("cancel reason", cancelReason);
+        diagnostics.Assert("cancel reason", null, cancelReason);
         Assert.IsNull(cancelReason);
     }
 
