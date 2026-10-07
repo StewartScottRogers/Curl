@@ -1129,6 +1129,14 @@ internal static class CurlComposition
     /// for this process's platform. Tests pass <see langword="false" /> to reach <c>--http2</c>, <c>--http3</c> and
     /// the TLS-SRP options on every platform (ADR-0397).
     /// </param>
+    /// <param name="writesProgressMeter">
+    /// Whether the runner writes curl's progress meter and the <c>-#</c> bar, as the executable's runner
+    /// does; off by default, so tests that pin standard error see none. The conformance harness turns it on (BL-1445).
+    /// </param>
+    /// <param name="writeOutFileOpener">
+    /// Opens the <c>-w</c> <c>%output{file}</c> targets, such as a <see cref="DiskWriteOutFileOpener" />; or
+    /// <see langword="null" /> for the runner's <see cref="RefusingWriteOutFileOpener" />, which opens none (BL-1445).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1140,7 +1148,9 @@ internal static class CurlComposition
         ISecurityContextFactory? securityContexts = null,
         TimeProvider? signingClock = null,
         ConnectionCache? runConnections = null,
-        bool? parsesAsWindowsBuild = null)
+        bool? parsesAsWindowsBuild = null,
+        bool writesProgressMeter = false,
+        IWriteOutFileOpener? writeOutFileOpener = null)
     {
         LateBoundDiagnosticLog runLog = new();
         return new(
@@ -1151,6 +1161,8 @@ internal static class CurlComposition
             standardError,
             standardInput,
             OperatingSystem.IsWindows(),
+            writesProgressMeter: writesProgressMeter,
+            writeOutFileOpener: writeOutFileOpener,
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
             runConnectionCache: runConnections,
