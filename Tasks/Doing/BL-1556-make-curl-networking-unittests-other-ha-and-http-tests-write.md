@@ -33,3 +33,4 @@ Every test in `Curl.Networking.UnitTests`' `Ha*` and `Http*` test files other th
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
