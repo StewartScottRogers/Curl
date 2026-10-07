@@ -1,7 +1,7 @@
 using Curl.Core.Fakes;
 using Curl.Core.Hsts;
-using Curl.Testing;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Core;

@@ -605,10 +605,17 @@ public sealed class HstsCacheTests
         var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
         diagnostics.Arrange("entries read", HstsCache.MaxEntries);
-        cache.ReadFile(string.Concat(Enumerable.Range(0, HstsCache.MaxEntries).Select(number => $"h{number} \"unlimited\"\n")));
+        using (diagnostics.Phase("read file"))
+        {
+            cache.ReadFile(string.Concat(Enumerable.Range(0, HstsCache.MaxEntries).Select(number => $"h{number} \"unlimited\"\n")));
+        }
+
         diagnostics.Arrange("header", "max-age=60 for new");
 
-        cache.ApplyHeader("max-age=60", "new");
+        using (diagnostics.Phase("apply header"))
+        {
+            cache.ApplyHeader("max-age=60", "new");
+        }
 
         diagnostics.Act("entry count", cache.Entries.Count);
         diagnostics.Act("first host", cache.Entries[0].Host);
