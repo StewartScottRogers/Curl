@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -21,15 +22,21 @@ public sealed class VerboseTransferEventWriterQuicTlsTests
 
     private readonly MemoryStream output = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void TlsHandshake_QuicOnWindows_WritesCurlSesLibreSslLines()
     {
         using var leaf = EcCertificate();
         using var intermediate = RsaCertificate();
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("backend", TlsBackend.Schannel);
+        diagnostics.Arrange("handshake", "QUIC, TLS 1.3, EC leaf + RSA intermediate, VerifiedHostName=" + Host);
+
         Writer(TlsBackend.Schannel).ReportTlsHandshake(QuicHandshake(leaf, intermediate) with { VerifiedHostName = Host });
 
-        Assert.AreEqual(
+        const string expected =
             "* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / [blank] / UNDEF\n" +
             "* Server certificate:\n" +
             "*   subject: CN=cloudflare-quic.com\n" +
@@ -39,8 +46,11 @@ public sealed class VerboseTransferEventWriterQuicTlsTests
             "*   Certificate level 0: Public key type ? (256/128 Bits/secBits), signed using ecdsa-with-SHA256\n" +
             "*   Certificate level 1: Public key type ? (2048/112 Bits/secBits), signed using sha256WithRSAEncryption\n" +
             "*   subjectAltName: \"cloudflare-quic.com\" matches cert's \"cloudflare-quic.com\"\n" +
-            "* SSL certificate verified via OpenSSL.\n",
-            Written());
+            "* SSL certificate verified via OpenSSL.\n";
+        string written = Written();
+        diagnostics.Act("written", written);
+        diagnostics.Diff("written", expected, written);
+        Assert.AreEqual(expected, written);
     }
 
     // -k: no host-name line, and the failure line without "OpenSSL verify result".
@@ -49,25 +59,38 @@ public sealed class VerboseTransferEventWriterQuicTlsTests
     {
         using var leaf = EcCertificate();
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("backend", TlsBackend.Schannel);
+        diagnostics.Arrange("handshake", "QUIC, CertificateVerified=false, CertificateVerifyResult=null");
+
         Writer(TlsBackend.Schannel).ReportTlsHandshake(QuicHandshake(leaf) with { CertificateVerified = false, CertificateVerifyResult = null });
 
-        StringAssert.EndsWith(
-            Written(),
-            "signed using ecdsa-with-SHA256\n*  SSL certificate verification failed, continuing anyway!\n");
+        string written = Written();
+        const string expectedEnd = "signed using ecdsa-with-SHA256\n*  SSL certificate verification failed, continuing anyway!\n";
+        diagnostics.Act("written", written);
+        diagnostics.Assert("ends with failure line", true, written.EndsWith(expectedEnd, StringComparison.Ordinal));
+        StringAssert.EndsWith(written, expectedEnd);
     }
 
     [TestMethod]
     public void TlsHandshake_QuicOnLinux_WritesTheOpenSslLinesUnchanged()
     {
         using var leaf = EcCertificate();
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var handshake = QuicHandshake(leaf) with { VerifiedHostName = Host };
+        diagnostics.Arrange("backend", TlsBackend.OpenSsl);
+        diagnostics.Arrange("handshake", "QUIC then TCP, same leaf, VerifiedHostName=" + Host);
 
         Writer(TlsBackend.OpenSsl).ReportTlsHandshake(handshake);
         var quic = Written();
         output.SetLength(0);
         Writer(TlsBackend.OpenSsl).ReportTlsHandshake(handshake with { IsQuic = false });
 
-        Assert.AreEqual(Written(), quic);
+        string tcp = Written();
+        diagnostics.Act("quic written", quic);
+        diagnostics.Act("tcp written", tcp);
+        diagnostics.Diff("tcp vs quic", tcp, quic);
+        Assert.AreEqual(tcp, quic);
         StringAssert.StartsWith(quic, "* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384 / X25519 / UNDEF\n");
         StringAssert.Contains(quic, "*   Certificate level 0: Public key type EC/prime256v1 (256/128 Bits/secBits)");
         StringAssert.EndsWith(quic, "* OpenSSL verify result: 0\n* SSL certificate verified via OpenSSL.\n");
@@ -78,9 +101,17 @@ public sealed class VerboseTransferEventWriterQuicTlsTests
     {
         using var leaf = EcCertificate();
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("backend", TlsBackend.Schannel);
+        diagnostics.Arrange("handshake", "TCP, offered h2, negotiated h3");
+
         Writer(TlsBackend.Schannel).ReportTlsHandshake(QuicHandshake(leaf) with { IsQuic = false, OfferedApplicationProtocols = ["h2"] });
 
-        Assert.AreEqual("* ALPN: curl offers h2\n* ALPN: server accepted h3\n", Written());
+        const string expected = "* ALPN: curl offers h2\n* ALPN: server accepted h3\n";
+        string written = Written();
+        diagnostics.Act("written", written);
+        diagnostics.Diff("written", expected, written);
+        Assert.AreEqual(expected, written);
     }
 
     [TestMethod]
@@ -88,6 +119,10 @@ public sealed class VerboseTransferEventWriterQuicTlsTests
     [DataRow(@"C:\roots.pem", false, "* SSL Trust Anchors:\n*   CAfile: C:\\roots.pem\n")]
     public void TlsTrust_QuicOnWindows_WritesTheTrustAnchorsCurlUsed(string? caFile, bool usesWindowsStores, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("caFile", caFile);
+        diagnostics.Arrange("usesWindowsStores", usesWindowsStores);
+
         Writer(TlsBackend.Schannel).ReportTlsTrust(new TlsTrustEvent
         {
             VerifiesPeer = true,
@@ -96,23 +131,40 @@ public sealed class VerboseTransferEventWriterQuicTlsTests
             IsQuic = true,
         });
 
-        Assert.AreEqual(expected, Written());
+        string written = Written();
+        diagnostics.Act("written", written);
+        diagnostics.Diff("written", expected, written);
+        Assert.AreEqual(expected, written);
     }
 
     [TestMethod]
     public void TlsTrust_QuicOnWindowsWithoutVerification_SaysVerificationIsDisabled()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("trust event", "VerifiesPeer=false, IsQuic=true");
+
         Writer(TlsBackend.Schannel).ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false, IsQuic = true });
 
-        Assert.AreEqual("* SSL Trust: peer verification disabled\n", Written());
+        const string expected = "* SSL Trust: peer verification disabled\n";
+        string written = Written();
+        diagnostics.Act("written", written);
+        diagnostics.Diff("written", expected, written);
+        Assert.AreEqual(expected, written);
     }
 
     [TestMethod]
     public void TlsTrust_TcpOnWindows_WritesTheSchannelLinesNotTheTrustAnchors()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("trust event", "VerifiesPeer=true, UsesWindowsSystemStores=true, TCP");
+
         Writer(TlsBackend.Schannel).ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = true, UsesWindowsSystemStores = true });
 
-        Assert.AreEqual("* schannel: disabled automatic use of client certificate\n", Written());
+        const string expected = "* schannel: disabled automatic use of client certificate\n";
+        string written = Written();
+        diagnostics.Act("written", written);
+        diagnostics.Diff("written", expected, written);
+        Assert.AreEqual(expected, written);
     }
 
     private static TlsHandshakeEvent QuicHandshake(params X509Certificate2[] chain)

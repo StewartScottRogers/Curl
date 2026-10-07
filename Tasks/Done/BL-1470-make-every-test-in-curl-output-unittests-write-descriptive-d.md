@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Output.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1470 — Make every test in Curl.Output.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,23 @@ Every test in `Curl.Output.UnitTests` writes, through BL-1457's shared `TestDiag
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Output.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Output.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Output.UnitTests -warnaserror` is clean and `dotnet test Curl.Output.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Output.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Output.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Output.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Output.UnitTests -warnaserror` is clean and `dotnet test Curl.Output.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Output.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 327 test methods in 30 files.
+- Done by five parallel test-writer agents, one group of files each; shared per-file helpers (for example `ReportText`, `ReportLines`, `WriteTextDiagnostics`) write the ACT and DIFF lines for the tests that use them.
+- Counts before -> after (Select-String -AllMatches, excluding obj): `Assert.` 446 -> 446, `[TestMethod` 327 -> 327, `[DataRow(` 288 -> 288. Run total 553 before and after (550 passed, 3 skipped by OS condition); 550 END lines, one per test that ran, and none with arrange 0, act 0 or assert 0.
+- Removed `Assert.` lines in the diff are inline calls rewritten to assert on a captured local (same check), so the ACT line can print the value.
+- `TryGetVariableText_UrlPartsOfDriveLetterFileUrl_MatchPlatformCurl` expects different text per platform, so it writes what this platform rendered and whether it matches, not the expected text.
+- SLOW: none. No test printed a `SLOW:` line, so no follow-up task.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Output.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF diagnostics

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Output;
 
 /// <summary>
@@ -8,23 +10,33 @@ namespace Curl.Output;
 [TestClass]
 public sealed class ParallelProgressMeterTextTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void StatusLine_RunningWithUnknownSizes_WritesTheMeasuredLine()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         ParallelProgressFigures figures = new(null, null, 10, 0, 2, 1, 0, 1, 0, 6);
+        diagnostics.Arrange("figures", figures);
 
         string line = ParallelProgressMeterText.StatusLine(figures, null);
 
+        diagnostics.Act("line", line);
+        diagnostics.Diff("line", "\r--  --     10     0     2     1           00:00:01              6      ", line);
         Assert.AreEqual("\r--  --     10     0     2     1           00:00:01              6      ", line);
     }
 
     [TestMethod]
     public void StatusLine_Final_WritesTheMeasuredLineAndItsLineEnding()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         ParallelProgressFigures figures = new(100, null, 20, 0, 2, 0, 3, 3, 0, 6);
+        diagnostics.Arrange("figures", figures);
 
         string line = ParallelProgressMeterText.StatusLine(figures, "\n");
 
+        diagnostics.Act("line", line);
+        diagnostics.Diff("line", "\r100 --     20     0     2     0  00:00:03 00:00:03              6     \n", line);
         Assert.AreEqual("\r100 --     20     0     2     0  00:00:03 00:00:03              6     \n", line);
     }
 
@@ -33,10 +45,15 @@ public sealed class ParallelProgressMeterTextTests
     [DataRow(1000L, "\r100 100 ")]
     public void StatusLine_KnownPercent_IsRightAlignedInThreeAndCutToThree(long percent, string expectedStart)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("percent", percent);
+        diagnostics.Arrange("expected start", expectedStart);
         ParallelProgressFigures figures = new(percent, percent, 0, 0, 0, 0, 0, 0, 0, 0);
 
         string line = ParallelProgressMeterText.StatusLine(figures, null);
 
+        diagnostics.Act("line", line);
+        diagnostics.Assert("line starts with", expectedStart, line.Length >= expectedStart.Length ? line[..expectedStart.Length] : line);
         StringAssert.StartsWith(line, expectedStart);
     }
 
@@ -58,8 +75,13 @@ public sealed class ParallelProgressMeterTextTests
     [DataRow(long.MaxValue, "8191P")]
     public void Size_Bytes_IsFiveColumnsAsMax5DataWritesIt(long bytes, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("bytes", bytes);
+
         string size = ParallelProgressMeterText.Size(bytes);
 
+        diagnostics.Act("size", size);
+        diagnostics.Diff("size", expected, size);
         Assert.AreEqual(expected, size);
     }
 
@@ -74,8 +96,13 @@ public sealed class ParallelProgressMeterTextTests
     [DataRow(86400000L, "   1000d")]
     public void Time_Seconds_IsEightColumnsAsTime2StrWritesIt(long seconds, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("seconds", seconds);
+
         string time = ParallelProgressMeterText.Time(seconds);
 
+        diagnostics.Act("time", time);
+        diagnostics.Diff("time", expected, time);
         Assert.AreEqual(expected, time);
     }
 }

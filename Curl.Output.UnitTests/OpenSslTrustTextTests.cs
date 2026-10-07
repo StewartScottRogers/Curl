@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -9,33 +10,58 @@ namespace Curl.Output;
 [TestClass]
 public sealed class OpenSslTrustTextTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Lines_BlobAndFile_BlobOverridesTheFile()
     {
-        CollectionAssert.AreEqual(
-            new[] { "SSL Trust Anchors:", "  CA Blob from configuration", "  CApath: /d" },
-            OpenSslTrustText.Lines(new TlsTrustEvent
-            {
-                VerifiesPeer = true,
-                HasCaCertificateBlob = true,
-                CaCertificateFile = "/f.pem",
-                CaCertificateDirectory = "/d",
-            }).ToArray());
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[] expected = ["SSL Trust Anchors:", "  CA Blob from configuration", "  CApath: /d"];
+        diagnostics.Arrange("trust", "VerifiesPeer, CA blob, file /f.pem, directory /d");
+
+        var actual = OpenSslTrustText.Lines(new TlsTrustEvent
+        {
+            VerifiesPeer = true,
+            HasCaCertificateBlob = true,
+            CaCertificateFile = "/f.pem",
+            CaCertificateDirectory = "/d",
+        }).ToArray();
+
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void Lines_DirectoryOnly_NamesOnlyTheDirectory()
     {
-        CollectionAssert.AreEqual(
-            new[] { "SSL Trust Anchors:", "  CApath: /d" },
-            OpenSslTrustText.Lines(new TlsTrustEvent { VerifiesPeer = true, CaCertificateDirectory = "/d" }).ToArray());
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[] expected = ["SSL Trust Anchors:", "  CApath: /d"];
+        diagnostics.Arrange("trust", "VerifiesPeer, directory /d");
+
+        var actual = OpenSslTrustText.Lines(new TlsTrustEvent { VerifiesPeer = true, CaCertificateDirectory = "/d" }).ToArray();
+
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void Lines_NoSource_SaysNoTrustAnchorsAreConfigured()
     {
-        CollectionAssert.AreEqual(
-            new[] { "SSL Trust Anchors:", "  no trust anchors configured" },
-            OpenSslTrustText.Lines(new TlsTrustEvent { VerifiesPeer = true }).ToArray());
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[] expected = ["SSL Trust Anchors:", "  no trust anchors configured"];
+        diagnostics.Arrange("trust", "VerifiesPeer only");
+
+        var actual = OpenSslTrustText.Lines(new TlsTrustEvent { VerifiesPeer = true }).ToArray();
+
+        Report(diagnostics, expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
+    private static void Report(TestDiagnostics diagnostics, string[] expected, string[] actual)
+    {
+        var expectedText = string.Join("\n", expected);
+        var actualText = string.Join("\n", actual);
+        diagnostics.Act("lines", actualText);
+        diagnostics.Diff("lines", expectedText, actualText);
     }
 }

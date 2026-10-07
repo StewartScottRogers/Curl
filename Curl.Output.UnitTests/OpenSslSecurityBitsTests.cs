@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Output;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Curl.Output;
 [TestClass]
 public sealed class OpenSslSecurityBitsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(2048, 112)]
     [DataRow(3072, 128)]
@@ -17,7 +21,14 @@ public sealed class OpenSslSecurityBitsTests
     [DataRow(15360, 256)]
     public void ForModulusBits_CanonicalSize_ReturnsTheStandardsStrength(int modulusBits, int expected)
     {
-        Assert.AreEqual(expected, OpenSslSecurityBits.ForModulusBits(modulusBits));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("modulus bits", modulusBits);
+
+        var actual = OpenSslSecurityBits.ForModulusBits(modulusBits);
+
+        diagnostics.Act("security bits", actual);
+        diagnostics.Assert("security bits", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -26,7 +37,14 @@ public sealed class OpenSslSecurityBitsTests
     [DataRow(1000000, 1200)]
     public void ForModulusBits_OutsideTheFormulasRange_ReturnsItsBounds(int modulusBits, int expected)
     {
-        Assert.AreEqual(expected, OpenSslSecurityBits.ForModulusBits(modulusBits));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("modulus bits", modulusBits);
+
+        var actual = OpenSslSecurityBits.ForModulusBits(modulusBits);
+
+        diagnostics.Act("security bits", actual);
+        diagnostics.Assert("security bits", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -36,6 +54,13 @@ public sealed class OpenSslSecurityBitsTests
     [DataRow(20000, 296)]
     public void ForModulusBits_OtherSize_EvaluatesTheFormula(int modulusBits, int expected)
     {
-        Assert.AreEqual(expected, OpenSslSecurityBits.ForModulusBits(modulusBits));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("modulus bits", modulusBits);
+
+        var actual = OpenSslSecurityBits.ForModulusBits(modulusBits);
+
+        diagnostics.Act("security bits", actual);
+        diagnostics.Assert("security bits", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Output;
 
 /// <summary>
@@ -13,6 +15,8 @@ public sealed class WriteOutTimeFormatterTests
     // Sunday 2005-01-02 15:04:05.000007 UTC, where every number has a leading zero to drop.
     private static readonly FixedTimeProvider LeadingZeros = new(new DateTimeOffset(2005, 1, 2, 15, 4, 5, TimeSpan.Zero).AddTicks(70));
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("%a|%A|%b|%B", "Sun|Sunday|Sep|September")]
     [DataRow("%c", "9/27/2026 3:30:08 AM")]
@@ -25,7 +29,10 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("", "")]
     public void Format_MeasuredConversions_MatchCurl(string format, string expected)
     {
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string actual = RunFormat(diagnostics, format, expected, Measured);
+
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -36,7 +43,10 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("%#z|%#Z", FixedTimeProvider.TimeZoneStandardName + "|" + FixedTimeProvider.TimeZoneStandardName)]
     public void Format_AlternateConversions_MatchCurl(string format, string expected)
     {
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string actual = RunFormat(diagnostics, format, expected, Measured);
+
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -44,7 +54,10 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("%#d|%#H|%#I|%#j|%#m|%#M|%#S|%#U|%#W|%#y", "2|15|3|2|1|4|5|1|0|5")]
     public void Format_LeadingZeros_AreDroppedOnlyByTheAlternateFlag(string format, string expected)
     {
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, LeadingZeros));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string actual = RunFormat(diagnostics, format, expected, LeadingZeros);
+
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -60,33 +73,69 @@ public sealed class WriteOutTimeFormatterTests
     [DataRow("x%#")]
     public void Format_ConversionTheRuntimeRejects_RendersNothing(string format)
     {
-        Assert.AreEqual(string.Empty, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string actual = RunFormat(diagnostics, format, string.Empty, Measured);
+
+        Assert.AreEqual(string.Empty, actual);
     }
 
     [TestMethod]
     public void Format_ResultOf255Bytes_Fits()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         string format = new('a', 255);
 
-        Assert.AreEqual(format, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, Measured));
+        string actual = RunFormat(diagnostics, format, format, Measured);
+
+        Assert.AreEqual(format, actual);
     }
 
     [TestMethod]
     public void Format_ResultOf256Bytes_RendersNothing()
     {
-        Assert.AreEqual(string.Empty, WriteOutTimeFormatter.Format(new string('a', 256), WriteOutTimeDialect.WindowsCRuntime, Measured));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        string format = new('a', 256);
+
+        string actual = RunFormat(diagnostics, format, string.Empty, Measured);
+
+        Assert.AreEqual(string.Empty, actual);
     }
 
     [TestMethod]
     public void Format_NullArgument_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format(null!, WriteOutTimeDialect.WindowsCRuntime, Measured));
-        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format("%Y", WriteOutTimeDialect.WindowsCRuntime, null!));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("arguments", "null format, then null time provider");
+
+        ArgumentNullException first = Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format(null!, WriteOutTimeDialect.WindowsCRuntime, Measured));
+        ArgumentNullException second = Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format("%Y", WriteOutTimeDialect.WindowsCRuntime, null!));
+
+        diagnostics.Act("null format throws", first.GetType().Name + ": " + first.Message);
+        diagnostics.Act("null time provider throws", second.GetType().Name + ": " + second.Message);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), first.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), second.GetType().Name);
     }
 
     [TestMethod]
     public void Format_UndefinedDialect_Throws()
     {
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WriteOutTimeFormatter.Format("%Y", (WriteOutTimeDialect)2, Measured));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("dialect", 2);
+
+        ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => WriteOutTimeFormatter.Format("%Y", (WriteOutTimeDialect)2, Measured));
+
+        diagnostics.Act("throws", exception.GetType().Name + ": " + exception.Message);
+        diagnostics.Assert("exception type", nameof(ArgumentOutOfRangeException), exception.GetType().Name);
+    }
+
+    private static string RunFormat(TestDiagnostics diagnostics, string format, string expected, FixedTimeProvider clock)
+    {
+        diagnostics.Arrange("format", format);
+
+        string actual = WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.WindowsCRuntime, clock);
+
+        diagnostics.Act("rendered", actual);
+        diagnostics.Diff("rendered", expected, actual);
+        return actual;
     }
 }

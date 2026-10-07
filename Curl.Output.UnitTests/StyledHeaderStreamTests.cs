@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -15,14 +16,26 @@ public sealed class StyledHeaderStreamTests
 
     private readonly MemoryStream output = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private static void Check(TestDiagnostics diagnostics, string input, string expected, string actual)
+    {
+        diagnostics.Arrange("input", input);
+        diagnostics.Act("styled output", actual);
+        diagnostics.Diff("styled output", expected, actual);
+        diagnostics.Assert("styled output", expected, actual);
+    }
+
     [TestMethod]
     public void Write_WholeHeadAtOnce_StylesEachLine()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         using StyledHeaderStream stream = CreateStream();
 
         byte[] head = Encoding.Latin1.GetBytes("xx" + Head);
         stream.Write(head, 2, head.Length - 2);
         stream.Flush();
+        Check(diagnostics, Head, StyledHead, OutputText);
 
         Assert.AreEqual(StyledHead, OutputText);
     }
@@ -30,9 +43,11 @@ public sealed class StyledHeaderStreamTests
     [TestMethod]
     public async Task WriteAsync_WholeHeadAtOnce_StylesEachLine()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         await using StyledHeaderStream stream = CreateStream();
 
         await stream.WriteAsync(Encoding.Latin1.GetBytes(Head));
+        Check(diagnostics, Head, StyledHead, OutputText);
 
         Assert.AreEqual(StyledHead, OutputText);
     }
@@ -40,9 +55,11 @@ public sealed class StyledHeaderStreamTests
     [TestMethod]
     public void Write_LineWithNoLineFeed_StylesItAsItIs()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         using StyledHeaderStream stream = CreateStream();
 
         stream.Write(Encoding.Latin1.GetBytes("A: b"));
+        Check(diagnostics, "A: b", "\e[1mA\e[0m: b", OutputText);
 
         Assert.AreEqual("\e[1mA\e[0m: b", OutputText);
     }
@@ -50,12 +67,18 @@ public sealed class StyledHeaderStreamTests
     [TestMethod]
     public void Members_OfAWriteOnlyStream_ReadAndSeekNothing()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         using StyledHeaderStream stream = CreateStream();
+        diagnostics.Arrange("stream", "write-only styled header stream");
+        diagnostics.Act("CanRead, CanSeek, CanWrite", $"{stream.CanRead}, {stream.CanSeek}, {stream.CanWrite}");
+        diagnostics.Assert("CanRead, CanSeek, CanWrite", "False, False, True", $"{stream.CanRead}, {stream.CanSeek}, {stream.CanWrite}");
 
         Assert.IsFalse(stream.CanRead);
         Assert.IsFalse(stream.CanSeek);
         Assert.IsTrue(stream.CanWrite);
-        Assert.ThrowsExactly<NotSupportedException>(() => stream.Length);
+        NotSupportedException lengthException = Assert.ThrowsExactly<NotSupportedException>(() => stream.Length);
+        diagnostics.Act("Length exception", lengthException.GetType().Name);
+        diagnostics.Assert("Length exception", nameof(NotSupportedException), lengthException.GetType().Name);
         Assert.ThrowsExactly<NotSupportedException>(() => stream.Position);
         Assert.ThrowsExactly<NotSupportedException>(() => stream.Position = 0);
         Assert.ThrowsExactly<NotSupportedException>(() => stream.Read(new byte[1], 0, 1));
