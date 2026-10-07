@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -15,11 +17,35 @@ public sealed class CommandLineConnectionSwitchTests
 
     private static readonly Func<string, bool> NoPathExists = _ => false;
 
+    private static readonly string[] SwitchProperties =
+    [
+        nameof(CommandLineOptions.TcpNoDelay),
+        nameof(CommandLineOptions.UseAlpn),
+        nameof(CommandLineOptions.ReuseSessionIds),
+        nameof(CommandLineOptions.TcpKeepAlive),
+        nameof(CommandLineOptions.StyledOutput),
+        nameof(CommandLineOptions.AllowBeast),
+        nameof(CommandLineOptions.UseNativeCaStore),
+        nameof(CommandLineOptions.RevocationCheckBestEffort),
+    ];
+
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Parse_NoSwitches_KeepsCurlDefaults()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url], NoPathExists);
+        CommandLineParseResult result = Parse([Url]);
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        if (result.Options is { } options)
+        {
+            foreach (string property in SwitchProperties)
+            {
+                diagnostics.Act(property, ReadSwitch(options, property));
+            }
+        }
+
+        diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.TcpNoDelay);
         Assert.IsTrue(result.Options.UseAlpn);
@@ -50,8 +76,9 @@ public sealed class CommandLineConnectionSwitchTests
     [DataRow("--no-ssl-revoke-best-effort", nameof(CommandLineOptions.RevocationCheckBestEffort), false)]
     public void Parse_Switch_SetsItsProperty(string argument, string property, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, Url], NoPathExists);
+        CommandLineParseResult result = Parse([argument, Url]);
 
+        TestDiagnostics.For(TestContext).Assert(property, expected, result.Options is { } options ? ReadSwitch(options, property) : null);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, ReadSwitch(result.Options, property));
     }
@@ -67,10 +94,20 @@ public sealed class CommandLineConnectionSwitchTests
     [DataRow("--ssl-revoke-best-effort", "--no-ssl-revoke-best-effort", nameof(CommandLineOptions.RevocationCheckBestEffort), false)]
     public void Parse_SwitchThenItsOpposite_LastOneWins(string first, string second, string property, bool expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url], NoPathExists);
+        CommandLineParseResult result = Parse([first, second, Url]);
 
+        TestDiagnostics.For(TestContext).Assert(property, expected, result.Options is { } options ? ReadSwitch(options, property) : null);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, ReadSwitch(result.Options, property));
+    }
+
+    private CommandLineParseResult Parse(string[] arguments)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, NoPathExists);
+        diagnostics.ActParse(result);
+        return result;
     }
 
     private static bool ReadSwitch(CommandLineOptions options, string property) => property switch

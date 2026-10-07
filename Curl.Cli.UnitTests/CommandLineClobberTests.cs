@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -9,11 +11,14 @@ public sealed class CommandLineClobberTests
 {
     private const string Url = "http://127.0.0.1:1/";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Parse_NoSpelling_LeavesClobberUnset()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        TestDiagnostics.For(TestContext).Assert("clobber", null, result.Options?.Clobber);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.Clobber);
     }
@@ -23,8 +28,9 @@ public sealed class CommandLineClobberTests
     [DataRow("--no-clobber", false)]
     public void Parse_OneSpelling_SetsClobber(string spelling, bool clobber)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = Parse([spelling, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("clobber", clobber, result.Options?.Clobber);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(clobber, result.Options.Clobber);
     }
@@ -34,9 +40,19 @@ public sealed class CommandLineClobberTests
     [DataRow("--clobber", "--no-clobber", false)]
     public void Parse_TwoSpellings_LastOneWins(string first, string second, bool clobber)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+        CommandLineParseResult result = Parse([first, second, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("clobber", clobber, result.Options?.Clobber);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(clobber, result.Options.Clobber);
+    }
+
+    private CommandLineParseResult Parse(string[] arguments)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+        return result;
     }
 }

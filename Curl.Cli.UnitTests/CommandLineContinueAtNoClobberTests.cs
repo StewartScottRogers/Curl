@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -14,6 +15,8 @@ public sealed class CommandLineContinueAtNoClobberTests
 
     private const string MutuallyExclusive = "curl: --continue-at is mutually exclusive with --no-clobber";
 
+    public TestContext TestContext { get; set; } = null!;
+
     // curl -C 5 --no-clobber -o x URL, --no-clobber -C 5 -o x URL, and so on: exit 2, naming the second.
     [TestMethod]
     [DataRow(new[] { "-C", "5", "--no-clobber", "-o", "x", Url }, "--no-clobber")]
@@ -26,8 +29,10 @@ public sealed class CommandLineContinueAtNoClobberTests
     [DataRow(new[] { "-C", "5", "--no-clobber", "-s", "-o", "x", Url }, "--no-clobber")]
     public void Parse_NoClobberWithContinueAt_IsRefusedWithThreeLines(string[] arguments, string refusedOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        string[] expected = [MutuallyExclusive, $"curl: option {refusedOption}: is badly used here", CommandLineRefusal.TryHelpLine];
+        AssertRefusalLogged(expected, result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -41,8 +46,10 @@ public sealed class CommandLineContinueAtNoClobberTests
     [DataRow(new[] { "-s", "--no-clobber", "-C", "5", "-o", "x", Url }, "-C")]
     public void Parse_NoClobberWithContinueAtAfterSilent_IsRefusedWithoutTheErrorLine(string[] arguments, string refusedOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        string[] expected = [$"curl: option {refusedOption}: is badly used here", CommandLineRefusal.TryHelpLine];
+        AssertRefusalLogged(expected, result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -57,8 +64,11 @@ public sealed class CommandLineContinueAtNoClobberTests
     [DataRow(new[] { "--no-clobber", "--clobber", "-C", "5", "-o", "x", Url })]
     public void Parse_ContinueAtWithClobberOn_IsAccepted(string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("resume from", 5L, result.Options?.ResumeFrom);
+        diagnostics.Assert("clobber", true, result.Options?.Clobber);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(5L, result.Options.ResumeFrom);
         Assert.IsTrue(result.Options.Clobber);
@@ -69,8 +79,9 @@ public sealed class CommandLineContinueAtNoClobberTests
     [TestMethod]
     public void Parse_NoClobberWithoutContinueAt_IsAccepted()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-clobber", "-o", "x", Url]);
+        CommandLineParseResult result = Parse(["--no-clobber", "-o", "x", Url]);
 
+        TestDiagnostics.For(TestContext).Assert("clobber", false, result.Options?.Clobber);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.Clobber);
     }
@@ -81,8 +92,9 @@ public sealed class CommandLineContinueAtNoClobberTests
     [DataRow(new[] { "--remove-on-error", "--no-clobber", "-C", "5", Url }, "curl: --continue-at is mutually exclusive with --remove-on-error")]
     public void Parse_EarlierExclusionAndNoClobberBeforeContinueAt_NamesTheEarlierExclusion(string[] arguments, string errorLine)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        TestDiagnostics.For(TestContext).Assert("first stderr line", errorLine, result.Refusal?.StandardErrorLines[0]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(errorLine, result.Refusal.StandardErrorLines[0]);
     }
@@ -90,6 +102,32 @@ public sealed class CommandLineContinueAtNoClobberTests
     [TestMethod]
     public void ContinueAtExclusiveWithNoClobber_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtExclusiveWithNoClobber(null!, errorsHidden: false));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("spelled option", null);
+        diagnostics.Arrange("errors hidden", false);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtExclusiveWithNoClobber(null!, errorsHidden: false));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
+
+    private CommandLineParseResult Parse(string[] arguments)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertRefusalLogged(string[] expectedLines, CommandLineParseResult result)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        diagnostics.Diff(
+            "stderr",
+            string.Join('\n', expectedLines),
+            string.Join('\n', result.Refusal?.StandardErrorLines ?? []));
     }
 }
