@@ -1,5 +1,6 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -14,6 +15,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerServerSystemTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:18221/file.txt";
 
     private const string LoggingIn = "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n";
@@ -36,10 +39,18 @@ public sealed class FtpProtocolHandlerServerSystemTests
     [DataRow("215 OS/400", DisplayName = "215 OS/400 with nothing after it: curl reads the line end into the word (measured)")]
     public async Task ExecuteAsync_RelativePwdAndNoOs400_SendsSystAndCarriesOn(string systReply)
     {
-        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggingIn + RelativePwd + systReply + "\r\n" + Download, "hello");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("systReply", systReply);
 
+        diagnostics.ArrangeFtp(Url);
+        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggingIn + RelativePwd + systReply + "\r\n" + Download, "hello");
+        diagnostics.ActRun(run);
+
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
+        diagnostics.DiffSent(Login + "SYST\r\n" + DownloadCommands, run.Sent);
         Assert.AreEqual(Login + "SYST\r\n" + DownloadCommands, run.Sent);
+        diagnostics.Assert("entry path", "home", run.Report?.FtpEntryPath);
         Assert.AreEqual("home", run.Report?.FtpEntryPath);
     }
 
@@ -48,39 +59,60 @@ public sealed class FtpProtocolHandlerServerSystemTests
     [DataRow("215   os/400 x", DisplayName = "any letter case, extra spaces")]
     public async Task ExecuteAsync_Os400AndNamefmtRefused_SendsSiteNamefmtAndCarriesOn(string systReply)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("systReply", systReply);
+
+        diagnostics.ArrangeFtp(Url);
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
             LoggingIn + RelativePwd + systReply + "\r\n502 Command not implemented\r\n" + Download,
             "hello");
+        diagnostics.ActRun(run);
 
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
+        diagnostics.DiffSent(Login + "SYST\r\nSITE NAMEFMT 1\r\n" + DownloadCommands, run.Sent);
         Assert.AreEqual(Login + "SYST\r\nSITE NAMEFMT 1\r\n" + DownloadCommands, run.Sent);
+        diagnostics.Assert("entry path", "home", run.Report?.FtpEntryPath);
         Assert.AreEqual("home", run.Report?.FtpEntryPath);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Os400AndNamefmtAccepted_SendsPwdAgainWithNoSecondSyst()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // Measured with 'SITE=250 ok': SYST, SITE NAMEFMT 1, PWD, then straight to EPSV.
+        diagnostics.ArrangeFtp(Url);
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
             LoggingIn + RelativePwd + "215 OS/400 is the remote operating system\r\n250 ok\r\n"
                 + "257 \"lib\" is cwd\r\n" + Download,
             "hello");
+        diagnostics.ActRun(run);
 
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
+        diagnostics.DiffSent(Login + "SYST\r\nSITE NAMEFMT 1\r\nPWD\r\n" + DownloadCommands, run.Sent);
         Assert.AreEqual(Login + "SYST\r\nSITE NAMEFMT 1\r\nPWD\r\n" + DownloadCommands, run.Sent);
+        diagnostics.Assert("entry path", "lib", run.Report?.FtpEntryPath);
         Assert.AreEqual("lib", run.Report?.FtpEntryPath);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_SecondPwdWithAnUnendedQuote_FailsWithExit8AndNoQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        diagnostics.ArrangeFtp(Url);
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
             LoggingIn + RelativePwd + "215 OS/400 x\r\n250 ok\r\n257 \"lib\r\n");
+        diagnostics.ActRun(run);
 
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
+        diagnostics.DiffSent(Login + "SYST\r\nSITE NAMEFMT 1\r\nPWD\r\n", run.Sent);
         Assert.AreEqual(Login + "SYST\r\nSITE NAMEFMT 1\r\nPWD\r\n", run.Sent);
     }
 
@@ -90,9 +122,16 @@ public sealed class FtpProtocolHandlerServerSystemTests
     [DataRow("550 no", DisplayName = "a refused PWD")]
     public async Task ExecuteAsync_PwdNamingNoRelativeDirectory_SendsNoSyst(string pwdReply)
     {
-        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggingIn + pwdReply + "\r\n" + Download, "hello");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("pwdReply", pwdReply);
 
+        diagnostics.ArrangeFtp(Url);
+        FtpRun run = await FtpRun.ExecuteAsync(Url, LoggingIn + pwdReply + "\r\n" + Download, "hello");
+        diagnostics.ActRun(run);
+
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
+        diagnostics.DiffSent(Login + DownloadCommands, run.Sent);
         Assert.AreEqual(Login + DownloadCommands, run.Sent);
     }
 }

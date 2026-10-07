@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -13,6 +14,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerAccountAndPretTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:47811/f.txt";
 
     private const string Greeting = "220 Recorder ready\r\n";
@@ -38,9 +41,16 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [DataRow("332 Need account\r\n", "USER u\r\n")]
     public async Task ExecuteAsync_332WithFtpAccount_SendsAcctAndDownloads(string beforeAccount, string sentBeforeAccount)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+        diagnostics.Arrange("beforeAccount", beforeAccount);
+        diagnostics.Arrange("sentBeforeAccount", sentBeforeAccount);
+
         // curl -sS -u u:p --ftp-account acc, PASS (or USER) answered 332, ACCT answered 230: exit 0.
         FtpRun run = await RunAsync(Greeting + beforeAccount + "230 OK\r\n" + Pwd + Downloaded, account: "acc");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(sentBeforeAccount + "ACCT acc\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(sentBeforeAccount + "ACCT acc\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
         Assert.AreEqual("x", run.OutputText);
@@ -52,9 +62,16 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [DataRow("332 More", "ACCT rejected by server: 332")]
     public async Task ExecuteAsync_AcctAnsweredWithAnythingBut230_FailsWithExit11AndNoQuit(string reply, string message)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+        diagnostics.Arrange("reply", reply);
+        diagnostics.Arrange("message", message);
+
         // curl: (11) ACCT rejected by server: 530 (ADR-0216).
         FtpRun run = await RunAsync(Greeting + Password + "332 Need account\r\n" + reply + "\r\n", account: "acc");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\nPASS p\r\nACCT acc\r\n", run.Sent);
         Assert.AreEqual("USER u\r\nPASS p\r\nACCT acc\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPassReply, message), run.Result);
     }
@@ -62,9 +79,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_UserAnswered332WithoutFtpAccount_FailsWithExit67()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // curl: (67) ACCT requested but none available
         FtpRun run = await RunAsync(Greeting + "332 Need account\r\n");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\n", run.Sent);
         Assert.AreEqual("USER u\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "ACCT requested but none available"), run.Result);
     }
@@ -72,8 +94,13 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_PassAnswered230WithFtpAccount_SendsNoAcct()
     {
-        FtpRun run = await RunAsync(Greeting + Password + LoggedIn + Pwd + Downloaded, account: "acc");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
 
+        FtpRun run = await RunAsync(Greeting + Password + LoggedIn + Pwd + Downloaded, account: "acc");
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent("USER u\r\nPASS p\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual("USER u\r\nPASS p\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -83,10 +110,16 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [DataRow("500 No")]
     public async Task ExecuteAsync_UserRefusedWithAlternative_SendsTheAlternativeThenPass(string refusal)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+        diagnostics.Arrange("refusal", refusal);
+
         // curl -sS -u u:p --ftp-alternative-to-user "USER alt", USER answered 530 (or 500),
         // then 331: exit 0.
         FtpRun run = await RunAsync(Greeting + refusal + "\r\n331 Pw\r\n" + LoggedIn + Pwd + Downloaded, alternative: "USER alt");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\nUSER alt\r\nPASS p\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual("USER u\r\nUSER alt\r\nPASS p\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -94,8 +127,13 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_AlternativeAnswered230_LogsInWithoutPass()
     {
-        FtpRun run = await RunAsync(Greeting + "530 No\r\n230 In\r\n" + Pwd + Downloaded, alternative: "USER alt");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
 
+        FtpRun run = await RunAsync(Greeting + "530 No\r\n230 In\r\n" + Pwd + Downloaded, alternative: "USER alt");
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent("USER u\r\nUSER alt\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual("USER u\r\nUSER alt\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -103,8 +141,13 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_AlternativeAnswered332WithFtpAccount_SendsAcct()
     {
-        FtpRun run = await RunAsync(Greeting + "530 No\r\n332 Acct\r\n230 OK\r\n" + Pwd + Downloaded, account: "acc", alternative: "USER alt");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
 
+        FtpRun run = await RunAsync(Greeting + "530 No\r\n332 Acct\r\n230 OK\r\n" + Pwd + Downloaded, account: "acc", alternative: "USER alt");
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent("USER u\r\nUSER alt\r\nACCT acc\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual("USER u\r\nUSER alt\r\nACCT acc\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -112,9 +155,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_AlternativeRefusedToo_FailsWithExit67()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // curl: (67) Access denied: 530 - the alternative is sent once.
         FtpRun run = await RunAsync(Greeting + "530 No\r\n530 Again\r\n", alternative: "USER alt");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\nUSER alt\r\n", run.Sent);
         Assert.AreEqual("USER u\r\nUSER alt\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Access denied: 530"), run.Result);
     }
@@ -122,9 +170,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_PassRefusedWithAlternative_SendsTheAlternativeAndPassAgainOnce()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // PASS answered 530: curl sends the alternative, PASS again, and gives up at the second 530.
         FtpRun run = await RunAsync(Greeting + Password + "530 No\r\n" + Password + "530 No\r\n", alternative: "USER alt");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\nPASS p\r\nUSER alt\r\nPASS p\r\n", run.Sent);
         Assert.AreEqual("USER u\r\nPASS p\r\nUSER alt\r\nPASS p\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Access denied: 530"), run.Result);
     }
@@ -132,9 +185,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_PassAnswered331WithAlternative_SendsTheAlternative()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // A 331 to PASS is a refusal, not a request for the password.
         FtpRun run = await RunAsync(Greeting + Password + "331 Again\r\n" + Password + "230 In\r\n" + Pwd + Downloaded, alternative: "USER alt");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\nPASS p\r\nUSER alt\r\nPASS p\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual("USER u\r\nPASS p\r\nUSER alt\r\nPASS p\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -142,9 +200,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_PassAnswered331WithoutAlternative_FailsWithExit67()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // curl: (67) Access denied: 331
         FtpRun run = await RunAsync(Greeting + Password + "331 Again\r\n");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\nPASS p\r\n", run.Sent);
         Assert.AreEqual("USER u\r\nPASS p\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Access denied: 331"), run.Result);
     }
@@ -152,9 +215,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_UserAnswered421WithAlternative_FailsWithExit28()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // curl: (28) Timeout was reached - a 421 ends the session before the alternative.
         FtpRun run = await RunAsync(Greeting + "421 No\r\n", alternative: "USER alt");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent("USER u\r\n", run.Sent);
         Assert.AreEqual("USER u\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached"), run.Result);
     }
@@ -162,9 +230,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_FtpPretDownload_SendsPretRetrBeforeEpsv()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // curl -sS --ftp-pret ftp://127.0.0.1:47811/f.txt, PRET answered 200: exit 0.
         FtpRun run = await RunPretAsync(Url, "200 OK\r\n" + Downloaded);
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\nEPSV\r\nTYPE I\r\nSIZE f.txt\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\nEPSV\r\nTYPE I\r\nSIZE f.txt\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -172,8 +245,13 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_FtpPretInADirectory_SendsPretAfterCwd()
     {
-        FtpRun run = await RunPretAsync("ftp://127.0.0.1:47811/d/f.txt", "250 OK\r\n200 OK\r\n" + Downloaded);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "ftp://127.0.0.1:47811/d/f.txt");
 
+        FtpRun run = await RunPretAsync("ftp://127.0.0.1:47811/d/f.txt", "250 OK\r\n200 OK\r\n" + Downloaded);
+        diagnostics.ActRun(run);
+
+        diagnostics.Assert("sent starts with", FtpDiagnostics.Escape(AnonymousSent + "PWD\r\nCWD d\r\nPRET RETR f.txt\r\nEPSV\r\n"), FtpDiagnostics.Escape(run.Sent));
         StringAssert.StartsWith(run.Sent, AnonymousSent + "PWD\r\nCWD d\r\nPRET RETR f.txt\r\nEPSV\r\n");
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -184,6 +262,13 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [DataRow("ftp://127.0.0.1:47811/d/", false, "PRET LIST\r\n", "LIST d\r\n")]
     public async Task ExecuteAsync_FtpPretListing_SendsPretWithTheListVerbAlone(string url, bool listOnly, string pretSent, string listSent)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+        diagnostics.Arrange("url", url);
+        diagnostics.Arrange("listOnly", listOnly);
+        diagnostics.Arrange("pretSent", pretSent);
+        diagnostics.Arrange("listSent", listSent);
+
         // curl -sS --ftp-pret [-l] [--ftp-method nocwd] ftp://127.0.0.1:47811/[d/]: PRET LIST
         // or PRET NLST, with no argument even when LIST carries the directory.
         const string replies = "257 \"/\" is current directory\r\n200 OK\r\n229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n"
@@ -200,7 +285,9 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
                 ListOnly = listOnly,
                 FtpFileMethod = FtpFileMethod.NoCwd,
             });
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(AnonymousSent + "PWD\r\n" + pretSent + "EPSV\r\nTYPE A\r\n" + listSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(AnonymousSent + "PWD\r\n" + pretSent + "EPSV\r\nTYPE A\r\n" + listSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -210,6 +297,11 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [DataRow(true, "APPE up.txt")]
     public async Task ExecuteAsync_FtpPretUpload_SendsPretStorForStorAndAppe(bool append, string storeSent)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "ftp://127.0.0.1:47811/up.txt");
+        diagnostics.Arrange("append", append);
+        diagnostics.Arrange("storeSent", storeSent);
+
         // curl -sS --ftp-pret [-a] -T file ftp://127.0.0.1:47811/up.txt: PRET STOR up.txt either way.
         const string replies = "257 \"/\" is current directory\r\n200 OK\r\n229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n"
             + "150 Opening BINARY mode data connection\r\n226 Transfer complete\r\n221 Bye\r\n";
@@ -224,7 +316,9 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
                 Upload = new MemoryStream(Encoding.Latin1.GetBytes("up")),
                 Append = append,
             });
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(AnonymousSent + "PWD\r\nPRET STOR up.txt\r\nEPSV\r\nTYPE I\r\n" + storeSent + "\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(AnonymousSent + "PWD\r\nPRET STOR up.txt\r\nEPSV\r\nTYPE I\r\n" + storeSent + "\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual("up", Encoding.Latin1.GetString(run.Data.Sent));
         Assert.AreEqual(TransferResult.Success(2), run.Result);
@@ -233,6 +327,9 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_FtpPretWithDisableEpsv_SendsPretBeforePasv()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         const string replies = "257 \"/\" is current directory\r\n200 OK\r\n227 Entering Passive Mode (127,0,0,1,249,77)\r\n200 Type set\r\n213 1\r\n"
             + "150 Opening BINARY mode data connection\r\n226 Transfer complete\r\n221 Bye\r\n";
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -240,7 +337,9 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
             Greeting + Password + LoggedIn + replies,
             "x",
             c => new TransferContext { Url = c.Url, Output = c.Output, FtpSendPret = true, FtpDisableEpsv = true });
+        diagnostics.ActRun(run);
 
+        diagnostics.Assert("sent starts with", FtpDiagnostics.Escape(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\nPASV\r\n"), FtpDiagnostics.Escape(run.Sent));
         StringAssert.StartsWith(run.Sent, AnonymousSent + "PWD\r\nPRET RETR f.txt\r\nPASV\r\n");
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -248,10 +347,15 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_FtpPretThenEpsvRefused_SendsPretOnceBeforeBoth()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         const string replies = "200 OK\r\n500 no\r\n227 Entering Passive Mode (127,0,0,1,250,48)\r\n200 Type set\r\n213 1\r\n"
             + "150 Opening BINARY mode data connection\r\n226 Transfer complete\r\n221 Bye\r\n";
         FtpRun run = await RunPretAsync(Url, replies);
+        diagnostics.ActRun(run);
 
+        diagnostics.Assert("sent starts with", FtpDiagnostics.Escape(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\nEPSV\r\nPASV\r\nTYPE I\r\n"), FtpDiagnostics.Escape(run.Sent));
         StringAssert.StartsWith(run.Sent, AnonymousSent + "PWD\r\nPRET RETR f.txt\r\nEPSV\r\nPASV\r\nTYPE I\r\n");
         Assert.AreEqual(TransferResult.Success(1), run.Result);
     }
@@ -261,9 +365,16 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [DataRow("202 Superfl", "PRET command not accepted: 202")]
     public async Task ExecuteAsync_PretAnsweredWithAnythingBut200_FailsWithExit84AndNoQuit(string reply, string message)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+        diagnostics.Arrange("reply", reply);
+        diagnostics.Arrange("message", message);
+
         // curl: (84) PRET command not accepted: 500
         FtpRun run = await RunPretAsync(Url, reply + "\r\n");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\n", run.Sent);
         Assert.AreEqual(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPretFailed, message), run.Result);
     }
@@ -271,8 +382,13 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_PretRefusedForAListing_FailsWithExit84()
     {
-        FtpRun run = await RunPretAsync("ftp://127.0.0.1:47811/", "500 No\r\n");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "ftp://127.0.0.1:47811/");
 
+        FtpRun run = await RunPretAsync("ftp://127.0.0.1:47811/", "500 No\r\n");
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent(AnonymousSent + "PWD\r\nPRET LIST\r\n", run.Sent);
         Assert.AreEqual(AnonymousSent + "PWD\r\nPRET LIST\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPretFailed, "PRET command not accepted: 500"), run.Result);
     }
@@ -280,9 +396,14 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_PretAnswered421_FailsWithExit28()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // curl: (28) Timeout was reached
         FtpRun run = await RunPretAsync(Url, "421 No\r\n");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\n", run.Sent);
         Assert.AreEqual(AnonymousSent + "PWD\r\nPRET RETR f.txt\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached"), run.Result);
     }
@@ -290,13 +411,18 @@ public sealed class FtpProtocolHandlerAccountAndPretTests
     [TestMethod]
     public async Task ExecuteAsync_FtpPretInActiveMode_SendsNoPret()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", Url);
+
         // curl -sS --ftp-pret -P - : EPRT with no PRET before it. A handler with no listener
         // cannot bind, so the run ends there with exit 30.
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + Password + LoggedIn + "257 \"/\" is current directory\r\n221 Bye\r\n"));
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), FtpPort = "-", FtpSendPret = true };
 
         TransferResult result = await new FtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(control))).ExecuteAsync(context);
+        diagnostics.ActResult(result);
 
+        diagnostics.DiffSent(AnonymousSent + "PWD\r\nQUIT\r\n", Encoding.Latin1.GetString(control.Sent));
         Assert.AreEqual(AnonymousSent + "PWD\r\nQUIT\r\n", Encoding.Latin1.GetString(control.Sent));
         Assert.AreEqual(CurlExitCode.FtpPortFailed, result.ExitCode);
     }

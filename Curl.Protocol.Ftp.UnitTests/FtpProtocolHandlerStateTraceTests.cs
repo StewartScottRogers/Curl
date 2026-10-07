@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -16,6 +17,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerStateTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const int ControlPort = 47162;
 
     private const string LoggedIn = "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n";
@@ -84,8 +87,10 @@ public sealed class FtpProtocolHandlerStateTraceTests
     [TestMethod]
     public async Task ExecuteAsync_TracedPassiveDownload_WritesCurlsFtpLinesInOrder()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:47162/a.txt
-        TraceRecordingEvents events = await RunAsync("/a.txt", LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye, _ => { });
+        TraceRecordingEvents events = await RunAsync(diagnostics, "/a.txt", LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye, _ => { });
 
         string[] expected =
         [
@@ -109,14 +114,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [RETR] -> [STOP]",
             .. TransferEnd,
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript));
         CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedPassiveUpload_WritesTheStorStates()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -T up.txt ftp://127.0.0.1:47163/b.txt
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/b.txt",
             LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye,
             context => context.Upload = new MemoryStream("hi"u8.ToArray()));
@@ -137,14 +145,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* upload completely sent off: 2 bytes",
             .. TransferEnd,
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript));
         CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedListing_WritesTheListStates()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:47163/
-        TraceRecordingEvents events = await RunAsync("/", LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye, _ => { });
+        TraceRecordingEvents events = await RunAsync(diagnostics, "/", LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye, _ => { });
 
         string[] expected =
         [
@@ -162,13 +173,16 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [LIST] -> [STOP]",
             .. TransferEnd,
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript));
         CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedResumedUpload_EntersTheStorStateOnAppe()
     {
-        TraceRecordingEvents events = await RunAsync(
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/b.txt",
             LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye,
             context =>
@@ -178,6 +192,8 @@ public sealed class FtpProtocolHandlerStateTraceTests
             });
 
         int appe = events.Transcript.IndexOf("> APPE b.txt");
+        diagnostics.Act("APPE line index", appe);
+        diagnostics.Diff("lines after APPE", "* [FTP] [STOR_TYPE] -> [STOR]\n* [FTP] [STOR] ftp_domore_pollset()", string.Join('\n', events.Transcript.Skip(appe + 1).Take(2)));
         CollectionAssert.AreEqual(
             new[] { "* [FTP] [STOR_TYPE] -> [STOR]", "* [FTP] [STOR] ftp_domore_pollset()" },
             events.Transcript.Skip(appe + 1).Take(2).ToArray());
@@ -186,20 +202,25 @@ public sealed class FtpProtocolHandlerStateTraceTests
     [TestMethod]
     public async Task ExecuteAsync_TracedNameOnlyListing_EntersTheListStateOnNlst()
     {
-        TraceRecordingEvents events = await RunAsync(
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/",
             LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye,
             context => context.ListOnly = true);
 
         int nlst = events.Transcript.IndexOf("> NLST");
+        diagnostics.Assert("line after NLST", "* [FTP] [LIST_TYPE] -> [LIST]", events.Transcript[nlst + 1]);
         Assert.AreEqual("* [FTP] [LIST_TYPE] -> [LIST]", events.Transcript[nlst + 1]);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedCwd_EntersTheCwdStateOnceAndAwaitsTheDataAfterTheFirst()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/d/e/a.txt (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/d/e/a.txt",
             LoggedIn + "250 OK\r\n250 OK\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             _ => { });
@@ -221,25 +242,31 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [PASV] -> [STOP]",
             "* [FTP] [STOP] DO phase is complete2",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_MultiLineTransferReply_ReportsEveryLinesBytesAsNread()
     {
-        TraceRecordingEvents events = await RunAsync(
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + "226-Done\r\n" + Complete + Bye,
             _ => { });
 
+        diagnostics.Assert("transcript holds", "* [FTP] getftpresponse -> result=0, nread=33, ftpcode=226", events.Transcript.Contains("* [FTP] getftpresponse -> result=0, nread=33, ftpcode=226"));
         CollectionAssert.Contains(events.Transcript, "* [FTP] getftpresponse -> result=0, nread=33, ftpcode=226");
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RefusedGreeting_EndsTheTraceBeforeTheConnectPhaseIsDone()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, GREETING=500 go away: exit 8 (BL-1197)
-        TraceRecordingEvents events = await RunAsync("/a.txt", "500 Go away\r\n", _ => { });
+        TraceRecordingEvents events = await RunAsync(diagnostics, "/a.txt", "500 Go away\r\n", _ => { });
 
         string[] expected =
         [
@@ -248,14 +275,18 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "< 500 Go away",
             "* [FTP] [WAIT220] done, result=8",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript));
         CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NotTraced_WritesNoFtpLine()
     {
-        TraceRecordingEvents events = await RunAsync("/a.txt", LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye, _ => { }, traced: false);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        TraceRecordingEvents events = await RunAsync(diagnostics, "/a.txt", LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye, _ => { }, traced: false);
+
+        diagnostics.Assert("FTP state lines", 0, events.Transcript.Count(line => line.StartsWith("* [FTP]", StringComparison.Ordinal)));
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* [FTP]", StringComparison.Ordinal)));
         CollectionAssert.Contains(events.Transcript, "* Getting file with size: 6");
     }
@@ -263,8 +294,10 @@ public sealed class FtpProtocolHandlerStateTraceTests
     [TestMethod]
     public async Task ExecuteAsync_TracedActiveDownloadWithEprt_WritesThePortStates()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -P 127.0.0.1 ftp://127.0.0.1:47196/a.txt
-        TraceRecordingEvents events = await RunActiveAsync(
+        TraceRecordingEvents events = await RunActiveAsync(diagnostics,
             "/a.txt",
             LoggedIn + "200 EPRT command successful\r\n200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             _ => { });
@@ -293,19 +326,23 @@ public sealed class FtpProtocolHandlerStateTraceTests
             .. ActiveAccept,
             .. TransferEnd,
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript));
         CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedActiveDownloadWithPort_WritesThePortStates()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v --disable-eprt -P 127.0.0.1 ftp://127.0.0.1:47196/a.txt
-        TraceRecordingEvents events = await RunActiveAsync(
+        TraceRecordingEvents events = await RunActiveAsync(diagnostics,
             "/a.txt",
             LoggedIn + "200 PORT command successful\r\n200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context => context.FtpUseEprt = false);
 
         string[] expected = ActiveDoPhase("PORT 127,0,0,1,235,195", "200 PORT command successful");
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript.Take(expected.Length).ToArray()));
         CollectionAssert.AreEqual(expected, events.Transcript.Take(expected.Length).ToArray());
         int notAvailable = events.Transcript.IndexOf("* Data conn was not available immediately");
         string[] accept = ["* [FTP] [RETR] -> [STOP]", "* [FTP] [STOP] ftp_domore_pollset()", .. ActiveAccept];
@@ -317,8 +354,10 @@ public sealed class FtpProtocolHandlerStateTraceTests
     [TestMethod]
     public async Task ExecuteAsync_TracedActiveUpload_LeavesTheStorStateBeforeTheAccept()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -P 127.0.0.1 -T up.txt ftp://127.0.0.1:47197/u.txt
-        TraceRecordingEvents events = await RunActiveAsync(
+        TraceRecordingEvents events = await RunActiveAsync(diagnostics,
             "/u.txt",
             LoggedIn + "200 EPRT command successful\r\n200 Type set\r\n" + Opened + Complete + Bye,
             context => context.Upload = new MemoryStream("hi"u8.ToArray()));
@@ -341,6 +380,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* upload completely sent off: 2 bytes",
             .. TransferEnd,
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript));
         CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
@@ -363,8 +403,10 @@ public sealed class FtpProtocolHandlerStateTraceTests
     [TestMethod]
     public async Task ExecuteAsync_TracedRefusedRetr_ClosesTheDataConnectionAndKeepsResultZero()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, RETR=550 No such file: exit 78 (BL-1197)
-        TraceRecordingEvents events = await RunAsync("/a.txt", LoggedIn + Epsv + "200 Type set\r\n213 6\r\n550 No such file\r\n" + Bye, _ => { });
+        TraceRecordingEvents events = await RunAsync(diagnostics, "/a.txt", LoggedIn + Epsv + "200 Type set\r\n213 6\r\n550 No such file\r\n" + Bye, _ => { });
 
         string[] expected =
         [
@@ -375,14 +417,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [RETR] closing DATA connection",
             "* [FTP] [RETR] done, result=0",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "> RETR a.txt")));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> RETR a.txt"));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRemoteTime_EntersTheMdtmStateFirstInTheDoPhase()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -R ftp://127.0.0.1:P/a.txt (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + "213 20260927123456\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context => context.RemoteTime = true);
@@ -399,14 +444,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "< 229 Entering Extended Passive Mode (|||53990|)",
             "* [FTP] [PASV] -> [STOP]",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "* [FTP] [STOP] DO phase starts").Take(expected.Length).ToArray()));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "* [FTP] [STOP] DO phase starts").Take(expected.Length).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedResumedDownload_EntersTheRetrRestStateAfterFtpStateRetr()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -C 2 ftp://127.0.0.1:P/a.txt (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 6\r\n350 Restarting at 2\r\n" + Opened + Complete + Bye,
             context => context.ResumeFrom = 2);
@@ -424,14 +472,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [RETR_REST] -> [RETR]",
             "* [FTP] [RETR] ftp_domore_pollset()",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "< 213 6", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "< 213 6", expected.Length));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedDisableEpsv_EntersThePasvStateOnPasv()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v --disable-epsv ftp://127.0.0.1:P/a.txt (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + Pasv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context => context.FtpDisableEpsv = true);
@@ -445,14 +496,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [PASV] perform, awaiting DATA connect",
             "< 227 Entering Passive Mode (127,0,0,1,210,230)",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRefusedEpsv_ClosesTheDataConnectionAndStaysInPasvForPasv()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, EPSV=500 no (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + "500 no\r\n" + Pasv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             _ => { });
@@ -469,12 +523,15 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "> PASV",
             "< 227 Entering Passive Mode (127,0,0,1,210,230)",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "> EPSV", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "> EPSV", expected.Length));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedSsl_WritesTheAuthPbszAndProtStates()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v --ssl -k ftp://127.0.0.1:P/a.txt (BL-1197)
         var securedControl = new ScriptedConnection(Encoding.Latin1.GetBytes(
             "331 Password required\r\n230 Logged in\r\n200 PBSZ=0\r\n200 Protection level set to P\r\n257 \"/\" is current directory\r\n"
@@ -484,7 +541,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
         };
         var tls = new QueuedTlsProvider(ConnectResult.Connected(securedControl), ConnectResult.Connected(new ScriptedConnection("hello\n"u8.ToArray())));
 
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             "220 Recorder ready\r\n234 AUTH accepted\r\n",
             context => context.SslLevel = TransportSecurityLevel.Try,
@@ -515,15 +572,18 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [PWD] -> [STOP]",
             "* [FTP] [STOP] protocol connect phase DONE",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "* [FTP] [STOP] -> [WAIT220]").Take(expected.Length).ToArray()));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "* [FTP] [STOP] -> [WAIT220]").Take(expected.Length).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedAlternativeToUser_StaysInUserWithNoStateLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl --trace-config ftp -v --ftp-alternative-to-user "XALT alt", USER answered 530:
         // curl's ftp_state_user_resp sends the alternative in state USER and stays there.
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             "220 Recorder ready\r\n530 No\r\n331 Password required\r\n230 Logged in\r\n221 Bye\r\n",
             context => context.FtpAlternativeToUser = "XALT alt");
@@ -538,14 +598,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "> PASS ftp@example.com",
             "* [FTP] [USER] -> [PASS]",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "> USER anonymous").Take(expected.Length).ToArray()));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> USER anonymous").Take(expected.Length).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedQuotes_WritesTheQuoteAndPrequoteStatesAndThePostQuoteReply()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -Q NOOP -Q '-SITE x' -Q +HELP ftp://127.0.0.1:P/a.txt (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + "200 ok\r\n" + Epsv + "200 Type set\r\n214 ok\r\n213 6\r\n" + Opened + Complete + "200 ok\r\n" + Bye,
             context => context.QuoteCommands.AddRange(["NOOP", "-SITE x", "+HELP"]));
@@ -592,14 +655,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] getftpresponse -> result=0, nread=8, ftpcode=200",
             "* [FTP] [STOP] done, result=0",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "* [FTP] [STOP] DO phase starts")));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "* [FTP] [STOP] DO phase starts"));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRelativeEntryPath_EntersTheSystState()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, PWD=257 "x" is cwd (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"x\" is cwd\r\n502 Command not implemented\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             _ => { });
@@ -615,15 +681,18 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [SYST] -> [STOP]",
             "* [FTP] [STOP] protocol connect phase DONE",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "> PWD").Take(expected.Length).ToArray()));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> PWD").Take(expected.Length).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedOs400_EntersTheNamefmtStateAndThePwdStateAgain()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, PWD=257 "QSYS.LIB" then "/QSYS.LIB",
         // SYST=215 OS/400 V7R4, SITE=250 OK (BL-1199)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"QSYS.LIB\"\r\n215 OS/400 V7R4\r\n250 OK\r\n257 \"/QSYS.LIB\"\r\n"
                 + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
@@ -643,14 +712,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [PWD] -> [STOP]",
             "* [FTP] [STOP] protocol connect phase DONE",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "> SYST").Take(expected.Length).ToArray()));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> SYST").Take(expected.Length).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedPret_EntersThePretStateAndAwaitsTheDataAfterIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v --ftp-pret ftp://127.0.0.1:P/a.txt, PRET=200 OK (BL-1199)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + "200 OK\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context => context.FtpSendPret = true);
@@ -667,15 +739,18 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* Connect data stream passively",
             "< 229 Entering Extended Passive Mode (|||53990|)",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedCreateDirs_EntersTheMkdStateAndTheCwdStateBeforeTheSecondCwd()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v --ftp-create-dirs ftp://127.0.0.1:P/d/a.txt,
         // CWD=550 no then 250 OK, MKD=257 created (BL-1199)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/d/a.txt",
             LoggedIn + "550 no\r\n257 created\r\n250 OK\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context => context.FtpCreateDirectories = true);
@@ -696,14 +771,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "> EPSV",
             "* [FTP] [CWD] -> [PASV]",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "* [FTP] [STOP] DO phase starts", expected.Length));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedAccount_EntersTheAcctState()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v --ftp-account bob ftp://127.0.0.1:P/a.txt, PASS=332 (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             "220 Recorder ready\r\n331 Password required\r\n332 need acct\r\n230 ok\r\n257 \"/\" is current directory\r\n" + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context => context.FtpAccount = "bob");
@@ -719,46 +797,58 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "> PWD",
             "* [FTP] [ACCT] -> [PWD]",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "> PASS ftp@example.com").Take(expected.Length).ToArray()));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "> PASS ftp@example.com").Take(expected.Length).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRefusedPass_WritesDoneWithTheExitCode()
     {
-        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, PASS=530 no: exit 67 (BL-1197)
-        TraceRecordingEvents events = await RunAsync("/a.txt", "220 Recorder ready\r\n331 Password required\r\n530 no\r\n", _ => { });
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/a.txt, PASS=530 no: exit 67 (BL-1197)
+        TraceRecordingEvents events = await RunAsync(diagnostics, "/a.txt", "220 Recorder ready\r\n331 Password required\r\n530 no\r\n", _ => { });
+
+        diagnostics.Diff("transcript", "< 530 no\n* [FTP] [PASS] done, result=67", string.Join('\n', FtpLinesFrom(events, "< 530 no")));
         CollectionAssert.AreEqual(new[] { "< 530 no", "* [FTP] [PASS] done, result=67" }, FtpLinesFrom(events, "< 530 no"));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRefusedCwd_WritesTheDoPhaseFailedAndResultZero()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v ftp://127.0.0.1:P/d/a.txt, CWD=550 no: exit 9 (BL-1197)
-        TraceRecordingEvents events = await RunAsync("/d/a.txt", LoggedIn + "550 no\r\n" + Bye, _ => { });
+        TraceRecordingEvents events = await RunAsync(diagnostics, "/d/a.txt", LoggedIn + "550 no\r\n" + Bye, _ => { });
 
         string[] expected = ["< 550 no", "* [FTP] [CWD] DO phase failed", "* [FTP] [CWD] done, result=0"];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "< 550 no")));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "< 550 no"));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRefusedQuote_WritesTheDoPhaseFailedAndExit21()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -Q NOOP ftp://127.0.0.1:P/a.txt, NOOP=502 (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + "502 Command not implemented\r\n",
             context => context.QuoteCommands.Add("NOOP"));
 
         string[] expected = ["< 502 Command not implemented", "* [FTP] [QUOTE] DO phase failed", "* [FTP] [QUOTE] done, result=21"];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', FtpLinesFrom(events, "< 502 Command not implemented")));
         CollectionAssert.AreEqual(expected, FtpLinesFrom(events, "< 502 Command not implemented"));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRange_ReadsAborsReplyAfterClosingTheDataConnection()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -r 0-1 ftp://127.0.0.1:P/a.txt (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context => context.Range = ByteRange.Bounded(0, 1));
@@ -775,15 +865,18 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [STOP] done, result=0",
             "* shutting down connection #0",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "* Remembering we are in directory \"\"", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "* Remembering we are in directory \"\"", expected.Length));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedRangeWithRefusedPostQuote_WritesDoneWithResult21AfterTheQuote()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -r 0-1 -Q -NOOP ftp://127.0.0.1:P/a.txt (BL-1201):
         // ABOR reads RETR's 226, so NOOP reads ABOR's 502.
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + "502 Command not implemented\r\n500 no\r\n" + Bye,
             context =>
@@ -807,14 +900,17 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [STOP] done, result=21",
             "* shutting down connection #0",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript.Skip(events.Transcript.IndexOf("> ABOR")).ToArray()));
         CollectionAssert.AreEqual(expected, events.Transcript.Skip(events.Transcript.IndexOf("> ABOR")).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TracedUploadResumedFromTheRemoteSize_EntersTheStorSizeState()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --trace-config ftp -v -T up.txt -C - ftp://127.0.0.1:P/a.txt (BL-1197)
-        TraceRecordingEvents events = await RunAsync(
+        TraceRecordingEvents events = await RunAsync(diagnostics,
             "/a.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 6\r\n" + Opened + Complete + Bye,
             context =>
@@ -832,6 +928,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "> APPE a.txt",
             "* [FTP] [STOR_SIZE] -> [STOR]",
         ];
+        diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', Slice(events, "> SIZE a.txt", expected.Length)));
         CollectionAssert.AreEqual(expected, Slice(events, "> SIZE a.txt", expected.Length));
     }
 
@@ -847,8 +944,9 @@ public sealed class FtpProtocolHandlerStateTraceTests
             .Where(line => line.StartsWith("* [FTP]", StringComparison.Ordinal) || line.StartsWith("> ", StringComparison.Ordinal) || line.StartsWith("< ", StringComparison.Ordinal)),
     ];
 
-    private static async Task<TraceRecordingEvents> RunActiveAsync(string path, string replies, Action<MutableContext> adjust)
+    private static async Task<TraceRecordingEvents> RunActiveAsync(TestDiagnostics diagnostics, string path, string replies, Action<MutableContext> adjust)
     {
+        diagnostics.ArrangeFtp($"ftp://127.0.0.1:{ControlPort}{path}", replies);
         var events = new TraceRecordingEvents();
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
         {
@@ -868,11 +966,13 @@ public sealed class FtpProtocolHandlerStateTraceTests
 
         var handler = new FtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(control)), new QueuedListener(ListenResult.Listening(pending)), new QueuedTlsProvider()) { TracesStateMachine = true };
         await handler.ExecuteAsync(context);
+        diagnostics.Act("transcript lines", events.Transcript.Count);
         return events;
     }
 
-    private static async Task<TraceRecordingEvents> RunAsync(string path, string replies, Action<MutableContext> adjust, bool traced = true, QueuedTlsProvider? tls = null)
+    private static async Task<TraceRecordingEvents> RunAsync(TestDiagnostics diagnostics, string path, string replies, Action<MutableContext> adjust, bool traced = true, QueuedTlsProvider? tls = null)
     {
+        diagnostics.ArrangeFtp($"ftp://127.0.0.1:{ControlPort}{path}", replies);
         var events = new TraceRecordingEvents();
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
         {
@@ -905,6 +1005,7 @@ public sealed class FtpProtocolHandlerStateTraceTests
 
         var handler = new FtpProtocolHandler(connector, new QueuedListener(), tls ?? new QueuedTlsProvider()) { TracesStateMachine = traced };
         await handler.ExecuteAsync(context);
+        diagnostics.Act("transcript lines", events.Transcript.Count);
         return events;
     }
 

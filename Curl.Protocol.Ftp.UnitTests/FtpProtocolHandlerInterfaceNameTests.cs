@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -17,7 +18,9 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerInterfaceNameTests
 {
-    private const string Url = "ftp://127.0.0.1:47471/a.txt";
+    public TestContext TestContext { get; set; } = null!;
+
+    private const string Url ="ftp://127.0.0.1:47471/a.txt";
 
     private const string LoggedIn = "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n";
 
@@ -35,6 +38,10 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
     {
         // curl -v -P lo ftp://172.26.96.1:47471/f.txt (Linux, OpenSSL): EPRT |1|127.0.0.1|37667|.
         // curl compares the name without regard to case, so -P LO is lo.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-P value", name);
+        diagnostics.Arrange("expected address", expected);
+        diagnostics.Arrange("expected port", port);
         var lookup = new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["lo"] = [IPAddress.Loopback, IPAddress.Parse("10.255.255.254"), IPAddress.IPv6Loopback],
@@ -42,12 +49,17 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
         });
         var resolver = new NamedDnsResolver(new Dictionary<string, IPAddress[]>());
 
-        InterfaceRun run = await RunAsync(name, LoggedIn + Retrieved, lookup, resolver, "172.26.99.197", Pending(port, expected));
+        InterfaceRun run = await RunAsync(diagnostics, name, LoggedIn + Retrieved, lookup, resolver, "172.26.99.197", Pending(port, expected));
 
+        diagnostics.DiffSent(LogInSent + $"EPRT |1|{expected}|{port}|\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(LogInSent + $"EPRT |1|{expected}|{port}|\r\n" + RetrieveSent, run.Sent);
+        diagnostics.Assert("looked-up names", name, string.Join(",", lookup.Names));
         CollectionAssert.AreEqual(new[] { name }, lookup.Names);
+        diagnostics.Assert("resolved hosts", string.Empty, string.Join(",", resolver.Hosts));
         Assert.IsEmpty(resolver.Hosts);
+        diagnostics.Assert("listen target", new ListenTarget(IPAddress.Parse(expected), 0, 0), run.Listener.Targets.Single());
         Assert.AreEqual(new ListenTarget(IPAddress.Parse(expected), 0, 0), run.Listener.Targets.Single());
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
 
@@ -63,6 +75,10 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
     {
         // Curl_if2ip keeps an IPv6 address only when Curl_ipv6_scope gives it the control
         // connection's scope, and announces it as inet_ntop writes it, with no scope ID.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("control address", control);
+        diagnostics.Arrange("interface addresses", addresses);
+        diagnostics.Arrange("expected address", expected);
         var lookup = new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>
         {
             ["if0"] = [.. addresses.Split(',').Select(IPAddress.Parse)],
@@ -70,10 +86,13 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
         IPAddress announced = IPAddress.Parse(expected);
         string family = announced.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6 ? "2" : "1";
 
-        InterfaceRun run = await RunAsync("if0", LoggedIn + Retrieved, lookup, new NamedDnsResolver(new Dictionary<string, IPAddress[]>()), control, Pending(40001, expected));
+        InterfaceRun run = await RunAsync(diagnostics, "if0", LoggedIn + Retrieved, lookup, new NamedDnsResolver(new Dictionary<string, IPAddress[]>()), control, Pending(40001, expected));
 
+        diagnostics.DiffSent(LogInSent + $"EPRT |{family}|{expected}|40001|\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(LogInSent + $"EPRT |{family}|{expected}|40001|\r\n" + RetrieveSent, run.Sent);
+        diagnostics.Assert("listen target", new ListenTarget(announced, 0, 0), run.Listener.Targets.Single());
         Assert.AreEqual(new ListenTarget(announced, 0, 0), run.Listener.Targets.Single());
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
 
@@ -85,17 +104,24 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
     {
         // Curl_if2ip answers IF2IP_AF_NOT_SUPPORTED, and ftp_state_use_port ends with
         // CURLE_FTP_PORT_FAILED without resolving the name.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("control address", control);
+        diagnostics.Arrange("interface addresses", addresses);
         var lookup = new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>
         {
             ["if0"] = [.. addresses.Split(',').Select(IPAddress.Parse)],
         });
         var resolver = new NamedDnsResolver(new Dictionary<string, IPAddress[]>());
 
-        InterfaceRun run = await RunAsync("if0", LoggedIn + "221 Bye\r\n", lookup, resolver, control);
+        InterfaceRun run = await RunAsync(diagnostics, "if0", LoggedIn + "221 Bye\r\n", lookup, resolver, control);
 
+        diagnostics.DiffSent(LogInSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(LogInSent + "QUIT\r\n", run.Sent);
+        diagnostics.Assert("resolved hosts", string.Empty, string.Join(",", resolver.Hosts));
         Assert.IsEmpty(resolver.Hosts);
+        diagnostics.Assert("listen targets", 0, run.Listener.Targets.Count);
         Assert.AreEqual(0, run.Listener.Targets.Count);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.FtpPortFailed, "Failed to do PORT"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpPortFailed, "Failed to do PORT"), run.Result);
     }
 
@@ -105,17 +131,23 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
         // The Schannel build has no getifaddrs, so its lookup finds no interface and
         // -P "Loopback Pseudo-Interface 1" was resolved as a host name (ADR-0108); off Windows
         // a name that is no interface is resolved the same way.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-P value", "Loopback Pseudo-Interface 1");
         var lookup = new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>());
         var resolver = new NamedDnsResolver(new Dictionary<string, IPAddress[]>
         {
             ["Loopback Pseudo-Interface 1"] = [IPAddress.Loopback],
         });
 
-        InterfaceRun run = await RunAsync("Loopback Pseudo-Interface 1", LoggedIn + Retrieved, lookup, resolver, "127.0.0.1", Pending(40002, "127.0.0.1"));
+        InterfaceRun run = await RunAsync(diagnostics, "Loopback Pseudo-Interface 1", LoggedIn + Retrieved, lookup, resolver, "127.0.0.1", Pending(40002, "127.0.0.1"));
 
+        diagnostics.DiffSent(LogInSent + "EPRT |1|127.0.0.1|40002|\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(LogInSent + "EPRT |1|127.0.0.1|40002|\r\n" + RetrieveSent, run.Sent);
+        diagnostics.Assert("looked-up names", "Loopback Pseudo-Interface 1", string.Join(",", lookup.Names));
         CollectionAssert.AreEqual(new[] { "Loopback Pseudo-Interface 1" }, lookup.Names);
+        diagnostics.Assert("resolved hosts", "Loopback Pseudo-Interface 1", string.Join(",", resolver.Hosts));
         CollectionAssert.AreEqual(new[] { "Loopback Pseudo-Interface 1" }, resolver.Hosts);
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
 
@@ -123,30 +155,41 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
     public async Task ExecuteAsync_PortDash_IsNotLookedUp()
     {
         // -P - is the control connection's own address; curl asks Curl_if2ip nothing.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-P value", "-");
         var lookup = new NamedNetworkInterfaceLookup(new Dictionary<string, IPAddress[]>());
 
-        InterfaceRun run = await RunAsync("-", LoggedIn + Retrieved, lookup, new NamedDnsResolver(new Dictionary<string, IPAddress[]>()), "127.0.0.1", Pending(40003, "127.0.0.1"));
+        InterfaceRun run = await RunAsync(diagnostics, "-", LoggedIn + Retrieved, lookup, new NamedDnsResolver(new Dictionary<string, IPAddress[]>()), "127.0.0.1", Pending(40003, "127.0.0.1"));
 
+        diagnostics.DiffSent(LogInSent + "EPRT |1|127.0.0.1|40003|\r\n" + RetrieveSent, run.Sent);
         Assert.AreEqual(LogInSent + "EPRT |1|127.0.0.1|40003|\r\n" + RetrieveSent, run.Sent);
+        diagnostics.Assert("looked-up names", string.Empty, string.Join(",", lookup.Names));
         Assert.IsEmpty(lookup.Names);
     }
 
     [TestMethod]
     public void Constructor_NullInterfaceLookup_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("interface lookup", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => new FtpProtocolHandler(
                 new QueuedConnector(),
                 new QueuedListener(),
                 new QueuedTlsProvider(),
                 new NamedDnsResolver(new Dictionary<string, IPAddress[]>()),
                 null!));
+
+        diagnostics.Act("throws", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     private static ScriptedPendingConnection Pending(int port, string address) =>
         new(new IPEndPoint(IPAddress.Parse(address), port), ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes("hello"))));
 
     private static async Task<InterfaceRun> RunAsync(
+        TestDiagnostics diagnostics,
         string ftpPort,
         string replies,
         INetworkInterfaceLookup lookup,
@@ -154,6 +197,7 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
         string? controlLocal,
         params ScriptedPendingConnection[] pending)
     {
+        diagnostics.ArrangeFtp(Url, replies);
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
         {
             LocalEndPoint = controlLocal is null ? null : new IPEndPoint(IPAddress.Parse(controlLocal), 60032),
@@ -165,7 +209,13 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
             mutable => mutable.FtpPort = ftpPort);
         var handler = new FtpProtocolHandler(connector, listener, new QueuedTlsProvider(), resolver, lookup);
 
-        TransferResult result = await handler.ExecuteAsync(context);
+        TransferResult result;
+        using (diagnostics.Phase("transfer"))
+        {
+            result = await handler.ExecuteAsync(context);
+        }
+
+        diagnostics.ActResult(result);
 
         return new InterfaceRun(result with { Report = null }, control, listener);
     }

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -19,6 +20,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerTimeLimitTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:47904/f.txt";
 
     private const string Greeting = "220 Recorder ready\r\n";
@@ -32,6 +35,9 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_NoGreetingBeforeTheConnectTimeout_EndsWithExit28AndCurlsOperationMessage()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_NoGreetingBeforeTheConnectTimeout_EndsWithExit28AndCurlsOperationMessage");
+
         // curl -m 1 / --connect-timeout 1 ftp://127.0.0.1:47903/f.txt, GREETING=STALL.
         var control = new StallingConnection();
         Task<TransferResult> run = StartAsync(control, OneSecond);
@@ -39,6 +45,8 @@ public sealed class FtpProtocolHandlerTimeLimitTests
 
         clock.Advance(OneSecond);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.OperationTimedOut, "Operation timed out after 1000 milliseconds with 0 bytes received"),
             (await run) with { Report = null });
@@ -48,6 +56,9 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_UserUnansweredBeforeTheConnectTimeout_EndsWithExit28AndNoQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_UserUnansweredBeforeTheConnectTimeout_EndsWithExit28AndNoQuit");
+
         // curl --connect-timeout 1 ftp://127.0.0.1:47904/f.txt, USER=STALL.
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
         Task<TransferResult> run = StartAsync(control, OneSecond);
@@ -56,6 +67,8 @@ public sealed class FtpProtocolHandlerTimeLimitTests
         clock.Advance(OneSecond);
 
         TransferResult result = await run;
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.OperationTimedOut, "Operation timed out after 1000 milliseconds with 0 bytes received"),
             result with { Report = null });
@@ -66,11 +79,16 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_LoginStalledShortOfTheConnectTimeout_IsStillRunning()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_LoginStalledShortOfTheConnectTimeout_IsStillRunning");
+
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
         Task<TransferResult> run = StartAsync(control, OneSecond);
         await control.Stalled;
 
         clock.Advance(TimeSpan.FromMilliseconds(999));
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromMilliseconds(1));
 
@@ -80,11 +98,16 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_NoConnectTimeout_HoldsTheLoginToCurls300Seconds()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_NoConnectTimeout_HoldsTheLoginToCurls300Seconds");
+
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
         Task<TransferResult> run = StartAsync(control, connectTimeout: null);
         await control.Stalled;
 
         clock.Advance(TimeSpan.FromSeconds(299));
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(OneSecond);
 
@@ -94,24 +117,34 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_ZeroConnectTimeout_HoldsTheLoginToCurls300Seconds()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ZeroConnectTimeout_HoldsTheLoginToCurls300Seconds");
+
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
         Task<TransferResult> run = StartAsync(control, TimeSpan.Zero);
         await control.Stalled;
 
         clock.Advance(TimeSpan.FromSeconds(300));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual("Operation timed out after 300000 milliseconds with 0 bytes received", (await run).ErrorMessage);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TimerFiresEarly_WaitsOutTheRestOfTheConnectTimeout()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_TimerFiresEarly_WaitsOutTheRestOfTheConnectTimeout");
+
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
         Task<TransferResult> run = StartAsync(control, OneSecond);
         await control.Stalled;
 
         clock.Advance(TimeSpan.FromMilliseconds(400));
         clock.FireEveryTimerNow();
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromMilliseconds(600));
 
@@ -121,6 +154,9 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_ControlConnectOutlastsTheConnectTimeout_EndsAtTheFirstStall()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ControlConnectOutlastsTheConnectTimeout_EndsAtTheFirstStall");
+
         // The limit counts from the start of the request, before the TCP connect.
         var control = new StallingConnection();
         var connector = new ClockAdvancingConnector(clock, TimeSpan.FromSeconds(2), control);
@@ -129,12 +165,17 @@ public sealed class FtpProtocolHandlerTimeLimitTests
 
         clock.Advance(TimeSpan.Zero);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", (await run).ErrorMessage);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_StalledAfterTheEntryPath_IsNotHeldToTheConnectTimeout()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_StalledAfterTheEntryPath_IsNotHeldToTheConnectTimeout");
+
         // Past PWD curl is in DO, which only -m limits: the stall ends with the transfer's
         // cancellation, which the runner turns into its message.
         using var cancellation = new CancellationTokenSource();
@@ -143,6 +184,8 @@ public sealed class FtpProtocolHandlerTimeLimitTests
         await control.Stalled;
 
         clock.Advance(TimeSpan.FromSeconds(10));
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.IsFalse(run.IsCompleted);
         await cancellation.CancelAsync();
 
@@ -153,6 +196,9 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_CancelledDuringTheLogin_LetsTheCancellationOut()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_CancelledDuringTheLogin_LetsTheCancellationOut");
+
         // -m running out first is the runner's to report.
         using var cancellation = new CancellationTokenSource();
         var control = new StallingConnection(Encoding.Latin1.GetBytes(Greeting));
@@ -161,18 +207,25 @@ public sealed class FtpProtocolHandlerTimeLimitTests
 
         await cancellation.CancelAsync();
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => run);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ControlConnected_ReportsTheTransferStartedBeforeTheGreeting()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ControlConnected_ReportsTheTransferStartedBeforeTheGreeting");
+
         // curl draws its progress meter, and -m's message says "Operation", from the TCP connect on.
         var progress = new RecordingProgress();
         var control = new StallingConnection();
         Task<TransferResult> run = StartAsync(new QueuedConnector(ConnectResult.Connected(control)), OneSecond, progress, CancellationToken.None);
         await control.Stalled;
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.IsTrue(progress.Started);
         clock.Advance(OneSecond);
         await run;
@@ -181,6 +234,9 @@ public sealed class FtpProtocolHandlerTimeLimitTests
     [TestMethod]
     public async Task ExecuteAsync_StalledMidRetrieve_ReportsTheBytesReceivedAndLetsTheCancellationOut()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_StalledMidRetrieve_ReportsTheBytesReceivedAndLetsTheCancellationOut");
+
         // curl -m 1 ftp://127.0.0.1:47907/f.txt, SIZE=213 100 and 5 bytes sent before the
         // data connection stalled: "with 5 out of 100 bytes received", from these reports.
         using var cancellation = new CancellationTokenSource();
@@ -194,6 +250,8 @@ public sealed class FtpProtocolHandlerTimeLimitTests
 
         await cancellation.CancelAsync();
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         await Assert.ThrowsExactlyAsync<TaskCanceledException>(() => run);
         CollectionAssert.AreEqual(new[] { (5L, (long?)100) }, progress.Downloaded);
     }

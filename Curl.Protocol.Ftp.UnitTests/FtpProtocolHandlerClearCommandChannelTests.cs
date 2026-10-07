@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -18,6 +19,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerClearCommandChannelTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Greeting = "220 Recorder ready\r\n";
 
     private const string AuthAccepted = "234 AUTH accepted\r\n";
@@ -41,6 +44,9 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
     [DataRow(FtpCommandChannelClearing.Active, true)]
     public async Task ExecuteAsync_CccAccepted_SendsTheRestInPlainText(FtpCommandChannelClearing clearing, bool sendCloseNotifyFirst)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_CccAccepted_SendsTheRestInPlainText");
+
         // curl -k --ftp-ssl-reqd --ftp-ssl-ccc [--ftp-ssl-ccc-mode active] ftp://.../a.txt,
         // OpenSSL build: PWD and everything after it in plain text, exit 0.
         var plaintext = Scripted(Retrieved);
@@ -48,6 +54,8 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
 
         CccRun run = await RunAsync(securedControl, context => context.FtpCommandChannelClearing = clearing);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual("AUTH SSL\r\n", run.PlainSent);
         Assert.AreEqual(LogInAndProtectSent + "CCC\r\n", Encoding.Latin1.GetString(securedControl.Sent));
         CollectionAssert.AreEqual(new[] { sendCloseNotifyFirst }, securedControl.ClearTlsRequests);
@@ -59,12 +67,17 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
     [TestMethod]
     public async Task ExecuteAsync_CccAnswered450_ClearsTlsAsBelow500()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_CccAnswered450_ClearsTlsAsBelow500");
+
         // curl 8.18.0 (OpenSSL) with CCC answered 450: TLS is cleared all the same.
         var plaintext = Scripted(Retrieved);
         var securedControl = Scripted(LoggedInAndProtected + "450 later\r\n", clearedTo: plaintext);
 
         CccRun run = await RunAsync(securedControl, context => context.FtpCommandChannelClearing = FtpCommandChannelClearing.Passive);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.HasCount(1, securedControl.ClearTlsRequests);
         Assert.AreEqual(RetrieveSent, Encoding.Latin1.GetString(plaintext.Sent));
         Assert.AreEqual(TransferResult.Success(5), run.Result);
@@ -75,6 +88,9 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
     [DataRow("533 CCC denied")]
     public async Task ExecuteAsync_CccRefused_CarriesOnOverTls(string refusal)
     {
+        var testDiagnostics = TestDiagnostics.For(TestContext);
+        testDiagnostics.Arrange("test", "ExecuteAsync_CccRefused_CarriesOnOverTls");
+
         // curl -k --ftp-ssl-reqd --ftp-ssl-ccc, CCC answered 500 or 533: PWD follows over TLS, exit 0.
         var diagnostics = new RecordingDiagnosticLog(DiagnosticLogLevel.Warning);
         var securedControl = Scripted(LoggedInAndProtected + refusal + "\r\n" + Retrieved);
@@ -85,6 +101,8 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
             context.DiagnosticLog = diagnostics;
         });
 
+        testDiagnostics.Act("steps before the checks", "completed");
+        testDiagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(LogInAndProtectSent + "CCC\r\n" + RetrieveSent, Encoding.Latin1.GetString(securedControl.Sent));
         Assert.IsEmpty(securedControl.ClearTlsRequests);
         CollectionAssert.Contains(
@@ -98,6 +116,9 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
     [DataRow(FtpCommandChannelClearing.Active)]
     public async Task ExecuteAsync_TlsNotCleared_EndsWithExit81WithoutQuit(FtpCommandChannelClearing clearing)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_TlsNotCleared_EndsWithExit81WithoutQuit");
+
         // curl 8.21.0 (Schannel) -v -k --ftp-ssl-reqd --ftp-ssl-ccc, CCC answered 200:
         // "* Failed to clear the command channel (CCC)", then exit 81 with no QUIT.
         var events = new RecordingTransferEvents();
@@ -109,6 +130,8 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
             context.Events = events;
         });
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(LogInAndProtectSent + "CCC\r\n", Encoding.Latin1.GetString(securedControl.Sent));
         Assert.AreEqual("Failed to clear the command channel (CCC)", events.Info[^1]);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Again, "Failed to clear the command channel (CCC)"), run.Result);
@@ -117,6 +140,9 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
     [TestMethod]
     public async Task ExecuteAsync_FtpsUrl_ClearsTheImplicitTlsControlConnection()
     {
+        var testDiagnostics = TestDiagnostics.For(TestContext);
+        testDiagnostics.Arrange("test", "ExecuteAsync_FtpsUrl_ClearsTheImplicitTlsControlConnection");
+
         // curl -k --ftp-ssl-ccc ftps://.../a.txt: CCC follows PROT on implicit TLS too.
         var diagnostics = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
         var plaintext = Scripted(Retrieved);
@@ -134,6 +160,8 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
 
         TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
 
+        testDiagnostics.Act("steps before the checks", "completed");
+        testDiagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(LogInAndProtectSent + "CCC\r\n", Encoding.Latin1.GetString(control.Sent));
         Assert.AreEqual(RetrieveSent, Encoding.Latin1.GetString(plaintext.Sent));
         CollectionAssert.Contains(diagnostics.At(DiagnosticLogLevel.Info), "CCC: the control connection is plaintext");
@@ -143,6 +171,9 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
     [TestMethod]
     public async Task ExecuteAsync_CccWithoutTls_SendsNoCcc()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_CccWithoutTls_SendsNoCcc");
+
         // --ftp-ssl-ccc without --ssl or --ssl-reqd: the control connection is never TLS, so no CCC.
         var control = Scripted(Greeting + "331 Password required\r\n230 Logged in\r\n" + Retrieved);
         var connector = new QueuedConnector(ConnectResult.Connected(control), ConnectResult.Connected(Scripted("hello")));
@@ -152,6 +183,8 @@ public sealed class FtpProtocolHandlerClearCommandChannelTests
 
         TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(), new QueuedTlsProvider()).ExecuteAsync(context);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\n" + RetrieveSent, Encoding.Latin1.GetString(control.Sent));
         Assert.IsEmpty(control.ClearTlsRequests);
         Assert.AreEqual(TransferResult.Success(5), result with { Report = null });

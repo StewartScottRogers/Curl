@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -15,6 +16,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerMaxFileSizeTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:18321/dir/f.txt";
 
     private const string InDirectory = "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n250 OK\r\n";
@@ -38,9 +41,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeOverTheLimit_FailsWithExit63BeforeRetr()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeOverTheLimit_FailsWithExit63BeforeRetr");
+
         // curl --max-filesize 5 on the fourteen-byte file: SIZE, QUIT, "Maximum file size exceeded".
         FtpRun run = await RunAsync(Sized + Bye, Data, 5);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual("", run.OutputText);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Maximum file size exceeded", 0), run.Result);
@@ -49,9 +57,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeEqualToTheLimit_Downloads()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeEqualToTheLimit_Downloads");
+
         // curl --max-filesize 14 on the fourteen-byte file: exit 0.
         FtpRun run = await RunAsync(Sized + Opened + Bye, Data, 10);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "RETR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Data, run.OutputText);
         Assert.AreEqual(TransferResult.Success(10), run.Result);
@@ -60,9 +73,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeUnderTheLimit_Downloads()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeUnderTheLimit_Downloads");
+
         // curl --max-filesize 100: exit 0.
         FtpRun run = await RunAsync(Sized + Opened + Bye, Data, 100);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "RETR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(10), run.Result);
     }
@@ -70,8 +88,13 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_ZeroLimit_MeansNoLimit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ZeroLimit_MeansNoLimit");
+
         FtpRun run = await RunAsync(Sized + Opened + Bye, Data, 0);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(Data, run.OutputText);
         Assert.AreEqual(TransferResult.Success(10), run.Result);
     }
@@ -79,9 +102,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_ResumeWithTheWholeFileOverTheLimit_FailsBeforeRest()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ResumeWithTheWholeFileOverTheLimit_FailsBeforeRest");
+
         // curl --max-filesize 10 -C 10 on the fourteen-byte file: the whole size is compared, not what is left.
         FtpRun run = await RunAsync(Sized + Bye, Data, 8, resumeFrom: 5);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Maximum file size exceeded", 0), run.Result);
     }
@@ -89,9 +117,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_RangeWithTheWholeFileOverTheLimit_SendsAborThenQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_RangeWithTheWholeFileOverTheLimit_SendsAborThenQuit");
+
         // curl --max-filesize 10 -r 0-3 on the fourteen-byte file: SIZE, ABOR, QUIT.
         FtpRun run = await RunAsync(Sized + "502 Command not implemented\r\n" + Bye, Data, 8, range: ByteRange.Bounded(0, 3));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "ABOR\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Maximum file size exceeded", 0), run.Result);
     }
@@ -99,9 +132,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeRefusedWith550_StillFailsWithExit78()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeRefusedWith550_StillFailsWithExit78");
+
         // curl --max-filesize 5 with SIZE answered 550: "The file does not exist", as without the limit.
         FtpRun run = await RunAsync(Typed + "550 No such file\r\n" + Bye, Data, 5);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "QUIT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteFileNotFound, "The file does not exist", 0), run.Result);
     }
@@ -109,9 +147,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeUnknownAndDataOverTheLimit_StopsAtTheLimitWithoutQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeUnknownAndDataOverTheLimit_StopsAtTheLimitWithoutQuit");
+
         // curl --max-filesize 5 with SIZE answered 500: RETR, "Hello" written, no QUIT.
         FtpRun run = await RunAsync(Unsized + Opened + Bye, Data, 5);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "RETR f.txt\r\n", run.Sent);
         Assert.AreEqual("01234", run.OutputText);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (5) with 5 bytes", 5), run.Result);
@@ -120,9 +163,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeUnknownAndDataEqualToTheLimit_Downloads()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeUnknownAndDataEqualToTheLimit_Downloads");
+
         // curl --max-filesize 14 with SIZE answered 500: exit 0.
         FtpRun run = await RunAsync(Unsized + Opened + Bye, Data, 10);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "RETR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Data, run.OutputText);
         Assert.AreEqual(TransferResult.Success(10), run.Result);
@@ -131,6 +179,9 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeUnknownAndMoreArrivingOnceTheLimitIsFilled_WritesNothingMore()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeUnknownAndMoreArrivingOnceTheLimitIsFilled_WritesNothingMore");
+
         // The limit filled by the first read exactly: the second read is refused whole, with no empty write.
         var output = new CountingStream();
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -139,6 +190,8 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
             new ScriptedConnection(Encoding.Latin1.GetBytes("01234"), Encoding.Latin1.GetBytes("56789")),
             c => Limited(c, 5, output: output));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "RETR f.txt\r\n", run.Sent);
         Assert.AreEqual(1, output.Writes);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (5) with 5 bytes", 5), run.Result);
@@ -147,9 +200,14 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_SizeUnknownAndResumed_CountsTheLimitFromTheResumedByte()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SizeUnknownAndResumed_CountsTheLimitFromTheResumedByte");
+
         // curl --max-filesize 5 -C 4 with SIZE answered 500: REST 4, "o, wo" written.
         FtpRun run = await RunAsync(Unsized + "350 Restarting\r\n" + Opened + Bye, "456789", 5, resumeFrom: 4);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual(SizeSent + "REST 4\r\nRETR f.txt\r\n", run.Sent);
         Assert.AreEqual("45678", run.OutputText);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (5) with 5 bytes", 5), run.Result);
@@ -158,6 +216,9 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
     [TestMethod]
     public async Task ExecuteAsync_ListingOverTheLimit_StopsAtTheLimitWithoutQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ListingOverTheLimit_StopsAtTheLimitWithoutQuit");
+
         // curl --max-filesize 5 ftp://host/: TYPE A, LIST, "Hello" written, no QUIT.
         FtpRun run = await FtpRun.ExecuteAsync(
             "ftp://127.0.0.1:18321/dir/",
@@ -165,6 +226,8 @@ public sealed class FtpProtocolHandlerMaxFileSizeTests
             Data,
             c => Limited(c, 5));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nEPSV\r\nTYPE A\r\nLIST\r\n", run.Sent);
         Assert.AreEqual("01234", run.OutputText);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (5) with 5 bytes", 5), run.Result);

@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1474 — Make every test in Curl.Protocol.Ftp.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,23 @@ Every test in `Curl.Protocol.Ftp.UnitTests` writes, through BL-1457's shared `Te
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Protocol.Ftp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Protocol.Ftp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Ftp.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Ftp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Ftp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Ftp.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run, at the upper end: 488 test methods in 29 files.
 
+- Before: Assert. 1125, [TestMethod 488, [DataRow( 180. After: Assert. 1125, [TestMethod 488, [DataRow( 180.
+- Shared lines come from the new Fakes/FtpDiagnostics.cs (ArrangeFtp, ActRun, ActResult, DiffSent); several files' private RunAsync helpers take the test's TestDiagnostics and write ARRANGE, ACT and a PHASE transfer line.
+- Detailed run: 616 total, 612 passed, 4 skipped by OSCondition on this platform; the 612 tests that ran each wrote an END line, and none has arrange 0, act 0 or assert 0. Skipped tests never start, so they write no END line.
+- No test printed a SLOW: line; no follow-up task needed.
+
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Protocol.Ftp.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF diagnostics

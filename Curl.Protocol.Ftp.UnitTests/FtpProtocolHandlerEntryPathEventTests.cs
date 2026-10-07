@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -16,6 +17,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerEntryPathEventTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string File = "hello ftp\r\n";
 
     private const string LoggingIn = "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n";
@@ -39,12 +42,17 @@ public sealed class FtpProtocolHandlerEntryPathEventTests
     [DataRow("/dir/", FtpFileMethod.NoCwd, "> EPSV\r\n", DisplayName = "a nocwd listing")]
     public async Task ExecuteAsync_PathNeedingNoCwd_ReportsTheSamePathLineAfterTheEntryPath(string path, FtpFileMethod method, string next)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("ftp method", method);
+        diagnostics.Arrange("expected next command", FtpDiagnostics.Escape(next));
         bool listing = path.EndsWith('/');
-        EventRun run = await RunAsync(path, RootPwd + Epsv + (listing ? Listed : Retrieved), context => context.FtpFileMethod = method);
+        EventRun run = await RunAsync(diagnostics, path, RootPwd + Epsv + (listing ? Listed : Retrieved), context => context.FtpFileMethod = method);
 
-        CollectionAssert.AreEqual(
-            new[] { "> PWD\r\n", "< " + RootPwd, EntryPathIsRoot, SamePath, next },
-            run.Events.Transcript.Skip(5).Take(5).ToArray());
+        string[] expected = ["> PWD\r\n", "< " + RootPwd, EntryPathIsRoot, SamePath, next];
+        string[] actual = run.Events.Transcript.Skip(5).Take(5).ToArray();
+        DiffLines(diagnostics, "transcript lines 5 to 9", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("is success", true, run.Result.IsSuccess);
         Assert.IsTrue(run.Result.IsSuccess);
     }
 
@@ -55,45 +63,62 @@ public sealed class FtpProtocolHandlerEntryPathEventTests
     [DataRow("//a/file.txt", FtpFileMethod.NoCwd, "> EPSV\r\n", DisplayName = "a // path under nocwd")]
     public async Task ExecuteAsync_PathLeavingTheEntryDirectory_ReportsNoSamePathLine(string path, FtpFileMethod method, string next)
     {
-        EventRun run = await RunAsync(path, RootPwd + "250 OK\r\n250 OK\r\n", context => context.FtpFileMethod = method);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("ftp method", method);
+        diagnostics.Arrange("expected next command", FtpDiagnostics.Escape(next));
+        EventRun run = await RunAsync(diagnostics, path, RootPwd + "250 OK\r\n250 OK\r\n", context => context.FtpFileMethod = method);
 
-        CollectionAssert.AreEqual(
-            new[] { "> PWD\r\n", "< " + RootPwd, EntryPathIsRoot, next },
-            run.Events.Transcript.Skip(5).Take(4).ToArray());
+        string[] expected = ["> PWD\r\n", "< " + RootPwd, EntryPathIsRoot, next];
+        string[] actual = run.Events.Transcript.Skip(5).Take(4).ToArray();
+        DiffLines(diagnostics, "transcript lines 5 to 8", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("same path line reported", false, run.Events.Transcript.Contains(SamePath));
         Assert.DoesNotContain(SamePath, run.Events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_QuoteAfterLogin_ReportsTheSamePathLineBeforeTheQuote()
     {
-        // curl -v -Q NOOP ftp://127.0.0.1:47962/file.txt, NOOP answered 200 ok.
-        EventRun run = await RunAsync("/file.txt", RootPwd + "200 ok\r\n" + Epsv + Retrieved, context => context.QuoteCommands.Add("NOOP"));
+        var diagnostics = TestDiagnostics.For(TestContext);
 
-        CollectionAssert.AreEqual(
-            new[] { EntryPathIsRoot, SamePath, "> NOOP\r\n", "< 200 ok\r\n", "> EPSV\r\n" },
-            run.Events.Transcript.Skip(7).Take(5).ToArray());
+        // curl -v -Q NOOP ftp://127.0.0.1:47962/file.txt, NOOP answered 200 ok.
+        diagnostics.Arrange("option", "-Q NOOP");
+        EventRun run = await RunAsync(diagnostics, "/file.txt", RootPwd + "200 ok\r\n" + Epsv + Retrieved, context => context.QuoteCommands.Add("NOOP"));
+
+        string[] expected = [EntryPathIsRoot, SamePath, "> NOOP\r\n", "< 200 ok\r\n", "> EPSV\r\n"];
+        string[] actual = run.Events.Transcript.Skip(7).Take(5).ToArray();
+        DiffLines(diagnostics, "transcript lines 7 to 11", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_QuoteAfterLoginWithACwd_ReportsNoSamePathLine()
     {
-        // curl -v -Q NOOP ftp://127.0.0.1:47961/dir/file.txt
-        EventRun run = await RunAsync("/dir/file.txt", RootPwd + "200 ok\r\n250 OK\r\n" + Epsv + Retrieved, context => context.QuoteCommands.Add("NOOP"));
+        var diagnostics = TestDiagnostics.For(TestContext);
 
-        CollectionAssert.AreEqual(
-            new[] { EntryPathIsRoot, "> NOOP\r\n", "< 200 ok\r\n", "> CWD dir\r\n" },
-            run.Events.Transcript.Skip(7).Take(4).ToArray());
+        // curl -v -Q NOOP ftp://127.0.0.1:47961/dir/file.txt
+        diagnostics.Arrange("option", "-Q NOOP");
+        EventRun run = await RunAsync(diagnostics, "/dir/file.txt", RootPwd + "200 ok\r\n250 OK\r\n" + Epsv + Retrieved, context => context.QuoteCommands.Add("NOOP"));
+
+        string[] expected = [EntryPathIsRoot, "> NOOP\r\n", "< 200 ok\r\n", "> CWD dir\r\n"];
+        string[] actual = run.Events.Transcript.Skip(7).Take(4).ToArray();
+        DiffLines(diagnostics, "transcript lines 7 to 10", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RelativeEntryPath_ReportsTheEntryPathOnceSystIsSent()
     {
-        // curl -v ftp://127.0.0.1:47962/file.txt, PWD answered 257 "home" is current.
-        EventRun run = await RunAsync("/file.txt", "257 \"home\" is current\r\n502 Command not implemented\r\n" + Epsv + Retrieved, _ => { });
+        var diagnostics = TestDiagnostics.For(TestContext);
 
-        CollectionAssert.AreEqual(
-            new[] { "< 257 \"home\" is current\r\n", "> SYST\r\n", "* Entry path is 'home'", "< 502 Command not implemented\r\n", SamePath, "> EPSV\r\n" },
-            run.Events.Transcript.Skip(6).Take(6).ToArray());
+        // curl -v ftp://127.0.0.1:47962/file.txt, PWD answered 257 "home" is current.
+        diagnostics.Arrange("PWD answer", "257 \"home\" is current");
+        EventRun run = await RunAsync(diagnostics, "/file.txt", "257 \"home\" is current\r\n502 Command not implemented\r\n" + Epsv + Retrieved, _ => { });
+
+        string[] expected = ["< 257 \"home\" is current\r\n", "> SYST\r\n", "* Entry path is 'home'", "< 502 Command not implemented\r\n", SamePath, "> EPSV\r\n"];
+        string[] actual = run.Events.Transcript.Skip(6).Take(6).ToArray();
+        DiffLines(diagnostics, "transcript lines 6 to 11", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -101,7 +126,10 @@ public sealed class FtpProtocolHandlerEntryPathEventTests
     {
         // curl -v ftp://127.0.0.1:47962/file.txt, PWD answered "QSYS.LIB" then "/QSYS.LIB",
         // SYST 215 OS/400 is the remote, SITE 250 ok.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("system", "OS/400");
         EventRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             "257 \"QSYS.LIB\" is current\r\n215 OS/400 is the remote\r\n250 ok\r\n257 \"/QSYS.LIB\" is current\r\n" + Epsv + Retrieved,
             _ => { });
@@ -121,7 +149,9 @@ public sealed class FtpProtocolHandlerEntryPathEventTests
             SamePath,
             "> EPSV\r\n",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(5).Take(12).ToArray());
+        string[] actual = run.Events.Transcript.Skip(5).Take(12).ToArray();
+        DiffLines(diagnostics, "transcript lines 5 to 16", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -130,16 +160,25 @@ public sealed class FtpProtocolHandlerEntryPathEventTests
     [DataRow("500 no", null, DisplayName = "PWD refused")]
     public async Task ExecuteAsync_PwdNamingNoDirectory_ReportsCurlsLineForTheReply(string pwdReply, string? line)
     {
-        EventRun run = await RunAsync("/file.txt", pwdReply + "\r\n" + Epsv + Retrieved, _ => { });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("PWD reply", pwdReply);
+        diagnostics.Arrange("expected line", line ?? "(none)");
+        EventRun run = await RunAsync(diagnostics, "/file.txt", pwdReply + "\r\n" + Epsv + Retrieved, _ => { });
 
         string[] expected = line is null
             ? ["< " + pwdReply + "\r\n", SamePath, "> EPSV\r\n"]
             : ["< " + pwdReply + "\r\n", line, SamePath, "> EPSV\r\n"];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(6).Take(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.Skip(6).Take(expected.Length).ToArray();
+        DiffLines(diagnostics, "transcript from line 6", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
-    private static async Task<EventRun> RunAsync(string path, string repliesAfterLogin, Action<MutableContext> adjust)
+    private static void DiffLines(TestDiagnostics diagnostics, string label, IEnumerable<string> expected, IEnumerable<string> actual) =>
+        diagnostics.Diff(label, FtpDiagnostics.Escape(string.Join(" | ", expected)), FtpDiagnostics.Escape(string.Join(" | ", actual)));
+
+    private static async Task<EventRun> RunAsync(TestDiagnostics diagnostics, string path, string repliesAfterLogin, Action<MutableContext> adjust)
     {
+        diagnostics.ArrangeFtp("ftp://127.0.0.1:47961" + path, LoggingIn + repliesAfterLogin);
         var events = new RecordingTransferEvents();
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(LoggingIn + repliesAfterLogin))
         {
@@ -156,7 +195,13 @@ public sealed class FtpProtocolHandlerEntryPathEventTests
                 adjust(mutable);
             });
 
-        TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(), new QueuedTlsProvider()).ExecuteAsync(context);
+        TransferResult result;
+        using (diagnostics.Phase("transfer"))
+        {
+            result = await new FtpProtocolHandler(connector, new QueuedListener(), new QueuedTlsProvider()).ExecuteAsync(context);
+        }
+
+        diagnostics.ActResult(result);
         return new EventRun(result, events);
     }
 
