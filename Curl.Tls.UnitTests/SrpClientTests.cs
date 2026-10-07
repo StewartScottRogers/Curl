@@ -1,6 +1,7 @@
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Tls;
 
@@ -39,52 +40,108 @@ public sealed class SrpClientTests
         "41BB59B6 D5979B5C 00A172B4 A2A5903A 0BDCAF8A 709585EB 2AFAFA8F 3499B200 210DCC1F 10EB3394 3CD67FC8 8A2F39A4 BE5BEC4E C0A3212D " +
         "C346D7E4 74B29EDE 8A469FFE CA686E5A");
 
-    [TestMethod]
-    public void MultiplierIsAppendixBsK() =>
-        CollectionAssert.AreEqual(Hex("7556AA04 5AEF2CDD 07ABAF0F 665C3E81 8913186F"), SrpClient.ComputeMultiplier(SrpGroup.Bits1024));
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    public void PrivateKeyIsAppendixBsX() =>
-        CollectionAssert.AreEqual(Hex("94B7555A ABE9127C C58CCF49 93DB6CF8 4D16C124"), SrpClient.ComputePrivateKey(Salt, Identity, Password));
+    public void MultiplierIsAppendixBsK()
+    {
+        byte[] expected = Hex("7556AA04 5AEF2CDD 07ABAF0F 665C3E81 8913186F");
+        Diagnostics.Arrange("group", "RFC 5054 Appendix A, 1024-bit");
+
+        byte[] k = SrpClient.ComputeMultiplier(SrpGroup.Bits1024);
+
+        WriteResult("k", expected, k);
+        CollectionAssert.AreEqual(expected, k);
+    }
 
     [TestMethod]
-    public void VerifierIsAppendixBsV() =>
-        CollectionAssert.AreEqual(ExpectedVerifier, SrpClient.ComputeVerifier(SrpGroup.Bits1024, SrpClient.ComputePrivateKey(Salt, Identity, Password)));
+    public void PrivateKeyIsAppendixBsX()
+    {
+        byte[] expected = Hex("94B7555A ABE9127C C58CCF49 93DB6CF8 4D16C124");
+        WriteCredentials();
+
+        byte[] x = SrpClient.ComputePrivateKey(Salt, Identity, Password);
+
+        WriteResult("x", expected, x);
+        CollectionAssert.AreEqual(expected, x);
+    }
 
     [TestMethod]
-    public void ClientPublicValueIsAppendixBsA() =>
-        CollectionAssert.AreEqual(ExpectedA, SrpClient.ComputePublicValue(SrpGroup.Bits1024, PrivateValueA));
+    public void VerifierIsAppendixBsV()
+    {
+        WriteCredentials();
+
+        byte[] v = SrpClient.ComputeVerifier(SrpGroup.Bits1024, SrpClient.ComputePrivateKey(Salt, Identity, Password));
+
+        WriteResult("v", ExpectedVerifier, v);
+        CollectionAssert.AreEqual(ExpectedVerifier, v);
+    }
+
+    [TestMethod]
+    public void ClientPublicValueIsAppendixBsA()
+    {
+        Diagnostics.Arrange("a", Convert.ToHexStringLower(PrivateValueA));
+
+        byte[] a = SrpClient.ComputePublicValue(SrpGroup.Bits1024, PrivateValueA);
+
+        WriteResult("A", ExpectedA, a);
+        CollectionAssert.AreEqual(ExpectedA, a);
+    }
 
     [TestMethod]
     public void ServerPublicValueFromTheVerifierIsAppendixBsB()
     {
+        Diagnostics.Arrange("b", Convert.ToHexStringLower(PrivateValueB));
         BigInteger n = Integer(SrpGroup.Bits1024.Prime);
         BigInteger k = Integer(SrpClient.ComputeMultiplier(SrpGroup.Bits1024));
         BigInteger b = ((k * Integer(ExpectedVerifier)) + BigInteger.ModPow(2, Integer(PrivateValueB), n)) % n;
 
-        CollectionAssert.AreEqual(ExpectedB, b.ToByteArray(isUnsigned: true, isBigEndian: true));
+        byte[] serverPublicValue = b.ToByteArray(isUnsigned: true, isBigEndian: true);
+
+        WriteResult("B", ExpectedB, serverPublicValue);
+        CollectionAssert.AreEqual(ExpectedB, serverPublicValue);
     }
 
     [TestMethod]
-    public void ScramblerIsAppendixBsU() =>
-        CollectionAssert.AreEqual(Hex("CE38B959 3487DA98 554ED47D 70A7AE5F 462EF019"), SrpClient.ComputeScrambler(SrpGroup.Bits1024, ExpectedA, ExpectedB));
+    public void ScramblerIsAppendixBsU()
+    {
+        byte[] expected = Hex("CE38B959 3487DA98 554ED47D 70A7AE5F 462EF019");
+        Diagnostics.Bytes("A", ExpectedA);
+        Diagnostics.Arrange("B", Convert.ToHexStringLower(ExpectedB));
+
+        byte[] u = SrpClient.ComputeScrambler(SrpGroup.Bits1024, ExpectedA, ExpectedB);
+
+        WriteResult("u", expected, u);
+        CollectionAssert.AreEqual(expected, u);
+    }
 
     [TestMethod]
     public void PremasterSecretIsAppendixBs()
     {
+        WriteCredentials();
+        Diagnostics.Arrange("a", Convert.ToHexStringLower(PrivateValueA));
         byte[] privateKey = SrpClient.ComputePrivateKey(Salt, Identity, Password);
 
-        CollectionAssert.AreEqual(ExpectedPremasterSecret, SrpClient.ComputePremasterSecret(SrpGroup.Bits1024, privateKey, PrivateValueA, ExpectedB));
+        byte[] premasterSecret = SrpClient.ComputePremasterSecret(SrpGroup.Bits1024, privateKey, PrivateValueA, ExpectedB);
+
+        WriteResult("premaster secret", ExpectedPremasterSecret, premasterSecret);
+        CollectionAssert.AreEqual(ExpectedPremasterSecret, premasterSecret);
     }
 
     [TestMethod]
     public void ServerComputesTheSamePremasterSecretFromAAndTheVerifier()
     {
+        Diagnostics.Arrange("b", Convert.ToHexStringLower(PrivateValueB));
         BigInteger n = Integer(SrpGroup.Bits1024.Prime);
         BigInteger u = Integer(SrpClient.ComputeScrambler(SrpGroup.Bits1024, ExpectedA, ExpectedB));
         BigInteger basis = Integer(ExpectedA) * BigInteger.ModPow(Integer(ExpectedVerifier), u, n) % n;
 
-        CollectionAssert.AreEqual(ExpectedPremasterSecret, BigInteger.ModPow(basis, Integer(PrivateValueB), n).ToByteArray(isUnsigned: true, isBigEndian: true));
+        byte[] premasterSecret = BigInteger.ModPow(basis, Integer(PrivateValueB), n).ToByteArray(isUnsigned: true, isBigEndian: true);
+
+        WriteResult("server's premaster secret", ExpectedPremasterSecret, premasterSecret);
+        CollectionAssert.AreEqual(ExpectedPremasterSecret, premasterSecret);
     }
 
     [TestMethod]
@@ -92,10 +149,13 @@ public sealed class SrpClientTests
     {
         byte[] padded = new byte[SrpGroup.Bits1024.PrimeLength];
         padded[^1] = 7;
+        Diagnostics.Arrange("A and B", "07 and 00 00 07, each padded to 128 bytes");
 
         byte[] expected = SHA1.HashData([.. padded, .. padded]);
+        byte[] u = SrpClient.ComputeScrambler(SrpGroup.Bits1024, [7], [0, 0, 7]);
 
-        CollectionAssert.AreEqual(expected, SrpClient.ComputeScrambler(SrpGroup.Bits1024, [7], [0, 0, 7]));
+        WriteResult("u", expected, u);
+        CollectionAssert.AreEqual(expected, u);
     }
 
     // SHA-256 of each prime's upper-case hex, computed from the text of RFC 5054 Appendix A.
@@ -109,8 +169,12 @@ public sealed class SrpClientTests
     [DataRow(6, 8192, 19, "d0c08f76798cac51345c195a01a2bea21bc577cfa9d857bbc6627ee41cb0b2b6")]
     public void GroupTableIsAppendixA(int index, int bits, int generator, string primeHexSha256)
     {
+        Diagnostics.Arrange("group index", index);
         SrpGroup group = SrpGroup.All[index];
 
+        string primeHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.ASCII.GetBytes(Convert.ToHexString(group.Prime))));
+        Diagnostics.Act("prime bits, length, generator", $"{Integer(group.Prime).GetBitLength()}, {group.PrimeLength}, {Convert.ToHexStringLower(group.Generator.ToArray())}");
+        Diagnostics.Diff("SHA-256 of the prime's hex", primeHexSha256, primeHash);
         Assert.AreEqual(bits / 8, group.PrimeLength);
         Assert.AreEqual(bits, (int)Integer(group.Prime).GetBitLength());
         CollectionAssert.AreEqual(new[] { (byte)generator }, group.Generator.ToArray());
@@ -119,25 +183,76 @@ public sealed class SrpClientTests
     }
 
     [TestMethod]
-    public void FindIgnoresLeadingZeroBytes() =>
-        Assert.AreSame(SrpGroup.Bits2048, SrpGroup.Find([0, .. SrpGroup.Bits2048.Prime], [0, 2]));
+    public void FindIgnoresLeadingZeroBytes()
+    {
+        Diagnostics.Arrange("prime and generator", "00 then the 2048-bit prime, and 00 02");
+
+        SrpGroup? found = SrpGroup.Find([0, .. SrpGroup.Bits2048.Prime], [0, 2]);
+
+        WriteFound(found, SrpGroup.Bits2048);
+        Assert.AreSame(SrpGroup.Bits2048, found);
+    }
 
     [TestMethod]
-    public void FindRefusesAKnownPrimeWithAnotherGenerator() =>
-        Assert.IsNull(SrpGroup.Find(SrpGroup.Bits1024.Prime, [5]));
+    public void FindRefusesAKnownPrimeWithAnotherGenerator()
+    {
+        Diagnostics.Arrange("prime and generator", "the 1024-bit prime, and 05");
+
+        SrpGroup? found = SrpGroup.Find(SrpGroup.Bits1024.Prime, [5]);
+
+        WriteFound(found, null);
+        Assert.IsNull(found);
+    }
 
     [TestMethod]
-    public void FindRefusesAPrimeOutsideAppendixA() =>
-        Assert.IsNull(SrpGroup.Find(FiniteFieldDhGroupPrime(), [2]));
+    public void FindRefusesAPrimeOutsideAppendixA()
+    {
+        Diagnostics.Arrange("prime and generator", "the ffdhe2048 prime, and 02");
+
+        SrpGroup? found = SrpGroup.Find(FiniteFieldDhGroupPrime(), [2]);
+
+        WriteFound(found, null);
+        Assert.IsNull(found);
+    }
 
     [TestMethod]
     public void EveryMethodRefusesANullGroup()
     {
+        Diagnostics.Arrange("group", "null");
+        Diagnostics.Act("calls", "ComputeMultiplier, ComputeVerifier, ComputePublicValue, ComputeScrambler, ComputePremasterSecret");
+        Diagnostics.Assert("exception each call must throw", nameof(ArgumentNullException), "checked by Assert.ThrowsExactly below");
         Assert.ThrowsExactly<ArgumentNullException>(() => SrpClient.ComputeMultiplier(null!));
         Assert.ThrowsExactly<ArgumentNullException>(() => SrpClient.ComputeVerifier(null!, [1]));
         Assert.ThrowsExactly<ArgumentNullException>(() => SrpClient.ComputePublicValue(null!, [1]));
         Assert.ThrowsExactly<ArgumentNullException>(() => SrpClient.ComputeScrambler(null!, [1], [1]));
         Assert.ThrowsExactly<ArgumentNullException>(() => SrpClient.ComputePremasterSecret(null!, [1], [1], [1]));
+    }
+
+    // Writes RFC 5054 Appendix B's identity, password and salt.
+    private void WriteCredentials()
+    {
+        Diagnostics.Arrange("identity", "alice");
+        Diagnostics.Arrange("password", "password123");
+        Diagnostics.Arrange("salt", Convert.ToHexStringLower(Salt));
+    }
+
+    // Writes a computed value as ACT (hex up to 64 bytes, BYTES past that) and a DIFF
+    // against the RFC's.
+    private void WriteResult(string label, byte[] expected, byte[] actual)
+    {
+        Diagnostics.Act(label, actual.Length <= 64 ? Convert.ToHexStringLower(actual) : $"{actual.Length} bytes");
+        if (actual.Length > 64)
+        {
+            Diagnostics.Bytes(label, actual);
+        }
+
+        Diagnostics.Diff(label, expected, actual);
+    }
+
+    private void WriteFound(SrpGroup? found, SrpGroup? expected)
+    {
+        Diagnostics.Act("group found", found is null ? "none" : $"{found.PrimeLength * 8}-bit");
+        Diagnostics.Assert("group found", expected is null ? "none" : $"{expected.PrimeLength * 8}-bit", found is null ? "none" : $"{found.PrimeLength * 8}-bit");
     }
 
     private static byte[] FiniteFieldDhGroupPrime() => Curl.Cryptography.FiniteFieldDiffieHellmanGroup.Ffdhe2048.Prime.ToArray();

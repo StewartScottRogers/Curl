@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using Curl.Testing;
 using static Curl.Tls.Rfc8448Messages;
 
 namespace Curl.Tls;
@@ -36,10 +38,14 @@ public sealed class Rfc8448ResumedHandshakeTests
 
     private static readonly DateTimeOffset TicketReceived = new(2026, 9, 29, 12, 0, 0, TimeSpan.Zero);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void SimpleHandshakeRecordsTheTicketAsASession()
     {
-        TlsSessionRecord session = SimpleSession();
+        TlsSessionRecord session = RecordedSimpleSession();
 
         Assert.AreEqual(0x0304, session.Version);
         Assert.AreEqual(0x1301, session.CipherSuite);
@@ -58,7 +64,7 @@ public sealed class Rfc8448ResumedHandshakeTests
     [TestMethod]
     public void ResumedHandshakeSendsTheTraceClientHelloAndInstallsTheEarlyTrafficSecret()
     {
-        using Tls13ClientHandshake client = ResumedClient(SimpleSession());
+        using Tls13ClientHandshake client = ResumedClient(RecordedSimpleSession());
 
         Tls13HandshakeOutput output = client.Start();
 
@@ -76,7 +82,7 @@ public sealed class Rfc8448ResumedHandshakeTests
     [TestMethod]
     public void EarlyTrafficSecretProtectsTheTraceEarlyDataRecord()
     {
-        using Tls13ClientHandshake client = ResumedClient(SimpleSession());
+        using Tls13ClientHandshake client = ResumedClient(RecordedSimpleSession());
         byte[] secret = client.Start().SecretsInstalled.Single().Secret;
 
         using Tls13RecordProtection protection = Tls13RecordProtection.Create(client.EarlyDataCipherSuite!, secret);
@@ -87,7 +93,7 @@ public sealed class Rfc8448ResumedHandshakeTests
     [TestMethod]
     public void ResumedHandshakeInstallsTheTraceHandshakeSecretsOnTheServerHello()
     {
-        using Tls13ClientHandshake client = ResumedClient(SimpleSession());
+        using Tls13ClientHandshake client = ResumedClient(RecordedSimpleSession());
         client.Start();
 
         Tls13HandshakeOutput output = client.Receive(TlsEncryptionLevel.Initial, Hex(ResumedServerHello));
@@ -101,7 +107,7 @@ public sealed class Rfc8448ResumedHandshakeTests
     [TestMethod]
     public void ResumedHandshakeAcceptsTheEarlyDataAndSendsTheTraceEndOfEarlyDataAndFinished()
     {
-        using Tls13ClientHandshake client = ResumedClient(SimpleSession());
+        using Tls13ClientHandshake client = ResumedClient(RecordedSimpleSession());
         client.Start();
         client.Receive(TlsEncryptionLevel.Initial, Hex(ResumedServerHello));
 
@@ -124,7 +130,7 @@ public sealed class Rfc8448ResumedHandshakeTests
     [TestMethod]
     public void ResumedHandshakeWithoutEndOfEarlyDataSendsOnlyTheFinished()
     {
-        using Tls13ClientHandshake client = ResumedClient(SimpleSession(), settings => settings with { SendEndOfEarlyData = false });
+        using Tls13ClientHandshake client = ResumedClient(RecordedSimpleSession(), settings => settings with { SendEndOfEarlyData = false });
         client.Start();
         client.Receive(TlsEncryptionLevel.Initial, Hex(ResumedServerHello));
 
@@ -132,13 +138,16 @@ public sealed class Rfc8448ResumedHandshakeTests
 
         Assert.IsTrue(client.EarlyDataAccepted);
         Assert.AreEqual(TlsEncryptionLevel.Handshake, output.BytesToSend.Single().Level);
+        Diagnostics.Act("early data accepted", client.EarlyDataAccepted);
+        Diagnostics.Act("flights sent", output.BytesToSend.Count);
+        Diagnostics.Diff("Finished, which must differ from the trace's", Hex(ResumedClientFinished), output.BytesToSend[^1].Bytes);
         Assert.IsFalse(output.BytesToSend.Single().Bytes.AsSpan().SequenceEqual(Hex(ResumedClientFinished)), "The Finished covers a transcript without EndOfEarlyData.");
     }
 
     [TestMethod]
     public void ResumedSessionIsExportedAndReadBackWithTheTraceTicket()
     {
-        TlsSessionRecord session = SimpleSession();
+        TlsSessionRecord session = RecordedSimpleSession();
 
         TlsSessionRecord decoded = TlsSessionCodec.Decode(TlsSessionCodec.Encode(session))!;
 
@@ -169,6 +178,25 @@ public sealed class Rfc8448ResumedHandshakeTests
         return client.ReceivedSessions.Single();
     }
 
+    // Runs SimpleSession under a PHASE and writes the trace inputs it replays and the
+    // session it records.
+    private TlsSessionRecord RecordedSimpleSession()
+    {
+        Diagnostics.Arrange(nameof(SimpleClientRandom), SimpleClientRandom);
+        Diagnostics.Arrange(nameof(SimpleClientPrivateKey), SimpleClientPrivateKey);
+        Diagnostics.Arrange("ticket received at", TicketReceived);
+
+        TlsSessionRecord session;
+        using (Diagnostics.Phase("section 3 handshake"))
+        {
+            session = SimpleSession();
+        }
+
+        Diagnostics.Act("session cipher suite", $"0x{session.CipherSuite:x4}");
+        Diagnostics.Bytes("session ticket", session.Ticket);
+        return session;
+    }
+
     private static Tls13ClientSettings TraceSettings() => new()
     {
         ServerName = "server",
@@ -178,7 +206,7 @@ public sealed class Rfc8448ResumedHandshakeTests
         SignatureAlgorithms = TraceSignatureAlgorithms,
     };
 
-    private static Tls13ClientHandshake ResumedClient(TlsSessionRecord session, Func<Tls13ClientSettings, Tls13ClientSettings>? change = null)
+    private Tls13ClientHandshake ResumedClient(TlsSessionRecord session, Func<Tls13ClientSettings, Tls13ClientSettings>? change = null)
     {
         Tls13ClientSettings settings = TraceSettings() with
         {
@@ -193,18 +221,19 @@ public sealed class Rfc8448ResumedHandshakeTests
             ResumptionSession = session,
             OfferEarlyData = true,
         };
-        ReplayTlsRandomSource random = new([Hex(ResumedClientRandom)], [new X25519KeyShare(Hex(ResumedClientPrivateKey))]);
+        ReplayTlsRandomSource random = new([Diagnostics.ArrangeHex(nameof(ResumedClientRandom), ResumedClientRandom)], [new X25519KeyShare(Diagnostics.ArrangeHex(nameof(ResumedClientPrivateKey), ResumedClientPrivateKey))]);
         return new Tls13ClientHandshake((change ?? (same => same))(settings), random, new RecordingCertificateVerifier());
     }
 
-    private static void AssertSecret(Tls13TrafficSecret secret, TlsEncryptionLevel level, TlsTrafficDirection direction, string expected)
+    private void AssertSecret(Tls13TrafficSecret secret, TlsEncryptionLevel level, TlsTrafficDirection direction, string expected, [CallerArgumentExpression(nameof(secret))] string label = "")
     {
         Assert.AreEqual(level, secret.Level);
         Assert.AreEqual(direction, secret.Direction);
-        AssertHex(expected, secret.Secret);
+        AssertHex(expected, secret.Secret, label);
     }
 
     private static byte[] Hex(string hex) => Convert.FromHexString(hex);
 
-    private static void AssertHex(string expected, byte[] actual) => Assert.AreEqual(expected, Convert.ToHexStringLower(actual));
+    private void AssertHex(string expected, byte[] actual, [CallerArgumentExpression(nameof(actual))] string label = "") =>
+        Assert.AreEqual(expected, Diagnostics.ActAndDiffHex(label, expected, actual));
 }

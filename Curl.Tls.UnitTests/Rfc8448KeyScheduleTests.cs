@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using Curl.Testing;
 using static Curl.Tls.Rfc8448Messages;
 
 namespace Curl.Tls;
@@ -29,10 +31,18 @@ public sealed class Rfc8448KeyScheduleTests
 
     private static readonly Tls13KeySchedule Schedule = Tls13KeySchedule.Sha256;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     // Section 3: {server} extract secret "early".
     [TestMethod]
-    public void ComputeEarlySecretWithoutPreSharedKeyMatchesTheSimpleHandshake() =>
+    public void ComputeEarlySecretWithoutPreSharedKeyMatchesTheSimpleHandshake()
+    {
+        Diagnostics.Arrange("pre-shared key", "none");
+
         AssertHex(SimpleEarlySecret, Schedule.ComputeEarlySecret(null));
+    }
 
     // Section 3: {server} derive secret for handshake "tls13 derived", then extract secret "handshake".
     [TestMethod]
@@ -138,8 +148,10 @@ public sealed class Rfc8448KeyScheduleTests
 
     // Section 4: {client} extract secret "early" from the resumption PSK.
     [TestMethod]
-    public void ComputeEarlySecretWithPreSharedKeyMatchesTheResumedHandshake() =>
+    public void ComputeEarlySecretWithPreSharedKeyMatchesTheResumedHandshake()
+    {
         AssertHex(ResumedEarlySecret, Schedule.ComputeEarlySecret(Hex(SimpleResumptionPreSharedKey)));
+    }
 
     // Section 4: {client} calculate PSK binder, over the ClientHello without its binders
     // list (two-byte length, one-byte length, 32-byte binder).
@@ -172,16 +184,21 @@ public sealed class Rfc8448KeyScheduleTests
         AssertHex("6d475f0993c8e564610db2b9", early.Iv);
     }
 
-    private static byte[] Hex(string hex) => Convert.FromHexString(hex);
+    // Writes the trace input as ARRANGE, labelled with the expression that names it.
+    private byte[] Hex(string hex, [CallerArgumentExpression(nameof(hex))] string label = "") =>
+        Diagnostics.ArrangeHex(label, hex);
 
-    private static void AssertHex(string expected, byte[] actual) => Assert.AreEqual(expected, Convert.ToHexStringLower(actual));
+    // Writes the derived value as ACT and a DIFF against the trace's, labelled with the
+    // expression that derived it.
+    private void AssertHex(string expected, byte[] actual, [CallerArgumentExpression(nameof(actual))] string label = "") =>
+        Assert.AreEqual(expected, Diagnostics.ActAndDiffHex(label, expected, actual));
 
     private static byte[] Sha256Of(params string[] messages)
     {
         using TranscriptHash transcript = Schedule.CreateTranscriptHash();
         foreach (string message in messages)
         {
-            transcript.Append(Hex(message));
+            transcript.Append(Convert.FromHexString(message));
         }
 
         return transcript.GetCurrentHash();

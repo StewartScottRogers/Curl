@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using Curl.Testing;
 using static Curl.Tls.Rfc8448Messages;
 
 namespace Curl.Tls;
@@ -31,6 +33,10 @@ public sealed class Rfc8448ClientHandshakeTests
     private static readonly TlsExtension SessionTicket = new(TlsExtensionType.SessionTicket, []);
     private static readonly TlsExtension PskKeyExchangeModes = new(TlsExtensionType.PskKeyExchangeModes, [0x01, 0x01]);
     private static readonly TlsExtension RecordSizeLimit = new(TlsExtensionType.RecordSizeLimit, [0x40, 0x01]);
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     public void SimpleHandshakeSendsTheTraceClientHello()
@@ -105,11 +111,16 @@ public sealed class Rfc8448ClientHandshakeTests
         byte[] flight = Convert.FromHexString(SimpleEncryptedExtensions + SimpleCertificate + SimpleCertificateVerify + SimpleServerFinished);
 
         List<TlsHandshakeBytes> sent = [];
-        foreach (byte octet in flight)
+        using (Diagnostics.Phase("server flight one byte at a time"))
         {
-            sent.AddRange(client.Receive(TlsEncryptionLevel.Handshake, [octet]).BytesToSend);
+            foreach (byte octet in flight)
+            {
+                sent.AddRange(client.Receive(TlsEncryptionLevel.Handshake, [octet]).BytesToSend);
+            }
         }
 
+        Diagnostics.Act("flights sent", sent.Count);
+        Diagnostics.Assert("flights sent", 1, sent.Count);
         Assert.IsTrue(client.IsComplete);
         Assert.HasCount(1, sent);
         AssertHex(SimpleClientFinished, sent[0].Bytes);
@@ -123,8 +134,11 @@ public sealed class Rfc8448ClientHandshakeTests
         client.Receive(TlsEncryptionLevel.Initial, Convert.FromHexString(SimpleServerHello));
         client.Receive(TlsEncryptionLevel.Handshake, Convert.FromHexString(SimpleEncryptedExtensions + SimpleCertificate + SimpleCertificateVerify + SimpleServerFinished));
 
-        Tls13HandshakeOutput output = client.Receive(TlsEncryptionLevel.Application, Convert.FromHexString(SimpleNewSessionTicket));
+        Tls13HandshakeOutput output = client.Receive(TlsEncryptionLevel.Application, Hex(SimpleNewSessionTicket));
 
+        Diagnostics.Act("failure", output.Failure);
+        Diagnostics.Act("tickets received", client.ReceivedTickets.Count);
+        Diagnostics.Assert("first ticket lifetime", 0x1eu, client.ReceivedTickets.Count == 0 ? null : client.ReceivedTickets[0].TicketLifetime);
         Assert.IsNull(output.Failure);
         Assert.IsTrue(output.IsComplete);
         Assert.HasCount(1, client.ReceivedTickets);
@@ -136,13 +150,22 @@ public sealed class Rfc8448ClientHandshakeTests
     {
         using Tls13ClientHandshake client = RetryClient();
 
-        Tls13HandshakeOutput first = client.Start();
-        Tls13HandshakeOutput second = client.Receive(TlsEncryptionLevel.Initial, Convert.FromHexString(HelloRetryRequest));
-        Tls13HandshakeOutput keys = client.Receive(TlsEncryptionLevel.Initial, Convert.FromHexString(RetryServerHello));
-        Tls13HandshakeOutput finished = client.Receive(
-            TlsEncryptionLevel.Handshake,
-            Convert.FromHexString(RetryEncryptedExtensions + SimpleCertificate + RetryCertificateVerify + RetryServerFinished));
+        Tls13HandshakeOutput first;
+        Tls13HandshakeOutput second;
+        Tls13HandshakeOutput keys;
+        Tls13HandshakeOutput finished;
+        using (Diagnostics.Phase("handshake with HelloRetryRequest"))
+        {
+            first = client.Start();
+            second = client.Receive(TlsEncryptionLevel.Initial, Convert.FromHexString(HelloRetryRequest));
+            keys = client.Receive(TlsEncryptionLevel.Initial, Convert.FromHexString(RetryServerHello));
+            finished = client.Receive(
+                TlsEncryptionLevel.Handshake,
+                Convert.FromHexString(RetryEncryptedExtensions + SimpleCertificate + RetryCertificateVerify + RetryServerFinished));
+        }
 
+        Diagnostics.Act("second flight failure", second.Failure);
+        Diagnostics.Act("final flight failure", finished.Failure);
         AssertHex(RetryFirstClientHello, first.BytesToSend[0].Bytes);
         Assert.IsNull(second.Failure);
         Assert.HasCount(1, second.BytesToSend);
@@ -156,7 +179,7 @@ public sealed class Rfc8448ClientHandshakeTests
         Assert.AreEqual(TlsNamedGroup.Secp256r1, client.NegotiatedGroup);
     }
 
-    private static Tls13ClientHandshake SimpleClient(RecordingCertificateVerifier verifier)
+    private Tls13ClientHandshake SimpleClient(RecordingCertificateVerifier verifier)
     {
         Tls13ClientSettings settings = new()
         {
@@ -181,7 +204,7 @@ public sealed class Rfc8448ClientHandshakeTests
         return new Tls13ClientHandshake(settings, random, verifier);
     }
 
-    private static Tls13ClientHandshake RetryClient()
+    private Tls13ClientHandshake RetryClient()
     {
         Tls13ClientSettings settings = new()
         {
@@ -211,14 +234,19 @@ public sealed class Rfc8448ClientHandshakeTests
         return new Tls13ClientHandshake(settings, random, new RecordingCertificateVerifier());
     }
 
-    private static void AssertSecret(Tls13TrafficSecret secret, TlsEncryptionLevel level, TlsTrafficDirection direction, string expected)
+    private void AssertSecret(Tls13TrafficSecret secret, TlsEncryptionLevel level, TlsTrafficDirection direction, string expected, [CallerArgumentExpression(nameof(secret))] string label = "")
     {
         Assert.AreEqual(level, secret.Level);
         Assert.AreEqual(direction, secret.Direction);
-        AssertHex(expected, secret.Secret);
+        AssertHex(expected, secret.Secret, label);
     }
 
-    private static byte[] Hex(string hex) => Convert.FromHexString(hex);
+    // Writes the trace input as ARRANGE, labelled with the expression that names it.
+    private byte[] Hex(string hex, [CallerArgumentExpression(nameof(hex))] string label = "") =>
+        Diagnostics.ArrangeHex(label, hex);
 
-    private static void AssertHex(string expected, byte[] actual) => Assert.AreEqual(expected, Convert.ToHexStringLower(actual));
+    // Writes what the client produced as ACT and a DIFF against the trace's, labelled with
+    // the expression that produced it.
+    private void AssertHex(string expected, byte[] actual, [CallerArgumentExpression(nameof(actual))] string label = "") =>
+        Assert.AreEqual(expected, Diagnostics.ActAndDiffHex(label, expected, actual));
 }

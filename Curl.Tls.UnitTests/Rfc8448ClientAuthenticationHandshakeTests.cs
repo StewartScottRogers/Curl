@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Testing;
 using static Curl.Tls.Rfc8448Messages;
 
 namespace Curl.Tls;
@@ -37,18 +39,35 @@ public sealed class Rfc8448ClientAuthenticationHandshakeTests
     // RFC 8448 section 6: CertificateVerify is header (4), scheme (2), signature length (2), the signature.
     private static readonly byte[] TraceClientSignature = Hex(ClientAuthenticationClientCertificateVerify[16..]);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ClientAuthenticationHandshakeSendsTheTraceClientHelloAndAnswersTheCertificateRequestWithTheTraceFlight()
     {
         TraceSignatureSigningKey key = new(TraceClientSignature);
         using Tls13ClientHandshake client = ClientAuthenticationClient(key);
 
-        Tls13HandshakeOutput hello = client.Start();
-        Tls13HandshakeOutput keys = client.Receive(TlsEncryptionLevel.Initial, Hex(ClientAuthenticationServerHello));
-        Tls13HandshakeOutput flight = client.Receive(
-            TlsEncryptionLevel.Handshake,
-            Hex(ClientAuthenticationEncryptedExtensions + ClientAuthenticationCertificateRequest + ClientAuthenticationServerCertificate
-                + ClientAuthenticationServerCertificateVerify + ClientAuthenticationServerFinished));
+        Tls13HandshakeOutput hello;
+        Tls13HandshakeOutput keys;
+        Tls13HandshakeOutput flight;
+        using (Diagnostics.Phase("handshake"))
+        {
+            hello = client.Start();
+            keys = client.Receive(TlsEncryptionLevel.Initial, Hex(ClientAuthenticationServerHello));
+            flight = client.Receive(
+                TlsEncryptionLevel.Handshake,
+                Hex(ClientAuthenticationEncryptedExtensions + ClientAuthenticationCertificateRequest + ClientAuthenticationServerCertificate
+                    + ClientAuthenticationServerCertificateVerify + ClientAuthenticationServerFinished));
+        }
+
+        string clientFlight = string.Concat(flight.BytesToSend.Select(sent => Convert.ToHexStringLower(sent.Bytes)));
+        Diagnostics.Act("failure", flight.Failure);
+        Diagnostics.Diff(
+            "client Certificate, CertificateVerify and Finished",
+            ClientAuthenticationClientCertificate + ClientAuthenticationClientCertificateVerify + ClientAuthenticationClientFinished,
+            clientFlight);
 
         // RFC 8448 section 6: {client} construct a ClientHello handshake message.
         Assert.HasCount(1, hello.BytesToSend);
@@ -64,7 +83,7 @@ public sealed class Rfc8448ClientAuthenticationHandshakeTests
         Assert.IsTrue(flight.IsComplete);
         Assert.AreEqual(
             ClientAuthenticationClientCertificate + ClientAuthenticationClientCertificateVerify + ClientAuthenticationClientFinished,
-            string.Concat(flight.BytesToSend.Select(sent => Convert.ToHexStringLower(sent.Bytes))));
+            clientFlight);
         Assert.IsTrue(flight.BytesToSend.All(sent => sent.Level == TlsEncryptionLevel.Handshake));
 
         // RFC 8448 section 6: {server} derive secret "tls13 s ap traffic" and "tls13 c ap traffic".
@@ -88,7 +107,9 @@ public sealed class Rfc8448ClientAuthenticationHandshakeTests
         // over the content the client asked its key to sign, so that content is the trace's.
         using X509Certificate2 certificate = X509CertificateLoader.LoadCertificate(ClientCertificateDer);
         using RSA publicKey = certificate.GetRSAPublicKey()!;
-        Assert.IsTrue(publicKey.VerifyData(key.SignedContent!, TraceClientSignature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        bool verified = publicKey.VerifyData(key.SignedContent!, TraceClientSignature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        Diagnostics.Assert("trace signature verifies over the signed content", true, verified);
+        Assert.IsTrue(verified);
     }
 
     [TestMethod]
@@ -108,29 +129,40 @@ public sealed class Rfc8448ClientAuthenticationHandshakeTests
             InverseQ = Hex(Section2Coefficient),
         });
 
+        Diagnostics.Arrange("private key", "RFC 8448 section 2's RSA key");
         byte[] signature = new RsaTlsSigningKey(privateKey).Sign(TlsSignatureScheme.RsaPssRsaeSha256, trace.SignedContent!);
+        Diagnostics.Act("signature length", signature.Length);
 
         // RFC 8448 section 6's client key is not published, so section 2's RSA key signs the section 6 content
         // and section 3's server certificate, which carries that key, verifies it.
         using X509Certificate2 certificate = X509CertificateLoader.LoadCertificate(Body(SimpleCertificate, HandshakeType.Certificate)[7..^2]);
         using RSA publicKey = certificate.GetRSAPublicKey()!;
+        bool verified = publicKey.VerifyData(trace.SignedContent!, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        Diagnostics.Assert("signature verifies under section 3's server certificate", true, verified);
         Assert.HasCount(128, signature);
-        Assert.IsTrue(publicKey.VerifyData(trace.SignedContent!, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
+        Assert.IsTrue(verified);
     }
 
-    private static void DriveClientAuthenticationHandshake(TraceSignatureSigningKey key)
+    private void DriveClientAuthenticationHandshake(TraceSignatureSigningKey key)
     {
         using Tls13ClientHandshake client = ClientAuthenticationClient(key);
-        client.Start();
-        client.Receive(TlsEncryptionLevel.Initial, Hex(ClientAuthenticationServerHello));
-        Tls13HandshakeOutput flight = client.Receive(
-            TlsEncryptionLevel.Handshake,
-            Hex(ClientAuthenticationEncryptedExtensions + ClientAuthenticationCertificateRequest + ClientAuthenticationServerCertificate
-                + ClientAuthenticationServerCertificateVerify + ClientAuthenticationServerFinished));
+        Tls13HandshakeOutput flight;
+        using (Diagnostics.Phase("handshake"))
+        {
+            client.Start();
+            client.Receive(TlsEncryptionLevel.Initial, Hex(ClientAuthenticationServerHello));
+            flight = client.Receive(
+                TlsEncryptionLevel.Handshake,
+                Hex(ClientAuthenticationEncryptedExtensions + ClientAuthenticationCertificateRequest + ClientAuthenticationServerCertificate
+                    + ClientAuthenticationServerCertificateVerify + ClientAuthenticationServerFinished));
+        }
+
+        Diagnostics.Act("handshake complete", flight.IsComplete);
+        Diagnostics.Bytes("content the client asked its key to sign", key.SignedContent);
         Assert.IsTrue(flight.IsComplete);
     }
 
-    private static Tls13ClientHandshake ClientAuthenticationClient(TlsSigningKey key)
+    private Tls13ClientHandshake ClientAuthenticationClient(TlsSigningKey key)
     {
         Tls13ClientSettings settings = new()
         {
@@ -157,20 +189,21 @@ public sealed class Rfc8448ClientAuthenticationHandshakeTests
             ],
             ClientCertificate = new TlsClientCertificate([ClientCertificateDer], key),
         };
-        ReplayTlsRandomSource random = new([Hex(ClientRandom)], [new X25519KeyShare(Hex(ClientPrivateKey))]);
+        ReplayTlsRandomSource random = new([Diagnostics.ArrangeHex(nameof(ClientRandom), ClientRandom)], [new X25519KeyShare(Diagnostics.ArrangeHex(nameof(ClientPrivateKey), ClientPrivateKey))]);
         return new Tls13ClientHandshake(settings, random, new RecordingCertificateVerifier());
     }
 
-    private static void AssertSecret(Tls13TrafficSecret secret, TlsEncryptionLevel level, TlsTrafficDirection direction, string expected)
+    private void AssertSecret(Tls13TrafficSecret secret, TlsEncryptionLevel level, TlsTrafficDirection direction, string expected, [CallerArgumentExpression(nameof(secret))] string label = "")
     {
         Assert.AreEqual(level, secret.Level);
         Assert.AreEqual(direction, secret.Direction);
-        AssertHex(expected, secret.Secret);
+        AssertHex(expected, secret.Secret, label);
     }
 
     private static byte[] Hex(string hex) => Convert.FromHexString(hex);
 
-    private static void AssertHex(string expected, byte[] actual) => Assert.AreEqual(expected, Convert.ToHexStringLower(actual));
+    private void AssertHex(string expected, byte[] actual, [CallerArgumentExpression(nameof(actual))] string label = "") =>
+        Assert.AreEqual(expected, Diagnostics.ActAndDiffHex(label, expected, actual));
 
     /// <summary>
     /// An RSA key certified as <c>rsaEncryption</c> that signs only with RSA-PSS by returning
