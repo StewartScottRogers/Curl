@@ -26,12 +26,35 @@
                   "reappeared; previously AF-####". The closed file is not touched.
       new         Anything else is filed as the next AF-#### with status proposed. A finding from
                   an auditor in -Unreliable says so in its Summary.
-      re-audit    Each reaudits entry appends a Re-audits line to the finding it names. When
-                  reproduces is false, the auditor is the finding's own and not in -Unreliable,
-                  and the finding is open, it is closed: status closed, reason, closed,
-                  closed-by, and a Log line. Nothing else closes a finding - not its task's
-                  state, and not an audit that did not report it. Closed findings are never
-                  changed. Re-audits lines go at the end of Re-audits, before Log (BL-1183).
+      mutant key  A finding with reproduction.mutation (<file>:<line>:<operator>, from
+                  Invoke-MutationTest.ps1) is matched and filed under the mechanical key
+                  quality:<file>:<member>-<operator word>:surviving-mutant, the member read from
+                  -Tree at that line, with "reproduction: mutation <file>:<line>:<operator>" and
+                  the targeted -Site command as its reproduction (ADR-0422).
+      duplicate   Before anything else, open findings that share a key are one finding: all but
+                  the lowest ID are closed with closed-how duplicate and duplicate-of, and their
+                  tasks join the original's tasks list.
+      set aside   A re-audit or repeat whose finding sits in a project that depends on a planted
+                  defect's project (its .csproj references in -Tree, transitively), or whose
+                  evidence cites a planted file by name, is recorded "not re-audited | overlaps
+                  planted defect PD-###" and counts as neither yes nor no: auditors run their
+                  reproductions in the planted tree.
+      re-audit    Each other reaudits entry appends a Re-audits line to the finding it names (one
+                  from another auditor marked "(re-audited by <auditor>)"). An open finding whose
+                  own auditor says it no longer reproduces is closed (status, reason, closed,
+                  closed-how, closed-by and a Log line) by the first of:
+                    mechanical        it has a mutation reproduction and the runner's targeted
+                                      rerun on the clean audited -Commit kills the mutant
+                                      (-RerunReproductions), whatever -Unreliable says;
+                    reliable-reaudit  no mechanical answer (none, or the rerun could not tell)
+                                      and the auditor is not in -Unreliable;
+                    consecutive       no mechanical answer and the finding's previous Re-audits
+                                      line is its own auditor's "no" from a different audit;
+                                      closed-by names both scorecards.
+                  A rerun in which the mutant survives closes nothing. Nothing else closes a
+                  finding - not its task's state, and not an audit that did not report it. Closed
+                  findings are never changed. Re-audits lines go at the end of Re-audits, before
+                  Log (BL-1183).
 
     Prints one summary line: new, still open, closed, catches.
 
@@ -56,8 +79,17 @@
 .PARAMETER FindingsDirectory
     Default: Audit/Findings in this repository.
 
+.PARAMETER Tree
+    The audited (planted) tree: where a mutant's member and the projects' references are read.
+
+.PARAMETER RerunReproductions
+    Rerun each mechanical reproduction the closure rule needs, with Invoke-MutationTest.ps1 -Site
+    on -Commit (the clean audited commit, not the planted tree). Without it the rerun reads as
+    unverified and the other closure paths apply.
+
 .PARAMETER SelfTest
-    Run against Audit/Tools/Fixtures/findings, copied to a temporary folder, and check every rule.
+    Run against Audit/Tools/Fixtures/findings and Fixtures/closure, copied to a temporary folder,
+    and check every rule.
 #>
 param(
     [string]$ReportDirectory,
@@ -67,8 +99,12 @@ param(
     [string]$Commit,
     [string]$Date = (Get-Date -Format 'yyyy-MM-dd'),
     [string]$FindingsDirectory,
+    [string]$Tree,
+    [switch]$RerunReproductions,
     [switch]$SelfTest
 )
+# Finding ID -> a mechanical outcome to use instead of rerunning; only the self-test sets it.
+$MechanicalOutcomes = @{}
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -98,11 +134,230 @@ function Read-Finding([string]$Path) {
             if ($line -match '^([a-z-]+):\s?(.*)$') { $fields[$Matches[1]] = $Matches[2].Trim() }
         }
     }
-    return [pscustomobject]@{ Path = $Path; Id = $fields['id']; Key = $fields['key']; Status = $fields['status']; Auditor = $fields['auditor'] }
+    $location = if ($text -match '(?m)^Location: `([^`]*)`') { $Matches[1] } else { '' }
+    return [pscustomobject]@{ Path = $Path; Id = $fields['id']; Key = $fields['key']; Status = $fields['status']; Auditor = $fields['auditor']; Reproduction = "$($fields['reproduction'])"; Tasks = "$($fields['tasks'])"; Location = $location }
 }
 
+# --- planted defects overlapping a finding (ADR-0422) -----------------------------------------
+
+function Get-ProjectClosure([string]$Project) {
+    # The project, its .UnitLibrary/.UnitTests twin, and every project they reference, transitively,
+    # as the audited tree (-Tree) has them: a planted defect in any of them can change what the
+    # project's tests and reproductions show.
+    $seen = @{}
+    $queue = New-Object System.Collections.Queue
+    foreach ($p in @($Project, ($Project -replace '\.UnitTests$', '.UnitLibrary'), ($Project -replace '\.UnitLibrary$', '.UnitTests'))) { $queue.Enqueue($p) }
+    while ($queue.Count) {
+        $p = $queue.Dequeue()
+        if ($seen.ContainsKey($p)) { continue }
+        $seen[$p] = $true
+        $csproj = if ($Tree) { Join-Path $Tree "$p\$p.csproj" } else { '' }
+        if (-not $csproj -or -not (Test-Path -LiteralPath $csproj)) { continue }
+        foreach ($m in [regex]::Matches([IO.File]::ReadAllText($csproj), 'ProjectReference\s+Include="[^"]*?([^"\\/]+)\.csproj"')) { $queue.Enqueue($m.Groups[1].Value) }
+    }
+    return @($seen.Keys)
+}
+
+function Get-OverlappingPlant($Target, [string]$Evidence, [object[]]$Planted) {
+    # The planted defect that may have produced this audit's verdict on the finding, or $null: one
+    # in a project the finding's location depends on (Get-ProjectClosure), or one whose file name
+    # the auditor's evidence cites. Auditors re-audit in the planted tree (BL-1597's audit: AF-0009
+    # and AF-0026 "reproduced" because of PD-303 and PD-103).
+    foreach ($p in $Planted) {
+        $file = "$($p.file)" -replace '\\', '/'
+        $name = $file.Substring($file.LastIndexOf('/') + 1)
+        if ($name -and $Evidence.IndexOf($name, [StringComparison]::OrdinalIgnoreCase) -ge 0) { return $p }
+        if ($file -notmatch '/') { continue }
+        $plantProject = ($file -split '/')[0]
+        foreach ($part in ("$($Target.Location)" -split ',\s*')) {
+            $project = (($part -replace '\\', '/').Trim() -split '/')[0]
+            if ($project -and (@(Get-ProjectClosure $project) -contains $plantProject)) { return $p }
+        }
+    }
+    return $null
+}
+
+function Add-SetAsideLine($Target, $Plant, [string]$Verdict, [string]$Evidence) {
+    Add-ReauditLine $Target.Path "- $Date | $Scorecard | not re-audited | overlaps planted defect $($Plant.id) in $($Plant.file), so the auditor's verdict (reproduces $Verdict) is set aside: $Evidence"
+}
+
+# The front matter keys in template order (Findings/README.md). Findings filed before ADR-0422 lack
+# reproduction, tasks, duplicate-of and closed-how; Set-FrontMatter adds one in its place when set.
+$FrontMatterOrder = @('id', 'title', 'auditor', 'severity', 'status', 'reason', 'key', 'reproduction', 'task', 'tasks', 'found', 'found-at', 'scorecard', 'duplicate-of', 'closed', 'closed-how', 'closed-by')
+
 function Set-FrontMatter([string]$Text, [string]$Name, [string]$Value) {
-    return [regex]::new("(?m)^$([regex]::Escape($Name)):[^\r\n]*").Replace($Text, "${Name}: $Value", 1)
+    $line = "${Name}: $Value".TrimEnd()
+    $existing = [regex]::new("(?m)^$([regex]::Escape($Name)):[^\r\n]*")
+    if ($existing.IsMatch($Text)) { return $existing.Replace($Text, $line.Replace('$', '$$'), 1) }
+    $newline = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $before = @($FrontMatterOrder[0..([array]::IndexOf($FrontMatterOrder, $Name) - 1)])
+    [array]::Reverse($before)
+    foreach ($previous in $before) {
+        $at = [regex]::Match($Text, "(?m)^$([regex]::Escape($previous)):[^\r\n]*")
+        if ($at.Success) { return $Text.Insert($at.Index + $at.Length, $newline + $line) }
+    }
+    return $Text
+}
+
+# --- surviving mutants: a mechanical key and reproduction (ADR-0422) ---------------------------
+
+# Operator names from Invoke-MutationTest.ps1, as words a key may hold.
+$OperatorWords = @{ '==' = 'eq'; '!=' = 'ne'; '<' = 'lt'; '>' = 'gt'; '<=' = 'le'; '>=' = 'ge'; '&&' = 'and'; '||' = 'or'; '+1' = 'plus1'; '-1' = 'minus1'; 'true' = 'true'; 'false' = 'false'; '!(' = 'not' }
+
+# A member declaration; the same rule as Invoke-MutationTest.ps1's $MemberPattern.
+$MemberPattern = '^\s*(?:(?:public|private|protected|internal|static|async|override|virtual|sealed|abstract|extern|unsafe|new|partial|readonly|required|file)\s+)+[^=;(){}]*?\b([A-Za-z_]\w*)\s*(?:<[^<>]*(?:<[^<>]*>[^<>]*)*>)?\s*(?:\(|\{|=>|=(?![=>]))'
+
+function Get-MutationSite([string]$Text) {
+    # "<file>:<line>:<operator>" (a report's reproduction.mutation) or "mutation <file>:<line>:<operator>"
+    # (a finding's reproduction field) -> File, Line, Operator; $null for anything else.
+    if ("$Text".Trim() -notmatch '^(?:mutation\s+)?(?<file>[^\s:]+\.cs):(?<line>\d+):(?<op>\S+)$') { return $null }
+    if (-not $OperatorWords.ContainsKey($Matches['op'])) { return $null }
+    return [pscustomobject]@{ File = ($Matches['file'] -replace '\\', '/'); Line = [int]$Matches['line']; Operator = $Matches['op'] }
+}
+
+function Get-SiteMember($Site, [string]$ReportedKey) {
+    # The member the site is in: from the audited tree (-Tree) when it has the file, otherwise
+    # the <what> of the auditor's key without an operator suffix, letters and digits only.
+    $path = if ($Tree) { Join-Path $Tree ($Site.File -replace '/', '\') } else { '' }
+    if ($path -and (Test-Path -LiteralPath $path)) {
+        $lines = [IO.File]::ReadAllLines($path)
+        for ($i = [math]::Min($Site.Line, $lines.Length) - 1; $i -ge 0; $i--) { if ($lines[$i] -match $MemberPattern) { return $Matches[1] } }
+        return '-'
+    }
+    $what = @("$ReportedKey" -split ':')
+    $name = if ($what.Count -ge 4) { $what[$what.Count - 2] } else { '-' }
+    return (($name -split '-')[0] -replace '[^A-Za-z0-9_]', '')
+}
+
+function Get-MutantKey([string]$Auditor, $Site, [string]$Member) {
+    return "${Auditor}:$($Site.File):$Member-$($OperatorWords[$Site.Operator]):surviving-mutant"
+}
+
+function Get-MutantCommand($Site, [string]$Member) {
+    return "powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site $($Site.File):$($Site.Line):$($Site.Operator) -Member $Member -ExcludeBaselineFailures -TimeoutSeconds 600"
+}
+
+function ConvertTo-FiledFinding($Finding, [string]$Auditor) {
+    # A reported finding as it is matched and filed. One with reproduction.mutation gets the
+    # mechanical key, the targeted reproduction command and a reproduction field; so the same
+    # mutant reported in other words is the same finding (ADR-0422).
+    $site = Get-MutationSite "$($Finding.reproduction.mutation)"
+    $filed = [pscustomobject]@{ Key = "$($Finding.key)"; Reproduction = 'none'; Command = "$($Finding.reproduction.command)" }
+    if (-not $site) { return $filed }
+    $member = Get-SiteMember $site "$($Finding.key)"
+    $filed.Key = Get-MutantKey $Auditor $site $member
+    $filed.Reproduction = "mutation $($site.File):$($site.Line):$($site.Operator)"
+    $filed.Command = Get-MutantCommand $site $member
+    return $filed
+}
+
+# --- closing (ADR-0422) -----------------------------------------------------------------------
+
+function Get-ReauditLines([string]$Text) {
+    # The Re-audits lines, oldest first: Date, Scorecard, Reproduces, Evidence, Own (written for the
+    # finding's own auditor: every line not marked "(re-audited by <auditor>)").
+    $section = if ($Text -match '(?s)## Re-audits[ \t]*\r?\n(.*?)(\r?\n## |\z)') { $Matches[1] } else { '' }
+    $lines = @()
+    foreach ($line in ($section -split '\r?\n')) {
+        if ($line -notmatch '^- (\S+) \| (\S+) \| reproduces: (yes|no) \| ?(.*)$') { continue }
+        $lines += [pscustomobject]@{ Date = $Matches[1]; Scorecard = $Matches[2]; Reproduces = ($Matches[3] -eq 'yes'); Evidence = $Matches[4]; Own = ($Matches[4] -notlike '(re-audited by *') }
+    }
+    return $lines
+}
+
+function Get-ConsecutiveNo([string]$Text, [string]$ScorecardName) {
+    # The scorecard of the previous Re-audits line when it, too, is the finding's own auditor saying
+    # "reproduces: no" on a different audit than this one; otherwise ''. Called after this audit's
+    # line was added, so that line is the last.
+    $lines = @(Get-ReauditLines $Text)
+    if ($lines.Count -lt 2) { return '' }
+    $previous = $lines[$lines.Count - 2]
+    if ($previous.Own -and -not $previous.Reproduces -and $previous.Scorecard -ne $ScorecardName) { return $previous.Scorecard }
+    return ''
+}
+
+function Invoke-MechanicalReproduction($Target) {
+    # Reruns a finding's mechanical reproduction on the audited commit: 'killed' (the targeted
+    # mutant is killed or timed out: fixed), 'survived' (still reproduces), 'unverified' (not run,
+    # or it could not tell), or 'none' (the finding has no mechanical reproduction).
+    $site = Get-MutationSite $Target.Reproduction
+    if (-not $site) { return 'none' }
+    if ($MechanicalOutcomes.ContainsKey($Target.Id)) { return $MechanicalOutcomes[$Target.Id] }
+    if (-not $RerunReproductions) { return 'unverified' }
+    $member = if ($Target.Key -match ':([A-Za-z0-9_]+)-[a-z0-9]+:surviving-mutant$') { $Matches[1] } else { '' }
+    $out = Join-Path ([IO.Path]::GetTempPath()) ("reproduction-$($Target.Id)-" + [guid]::NewGuid().ToString('N') + '.json')
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'Invoke-MutationTest.ps1'), '-Site', "$($site.File):$($site.Line):$($site.Operator)", '-Commit', $Commit, '-ExcludeBaselineFailures', '-TimeoutSeconds', '600', '-OutFile', $out)
+    if ($member) { $arguments += @('-Member', $member) }
+    $ErrorActionPreference = 'Continue'
+    & powershell @arguments *> $null
+    $outcome = 'unverified'
+    if (Test-Path -LiteralPath $out) {
+        $result = Get-Content -LiteralPath $out -Raw | ConvertFrom-Json
+        $outcome = switch ("$($result.outcome)") { 'killed' { 'killed' } 'timedOut' { 'killed' } 'survived' { 'survived' } default { 'unverified' } }
+        Remove-Item -LiteralPath $out -ErrorAction SilentlyContinue
+    }
+    return $outcome
+}
+
+function Get-ClosePath($Target, [string]$Auditor, [bool]$Flagged, [string]$Mechanical) {
+    # How a "reproduces: no" re-audit closes an open finding, or $null when it does not: its own
+    # auditor's re-audit, then, in this order, the runner's mechanical rerun agreeing (whatever the
+    # auditor's reliability), a reliable auditor (findings with no mechanical answer), or two
+    # consecutive "no" re-audits on two different audits. A mechanical "survived" closes nothing.
+    if ($Target.Auditor -ne $Auditor -or $Target.Status -notin 'proposed', 'accepted', 'deferred', 'blocked') { return $null }
+    if ($Mechanical -eq 'killed') { return [pscustomobject]@{ How = 'mechanical'; By = $Scorecard } }
+    if ($Mechanical -eq 'survived') { return $null }
+    if (-not $Flagged) { return [pscustomobject]@{ How = 'reliable-reaudit'; By = $Scorecard } }
+    $previous = Get-ConsecutiveNo ([IO.File]::ReadAllText($Target.Path)) $Scorecard
+    if ($previous) { return [pscustomobject]@{ How = 'consecutive'; By = "$previous, $Scorecard" } }
+    return $null
+}
+
+function Close-Finding($Target, $Path, [string]$Reason) {
+    $text = [IO.File]::ReadAllText($Target.Path)
+    $text = Set-FrontMatter $text 'status' 'closed'
+    $text = Set-FrontMatter $text 'reason' $Reason
+    $text = Set-FrontMatter $text 'closed' $Date
+    $text = Set-FrontMatter $text 'closed-how' $Path.How
+    $text = Set-FrontMatter $text 'closed-by' $Path.By
+    [IO.File]::WriteAllText($Target.Path, $text, $Utf8)
+    Add-LogLine $Target.Path "- ${Date}: $($Target.Status) -> closed. $Reason"
+    $Target.Status = 'closed'
+}
+
+function Close-Duplicates([object[]]$Findings) {
+    # Open findings with the same key are one finding: every one but the lowest ID is closed as a
+    # duplicate of it (closed-how: duplicate, duplicate-of), and its tasks join the original's
+    # tasks list. Returns how many were closed.
+    $closed = 0
+    $open = @($Findings | Where-Object { $_.Status -in 'proposed', 'accepted', 'deferred', 'blocked' } | Sort-Object Id)
+    foreach ($group in @($open | Group-Object Key | Where-Object { $_.Count -gt 1 })) {
+        $original = $group.Group[0]
+        foreach ($dup in @($group.Group | Select-Object -Skip 1)) {
+            $text = Set-FrontMatter ([IO.File]::ReadAllText($dup.Path)) 'duplicate-of' $original.Id
+            [IO.File]::WriteAllText($dup.Path, $text, $Utf8)
+            Add-FindingTasks $original (Get-FindingTasks $dup)
+            Close-Finding $dup ([pscustomobject]@{ How = 'duplicate'; By = $Scorecard }) "Duplicate of $($original.Id): the same key."
+            $closed++
+        }
+    }
+    return $closed
+}
+
+function Get-FindingTasks($Finding) {
+    # Every task filed for the finding: its tasks list, and its task when that is not in it.
+    $text = [IO.File]::ReadAllText($Finding.Path)
+    $all = @()
+    if ($text -match '(?m)^tasks:[ \t]*([^\r\n]*)') { $all += @($Matches[1] -split ',\s*' | Where-Object { $_ -match '^BL-\d+$' }) }
+    if ($text -match '(?m)^task:[ \t]*(BL-\d+)') { $all += $Matches[1] }
+    return @($all | Select-Object -Unique)
+}
+
+function Add-FindingTasks($Finding, [string[]]$Ids) {
+    $all = @(@(Get-FindingTasks $Finding) + @($Ids) | Where-Object { $_ } | Sort-Object { [int]($_ -replace '\D', '') } -Unique)
+    if (-not $all.Count) { return }
+    $text = Set-FrontMatter ([IO.File]::ReadAllText($Finding.Path)) 'tasks' ($all -join ', ')
+    [IO.File]::WriteAllText($Finding.Path, $text, $Utf8)
 }
 
 function Add-ReauditLine([string]$Path, [string]$Line) {
@@ -179,16 +434,16 @@ function Test-Catch($Finding, [string]$Auditor, [object[]]$Planted) {
     return $null
 }
 
-function New-FindingFile($Finding, [string]$Auditor, [string]$Id, [string]$Note) {
+function New-FindingFile($Finding, $Filed, [string]$Auditor, [string]$Id, [string]$Note) {
     $template = Join-Path $FindingsDirectory 'FINDING-TEMPLATE.md'
     if (-not (Test-Path -LiteralPath $template)) { $template = Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md' }
     $summary = "$($Finding.severity) finding from the $Auditor auditor at ``$($Finding.location)``: $($Finding.title)."
     if ($Note) { $summary += " $Note" }
     $values = [ordered]@{
         '{{ID}}' = $Id; '{{TITLE}}' = "$($Finding.title)"; '{{AUDITOR}}' = $Auditor; '{{SEVERITY}}' = "$($Finding.severity)"
-        '{{KEY}}' = "$($Finding.key)"; '{{FOUND}}' = $Date; '{{FOUND_AT}}' = $Commit; '{{SCORECARD}}' = $Scorecard
+        '{{KEY}}' = $Filed.Key; '{{REPRODUCTION}}' = $Filed.Reproduction; '{{FOUND}}' = $Date; '{{FOUND_AT}}' = $Commit; '{{SCORECARD}}' = $Scorecard
         '{{SUMMARY}}' = $summary; '{{LOCATION}}' = "$($Finding.location)"; '{{EVIDENCE}}' = "$($Finding.evidence)"
-        '{{REPRODUCTION_COMMAND}}' = "$($Finding.reproduction.command)"; '{{REPRODUCTION_EXPECTED}}' = "$($Finding.reproduction.expected)"
+        '{{REPRODUCTION_COMMAND}}' = $Filed.Command; '{{REPRODUCTION_EXPECTED}}' = "$($Finding.reproduction.expected)"
         '{{REPRODUCTION_ACTUAL}}' = "$($Finding.reproduction.actual)"
     }
     $text = [IO.File]::ReadAllText($template)
@@ -206,6 +461,7 @@ function Invoke-WriteFindings {
     if ($Manifest -and (Test-Path -LiteralPath $Manifest)) { $planted = @((Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json).planted) }
     $counts = @{ new = 0; open = 0; closed = 0; catches = 0 }
     $catches = @()
+    $counts.closed += Close-Duplicates $existing
 
     foreach ($auditor in $AuditorOrder) {
         $reportPath = Join-Path $ReportDirectory "$auditor.md"
@@ -221,10 +477,13 @@ function Invoke-WriteFindings {
                 $counts.catches++
                 continue
             }
-            $same = @($existing | Where-Object { $_.Key -ceq "$($f.key)" })
+            $filed = ConvertTo-FiledFinding $f $auditor
+            $same = @($existing | Where-Object { $_.Key -ceq $filed.Key })
             $live = @($same | Where-Object { $_.Status -in 'proposed', 'accepted', 'deferred', 'blocked', 'rejected' })[0]
             if ($live) {
-                Add-ReauditLine $live.Path "- $Date | $Scorecard | reproduces: yes | still reported"
+                $plant = Get-OverlappingPlant $live "$($f.evidence)" $planted
+                if ($plant) { Add-SetAsideLine $live $plant 'yes' 'still reported' }
+                else { Add-ReauditLine $live.Path "- $Date | $Scorecard | reproduces: yes | still reported" }
                 if ($live.Status -ne 'rejected') { $counts.open++ }
                 continue
             }
@@ -234,7 +493,7 @@ function Invoke-WriteFindings {
             if ($flagged) { $notes += "Reported by an auditor flagged unreliable in $Scorecard." }
             $id = 'AF-{0:D4}' -f $next
             $next++
-            $path = New-FindingFile $f $auditor $id ($notes -join ' ')
+            $path = New-FindingFile $f $filed $auditor $id ($notes -join ' ')
             $existing += Read-Finding $path
             $counts.new++
         }
@@ -242,19 +501,29 @@ function Invoke-WriteFindings {
         foreach ($r in @($report.reaudits | Where-Object { $_ })) {
             $target = @($existing | Where-Object { $_.Id -eq "$($r.finding)" })[0]
             if (-not $target -or $target.Status -eq 'closed') { continue }
+            if ($null -eq $r.reproduces) {
+                # The auditor could not run the reproduction (a site its sample missed, a red baseline):
+                # not a "no" (Quality.md, ADR-0422).
+                Add-ReauditLine $target.Path "- $Date | $Scorecard | not re-audited | $($r.evidence)"
+                continue
+            }
             $reproduces = [bool]$r.reproduces
-            Add-ReauditLine $target.Path "- $Date | $Scorecard | reproduces: $(if ($reproduces) { 'yes' } else { 'no' }) | $($r.evidence)"
-            $canClose = (-not $reproduces) -and ($target.Auditor -eq $auditor) -and (-not $flagged) -and ($target.Status -in 'proposed', 'accepted', 'deferred', 'blocked')
-            if ($canClose) {
-                $reason = "Re-audit $Scorecard`: the reproduction no longer reproduces."
-                $text = [IO.File]::ReadAllText($target.Path)
-                $text = Set-FrontMatter $text 'status' 'closed'
-                $text = Set-FrontMatter $text 'reason' $reason
-                $text = Set-FrontMatter $text 'closed' $Date
-                $text = Set-FrontMatter $text 'closed-by' $Scorecard
-                [IO.File]::WriteAllText($target.Path, $text, $Utf8)
-                Add-LogLine $target.Path "- ${Date}: $($target.Status) -> closed. $reason"
-                $target.Status = 'closed'
+            $plant =Get-OverlappingPlant $target "$($r.evidence)" $planted
+            if ($plant) { Add-SetAsideLine $target $plant $(if ($reproduces) { 'yes' } else { 'no' }) "$($r.evidence)"; continue }
+            $own = $target.Auditor -eq $auditor
+            $mechanical = if ((-not $reproduces) -and $own) { Invoke-MechanicalReproduction $target } else { 'none' }
+            $evidence = "$($r.evidence)"
+            if (-not $own) { $evidence = "(re-audited by $auditor) $evidence" }
+            if ($mechanical -ne 'none') { $evidence += " Runner's targeted mutation rerun: $mechanical." }
+            Add-ReauditLine $target.Path "- $Date | $Scorecard | reproduces: $(if ($reproduces) { 'yes' } else { 'no' }) | $evidence"
+            $path = if ($reproduces) { $null } else { Get-ClosePath $target $auditor $flagged $mechanical }
+            if ($path) {
+                $because = switch ($path.How) {
+                    'mechanical' { "the reproduction no longer reproduces, and the runner's targeted mutant was killed" }
+                    'consecutive' { "a second consecutive re-audit by its own auditor found the reproduction no longer reproduces ($($path.By))" }
+                    default { 'the reproduction no longer reproduces' }
+                }
+                Close-Finding $target $path "Re-audit $Scorecard`: $because."
                 $counts.closed++
             }
         }
@@ -323,6 +592,32 @@ if ($SelfTest) {
         $other = [pscustomobject]@{ key = 'process:logs:BL-1300:redone-work'; title = 'BL-1300 claimed 3 times'; location = 'logs/DarkFactory-20261001-120001-L9.log'; evidence = 'three claims' }
         Check 'a process report naming a planted log defect''s catch text is a catch, whatever file it cites' ((Test-Catch $report1 'process' @($plant1)) -and (Test-Catch $report2 'process' @($plant2)) -and -not (Test-Catch $other 'process' @($plant1)) -and -not (Test-Catch $report1 'security' @($plant1))) 'both PD-501 reports; not another task, not another auditor'
         Check 'summary line' ($line -eq 'findings: new 3, still open 1, closed 1, catches 2') $line
+
+        # ADR-0422: closing on mechanical evidence, two consecutive "no"s, duplicates, mechanical keys.
+        $closure = Join-Path $work 'closure'
+        Copy-Item -Recurse -LiteralPath (Join-Path $PSScriptRoot 'Fixtures\closure') -Destination $closure
+        $FindingsDirectory = Join-Path $closure 'findings'
+        Copy-Item -LiteralPath (Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md') -Destination $FindingsDirectory
+        $ReportDirectory = Join-Path $closure 'reports'; $Manifest = Join-Path $closure 'manifest.json'; $Tree = Join-Path $closure 'tree'
+        $Unreliable = @('quality')
+        $script:MechanicalOutcomes = @{ 'AF-0010' = 'killed'; 'AF-0011' = 'survived' }
+        $line2 = Invoke-WriteFindings
+        $c10 = Text 'AF-0010'; $c11 = Text 'AF-0011'; $c12 = Text 'AF-0012'; $c13 = Text 'AF-0013'; $c14 = Text 'AF-0014'; $c15 = Text 'AF-0015'; $c16 = Text 'AF-0019'; $c17 = Text 'AF-0017'; $c18 = Text 'AF-0018'
+        Check 'an unreliable auditor''s "no" closes when the runner''s targeted mutant is killed' ($c10 -match '(?m)^status: closed$' -and $c10 -match '(?m)^closed-how: mechanical$' -and $c10 -match '(?m)^closed-by: 2026-10-14_0930.md$' -and $c10 -match "rerun: killed\.") 'AF-0010'
+        Check 'a "no" the runner''s rerun contradicts (survived) stays open' ($c11 -match '(?m)^status: accepted$' -and $c11 -match "rerun: survived\.") 'AF-0011'
+        Check 'another auditor''s re-audit is marked and closes nothing' ($c11 -match '\| reproduces: no \| \(re-audited by security\) looked fine') 'AF-0011'
+        Check 'two consecutive "no"s on two audits close an unreliable auditor''s finding' ($c12 -match '(?m)^status: closed$' -and $c12 -match '(?m)^closed-how: consecutive$' -and $c12 -match '(?m)^closed-by: 2026-10-07_0844.md, 2026-10-14_0930.md$') 'AF-0012'
+        Check 'closed-how is inserted in template order into a finding from before ADR-0422' ($c12 -match '(?s)\nclosed: 2026-10-14\nclosed-how: consecutive\nclosed-by: ') 'AF-0012'
+        Check 'a "no" after a "yes" from an unreliable auditor stays open' ($c13 -match '(?m)^status: accepted$') 'AF-0013'
+        Check 'open findings with one key: the later is closed as a duplicate of the earlier' ($c15 -match '(?m)^status: closed$' -and $c15 -match '(?m)^closed-how: duplicate$' -and $c15 -match '(?m)^duplicate-of: AF-0014$' -and $c14 -match '(?m)^tasks: BL-6, BL-7$' -and $c14 -match '(?m)^status: accepted$') 'AF-0015'
+        Check 'the same mutant in other words is a repeat of the open finding' ($c14 -match 'reproduces: yes \| still reported' -and -not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'title: NoDelay can become false')) 'AF-0014'
+        Check 'a new surviving mutant gets the mechanical key, reproduction and command' ($c16 -match '(?m)^key: quality:Curl\.Net\.UnitLibrary/C\.cs:Check-eq:surviving-mutant\r?$' -and $c16 -match '(?m)^reproduction: mutation Curl\.Net\.UnitLibrary/C\.cs:6:==\r?$' -and $c16 -match 'Invoke-MutationTest\.ps1 -Site Curl\.Net\.UnitLibrary/C\.cs:6:== -Member Check -ExcludeBaselineFailures') 'AF-0019'
+        Check 'a re-audit in a project that depends on a planted defect''s project is set aside, not counted' ($c17 -match '\| not re-audited \| overlaps planted defect PD-103 in Curl\.Dep\.UnitLibrary/Reader\.cs, so the auditor''s verdict \(reproduces yes\) is set aside: fails with IndexOutOfRange' -and $c17 -notmatch 'reproduces: yes \| fails') 'AF-0017'
+        Check 'a re-audit whose evidence cites a planted file is set aside' ($c18 -match 'overlaps planted defect PD-104' -and $c18 -match '(?m)^status: accepted\r?$') 'AF-0018'
+        Check 'a set-aside line is neither yes nor no' (@(Get-ReauditLines $c17).Count -eq 2) "$(@(Get-ReauditLines $c17).Count) parsed"        Check 'a re-audit with reproduces null is "not re-audited", not a no' ($c14 -match '\| 2026-10-14_0930\.md \| not re-audited \| site not sampled' -and $c14 -match '(?m)^status: accepted\r?$') 'AF-0014'
+        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 3, catches 0') $line2
+        $Tree = ''
+        Check 'with no tree the member is the key''s <what> without its operator' ((Get-SiteMember ([pscustomobject]@{ File = 'X.UnitLibrary/Y.cs'; Line = 3; Operator = 'true' }) 'quality:X.UnitLibrary/Y.cs:Turn-true:surviving-mutant') -eq 'Turn') 'Turn'
         exit $(if ($failed) { 1 } else { 0 })
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue }
