@@ -18,7 +18,9 @@ reply-part selection, connection closing, the `<servercmd>` commands that change
 `<servercmd>` reporting and byte recording against upstream's `sws.c`. The harness's other
 tests (`UpstreamCaseRunnerTests`, `UpstreamCaseScreeningTests`, `UpstreamCaseVerificationTests`,
 `UpstreamCaseRatchetTests`, `UpstreamCommandLineSplitterTests`, ...) drive it from inline
-test-file text.
+test-file text. The adversarial black-box tests of `Documentation/Wiki/Adversarial-Testing.md`
+(BL-1494) sit in `<Class>Tests.Adversarial.cs` files, as the second half of a `partial` test
+class, so each production class still has one test class.
 
 `UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet` is the one
 data-driven method, in `TestCategory("Conformance")` and part of the fast suite, that runs

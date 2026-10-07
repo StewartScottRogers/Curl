@@ -10,7 +10,7 @@ namespace Curl.Conformance;
 /// connection closes, which <c>&lt;servercmd&gt;</c> commands are reported, and what is recorded.
 /// </summary>
 [TestClass]
-public sealed class SwsHttpServerConnectorTests
+public sealed partial class SwsHttpServerConnectorTests
 {
     private const string Get = "GET /1234 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
 
