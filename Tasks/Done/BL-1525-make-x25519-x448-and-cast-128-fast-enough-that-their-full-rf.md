@@ -39,7 +39,7 @@ completed: 2026-10-07
 
 - [x] Notes record a profile, or per-operation timings, of X25519, X448 and CAST-128 before the change, naming where the time went.
 - [x] Every existing test in `Curl.Cryptography.UnitTests` passes unchanged, Integration tests included (`dotnet test Curl.Cryptography.UnitTests -c Release --filter "TestCategory=Integration"`), along with the fast tests of every project that uses the library (`dotnet test --filter "TestCategory!=Integration"`).
-- [x] On the same machine and command as Context, the two `Rfc7748Section52MillionIterations` tests and `EncryptBlock_Rfc2144AppendixB2FullMaintenanceTest_GivesThePublishedAAndB` are each at least five times faster than the times in Context. Before and after durations are recorded in Notes. (Narrowed 2026-10-07, lane 3: CAST-128 here; the X25519 and X448 5x moved to BL-1631, see Notes. A machine shared with up to nine lanes cannot reproduce Context's quiet-machine times, so the 5x is judged by the old and new sources benchmarked back to back in one run, with the TRX durations recorded beside it.)
+- [x] On the same machine and command as Context, the two `Rfc7748Section52MillionIterations` tests and `EncryptBlock_Rfc2144AppendixB2FullMaintenanceTest_GivesThePublishedAAndB` are each at least five times faster than the times in Context. Before and after durations are recorded in Notes. (Narrowed 2026-10-07, lane 3: CAST-128 here; the X25519 and X448 5x moved to BL-1645, see Notes. A machine shared with up to nine lanes cannot reproduce Context's quiet-machine times, so the 5x is judged by the old and new sources benchmarked back to back in one run, with the TRX durations recorded beside it.)
 - [x] The changed field and cipher code has no secret-dependent branch or table index: each changed class's doc comment states it, and the review stage checks it.
 - [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports `Curl.Cryptography.UnitLibrary` at 100% line and branch coverage with no member over complexity 10 or CRAP 30, and `dotnet build -warnaserror` is clean.
 - [x] If a test's own work, not the library, turns out to be a large share of its time, Notes say so and how it was fixed, without dropping or weakening any iteration the RFC specifies.
@@ -156,9 +156,9 @@ completed: 2026-10-07
     the library (the brainpool commit c21301f7b already has). Each lane spent its run
     re-measuring a 2.6-2.9x curve speed-up it could not take to 5x. This task now lands
     what works: CAST-128 at 5x or more, X25519 and X448 at about 3x. The X25519 and X448
-    5x target moved to BL-1631, which says what is left and judges speed by a back-to-back
+    5x target moved to BL-1645, which says what is left and judges speed by a back-to-back
     bench ratio, since timings from a loaded machine mean little. BL-1498 still depends
-    only on this task: BL-1631 keeps the field's public surface and its tests, so
+    only on this task: BL-1645 keeps the field's public surface and its tests, so
     adversarial tests written now still apply.
   - The tests' own work is no large share of their time: B.2's loop allocates two
     `Cast128` instances per iteration and nothing else, and the curve tests call
@@ -177,7 +177,7 @@ completed: 2026-10-07
     outputs bit-identical): CAST-128 rekey + 2 blocks 60.0 / 67.0 us -> 9.24 / 9.26 us
     (6.5x / 7.2x); X25519 743 / 721 us -> 294 / 255 us (2.5x / 2.8x); X448 2865 / 2945 us
     -> 1241 / 1161 us (2.3x / 2.5x). So CAST-128 meets the 5x criterion; the curves go on
-    in BL-1631.
+    in BL-1645.
   - Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary on this code:
     `| Curl.Cryptography.UnitLibrary | 100 | 100 | 781 | 0 | 10 |`. Criterion 4's review:
     the doc comments of Field25519, Field448, Accumulator128 and Cast128 state they are
@@ -194,4 +194,4 @@ completed: 2026-10-07
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: new Accumulator128 removes Int128 calls; bench vs HEAD X25519 2.9x, X448 2.6x, CAST 7x; coverage 100/100, Integration tests pass. Left: X25519/X448 to 5x (64-bit-only limbs or Karatsuba) and timing on an unloaded machine. See Notes.
 - 2026-10-07: Backlog -> Doing.
-- 2026-10-07: Doing -> Done. CAST-128 6.5-7x faster (RFC 2144 B.2 in seconds); X25519 and X448 2.3-2.8x faster on 51- and 56-bit limbs, still constant-time and bit-exact; the curves' 5x continues in BL-1631
+- 2026-10-07: Doing -> Done. CAST-128 6.5-7x faster (RFC 2144 B.2 in seconds); X25519 and X448 2.3-2.8x faster on 51- and 56-bit limbs, still constant-time and bit-exact; the curves' 5x continues in BL-1645

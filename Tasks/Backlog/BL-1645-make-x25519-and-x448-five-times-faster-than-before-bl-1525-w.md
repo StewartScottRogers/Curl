@@ -1,5 +1,5 @@
 ---
-id: BL-1631
+id: BL-1645
 title: Make X25519 and X448 five times faster than before BL-1525 with 64-bit-only field arithmetic
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1631 — Make X25519 and X448 five times faster than before BL-1525 with 64-bit-only field arithmetic
+# BL-1645 — Make X25519 and X448 five times faster than before BL-1525 with 64-bit-only field arithmetic
 
 ## Goal
 
