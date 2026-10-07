@@ -1,4 +1,5 @@
 using Curl.Core.Fakes;
+using Curl.Testing;
 
 namespace Curl.Core.Hsts;
 
@@ -17,58 +18,84 @@ public sealed class HstsCacheTests
 
     private const long Windows = HstsCache.LatestWritableExpiryOnWindows;
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void FormatFile_AfterAYearWithSubdomains_WritesCurlsFile()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 5, 59, 2);
+        diagnostics.Arrange("clock", "2026-09-29 05:59:02 UTC");
+        diagnostics.Arrange("header", "max-age=31536000; includeSubDomains for localhost");
 
         cache.ApplyHeader("max-age=31536000; includeSubDomains", "localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
 
-        Assert.AreEqual(Header + ".localhost \"20270929 05:59:02\"\r\n", cache.FormatFile("\r\n", Windows));
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", Header + ".localhost \"20270929 05:59:02\"\r\n", file);
+        Assert.AreEqual(Header + ".localhost \"20270929 05:59:02\"\r\n", file);
     }
 
     [TestMethod]
     public void FormatFile_WithLineFeed_EndsEveryLineInLineFeed()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 5, 59, 2);
+        diagnostics.Arrange("clock", "2026-09-29 05:59:02 UTC");
+        diagnostics.Arrange("header", "max-age=31536000; includeSubDomains for localhost");
 
         cache.ApplyHeader("max-age=31536000; includeSubDomains", "localhost");
+        string? file = cache.FormatFile("\n", HstsCache.LatestWritableExpiryOffWindows);
 
-        Assert.AreEqual(
-            string.Join('\n', HstsCache.FileHeaderLines) + "\n.localhost \"20270929 05:59:02\"\n",
-            cache.FormatFile("\n", HstsCache.LatestWritableExpiryOffWindows));
+        string expected = string.Join('\n', HstsCache.FileHeaderLines) + "\n.localhost \"20270929 05:59:02\"\n";
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", expected, file);
+        Assert.AreEqual(expected, file);
     }
 
     [TestMethod]
     public void ApplyHeader_MaxAgeZeroAfterReadingCurlsFile_LeavesOnlyTheComments()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("clock", "2026-09-29 06:00:00 UTC");
+        diagnostics.Arrange("file read", ".localhost expiring 20270929 05:59:02");
         cache.ReadFile(Header + ".localhost \"20270929 05:59:02\"\r\n");
 
+        diagnostics.Arrange("header", "max-age=0 for localhost");
         cache.ApplyHeader("max-age=0", "localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
 
-        Assert.AreEqual(Header, cache.FormatFile("\r\n", Windows));
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", Header, file);
+        Assert.AreEqual(Header, file);
     }
 
     [TestMethod]
     public void ReadFile_CurlsSeededFile_KeepsWhatCurlKept()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 1);
+        diagnostics.Arrange("clock", "2026-09-29 06:00:01 UTC");
         cache.ReadFile(
             "# c\n   # indented\n\nplain.test \"unlimited\"\n.sub.test \"20300101 00:00:00\"\nold.test \"20200101 00:00:00\"\n"
             + "bad.test 20300101\ndup.test \"20300101 00:00:00\"\ndup.test \"20310101 00:00:00\"\nDUP.test \"20290101 00:00:00\"\n"
             + "trail.test. \"20300101 00:00:00\"\ngarbage.test \"not a date\"\n  lead.test \"20300101 00:00:00\"\n"
             + "two.test  \"20300101 00:00:00\"\ntab.test\t\"20300101 00:00:00\"\nx.test \"20300101 00:00:00\" y\n"
             + "cr.test \"20300101 00:00:00\"\r\nlocalhost \"20300101 00:00:00\"\nlast.test \"20300101 00:00:00\"");
+        diagnostics.Arrange("seeded entries kept", cache.Entries.Count);
 
+        diagnostics.Arrange("header", "max-age=60 for localhost");
         cache.ApplyHeader("max-age=60", "localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
 
-        Assert.AreEqual(
-            Header
+        string expected = Header
             + "plain.test \"unlimited\"\r\n.sub.test \"20300101 00:00:00\"\r\ndup.test \"20310101 00:00:00\"\r\n"
             + "trail.test \"20300101 00:00:00\"\r\nlead.test \"20300101 00:00:00\"\r\ncr.test \"20300101 00:00:00\"\r\n"
-            + "localhost \"20260929 06:01:01\"\r\nlast.test \"20300101 00:00:00\"\r\n",
-            cache.FormatFile("\r\n", Windows));
+            + "localhost \"20260929 06:01:01\"\r\nlast.test \"20300101 00:00:00\"\r\n";
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", expected, file);
+        Assert.AreEqual(expected, file);
     }
 
     [TestMethod]
@@ -76,156 +103,264 @@ public sealed class HstsCacheTests
     [DataRow("max-age=9223372036854775807", "localhost")]
     public void ApplyHeader_MaxAgePastSixtyFourBits_WritesUnlimited(string headerValue, string written)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 2);
         cache.ReadFile("a.test \"20300101 00:00:00\"\n");
+        diagnostics.Arrange("header", headerValue);
 
         cache.ApplyHeader(headerValue, "localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
 
-        Assert.AreEqual(Header + "a.test \"20300101 00:00:00\"\r\n" + written + " \"unlimited\"\r\n", cache.FormatFile("\r\n", Windows));
+        string expected = Header + "a.test \"20300101 00:00:00\"\r\n" + written + " \"unlimited\"\r\n";
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", expected, file);
+        Assert.AreEqual(expected, file);
+        diagnostics.Act("second entry unlimited", cache.Entries[1].IsUnlimited);
+        diagnostics.Assert("second entry unlimited", true, cache.Entries[1].IsUnlimited);
         Assert.IsTrue(cache.Entries[1].IsUnlimited);
     }
 
     [TestMethod]
     public void FormatFile_ExpiryAtTheWindowsLimit_WritesIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("file read", "e expiring 30010101 20:59:59");
         cache.ReadFile("e \"30010101 20:59:59\"\n");
 
-        Assert.AreEqual(Header + "e \"30010101 20:59:59\"\r\n", cache.FormatFile("\r\n", Windows));
+        string? file = cache.FormatFile("\r\n", Windows);
+
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", Header + "e \"30010101 20:59:59\"\r\n", file);
+        Assert.AreEqual(Header + "e \"30010101 20:59:59\"\r\n", file);
     }
 
     [TestMethod]
     public void FormatFile_ExpiryPastTheWindowsLimit_WritesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("file read", "e expiring 30010101 20:59:59, f expiring 30010101 21:00:00");
         cache.ReadFile("e \"30010101 20:59:59\"\nf \"30010101 21:00:00\"\n");
 
-        Assert.IsNull(cache.FormatFile("\r\n", Windows));
+        string? file = cache.FormatFile("\r\n", Windows);
+
+        diagnostics.Act("file", file ?? "null");
+        diagnostics.Assert("file", "null", file ?? "null");
+        Assert.IsNull(file);
     }
 
     [TestMethod]
     public void FormatFile_MaxAgePastTheWindowsLimit_WritesNothingOnWindowsAndTheYearElsewhere()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 25);
+        diagnostics.Arrange("header", "max-age=251611639175 for localhost");
 
         cache.ApplyHeader("max-age=251611639175", "localhost");
+        string? windowsFile = cache.FormatFile("\r\n", Windows);
+        string? otherFile = cache.FormatFile("\n", HstsCache.LatestWritableExpiryOffWindows);
 
-        Assert.IsNull(cache.FormatFile("\r\n", Windows));
-        Assert.AreEqual(
-            string.Join('\n', HstsCache.FileHeaderLines) + "\nlocalhost \"100000101 00:00:00\"\n",
-            cache.FormatFile("\n", HstsCache.LatestWritableExpiryOffWindows));
+        diagnostics.Act("windows file", windowsFile ?? "null");
+        diagnostics.Assert("windows file", "null", windowsFile ?? "null");
+        Assert.IsNull(windowsFile);
+        string expected = string.Join('\n', HstsCache.FileHeaderLines) + "\nlocalhost \"100000101 00:00:00\"\n";
+        diagnostics.Act("other file", otherFile);
+        diagnostics.Assert("other file", expected, otherFile);
+        Assert.AreEqual(expected, otherFile);
     }
 
     [TestMethod]
     public void FormatFile_ExpiryPastTheLastYearAnIntHolds_WritesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        string header = "max-age=" + (HstsCache.LatestWritableExpiryOffWindows + 1 - new DateTimeOffset(2026, 9, 29, 6, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds());
+        diagnostics.Arrange("header", header);
 
-        cache.ApplyHeader("max-age=" + (HstsCache.LatestWritableExpiryOffWindows + 1 - new DateTimeOffset(2026, 9, 29, 6, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds()), "localhost");
+        cache.ApplyHeader(header, "localhost");
+        string? file = cache.FormatFile("\n", HstsCache.LatestWritableExpiryOffWindows);
 
-        Assert.IsNull(cache.FormatFile("\n", HstsCache.LatestWritableExpiryOffWindows));
+        diagnostics.Act("file", file ?? "null");
+        diagnostics.Assert("file", "null", file ?? "null");
+        Assert.IsNull(file);
     }
 
     [TestMethod]
     public void Find_SubdomainOfAnIncludeSubDomainsEntry_FindsIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 27);
+        diagnostics.Arrange("file read", ".localhost unlimited");
         cache.ReadFile(".localhost \"unlimited\"\n");
 
-        Assert.AreEqual(new HstsEntry("localhost", true, HstsEntry.UnlimitedExpiry), cache.Find("www.localhost"));
+        HstsEntry? found = cache.Find("www.localhost");
+
+        var expected = new HstsEntry("localhost", true, HstsEntry.UnlimitedExpiry);
+        diagnostics.Act("found", found);
+        diagnostics.Assert("found", expected, found);
+        Assert.AreEqual(expected, found);
     }
 
     [TestMethod]
     public void ApplyHeader_SubdomainOfAnIncludeSubDomainsEntry_AddsItsOwnEntry()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 27);
+        diagnostics.Arrange("file read", ".localhost unlimited");
         cache.ReadFile(".localhost \"unlimited\"\n");
+        diagnostics.Arrange("header", "max-age=60 for www.localhost");
 
         cache.ApplyHeader("max-age=60", "www.localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
 
-        Assert.AreEqual(Header + ".localhost \"unlimited\"\r\nwww.localhost \"20260929 06:01:27\"\r\n", cache.FormatFile("\r\n", Windows));
+        string expected = Header + ".localhost \"unlimited\"\r\nwww.localhost \"20260929 06:01:27\"\r\n";
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", expected, file);
+        Assert.AreEqual(expected, file);
     }
 
     [TestMethod]
     public void Find_SubdomainOfAnEntryWithoutIncludeSubDomains_FindsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 28);
+        diagnostics.Arrange("file read", "localhost unlimited");
         cache.ReadFile("localhost \"unlimited\"\n");
 
-        Assert.IsNull(cache.Find("www.localhost"));
+        HstsEntry? found = cache.Find("www.localhost");
+
+        diagnostics.Act("found", found?.Host ?? "null");
+        diagnostics.Assert("found", "null", found?.Host ?? "null");
+        Assert.IsNull(found);
     }
 
     [TestMethod]
     public void Find_HostInAnotherCaseWithTrailingDot_FindsItsEntry()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 29);
+        diagnostics.Arrange("file read", ".localhost unlimited");
         cache.ReadFile(".localhost \"unlimited\"\n");
 
-        Assert.AreEqual("localhost", cache.Find("LOCALHOST.")?.Host);
+        string? host = cache.Find("LOCALHOST.")?.Host;
+
+        diagnostics.Act("found host", host ?? "null");
+        diagnostics.Assert("found host", "localhost", host);
+        Assert.AreEqual("localhost", host);
     }
 
     [TestMethod]
     public void ApplyHeader_HostInAnotherCaseWithTrailingDot_UpdatesTheEntryInPlace()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 29);
+        diagnostics.Arrange("file read", ".localhost unlimited");
         cache.ReadFile(".localhost \"unlimited\"\n");
+        diagnostics.Arrange("header", "max-age=60 for LOCALHOST.");
 
         cache.ApplyHeader("max-age=60", "LOCALHOST.");
+        string? file = cache.FormatFile("\r\n", Windows);
 
-        Assert.AreEqual(Header + "localhost \"20260929 06:01:29\"\r\n", cache.FormatFile("\r\n", Windows));
+        string expected = Header + "localhost \"20260929 06:01:29\"\r\n";
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", expected, file);
+        Assert.AreEqual(expected, file);
     }
 
     [TestMethod]
     public void Find_ExpiredEntry_FindsNothingAndDropsIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeTimeProvider clock = new(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
         HstsCache cache = new(clock);
+        diagnostics.Arrange("clock", "2020-01-01 00:00:00 UTC");
         cache.ReadFile("localhost \"20200101 00:00:01\"\nother \"unlimited\"\n");
+        diagnostics.Arrange("clock advance", "1 second");
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.IsNull(cache.Find("localhost"));
-        Assert.AreEqual(Header + "other \"unlimited\"\r\n", cache.FormatFile("\r\n", Windows));
+        HstsEntry? found = cache.Find("localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
+
+        diagnostics.Act("found", found?.Host ?? "null");
+        diagnostics.Assert("found", "null", found?.Host ?? "null");
+        Assert.IsNull(found);
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", Header + "other \"unlimited\"\r\n", file);
+        Assert.AreEqual(Header + "other \"unlimited\"\r\n", file);
     }
 
     [TestMethod]
     public void FormatFile_ExpiredEntryNoLookupPassed_StillWritesIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeTimeProvider clock = new(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
         HstsCache cache = new(clock);
+        diagnostics.Arrange("clock", "2020-01-01 00:00:00 UTC");
         cache.ReadFile("localhost \"20200101 00:00:01\"\n");
+        diagnostics.Arrange("clock advance", "1 second");
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.AreEqual(Header + "localhost \"20200101 00:00:01\"\r\n", cache.FormatFile("\r\n", Windows));
+        string? file = cache.FormatFile("\r\n", Windows);
+
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", Header + "localhost \"20200101 00:00:01\"\r\n", file);
+        Assert.AreEqual(Header + "localhost \"20200101 00:00:01\"\r\n", file);
     }
 
     [TestMethod]
     public void ReadFile_ExpiredEntry_SkipsIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 30);
+        diagnostics.Arrange("clock", "2026-09-29 06:00:30 UTC");
+        diagnostics.Arrange("file read", "localhost expiring 20200101 00:00:00");
         cache.ReadFile("localhost \"20200101 00:00:00\"\n");
 
-        Assert.IsNull(cache.Find("localhost"));
-        Assert.AreEqual(Header, cache.FormatFile("\r\n", Windows));
+        HstsEntry? found = cache.Find("localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
+
+        diagnostics.Act("found", found?.Host ?? "null");
+        diagnostics.Assert("found", "null", found?.Host ?? "null");
+        Assert.IsNull(found);
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", Header, file);
+        Assert.AreEqual(Header, file);
     }
 
     [TestMethod]
     public void ReadFile_SubdomainLineUnderAHeldParent_SkipsOnlyTheDottedOne()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 1, 6);
+        diagnostics.Arrange("clock", "2026-09-29 06:01:06 UTC");
+        diagnostics.Arrange("file read", ".sub.test, .a.sub.test, b.sub.test");
         cache.ReadFile(".sub.test \"20300101 00:00:00\"\n.a.sub.test \"20300101 00:00:00\"\nb.sub.test \"20300101 00:00:00\"\n");
 
+        diagnostics.Arrange("header", "max-age=0 for localhost");
         cache.ApplyHeader("max-age=0", "localhost");
+        string? file = cache.FormatFile("\r\n", Windows);
 
-        Assert.AreEqual(Header + ".sub.test \"20300101 00:00:00\"\r\nb.sub.test \"20300101 00:00:00\"\r\n", cache.FormatFile("\r\n", Windows));
+        string expected = Header + ".sub.test \"20300101 00:00:00\"\r\nb.sub.test \"20300101 00:00:00\"\r\n";
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", expected, file);
+        Assert.AreEqual(expected, file);
     }
 
     [TestMethod]
     public void ReadFile_SameHostTwice_KeepsTheLaterExpiryAndAnyIncludeSubDomains()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("file read", "dup.test expiring 2031, .DUP.test expiring 2030");
         cache.ReadFile("dup.test \"20310101 00:00:00\"\n.DUP.test \"20300101 00:00:00\"\n");
 
-        Assert.AreEqual(new HstsEntry("dup.test", true, new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds()), cache.Entries.Single());
+        HstsEntry entry = cache.Entries.Single();
+
+        var expected = new HstsEntry("dup.test", true, new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds());
+        diagnostics.Act("entry", entry);
+        diagnostics.Assert("entry", expected, entry);
+        Assert.AreEqual(expected, entry);
     }
 
     [TestMethod]
@@ -236,10 +371,16 @@ public sealed class HstsCacheTests
     [DataRow("20300101", "20300101 00:00:00")]
     public void ReadFile_DateCurlReads_WritesItAsCurlDid(string written, string rewritten)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("date written", written);
         cache.ReadFile("e \"" + written + "\"\n");
 
-        Assert.AreEqual(Header + "e \"" + rewritten + "\"\r\n", cache.FormatFile("\r\n", Windows));
+        string? file = cache.FormatFile("\r\n", Windows);
+
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", Header + "e \"" + rewritten + "\"\r\n", file);
+        Assert.AreEqual(Header + "e \"" + rewritten + "\"\r\n", file);
     }
 
     [TestMethod]
@@ -255,9 +396,15 @@ public sealed class HstsCacheTests
     [DataRow("not a date")]
     public void ReadFile_DateCurlRefuses_DropsTheLine(string written)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("date written", written);
         cache.ReadFile("e \"" + written + "\"\n");
 
+        int count = cache.Entries.Count;
+
+        diagnostics.Act("entry count", count);
+        diagnostics.Assert("entry count", 0, count);
         Assert.AreEqual(0, cache.Entries.Count);
     }
 
@@ -267,20 +414,32 @@ public sealed class HstsCacheTests
     [DataRow(".. \"unlimited\"")]
     public void ReadFile_HostOfOnlyDots_AddsNothing(string line)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("line", line);
         cache.ReadFile(line);
 
+        int count = cache.Entries.Count;
+
+        diagnostics.Act("entry count", count);
+        diagnostics.Assert("entry count", 0, count);
         Assert.AreEqual(0, cache.Entries.Count);
     }
 
     [TestMethod]
     public void ReadFile_LineLongerThanCurlReads_EndsTheReading()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("maximum line length", HstsCache.MaxFileLineLength);
         cache.ReadFile(
             "a \"unlimited\"\r\n# " + new string('x', HstsCache.MaxFileLineLength - 2) + "\r\nb \"unlimited\"\n#"
             + new string('x', HstsCache.MaxFileLineLength) + "\nc \"unlimited\"\n");
 
+        string[] hosts = cache.Entries.Select(entry => entry.Host).ToArray();
+
+        diagnostics.Act("hosts", string.Join(",", hosts));
+        diagnostics.Assert("hosts", "a,b", string.Join(",", hosts));
         CollectionAssert.AreEqual(new[] { "a", "b" }, cache.Entries.Select(entry => entry.Host).ToArray());
     }
 
@@ -292,10 +451,14 @@ public sealed class HstsCacheTests
     [DataRow("255.255.255.255")]
     public void ApplyHeader_FromAnIpAddress_LearnsNothing(string host)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("host", host);
 
         cache.ApplyHeader("max-age=60", host);
 
+        diagnostics.Act("entry count", cache.Entries.Count);
+        diagnostics.Assert("entry count", 0, cache.Entries.Count);
         Assert.AreEqual(0, cache.Entries.Count);
     }
 
@@ -312,10 +475,15 @@ public sealed class HstsCacheTests
     [DataRow("a:b")]
     public void ApplyHeader_FromANameThatIsNoAddress_LearnsIt(string host)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("host", host);
 
         cache.ApplyHeader("max-age=60", host);
 
+        string learned = cache.Entries.Single().Host;
+        diagnostics.Act("learned host", learned);
+        diagnostics.Assert("learned host", host, learned);
         Assert.AreEqual(host, cache.Entries.Single().Host);
     }
 
@@ -324,92 +492,151 @@ public sealed class HstsCacheTests
     [DataRow(".")]
     public void ApplyHeader_EmptyHost_LearnsNothing(string host)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("host", host);
 
         cache.ApplyHeader("max-age=60", host);
 
+        diagnostics.Act("entry count", cache.Entries.Count);
+        diagnostics.Assert("entry count", 0, cache.Entries.Count);
         Assert.AreEqual(0, cache.Entries.Count);
     }
 
     [TestMethod]
     public void ApplyHeader_RefusedValue_LearnsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("header", "includeSubDomains for localhost");
 
         cache.ApplyHeader("includeSubDomains", "localhost");
 
+        diagnostics.Act("entry count", cache.Entries.Count);
+        diagnostics.Assert("entry count", 0, cache.Entries.Count);
         Assert.AreEqual(0, cache.Entries.Count);
     }
 
     [TestMethod]
     public void ApplyHeader_MaxAgeZeroForAnUnknownHost_ChangesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("file read", ".localhost unlimited");
         cache.ReadFile(".localhost \"unlimited\"\n");
+        diagnostics.Arrange("header", "max-age=0 for www.localhost");
 
         cache.ApplyHeader("max-age=0", "www.localhost");
 
+        diagnostics.Act("entry count", cache.Entries.Count);
+        diagnostics.Assert("entry count", 1, cache.Entries.Count);
         Assert.AreEqual(1, cache.Entries.Count);
     }
 
     [TestMethod]
     public void ApplyHeader_HostLongerThanCurlLooksUp_AddsItAgainEachTime()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
         string host = new('a', HstsFileLineParser.MaxHostLength + 1);
+        diagnostics.Arrange("host length", host.Length);
 
         cache.ApplyHeader("max-age=60", host);
         cache.ApplyHeader("max-age=60", host);
 
+        diagnostics.Act("entry count", cache.Entries.Count);
+        diagnostics.Assert("entry count", 2, cache.Entries.Count);
         Assert.AreEqual(2, cache.Entries.Count);
+        HstsEntry? found = cache.Find(host);
+        diagnostics.Act("found", found?.Host.Length ?? -1);
+        diagnostics.Assert("found", "null", found is null ? "null" : "an entry");
         Assert.IsNull(cache.Find(host));
     }
 
     [TestMethod]
     public void Find_SeveralParents_TakesTheLongestAndAnExactMatchOverAll()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("file read", ".b.test, .c.test, x.b.test, .test");
         cache.ReadFile(".b.test \"20300101 00:00:00\"\n.c.test \"unlimited\"\nx.b.test \"20310101 00:00:00\"\n.test \"unlimited\"\n");
 
-        Assert.AreEqual("b.test", cache.Find("y.x.b.test")?.Host);
-        Assert.AreEqual("x.b.test", cache.Find("X.B.TEST")?.Host);
-        Assert.AreEqual("test", cache.Find("q.test")?.Host);
-        Assert.IsNull(cache.Find("xb.test.org"));
-        Assert.IsNull(cache.Find("atest"));
+        string? deepest = cache.Find("y.x.b.test")?.Host;
+        string? exact = cache.Find("X.B.TEST")?.Host;
+        string? shorter = cache.Find("q.test")?.Host;
+        HstsEntry? lookalike = cache.Find("xb.test.org");
+        HstsEntry? noDot = cache.Find("atest");
+
+        diagnostics.Act("y.x.b.test", deepest ?? "null");
+        diagnostics.Assert("y.x.b.test", "b.test", deepest);
+        Assert.AreEqual("b.test", deepest);
+        diagnostics.Act("X.B.TEST", exact ?? "null");
+        diagnostics.Assert("X.B.TEST", "x.b.test", exact);
+        Assert.AreEqual("x.b.test", exact);
+        diagnostics.Act("q.test", shorter ?? "null");
+        diagnostics.Assert("q.test", "test", shorter);
+        Assert.AreEqual("test", shorter);
+        diagnostics.Act("xb.test.org", lookalike?.Host ?? "null");
+        diagnostics.Assert("xb.test.org", "null", lookalike?.Host ?? "null");
+        Assert.IsNull(lookalike);
+        diagnostics.Act("atest", noDot?.Host ?? "null");
+        diagnostics.Assert("atest", "null", noDot?.Host ?? "null");
+        Assert.IsNull(noDot);
     }
 
     [TestMethod]
     public void Find_EmptyHost_FindsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("file read", "a unlimited");
         cache.ReadFile("a \"unlimited\"\n");
 
-        Assert.IsNull(cache.Find(string.Empty));
+        HstsEntry? found = cache.Find(string.Empty);
+
+        diagnostics.Act("found", found?.Host ?? "null");
+        diagnostics.Assert("found", "null", found?.Host ?? "null");
+        Assert.IsNull(found);
     }
 
     [TestMethod]
     public void ApplyHeader_PastMaxEntries_DropsTheFirst()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("entries read", HstsCache.MaxEntries);
         cache.ReadFile(string.Concat(Enumerable.Range(0, HstsCache.MaxEntries).Select(number => $"h{number} \"unlimited\"\n")));
+        diagnostics.Arrange("header", "max-age=60 for new");
 
         cache.ApplyHeader("max-age=60", "new");
 
+        diagnostics.Act("entry count", cache.Entries.Count);
+        diagnostics.Act("first host", cache.Entries[0].Host);
+        diagnostics.Act("last host", cache.Entries[^1].Host);
+        diagnostics.Assert("entry count", HstsCache.MaxEntries, cache.Entries.Count);
         Assert.AreEqual(HstsCache.MaxEntries, cache.Entries.Count);
+        diagnostics.Assert("first host", "h1", cache.Entries[0].Host);
         Assert.AreEqual("h1", cache.Entries[0].Host);
+        diagnostics.Assert("last host", "new", cache.Entries[^1].Host);
         Assert.AreEqual("new", cache.Entries[^1].Host);
     }
 
     [TestMethod]
     public void Members_NullArguments_Throw()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        diagnostics.Arrange("arguments", "a null for each of ReadFile, ApplyHeader (both), Find, FormatFile");
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.ReadFile(null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader(null!, "a"));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader("max-age=1", null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.FormatFile(null!, Windows));
+        var readFile = Assert.ThrowsExactly<ArgumentNullException>(() => cache.ReadFile(null!));
+        var applyHeaderValue = Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader(null!, "a"));
+        var applyHeaderHost = Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader("max-age=1", null!));
+        var find = Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(null!));
+        var formatFile = Assert.ThrowsExactly<ArgumentNullException>(() => cache.FormatFile(null!, Windows));
+
+        diagnostics.Act("exceptions", string.Join(",", new[] { readFile, applyHeaderValue, applyHeaderHost, find, formatFile }.Select(exception => exception.GetType().Name)));
+        diagnostics.Assert("exception type of ReadFile", nameof(ArgumentNullException), readFile.GetType().Name);
+        diagnostics.Assert("exception type of FormatFile", nameof(ArgumentNullException), formatFile.GetType().Name);
     }
 
     private static HstsCache CacheAt(int year, int month, int day, int hour, int minute, int second) =>

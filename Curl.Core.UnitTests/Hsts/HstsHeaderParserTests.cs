@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Core.Hsts;
 
 /// <summary>
@@ -8,6 +10,8 @@ namespace Curl.Core.Hsts;
 [TestClass]
 public sealed class HstsHeaderParserTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("max-age=31536000; includeSubDomains", 31536000L, true)]
     [DataRow("max-age=\"60\"", 60L, false)]
@@ -23,8 +27,18 @@ public sealed class HstsHeaderParserTests
     [DataRow("max-age=60; includeSubDomains\r\n", 60L, true)]
     [DataRow("max-age=9223372036854775807", long.MaxValue, false)]
     [DataRow("max-age=99999999999999999999999; includeSubDomains", long.MaxValue, true)]
-    public void Parse_ValueCurlReads_ReadsItsDirectives(string value, long maxAgeSeconds, bool includeSubDomains) =>
-        Assert.AreEqual(new HstsHeader(maxAgeSeconds, includeSubDomains), HstsHeaderParser.Parse(value));
+    public void Parse_ValueCurlReads_ReadsItsDirectives(string value, long maxAgeSeconds, bool includeSubDomains)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("header value", value);
+        HstsHeader expected = new(maxAgeSeconds, includeSubDomains);
+
+        HstsHeader? parsed = HstsHeaderParser.Parse(value);
+
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Assert("parsed header", expected, parsed);
+        Assert.AreEqual(expected, parsed);
+    }
 
     [TestMethod]
     [DataRow("max-age=60; max-age=70")]
@@ -38,10 +52,27 @@ public sealed class HstsHeaderParserTests
     [DataRow("max-age 60")]
     [DataRow("max-age")]
     [DataRow("")]
-    public void Parse_ValueCurlRefuses_ReadsNothing(string value) =>
-        Assert.IsNull(HstsHeaderParser.Parse(value));
+    public void Parse_ValueCurlRefuses_ReadsNothing(string value)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("header value", value);
+
+        HstsHeader? parsed = HstsHeaderParser.Parse(value);
+
+        diagnostics.Act("parsed", parsed?.ToString() ?? "null");
+        diagnostics.Assert("parsed header", "null", parsed?.ToString() ?? "null");
+        Assert.IsNull(parsed);
+    }
 
     [TestMethod]
-    public void Parse_Null_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => HstsHeaderParser.Parse(null!));
+    public void Parse_Null_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("header value", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => HstsHeaderParser.Parse(null!));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 }

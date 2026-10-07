@@ -1,5 +1,6 @@
 using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core.Hsts;
 
@@ -17,15 +18,25 @@ public sealed class HstsTransferPolicyTests
 
     private readonly HstsTransferPolicy policy = new(new FakeTimeProvider(Now));
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("http://localhost:18443/p?q", "https://localhost:18443/p?q")]
     [DataRow("HTTP://LocalHost.:80/a", "https://LocalHost.:80/a")]
     [DataRow("http://www.localhost/", "https://www.localhost/")]
     public void TrySwitchToHttps_KnownHost_ReplacesTheSchemeOnly(string url, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         policy.ReadFile(".localhost \"unlimited\"\n");
+        diagnostics.Arrange("url", url);
 
-        Assert.IsTrue(policy.TrySwitchToHttps(url, CurlUrl.Parse(url), out string? httpsUrl));
+        bool switched = policy.TrySwitchToHttps(url, CurlUrl.Parse(url), out string? httpsUrl);
+
+        diagnostics.Act("switched", switched);
+        diagnostics.Act("https url", httpsUrl);
+        diagnostics.Assert("switched", true, switched);
+        Assert.IsTrue(switched);
+        diagnostics.Assert("https url", expected, httpsUrl);
         Assert.AreEqual(expected, httpsUrl);
     }
 
@@ -35,18 +46,36 @@ public sealed class HstsTransferPolicyTests
     [DataRow("ftp://localhost/")]
     public void TrySwitchToHttps_UnknownHostOrNotHttp_LeavesTheUrl(string url)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         policy.ReadFile(".localhost \"unlimited\"\n");
+        diagnostics.Arrange("url", url);
 
-        Assert.IsFalse(policy.TrySwitchToHttps(url, CurlUrl.Parse(url), out string? httpsUrl));
+        bool switched = policy.TrySwitchToHttps(url, CurlUrl.Parse(url), out string? httpsUrl);
+
+        diagnostics.Act("switched", switched);
+        diagnostics.Act("https url", httpsUrl);
+        diagnostics.Assert("switched", false, switched);
+        Assert.IsFalse(switched);
+        diagnostics.Assert("https url", "null", httpsUrl ?? "null");
         Assert.IsNull(httpsUrl);
     }
 
     [TestMethod]
     public void StoreFromResponse_IllegalHeaderOnANameHost_ReturnsFalseAndStoresNothing()
     {
-        Assert.IsFalse(policy.StoreFromResponse(CurlUrl.Parse("https://localhost/"), "max-age=abc", Now));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("header", "max-age=abc from https://localhost/");
 
-        Assert.AreEqual(EmptyFile, policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows));
+        bool stored = policy.StoreFromResponse(CurlUrl.Parse("https://localhost/"), "max-age=abc", Now);
+
+        diagnostics.Act("stored", stored);
+        diagnostics.Assert("stored", false, stored);
+        Assert.IsFalse(stored);
+
+        string? file = policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows);
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", EmptyFile, file);
+        Assert.AreEqual(EmptyFile, file);
     }
 
     [TestMethod]
@@ -54,44 +83,88 @@ public sealed class HstsTransferPolicyTests
     [DataRow("https://[::1]/")]
     public void StoreFromResponse_IllegalHeaderOnAnIpAddressHost_ReturnsTrueAndStoresNothing(string url)
     {
-        Assert.IsTrue(policy.StoreFromResponse(CurlUrl.Parse(url), "max-age=abc", Now));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("header", "max-age=abc from " + url);
 
-        Assert.AreEqual(EmptyFile, policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows));
+        bool stored = policy.StoreFromResponse(CurlUrl.Parse(url), "max-age=abc", Now);
+
+        diagnostics.Act("stored", stored);
+        diagnostics.Assert("stored", true, stored);
+        Assert.IsTrue(stored);
+
+        string? file = policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows);
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", EmptyFile, file);
+        Assert.AreEqual(EmptyFile, file);
     }
 
     [TestMethod]
     public void StoreFromResponse_HttpOrigin_ReturnsTrueAndStoresNothing()
     {
-        Assert.IsTrue(policy.StoreFromResponse(CurlUrl.Parse("http://localhost/"), "max-age=60", Now));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("header", "max-age=60 from http://localhost/");
 
-        Assert.AreEqual(EmptyFile, policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows));
+        bool stored = policy.StoreFromResponse(CurlUrl.Parse("http://localhost/"), "max-age=60", Now);
+
+        diagnostics.Act("stored", stored);
+        diagnostics.Assert("stored", true, stored);
+        Assert.IsTrue(stored);
+
+        string? file = policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows);
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", EmptyFile, file);
+        Assert.AreEqual(EmptyFile, file);
     }
 
     [TestMethod]
     public void StoreFromResponse_LegalHeader_ReturnsTrueAndStoresTheHostFromTheGivenTime()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IHstsStore store = policy;
+        DateTimeOffset received = Now.AddHours(1);
+        diagnostics.Arrange("header", "max-age=60 from https://localhost/");
+        diagnostics.Arrange("received at", received);
 
-        Assert.IsTrue(store.StoreFromResponse(CurlUrl.Parse("https://localhost/"), "max-age=60", Now.AddHours(1)));
+        bool stored = store.StoreFromResponse(CurlUrl.Parse("https://localhost/"), "max-age=60", received);
 
-        Assert.AreEqual(
-            EmptyFile + "localhost \"20260929 15:23:10\"\n",
-            policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows));
+        diagnostics.Act("stored", stored);
+        diagnostics.Assert("stored", true, stored);
+        Assert.IsTrue(stored);
+
+        string? file = policy.FormatFile("\n", HstsCache.LatestWritableExpiryOnWindows);
+        diagnostics.Act("file", file);
+        diagnostics.Assert("file", EmptyFile + "localhost \"20260929 15:23:10\"\n", file);
+        Assert.AreEqual(EmptyFile + "localhost \"20260929 15:23:10\"\n", file);
     }
 
     [TestMethod]
     public void StoreFromResponse_NullArguments_Throw()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => policy.StoreFromResponse(null!, "max-age=60", Now));
-        Assert.ThrowsExactly<ArgumentNullException>(() => policy.StoreFromResponse(CurlUrl.Parse("https://localhost/"), null!, Now));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("arguments", "null url, then null header");
+
+        var urlException = Assert.ThrowsExactly<ArgumentNullException>(() => policy.StoreFromResponse(null!, "max-age=60", Now));
+        var headerException = Assert.ThrowsExactly<ArgumentNullException>(() => policy.StoreFromResponse(CurlUrl.Parse("https://localhost/"), null!, Now));
+
+        diagnostics.Act("url exception", urlException.GetType().Name);
+        diagnostics.Act("header exception", headerException.GetType().Name);
+        diagnostics.Assert("url exception type", nameof(ArgumentNullException), urlException.GetType().Name);
+        diagnostics.Assert("header exception type", nameof(ArgumentNullException), headerException.GetType().Name);
     }
 
     [TestMethod]
     public void Members_NullArguments_Throw()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         CurlUrl url = CurlUrl.Parse("http://localhost/");
+        diagnostics.Arrange("arguments", "null url text, then null parsed url");
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => policy.TrySwitchToHttps(null!, url, out _));
-        Assert.ThrowsExactly<ArgumentNullException>(() => policy.TrySwitchToHttps("http://localhost/", null!, out _));
+        var textException = Assert.ThrowsExactly<ArgumentNullException>(() => policy.TrySwitchToHttps(null!, url, out _));
+        var urlException = Assert.ThrowsExactly<ArgumentNullException>(() => policy.TrySwitchToHttps("http://localhost/", null!, out _));
+
+        diagnostics.Act("text exception", textException.GetType().Name);
+        diagnostics.Act("url exception", urlException.GetType().Name);
+        diagnostics.Assert("text exception type", nameof(ArgumentNullException), textException.GetType().Name);
+        diagnostics.Assert("url exception type", nameof(ArgumentNullException), urlException.GetType().Name);
     }
 }

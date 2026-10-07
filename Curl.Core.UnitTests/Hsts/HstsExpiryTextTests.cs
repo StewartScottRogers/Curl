@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Core.Hsts;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Curl.Core.Hsts;
 [TestClass]
 public sealed class HstsExpiryTextTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(0L, "19700101 00:00:00")]
     [DataRow(1822197542L, "20270929 05:59:02")]
@@ -16,6 +20,15 @@ public sealed class HstsExpiryTextTests
     [DataRow(HstsCache.LatestWritableExpiryOnWindows, "30010101 20:59:59")]
     [DataRow(253402300800L, "100000101 00:00:00")]
     [DataRow(HstsCache.LatestWritableExpiryOffWindows, "21474855471231 23:59:59")]
-    public void Format_Instant_WritesCurlsDate(long unixSeconds, string text) =>
-        Assert.AreEqual(text, HstsExpiryText.Format(unixSeconds));
+    public void Format_Instant_WritesCurlsDate(long unixSeconds, string text)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("unix seconds", unixSeconds);
+
+        string formatted = HstsExpiryText.Format(unixSeconds);
+
+        diagnostics.Act("formatted", formatted);
+        diagnostics.Assert("expiry text", text, formatted);
+        Assert.AreEqual(text, formatted);
+    }
 }

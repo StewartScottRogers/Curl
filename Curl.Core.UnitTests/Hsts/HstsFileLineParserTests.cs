@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Core.Hsts;
 
 /// <summary>
@@ -8,6 +10,8 @@ namespace Curl.Core.Hsts;
 [TestClass]
 public sealed class HstsFileLineParserTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("localhost \"20300101 00:00:00\"", "localhost", "20300101 00:00:00")]
     [DataRow(".sub.test \"unlimited\"", ".sub.test", "unlimited")]
@@ -18,8 +22,18 @@ public sealed class HstsFileLineParserTests
     [DataRow("e \"a\\\"b\"", "e", "a\\\"b")]
     [DataRow("e \"\"", "e", "")]
     [DataRow("e \"12345678901234567\"", "e", "12345678901234567")]
-    public void Parse_LineCurlReads_ReadsItsFields(string line, string host, string expiryText) =>
-        Assert.AreEqual(new HstsFileLine(host, expiryText), HstsFileLineParser.Parse(line));
+    public void Parse_LineCurlReads_ReadsItsFields(string line, string host, string expiryText)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("line", line);
+        HstsFileLine expected = new(host, expiryText);
+
+        HstsFileLine? parsed = HstsFileLineParser.Parse(line);
+
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Assert("parsed line", expected, parsed);
+        Assert.AreEqual(expected, parsed);
+    }
 
     [TestMethod]
     [DataRow("")]
@@ -36,20 +50,55 @@ public sealed class HstsFileLineParserTests
     [DataRow("x.test ")]
     [DataRow("e \"123456789012345678\"")]
     [DataRow("e \"1234567890123456\\78\"")]
-    public void Parse_LineCurlSkips_ReadsNothing(string line) =>
-        Assert.IsNull(HstsFileLineParser.Parse(line));
+    public void Parse_LineCurlSkips_ReadsNothing(string line)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("line", line);
+
+        HstsFileLine? parsed = HstsFileLineParser.Parse(line);
+
+        diagnostics.Act("parsed", parsed?.ToString() ?? "null");
+        diagnostics.Assert("parsed line", "null", parsed?.ToString() ?? "null");
+        Assert.IsNull(parsed);
+    }
 
     [TestMethod]
-    public void Parse_HostOfTheLongestLength_ReadsIt() =>
-        Assert.AreEqual(
-            new string('h', HstsFileLineParser.MaxHostLength),
-            HstsFileLineParser.Parse(new string('h', HstsFileLineParser.MaxHostLength) + " \"unlimited\"")?.Host);
+    public void Parse_HostOfTheLongestLength_ReadsIt()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string host = new('h', HstsFileLineParser.MaxHostLength);
+        diagnostics.Arrange("host length", host.Length);
+
+        string? parsedHost = HstsFileLineParser.Parse(host + " \"unlimited\"")?.Host;
+
+        diagnostics.Act("parsed host length", parsedHost?.Length ?? -1);
+        diagnostics.Assert("parsed host", host, parsedHost);
+        Assert.AreEqual(host, parsedHost);
+    }
 
     [TestMethod]
-    public void Parse_HostLongerThanCurlReads_ReadsNothing() =>
-        Assert.IsNull(HstsFileLineParser.Parse(new string('h', HstsFileLineParser.MaxHostLength + 1) + " \"unlimited\""));
+    public void Parse_HostLongerThanCurlReads_ReadsNothing()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string host = new('h', HstsFileLineParser.MaxHostLength + 1);
+        diagnostics.Arrange("host length", host.Length);
+
+        HstsFileLine? parsed = HstsFileLineParser.Parse(host + " \"unlimited\"");
+
+        diagnostics.Act("parsed", parsed is null ? "null" : "a line");
+        diagnostics.Assert("parsed line", "null", parsed is null ? "null" : "a line");
+        Assert.IsNull(parsed);
+    }
 
     [TestMethod]
-    public void Parse_Null_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => HstsFileLineParser.Parse(null!));
+    public void Parse_Null_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("line", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => HstsFileLineParser.Parse(null!));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 }

@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core;
 
@@ -13,6 +14,8 @@ namespace Curl.Core;
 public sealed class IpfsGatewayRewriterTests
 {
     private const string GatewayFile = "/home/u/.ipfs/gateway";
+
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     [DataRow("http://127.0.0.1:1", "ipfs://bafyabc/x", "http://127.0.0.1:1/ipfs/bafyabc/x")]
@@ -52,37 +55,71 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("http://127.0.0.1:1", "ipfs://cid/x?a%20b&c", "http://127.0.0.1:1/ipfs/cid/x?a%20b&c")]
     public void TryRewrite_GatewayOption_BuildsTheMeasuredUrl(string gateway, string url, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter();
+        diagnostics.Arrange("gateway option", gateway);
+        diagnostics.Arrange("url", url);
 
-        Assert.IsTrue(rewriter.TryRewrite(CurlUrl.Parse(url), gateway, out string? gatewayUrl, out IpfsGatewayFailure? failure));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse(url), gateway, out string? gatewayUrl, out IpfsGatewayFailure? failure);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        diagnostics.Act("failure", failure?.Message);
+        diagnostics.Assert("rewritten", true, rewritten);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", expected, gatewayUrl);
         Assert.AreEqual(expected, gatewayUrl);
+        diagnostics.Assert("failure", null, failure?.Message);
         Assert.IsNull(failure);
     }
 
     [TestMethod]
     public void TryRewrite_EveryPrintableByte_EncodesTheMeasuredSet()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string path = string.Concat(Enumerable.Range(0x20, 0x7F - 0x20).Select(value => $"%{value:X2}"));
+        const string Expected = "http://127.0.0.1:1/ipfs/cid/%20!%22%23$%25&'()*+,-./0123456789:;%3C=%3E%3F@ABCDEFGHIJKLMNOPQRSTUVWXYZ[%5C]%5E_%60abcdefghijklmnopqrstuvwxyz{%7C}~";
+        diagnostics.Arrange("path", path);
 
-        Assert.IsTrue(CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/" + path), "http://127.0.0.1:1/", out string? gatewayUrl, out _));
+        bool rewritten = CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/" + path), "http://127.0.0.1:1/", out string? gatewayUrl, out _);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", Expected, gatewayUrl);
         Assert.AreEqual(
-            "http://127.0.0.1:1/ipfs/cid/%20!%22%23$%25&'()*+,-./0123456789:;%3C=%3E%3F@ABCDEFGHIJKLMNOPQRSTUVWXYZ[%5C]%5E_%60abcdefghijklmnopqrstuvwxyz{%7C}~",
+            Expected,
             gatewayUrl);
     }
 
     [TestMethod]
     public void TryRewrite_EveryHighByte_IsPercentEncoded()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string path = string.Concat(Enumerable.Range(0x80, 0x80).Select(value => $"%{value:X2}"));
+        diagnostics.Arrange("path", path);
 
-        Assert.IsTrue(CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/" + path), "http://127.0.0.1:1/", out string? gatewayUrl, out _));
+        bool rewritten = CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/" + path), "http://127.0.0.1:1/", out string? gatewayUrl, out _);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", "http://127.0.0.1:1/ipfs/cid/" + path, gatewayUrl);
         Assert.AreEqual("http://127.0.0.1:1/ipfs/cid/" + path, gatewayUrl);
     }
 
     [TestMethod]
     public void TryRewrite_UnencodedNonAsciiPath_IsEncodedAsUtf8()
     {
-        Assert.IsTrue(CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/\u00E9\U0001F600"), "http://h:1", out string? gatewayUrl, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "ipfs://cid/\u00E9\U0001F600");
+
+        bool rewritten = CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/\u00E9\U0001F600"), "http://h:1", out string? gatewayUrl, out _);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", "http://h:1/ipfs/cid/%C3%A9%F0%9F%98%80", gatewayUrl);
         Assert.AreEqual("http://h:1/ipfs/cid/%C3%A9%F0%9F%98%80", gatewayUrl);
     }
 
@@ -95,14 +132,14 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("https://[::1]/")]
     public void TryRewrite_UnusableGatewayOption_IsMalformedTargetUrl(string gateway)
     {
-        AssertMalformed(CreateRewriter(), "ipfs://cid/x", gateway);
+        AssertMalformed(TestDiagnostics.For(TestContext), CreateRewriter(), "ipfs://cid/x", gateway);
     }
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void TryRewrite_OnWindows_DriveLetterFileGatewayOption_IsMalformedTargetUrl()
     {
-        AssertMalformed(CreateRewriter(), "ipfs://cid/x", "file:///C:/x");
+        AssertMalformed(TestDiagnostics.For(TestContext), CreateRewriter(), "ipfs://cid/x", "file:///C:/x");
     }
 
     [TestMethod]
@@ -111,8 +148,19 @@ public sealed class IpfsGatewayRewriterTests
     {
         // curl's non-Windows builds reject a drive letter in a file: URL (lib/urlapi.c,
         // CURLUE_BAD_FILE_URL), so src/tool_ipfs.c cannot parse the gateway option at all.
-        Assert.IsFalse(CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/x"), "file:///C:/x", out string? gatewayUrl, out IpfsGatewayFailure? failure));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("gateway option", "file:///C:/x");
+
+        bool rewritten = CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/x"), "file:///C:/x", out string? gatewayUrl, out IpfsGatewayFailure? failure);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        diagnostics.Act("failure", failure?.Message);
+        diagnostics.Assert("rewritten", false, rewritten);
+        Assert.IsFalse(rewritten);
+        diagnostics.Assert("gateway url", null, gatewayUrl);
         Assert.IsNull(gatewayUrl);
+        diagnostics.Assert("failure is malformed gateway option", true, ReferenceEquals(IpfsGatewayFailure.MalformedGatewayOption, failure));
         Assert.AreSame(IpfsGatewayFailure.MalformedGatewayOption, failure);
     }
 
@@ -130,16 +178,36 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("http://h:99999/")]
     public void TryRewrite_MalformedGatewayOption_IsMalformedGatewayOption(string gateway)
     {
-        Assert.IsFalse(CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/x"), gateway, out string? gatewayUrl, out IpfsGatewayFailure? failure));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("gateway option", gateway);
+
+        bool rewritten = CreateRewriter().TryRewrite(CurlUrl.Parse("ipfs://cid/x"), gateway, out string? gatewayUrl, out IpfsGatewayFailure? failure);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        diagnostics.Act("failure", failure?.Message);
+        diagnostics.Assert("rewritten", false, rewritten);
+        Assert.IsFalse(rewritten);
+        diagnostics.Assert("gateway url", null, gatewayUrl);
         Assert.IsNull(gatewayUrl);
+        diagnostics.Assert("failure is malformed gateway option", true, ReferenceEquals(IpfsGatewayFailure.MalformedGatewayOption, failure));
         Assert.AreSame(IpfsGatewayFailure.MalformedGatewayOption, failure);
     }
 
     [TestMethod]
     public void MalformedGatewayOption_IsExitFortyThreeWithCurlsMessage()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IpfsGatewayFailure failure = IpfsGatewayFailure.MalformedGatewayOption;
+        diagnostics.Arrange("failure", "MalformedGatewayOption");
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Act("message", failure.Message);
+
+        diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, IpfsGatewayFailure.MalformedGatewayOption.ExitCode);
+        diagnostics.Assert("exit code number", 43, (int)failure.ExitCode);
         Assert.AreEqual(43, (int)IpfsGatewayFailure.MalformedGatewayOption.ExitCode);
+        diagnostics.Assert("message", "--ipfs-gateway was given a malformed URL", failure.Message);
         Assert.AreEqual("--ipfs-gateway was given a malformed URL", IpfsGatewayFailure.MalformedGatewayOption.Message);
     }
 
@@ -152,28 +220,49 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("ipfs://cid/%00x")]
     public void TryRewrite_PathDecodingToAControlByte_IsMalformedTargetUrl(string url)
     {
-        AssertMalformed(CreateRewriter(), url, "http://127.0.0.1:1/");
+        AssertMalformed(TestDiagnostics.For(TestContext), CreateRewriter(), url, "http://127.0.0.1:1/");
     }
 
     [TestMethod]
     public void TryRewrite_NoGatewayAnywhere_IsGatewayDetectionFailed()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(new() { ["HOME"] = "/home/u" });
+        diagnostics.Arrange("environment", "HOME=/home/u");
 
-        Assert.IsFalse(rewriter.TryRewrite(CurlUrl.Parse("ipfs://bafyabc/x"), null, out string? gatewayUrl, out IpfsGatewayFailure? failure));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse("ipfs://bafyabc/x"), null, out string? gatewayUrl, out IpfsGatewayFailure? failure);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        diagnostics.Act("exit code", failure?.ExitCode);
+        diagnostics.Act("message", failure?.Message);
+        diagnostics.Assert("rewritten", false, rewritten);
+        Assert.IsFalse(rewritten);
+        diagnostics.Assert("gateway url", null, gatewayUrl);
         Assert.IsNull(gatewayUrl);
-        Assert.AreEqual(CurlExitCode.FileCouldntReadFile, failure.ExitCode);
-        Assert.AreEqual("IPFS automatic gateway detection failed", failure.Message);
+        diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, failure?.ExitCode);
+        Assert.AreEqual(CurlExitCode.FileCouldntReadFile, failure!.ExitCode);
+        diagnostics.Assert("message", "IPFS automatic gateway detection failed", failure?.Message);
+        Assert.AreEqual("IPFS automatic gateway detection failed", failure!.Message);
     }
 
     [TestMethod]
     public void TryRewrite_GatewayOption_WinsOverTheEnvironmentAndTheFile()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(
             new() { ["IPFS_GATEWAY"] = "http://127.0.0.1:2/e", ["HOME"] = "/home/u" },
             new() { [GatewayFile] = "http://127.0.0.1:4/h" });
+        diagnostics.Arrange("environment gateway", "http://127.0.0.1:2/e");
+        diagnostics.Arrange("file gateway", "http://127.0.0.1:4/h");
+        diagnostics.Arrange("gateway option", "http://127.0.0.1:3/o");
 
-        Assert.IsTrue(rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), "http://127.0.0.1:3/o", out string? gatewayUrl, out _));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), "http://127.0.0.1:3/o", out string? gatewayUrl, out _);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", "http://127.0.0.1:3/o/ipfs/cid", gatewayUrl);
         Assert.AreEqual("http://127.0.0.1:3/o/ipfs/cid", gatewayUrl);
     }
 
@@ -183,11 +272,18 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("HTTP://127.0.0.1:1", "http://127.0.0.1:1/ipfs/cid/x")]
     public void TryRewrite_EnvironmentVariable_WinsOverTheFile(string variable, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(
             new() { ["IPFS_GATEWAY"] = variable, ["HOME"] = "/home/u" },
             new() { [GatewayFile] = "http://127.0.0.1:4/h" });
+        diagnostics.Arrange("environment gateway", variable);
 
-        Assert.IsTrue(rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid/x"), null, out string? gatewayUrl, out _));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid/x"), null, out string? gatewayUrl, out _);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", expected, gatewayUrl);
         Assert.AreEqual(expected, gatewayUrl);
     }
 
@@ -203,11 +299,13 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("127.0.0.1:1")]
     public void TryRewrite_UnusableEnvironmentVariable_IsMalformedTargetUrl(string variable)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(
             new() { ["IPFS_GATEWAY"] = variable, ["HOME"] = "/home/u" },
             new() { [GatewayFile] = "http://127.0.0.1:4/h" });
+        diagnostics.Arrange("environment gateway", variable);
 
-        AssertMalformed(rewriter, "ipfs://cid", null);
+        AssertMalformed(diagnostics, rewriter, "ipfs://cid", null);
     }
 
     [TestMethod]
@@ -215,11 +313,18 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("/home/u/")]
     public void TryRewrite_HomeGatewayFile_UsesItsFirstLine(string home)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(
             new() { ["HOME"] = home },
             new() { [GatewayFile] = "http://127.0.0.1:4/h\r\nsecond\n" });
+        diagnostics.Arrange("home", home);
 
-        Assert.IsTrue(rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out string? gatewayUrl, out _));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out string? gatewayUrl, out _);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", "http://127.0.0.1:4/h/ipfs/cid", gatewayUrl);
         Assert.AreEqual("http://127.0.0.1:4/h/ipfs/cid", gatewayUrl);
     }
 
@@ -228,11 +333,18 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("/ip/")]
     public void TryRewrite_IpfsPathGatewayFile_WinsOverHome(string ipfsPath)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(
             new() { ["IPFS_PATH"] = ipfsPath, ["HOME"] = "/home/u" },
             new() { ["/ip/gateway"] = "http://127.0.0.1:5/p", [GatewayFile] = "http://127.0.0.1:4/h" });
+        diagnostics.Arrange("ipfs path", ipfsPath);
 
-        Assert.IsTrue(rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out string? gatewayUrl, out _));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out string? gatewayUrl, out _);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        Assert.IsTrue(rewritten);
+        diagnostics.Assert("gateway url", "http://127.0.0.1:5/p/ipfs/cid", gatewayUrl);
         Assert.AreEqual("http://127.0.0.1:5/p/ipfs/cid", gatewayUrl);
     }
 
@@ -242,9 +354,16 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("\r\n")]
     public void TryRewrite_GatewayFileWithAnEmptyFirstLine_IsGatewayDetectionFailed(string text)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(new() { ["IPFS_PATH"] = "/ip" }, new() { ["/ip/gateway"] = text });
+        diagnostics.Arrange("gateway file text", text);
 
-        Assert.IsFalse(rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out _, out IpfsGatewayFailure? failure));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out _, out IpfsGatewayFailure? failure);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("failure", failure?.Message);
+        Assert.IsFalse(rewritten);
+        diagnostics.Assert("failure is gateway detection failed", true, ReferenceEquals(IpfsGatewayFailure.GatewayDetectionFailed, failure));
         Assert.AreSame(IpfsGatewayFailure.GatewayDetectionFailed, failure);
     }
 
@@ -253,9 +372,11 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("127.0.0.1:6")]
     public void TryRewrite_UnusableGatewayFile_IsMalformedTargetUrl(string text)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         IpfsGatewayRewriter rewriter = CreateRewriter(new() { ["IPFS_PATH"] = "/ip" }, new() { ["/ip/gateway"] = text });
+        diagnostics.Arrange("gateway file text", text);
 
-        AssertMalformed(rewriter, "ipfs://cid", null);
+        AssertMalformed(diagnostics, rewriter, "ipfs://cid", null);
     }
 
     [TestMethod]
@@ -263,17 +384,30 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow(null)]
     public void TryRewrite_NoHome_IsGatewayDetectionFailed(string? home)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         Dictionary<string, string?> environment = new() { ["HOME"] = home, ["USERPROFILE"] = "/home/u" };
         IpfsGatewayRewriter rewriter = CreateRewriter(environment, new() { [GatewayFile] = "http://127.0.0.1:4/h" });
+        diagnostics.Arrange("home", home ?? "(null)");
 
-        Assert.IsFalse(rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out _, out IpfsGatewayFailure? failure));
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse("ipfs://cid"), null, out _, out IpfsGatewayFailure? failure);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("failure", failure?.Message);
+        Assert.IsFalse(rewritten);
+        diagnostics.Assert("failure is gateway detection failed", true, ReferenceEquals(IpfsGatewayFailure.GatewayDetectionFailed, failure));
         Assert.AreSame(IpfsGatewayFailure.GatewayDetectionFailed, failure);
     }
 
     [TestMethod]
     public void TryRewrite_NotAnIpfsUrl_Throws()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => CreateRewriter().TryRewrite(CurlUrl.Parse("http://cid/"), "http://h", out _, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "http://cid/");
+
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => CreateRewriter().TryRewrite(CurlUrl.Parse("http://cid/"), "http://h", out _, out _));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -282,33 +416,73 @@ public sealed class IpfsGatewayRewriterTests
     [DataRow("http://cid", false)]
     public void IsIpfsUrl_NamesIpfsAndIpns(string url, bool expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+
+        bool isIpfsUrl = IpfsGatewayRewriter.IsIpfsUrl(CurlUrl.Parse(url));
+
+        diagnostics.Act("is ipfs url", isIpfsUrl);
+        diagnostics.Assert("is ipfs url", expected, isIpfsUrl);
         Assert.AreEqual(expected, IpfsGatewayRewriter.IsIpfsUrl(CurlUrl.Parse(url)));
     }
 
     [TestMethod]
     public void IsIpfsUrl_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => IpfsGatewayRewriter.IsIpfsUrl(null!));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", "(null)");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => IpfsGatewayRewriter.IsIpfsUrl(null!));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void Constructor_NullReader_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new IpfsGatewayRewriter(null!, _ => null));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new IpfsGatewayRewriter(_ => null, null!));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("readers", "environment reader null, then file reader null");
+
+        var environmentException = Assert.ThrowsExactly<ArgumentNullException>(() => new IpfsGatewayRewriter(null!, _ => null));
+        var fileException = Assert.ThrowsExactly<ArgumentNullException>(() => new IpfsGatewayRewriter(_ => null, null!));
+
+        diagnostics.Act("environment reader exception", environmentException.GetType().Name);
+        diagnostics.Act("file reader exception", fileException.GetType().Name);
+        diagnostics.Assert("environment reader exception", nameof(ArgumentNullException), environmentException.GetType().Name);
+        diagnostics.Assert("file reader exception", nameof(ArgumentNullException), fileException.GetType().Name);
     }
 
     [TestMethod]
     public void MalformedTargetUrl_IsExitThreeWithCurlsMessage()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IpfsGatewayFailure failure = IpfsGatewayFailure.MalformedTargetUrl;
+        diagnostics.Arrange("failure", "MalformedTargetUrl");
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Act("message", failure.Message);
+
+        diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, IpfsGatewayFailure.MalformedTargetUrl.ExitCode);
+        diagnostics.Assert("message", "malformed target URL", failure.Message);
         Assert.AreEqual("malformed target URL", IpfsGatewayFailure.MalformedTargetUrl.Message);
     }
 
-    private static void AssertMalformed(IpfsGatewayRewriter rewriter, string url, string? gateway)
+    private static void AssertMalformed(TestDiagnostics diagnostics, IpfsGatewayRewriter rewriter, string url, string? gateway)
     {
-        Assert.IsFalse(rewriter.TryRewrite(CurlUrl.Parse(url), gateway, out string? gatewayUrl, out IpfsGatewayFailure? failure));
+        diagnostics.Arrange("url", url);
+        diagnostics.Arrange("gateway option", gateway ?? "(none)");
+
+        bool rewritten = rewriter.TryRewrite(CurlUrl.Parse(url), gateway, out string? gatewayUrl, out IpfsGatewayFailure? failure);
+
+        diagnostics.Act("rewritten", rewritten);
+        diagnostics.Act("gateway url", gatewayUrl);
+        diagnostics.Act("failure", failure?.Message);
+        diagnostics.Assert("rewritten", false, rewritten);
+        Assert.IsFalse(rewritten);
+        diagnostics.Assert("gateway url", null, gatewayUrl);
         Assert.IsNull(gatewayUrl);
+        diagnostics.Assert("failure is malformed target url", true, ReferenceEquals(IpfsGatewayFailure.MalformedTargetUrl, failure));
         Assert.AreSame(IpfsGatewayFailure.MalformedTargetUrl, failure);
     }
 
