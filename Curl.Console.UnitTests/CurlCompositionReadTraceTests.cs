@@ -1,6 +1,7 @@
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -13,14 +14,22 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionReadTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("-v", "--trace-config", "read")]
     [DataRow("-v", "--trace-config", "all")]
     [DataRow("-vvv")]
     public void CreateTransports_UnderTraceConfigRead_TracesRead(params string[] arguments)
     {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
         CurlTransports transports = CurlComposition.CreateTransports(Parse(arguments), TimeProvider.System);
+        bool tracesRead = transports.TracesRead;
+        Diagnostics.Act("traces read", tracesRead);
 
+        Diagnostics.Assert("traces read", true, tracesRead);
         Assert.IsTrue(transports.TracesRead);
     }
 
@@ -30,8 +39,12 @@ public sealed class CurlCompositionReadTraceTests
     [DataRow("-v", "--trace-config", "read,-read")]
     public void CreateTransports_WithoutTheReadComponent_DoesNotTraceRead(params string[] arguments)
     {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
         CurlTransports transports = CurlComposition.CreateTransports(Parse(arguments), TimeProvider.System);
+        bool tracesRead = transports.TracesRead;
+        Diagnostics.Act("traces read", tracesRead);
 
+        Diagnostics.Assert("traces read", false, tracesRead);
         Assert.IsFalse(transports.TracesRead);
     }
 
@@ -40,6 +53,7 @@ public sealed class CurlCompositionReadTraceTests
     [DataRow(false)]
     public void CreateProtocolHandlers_HandsTheChoiceToTheHttpHandler(bool tracesRead)
     {
+        Diagnostics.Arrange("traces read requested", tracesRead);
         HttpProtocolHandler http = CurlComposition
             .CreateProtocolHandlers(new ScriptedConnector([]), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesRead: tracesRead)
             .OfType<EndPointReportingProtocolHandler>()
@@ -47,6 +61,8 @@ public sealed class CurlCompositionReadTraceTests
             .OfType<HttpProtocolHandler>()
             .Single();
 
+        Diagnostics.Act("http handler traces client readers", http.TracesClientReaders);
+        Diagnostics.Assert("http handler traces client readers", tracesRead, http.TracesClientReaders);
         Assert.AreEqual(tracesRead, http.TracesClientReaders);
     }
 

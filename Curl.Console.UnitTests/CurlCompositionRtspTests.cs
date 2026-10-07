@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -16,6 +17,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionRtspTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Request = "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\n\r\n";
 
     private const string Ok = "RTSP/1.0 200 OK\r\nCSeq: 1\r\nPublic: OPTIONS, DESCRIBE\r\n\r\n";
@@ -36,8 +41,17 @@ public sealed class CurlCompositionRtspTests
     {
         ScriptedConnector connector = new([Latin1.GetBytes(Ok)]);
 
+        Diagnostics.Arrange("command line arguments", "-sv rtsp://127.0.0.1:47950/media");
+        Diagnostics.Arrange("scripted response", Ok);
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, ["-sv", "rtsp://127.0.0.1:47950/media"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
+        Diagnostics.Act("request written", Latin1.GetString(connector.Written));
+        Diagnostics.Assert("request written", Request, Latin1.GetString(connector.Written));
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(Request, Latin1.GetString(connector.Written));
         Assert.AreEqual(("127.0.0.1", 47950, false), (connector.Targets.Single().Host, connector.Targets.Single().Port, connector.Targets.Single().UseTls));
         Assert.AreEqual(string.Empty, standardOutput);
@@ -58,9 +72,18 @@ public sealed class CurlCompositionRtspTests
     {
         ScriptedConnector connector = new([Latin1.GetBytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n")]);
 
+        Diagnostics.Arrange("command line arguments", "-v -s -X DESCRIBE -H \"Accept: application/sdp\" -d abc rtsp://127.0.0.1:47960/media");
+        Diagnostics.Arrange("scripted response", "RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n");
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             connector, ["-v", "-s", "-X", "DESCRIBE", "-H", "Accept: application/sdp", "-d", "abc", "rtsp://127.0.0.1:47960/media"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
+        Diagnostics.Act("request written", Latin1.GetString(connector.Written));
+        Diagnostics.Assert("request written", "OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nAccept: application/sdp\r\n\r\n", Latin1.GetString(connector.Written));
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual("OPTIONS * RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: curl/8.21.0\r\nAccept: application/sdp\r\n\r\n", Latin1.GetString(connector.Written));
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
@@ -84,8 +107,16 @@ public sealed class CurlCompositionRtspTests
     {
         ScriptedConnector connector = new([Latin1.GetBytes("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 2\r\n\r\nok")]);
 
+        Diagnostics.Arrange("command line arguments", "-v -s -i rtsp://127.0.0.1:47973/media");
+        Diagnostics.Arrange("scripted response", "RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 2\r\n\r\nok");
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, ["-v", "-s", "-i", "rtsp://127.0.0.1:47973/media"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
+        Diagnostics.Assert("standard output", "RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 2\r\n\r\n", standardOutput);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 2\r\n\r\n", standardOutput);
         Assert.AreEqual(
             Lines(
@@ -105,8 +136,15 @@ public sealed class CurlCompositionRtspTests
     {
         ScriptedConnector connector = new([Latin1.GetBytes("RTSP/1.0 404 Not Found\r\nCSeq: 1\r\n\r\n")]);
 
+        Diagnostics.Arrange("command line arguments", "-v -sSf rtsp://127.0.0.1:47976/media");
+        Diagnostics.Arrange("scripted response", "RTSP/1.0 404 Not Found\r\nCSeq: 1\r\n\r\n");
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, ["-v", "-sSf", "rtsp://127.0.0.1:47976/media"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
+        Diagnostics.Assert("exit code", 22, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
             Lines(
@@ -126,8 +164,15 @@ public sealed class CurlCompositionRtspTests
     {
         ScriptedConnector connector = new([Latin1.GetBytes("RTSP/1.0 200 OK\r\nCSeq: 7\r\n\r\n")]);
 
+        Diagnostics.Arrange("command line arguments", "-v -s rtsp://127.0.0.1:47971/media");
+        Diagnostics.Arrange("scripted response", "RTSP/1.0 200 OK\r\nCSeq: 7\r\n\r\n");
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, ["-v", "-s", "rtsp://127.0.0.1:47971/media"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
+        Diagnostics.Assert("exit code", 85, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
             Lines(
@@ -146,8 +191,15 @@ public sealed class CurlCompositionRtspTests
     {
         ScriptedConnector connector = new([Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")]);
 
+        Diagnostics.Arrange("command line arguments", "-v -sS rtsp://127.0.0.1:47972/media");
+        Diagnostics.Arrange("scripted response", "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, ["-v", "-sS", "rtsp://127.0.0.1:47972/media"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
+        Diagnostics.Assert("exit code", 52, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
             Lines(
@@ -169,8 +221,16 @@ public sealed class CurlCompositionRtspTests
         ]);
         await using PoolingConnector pool = new(connector, TimeProvider.System);
 
+        Diagnostics.Arrange("command line arguments", "-v -s rtsp://127.0.0.1:47979/a rtsp://127.0.0.1:47979/b");
+
         (int exitCode, _, string standardError) = await RunAsync(pool, ["-v", "-s", "rtsp://127.0.0.1:47979/a", "rtsp://127.0.0.1:47979/b"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard error", standardError.Replace("\r", string.Empty, StringComparison.Ordinal));
+        Diagnostics.Act("request written", Latin1.GetString(connector.Written));
+        Diagnostics.Act("connection targets", connector.Targets.Count);
+        Diagnostics.Assert("connection targets", 1, connector.Targets.Count);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(Request + "OPTIONS * RTSP/1.0\r\nCSeq: 0\r\nUser-Agent: curl/8.21.0\r\n\r\n", Latin1.GetString(connector.Written));
         Assert.HasCount(1, connector.Targets);
         StringAssert.Contains(
@@ -182,9 +242,15 @@ public sealed class CurlCompositionRtspTests
     [TestMethod]
     public async Task CreateRunner_Version_ListsRtspBetweenPop3sAndScp()
     {
+        Diagnostics.Arrange("command line arguments", "-V");
+
         (int exitCode, string standardOutput, _) = await RunAsync(new ScriptedConnector([]), ["-V"]);
 
         string protocols = standardOutput.Split(Environment.NewLine).Single(line => line.StartsWith("Protocols:", StringComparison.Ordinal));
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("protocols line", protocols);
+        Diagnostics.Assert("protocols line", CurlVersionText.ProtocolsLine, protocols);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(CurlVersionText.ProtocolsLine, protocols);
         StringAssert.Contains(protocols, " pop3 pop3s rtsp scp ");
         Assert.AreEqual(0, exitCode);

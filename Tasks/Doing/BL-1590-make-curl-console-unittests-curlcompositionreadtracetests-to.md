@@ -23,13 +23,19 @@ Every test in these `Curl.Console.UnitTests` files (14 files, 109 test methods, 
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Console.UnitTests --filter "<these classes' filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
-- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
-- [ ] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Console.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+- [x] `dotnet test Curl.Console.UnitTests --filter "<these classes' filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Console.UnitTests -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Console.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
 
 ## Notes
+
+- Counts in the 14 files, before -> after: `Assert.` 257 -> 257, `[TestMethod` 109 -> 109, `[DataRow(` 100 -> 100.
+- The filtered detailed run: 181 tests, 178 passed and 3 skipped by OS condition. All 178 that ran print an `END` line, and none has a zero arrange, act or assert count.
+- No test printed a `SLOW:` line.
+- `Phase("handshake")` wraps the proxy TLS handshakes in `CurlCompositionTests.ProxyPinnedPublicKey.cs` and `.ProxyTlsHandshake.cs`. In the handshake file, the shared assertion helper now returns both results and its callers describe them through `DescribeProxyAndOrigin`; the assertions are the same.
+- Nothing OS-dependent is printed: temp paths appear as file names only, and line endings are escaped or `` is stripped.
 
 ## Log
 

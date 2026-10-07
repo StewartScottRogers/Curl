@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -13,6 +14,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionSmtpTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string ControlReplies =
         "220 localhost ESMTP\r\n250-localhost\r\n250 SMTPUTF8\r\n250 Recorder <recorder@localhost>\r\n221 Bye\r\n";
 
@@ -22,30 +27,50 @@ public sealed class CurlCompositionSmtpTraceTests
     [DataRow("-v", "--trace-config", "all")]
     [DataRow("-v", "--trace-config", "tls,SMTP")]
     [DataRow("-vv")]
-    public void TracesSmtp_WithTheSmtpComponent_IsTrue(params string[] arguments) =>
-        Assert.IsTrue(CurlComposition.TracesSmtp(Parse(arguments)));
+    public void TracesSmtp_WithTheSmtpComponent_IsTrue(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+        bool tracesSmtp = CurlComposition.TracesSmtp(Parse(arguments));
+        Diagnostics.Act("traces smtp", tracesSmtp);
+
+        Diagnostics.Assert("traces smtp", true, tracesSmtp);
+        Assert.IsTrue(tracesSmtp);
+    }
 
     [TestMethod]
     [DataRow("-v")]
     [DataRow("-v", "--trace-config", "ftp")]
     [DataRow("-v", "--trace-config", "smtp,-smtp")]
     [DataRow("-v", "--trace-config", "network")]
-    public void TracesSmtp_WithoutTheSmtpComponent_IsFalse(params string[] arguments) =>
-        Assert.IsFalse(CurlComposition.TracesSmtp(Parse(arguments)));
+    public void TracesSmtp_WithoutTheSmtpComponent_IsFalse(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+        bool tracesSmtp = CurlComposition.TracesSmtp(Parse(arguments));
+        Diagnostics.Act("traces smtp", tracesSmtp);
+
+        Diagnostics.Assert("traces smtp", false, tracesSmtp);
+        Assert.IsFalse(tracesSmtp);
+    }
 
     [TestMethod]
     public void CreateTransports_UnderTraceConfigSmtp_TracesSmtp()
     {
+        Diagnostics.Arrange("command line arguments", "-v --trace-config smtp");
         CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "smtp"), TimeProvider.System);
+        Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
 
+        Diagnostics.Assert("transports trace smtp", true, transports.TracesSmtp);
         Assert.IsTrue(transports.TracesSmtp);
     }
 
     [TestMethod]
     public void CreateTransports_WithoutTheSmtpComponent_DoesNotTraceSmtp()
     {
+        Diagnostics.Arrange("command line arguments", "-v");
         CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        Diagnostics.Act("transports trace smtp", transports.TracesSmtp);
 
+        Diagnostics.Assert("transports trace smtp", false, transports.TracesSmtp);
         Assert.IsFalse(transports.TracesSmtp);
     }
 
@@ -54,6 +79,8 @@ public sealed class CurlCompositionSmtpTraceTests
     [DataRow(false)]
     public async Task CreateProtocolHandlers_SmtpTransfer_WritesTheSmtpLinesOnlyWhenTraced(bool tracesSmtp)
     {
+        Diagnostics.Arrange("traces smtp requested", tracesSmtp);
+        Diagnostics.Arrange("scripted server replies", ControlReplies);
         ScriptedConnector server = new([Encoding.Latin1.GetBytes(ControlReplies)]);
         IProtocolHandler smtp = CurlComposition
             .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: tracesSmtp)
@@ -68,6 +95,11 @@ public sealed class CurlCompositionSmtpTraceTests
             Mail = new MailRequestOptions { Recipients = ["c@d"] },
         });
 
+        int smtpLineCount = events.Info.Count(line => line.StartsWith("[SMTP] ", StringComparison.Ordinal));
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("smtp info line count", smtpLineCount);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("smtp info line count", tracesSmtp ? 13 : 0, smtpLineCount);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(tracesSmtp, events.Info.Contains("[SMTP] smtp_setup_connection() -> 0"));
         // The 13 lines curl 8.21.0 writes for a VRFY (BL-1163 Notes).

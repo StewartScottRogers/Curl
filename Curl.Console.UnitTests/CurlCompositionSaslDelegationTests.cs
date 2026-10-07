@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -14,12 +15,18 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionSaslDelegationTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(new string[0], SecurityDelegation.None, DisplayName = "no --delegation")]
     [DataRow(new[] { "--delegation", "policy" }, SecurityDelegation.Policy, DisplayName = "--delegation policy")]
     [DataRow(new[] { "--delegation", "always" }, SecurityDelegation.Always, DisplayName = "--delegation always")]
     public async Task RunAsync_ServerOffersOnlyGssapi_AsksTheKerberosContextForTheDelegationLevel(string[] delegationArguments, SecurityDelegation expected)
     {
+        Diagnostics.Arrange("delegation arguments", string.Join(" ", delegationArguments));
+        Diagnostics.Arrange("expected delegation", expected);
         RefusingContexts contexts = new();
         ScriptedConnector server = new([Encoding.ASCII.GetBytes("220 localhost ESMTP\r\n250-localhost\r\n250 AUTH GSSAPI\r\n"), Encoding.ASCII.GetBytes("334 \r\n")]);
         using MemoryStream standardOutput = new();
@@ -36,6 +43,11 @@ public sealed class CurlCompositionSaslDelegationTests
                 securityContexts: contexts)
             .RunAsync(["-sS", "-u", @"EXAMPLE\u:p", .. delegationArguments, "smtp://127.0.0.1:18025/"]);
 
+        SecurityDelegation? requestedDelegation = contexts.Request?.Delegation;
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("requested delegation", requestedDelegation);
+        Diagnostics.Assert("exit code", (int)CurlExitCode.AuthError, exitCode);
+        Diagnostics.Assert("requested delegation", expected, requestedDelegation);
         Assert.AreEqual((int)CurlExitCode.AuthError, exitCode);
         Assert.AreEqual(
             new SecurityContextRequest(SecurityMechanism.Kerberos, "smtp", "127.0.0.1")

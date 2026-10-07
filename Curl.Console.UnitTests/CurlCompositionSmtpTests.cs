@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -17,6 +18,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionSmtpTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Message = "Subject: t\r\n\r\nhello\r\n";
 
     private const string Greeting = "220 localhost ESMTP\r\n";
@@ -49,8 +54,18 @@ public sealed class CurlCompositionSmtpTests
         ScriptedConnector connector = new(
             [Encoding.ASCII.GetBytes(Greeting + EhloReply + Ok + Ok + StartData + Accepted + Bye)]);
 
+        Diagnostics.Arrange("url", $"{scheme}://127.0.0.1:18025/");
+        Diagnostics.Arrange("scripted server replies", Greeting + EhloReply + Ok + Ok + StartData + Accepted + Bye);
+
         (int exitCode, string standardOutput, string standardError) = await RunMailUploadAsync(connector, $"{scheme}://127.0.0.1:18025/");
 
+        string written = Encoding.ASCII.GetString(connector.Written);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError);
+        Diagnostics.Act("bytes written", written);
+        Diagnostics.Assert("bytes written", Ehlo + Transaction, written);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(Ehlo + Transaction, Encoding.ASCII.GetString(connector.Written));
         Assert.AreEqual(("127.0.0.1", 18025, useTls), (connector.Targets.Single().Host, connector.Targets.Single().Port, connector.Targets.Single().UseTls));
         Assert.AreEqual(string.Empty, standardOutput);
@@ -69,9 +84,19 @@ public sealed class CurlCompositionSmtpTests
                 Encoding.ASCII.GetBytes(Ok + Ok + StartData + Accepted + Bye),
             ]);
 
+        Diagnostics.Arrange("command line arguments", "-u u:p smtp://127.0.0.1:18025/");
+        Diagnostics.Arrange("cram-md5 challenge", CramMd5Challenge);
+
         (int exitCode, string standardOutput, string standardError) = await RunMailUploadAsync(
             connector, "smtp://127.0.0.1:18025/", "-u", "u:p");
 
+        string written = Encoding.ASCII.GetString(connector.Written);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError);
+        Diagnostics.Act("bytes written", written);
+        Diagnostics.Assert("bytes written", Ehlo + "AUTH CRAM-MD5\r\ndSAwNWVlYTdmN2JkODM3ODYwNDQ2ODBiNzAwYjQ5NjVhNA==\r\n" + Transaction, written);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(
             Ehlo + "AUTH CRAM-MD5\r\ndSAwNWVlYTdmN2JkODM3ODYwNDQ2ODBiNzAwYjQ5NjVhNA==\r\n" + Transaction,
             Encoding.ASCII.GetString(connector.Written));

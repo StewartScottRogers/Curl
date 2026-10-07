@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -17,6 +18,10 @@ public sealed class CurlCompositionSshTests
 {
     private const string User = "tester";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Password = "secret";
 
     private static readonly byte[] Hello = "hello world"u8.ToArray();
@@ -29,9 +34,16 @@ public sealed class CurlCompositionSshTests
         InMemorySshServer server = new(User, Password);
         server.Files["/data/hello.txt"] = Hello;
 
+        Diagnostics.Arrange("scheme", scheme);
+        Diagnostics.Arrange("expected channel request", channelRequest);
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             server, ["-k", "-u", $"{User}:{Password}", $"{scheme}://127.0.0.1:2222/data/hello.txt"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError);
+        Diagnostics.Assert("standard output", "hello world", standardOutput);
         Assert.AreEqual("hello world", standardOutput);
         Assert.AreEqual(string.Empty, standardError);
         Assert.AreEqual(0, exitCode);
@@ -47,8 +59,13 @@ public sealed class CurlCompositionSshTests
         InMemorySshServer server = new(User, Password);
         server.Files["/f"] = Hello;
 
+        Diagnostics.Arrange("url", "sftp://127.0.0.1/f");
+
         (int exitCode, _, _) = await RunAsync(server, ["-k", "-u", $"{User}:{Password}", "sftp://127.0.0.1/f"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("connected port", server.Targets.Single().Port);
+        Diagnostics.Assert("connected port", 22, server.Targets.Single().Port);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(22, server.Targets.Single().Port);
     }
@@ -60,9 +77,16 @@ public sealed class CurlCompositionSshTests
     {
         InMemorySshServer server = new(User, Password);
 
+        Diagnostics.Arrange("scheme", scheme);
+        Diagnostics.Arrange("expected line", line);
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             server, ["-k", "-u", $"{User}:{Password}", $"{scheme}://127.0.0.1:2222/missing.txt"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError);
+        Diagnostics.Assert("exit code", 78, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(line + Environment.NewLine, standardError);
         Assert.AreEqual(78, exitCode);
@@ -75,11 +99,17 @@ public sealed class CurlCompositionSshTests
         server.Files["/f"] = Hello;
         string knownHosts = Path.Combine(Path.GetTempPath(), $"curl-bl576-{Guid.NewGuid():N}");
         await File.WriteAllTextAsync(knownHosts, server.KnownHostsLine("[127.0.0.1]:2222"));
+        Diagnostics.Arrange("url", "sftp://127.0.0.1:2222/f");
+        Diagnostics.Arrange("known hosts line", server.KnownHostsLine("[127.0.0.1]:2222"));
         try
         {
             (int exitCode, string standardOutput, string standardError) = await RunAsync(
                 server, ["--knownhosts", knownHosts, "-u", $"{User}:{Password}", "sftp://127.0.0.1:2222/f"]);
 
+            Diagnostics.Act("exit code", exitCode);
+            Diagnostics.Act("standard output", standardOutput);
+            Diagnostics.Act("standard error", standardError);
+            Diagnostics.Assert("exit code", 0, exitCode);
             Assert.AreEqual("hello world", standardOutput);
             Assert.AreEqual(string.Empty, standardError);
             Assert.AreEqual(0, exitCode);
@@ -96,9 +126,16 @@ public sealed class CurlCompositionSshTests
         InMemorySshServer server = new(User, Password);
         server.Files["/f"] = Hello;
 
+        Diagnostics.Arrange("host key sha256", server.HostKeySha256);
+        Diagnostics.Arrange("url", "scp://127.0.0.1:2222/f");
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             server, ["--hostpubsha256", server.HostKeySha256, "-u", $"{User}:{Password}", "scp://127.0.0.1:2222/f"], silent: false);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error", standardError);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual("hello world", standardOutput);
         Assert.AreEqual("Warning: Could not find a known_hosts file" + Environment.NewLine, standardError);
         Assert.AreEqual(0, exitCode);
@@ -109,8 +146,14 @@ public sealed class CurlCompositionSshTests
     {
         InMemorySshServer server = new(User, Password);
 
+        Diagnostics.Arrange("url", "sftp://127.0.0.1:2222/f");
+
         (int exitCode, string standardOutput, string standardError) = await RunAsync(server, ["sftp://127.0.0.1:2222/f"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard error", standardError);
+        Diagnostics.Act("connection targets", server.Targets.Count);
+        Diagnostics.Assert("exit code", 2, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
             "curl: Could not find a known_hosts file" + Environment.NewLine + "curl: (2) Failed initialization" + Environment.NewLine,
@@ -122,8 +165,13 @@ public sealed class CurlCompositionSshTests
     [TestMethod]
     public async Task CreateRunner_Version_ListsScpAndSftp()
     {
+        Diagnostics.Arrange("arguments", "-V");
+
         (int exitCode, string standardOutput, _) = await RunAsync(new InMemorySshServer(User, Password), ["-V"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Assert("exit code", 0, exitCode);
         StringAssert.Contains(standardOutput, "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss");
         Assert.AreEqual(0, exitCode);
     }

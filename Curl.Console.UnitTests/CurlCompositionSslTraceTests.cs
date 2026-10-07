@@ -1,5 +1,6 @@
 using Curl.Cli;
 using Curl.Networking;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -13,6 +14,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionSslTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(new[] { "-v", "--trace-config", "ssl" })]
     [DataRow(new[] { "-v", "--trace-config", "network" })]
@@ -20,8 +25,17 @@ public sealed class CurlCompositionSslTraceTests
     [DataRow(new[] { "-vvvv" })]
     public void TracesSsl_UnderSslNetworkOrAll_IsTrue(string[] arguments)
     {
-        Assert.IsTrue(CurlComposition.TracesSsl(Parse(arguments)));
-        Assert.IsTrue(Connector(arguments).TracesSslFilter);
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
+
+        bool parsedResult = CurlComposition.TracesSsl(Parse(arguments));
+        bool connectorResult = Connector(arguments).TracesSslFilter;
+
+        Diagnostics.Act("TracesSsl result", parsedResult);
+        Diagnostics.Act("connector TracesSslFilter", connectorResult);
+        Diagnostics.Assert("TracesSsl result", true, parsedResult);
+        Diagnostics.Assert("connector TracesSslFilter", true, connectorResult);
+        Assert.IsTrue(parsedResult);
+        Assert.IsTrue(connectorResult);
     }
 
     [TestMethod]
@@ -30,8 +44,17 @@ public sealed class CurlCompositionSslTraceTests
     [DataRow(new[] { "-v", "--trace-config", "tls" })]
     public void TracesSsl_UnderProxyTlsOrPlainVerbose_IsFalse(string[] arguments)
     {
-        Assert.IsFalse(CurlComposition.TracesSsl(Parse(arguments)));
-        Assert.IsFalse(Connector(arguments).TracesSslFilter);
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
+
+        bool parsedResult = CurlComposition.TracesSsl(Parse(arguments));
+        bool connectorResult = Connector(arguments).TracesSslFilter;
+
+        Diagnostics.Act("TracesSsl result", parsedResult);
+        Diagnostics.Act("connector TracesSslFilter", connectorResult);
+        Diagnostics.Assert("TracesSsl result", false, parsedResult);
+        Diagnostics.Assert("connector TracesSslFilter", false, connectorResult);
+        Assert.IsFalse(parsedResult);
+        Assert.IsFalse(connectorResult);
     }
 
     [TestMethod]
@@ -39,8 +62,17 @@ public sealed class CurlCompositionSslTraceTests
     [DataRow(new[] { "-v", "--trace-config", "all" })]
     public void TracesSslProxy_UnderProxyOrANamedAll_IsTrue(string[] arguments)
     {
-        Assert.IsTrue(CurlComposition.TracesSslProxy(Parse(arguments)));
-        Assert.IsTrue(Connector(arguments).TracesSslProxyFilter);
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
+
+        bool parsedResult = CurlComposition.TracesSslProxy(Parse(arguments));
+        bool connectorResult = Connector(arguments).TracesSslProxyFilter;
+
+        Diagnostics.Act("TracesSslProxy result", parsedResult);
+        Diagnostics.Act("connector TracesSslProxyFilter", connectorResult);
+        Diagnostics.Assert("TracesSslProxy result", true, parsedResult);
+        Diagnostics.Assert("connector TracesSslProxyFilter", true, connectorResult);
+        Assert.IsTrue(parsedResult);
+        Assert.IsTrue(connectorResult);
     }
 
     [TestMethod]
@@ -50,8 +82,17 @@ public sealed class CurlCompositionSslTraceTests
     [DataRow(new[] { "-vvvv" })]
     public void TracesSslProxy_UnderSslNetworkOrTheAllOfVvvv_IsFalse(string[] arguments)
     {
-        Assert.IsFalse(CurlComposition.TracesSslProxy(Parse(arguments)));
-        Assert.IsFalse(Connector(arguments).TracesSslProxyFilter);
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
+
+        bool parsedResult = CurlComposition.TracesSslProxy(Parse(arguments));
+        bool connectorResult = Connector(arguments).TracesSslProxyFilter;
+
+        Diagnostics.Act("TracesSslProxy result", parsedResult);
+        Diagnostics.Act("connector TracesSslProxyFilter", connectorResult);
+        Diagnostics.Assert("TracesSslProxy result", false, parsedResult);
+        Diagnostics.Assert("connector TracesSslProxyFilter", false, connectorResult);
+        Assert.IsFalse(parsedResult);
+        Assert.IsFalse(connectorResult);
     }
 
     private static TcpConnector Connector(string[] arguments) =>

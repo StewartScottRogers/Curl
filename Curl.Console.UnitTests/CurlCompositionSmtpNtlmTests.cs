@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -17,6 +18,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionSmtpNtlmTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Message = "Subject: t\r\n\r\nhello\r\n";
 
     private const string Type2 = "TlRMTVNTUAACAAAADAAMADgAAAAzgoriASNFZ4mrze8AAAAAAAAAACQAJABEAAAABgBwFwAAAA9TAGUAcgB2AGUAcgACAAwARABvAG0AYQBpAG4AAQAMAFMAZQByAHYAZQByAAAAAAAA";
@@ -29,9 +34,16 @@ public sealed class CurlCompositionSmtpNtlmTests
     {
         TokenSource tokens = new();
         ScriptedConnector server = Server();
+        Diagnostics.Arrange("command line arguments", "-sS -u u:p --mail-from a@b --mail-rcpt c@d -T mail.txt smtp://127.0.0.1:18025/");
+        Diagnostics.Arrange("server type 2 challenge", Type2);
 
         (int exitCode, string[] lines) = await RunMailUploadAsync(server, tokens);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("lines sent", string.Join(" | ", lines));
+        Diagnostics.Act("security context request", tokens.Request);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first five lines sent", "EHLO mail.txt | AUTH NTLM | AQ== | Aw== | MAIL FROM:<a@b>", string.Join(" | ", lines[..5]));
         Assert.AreEqual(0, exitCode);
         CollectionAssert.AreEqual(new[] { "EHLO mail.txt", "AUTH NTLM", "AQ==", "Aw==", "MAIL FROM:<a@b>" }, lines[..5]);
         CollectionAssert.AreEqual(Convert.FromBase64String(Type2), tokens.Context!.IncomingTokens[1]);
@@ -43,9 +55,15 @@ public sealed class CurlCompositionSmtpNtlmTests
     public async Task RunAsync_WindowsProductionRoute_SendsSspisType1AndAType3AsCurl8210Measured()
     {
         ScriptedConnector server = Server();
+        Diagnostics.Arrange("command line arguments", "-sS -u u:p --mail-from a@b --mail-rcpt c@d -T mail.txt smtp://127.0.0.1:18025/");
+        Diagnostics.Arrange("server type 2 challenge", Type2);
 
         (int exitCode, string[] lines) = await RunMailUploadAsync(server, null);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("lines sent", string.Join(" | ", lines));
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("second line sent", "AUTH NTLM", lines[1]);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("AUTH NTLM", lines[1]);
         StringAssert.StartsWith(lines[2], "TlRMTVNTUAABAAAAB4IIog");
@@ -58,9 +76,15 @@ public sealed class CurlCompositionSmtpNtlmTests
     public async Task RunAsync_ProductionRouteOffWindows_SendsCurlsOwnType1AndAType3()
     {
         ScriptedConnector server = Server();
+        Diagnostics.Arrange("command line arguments", "-sS -u u:p --mail-from a@b --mail-rcpt c@d -T mail.txt smtp://127.0.0.1:18025/");
+        Diagnostics.Arrange("server type 2 challenge", Type2);
 
         (int exitCode, string[] lines) = await RunMailUploadAsync(server, null);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("lines sent", string.Join(" | ", lines));
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("type 1 message line", "TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=", lines[2]);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("AUTH NTLM", lines[1]);
         Assert.AreEqual("TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=", lines[2]);
