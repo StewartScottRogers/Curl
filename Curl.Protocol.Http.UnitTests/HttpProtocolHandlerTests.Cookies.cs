@@ -31,12 +31,19 @@ public sealed partial class HttpProtocolHandlerTests
             ScriptedConnection connection = Connection(EmptyOkHead, chunkSize, expected);
             ScriptedCookieStore store = new("j=k");
             HttpRequestOptions options = new() { Headers = ["Cookie: c=d"] };
+            Diagnostics.Arrange("url, chunk size", $"{CookieUrl}, {chunkSize}");
+            Diagnostics.Arrange("store cookie, custom header", "j=k, Cookie: c=d");
 
             TransferResult result = await CookieHandler(QueueConnector.For(connection), store)
                 .ExecuteAsync(CookieContext(CookieUrl, options));
 
+            WriteResult(result);
+            Diagnostics.Act("store requests, responses", $"{store.Requests.Count}, {store.Responses.Count}");
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("store request", (CurlUrl.Parse(CookieUrl), false, CookieTime, NoTransferEvents.Instance), store.Requests.Single());
             Assert.AreEqual((CurlUrl.Parse(CookieUrl), false, CookieTime, NoTransferEvents.Instance), store.Requests.Single(), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("store responses", 0, store.Responses.Count);
             Assert.IsEmpty(store.Responses, $"Chunk size {chunkSize}");
         }
     }
@@ -47,10 +54,14 @@ public sealed partial class HttpProtocolHandlerTests
         const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
         ScriptedConnection connection = Connection(EmptyOkHead, 65536, expected);
         ScriptedCookieStore store = new();
+        Diagnostics.Arrange("url, store cookie", $"{CookieUrl}, (none)");
 
         TransferResult result = await CookieHandler(QueueConnector.For(connection), store).ExecuteAsync(CookieContext(CookieUrl));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("store requests", 1, store.Requests.Count);
         Assert.HasCount(1, store.Requests);
     }
 
@@ -58,10 +69,13 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_Https_AsksForSecureCookies()
     {
         ScriptedCookieStore store = new();
+        Diagnostics.Arrange("url", "https://example.com/p");
 
-        await CookieHandler(QueueConnector.For(Connection(EmptyOkHead, 65536)), store)
+        TransferResult result = await CookieHandler(QueueConnector.For(Connection(EmptyOkHead, 65536)), store)
             .ExecuteAsync(CookieContext("https://example.com/p"));
 
+        WriteResult(result);
+        Diagnostics.Assert("store request", (CurlUrl.Parse("https://example.com/p"), true, CookieTime, NoTransferEvents.Instance), store.Requests.Single());
         Assert.AreEqual((CurlUrl.Parse("https://example.com/p"), true, CookieTime, NoTransferEvents.Instance), store.Requests.Single());
     }
 
@@ -78,15 +92,24 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedCookieStore store = new("j=k") { RequestLine = limitLine };
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{CookieUrl}, {chunkSize}");
+            Diagnostics.Arrange("store cookie, request line", $"j=k, {limitLine}");
 
             TransferResult result = await CookieHandler(QueueConnector.For(Connection(EmptyOkHead, chunkSize)), store)
                 .ExecuteAsync(CookieContext(CookieUrl, events: events));
 
+            WriteResult(result);
+            WriteEvents("events", events.Events);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("events handed to the store", true, ReferenceEquals(events, store.Requests.Single().Events));
             Assert.AreSame(events, store.Requests.Single().Events, $"Chunk size {chunkSize}");
             int lineAt = events.Events.IndexOf("* " + limitLine);
             int requestAt = events.Events.FindIndex(line => line.StartsWith("> ", StringComparison.Ordinal));
+            Diagnostics.Act("limit line index, request line index", $"{lineAt}, {requestAt}");
+            Diagnostics.Assert("limit line index is at least", 0, lineAt);
             Assert.IsGreaterThanOrEqualTo(0, lineAt, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("limit line index is below", requestAt, lineAt);
             Assert.IsLessThan(requestAt, lineAt, $"Chunk size {chunkSize}");
         }
     }
@@ -105,17 +128,28 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedCookieStore store = new();
             HttpRequestOptions options = new() { FollowRedirects = followRedirects };
+            Diagnostics.Arrange("url, chunk size, follow redirects", $"{CookieUrl}, {chunkSize}, {followRedirects}");
+            Diagnostics.Arrange("response head", OneLine(head));
 
             TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
                 .ExecuteAsync(CookieContext(CookieUrl, options));
 
+            WriteResult(result);
+            Diagnostics.Act("store responses", store.Responses.Count);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            string[] actualSetCookies = store.Responses.Select(call => call.SetCookieHeader).ToArray();
+            WriteExpectedLines("set-cookie headers", ["b=2; Path=/", "a=1"], actualSetCookies);
             CollectionAssert.AreEqual(new[] { "b=2; Path=/", "a=1" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("stored from response", "0 | 1", string.Join(" | ", store.Responses.Select(call => call.StoredFromResponse)));
             CollectionAssert.AreEqual(new[] { 0, 1 }, store.Responses.Select(call => call.StoredFromResponse).ToArray(), $"Chunk size {chunkSize}");
             foreach ((CurlUrl uri, _, _, DateTimeOffset now, ITransferEvents events) in store.Responses)
             {
+                Diagnostics.Assert("response url", CurlUrl.Parse(CookieUrl), uri);
                 Assert.AreEqual(CurlUrl.Parse(CookieUrl), uri, $"Chunk size {chunkSize}");
+                Diagnostics.Assert("response time", CookieTime, now);
                 Assert.AreEqual(CookieTime, now, $"Chunk size {chunkSize}");
+                Diagnostics.Assert("response events", true, ReferenceEquals(NoTransferEvents.Instance, events));
                 Assert.AreSame(NoTransferEvents.Instance, events, $"Chunk size {chunkSize}");
             }
         }
@@ -146,12 +180,19 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{CookieUrl}, {chunkSize}");
+            Diagnostics.Arrange("response head", OneLine(head));
 
             TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
                 .ExecuteAsync(CookieContext(CookieUrl, events: events));
 
+            WriteResult(result);
+            WriteEvents("head events", HeadEvents(events));
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            WriteExpectedLines("head events", expected, HeadEvents(events));
             CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("stored from response", "0 | 1 | 2", string.Join(" | ", store.Responses.Select(call => call.StoredFromResponse)));
             CollectionAssert.AreEqual(new[] { 0, 1, 2 }, store.Responses.Select(call => call.StoredFromResponse).ToArray(), $"Chunk size {chunkSize}");
         }
     }
@@ -177,10 +218,15 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{CookieUrl}, {chunkSize}");
+            Diagnostics.Arrange("response head", OneLine(head));
 
-            await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
+            TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
                 .ExecuteAsync(CookieContext(CookieUrl, events: events));
 
+            WriteResult(result);
+            WriteEvents("head events", HeadEvents(events));
+            WriteExpectedLines("head events", expected, HeadEvents(events));
             CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
         }
     }
@@ -217,14 +263,24 @@ public sealed partial class HttpProtocolHandlerTests
                 TimeProvider = new FakeTimeProvider(CookieTime),
                 Events = events,
             };
+            Diagnostics.Arrange("url, chunk size", $"{CookieUrl}, {chunkSize}");
+            Diagnostics.Arrange("response", OneLine(response));
 
             TransferResult result = await CookieHandler(QueueConnector.For(Connection(response, chunkSize)), store)
                 .ExecuteAsync(context);
 
+            WriteResult(result);
+            WriteEvents("head events", HeadEvents(events));
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            WriteExpectedLines("head events", expected, HeadEvents(events));
             CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            string[] actualSetCookies = store.Responses.Select(call => call.SetCookieHeader).ToArray();
+            WriteExpectedLines("set-cookie headers", ["b=2"], actualSetCookies);
             CollectionAssert.AreEqual(new[] { "b=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
+            Diagnostics.Diff("header output", response, Latin1(headers.ToArray()));
             Assert.AreEqual(response, Latin1(headers.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("last info line", "Connection #0 to host 127.0.0.1:18082 left intact", events.Info[^1]);
             Assert.AreEqual("Connection #0 to host 127.0.0.1:18082 left intact", events.Info[^1], $"Chunk size {chunkSize}");
         }
     }
@@ -253,12 +309,20 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size, compressed", $"{CookieUrl}, {chunkSize}, {compressed}");
+            Diagnostics.Arrange("response head", OneLine(head));
 
             TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, chunkSize)), store)
                 .ExecuteAsync(CookieContext(CookieUrl, new HttpRequestOptions { Compressed = compressed }, events));
 
+            WriteResult(result);
+            WriteEvents("head events", HeadEvents(events));
+            Diagnostics.Assert("exit code", exitCode, result.ExitCode);
             Assert.AreEqual(exitCode, result.ExitCode, $"Chunk size {chunkSize}");
+            WriteExpectedLines("head events", expected, HeadEvents(events));
             CollectionAssert.AreEqual(expected, HeadEvents(events), $"Chunk size {chunkSize}");
+            string[] actualSetCookies = store.Responses.Select(call => call.SetCookieHeader).ToArray();
+            WriteExpectedLines("set-cookie headers", ["b=2"], actualSetCookies);
             CollectionAssert.AreEqual(new[] { "b=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
         }
     }
@@ -285,11 +349,17 @@ public sealed partial class HttpProtocolHandlerTests
         ];
         ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url", CookieUrl);
+        Diagnostics.Arrange("response head", OneLine(head));
 
-        await CookieHandler(QueueConnector.For(Connection(head, 65536)), store)
+        TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, 65536)), store)
             .ExecuteAsync(CookieContext(CookieUrl, events: events));
 
+        WriteResult(result);
+        WriteEvents("head events", HeadEvents(events));
+        WriteExpectedLines("head events", expected, HeadEvents(events));
         CollectionAssert.AreEqual(expected, HeadEvents(events));
+        Diagnostics.Assert("stored from response", "0 | 1", string.Join(" | ", store.Responses.Select(call => call.StoredFromResponse)));
         CollectionAssert.AreEqual(new[] { 0, 1 }, store.Responses.Select(call => call.StoredFromResponse).ToArray());
     }
 
@@ -303,12 +373,20 @@ public sealed partial class HttpProtocolHandlerTests
         const string head = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nno colon\r\n\r\n";
         ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url", CookieUrl);
+        Diagnostics.Arrange("response head", OneLine(head));
 
         TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, 65536)), store)
             .ExecuteAsync(CookieContext(CookieUrl, events: events));
 
+        WriteResult(result);
+        WriteEvents("head events", HeadEvents(events));
+        Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        CollectionAssert.AreEqual(new[] { "< HTTP/1.1 200 OK\r\n", "< Set-Cookie: a=1\r\n" }, HeadEvents(events));
+        string[] expected = ["< HTTP/1.1 200 OK\r\n", "< Set-Cookie: a=1\r\n"];
+        WriteExpectedLines("head events", expected, HeadEvents(events));
+        CollectionAssert.AreEqual(expected, HeadEvents(events));
+        Diagnostics.Assert("store responses", 0, store.Responses.Count);
         Assert.IsEmpty(store.Responses);
     }
 
@@ -323,12 +401,18 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedCookieStore store = new();
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse(CookieUrl), Output = new MemoryStream(), TimeProvider = new FakeTimeProvider(CookieTime), Events = events };
+        Diagnostics.Arrange("url", CookieUrl);
+        Diagnostics.Arrange("response head", OneLine(head));
 
         TransferResult result = await CookieHandler(QueueConnector.For(Connection(head, 65536)), store).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         (_, string setCookie, _, _, ITransferEvents handed) = store.Responses.Single();
+        Diagnostics.Assert("set-cookie header", "n2=v; Path=/", setCookie);
         Assert.AreEqual("n2=v; Path=/", setCookie);
+        Diagnostics.Assert("events handed to the store", true, ReferenceEquals(events, handed));
         Assert.AreSame(events, handed);
     }
 
@@ -336,10 +420,13 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_SetCookieWithoutAStore_IsIgnored()
     {
         const string head = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nContent-Length: 0\r\n\r\n";
+        Diagnostics.Arrange("url, response head", $"http://example.com/, {OneLine(head)}");
 
         TransferResult result = await Handler(QueueConnector.For(Connection(head, 65536, RootRequest)))
             .ExecuteAsync(Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -359,12 +446,20 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, challengeHead, EmptyOkHead);
             ScriptedCookieStore store = new("j=k", "t=2; s=1; j=k");
             HttpProtocolHandler handler = new(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic dTpw"), store);
+            Diagnostics.Arrange("url, chunk size", $"http://127.0.0.1:18083/, {chunkSize}");
+            Diagnostics.Arrange("store cookies, challenge head", $"j=k | t=2; s=1; j=k, {OneLine(challengeHead)}");
 
             TransferResult result = await handler.ExecuteAsync(CookieContext("http://127.0.0.1:18083/"));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", first + retry, connection.Written);
             Assert.AreEqual(first + retry, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("store requests", 2, store.Requests.Count);
             Assert.HasCount(2, store.Requests, $"Chunk size {chunkSize}");
+            string[] actualSetCookies = store.Responses.Select(call => call.SetCookieHeader).ToArray();
+            WriteExpectedLines("set-cookie headers", ["s=1", "t=2"], actualSetCookies);
             CollectionAssert.AreEqual(new[] { "s=1", "t=2" }, store.Responses.Select(call => call.SetCookieHeader).ToArray(), $"Chunk size {chunkSize}");
         }
     }
@@ -373,9 +468,12 @@ public sealed partial class HttpProtocolHandlerTests
     public void Constructor_KeepsTheCookieStore()
     {
         ScriptedCookieStore store = new();
+        Diagnostics.Arrange("cookie store", nameof(ScriptedCookieStore));
 
         HttpProtocolHandler handler = new(new QueueConnector(), new SilentAuthenticator(), store);
 
+        Diagnostics.Act("handler cookie store is the given store", ReferenceEquals(store, handler.CookieStore));
+        Diagnostics.Assert("cookie store", true, ReferenceEquals(store, handler.CookieStore));
         Assert.AreSame(store, handler.CookieStore);
     }
 

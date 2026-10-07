@@ -20,12 +20,18 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_Http11GetAtInfo_LogsTheRequestTheReplyAndTheEndUnderHttp()
     {
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Info);
+        Diagnostics.Arrange("url, log level", $"{LogUrl}, Info");
 
         TransferResult result = await Handler(QueueConnector.For(Connection(Head + "hello", 65536)))
             .ExecuteAsync(LogContext(log));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("every line under Http", true, log.Lines.All(line => line.Component == DiagnosticLogComponents.Http));
         Assert.IsTrue(log.Lines.All(line => line.Component == DiagnosticLogComponents.Http));
+        string[] expectedInfo = ["GET /a sent", "reply 200 OK", "body framed by Content-Length 5", "exchange done: status 200, 5 body bytes in 0 ms"];
+        WriteExpectedLines("info lines", expectedInfo, log.MessagesAt(DiagnosticLogLevel.Info));
         CollectionAssert.AreEqual(
             new[] { "GET /a sent", "reply 200 OK", "body framed by Content-Length 5", "exchange done: status 200, 5 body bytes in 0 ms" },
             log.MessagesAt(DiagnosticLogLevel.Info));
@@ -37,8 +43,12 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Info);
         const string chunked = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n";
 
-        await Handler(QueueConnector.For(Connection(chunked, 65536))).ExecuteAsync(LogContext(log));
+        Diagnostics.Arrange("url, log level, response", $"{LogUrl}, Info, chunked 200");
 
+        TransferResult result = await Handler(QueueConnector.For(Connection(chunked, 65536))).ExecuteAsync(LogContext(log));
+
+        WriteResult(result);
+        Diagnostics.Assert("info lines contain", "body framed chunked", OneLine(string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Info))));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Info), "body framed chunked");
     }
 
@@ -48,9 +58,14 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingDiagnosticLog log = new();
         HttpRequestOptions options = new() { Headers = ["Authorization: Bearer s3cret-token"] };
 
-        await Handler(QueueConnector.For(Connection(Head + "hello", 65536))).ExecuteAsync(LogContext(log, options));
+        Diagnostics.Arrange("url, log level, headers", $"{LogUrl}, Verbose, Authorization: Bearer s3cret-token");
 
+        TransferResult result = await Handler(QueueConnector.For(Connection(Head + "hello", 65536))).ExecuteAsync(LogContext(log, options));
+
+        WriteResult(result);
         string[] verbose = log.MessagesAt(DiagnosticLogLevel.Verbose);
+        WriteEvents("verbose lines", verbose);
+        Diagnostics.Assert("verbose lines contain", "header sent Authorization: (value not logged)", OneLine(string.Join(" | ", verbose)));
         CollectionAssert.Contains(verbose, "using HTTP/1.x on a new connection");
         CollectionAssert.Contains(verbose, "header sent Host: 127.0.0.1:18922");
         CollectionAssert.Contains(verbose, "header sent Authorization: (value not logged)");
@@ -74,12 +89,17 @@ public sealed partial class HttpProtocolHandlerTests
             DiagnosticLog = log,
             TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
         };
+        Diagnostics.Arrange("url, log level, version", $"{LogUrl}, Info, Http2PriorKnowledge");
 
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("line count", ">0", log.Lines.Count);
         Assert.IsNotEmpty(log.Lines);
+        Diagnostics.Assert("every line under Http2", true, log.Lines.All(line => line.Component == DiagnosticLogComponents.Http2));
         Assert.IsTrue(log.Lines.All(line => line.Component == DiagnosticLogComponents.Http2));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Info), "reply 200");
     }
@@ -90,12 +110,19 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Error);
         const string cutShort = "HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nhel";
 
+        Diagnostics.Arrange("url, log level, response", $"{LogUrl}, Error, Content-Length 10 cut after 3 bytes");
+
         TransferResult result = await Handler(QueueConnector.For(Connection(cutShort, 65536))).ExecuteAsync(LogContext(log));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
         (DiagnosticLogLevel level, string component, string message) = log.Lines.Single();
+        Diagnostics.Assert("level", DiagnosticLogLevel.Error, level);
         Assert.AreEqual(DiagnosticLogLevel.Error, level);
+        Diagnostics.Assert("component", DiagnosticLogComponents.Http, component);
         Assert.AreEqual(DiagnosticLogComponents.Http, component);
+        Diagnostics.Assert("message starts with", "exchange failed with PartialFile (exit 18): ", message);
         StringAssert.StartsWith(message, "exchange failed with PartialFile (exit 18): ");
     }
 
@@ -104,8 +131,12 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Error);
 
-        await Handler(QueueConnector.For(Connection(Head + "hello", 65536))).ExecuteAsync(LogContext(log));
+        Diagnostics.Arrange("url, log level", $"{LogUrl}, Error");
 
+        TransferResult result = await Handler(QueueConnector.For(Connection(Head + "hello", 65536))).ExecuteAsync(LogContext(log));
+
+        WriteResult(result);
+        Diagnostics.Assert("line count", 0, log.Lines.Count);
         Assert.IsEmpty(log.Lines);
     }
 
@@ -116,9 +147,13 @@ public sealed partial class HttpProtocolHandlerTests
         string basic = "Basic " + Convert.ToBase64String(Encoding.Latin1.GetBytes("user:s3cret"));
         TransferContext context = LogContext(log, credentials: new NetworkCredential("user", "s3cret"));
 
-        await new HttpProtocolHandler(QueueConnector.For(Connection(Head + "hello", 65536)), new ScriptedAuthenticator(basic, null))
+        Diagnostics.Arrange("url, log level, credentials", $"{LogUrl}, Verbose, user:(secret)");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(Connection(Head + "hello", 65536)), new ScriptedAuthenticator(basic, null))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("verbose lines contain", "header sent Authorization: (value not logged)", OneLine(string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Verbose))));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Verbose), "header sent Authorization: (value not logged)");
         AssertNoLineContains(log, "s3cret");
         AssertNoLineContains(log, basic["Basic ".Length..]);
@@ -130,8 +165,12 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingDiagnosticLog log = new();
         HttpRequestOptions options = new() { Headers = ["Authorization: Bearer s3cret"] };
 
-        await Handler(QueueConnector.For(Connection(Head + "hello", 65536))).ExecuteAsync(LogContext(log, options));
+        Diagnostics.Arrange("url, log level, headers", $"{LogUrl}, Verbose, Authorization: Bearer (secret)");
 
+        TransferResult result = await Handler(QueueConnector.For(Connection(Head + "hello", 65536))).ExecuteAsync(LogContext(log, options));
+
+        WriteResult(result);
+        Diagnostics.Assert("a line contains the secret", false, log.Lines.Any(line => line.Message.Contains("s3cret", StringComparison.Ordinal)));
         AssertNoLineContains(log, "s3cret");
     }
 
@@ -141,9 +180,13 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingDiagnosticLog log = new();
         const string reply = "HTTP/1.1 200 OK\r\nSet-Cookie: back=s3cret-too\r\nContent-Length: 0\r\n\r\n";
 
-        await CookieHandler(QueueConnector.For(Connection(reply, 65536)), new ScriptedCookieStore("name=s3cret"))
+        Diagnostics.Arrange("url, log level, stored cookie", $"{LogUrl}, Verbose, name=(secret)");
+
+        TransferResult result = await CookieHandler(QueueConnector.For(Connection(reply, 65536)), new ScriptedCookieStore("name=s3cret"))
             .ExecuteAsync(LogContext(log));
 
+        WriteResult(result);
+        Diagnostics.Assert("verbose lines contain", "header sent Cookie: (value not logged)", OneLine(string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Verbose))));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Verbose), "header sent Cookie: (value not logged)");
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Verbose), "header received Set-Cookie: (value not logged)");
         AssertNoLineContains(log, "s3cret");

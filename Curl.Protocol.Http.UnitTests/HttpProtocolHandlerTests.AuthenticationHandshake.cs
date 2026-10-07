@@ -24,10 +24,14 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(connection);
             HandshakeAuthenticator authenticator = new("NTLM T1", ["NTLM T3"]);
             MemoryStream output = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(NtlmContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", NtlmRequest("T1") + NtlmRequest("T3"), connection.Written);
             Assert.AreEqual(NtlmRequest("T1") + NtlmRequest("T3"), connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.HasCount(1, connector.Targets, $"Chunk size {chunkSize}");
@@ -44,10 +48,14 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope", NtlmChallengeHead + "nope", OkHead + "ok");
         HandshakeAuthenticator authenticator = new("NTLM T1", ["NTLM T1", "NTLM T3"]);
         MemoryStream output = new();
+        Diagnostics.Arrange("url, continuations", $"{AuthUrl}, NTLM T1 then NTLM T3");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(NtlmContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("connection written", NtlmRequest("T1") + NtlmRequest("T1") + NtlmRequest("T3"), connection.Written);
         Assert.AreEqual(NtlmRequest("T1") + NtlmRequest("T1") + NtlmRequest("T3"), connection.Written);
         CollectionAssert.AreEqual(new[] { true, false }, authenticator.Continuations.Select(continuation => continuation.SentBeforeAnyChallenge).ToArray());
     }
@@ -58,10 +66,14 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope");
         HandshakeAuthenticator authenticator = new("NTLM T1", [null]);
         MemoryStream output = new();
+        Diagnostics.Arrange("url, continuations", $"{AuthUrl}, none");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(NtlmContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("connection written", NtlmRequest("T1"), connection.Written);
         Assert.AreEqual(NtlmRequest("T1"), connection.Written);
         Assert.AreEqual("nope", Latin1(output.ToArray()));
     }
@@ -76,10 +88,14 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope");
         HandshakeAuthenticator authenticator = new("NTLM T1", [], new HttpAuthenticationFailedException(CurlExitCode.AuthError, "An authentication function returned an error"));
         MemoryStream output = new();
+        Diagnostics.Arrange("url, authenticator failure", $"{AuthUrl}, AuthError");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(NtlmContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.AuthError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.AuthError, result.ExitCode);
+        Diagnostics.Assert("error message", "An authentication function returned an error", result.ErrorMessage ?? "(none)");
         Assert.AreEqual("An authentication function returned an error", result.ErrorMessage);
         Assert.AreEqual(0L, output.Length);
     }
@@ -90,10 +106,14 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, "HTTP/1.1 401 Unauthorized\r\nContent-Length: 4\r\n\r\nnope");
         HandshakeAuthenticator authenticator = new("NTLM T1", ["NTLM T3"]);
         MemoryStream output = new();
+        Diagnostics.Arrange("url, response", $"{AuthUrl}, 401 without challenge");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(NtlmContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "nope", Latin1(output.ToArray()));
         Assert.AreEqual("nope", Latin1(output.ToArray()));
         Assert.IsEmpty(authenticator.Continuations);
     }
