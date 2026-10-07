@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -13,6 +14,9 @@ public sealed class HmacRipemd160Tests
 {
     private const string Hi = "4869205468657265";
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     // RFC 2286 section 2, test cases 1 to 7 (key, data and MAC in hexadecimal); case 5's
     // data is "Test With Truncation", its full 160-bit MAC.
     [TestMethod]
@@ -25,19 +29,29 @@ public sealed class HmacRipemd160Tests
     [DataRow("aa*80", "54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b657920616e64204c6172676572205468616e204f6e6520426c6f636b2d53697a652044617461", "69ea60798d71616cce5fd0871e23754cd75d5a0a")]
     public void HashData_Rfc2286Vector_GivesThePublishedMac(string key, string data, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] mac = new byte[HmacRipemd160.HashSize];
+        diagnostics.Arrange("vector source", "RFC 2286 section 2");
+        diagnostics.Bytes("key", FromHex(key));
+        diagnostics.Bytes("data", FromHex(data));
 
         HmacRipemd160.HashData(FromHex(key), FromHex(data), mac);
+        diagnostics.Act("mac", Convert.ToHexStringLower(mac));
 
+        diagnostics.Diff("mac", Convert.FromHexString(expected), mac);
         Assert.AreEqual(expected, Convert.ToHexStringLower(mac));
     }
 
     [TestMethod]
     public void AppendData_MessageSplitAcrossCalls_MacsAsTheWhole()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] message = Encoding.ASCII.GetBytes("Test Using Larger Than Block-Size Key and Larger Than One Block-Size Data");
         byte[] mac = new byte[HmacRipemd160.HashSize];
         using HmacRipemd160 hmac = new(FromHex("aa*80"));
+        diagnostics.Arrange("vector source", "RFC 2286 section 2, test case 7, appended 5 bytes at a time");
+        diagnostics.Bytes("key", FromHex("aa*80"));
+        diagnostics.Bytes("message", message);
 
         for (int offset = 0; offset < message.Length; offset += 5)
         {
@@ -45,36 +59,58 @@ public sealed class HmacRipemd160Tests
         }
 
         hmac.GetHashAndReset(mac);
+        diagnostics.Act("mac", Convert.ToHexStringLower(mac));
+
+        diagnostics.Diff("mac", Convert.FromHexString("69ea60798d71616cce5fd0871e23754cd75d5a0a"), mac);
         Assert.AreEqual("69ea60798d71616cce5fd0871e23754cd75d5a0a", Convert.ToHexStringLower(mac));
     }
 
     [TestMethod]
     public void GetHashAndReset_SecondMessage_IsMacedUnderTheSameKey()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] mac = new byte[HmacRipemd160.HashSize];
         using HmacRipemd160 hmac = new(FromHex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"));
         hmac.AppendData("something else"u8);
         hmac.GetHashAndReset(mac);
+        diagnostics.Arrange("vector source", "RFC 2286 section 2, test case 1, after a first message");
+        diagnostics.Bytes("key", FromHex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"));
+        diagnostics.Arrange("first message", "something else");
+        diagnostics.Bytes("second message", FromHex(Hi));
 
         hmac.AppendData(FromHex(Hi));
         hmac.GetHashAndReset(mac);
+        diagnostics.Act("second mac", Convert.ToHexStringLower(mac));
 
+        diagnostics.Diff("second mac", Convert.FromHexString("24cb4bd67d20fc1a5d2ed7732dcc39377f0a5668"), mac);
         Assert.AreEqual("24cb4bd67d20fc1a5d2ed7732dcc39377f0a5668", Convert.ToHexStringLower(mac));
     }
 
     [TestMethod]
     public void Verify_PublishedMac_ReturnsTrue()
     {
-        bool verified = HmacRipemd160.Verify("Jefe"u8, "what do ya want for nothing?"u8, FromHex("dda6c0213a485a9e24f4742064a7f033b43c4069"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "RFC 2286 section 2, test case 2");
+        diagnostics.Bytes("mac", FromHex("dda6c0213a485a9e24f4742064a7f033b43c4069"));
 
+        bool verified = HmacRipemd160.Verify("Jefe"u8, "what do ya want for nothing?"u8, FromHex("dda6c0213a485a9e24f4742064a7f033b43c4069"));
+        diagnostics.Act("verified", verified);
+
+        diagnostics.Assert("verified", true, verified);
         Assert.IsTrue(verified);
     }
 
     [TestMethod]
     public void Verify_FlippedBit_ReturnsFalse()
     {
-        bool verified = HmacRipemd160.Verify("Jefe"u8, "what do ya want for nothing?"u8, FromHex("dda6c0213a485a9e24f4742064a7f033b43c4068"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "RFC 2286 section 2, test case 2, last bit of the MAC flipped");
+        diagnostics.Bytes("mac", FromHex("dda6c0213a485a9e24f4742064a7f033b43c4068"));
 
+        bool verified = HmacRipemd160.Verify("Jefe"u8, "what do ya want for nothing?"u8, FromHex("dda6c0213a485a9e24f4742064a7f033b43c4068"));
+        diagnostics.Act("verified", verified);
+
+        diagnostics.Assert("verified", false, verified);
         Assert.IsFalse(verified);
     }
 
@@ -83,7 +119,13 @@ public sealed class HmacRipemd160Tests
     [DataRow(21)]
     public void Verify_WrongMacLength_Throws(int length)
     {
-        Assert.ThrowsExactly<ArgumentException>(() => HmacRipemd160.Verify("Jefe"u8, "x"u8, new byte[length]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mac length", length);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => HmacRipemd160.Verify("Jefe"u8, "x"u8, new byte[length]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -91,27 +133,42 @@ public sealed class HmacRipemd160Tests
     [DataRow(21)]
     public void GetHashAndReset_WrongDestinationLength_Throws(int length)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using HmacRipemd160 hmac = new("Jefe"u8);
+        diagnostics.Arrange("destination length", length);
 
-        Assert.ThrowsExactly<ArgumentException>(() => hmac.GetHashAndReset(new byte[length]));
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => hmac.GetHashAndReset(new byte[length]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void AppendData_AfterDispose_Throws()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HmacRipemd160 hmac = new("Jefe"u8);
         hmac.Dispose();
+        diagnostics.Arrange("state", "disposed");
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => hmac.AppendData("a"u8));
+        ObjectDisposedException exception = Assert.ThrowsExactly<ObjectDisposedException>(() => hmac.AppendData("a"u8));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ObjectDisposedException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void GetHashAndReset_AfterDispose_Throws()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         HmacRipemd160 hmac = new("Jefe"u8);
         hmac.Dispose();
+        diagnostics.Arrange("state", "disposed");
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => hmac.GetHashAndReset(new byte[HmacRipemd160.HashSize]));
+        ObjectDisposedException exception = Assert.ThrowsExactly<ObjectDisposedException>(() => hmac.GetHashAndReset(new byte[HmacRipemd160.HashSize]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception", nameof(ObjectDisposedException), exception.GetType().Name);
     }
 
     /// <summary>Hexadecimal, or <c>xx*n</c> for the byte <c>xx</c> repeated n times as RFC 2286 writes it.</summary>
