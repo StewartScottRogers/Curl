@@ -123,8 +123,7 @@ internal sealed class Des3CbcSha1GssMessageProtection : KerberosGssMessageProtec
     /// <summary>Triple-DES CBC under the context key itself, MIT's <c>des3-cbc-raw</c>, over whole blocks.</summary>
     private byte[] ApplyCbc(ReadOnlySpan<byte> data, ReadOnlySpan<byte> initializationVector, bool encrypt)
     {
-        using TripleDES tripleDes = TripleDES.Create();
-        tripleDes.SetKey(Key);
+        using TripleDES tripleDes = Des3CbcSha1KerberosEncryption.CreateTripleDes(Key);
         return encrypt
             ? tripleDes.EncryptCbc(data, initializationVector, PaddingMode.None)
             : tripleDes.DecryptCbc(data, initializationVector, PaddingMode.None);
