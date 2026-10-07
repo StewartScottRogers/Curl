@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1647 — Stop SwsHttpServerConnector losing recorded bytes when connections write on many threads at once
 
@@ -25,11 +25,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Conformance.UnitTests` writes on 32 connections from 32 threads for at least 100 rounds and asserts every byte is recorded; it fails before the fix and passes after.
-- [ ] Recording, the disconnect marker and `ReceivedBytes` are safe to call from many threads at once (a lock in `SwsServerRecording`, or equivalent), and the bytes of one `WriteAsync` stay contiguous.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage.
+- [x] A test in `Curl.Conformance.UnitTests` writes on 32 connections from 32 threads for at least 100 rounds and asserts every byte is recorded; it fails before the fix and passes after.
+- [x] Recording, the disconnect marker and `ReceivedBytes` are safe to call from many threads at once (a lock in `SwsServerRecording`, or equivalent), and the bytes of one `WriteAsync` stay contiguous.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Fix: `SwsServerRecording` takes one `System.Threading.Lock` in `Record`, `ArmDisconnectMonitor`, `RecordDisconnect` and `Bytes`; one `Record` call is one `WriteAsync`, so its bytes stay contiguous. The monitor flag sits under the same lock so arming and the disconnect line cannot interleave.
+- Test: `SwsHttpServerConnectorTests.ThirtyTwoConnectionsWrittenOneBytePerWriteOnThirtyTwoThreads_RecordEveryByte` (100 rounds, 32 `Task.Run` writers, one byte per write); lane 9 saw it fail before the fix and pass after. Carried over from branch factory/BL-1647-lane-9-20261007-111121.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports 100% line, 100% branch, 0 failing members.
+- The fast run fails only `Curl.Cookies.UnitTests` `EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother`, outside this task's touches and already BL-1651 (in Doing on another lane).
 
 ## Log
 
@@ -37,3 +42,4 @@ completed:
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Lane 9 could not integrate: fast tests failed twice (Curl.Cookies.UnitTests failed; then no test named) after rebasing onto the other lanes' work. The work is on branch factory/BL-1647-lane-9-20261007-111121; start with git cherry-pick --no-commit factory/BL-1647-lane-9-20261007-111121 and fix it.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. SwsServerRecording locks every member, so ReceivedBytes keeps every byte when 32 connections write on 32 threads at once
