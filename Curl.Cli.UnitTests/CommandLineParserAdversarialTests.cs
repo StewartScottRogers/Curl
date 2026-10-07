@@ -45,13 +45,30 @@ public sealed class CommandLineParserAdversarialTests
     }
 
     [TestMethod]
-    [DataRow("2147483648")]
     [DataRow("1.5")]
     [DataRow("0x10")]
     [DataRow("")]
-    public void Parse_RetryOnePastTheWindowsLongLimitOrNotAnInteger_RefusesAsNotProperNumerical(string value)
+    public void Parse_RetryNotAnInteger_RefusesAsNotProperNumerical(string value)
     {
         CommandLineParseResult result = Parse(["--retry", value, Url]);
+
+        AssertRefused(result, CurlExitCode.FailedInit, "curl: option --retry: expected a proper numerical parameter");
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Parse_OnWindows_RetryOnePastTheWindowsLongLimit_RefusesAsNotProperNumerical()
+    {
+        CommandLineParseResult result = Parse(["--retry", "2147483648", Url]);
+
+        AssertRefused(result, CurlExitCode.FailedInit, "curl: option --retry: expected a proper numerical parameter");
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_OnLinuxOrMacOS_RetryOnePastTheLongLimit_RefusesAsNotProperNumerical()
+    {
+        CommandLineParseResult result = Parse(["--retry", "9223372036854775808", Url]);
 
         AssertRefused(result, CurlExitCode.FailedInit, "curl: option --retry: expected a proper numerical parameter");
     }
