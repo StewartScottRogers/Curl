@@ -8,7 +8,7 @@ depends-on: [BL-1501]
 touches: [Curl.Kerberos.UnitLibrary, Curl.Kerberos.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1649 — Refuse a des3-cbc-sha1 key TripleDES calls weak with KerberosCryptographyException, not CryptographicException
 
@@ -24,12 +24,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Kerberos.UnitTests` encrypts and decrypts with an all-zero 24-byte des3 key and with one whose first two 8-byte parts are equal, and gets either a round trip or a `KerberosCryptographyException` with a named error, never a `CryptographicException`.
-- [ ] `dotnet build` is clean and the fast tests pass; the library keeps its 100% line and branch coverage.
+- [x] A test in `Curl.Kerberos.UnitTests` encrypts and decrypts with an all-zero 24-byte des3 key and with one whose first two 8-byte parts are equal, and gets either a round trip or a `KerberosCryptographyException` with a named error, never a `CryptographicException`.
+- [x] `dotnet build` is clean and the fast tests pass; the library keeps its 100% line and branch coverage.
 
 ## Notes
+
+- Decision (ADR-0423, decided by Claude under Stewart's delegation): refuse rather than hand-build DES. A key whose first and second, or second and third, 8-byte parts are equal apart from parity is single DES; no KDC issues one and des3 is deprecated, so refusing costs no observable compatibility. Three single-DES passes could not match MIT either: .NET's DES refuses DES weak keys such as all zeros.
+- `Des3CbcSha1KerberosEncryption.CreateTripleDes` is now the one factory for triple DES, used by the encryption type and `Des3CbcSha1GssMessageProtection`; it checks the parts itself (parity masked) and throws `KerberosCryptographyException(KerberosCryptographyError.WeakKey)` before .NET's check, so the answer does not depend on a platform's `TripleDES`. Derived keys go through it too. Public doc comments list `WeakKey`.
+- Tests: `EncryptDecryptChecksumAndPseudoRandom_WeakKey_ThrowWeakKey` (all zeros, first two parts equal, last two equal, parity-only difference) and `CreateTripleDes_StrongKey_EncryptsAsTripleDes`. Kerberos tests 781 green; Measure-CodeQuality: Curl.Kerberos.UnitLibrary 100% line, 100% branch, 0 failing members.
+- Full fast run: `Curl.Cookies.UnitTests` `EveryMember_ManyConcurrentCallers_EndWithTheSameCookiesAsOneAfterAnother` failed under full-suite load and passes alone; already filed as BL-1651.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. des3-cbc-sha1 refuses a key triple DES calls weak with KerberosCryptographyError.WeakKey; no CryptographicException escapes
