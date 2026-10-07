@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Quic.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1488 — Make every test in Curl.Quic.UnitTests write descriptive diagnostic output
 
@@ -27,15 +27,19 @@ Every test in `Curl.Quic.UnitTests` writes, through BL-1457's shared `TestDiagno
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Quic.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Quic.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Quic.UnitTests -warnaserror` is clean and `dotnet test Curl.Quic.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Quic.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Quic.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Quic.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Quic.UnitTests -warnaserror` is clean and `dotnet test Curl.Quic.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Quic.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 280 test methods in 24 files.
+- 2026-10-07 (lane 2): resumed from the earlier run's stash (applied as a diff, `git diff <sha>^1 <sha> -- Curl.Quic.UnitTests | git apply --3way`). The 5 missing `Assert.` calls were the six `Decode_*` tests in `QuicPacketNumberTests`, folded into one helper assertion; the helper is now `DecodeWithDiagnostics`, which writes the lines and returns the decoded value, and each test asserts it itself again. Added an `ACT` line to `OnLossDetectionTimeout_FirstInitialLost_ResendsTheClientHelloInANewPacketAndCompletes` and `Encode_CurlClientDefaults_MatchesCurlsBuild`.
+- Counts in `Curl.Quic.UnitTests` `.cs` files, before -> after: `Assert.` 901 -> 901, `[TestMethod` 280 -> 280, `[DataRow(` 109 -> 109. Test run: 411 before, 411 after, 411 `END` lines, none with a zero arrange, act or assert count.
+- SLOW: no test printed a `SLOW:` line (whole project ran in about 1.1 s), so no follow-up task.
+- Only `Curl.Quic.UnitTests` changed and nothing references it, so the fast tests run were that project's (411/411); `dotnet build` of the solution is clean.
 
 ## Log
 
@@ -43,3 +47,4 @@ Every test in `Curl.Quic.UnitTests` writes, through BL-1457's shared `TestDiagno
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Session budget ran out with work in the stash: all 24 files instrumented, build clean, 411/411 tests pass; left: Assert. count fell 901->896 (restore the 5 Assert calls removed, mostly QuicLossRecoveryTests OnLossDetectionTimeout and QuicPacketProtectionTests multi-throw tests), and 2 tests lack a line: QuicClientConnectionStateTests.OnLossDetectionTimeout_FirstInitialLost_* and QuicTransportParametersTests.Encode_CurlClientDefaults_MatchesCurlsBuild (act 0)
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Quic.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF diagnostics; 411/411 pass, assert counts unchanged

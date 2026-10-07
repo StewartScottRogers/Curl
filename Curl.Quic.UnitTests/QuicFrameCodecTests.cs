@@ -1,3 +1,4 @@
+using Curl.Testing;
 using static Curl.Quic.QuicTest;
 
 namespace Curl.Quic;
@@ -12,6 +13,10 @@ public sealed class QuicFrameCodecTests
     private static readonly byte[] ConnectionId = Hex("0102030405060708");
     private static readonly byte[] ResetToken = Hex("00112233445566778899aabbccddeeff");
     private static readonly byte[] EightBytes = Hex("a1a2a3a4a5a6a7a8");
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     public static IEnumerable<object[]> EveryFrame =>
     [
@@ -52,63 +57,116 @@ public sealed class QuicFrameCodecTests
     [DynamicData(nameof(EveryFrame))]
     public void EncodeThenDecode_EveryFrameType_WritesTheRfcLayoutAndReadsItBack(QuicFrame frame, string expectedHex)
     {
+        Diagnostics.Arrange("frame type", frame.Type);
+        Diagnostics.Arrange("expected hex", expectedHex);
+
         var encoded = QuicFrameCodec.Encode([frame]);
 
+        Diagnostics.Bytes($"encoded {frame.Type} frame", encoded);
+        Diagnostics.Diff("encoded hex", expectedHex, HexOf(encoded));
         Assert.AreEqual(expectedHex, HexOf(encoded));
         var decoded = QuicFrameCodec.Decode(encoded, QuicPacketType.OneRtt);
+        Diagnostics.Act("decoded frame count", decoded.Count);
+        Diagnostics.Assert("decoded frame count", 1, decoded.Count);
         Assert.HasCount(1, decoded);
+        Diagnostics.Assert("decoded frame type", frame.Type, decoded[0].Type);
         Assert.AreEqual(frame.Type, decoded[0].Type);
-        Assert.AreEqual(expectedHex, HexOf(QuicFrameCodec.Encode(decoded)));
+        var reencoded = HexOf(QuicFrameCodec.Encode(decoded));
+        Diagnostics.Diff("re-encoded hex", expectedHex, reencoded);
+        Assert.AreEqual(expectedHex, reencoded);
     }
 
     [TestMethod]
     public void Decode_AckWithRangesAndEcnCounts_ReadsEveryField()
     {
+        Diagnostics.Arrange("payload hex (Initial)", "030a0301020102040506");
+        Diagnostics.Bytes("payload", Hex("030a0301020102040506"));
+
         var ack = (QuicAckFrame)QuicFrameCodec.Decode(Hex("030a0301020102040506"), QuicPacketType.Initial).Single();
 
+        Diagnostics.Act("largest acknowledged", ack.LargestAcknowledged);
+        Diagnostics.Act("ack delay", ack.AckDelay);
+        Diagnostics.Act("first ack range", ack.FirstAckRange);
+        Diagnostics.Act("ack range", ack.AckRanges.Single());
+        Diagnostics.Act("ecn counts", ack.EcnCounts);
+        Diagnostics.Assert("largest acknowledged", 10UL, ack.LargestAcknowledged);
         Assert.AreEqual(10UL, ack.LargestAcknowledged);
+        Diagnostics.Assert("ack delay", 3UL, ack.AckDelay);
         Assert.AreEqual(3UL, ack.AckDelay);
+        Diagnostics.Assert("first ack range", 2UL, ack.FirstAckRange);
         Assert.AreEqual(2UL, ack.FirstAckRange);
+        Diagnostics.Assert("ack range", new QuicAckRange(1, 2), ack.AckRanges.Single());
         Assert.AreEqual(new QuicAckRange(1, 2), ack.AckRanges.Single());
+        Diagnostics.Assert("ecn counts", new QuicEcnCounts(4, 5, 6), ack.EcnCounts);
         Assert.AreEqual(new QuicEcnCounts(4, 5, 6), ack.EcnCounts);
     }
 
     [TestMethod]
     public void Decode_StreamWithoutLength_TakesTheRestOfThePayload()
     {
+        Diagnostics.Arrange("payload hex (OneRtt)", "0f040901dd" + "0c0409aabbcc");
+        Diagnostics.Bytes("payload", Hex("0f040901dd" + "0c0409aabbcc"));
+
         var stream = (QuicStreamFrame)QuicFrameCodec.Decode(Hex("0f040901dd" + "0c0409aabbcc"), QuicPacketType.OneRtt)[1];
 
+        Diagnostics.Act("offset", stream.Offset);
+        Diagnostics.Bytes("stream data", stream.Data.Span);
+        Diagnostics.Act("has length", stream.HasLength);
+        Diagnostics.Act("is fin", stream.IsFin);
+        Diagnostics.Assert("offset", 9UL, stream.Offset);
         Assert.AreEqual(9UL, stream.Offset);
+        Diagnostics.Diff("data hex", "aabbcc", HexOf(stream.Data));
         Assert.AreEqual("aabbcc", HexOf(stream.Data));
+        Diagnostics.Assert("has length", false, stream.HasLength);
         Assert.IsFalse(stream.HasLength);
+        Diagnostics.Assert("is fin", false, stream.IsFin);
         Assert.IsFalse(stream.IsFin);
     }
 
     [TestMethod]
     public void Decode_PaddingThenAFrame_ReadsTheRunAsOneFrame()
     {
+        Diagnostics.Arrange("payload hex (Initial)", "0000000001");
+
         var frames = QuicFrameCodec.Decode(Hex("0000000001"), QuicPacketType.Initial);
 
+        Diagnostics.Act("frames", string.Join(", ", frames.Select(frame => frame.Type)));
+        Diagnostics.Assert("first frame", new QuicPaddingFrame(4), frames[0]);
         Assert.AreEqual(new QuicPaddingFrame(4), frames[0]);
+        Diagnostics.Assert("second frame is ping", true, frames[1] is QuicPingFrame);
         Assert.IsInstanceOfType<QuicPingFrame>(frames[1]);
     }
 
     [TestMethod]
     public void Decode_ConnectionCloseReason_ReadsTheBytes()
     {
+        Diagnostics.Arrange("payload hex (Handshake)", "1c0a0603627965");
+
         var close = (QuicConnectionCloseFrame)QuicFrameCodec.Decode(Hex("1c0a0603627965"), QuicPacketType.Handshake).Single();
 
+        var reason = System.Text.Encoding.UTF8.GetString(close.ReasonPhrase.Span);
+        Diagnostics.Act("error code", close.ErrorCode);
+        Diagnostics.Act("frame type", close.FrameType);
+        Diagnostics.Act("reason phrase", reason);
+        Diagnostics.Assert("error code", (ulong)QuicTransportErrorCode.ProtocolViolation, close.ErrorCode);
         Assert.AreEqual((ulong)QuicTransportErrorCode.ProtocolViolation, close.ErrorCode);
+        Diagnostics.Assert("frame type", 6UL, close.FrameType);
         Assert.AreEqual(6UL, close.FrameType);
-        Assert.AreEqual("bye", System.Text.Encoding.UTF8.GetString(close.ReasonPhrase.Span));
+        Diagnostics.Assert("reason phrase", "bye", reason);
+        Assert.AreEqual("bye", reason);
     }
 
     [TestMethod]
     public void Decode_EmptyPayload_IsAProtocolViolation()
     {
+        Diagnostics.Arrange("payload hex (Initial)", "(empty)");
+
         var exception = Assert.ThrowsExactly<QuicTransportException>(() => QuicFrameCodec.Decode(ReadOnlyMemory<byte>.Empty, QuicPacketType.Initial));
 
+        Diagnostics.Act("exception", $"{exception.GetType().Name} {exception.ErrorCode}: {exception.Message}");
+        Diagnostics.Assert("error code", QuicTransportErrorCode.ProtocolViolation, exception.ErrorCode);
         Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, exception.ErrorCode);
+        Diagnostics.Diff("message", "QUIC ProtocolViolation: The Initial packet carries no frames.", exception.Message);
         Assert.AreEqual("QUIC ProtocolViolation: The Initial packet carries no frames.", exception.Message);
     }
 
@@ -130,12 +188,29 @@ public sealed class QuicFrameCodecTests
     [DataRow("18010015", DisplayName = "NEW_CONNECTION_ID with a 21-byte connection ID")]
     [DataRow("180100", DisplayName = "NEW_CONNECTION_ID ending before its length")]
     [DataRow("1aa1a2a3", DisplayName = "PATH_CHALLENGE shorter than eight bytes")]
-    public void Decode_MalformedFrame_IsAFrameEncodingError(string hex) =>
-        Assert.AreEqual(QuicTransportErrorCode.FrameEncodingError, ErrorOf(() => QuicFrameCodec.Decode(Hex(hex), QuicPacketType.OneRtt)));
+    public void Decode_MalformedFrame_IsAFrameEncodingError(string hex)
+    {
+        Diagnostics.Arrange("payload hex (OneRtt)", hex);
+        Diagnostics.Bytes("payload", Hex(hex));
+
+        var error = ErrorOf(() => QuicFrameCodec.Decode(Hex(hex), QuicPacketType.OneRtt));
+
+        Diagnostics.Act("transport error code", error);
+        Diagnostics.Assert("transport error code", QuicTransportErrorCode.FrameEncodingError, error);
+        Assert.AreEqual(QuicTransportErrorCode.FrameEncodingError, error);
+    }
 
     [TestMethod]
-    public void Decode_FrameTypeNotInItsShortestEncoding_IsAProtocolViolation() =>
-        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, ErrorOf(() => QuicFrameCodec.Decode(Hex("4001"), QuicPacketType.OneRtt)));
+    public void Decode_FrameTypeNotInItsShortestEncoding_IsAProtocolViolation()
+    {
+        Diagnostics.Arrange("payload hex (OneRtt)", "4001");
+
+        var error = ErrorOf(() => QuicFrameCodec.Decode(Hex("4001"), QuicPacketType.OneRtt));
+
+        Diagnostics.Act("transport error code", error);
+        Diagnostics.Assert("transport error code", QuicTransportErrorCode.ProtocolViolation, error);
+        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, error);
+    }
 
     [TestMethod]
     [DataRow("0a0401dd", QuicPacketType.Initial, DisplayName = "STREAM in Initial")]
@@ -147,17 +222,44 @@ public sealed class QuicFrameCodecTests
     [DataRow("01", QuicPacketType.Retry, DisplayName = "PING in Retry")]
     [DataRow("01", QuicPacketType.VersionNegotiation, DisplayName = "PING in Version Negotiation")]
     [DataRow("01", (QuicPacketType)99, DisplayName = "PING in an undefined packet type")]
-    public void Decode_FrameThePacketTypeMayNotCarry_IsAProtocolViolation(string hex, QuicPacketType packetType) =>
-        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, ErrorOf(() => QuicFrameCodec.Decode(Hex(hex), packetType)));
+    public void Decode_FrameThePacketTypeMayNotCarry_IsAProtocolViolation(string hex, QuicPacketType packetType)
+    {
+        Diagnostics.Arrange("payload hex", hex);
+        Diagnostics.Arrange("packet type", packetType);
+        Diagnostics.Bytes("payload", Hex(hex));
+
+        var error = ErrorOf(() => QuicFrameCodec.Decode(Hex(hex), packetType));
+
+        Diagnostics.Act("transport error code", error);
+        Diagnostics.Assert("transport error code", QuicTransportErrorCode.ProtocolViolation, error);
+        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, error);
+    }
 
     [TestMethod]
     [DataRow("1d0000", QuicPacketType.ZeroRtt)]
     [DataRow("1c000000", QuicPacketType.Handshake)]
     [DataRow("0a0401dd", QuicPacketType.ZeroRtt)]
-    public void Decode_FrameThePacketTypeMayCarry_IsRead(string hex, QuicPacketType packetType) =>
-        Assert.HasCount(1, QuicFrameCodec.Decode(Hex(hex), packetType));
+    public void Decode_FrameThePacketTypeMayCarry_IsRead(string hex, QuicPacketType packetType)
+    {
+        Diagnostics.Arrange("payload hex", hex);
+        Diagnostics.Arrange("packet type", packetType);
+        Diagnostics.Bytes("payload", Hex(hex));
+
+        var frames = QuicFrameCodec.Decode(Hex(hex), packetType);
+
+        Diagnostics.Act("decoded frame count", frames.Count);
+        Diagnostics.Assert("decoded frame count", 1, frames.Count);
+        Assert.HasCount(1, frames);
+    }
 
     [TestMethod]
-    public void Encode_NullFrames_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicFrameCodec.Encode(null!));
+    public void Encode_NullFrames_Throws()
+    {
+        Diagnostics.Arrange("frames", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => QuicFrameCodec.Encode(null!));
+
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 }

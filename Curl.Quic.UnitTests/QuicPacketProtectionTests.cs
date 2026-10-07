@@ -1,3 +1,4 @@
+using Curl.Testing;
 using Curl.Tls;
 using static Curl.Quic.QuicTest;
 
@@ -103,14 +104,32 @@ public sealed class QuicPacketProtectionTests
 
     private static readonly byte[] ServerConnectionId = Hex("f067a5502a4262b5");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void DeriveSecrets_Rfc9001AppendixA1_ReproducesTheInitialSecrets()
     {
         var connectionId = Hex(ClientDestinationConnectionId);
+        Diagnostics.Arrange("client destination connection ID", ClientDestinationConnectionId);
 
+        var salt = Convert.ToHexStringLower(QuicInitialSecrets.InitialSalt);
+        var initialSecret = HexOf(QuicInitialSecrets.DeriveInitialSecret(connectionId));
+        var clientSecret = HexOf(QuicInitialSecrets.DeriveClientInitialSecret(connectionId));
+        var serverSecret = HexOf(QuicInitialSecrets.DeriveServerInitialSecret(connectionId));
+
+        Diagnostics.Act("initial salt", salt);
+        Diagnostics.Act("initial secret", initialSecret);
+        Diagnostics.Act("client initial secret", clientSecret);
+        Diagnostics.Act("server initial secret", serverSecret);
+        Diagnostics.Diff("initial salt", "38762cf7f55934b34d179ae6a4c80cadccbb7f0a", salt);
         Assert.AreEqual("38762cf7f55934b34d179ae6a4c80cadccbb7f0a", Convert.ToHexStringLower(QuicInitialSecrets.InitialSalt));
+        Diagnostics.Diff("initial secret", "7db5df06e7a69e432496adedb00851923595221596ae2ae9fb8115c1e9ed0a44", initialSecret);
         Assert.AreEqual("7db5df06e7a69e432496adedb00851923595221596ae2ae9fb8115c1e9ed0a44", HexOf(QuicInitialSecrets.DeriveInitialSecret(connectionId)));
+        Diagnostics.Diff("client initial secret", "c00cf151ca5be075ed0ebfb5c80323c42d6b7db67881289af4008f1f6c357aea", clientSecret);
         Assert.AreEqual("c00cf151ca5be075ed0ebfb5c80323c42d6b7db67881289af4008f1f6c357aea", HexOf(QuicInitialSecrets.DeriveClientInitialSecret(connectionId)));
+        Diagnostics.Diff("server initial secret", "3c199828fd139efd216c155ad844cc81fb82fa8d7446fa7d78be803acdda951b", serverSecret);
         Assert.AreEqual("3c199828fd139efd216c155ad844cc81fb82fa8d7446fa7d78be803acdda951b", HexOf(QuicInitialSecrets.DeriveServerInitialSecret(connectionId)));
     }
 
@@ -121,11 +140,18 @@ public sealed class QuicPacketProtectionTests
     {
         var connectionId = Hex(ClientDestinationConnectionId);
         var secret = client ? QuicInitialSecrets.DeriveClientInitialSecret(connectionId) : QuicInitialSecrets.DeriveServerInitialSecret(connectionId);
+        Diagnostics.Arrange("side", client ? "client" : "server");
+        Diagnostics.Arrange("destination connection ID", ClientDestinationConnectionId);
+        Diagnostics.Bytes("initial secret", secret);
 
         var keys = QuicPacketKeys.Derive(QuicInitialSecrets.CipherSuite, secret);
 
+        Diagnostics.Act("derived key", HexOf(keys.Key));
+        Diagnostics.Diff("key", key, HexOf(keys.Key));
         Assert.AreEqual(key, HexOf(keys.Key));
+        Diagnostics.Diff("iv", iv, HexOf(keys.Iv));
         Assert.AreEqual(iv, HexOf(keys.Iv));
+        Diagnostics.Diff("header protection key", headerProtectionKey, HexOf(keys.HeaderProtectionKey));
         Assert.AreEqual(headerProtectionKey, HexOf(keys.HeaderProtectionKey));
     }
 
@@ -133,22 +159,38 @@ public sealed class QuicPacketProtectionTests
     public void Derive_Rfc9001AppendixA5Secret_ReproducesKeyIvHeaderProtectionKeyAndNextSecret()
     {
         var secret = Hex(ChaChaSecret);
+        Diagnostics.Arrange("cipher suite", "TLS_CHACHA20_POLY1305_SHA256");
+        Diagnostics.Arrange("1-RTT secret", ChaChaSecret);
 
         var keys = QuicPacketKeys.Derive(Tls13CipherSuite.ChaCha20Poly1305Sha256, secret);
+        var nextSecret = HexOf(QuicPacketKeys.DeriveNextSecret(Tls13CipherSuite.ChaCha20Poly1305Sha256, secret));
 
+        Diagnostics.Act("derived key", HexOf(keys.Key));
+        Diagnostics.Diff("key", "c6d98ff3441c3fe1b2182094f69caa2ed4b716b65488960a7a984979fb23e1c8", HexOf(keys.Key));
         Assert.AreEqual("c6d98ff3441c3fe1b2182094f69caa2ed4b716b65488960a7a984979fb23e1c8", HexOf(keys.Key));
+        Diagnostics.Diff("iv", "e0459b3474bdd0e44a41c144", HexOf(keys.Iv));
         Assert.AreEqual("e0459b3474bdd0e44a41c144", HexOf(keys.Iv));
+        Diagnostics.Diff("header protection key", "25a282b9e82f06f21f488917a4fc8f1b73573685608597d0efcb076b0ab7a7a4", HexOf(keys.HeaderProtectionKey));
         Assert.AreEqual("25a282b9e82f06f21f488917a4fc8f1b73573685608597d0efcb076b0ab7a7a4", HexOf(keys.HeaderProtectionKey));
+        Diagnostics.Diff("next secret (key update)", "1223504755036d556342ee9361d253421a826c9ecdf3c7148684b36b714881f9", nextSecret);
         Assert.AreEqual("1223504755036d556342ee9361d253421a826c9ecdf3c7148684b36b714881f9", HexOf(QuicPacketKeys.DeriveNextSecret(Tls13CipherSuite.ChaCha20Poly1305Sha256, secret)));
     }
 
     [TestMethod]
     public void Derive_NullArguments_Throw()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.Derive(null!, []));
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.Derive(QuicInitialSecrets.CipherSuite, null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.DeriveNextSecret(null!, []));
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.DeriveNextSecret(QuicInitialSecrets.CipherSuite, null!));
+        Diagnostics.Arrange("null arguments", "cipher suite null, then secret null, for Derive and DeriveNextSecret");
+
+        var exceptions = new[]
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.Derive(null!, [])),
+            Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.Derive(QuicInitialSecrets.CipherSuite, null!)),
+            Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.DeriveNextSecret(null!, [])),
+            Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketKeys.DeriveNextSecret(QuicInitialSecrets.CipherSuite, null!)),
+        };
+
+        Diagnostics.Act("parameter names", string.Join(", ", exceptions.Select(exception => exception.ParamName)));
+        Diagnostics.Assert("exceptions thrown", 4, exceptions.Length);
     }
 
     [TestMethod]
@@ -157,60 +199,110 @@ public sealed class QuicPacketProtectionTests
     [DataRow("25a282b9e82f06f21f488917a4fc8f1b73573685608597d0efcb076b0ab7a7a4", "5e5cd55c41f69080575d7999c25a5bfb", "aefefe7d03", 0x1303)]
     public void ComputeMask_Rfc9001AppendixASamples_ReproducesTheMask(string headerProtectionKey, string sample, string mask, int cipherSuite)
     {
+        Diagnostics.Arrange("header protection key", headerProtectionKey);
+        Diagnostics.Arrange("sample", sample);
+        Diagnostics.Arrange("cipher suite", $"0x{cipherSuite:x4}");
         using var headerProtection = QuicHeaderProtection.Create(Tls13CipherSuite.Find((ushort)cipherSuite)!, Hex(headerProtectionKey));
 
+        var actualMask = HexOf(headerProtection.ComputeMask(Hex(sample)));
+
+        Diagnostics.Act("header protection mask", actualMask);
+        Diagnostics.Diff("header protection mask", mask, actualMask);
         Assert.AreEqual(mask, HexOf(headerProtection.ComputeMask(Hex(sample))));
     }
 
     [TestMethod]
     public void ComputeMask_SampleNotSixteenBytes_Throws()
     {
+        Diagnostics.Arrange("sample length", 15);
         using var headerProtection = QuicHeaderProtection.Create(QuicInitialSecrets.CipherSuite, new byte[16]);
 
-        Assert.ThrowsExactly<ArgumentException>(() => headerProtection.ComputeMask(new byte[15]));
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => headerProtection.ComputeMask(new byte[15]));
+
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
-    public void Create_NullKey_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicHeaderProtection.Create(QuicInitialSecrets.CipherSuite, null!));
+    public void Create_NullKey_Throws()
+    {
+        Diagnostics.Arrange("header protection key", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => QuicHeaderProtection.Create(QuicInitialSecrets.CipherSuite, null!));
+
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 
     [TestMethod]
     public void Protect_Rfc9001AppendixA2ClientInitial_ReproducesTheProtectedPacket()
     {
+        Diagnostics.Arrange("destination connection ID", ClientDestinationConnectionId);
+        Diagnostics.Arrange("packet type", QuicPacketType.Initial);
+        Diagnostics.Arrange("packet number", 2);
         using var protection = QuicPacketProtection.CreateClientInitial(Hex(ClientDestinationConnectionId));
 
         var protectedPacket = protection.Protect(ClientInitial(), 2);
 
+        Diagnostics.Bytes("protected client Initial (RFC 9001 A.2)", protectedPacket);
+        Diagnostics.Act("protected packet length", protectedPacket.Length);
+        Diagnostics.Diff("protected packet", Hex(ProtectedClientInitial), protectedPacket);
         Assert.AreEqual(HexOf(Hex(ProtectedClientInitial)), HexOf(protectedPacket));
     }
 
     [TestMethod]
     public void Unprotect_Rfc9001AppendixA2ClientInitial_ReturnsThePlaintextPacket()
     {
+        Diagnostics.Arrange("destination connection ID", ClientDestinationConnectionId);
+        Diagnostics.Bytes("protected client Initial (RFC 9001 A.2)", Hex(ProtectedClientInitial));
         using var protection = QuicPacketProtection.CreateClientInitial(Hex(ClientDestinationConnectionId));
 
         var result = protection.Unprotect(Hex(ProtectedClientInitial), 0, null);
 
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet number", result.PacketNumber);
+        Diagnostics.Act("packet length", result.Length);
+        Diagnostics.Act("key phase changed", result.KeyPhaseChanged);
+        Diagnostics.Assert("status", QuicUnprotectStatus.Unprotected, result.Status);
         Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Diagnostics.Assert("packet number", 2UL, result.PacketNumber);
         Assert.AreEqual(2UL, result.PacketNumber);
+        Diagnostics.Assert("packet length", 1200, result.Length);
         Assert.AreEqual(1200, result.Length);
+        Diagnostics.Assert("key phase changed", false, result.KeyPhaseChanged);
         Assert.IsFalse(result.KeyPhaseChanged);
         var packet = (QuicLongHeaderPacket)result.Packet!;
         var expected = ClientInitial();
+        Diagnostics.Act("packet type", packet.Type);
+        Diagnostics.Act("packet number length", packet.PacketNumberLength);
+        Diagnostics.Act("truncated packet number", packet.TruncatedPacketNumber);
+        Diagnostics.Act("destination connection ID", HexOf(packet.DestinationConnectionId));
+        Diagnostics.Assert("packet type", QuicPacketType.Initial, packet.Type);
         Assert.AreEqual(QuicPacketType.Initial, packet.Type);
+        Diagnostics.Assert("packet number length", 4, packet.PacketNumberLength);
         Assert.AreEqual(4, packet.PacketNumberLength);
+        Diagnostics.Assert("truncated packet number", 2u, packet.TruncatedPacketNumber);
         Assert.AreEqual(2u, packet.TruncatedPacketNumber);
+        Diagnostics.Assert("destination connection ID", ClientDestinationConnectionId, HexOf(packet.DestinationConnectionId));
         Assert.AreEqual(ClientDestinationConnectionId, HexOf(packet.DestinationConnectionId));
+        Diagnostics.Diff("payload", expected.Payload.ToArray(), packet.Payload.ToArray());
         Assert.AreEqual(HexOf(expected.Payload), HexOf(packet.Payload));
     }
 
     [TestMethod]
     public void Protect_Rfc9001AppendixA3ServerInitial_ReproducesTheProtectedPacket()
     {
+        Diagnostics.Arrange("destination connection ID", ClientDestinationConnectionId);
+        Diagnostics.Arrange("packet type", QuicPacketType.Initial);
+        Diagnostics.Arrange("source connection ID", HexOf(ServerConnectionId));
+        Diagnostics.Arrange("packet number", 1);
         using var protection = QuicPacketProtection.CreateServerInitial(Hex(ClientDestinationConnectionId));
 
         var protectedPacket = protection.Protect(ServerInitial(), 1);
 
+        Diagnostics.Bytes("protected server Initial (RFC 9001 A.3)", protectedPacket);
+        Diagnostics.Act("protected packet length", protectedPacket.Length);
+        Diagnostics.Diff("protected packet", Hex(ProtectedServerInitial), protectedPacket);
         Assert.AreEqual(HexOf(Hex(ProtectedServerInitial)), HexOf(protectedPacket));
     }
 
@@ -220,14 +312,25 @@ public sealed class QuicPacketProtectionTests
         using var protection = QuicPacketProtection.CreateServerInitial(Hex(ClientDestinationConnectionId));
         var protectedPacket = Hex(ProtectedServerInitial);
         var datagram = protectedPacket.Concat(new byte[] { 0xe0, 0x00 }).ToArray();
+        Diagnostics.Arrange("destination connection ID", ClientDestinationConnectionId);
+        Diagnostics.Arrange("largest received packet number", 0);
+        Diagnostics.Bytes("coalesced datagram (server Initial plus two trailing bytes)", datagram);
 
         var result = protection.Unprotect(datagram, 0, 0);
 
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet number", result.PacketNumber);
+        Diagnostics.Act("packet length", result.Length);
+        Diagnostics.Assert("status", QuicUnprotectStatus.Unprotected, result.Status);
         Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Diagnostics.Assert("packet number", 1UL, result.PacketNumber);
         Assert.AreEqual(1UL, result.PacketNumber);
+        Diagnostics.Assert("packet length", protectedPacket.Length, result.Length);
         Assert.AreEqual(protectedPacket.Length, result.Length);
         var packet = (QuicLongHeaderPacket)result.Packet!;
+        Diagnostics.Assert("source connection ID", HexOf(ServerConnectionId), HexOf(packet.SourceConnectionId));
         Assert.AreEqual(HexOf(ServerConnectionId), HexOf(packet.SourceConnectionId));
+        Diagnostics.Diff("payload frames", Hex(ServerInitialFrames), packet.Payload.ToArray());
         Assert.AreEqual(HexOf(Hex(ServerInitialFrames)), HexOf(packet.Payload));
     }
 
@@ -237,9 +340,15 @@ public sealed class QuicPacketProtectionTests
         using var protection = QuicPacketProtection.CreateClientInitial(Hex(ClientDestinationConnectionId));
         var tampered = Hex(ProtectedClientInitial);
         tampered[100] ^= 0x01;
+        Diagnostics.Arrange("tampered byte index", 100);
+        Diagnostics.Bytes("tampered client Initial", tampered);
 
         var result = protection.Unprotect(tampered, 0, null);
 
+        var expectedResult = new QuicUnprotectResult(QuicUnprotectStatus.DroppedAuthenticationFailed, null, 0, 1200, false);
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet length", result.Length);
+        Diagnostics.Assert("result", expectedResult, result);
         Assert.AreEqual(new QuicUnprotectResult(QuicUnprotectStatus.DroppedAuthenticationFailed, null, 0, 1200, false), result);
     }
 
@@ -248,8 +357,14 @@ public sealed class QuicPacketProtectionTests
     {
         using var protection = QuicPacketProtection.CreateClientInitial(Hex(ClientDestinationConnectionId));
 
+        Diagnostics.Arrange("keys", "client Initial keys");
+        Diagnostics.Bytes("server Initial (protected with the server keys)", Hex(ProtectedServerInitial));
+
         var result = protection.Unprotect(Hex(ProtectedServerInitial), 0, null);
 
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet is null", result.Packet is null);
+        Diagnostics.Assert("status", QuicUnprotectStatus.DroppedAuthenticationFailed, result.Status);
         Assert.AreEqual(QuicUnprotectStatus.DroppedAuthenticationFailed, result.Status);
         Assert.IsNull(result.Packet);
     }
@@ -259,8 +374,14 @@ public sealed class QuicPacketProtectionTests
     {
         using var protection = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
 
+        Diagnostics.Arrange("packet length", 20);
+        Diagnostics.Bytes("truncated ChaCha20 packet", Hex(ProtectedChaChaPacket)[..20]);
+
         var result = protection.Unprotect(Hex(ProtectedChaChaPacket)[..20], 0, null);
 
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet length", result.Length);
+        Diagnostics.Assert("result", new QuicUnprotectResult(QuicUnprotectStatus.DroppedTooShortForSample, null, 0, 20, false), result);
         Assert.AreEqual(new QuicUnprotectResult(QuicUnprotectStatus.DroppedTooShortForSample, null, 0, 20, false), result);
     }
 
@@ -269,8 +390,15 @@ public sealed class QuicPacketProtectionTests
     {
         using var protection = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
 
+        Diagnostics.Arrange("1-RTT secret", ChaChaSecret);
+        Diagnostics.Arrange("packet number", ChaChaPacketNumber);
+        Diagnostics.Arrange("packet type", QuicPacketType.OneRtt);
+
         var protectedPacket = protection.Protect(ChaChaShortHeaderPacket(), ChaChaPacketNumber);
 
+        Diagnostics.Bytes("protected short header packet (RFC 9001 A.5)", protectedPacket);
+        Diagnostics.Act("protected packet", HexOf(protectedPacket));
+        Diagnostics.Diff("protected packet", ProtectedChaChaPacket, HexOf(protectedPacket));
         Assert.AreEqual(ProtectedChaChaPacket, HexOf(protectedPacket));
     }
 
@@ -279,15 +407,32 @@ public sealed class QuicPacketProtectionTests
     {
         using var protection = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
 
+        Diagnostics.Arrange("largest received packet number", ChaChaPacketNumber - 1);
+        Diagnostics.Bytes("protected short header packet (RFC 9001 A.5)", Hex(ProtectedChaChaPacket));
+
         var result = protection.Unprotect(Hex(ProtectedChaChaPacket), 0, ChaChaPacketNumber - 1);
 
-        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
-        Assert.AreEqual(ChaChaPacketNumber, result.PacketNumber);
-        Assert.AreEqual(21, result.Length);
         var packet = (QuicShortHeaderPacket)result.Packet!;
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet number", result.PacketNumber);
+        Diagnostics.Act("packet length", result.Length);
+        Diagnostics.Act("packet number length", packet.PacketNumberLength);
+        Diagnostics.Act("truncated packet number", packet.TruncatedPacketNumber);
+        Diagnostics.Act("key phase", packet.KeyPhase);
+        Diagnostics.Act("payload", HexOf(packet.Payload));
+        Diagnostics.Assert("status", QuicUnprotectStatus.Unprotected, result.Status);
+        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Diagnostics.Assert("packet number", ChaChaPacketNumber, result.PacketNumber);
+        Assert.AreEqual(ChaChaPacketNumber, result.PacketNumber);
+        Diagnostics.Assert("packet length", 21, result.Length);
+        Assert.AreEqual(21, result.Length);
+        Diagnostics.Assert("packet number length", 3, packet.PacketNumberLength);
         Assert.AreEqual(3, packet.PacketNumberLength);
+        Diagnostics.Assert("truncated packet number", 0xbff4u, packet.TruncatedPacketNumber);
         Assert.AreEqual(0xbff4u, packet.TruncatedPacketNumber);
+        Diagnostics.Assert("key phase", false, packet.KeyPhase);
         Assert.IsFalse(packet.KeyPhase);
+        Diagnostics.Assert("payload", "01", HexOf(packet.Payload));
         Assert.AreEqual("01", HexOf(packet.Payload));
     }
 
@@ -299,13 +444,25 @@ public sealed class QuicPacketProtectionTests
         using var receiver = QuicPacketProtection.Create(Tls13CipherSuite.Aes256GcmSha384, secret);
         var packet = new QuicShortHeaderPacket(ServerConnectionId, 2, 0x1234, Hex("0100000000"), SpinBit: true);
 
+        Diagnostics.Arrange("cipher suite", "AES-256-GCM");
+        Diagnostics.Arrange("packet number", 0x1234);
+        Diagnostics.Arrange("destination connection ID", HexOf(ServerConnectionId));
+
         var result = receiver.Unprotect(sender.Protect(packet, 0x1234), ServerConnectionId.Length, 0x1200);
 
-        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
-        Assert.AreEqual(0x1234UL, result.PacketNumber);
         var received = (QuicShortHeaderPacket)result.Packet!;
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet number", result.PacketNumber);
+        Diagnostics.Act("spin bit", received.SpinBit);
+        Diagnostics.Assert("status", QuicUnprotectStatus.Unprotected, result.Status);
+        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Diagnostics.Assert("packet number", 0x1234UL, result.PacketNumber);
+        Assert.AreEqual(0x1234UL, result.PacketNumber);
+        Diagnostics.Assert("spin bit", true, received.SpinBit);
         Assert.IsTrue(received.SpinBit);
+        Diagnostics.Assert("destination connection ID", HexOf(ServerConnectionId), HexOf(received.DestinationConnectionId));
         Assert.AreEqual(HexOf(ServerConnectionId), HexOf(received.DestinationConnectionId));
+        Diagnostics.Assert("payload", "0100000000", HexOf(received.Payload));
         Assert.AreEqual("0100000000", HexOf(received.Payload));
     }
 
@@ -318,14 +475,28 @@ public sealed class QuicPacketProtectionTests
         var packet = ClientInitial();
 
         var protectedPacket = sender.Protect(packet, 2);
+        Diagnostics.Arrange("cipher suite", "AES-128-CCM");
+        Diagnostics.Arrange("packet number", 2);
+        Diagnostics.Bytes("protected packet", protectedPacket);
+
         var result = receiver.Unprotect(protectedPacket, 0, null);
 
-        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
-        Assert.AreEqual(2UL, result.PacketNumber);
-        Assert.AreEqual(protectedPacket.Length, result.Length);
         var received = (QuicLongHeaderPacket)result.Packet!;
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet number", result.PacketNumber);
+        Diagnostics.Act("packet length", result.Length);
+        Diagnostics.Act("packet type", received.Type);
+        Diagnostics.Assert("status", QuicUnprotectStatus.Unprotected, result.Status);
+        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Diagnostics.Assert("packet number", 2UL, result.PacketNumber);
+        Assert.AreEqual(2UL, result.PacketNumber);
+        Diagnostics.Assert("packet length", protectedPacket.Length, result.Length);
+        Assert.AreEqual(protectedPacket.Length, result.Length);
+        Diagnostics.Assert("packet type", QuicPacketType.Initial, received.Type);
         Assert.AreEqual(QuicPacketType.Initial, received.Type);
+        Diagnostics.Assert("destination connection ID", ClientDestinationConnectionId, HexOf(received.DestinationConnectionId));
         Assert.AreEqual(HexOf(Hex(ClientDestinationConnectionId)), HexOf(received.DestinationConnectionId));
+        Diagnostics.Diff("payload", packet.Payload.ToArray(), received.Payload.ToArray());
         Assert.AreEqual(HexOf(packet.Payload), HexOf(received.Payload));
     }
 
@@ -337,13 +508,25 @@ public sealed class QuicPacketProtectionTests
         using var receiver = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
         var packet = new QuicShortHeaderPacket(ServerConnectionId, 2, 0x1234, Hex("0100000000"), SpinBit: true);
 
+        Diagnostics.Arrange("cipher suite", "AES-128-CCM");
+        Diagnostics.Arrange("packet number", 0x1234);
+        Diagnostics.Arrange("destination connection ID", HexOf(ServerConnectionId));
+
         var result = receiver.Unprotect(sender.Protect(packet, 0x1234), ServerConnectionId.Length, 0x1200);
 
-        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
-        Assert.AreEqual(0x1234UL, result.PacketNumber);
         var received = (QuicShortHeaderPacket)result.Packet!;
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("packet number", result.PacketNumber);
+        Diagnostics.Act("spin bit", received.SpinBit);
+        Diagnostics.Assert("status", QuicUnprotectStatus.Unprotected, result.Status);
+        Assert.AreEqual(QuicUnprotectStatus.Unprotected, result.Status);
+        Diagnostics.Assert("packet number", 0x1234UL, result.PacketNumber);
+        Assert.AreEqual(0x1234UL, result.PacketNumber);
+        Diagnostics.Assert("spin bit", true, received.SpinBit);
         Assert.IsTrue(received.SpinBit);
+        Diagnostics.Assert("destination connection ID", HexOf(ServerConnectionId), HexOf(received.DestinationConnectionId));
         Assert.AreEqual(HexOf(ServerConnectionId), HexOf(received.DestinationConnectionId));
+        Diagnostics.Assert("payload", "0100000000", HexOf(received.Payload));
         Assert.AreEqual("0100000000", HexOf(received.Payload));
     }
 
@@ -355,9 +538,13 @@ public sealed class QuicPacketProtectionTests
         using var receiver = QuicPacketProtection.Create(Tls13CipherSuite.Aes128CcmSha256, secret);
         var tampered = sender.Protect(new QuicShortHeaderPacket(ServerConnectionId, 2, 0x1234, Hex("0100000000")), 0x1234);
         tampered[^1] ^= 0x01;
+        Diagnostics.Arrange("cipher suite", "AES-128-CCM");
+        Diagnostics.Bytes("tampered packet (last byte flipped)", tampered);
 
         var result = receiver.Unprotect(tampered, ServerConnectionId.Length, 0x1200);
 
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Assert("status", QuicUnprotectStatus.DroppedAuthenticationFailed, result.Status);
         Assert.AreEqual(new QuicUnprotectResult(QuicUnprotectStatus.DroppedAuthenticationFailed, null, 0, tampered.Length, false), result);
     }
 
@@ -368,7 +555,14 @@ public sealed class QuicPacketProtectionTests
         using var receiver = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
         var protectedPacket = sender.Protect(ChaChaShortHeaderPacket() with { ReservedBits = 1 }, ChaChaPacketNumber);
 
-        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, ErrorOf(() => receiver.Unprotect(protectedPacket, 0, ChaChaPacketNumber)));
+        Diagnostics.Arrange("reserved bits", 1);
+        Diagnostics.Bytes("protected short header packet with reserved bits set", protectedPacket);
+
+        var error = ErrorOf(() => receiver.Unprotect(protectedPacket, 0, ChaChaPacketNumber));
+
+        Diagnostics.Act("transport error code", error);
+        Diagnostics.Assert("transport error code", QuicTransportErrorCode.ProtocolViolation, error);
+        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, error);
     }
 
     [TestMethod]
@@ -377,7 +571,14 @@ public sealed class QuicPacketProtectionTests
         using var protection = QuicPacketProtection.CreateServerInitial(Hex(ClientDestinationConnectionId));
         var protectedPacket = protection.Protect(ServerInitial() with { ReservedBits = 2 }, 1);
 
-        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, ErrorOf(() => protection.Unprotect(protectedPacket, 0, null)));
+        Diagnostics.Arrange("reserved bits", 2);
+        Diagnostics.Bytes("protected server Initial with reserved bits set", protectedPacket);
+
+        var error = ErrorOf(() => protection.Unprotect(protectedPacket, 0, null));
+
+        Diagnostics.Act("transport error code", error);
+        Diagnostics.Assert("transport error code", QuicTransportErrorCode.ProtocolViolation, error);
+        Assert.AreEqual(QuicTransportErrorCode.ProtocolViolation, error);
     }
 
     [TestMethod]
@@ -386,9 +587,17 @@ public sealed class QuicPacketProtectionTests
         using var protection = QuicPacketProtection.CreateClientInitial(Hex(ClientDestinationConnectionId));
         var retry = (QuicRetryPacket)QuicPacketCodec.Decode(Hex(RetryPacket), 0).Packet;
 
-        Assert.ThrowsExactly<ArgumentException>(() => protection.Protect(retry, 0));
-        Assert.ThrowsExactly<ArgumentException>(() => protection.Unprotect(Hex(RetryPacket), 0, null));
-        Assert.ThrowsExactly<ArgumentNullException>(() => protection.Protect(null!, 0));
+        Diagnostics.Arrange("packet", "RFC 9001 A.4 Retry packet");
+        Diagnostics.Bytes("Retry packet", Hex(RetryPacket));
+
+        var protectException = Assert.ThrowsExactly<ArgumentException>(() => protection.Protect(retry, 0));
+        var unprotectException = Assert.ThrowsExactly<ArgumentException>(() => protection.Unprotect(Hex(RetryPacket), 0, null));
+        var nullException = Assert.ThrowsExactly<ArgumentNullException>(() => protection.Protect(null!, 0));
+
+        Diagnostics.Act("Protect(Retry)", protectException.GetType().Name);
+        Diagnostics.Act("Unprotect(Retry)", unprotectException.GetType().Name);
+        Diagnostics.Act("Protect(null)", nullException.GetType().Name);
+        Diagnostics.Assert("Protect(null) exception type", nameof(ArgumentNullException), nullException.GetType().Name);
     }
 
     [TestMethod]
@@ -396,7 +605,13 @@ public sealed class QuicPacketProtectionTests
     {
         using var protection = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
 
-        Assert.ThrowsExactly<ArgumentException>(() => protection.Protect(ChaChaShortHeaderPacket(), ChaChaPacketNumber + 1));
+        Diagnostics.Arrange("truncated packet number", 0xbff4);
+        Diagnostics.Arrange("packet number", ChaChaPacketNumber + 1);
+
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => protection.Protect(ChaChaShortHeaderPacket(), ChaChaPacketNumber + 1));
+
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -405,20 +620,32 @@ public sealed class QuicPacketProtectionTests
         using var protection = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
         var packet = new QuicShortHeaderPacket(ReadOnlyMemory<byte>.Empty, 1, 5, Hex("0100"));
 
-        Assert.ThrowsExactly<ArgumentException>(() => protection.Protect(packet, 5));
+        Diagnostics.Arrange("payload", "0100");
+        Diagnostics.Arrange("packet number", 5);
+
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => protection.Protect(packet, 5));
+
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.ParamName}");
+        Diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void Create_SuiteWithoutQuicProtection_Throws()
     {
+        Diagnostics.Arrange("cipher suites checked", "0x1301 to 0x1305");
+        var supported = new[] { 0x1301, 0x1302, 0x1303, 0x1304, 0x1305 }.Select(suite => QuicPacketProtection.CanProtect((ushort)suite)).ToArray();
+        Diagnostics.Act("CanProtect 0x1301..0x1305", string.Join(", ", supported));
+        Diagnostics.Assert("CanProtect 0x1301..0x1305", "True, True, True, True, False", string.Join(", ", supported));
         Assert.IsTrue(QuicPacketProtection.CanProtect(0x1301));
         Assert.IsTrue(QuicPacketProtection.CanProtect(0x1302));
         Assert.IsTrue(QuicPacketProtection.CanProtect(0x1303));
         Assert.IsTrue(QuicPacketProtection.CanProtect(0x1304));
         Assert.IsFalse(QuicPacketProtection.CanProtect(0x1305));
-        Assert.ThrowsExactly<ArgumentException>(() => QuicPacketProtection.Create(Tls13CipherSuite.Aes128Ccm8Sha256, new byte[32]));
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketProtection.Create(null!, new byte[32]));
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketProtection.Create(QuicInitialSecrets.CipherSuite, null!));
+        var unsupported = Assert.ThrowsExactly<ArgumentException>(() => QuicPacketProtection.Create(Tls13CipherSuite.Aes128Ccm8Sha256, new byte[32]));
+        var nullSuite = Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketProtection.Create(null!, new byte[32]));
+        var nullSecret = Assert.ThrowsExactly<ArgumentNullException>(() => QuicPacketProtection.Create(QuicInitialSecrets.CipherSuite, null!));
+        Diagnostics.Act("exceptions", $"{unsupported.GetType().Name}, {nullSuite.ParamName}, {nullSecret.ParamName}");
+        Diagnostics.Assert("exception types", "ArgumentException, ArgumentNullException, ArgumentNullException", $"{unsupported.GetType().Name}, {nullSuite.GetType().Name}, {nullSecret.GetType().Name}");
     }
 
     [TestMethod]
@@ -433,18 +660,40 @@ public sealed class QuicPacketProtectionTests
         sender.UpdateKeys();
         var fourth = sender.Protect(Ping(3), 3);
 
-        Assert.IsFalse(receiver.Unprotect(first, 0, null).KeyPhaseChanged);
-        Assert.IsFalse(receiver.Unprotect(third, 0, 0).KeyPhaseChanged);
+        Diagnostics.Arrange("packets", "numbers 0, 1, 2 in phase 0 and 3 in phase 1 (sender updated keys before packet 3)");
+        Diagnostics.Bytes("packet 3 (phase 1)", fourth);
+
+        var firstChanged = receiver.Unprotect(first, 0, null).KeyPhaseChanged;
+        var thirdChanged = receiver.Unprotect(third, 0, 0).KeyPhaseChanged;
+        Diagnostics.Assert("packet 0 key phase changed", false, firstChanged);
+        Assert.IsFalse(firstChanged);
+        Diagnostics.Assert("packet 2 key phase changed", false, thirdChanged);
+        Assert.IsFalse(thirdChanged);
         var updated = receiver.Unprotect(fourth, 0, 2);
         var reordered = receiver.Unprotect(second, 0, 3);
 
+        Diagnostics.Act("sender key phase", sender.KeyPhase);
+        Diagnostics.Act("packet 3 status", updated.Status);
+        Diagnostics.Act("packet 3 key phase changed", updated.KeyPhaseChanged);
+        Diagnostics.Act("receiver key phase", receiver.KeyPhase);
+        Diagnostics.Act("packet 1 status", reordered.Status);
+        Diagnostics.Act("packet 1 number", reordered.PacketNumber);
+        Diagnostics.Act("packet 1 key phase changed", reordered.KeyPhaseChanged);
+        Diagnostics.Assert("sender key phase", true, sender.KeyPhase);
         Assert.IsTrue(sender.KeyPhase);
+        Diagnostics.Assert("packet 3 status", QuicUnprotectStatus.Unprotected, updated.Status);
         Assert.AreEqual(QuicUnprotectStatus.Unprotected, updated.Status);
+        Diagnostics.Assert("packet 3 key phase changed", true, updated.KeyPhaseChanged);
         Assert.IsTrue(updated.KeyPhaseChanged);
+        Diagnostics.Assert("packet 3 key phase bit", true, ((QuicShortHeaderPacket)updated.Packet!).KeyPhase);
         Assert.IsTrue(((QuicShortHeaderPacket)updated.Packet!).KeyPhase);
+        Diagnostics.Assert("receiver key phase", true, receiver.KeyPhase);
         Assert.IsTrue(receiver.KeyPhase);
+        Diagnostics.Assert("packet 1 status", QuicUnprotectStatus.Unprotected, reordered.Status);
         Assert.AreEqual(QuicUnprotectStatus.Unprotected, reordered.Status);
+        Diagnostics.Assert("packet 1 number", 1UL, reordered.PacketNumber);
         Assert.AreEqual(1UL, reordered.PacketNumber);
+        Diagnostics.Assert("packet 1 key phase changed", false, reordered.KeyPhaseChanged);
         Assert.IsFalse(reordered.KeyPhaseChanged);
         Assert.IsTrue(receiver.KeyPhase);
     }
@@ -461,15 +710,29 @@ public sealed class QuicPacketProtectionTests
         sender.UpdateKeys();
         var generationTwo = sender.Protect(Ping(2), 2);
 
-        Assert.IsTrue(receiver.Unprotect(generationOne, 0, null).KeyPhaseChanged);
+        Diagnostics.Arrange("packets", "number 0 in generation 0, 1 in generation 1, 2 in generation 2");
+
+        var oneChanged = receiver.Unprotect(generationOne, 0, null).KeyPhaseChanged;
+        Diagnostics.Assert("generation one key phase changed", true, oneChanged);
+        Assert.IsTrue(oneChanged);
         receiver.DiscardPreviousKeys();
         var dropped = receiver.Unprotect(old, 0, 1);
         var updated = receiver.Unprotect(generationTwo, 0, 1);
 
+        Diagnostics.Act("old packet status", dropped.Status);
+        Diagnostics.Act("generation two status", updated.Status);
+        Diagnostics.Act("generation two key phase changed", updated.KeyPhaseChanged);
+        Diagnostics.Act("receiver key phase", receiver.KeyPhase);
+        Diagnostics.Act("sender key phase", sender.KeyPhase);
+        Diagnostics.Assert("old packet status", QuicUnprotectStatus.DroppedAuthenticationFailed, dropped.Status);
         Assert.AreEqual(QuicUnprotectStatus.DroppedAuthenticationFailed, dropped.Status);
+        Diagnostics.Assert("generation two status", QuicUnprotectStatus.Unprotected, updated.Status);
         Assert.AreEqual(QuicUnprotectStatus.Unprotected, updated.Status);
+        Diagnostics.Assert("generation two key phase changed", true, updated.KeyPhaseChanged);
         Assert.IsTrue(updated.KeyPhaseChanged);
+        Diagnostics.Assert("receiver key phase", false, receiver.KeyPhase);
         Assert.IsFalse(receiver.KeyPhase);
+        Diagnostics.Assert("sender key phase", false, sender.KeyPhase);
         Assert.IsFalse(sender.KeyPhase);
     }
 
@@ -484,14 +747,25 @@ public sealed class QuicPacketProtectionTests
         receiver.UpdateKeys();
         receiver.UpdateKeys();
 
+        Diagnostics.Arrange("receiver key updates", 3);
+        Diagnostics.Bytes("packet 7 in the original phase", old);
+
         var result = receiver.Unprotect(old, 0, null);
 
+        Diagnostics.Act("status after three updates", result.Status);
+        Diagnostics.Assert("status after three updates", QuicUnprotectStatus.DroppedAuthenticationFailed, result.Status);
         Assert.AreEqual(QuicUnprotectStatus.DroppedAuthenticationFailed, result.Status);
         using var once = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, secret);
         once.UpdateKeys();
         var opened = once.Unprotect(old, 0, null);
+        Diagnostics.Act("status after one update", opened.Status);
+        Diagnostics.Act("key phase changed", opened.KeyPhaseChanged);
+        Diagnostics.Act("key phase", once.KeyPhase);
+        Diagnostics.Assert("status after one update", QuicUnprotectStatus.Unprotected, opened.Status);
         Assert.AreEqual(QuicUnprotectStatus.Unprotected, opened.Status);
+        Diagnostics.Assert("key phase changed", false, opened.KeyPhaseChanged);
         Assert.IsFalse(opened.KeyPhaseChanged);
+        Diagnostics.Assert("key phase", true, once.KeyPhase);
         Assert.IsTrue(once.KeyPhase);
     }
 
@@ -504,9 +778,16 @@ public sealed class QuicPacketProtectionTests
         forged[^1] ^= 0x01;
         var receiver = QuicPacketProtection.Create(Tls13CipherSuite.ChaCha20Poly1305Sha256, Hex(ChaChaSecret));
 
+        Diagnostics.Arrange("packet number", 9);
+        Diagnostics.Bytes("forged next-phase packet (last byte flipped)", forged);
+
         var result = receiver.Unprotect(forged, 0, null);
 
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Act("receiver key phase", receiver.KeyPhase);
+        Diagnostics.Assert("status", QuicUnprotectStatus.DroppedAuthenticationFailed, result.Status);
         Assert.AreEqual(QuicUnprotectStatus.DroppedAuthenticationFailed, result.Status);
+        Diagnostics.Assert("receiver key phase", false, receiver.KeyPhase);
         Assert.IsFalse(receiver.KeyPhase);
         receiver.Dispose();
     }
@@ -521,8 +802,15 @@ public sealed class QuicPacketProtectionTests
         protection.DiscardPreviousKeys();
 
         var protectedPacket = protection.Protect(Ping(4) with { KeyPhase = true }, 4);
+        Diagnostics.Arrange("packet number", 4);
+        Diagnostics.Arrange("packet key phase flag", true);
+        Diagnostics.Bytes("protected packet", protectedPacket);
+
         var result = protection.Unprotect(protectedPacket, 0, null);
 
+        var keyPhase = ((QuicShortHeaderPacket)result.Packet!).KeyPhase;
+        Diagnostics.Act("status", result.Status);
+        Diagnostics.Assert("unprotected key phase bit", false, keyPhase);
         Assert.IsFalse(((QuicShortHeaderPacket)result.Packet!).KeyPhase);
     }
 
@@ -531,10 +819,19 @@ public sealed class QuicPacketProtectionTests
     {
         var retry = (QuicRetryPacket)QuicPacketCodec.Decode(Hex(RetryPacket), 0).Packet;
 
+        Diagnostics.Arrange("original destination connection ID", ClientDestinationConnectionId);
+        Diagnostics.Bytes("Retry packet (RFC 9001 A.4)", Hex(RetryPacket));
+
         var tag = QuicRetryIntegrity.ComputeTag(Hex(ClientDestinationConnectionId), retry);
 
+        var valid = QuicRetryIntegrity.HasValidTag(Hex(ClientDestinationConnectionId), retry);
+        var reencoded = HexOf(QuicPacketCodec.Encode(retry with { RetryIntegrityTag = tag }));
+        Diagnostics.Act("integrity tag", HexOf(tag));
+        Diagnostics.Diff("integrity tag", "04a265ba2eff4d829058fb3f0f2496ba", HexOf(tag));
         Assert.AreEqual("04a265ba2eff4d829058fb3f0f2496ba", HexOf(tag));
+        Diagnostics.Assert("has valid tag", true, valid);
         Assert.IsTrue(QuicRetryIntegrity.HasValidTag(Hex(ClientDestinationConnectionId), retry));
+        Diagnostics.Diff("re-encoded Retry packet", RetryPacket, reencoded);
         Assert.AreEqual(RetryPacket, HexOf(QuicPacketCodec.Encode(retry with { RetryIntegrityTag = tag })));
     }
 
@@ -543,7 +840,17 @@ public sealed class QuicPacketProtectionTests
     {
         var retry = (QuicRetryPacket)QuicPacketCodec.Decode(Hex(RetryPacket), 0).Packet;
 
+        Diagnostics.Arrange("tampered token", "746f6b656f");
+        Diagnostics.Arrange("other connection ID", "8394c8f03e515709");
+
+        var tamperedToken = QuicRetryIntegrity.HasValidTag(Hex(ClientDestinationConnectionId), retry with { RetryToken = Hex("746f6b656f") });
+        var otherConnectionId = QuicRetryIntegrity.HasValidTag(Hex("8394c8f03e515709"), retry);
+
+        Diagnostics.Act("tampered token valid", tamperedToken);
+        Diagnostics.Act("other connection ID valid", otherConnectionId);
+        Diagnostics.Assert("tampered token valid", false, tamperedToken);
         Assert.IsFalse(QuicRetryIntegrity.HasValidTag(Hex(ClientDestinationConnectionId), retry with { RetryToken = Hex("746f6b656f") }));
+        Diagnostics.Assert("other connection ID valid", false, otherConnectionId);
         Assert.IsFalse(QuicRetryIntegrity.HasValidTag(Hex("8394c8f03e515709"), retry));
     }
 
@@ -552,8 +859,14 @@ public sealed class QuicPacketProtectionTests
     {
         var retry = (QuicRetryPacket)QuicPacketCodec.Decode(Hex(RetryPacket), 0).Packet;
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => QuicRetryIntegrity.ComputeTag([], null!));
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => QuicRetryIntegrity.ComputeTag(new byte[21], retry));
+        Diagnostics.Arrange("invalid arguments", "null Retry packet; 21-byte original destination connection ID");
+
+        var nullRetry = Assert.ThrowsExactly<ArgumentNullException>(() => QuicRetryIntegrity.ComputeTag([], null!));
+        var longId = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => QuicRetryIntegrity.ComputeTag(new byte[21], retry));
+
+        Diagnostics.Act("null Retry packet", $"{nullRetry.GetType().Name}: {nullRetry.ParamName}");
+        Diagnostics.Act("21-byte connection ID", $"{longId.GetType().Name}: {longId.ParamName}");
+        Diagnostics.Assert("exception types", "ArgumentNullException, ArgumentOutOfRangeException", $"{nullRetry.GetType().Name}, {longId.GetType().Name}");
     }
 
     private static QuicLongHeaderPacket ClientInitial()
