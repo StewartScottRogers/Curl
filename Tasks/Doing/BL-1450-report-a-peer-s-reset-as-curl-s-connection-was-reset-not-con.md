@@ -35,3 +35,4 @@ On Windows, a server that resets the connection right after accepting it makes C
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
