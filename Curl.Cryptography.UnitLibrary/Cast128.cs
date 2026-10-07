@@ -16,7 +16,8 @@ namespace Curl.Cryptography;
 /// <remarks>
 /// Constant-time in the key and the data: the round function and the key schedule read
 /// every entry of each S-box in order and keep the one they need by mask, so no memory
-/// address depends on a key- or data-mixed byte (ADR-0398). It exists because curl's SSH
+/// address depends on a key- or data-mixed byte (ADR-0398); the scan compares a vector of
+/// positions at a time. It exists because curl's SSH
 /// backends offer it. The 32 subkeys are copied into the instance and zeroed by
 /// <see cref="Dispose" />.
 /// </remarks>
@@ -257,18 +258,25 @@ public sealed class Cast128 : IDisposable
     /// Entry <paramref name="index" /> of 256-entry S-box number <paramref name="box" /> in
     /// <paramref name="boxes" />, without a secret-dependent address (ADR-0398): every entry
     /// of the box is read, in order, once, and kept only where its position equals
-    /// <paramref name="index" />, chosen by a mask computed without a branch.
+    /// <paramref name="index" />, chosen by a mask computed without a branch. The scan runs
+    /// <see cref="Vector{T}.Count" /> entries at a time: a vector compare of their positions
+    /// against the index gives each lane's mask, and the one kept entry is the sum of the
+    /// lanes, every other lane being zero.
     /// </summary>
     internal static uint ReadBox(ReadOnlySpan<uint> boxes, int box, uint index)
     {
         ReadOnlySpan<uint> table = boxes.Slice(box * BoxLength, BoxLength);
-        uint result = 0;
-        for (int position = 0; position < BoxLength; position++)
+        Vector<uint> target = new(index);
+        Vector<uint> step = new((uint)Vector<uint>.Count);
+        Vector<uint> positions = Vector<uint>.Indices;
+        Vector<uint> kept = Vector<uint>.Zero;
+        for (int position = 0; position < BoxLength; position += Vector<uint>.Count)
         {
-            result |= ConstantTime.EqualMask((uint)position, index) & table[position];
+            kept |= Vector.Equals(positions, target) & new Vector<uint>(table[position..]);
+            positions += step;
         }
 
-        return result;
+        return Vector.Sum(kept);
     }
 
     private static void ScheduleKey(ReadOnlySpan<byte> key, Span<uint> destination)
