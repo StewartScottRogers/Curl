@@ -24,8 +24,11 @@ public sealed partial class HttpProtocolHandlerTests
     [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_NegotiateWithoutATicketVerboseOnWindows_WritesSspisLinesInCurlsOrder()
     {
+        Diagnostics.Arrange("scripted response, user", "401 Negotiate, empty user");
         List<string> events = await NegotiateWithoutATicketEventsAsync(NegotiateDenied, new NetworkCredential(string.Empty, string.Empty));
 
+        WriteEvents("events", events);
+        WriteExpectedLines("verbose lines", ExpectedNegotiateWithoutATicketEvents(SspiNoCredentials, "''"), events);
         CollectionAssert.AreEqual(ExpectedNegotiateWithoutATicketEvents(SspiNoCredentials, "''"), events);
     }
 
@@ -33,8 +36,11 @@ public sealed partial class HttpProtocolHandlerTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ExecuteAsync_NegotiateWithoutATicketVerboseOffWindows_WritesGssApisLinesInCurlsOrder()
     {
+        Diagnostics.Arrange("scripted response, user", "401 Negotiate, empty user");
         List<string> events = await NegotiateWithoutATicketEventsAsync(NegotiateDenied, new NetworkCredential(string.Empty, string.Empty));
 
+        WriteEvents("events", events);
+        WriteExpectedLines("verbose lines", ExpectedNegotiateWithoutATicketEvents(GssApiNoCredentials, "''"), events);
         CollectionAssert.AreEqual(ExpectedNegotiateWithoutATicketEvents(GssApiNoCredentials, "''"), events);
     }
 
@@ -42,8 +48,11 @@ public sealed partial class HttpProtocolHandlerTests
     [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_NegotiateWithoutUserVerbose_StillStepsAContextForThe401()
     {
+        Diagnostics.Arrange("scripted response, user", "401 Negotiate, no credential");
         List<string> events = await NegotiateWithoutATicketEventsAsync(NegotiateDenied, credential: null);
 
+        WriteEvents("events", events);
+        WriteExpectedLines("verbose lines", ExpectedNegotiateWithoutATicketEvents(SspiNoCredentials, "''"), events);
         CollectionAssert.AreEqual(ExpectedNegotiateWithoutATicketEvents(SspiNoCredentials, "''"), events);
     }
 
@@ -51,8 +60,11 @@ public sealed partial class HttpProtocolHandlerTests
     [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_NegotiateWithDomainUserVerbose_NamesTheUserAsGiven()
     {
+        Diagnostics.Arrange("scripted response, user", "401 Negotiate, D\\u");
         List<string> events = await NegotiateWithoutATicketEventsAsync(NegotiateDenied, new NetworkCredential("D\\u", "p"));
 
+        WriteEvents("events", events);
+        WriteExpectedLines("verbose lines", ExpectedNegotiateWithoutATicketEvents(SspiNoCredentials, "'D\\u'"), events);
         CollectionAssert.AreEqual(ExpectedNegotiateWithoutATicketEvents(SspiNoCredentials, "'D\\u'"), events);
     }
 
@@ -62,7 +74,10 @@ public sealed partial class HttpProtocolHandlerTests
     {
         const string Response = "HTTP/1.1 401 Unauthorized\r\nX-A: 1\r\nWWW-Authenticate: Basic realm=\"x\"\r\nwww-authenticate: negotiate\r\nContent-Length: 4\r\n\r\ndeny";
 
+        Diagnostics.Arrange("scripted response", OneLine(Response));
         List<string> events = await NegotiateWithoutATicketEventsAsync(Response, new NetworkCredential(string.Empty, string.Empty));
+        WriteEvents("events", events);
+        Diagnostics.Assert("negotiate failure lines", 2, events.Count(line => line == SspiNoCredentials));
 
         CollectionAssert.AreEqual(
             new[]
@@ -93,10 +108,16 @@ public sealed partial class HttpProtocolHandlerTests
             new SecurityContextStep(SecurityContextStatus.Completed, [7, 8, 9]));
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse(AuthUrl), Output = new MemoryStream(), Credentials = new NetworkCredential("u", "p"), Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Negotiate }, Events = events };
+        Diagnostics.Arrange("scripted responses", "401 Negotiate BAUG, 200 ok");
+        Diagnostics.Arrange("context steps, user", "ContinueNeeded 1 2 3, Completed 7 8 9, u");
 
-        await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(context);
+        TransferResult result = await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("server auth lines", 2, events.Info.Count(line => line == "Server auth using Negotiate with user 'u'"));
         Assert.AreEqual(2, events.Info.Count(line => line == "Server auth using Negotiate with user 'u'"));
+        Diagnostics.Assert("info lines containing failed", 0, events.Info.Count(line => line.Contains("failed", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.Contains("failed", StringComparison.Ordinal)));
     }
 
@@ -106,9 +127,13 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, OkHead + "ok");
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse(AuthUrl), Output = new MemoryStream(), Credentials = new NetworkCredential("u", "p"), Events = events };
+        Diagnostics.Arrange("scripted response, user", "200 ok, u");
 
-        await NegotiateHandler(QueueConnector.For(connection), new ScriptedTokenSource()).ExecuteAsync(context);
+        TransferResult result = await NegotiateHandler(QueueConnector.For(connection), new ScriptedTokenSource()).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("server auth line", "Server auth using Basic with user 'u'", events.Info.Single(line => line.StartsWith("Server auth", StringComparison.Ordinal)));
         Assert.AreEqual("Server auth using Basic with user 'u'", events.Info.Single(line => line.StartsWith("Server auth", StringComparison.Ordinal)));
     }
 

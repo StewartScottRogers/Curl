@@ -32,9 +32,14 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = new();
             RecordingTransferEvents events = new();
 
+            Diagnostics.Arrange("url, proxy kind, version", $"https://example.test/, {kind}, http3-only");
             TransferResult result = await Handler(connector).ExecuteAsync(
                 Http3Context("https://example.test/", new MemoryStream(), options: ThroughProxy(kind), events: events));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
+            Diagnostics.Assert("error message", Http3SocksRefusal, result.ErrorMessage);
+            Diagnostics.Assert("info events", $"{Http3SocksRefusal}|closing connection #-1", string.Join("|", events.Info));
             Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode, kind.ToString());
             Assert.AreEqual(Http3SocksRefusal, result.ErrorMessage, kind.ToString());
             CollectionAssert.AreEqual(new[] { Http3SocksRefusal, "closing connection #-1" }, events.Info, kind.ToString());
@@ -53,9 +58,15 @@ public sealed partial class HttpProtocolHandlerTests
             RecordingTransferEvents events = new();
             MemoryStream output = new();
 
+            Diagnostics.Arrange("url, proxy kind, version", $"https://example.test/, {kind}, http3");
+            Diagnostics.Arrange("scripted response", "HTTP/1.1 200 OK, Content-Length: 2, ok");
             TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
                 "https://example.test/", output, options: ThroughProxy(kind), events: events, version: HttpVersionPreference.Http3));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
+            Diagnostics.Assert("first info event", Http3SocksRefusal, events.Info[0]);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, kind.ToString());
             Assert.IsNull(result.ErrorMessage, kind.ToString());
             Assert.AreEqual("ok", Latin1(output.ToArray()), kind.ToString());
@@ -75,9 +86,14 @@ public sealed partial class HttpProtocolHandlerTests
         // first message curl writes into its error buffer, so the later failure's is not shown.
         QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.Proxy, "SOCKS5 nothing"));
 
+        Diagnostics.Arrange("url, proxy kind, version", "https://example.test/, Socks5, http3");
+        Diagnostics.Arrange("scripted connect", "failed, Proxy, SOCKS5 nothing");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
             "https://example.test/", new MemoryStream(), options: ThroughProxy(ProxyKind.Socks5), version: HttpVersionPreference.Http3));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Proxy, result.ExitCode);
+        Diagnostics.Assert("error message", Http3SocksRefusal, result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
         Assert.AreEqual(Http3SocksRefusal, result.ErrorMessage);
         Assert.IsEmpty(connector.MultiplexedTargets);
@@ -95,9 +111,15 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QuicConnector(new FakeMultiplexedConnection(stream));
             MemoryStream output = new();
 
+            Diagnostics.Arrange("url, proxy kind, version", $"https://example.test/, {kind}, http3-only");
+            Diagnostics.Arrange("scripted response", "h3 200 ok");
             TransferResult result = await Handler(connector).ExecuteAsync(
                 Http3Context("https://example.test/", output, options: ThroughProxy(kind)));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
+            Diagnostics.Assert("http version", new Version(3, 0), result.Report!.HttpVersion);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, kind.ToString());
             Assert.AreEqual("ok", Latin1(output.ToArray()), kind.ToString());
             Assert.AreEqual(new Version(3, 0), result.Report!.HttpVersion, kind.ToString());
@@ -118,9 +140,14 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new();
         connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT-UDP tunnel failed, response 403"));
 
+        Diagnostics.Arrange("url, proxy kind, version", "https://example.test/, Http, http3-only");
+        Diagnostics.Arrange("scripted quic connect", "failed, CouldntConnect, CONNECT-UDP tunnel failed, response 403");
         TransferResult result = await Handler(connector).ExecuteAsync(
             Http3Context("https://example.test/", new MemoryStream(), options: ThroughProxy(ProxyKind.Http)));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("error message", "CONNECT-UDP tunnel failed, response 403", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("CONNECT-UDP tunnel failed, response 403", result.ErrorMessage);
         Assert.HasCount(1, connector.MultiplexedTargets);
@@ -136,9 +163,14 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT tunnel failed, response 403"));
         connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT-UDP tunnel failed, response 403"));
 
+        Diagnostics.Arrange("url, proxy kind, version", "https://example.test/, Http, http3");
+        Diagnostics.Arrange("scripted connects", "tcp: CONNECT tunnel failed, response 403; quic: CONNECT-UDP tunnel failed, response 403");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
             "https://example.test/", new MemoryStream(), options: ThroughProxy(ProxyKind.Http), version: HttpVersionPreference.Http3));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("error message", "CONNECT tunnel failed, response 403", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("CONNECT tunnel failed, response 403", result.ErrorMessage);
         Assert.AreEqual(ProxyKind.Http, connector.MultiplexedTargets.Single().Proxy!.Kind);
@@ -154,9 +186,15 @@ public sealed partial class HttpProtocolHandlerTests
         connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "CONNECT-UDP tunnel failed, response 403"));
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url, proxy kind, version", "https://example.test/, Https, http3");
+        Diagnostics.Arrange("scripted responses", "quic: failed 403; tcp: HTTP/1.1 200 ok");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
             "https://example.test/", output, options: ThroughProxy(ProxyKind.Https), version: HttpVersionPreference.Http3));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
+        Diagnostics.Assert("http version", new Version(1, 1), result.Report!.HttpVersion);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("ok", Latin1(output.ToArray()));
         Assert.AreEqual(new Version(1, 1), result.Report!.HttpVersion);
@@ -172,9 +210,13 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new();
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url, proxy kind, version", "http://example.test/, Http, http3-only");
         TransferResult result = await Handler(connector).ExecuteAsync(
             Http3Context("http://example.test/", new MemoryStream(), options: ThroughProxy(ProxyKind.Http), events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
+        Diagnostics.Assert("error message", "HTTP/3 requested for non-HTTPS URL", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual("HTTP/3 requested for non-HTTPS URL", result.ErrorMessage);
         CollectionAssert.AreEqual(new[] { "HTTP/3 requested for non-HTTPS URL", "closing connection #-1" }, events.Info);
@@ -188,9 +230,14 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536));
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url, proxy kind, version", "http://example.test/, Socks5, http3");
+        Diagnostics.Arrange("scripted response", "HTTP/1.1 200 OK, Content-Length: 2, ok");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
             "http://example.test/", new MemoryStream(), options: ThroughProxy(ProxyKind.Socks5), events: events, version: HttpVersionPreference.Http3));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("info contains refusal", false, events.Info.Contains(Http3SocksRefusal));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.DoesNotContain(events.Info, Http3SocksRefusal);
     }

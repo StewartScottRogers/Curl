@@ -24,14 +24,23 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(connection);
             ScriptedTokenSource tokens = NoTicketTokens();
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "401 Negotiate, 401 Negotiate (no ticket)");
 
             TransferResult result = await NegotiateHandler(connector, tokens).ExecuteAsync(AnyAuthContext(output, NoTransferEvents.Instance));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("request written", OneLine(AnyAuthRequest + AnyAuthRequest), OneLine(connection.Written));
             Assert.AreEqual(AnyAuthRequest + AnyAuthRequest, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("output", "deny", Latin1(output.ToArray()));
             Assert.AreEqual("deny", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connections opened", 1, connector.Targets.Count);
             Assert.HasCount(1, connector.Targets, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("contexts made", 2, tokens.ContextsMade);
             Assert.AreEqual(2, tokens.ContextsMade, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("contexts disposed", 2, tokens.ContextsDisposed);
             Assert.AreEqual(2, tokens.ContextsDisposed, $"Chunk size {chunkSize}");
         }
     }
@@ -40,8 +49,11 @@ public sealed partial class HttpProtocolHandlerTests
     [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_AnyAuthNegotiateWithoutATicketVerboseOnWindows_WritesSspisLinesInCurlsOrder()
     {
+        Diagnostics.Arrange("scripted responses", "401 Negotiate, 401 Negotiate (no ticket), verbose on Windows");
         List<string> events = await AnyAuthWithoutATicketEventsAsync();
 
+        WriteEvents("events", events);
+        WriteExpectedLines("verbose lines", ExpectedAnyAuthWithoutATicketEvents(SspiNoCredentials), events);
         CollectionAssert.AreEqual(ExpectedAnyAuthWithoutATicketEvents(SspiNoCredentials), events);
     }
 
@@ -49,8 +61,11 @@ public sealed partial class HttpProtocolHandlerTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ExecuteAsync_AnyAuthNegotiateWithoutATicketVerboseOffWindows_WritesGssApisLinesInCurlsOrder()
     {
+        Diagnostics.Arrange("scripted responses", "401 Negotiate, 401 Negotiate (no ticket), verbose off Windows");
         List<string> events = await AnyAuthWithoutATicketEventsAsync();
 
+        WriteEvents("events", events);
+        WriteExpectedLines("verbose lines", ExpectedAnyAuthWithoutATicketEvents(GssApiNoCredentials), events);
         CollectionAssert.AreEqual(ExpectedAnyAuthWithoutATicketEvents(GssApiNoCredentials), events);
     }
 
@@ -60,13 +75,19 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, NegotiateDenied, NegotiateDenied, NegotiateDenied);
         EmptyAnswerAuthenticator authenticator = new();
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "401 Negotiate x3, authenticator answers empty");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
             .ExecuteAsync(AnyAuthContext(output, NoTransferEvents.Instance));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("request written", OneLine(AnyAuthRequest + AnyAuthRequest), OneLine(connection.Written));
         Assert.AreEqual(AnyAuthRequest + AnyAuthRequest, connection.Written);
+        Diagnostics.Assert("output", "deny", Latin1(output.ToArray()));
         Assert.AreEqual("deny", Latin1(output.ToArray()));
+        Diagnostics.Assert("continuations", 1, authenticator.Continuations);
         Assert.AreEqual(1, authenticator.Continuations);
     }
 

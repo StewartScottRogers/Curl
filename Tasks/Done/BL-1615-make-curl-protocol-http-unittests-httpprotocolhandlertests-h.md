@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1615 — Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.Http3 to HttpProtocolHandlerTests.NtlmVerbose tests write descriptive diagnostic output
 
@@ -23,15 +23,22 @@ Every test in these `Curl.Protocol.Http.UnitTests` files (12 files, 95 test meth
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
-- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
-- [ ] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
 
 ## Notes
+
+- Counts in the twelve files, before -> after: `Assert.` 315 -> 315, `[TestMethod` 95 -> 95, `[DataRow(` 35 -> 35. Only lines were added, except that three tests that discarded the handler's result now keep it as `TransferResult result` so `WriteResult` can print it.
+- The class filter ran 798 tests (785 passed, 13 skipped, which print no END line). The 92 test methods in these files that run on Windows all printed END lines with nonzero arrange, act and assert counts; the three off-Windows GSS-API tests are skipped here and carry the same Arrange, Act and Assert calls in code.
+- Static helpers (`NegotiateWithoutATicketEventsAsync`, `NtlmVerboseLinesAsync` and the like) cannot reach the instance `Diagnostics`, so the tests that call them write their lines from what the helper returns.
+- No test in these files printed a `SLOW:` line. Three tests in other tasks' files did under parallel load (`ExecuteAsync_FinalHeadOf5001Headers_*`, `ExecuteAsync_HeadersOfA100HeadAndTheFinalHead_*`, `ExecuteAsync_FinalHeadOf5000Headers_*`, about 3.7 s each); they are outside this task's range.
+- Project fast tests: 1846 passed, 18 skipped, 0 failed.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. All 95 test methods in the twelve HttpProtocolHandlerTests files from Http3 to NtlmVerbose write arrange, act and assert diagnostics; build clean, fast tests green
