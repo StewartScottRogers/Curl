@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -16,10 +17,17 @@ public sealed class CommandLineIpAddressFamilyOptionTests
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
     private const string CannotBeReversed = "the given option cannot be reversed with a --no- prefix";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NeitherOption_LeavesEitherFamily()
     {
-        Assert.AreEqual(IpAddressFamilyChoice.Either, Accept().IpAddressFamily);
+        IpAddressFamilyChoice family = Accept().IpAddressFamily;
+
+        Diagnostics.Assert("ip address family", IpAddressFamilyChoice.Either, family);
+        Assert.AreEqual(IpAddressFamilyChoice.Either, family);
     }
 
     [TestMethod]
@@ -34,8 +42,11 @@ public sealed class CommandLineIpAddressFamilyOptionTests
     [DataRow(new[] { "--ipv6", "--ipv4" }, IpAddressFamilyChoice.IPv4Only)]
     public void Parse_AddressFamilyOption_LastOneWins(string[] arguments, IpAddressFamilyChoice expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("ip address family", expected, result.Options?.IpAddressFamily);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expected, result.Options.IpAddressFamily);
         Assert.IsEmpty(result.WarningLines);
@@ -47,7 +58,10 @@ public sealed class CommandLineIpAddressFamilyOptionTests
     [DataRow("-4", false)]
     public void Parse_BundledWithSilent_SetsSilentToo(string bundle, bool silent)
     {
-        Assert.AreEqual(silent, Accept(bundle).Silent);
+        bool actualSilent = Accept(bundle).Silent;
+
+        Diagnostics.Assert("silent", silent, actualSilent);
+        Assert.AreEqual(silent, actualSilent);
     }
 
     [TestMethod]
@@ -56,8 +70,14 @@ public sealed class CommandLineIpAddressFamilyOptionTests
     [DataRow("--no-ipv4=x")]
     public void Parse_NoSpelling_IsRefusedAsNotReversible(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = Parse([spelling, Url]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([$"curl: option {spelling}: {CannotBeReversed}", TryHelp]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -68,18 +88,30 @@ public sealed class CommandLineIpAddressFamilyOptionTests
     [TestMethod]
     public void Parse_NextAfterIpv4_StartsTheNextGroupWithEitherFamily()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-4", Url, "--next", Url]);
+        CommandLineParseResult result = Parse(["-4", Url, "--next", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("group 0 ip address family", IpAddressFamilyChoice.IPv4Only, result.Groups.Count > 0 ? result.Groups[0].IpAddressFamily : null);
+        Diagnostics.Assert("group 1 ip address family", IpAddressFamilyChoice.Either, result.Groups.Count > 1 ? result.Groups[1].IpAddressFamily : null);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(IpAddressFamilyChoice.IPv4Only, result.Groups[0].IpAddressFamily);
         Assert.AreEqual(IpAddressFamilyChoice.Either, result.Groups[1].IpAddressFamily);
     }
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    private CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }

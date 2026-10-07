@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -16,11 +17,23 @@ public sealed class CommandLineMailOptionTests
     private const string Url = "http://127.0.0.1:1/";
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_WithoutMailOptions_LeavesCurlsDefaults()
     {
         CommandLineOptions options = Accept();
 
+        Diagnostics.Assert("mail from", null, options.MailFrom);
+        Diagnostics.Assert("mail recipients", "[]", CommandLineParseDiagnostics.QuoteEach(options.MailRecipients));
+        Diagnostics.Assert("mail auth", null, options.MailAuth);
+        Diagnostics.Assert("mail recipient allow fails", false, options.MailRecipientAllowFails);
+        Diagnostics.Assert("upload flags", ImapUploadFlags.Seen, options.UploadFlags);
+        Diagnostics.Assert("login options", null, options.LoginOptions);
+        Diagnostics.Assert("sasl authorization identity", null, options.SaslAuthorizationIdentity);
+        Diagnostics.Assert("sasl initial response", false, options.SaslInitialResponse);
         Assert.IsNull(options.MailFrom);
         Assert.IsEmpty(options.MailRecipients);
         Assert.IsNull(options.MailAuth);
@@ -34,31 +47,46 @@ public sealed class CommandLineMailOptionTests
     [TestMethod]
     public void Parse_MailFromGivenTwice_KeepsTheLastVerbatim()
     {
-        Assert.AreEqual("<b@example.com>", Accept("--mail-from", "a@example.com", "--mail-from", "<b@example.com>").MailFrom);
+        string? mailFrom = Accept("--mail-from", "a@example.com", "--mail-from", "<b@example.com>").MailFrom;
+
+        Diagnostics.Assert("mail from", "<b@example.com>", mailFrom);
+        Assert.AreEqual("<b@example.com>", mailFrom);
     }
 
     [TestMethod]
     public void Parse_MailAuthGivenTwice_KeepsTheLastVerbatim()
     {
-        Assert.AreEqual("b@example.com", Accept("--mail-auth", "a@example.com", "--mail-auth", "b@example.com").MailAuth);
+        string? mailAuth = Accept("--mail-auth", "a@example.com", "--mail-auth", "b@example.com").MailAuth;
+
+        Diagnostics.Assert("mail auth", "b@example.com", mailAuth);
+        Assert.AreEqual("b@example.com", mailAuth);
     }
 
     [TestMethod]
     public void Parse_SaslAuthzidGivenTwice_KeepsTheLast()
     {
-        Assert.AreEqual("second", Accept("--sasl-authzid", "first", "--sasl-authzid", "second").SaslAuthorizationIdentity);
+        string? authorizationIdentity = Accept("--sasl-authzid", "first", "--sasl-authzid", "second").SaslAuthorizationIdentity;
+
+        Diagnostics.Assert("sasl authorization identity", "second", authorizationIdentity);
+        Assert.AreEqual("second", authorizationIdentity);
     }
 
     [TestMethod]
     public void Parse_LoginOptionsGivenTwice_KeepsTheLastVerbatim()
     {
-        Assert.AreEqual("AUTH=PLAIN", Accept("--login-options", "AUTH=*", "--login-options", "AUTH=PLAIN").LoginOptions);
+        string? loginOptions = Accept("--login-options", "AUTH=*", "--login-options", "AUTH=PLAIN").LoginOptions;
+
+        Diagnostics.Assert("login options", "AUTH=PLAIN", loginOptions);
+        Assert.AreEqual("AUTH=PLAIN", loginOptions);
     }
 
     [TestMethod]
     public void Parse_EmptyLoginOptions_IsAcceptedAndKept()
     {
-        Assert.AreEqual(string.Empty, Accept("--login-options", "").LoginOptions);
+        string? loginOptions = Accept("--login-options", "").LoginOptions;
+
+        Diagnostics.Assert("login options", "\"\"", loginOptions is null ? null : "\"" + loginOptions + "\"");
+        Assert.AreEqual(string.Empty, loginOptions);
     }
 
     [TestMethod]
@@ -66,13 +94,20 @@ public sealed class CommandLineMailOptionTests
     {
         CommandLineOptions options = Accept("--mail-rcpt", "c@example.com", "--mail-rcpt", "a@example.com", "--mail-rcpt", "b@example.com");
 
+        Diagnostics.Assert(
+            "mail recipients",
+            CommandLineParseDiagnostics.QuoteEach(["c@example.com", "a@example.com", "b@example.com"]),
+            CommandLineParseDiagnostics.QuoteEach(options.MailRecipients));
         CollectionAssert.AreEqual(new[] { "c@example.com", "a@example.com", "b@example.com" }, options.MailRecipients.ToArray());
     }
 
     [TestMethod]
     public void Parse_EmptyMailRcpt_IsAcceptedAndKept()
     {
-        CollectionAssert.AreEqual(new[] { string.Empty }, Accept("--mail-rcpt", "").MailRecipients.ToArray());
+        IReadOnlyList<string> recipients = Accept("--mail-rcpt", "").MailRecipients;
+
+        Diagnostics.Assert("mail recipients", CommandLineParseDiagnostics.QuoteEach([string.Empty]), CommandLineParseDiagnostics.QuoteEach(recipients));
+        CollectionAssert.AreEqual(new[] { string.Empty }, recipients.ToArray());
     }
 
     [TestMethod]
@@ -82,7 +117,10 @@ public sealed class CommandLineMailOptionTests
     [DataRow(new[] { "--no-mail-rcpt-allowfails", "--mail-rcpt-allowfails" }, true)]
     public void Parse_MailRcptAllowFails_TheLastSpellingWins(string[] arguments, bool expected)
     {
-        Assert.AreEqual(expected, Accept(arguments).MailRecipientAllowFails);
+        bool allowFails = Accept(arguments).MailRecipientAllowFails;
+
+        Diagnostics.Assert("mail recipient allow fails", expected, allowFails);
+        Assert.AreEqual(expected, allowFails);
     }
 
     [TestMethod]
@@ -92,7 +130,10 @@ public sealed class CommandLineMailOptionTests
     [DataRow(new[] { "--no-sasl-ir", "--sasl-ir" }, true)]
     public void Parse_SaslIr_TheLastSpellingWins(string[] arguments, bool expected)
     {
-        Assert.AreEqual(expected, Accept(arguments).SaslInitialResponse);
+        bool initialResponse = Accept(arguments).SaslInitialResponse;
+
+        Diagnostics.Assert("sasl initial response", expected, initialResponse);
+        Assert.AreEqual(expected, initialResponse);
     }
 
     [TestMethod]
@@ -103,13 +144,19 @@ public sealed class CommandLineMailOptionTests
     [DataRow("-seen,answered", ImapUploadFlags.Answered)]
     public void Parse_UploadFlags_SetsAndClearsFlagsLeftToRightFromSeen(string value, ImapUploadFlags expected)
     {
-        Assert.AreEqual(expected, Accept("--upload-flags", value).UploadFlags);
+        ImapUploadFlags uploadFlags = Accept("--upload-flags", value).UploadFlags;
+
+        Diagnostics.Assert("upload flags", expected, uploadFlags);
+        Assert.AreEqual(expected, uploadFlags);
     }
 
     [TestMethod]
     public void Parse_UploadFlagsGivenTwice_AddsToTheFlagsBefore()
     {
-        Assert.AreEqual(ImapUploadFlags.Draft | ImapUploadFlags.Flagged | ImapUploadFlags.Seen, Accept("--upload-flags", "draft", "--upload-flags", "flagged").UploadFlags);
+        ImapUploadFlags uploadFlags = Accept("--upload-flags", "draft", "--upload-flags", "flagged").UploadFlags;
+
+        Diagnostics.Assert("upload flags", ImapUploadFlags.Draft | ImapUploadFlags.Flagged | ImapUploadFlags.Seen, uploadFlags);
+        Assert.AreEqual(ImapUploadFlags.Draft | ImapUploadFlags.Flagged | ImapUploadFlags.Seen, uploadFlags);
     }
 
     [TestMethod]
@@ -123,7 +170,7 @@ public sealed class CommandLineMailOptionTests
     [DataRow("-")]
     public void Parse_UploadFlagsWithAnUnknownItem_IsRefusedAsUnknown(string value)
     {
-        AssertRefused(CommandLineParser.Parse(["--upload-flags", value, Url]), "curl: option --upload-flags: is unknown");
+        AssertRefused(Parse(["--upload-flags", value, Url]), "curl: option --upload-flags: is unknown");
     }
 
     [TestMethod]
@@ -132,7 +179,7 @@ public sealed class CommandLineMailOptionTests
     [DataRow("--sasl-authzid")]
     public void Parse_EmptyTextMailOption_IsRefusedAsBlank(string option)
     {
-        AssertRefused(CommandLineParser.Parse([option, "", Url]), $"curl: option {option}: blank argument where content is expected");
+        AssertRefused(Parse([option, "", Url]), $"curl: option {option}: blank argument where content is expected");
     }
 
     [TestMethod]
@@ -144,7 +191,7 @@ public sealed class CommandLineMailOptionTests
     [DataRow("--sasl-authzid")]
     public void Parse_ValueMailOptionLast_IsRefusedAsNeedingParameter(string option)
     {
-        AssertRefused(CommandLineParser.Parse([Url, option]), $"curl: option {option}: requires parameter");
+        AssertRefused(Parse([Url, option]), $"curl: option {option}: requires parameter");
     }
 
     [TestMethod]
@@ -156,21 +203,36 @@ public sealed class CommandLineMailOptionTests
     [DataRow("--no-sasl-authzid")]
     public void Parse_NegatedValueMailOption_IsRefusedAsNotReversible(string option)
     {
-        AssertRefused(CommandLineParser.Parse([option, "x", Url]), $"curl: option {option}: the given option cannot be reversed with a --no- prefix");
+        AssertRefused(Parse([option, "x", Url]), $"curl: option {option}: the given option cannot be reversed with a --no- prefix");
     }
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    private CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string optionLine)
+    private void AssertRefused(CommandLineParseResult result, string optionLine)
     {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach([optionLine, TryHelp]),
+            CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { optionLine, TryHelp }, result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }
