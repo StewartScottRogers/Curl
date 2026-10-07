@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Http;
 
 /// <summary>
@@ -8,13 +10,21 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpContentChecksumTrailerTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(true, 7, DisplayName = "gzip: CRC-32 and size")]
     [DataRow(false, 3, DisplayName = "zlib: Adler-32")]
     public void CarriedLength_IsOneLessThanTheTrailer(bool isGzip, int expected)
     {
+        Diagnostics.Arrange("gzip", isGzip);
+
         HttpContentChecksumTrailer trailer = new(isGzip);
 
+        Diagnostics.Act("carried length", trailer.CarriedLength);
+        Diagnostics.Assert("carried length", expected, trailer.CarriedLength);
         Assert.AreEqual(expected, trailer.CarriedLength);
     }
 
@@ -25,9 +35,13 @@ public sealed class HttpContentChecksumTrailerTests
     {
         HttpContentChecksumTrailer trailer = Hello(isGzip);
         byte[] bytes = HttpContentDecoderTests.Bytes(encoded);
+        Diagnostics.Arrange("gzip", isGzip);
+        Diagnostics.Arrange("encoded", encoded);
 
         int end = trailer.EndIn([], bytes);
 
+        Diagnostics.Act("end", end);
+        Diagnostics.Assert("end", bytes.Length, end);
         Assert.AreEqual(bytes.Length, end);
     }
 
@@ -39,9 +53,13 @@ public sealed class HttpContentChecksumTrailerTests
         HttpContentChecksumTrailer trailer = Hello(isGzip);
         byte[] bytes = HttpContentDecoderTests.Bytes(encoded + "4142");
         int split = bytes.Length - 4;
+        Diagnostics.Arrange("gzip", isGzip);
+        Diagnostics.Arrange("split", split);
 
         int end = trailer.EndIn(bytes.AsSpan(split - trailer.CarriedLength, trailer.CarriedLength), bytes.AsSpan(split));
 
+        Diagnostics.Act("end", end);
+        Diagnostics.Assert("end", 2, end);
         Assert.AreEqual(2, end);
     }
 
@@ -50,9 +68,12 @@ public sealed class HttpContentChecksumTrailerTests
     {
         HttpContentChecksumTrailer trailer = Hello(isGzip: true);
         byte[] bytes = HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip + HttpContentDecoderTests.Gzip);
+        Diagnostics.Arrange("encoded", "the gzip hello twice");
 
         int end = trailer.EndIn([], bytes);
 
+        Diagnostics.Act("end", end);
+        Diagnostics.Assert("end", 25, end);
         Assert.AreEqual(25, end);
     }
 
@@ -60,9 +81,12 @@ public sealed class HttpContentChecksumTrailerTests
     public void EndIn_NoTrailer_ReturnsMinusOne()
     {
         HttpContentChecksumTrailer trailer = Hello(isGzip: false);
+        Diagnostics.Arrange("carried and encoded", "062C 0241");
 
         int end = trailer.EndIn([0x06, 0x2C], HttpContentDecoderTests.Bytes("0241"));
 
+        Diagnostics.Act("end", end);
+        Diagnostics.Assert("end", -1, end);
         Assert.AreEqual(-1, end);
     }
 
@@ -77,11 +101,16 @@ public sealed class HttpContentChecksumTrailerTests
     {
         HttpContentChecksumTrailer trailer = new(isGzip);
         byte[] decoded = [.. Enumerable.Repeat((byte)0xFF, 100000)];
+        Diagnostics.Arrange("gzip", isGzip);
+        Diagnostics.Arrange("expected trailer", expectedTrailer);
 
         trailer.Append(decoded.AsSpan(0, 30000));
         trailer.Append(decoded.AsSpan(30000));
 
-        Assert.AreEqual(expectedTrailer.Length / 2, trailer.EndIn([], HttpContentDecoderTests.Bytes(expectedTrailer)));
+        int end = trailer.EndIn([], HttpContentDecoderTests.Bytes(expectedTrailer));
+        Diagnostics.Act("end", end);
+        Diagnostics.Assert("end", expectedTrailer.Length / 2, end);
+        Assert.AreEqual(expectedTrailer.Length / 2, end);
     }
 
     private static HttpContentChecksumTrailer Hello(bool isGzip)

@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -26,6 +27,10 @@ public sealed class HttpContentCodingDecoderTests
 
     private static readonly int[] ChunkSizes = [1, 7, 65536];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     /// <summary>
     /// Measured: <c>00 01 02 …</c> as gzip gives <c>incorrect header check</c>, and
     /// <c>1F 8B 07</c> gives <c>unknown compression method</c>. A zlib header naming method 7
@@ -42,11 +47,15 @@ public sealed class HttpContentCodingDecoderTests
     [DataRow("br", "FFFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "br: corrupt data")]
     public void Decode_CorruptBody_ThrowsExit61WithTheMeasuredMessage(string coding, string encoded, string message)
     {
+        Diagnostics.Arrange("coding", coding);
+        Diagnostics.Arrange("encoded", encoded);
         foreach (int chunkSize in ChunkSizes)
         {
             HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
                 () => Decode(coding, HttpContentDecoderTests.Bytes(encoded), chunkSize));
 
+            Diagnostics.Act($"exit at chunk size {chunkSize}", $"{thrown.ExitCode}: {thrown.Message}");
+            Diagnostics.Assert($"message at chunk size {chunkSize}", message, thrown.Message);
             Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, thrown.Message, $"Chunk size {chunkSize}");
         }
@@ -59,10 +68,13 @@ public sealed class HttpContentCodingDecoderTests
     [TestMethod]
     public void Decode_TruncatedGzip_DecodesWhatArrivedWithoutFailing()
     {
+        Diagnostics.Arrange("encoded", "the first 15 bytes of the gzip hello");
         foreach (int chunkSize in ChunkSizes)
         {
             byte[] decoded = Decode("gzip", HttpContentDecoderTests.Bytes(HttpContentDecoderTests.Gzip)[..15], chunkSize);
 
+            Diagnostics.Act($"decoded at chunk size {chunkSize}", Encoding.ASCII.GetString(decoded));
+            Diagnostics.Assert($"decoded at chunk size {chunkSize}", "hell", Encoding.ASCII.GetString(decoded));
             Assert.AreEqual("hell", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
         }
     }
@@ -81,6 +93,8 @@ public sealed class HttpContentCodingDecoderTests
     [DataRow("br", HttpContentDecoderTests.Brotli + "4142", DisplayName = "br, then 41 42")]
     public void Decode_BytesAfterTheEndOfTheStream_DecodesTheStreamThenThrowsExit23(string coding, string encoded)
     {
+        Diagnostics.Arrange("coding", coding);
+        Diagnostics.Arrange("encoded", encoded);
         foreach (int chunkSize in ChunkSizes)
         {
             List<byte> decoded = [];
@@ -88,6 +102,8 @@ public sealed class HttpContentCodingDecoderTests
             HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
                 () => DecodeInto(decoded, coding, HttpContentDecoderTests.Bytes(encoded), chunkSize));
 
+            Diagnostics.Act($"decoded at chunk size {chunkSize}", Encoding.ASCII.GetString([.. decoded]));
+            Diagnostics.Assert($"exit at chunk size {chunkSize}", CurlExitCode.WriteError, thrown.ExitCode);
             Assert.AreEqual("hello", Encoding.ASCII.GetString([.. decoded]), $"Chunk size {chunkSize}");
             Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("Failed writing received data to disk/application", thrown.Message, $"Chunk size {chunkSize}");
@@ -101,10 +117,13 @@ public sealed class HttpContentCodingDecoderTests
     [TestMethod]
     public void Decode_BytesAfterTheEndOfARawDeflateStream_AreDropped()
     {
+        Diagnostics.Arrange("encoded", HttpContentDecoderTests.RawDeflate + "4142");
         foreach (int chunkSize in ChunkSizes)
         {
             byte[] decoded = Decode("deflate", HttpContentDecoderTests.Bytes(HttpContentDecoderTests.RawDeflate + "4142"), chunkSize);
 
+            Diagnostics.Act($"decoded at chunk size {chunkSize}", Encoding.ASCII.GetString(decoded));
+            Diagnostics.Assert($"decoded at chunk size {chunkSize}", "hello", Encoding.ASCII.GetString(decoded));
             Assert.AreEqual("hello", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
         }
     }
@@ -116,6 +135,8 @@ public sealed class HttpContentCodingDecoderTests
     public void Decode_LargeBodyThenOneByte_ThrowsExit23AfterTheWholeBody(string coding)
     {
         byte[] body = [.. Enumerable.Range(0, 100000).Select(index => (byte)(index * index % 251))];
+        Diagnostics.Arrange("coding", coding);
+        Diagnostics.Arrange("body length", body.Length);
         foreach (int chunkSize in ChunkSizes)
         {
             List<byte> decoded = [];
@@ -123,6 +144,8 @@ public sealed class HttpContentCodingDecoderTests
             HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
                 () => DecodeInto(decoded, coding, [.. Encode(coding, body), 0x41], chunkSize));
 
+            Diagnostics.Act($"decoded length at chunk size {chunkSize}", decoded.Count);
+            Diagnostics.Diff($"decoded at chunk size {chunkSize}", body, [.. decoded]);
             CollectionAssert.AreEqual(body, decoded, $"Chunk size {chunkSize}");
             Assert.AreEqual(CurlExitCode.WriteError, thrown.ExitCode, $"Chunk size {chunkSize}");
         }
@@ -135,9 +158,15 @@ public sealed class HttpContentCodingDecoderTests
     public void Decode_LargeBodyThatEndsWithItsStream_DecodesWithoutFailing(string coding)
     {
         byte[] body = [.. Enumerable.Range(0, 100000).Select(index => (byte)(index * index % 251))];
+        Diagnostics.Arrange("coding", coding);
+        Diagnostics.Arrange("body length", body.Length);
         foreach (int chunkSize in ChunkSizes)
         {
-            CollectionAssert.AreEqual(body, Decode(coding, Encode(coding, body), chunkSize), $"Chunk size {chunkSize}");
+            byte[] decoded = Decode(coding, Encode(coding, body), chunkSize);
+
+            Diagnostics.Act($"decoded length at chunk size {chunkSize}", decoded.Length);
+            Diagnostics.Diff($"decoded at chunk size {chunkSize}", body, decoded);
+            CollectionAssert.AreEqual(body, decoded, $"Chunk size {chunkSize}");
         }
     }
 
@@ -147,8 +176,13 @@ public sealed class HttpContentCodingDecoderTests
     [DataRow("deflate", "78", DisplayName = "deflate: one byte")]
     public void Decode_TooFewBytesToTellTheFormat_DecodesNothing(string coding, string encoded)
     {
+        Diagnostics.Arrange("coding", coding);
+        Diagnostics.Arrange("encoded", encoded);
+
         byte[] decoded = Decode(coding, HttpContentDecoderTests.Bytes(encoded), 1);
 
+        Diagnostics.Act("decoded length", decoded.Length);
+        Diagnostics.Assert("decoded length", 0, decoded.Length);
         Assert.IsEmpty(decoded);
     }
 
@@ -160,9 +194,13 @@ public sealed class HttpContentCodingDecoderTests
     {
         byte[] body = [.. Enumerable.Range(0, 40000).Select(index => (byte)(index % 251))];
         HttpContentCodingDecoder decoder = new(CodingOf(coding));
+        Diagnostics.Arrange("coding", coding);
+        Diagnostics.Arrange("body length", body.Length);
 
         int[] sizes = [.. decoder.Decode(Encode(coding, body)).Select(piece => piece.Length)];
 
+        Diagnostics.Act("piece sizes", string.Join(", ", sizes));
+        Diagnostics.Assert("piece sizes", "16384, 16384, 7232", string.Join(", ", sizes));
         CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, sizes);
         CollectionAssert.AreEqual(body, Decode(coding, Encode(coding, body), 65536));
     }
@@ -173,10 +211,14 @@ public sealed class HttpContentCodingDecoderTests
     [TestMethod]
     public void Decode_ZstdFrame_WritesItsContent()
     {
+        Diagnostics.Arrange("encoded", ZstdHelloFrame);
         foreach (int chunkSize in ChunkSizes)
         {
             byte[] decoded = Decode("zstd", HttpContentDecoderTests.Bytes(ZstdHelloFrame), chunkSize);
 
+            Diagnostics.Bytes($"decoded at chunk size {chunkSize}", decoded);
+            Diagnostics.Act($"decoded length at chunk size {chunkSize}", decoded.Length);
+            Diagnostics.Diff($"decoded at chunk size {chunkSize}", "hello zstd\n"u8, decoded);
             Assert.AreEqual("hello zstd\n", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
         }
     }
@@ -187,10 +229,13 @@ public sealed class HttpContentCodingDecoderTests
     [TestMethod]
     public void Decode_TwoConcatenatedZstdFrames_WritesBothContents()
     {
+        Diagnostics.Arrange("encoded", ZstdHelloFrame + ZstdHelloFrame);
         foreach (int chunkSize in ChunkSizes)
         {
             byte[] decoded = Decode("zstd", HttpContentDecoderTests.Bytes(ZstdHelloFrame + ZstdHelloFrame), chunkSize);
 
+            Diagnostics.Act($"decoded length at chunk size {chunkSize}", decoded.Length);
+            Diagnostics.Diff($"decoded at chunk size {chunkSize}", "hello zstd\nhello zstd\n"u8, decoded);
             Assert.AreEqual("hello zstd\nhello zstd\n", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
         }
     }
@@ -202,10 +247,13 @@ public sealed class HttpContentCodingDecoderTests
     [TestMethod]
     public void Decode_TruncatedZstdFrame_WritesWhatArrivedWithoutFailing()
     {
+        Diagnostics.Arrange("encoded", "the first 15 bytes of the zstd hello frame");
         foreach (int chunkSize in ChunkSizes)
         {
             byte[] decoded = Decode("zstd", HttpContentDecoderTests.Bytes(ZstdHelloFrame)[..15], chunkSize);
 
+            Diagnostics.Act($"decoded at chunk size {chunkSize}", Encoding.ASCII.GetString(decoded));
+            Diagnostics.Assert($"decoded at chunk size {chunkSize}", "hello ", Encoding.ASCII.GetString(decoded));
             Assert.AreEqual("hello ", Encoding.ASCII.GetString(decoded), $"Chunk size {chunkSize}");
         }
     }
@@ -219,6 +267,7 @@ public sealed class HttpContentCodingDecoderTests
     [DataRow("28B52FFD200B5F0000" + ZstdHello, DisplayName = "zstd: reserved block type")]
     public void Decode_CorruptZstdBody_ThrowsExit61WithoutWriting(string encoded)
     {
+        Diagnostics.Arrange("encoded", encoded);
         foreach (int chunkSize in ChunkSizes)
         {
             List<byte> decoded = [];
@@ -226,6 +275,8 @@ public sealed class HttpContentCodingDecoderTests
             HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
                 () => DecodeInto(decoded, "zstd", HttpContentDecoderTests.Bytes(encoded), chunkSize));
 
+            Diagnostics.Act($"exit at chunk size {chunkSize}", $"{thrown.ExitCode}: {thrown.Message}");
+            Diagnostics.Assert($"decoded length at chunk size {chunkSize}", 0, decoded.Count);
             Assert.IsEmpty(decoded, $"Chunk size {chunkSize}");
             Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("Unrecognized or bad HTTP Content or Transfer-Encoding", thrown.Message, $"Chunk size {chunkSize}");
@@ -242,6 +293,7 @@ public sealed class HttpContentCodingDecoderTests
     [DataRow(ZstdHelloFrame + "00000000", DisplayName = "zstd, then four zero bytes")]
     public void Decode_BytesAfterTheLastZstdFrame_WritesTheFrameThenThrowsExit61(string encoded)
     {
+        Diagnostics.Arrange("encoded", encoded);
         foreach (int chunkSize in ChunkSizes)
         {
             List<byte> decoded = [];
@@ -249,6 +301,8 @@ public sealed class HttpContentCodingDecoderTests
             HttpTransferException thrown = Assert.ThrowsExactly<HttpTransferException>(
                 () => DecodeInto(decoded, "zstd", HttpContentDecoderTests.Bytes(encoded), chunkSize));
 
+            Diagnostics.Act($"exit at chunk size {chunkSize}", $"{thrown.ExitCode}: {thrown.Message}");
+            Diagnostics.Diff($"decoded at chunk size {chunkSize}", "hello zstd\n"u8, [.. decoded]);
             Assert.AreEqual("hello zstd\n", Encoding.ASCII.GetString([.. decoded]), $"Chunk size {chunkSize}");
             Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("Unrecognized or bad HTTP Content or Transfer-Encoding", thrown.Message, $"Chunk size {chunkSize}");
@@ -265,9 +319,13 @@ public sealed class HttpContentCodingDecoderTests
         // Window descriptor 0x30 (64 KiB), then a last RLE block of 40000 bytes of 'A'.
         byte[] encoded = HttpContentDecoderTests.Bytes("28B52FFD0030" + "03E204" + "41");
         using HttpContentCodingDecoder decoder = new(HttpContentCoding.Zstandard);
+        Diagnostics.Bytes("encoded", encoded);
+        Diagnostics.Arrange("frame", "a last RLE block of 40000 bytes of 'A'");
 
         int[] sizes = [.. decoder.Decode(encoded).Select(piece => piece.Length)];
 
+        Diagnostics.Act("piece sizes", string.Join(", ", sizes));
+        Diagnostics.Assert("piece sizes", "16384, 16384, 7232", string.Join(", ", sizes));
         CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, sizes);
         foreach (int chunkSize in ChunkSizes)
         {

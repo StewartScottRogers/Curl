@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -14,6 +15,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerMaxFileSizeTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Opening =
         "+OK POP3 ready <1896.697170952@localhost>\r\n"
         + "+OK Capability list follows\r\nUSER\r\nSASL PLAIN LOGIN\r\nSTLS\r\nTOP\r\nUIDL\r\n.\r\n";
@@ -41,6 +47,7 @@ public sealed class Pop3ProtocolHandlerMaxFileSizeTests
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3),
             result);
+        Diagnostics.AssertValues("output", "Fro", output);
         Assert.AreEqual("Fro", output);
         CollectionAssert.AreEqual((string[])["{ 24"], events.Transcript.Where(line => line.StartsWith('{')).ToArray());
         CollectionAssert.AreEqual(
@@ -58,6 +65,7 @@ public sealed class Pop3ProtocolHandlerMaxFileSizeTests
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (60) with 60 bytes", 60),
             result);
+        Diagnostics.AssertValues("output", "From: sender@example.com\r\nTo: recipient@example.com\r\nSubject", output);
         Assert.AreEqual("From: sender@example.com\r\nTo: recipient@example.com\r\nSubject", output);
     }
 
@@ -69,6 +77,7 @@ public sealed class Pop3ProtocolHandlerMaxFileSizeTests
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (8) with 8 bytes", 8),
             result);
+        Diagnostics.AssertValues("output", "1 133\r\n2", output);
         Assert.AreEqual("1 133\r\n2", output);
         Assert.EndsWith("LIST\r\nQUIT\r\n", sent);
     }
@@ -81,12 +90,14 @@ public sealed class Pop3ProtocolHandlerMaxFileSizeTests
     {
         (TransferResult result, _, string output, string sent) = await RunAsync(Url + "1", maxFileSize, RetrReply);
 
+        Diagnostics.AssertValues("result", TransferResult.Success(133), result);
         Assert.AreEqual(TransferResult.Success(133), result);
+        Diagnostics.AssertValues("output", Message, output);
         Assert.AreEqual(Message, output);
         Assert.EndsWith("QUIT\r\n", sent);
     }
 
-    private static async Task<(TransferResult Result, RecordingTransferEvents Events, string Output, string Sent)> RunAsync(
+    private async Task<(TransferResult Result, RecordingTransferEvents Events, string Output, string Sent)> RunAsync(
         string url, long? maxFileSize, string reply)
     {
         var connection = new ScriptedConnection([.. new[] { Opening, reply, Bye }.Select(Encoding.Latin1.GetBytes)]);
@@ -94,7 +105,11 @@ public sealed class Pop3ProtocolHandlerMaxFileSizeTests
         using var output = new MemoryStream();
         var context = new TransferContext { Url = CurlUrl.Parse(url), Output = output, Events = events, MaxFileSize = maxFileSize };
 
+        Diagnostics.ArrangeRun(url, connection.Script);
+        Diagnostics.Arrange("max file size", maxFileSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(none)");
         TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        Diagnostics.ActTransfer(result, events, connection.Sent);
+        Diagnostics.Bytes("output", output.ToArray());
 
         return (result, events, Encoding.Latin1.GetString(output.ToArray()), Encoding.Latin1.GetString(connection.Sent));
     }

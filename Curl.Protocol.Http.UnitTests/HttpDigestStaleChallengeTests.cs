@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Http;
 
 /// <summary>
@@ -7,13 +9,23 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpDigestStaleChallengeTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("Digest realm=\"r\", nonce=\"b\", stale=true", DisplayName = "bare true")]
     [DataRow("  digest nonce=\"b\", STALE = \"TRUE\"  ", DisplayName = "quoted, any case, blanks")]
     [DataRow("Digest\tstale=true", DisplayName = "tab after the scheme")]
     public void IsOfferedIn_FindsAStaleDigestChallenge(string challenge)
     {
-        Assert.IsTrue(HttpDigestStaleChallenge.IsOfferedIn(["Basic realm=\"r\"", challenge]));
+        Diagnostics.Arrange("challenges", $"Basic realm=\"r\" | {challenge}");
+
+        bool offered = HttpDigestStaleChallenge.IsOfferedIn(["Basic realm=\"r\"", challenge]);
+
+        Diagnostics.Act("stale offered", offered);
+        Diagnostics.Assert("stale offered", true, offered);
+        Assert.IsTrue(offered);
     }
 
     [TestMethod]
@@ -25,12 +37,24 @@ public sealed class HttpDigestStaleChallengeTests
     [DataRow("Digest =true, stale, nonce=\"stale=true\"", DisplayName = "no key, no value")]
     public void IsOfferedIn_FindsNoStaleDigestChallenge(string challenge)
     {
-        Assert.IsFalse(HttpDigestStaleChallenge.IsOfferedIn([challenge]));
+        Diagnostics.Arrange("challenge", challenge);
+
+        bool offered = HttpDigestStaleChallenge.IsOfferedIn([challenge]);
+
+        Diagnostics.Act("stale offered", offered);
+        Diagnostics.Assert("stale offered", false, offered);
+        Assert.IsFalse(offered);
     }
 
     [TestMethod]
     public void IsOfferedIn_FindsNothingInNoChallenges()
     {
-        Assert.IsFalse(HttpDigestStaleChallenge.IsOfferedIn([]));
+        Diagnostics.Arrange("challenges", "none");
+
+        bool offered = HttpDigestStaleChallenge.IsOfferedIn([]);
+
+        Diagnostics.Act("stale offered", offered);
+        Diagnostics.Assert("stale offered", false, offered);
+        Assert.IsFalse(offered);
     }
 }

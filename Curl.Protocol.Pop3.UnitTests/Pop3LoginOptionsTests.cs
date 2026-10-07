@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Pop3;
 
 /// <summary>
@@ -7,6 +9,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3LoginOptionsTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(null, "Any", null)]
     [DataRow("", "Any", null)]
@@ -19,8 +26,11 @@ public sealed class Pop3LoginOptionsTests
     [DataRow("AUTH=+APOP;", "Apop", null)]
     public void Read_LoginOptions_AllowTheirMethod(string? options, string method, string? mechanism)
     {
+        Diagnostics.Arrange("login options", options ?? "(null)");
         Pop3LoginOptions? read = Pop3LoginOptions.Read(options);
+        Diagnostics.Act("read", read?.ToString() ?? "(null)");
 
+        Diagnostics.Assert("read", new Pop3LoginOptions(Enum.Parse<Pop3LoginMethod>(method), mechanism), read?.ToString() ?? "(null)");
         Assert.AreEqual(new Pop3LoginOptions(Enum.Parse<Pop3LoginMethod>(method), mechanism), read);
     }
 
@@ -32,8 +42,11 @@ public sealed class Pop3LoginOptionsTests
     [DataRow("AUTH=PLAIN;FOO=bar")]
     public void Read_LoginOptionsCurlRefuses_IsNull(string options)
     {
+        Diagnostics.Arrange("login options", options);
         Pop3LoginOptions? read = Pop3LoginOptions.Read(options);
+        Diagnostics.Act("read", read?.ToString() ?? "(null)");
 
+        Diagnostics.Assert("read", "(null)", read?.ToString() ?? "(null)");
         Assert.IsNull(read);
     }
 }

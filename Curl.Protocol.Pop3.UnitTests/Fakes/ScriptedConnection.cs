@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Pop3.Fakes;
@@ -14,6 +15,9 @@ namespace Curl.Protocol.Pop3.Fakes;
 public sealed class ScriptedConnection(params byte[][] reads) : IConnection
 {
     private readonly List<byte> sent = [];
+
+    /// <summary>Gets every read of the script joined, as Latin-1 text, for a test's diagnostics.</summary>
+    public string Script { get; } = Encoding.Latin1.GetString([.. reads.SelectMany(read => read)]);
 
     private int nextRead;
 

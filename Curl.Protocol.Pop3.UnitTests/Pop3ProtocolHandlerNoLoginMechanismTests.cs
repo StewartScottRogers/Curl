@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -14,6 +15,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/";
 
     private const string Greeting = "+OK POP3 ready\r\n";
@@ -49,7 +55,9 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
         (TransferResult result, RecordingTransferEvents events, byte[] sent) = await RunAsync(
             Greeting + capaReply, user, bearerToken, loginOptions);
 
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(sent)", "CAPA\r\n", Encoding.Latin1.GetString(sent));
         Assert.AreEqual("CAPA\r\n", Encoding.Latin1.GetString(sent));
         CollectionAssert.AreEqual((string[])[expectedLine, Closing], events.Transcript.TakeLast(2).ToArray());
     }
@@ -64,6 +72,7 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync(Greeting + capaReply, "user", null, loginOptions);
 
         string[] notBuiltIn = [.. new[] { first, second }.OfType<string>().Select(mechanism => "* SASL: " + mechanism + " not builtin")];
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.LoginDenied, result.ExitCode);
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])["< .\r\n", "* SASL: no auth mechanism offered could be selected", .. notBuiltIn, Closing],
@@ -94,7 +103,9 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
     {
         (TransferResult result, RecordingTransferEvents events, byte[] sent) = await RunAsync(Greeting + capaReply, user, null, loginOptions);
 
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(sent)", "CAPA\r\n", Encoding.Latin1.GetString(sent));
         Assert.AreEqual("CAPA\r\n", Encoding.Latin1.GetString(sent));
         CollectionAssert.AreEqual(
             (string[])["< .\r\n", "* SASL: no auth mechanism offered could be selected", .. reasons, Closing],
@@ -114,6 +125,7 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
     {
         (_, RecordingTransferEvents events, _) = await RunAsync(Greeting + capaReply, "user", bearerToken, loginOptions, password: password);
 
+        Diagnostics.AssertValues("last 3 transcript lines", string.Join(" | ", "< .\r\n", "* SASL: no auth mechanism offered could be selected", Closing), string.Join(" | ", events.Transcript.TakeLast(3)));
         CollectionAssert.AreEqual(
             (string[])["< .\r\n", "* SASL: no auth mechanism offered could be selected", Closing],
             events.Transcript.TakeLast(3).ToArray());
@@ -126,6 +138,7 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
     {
         (_, RecordingTransferEvents events, _) = await RunAsync(Greeting + "+OK\r\nSASL SCRAM-SHA-256\r\n.\r\n", user, bearerToken, loginOptions);
 
+        Diagnostics.AssertValues("last 2 transcript lines", string.Join(" | ", Overlap, Closing), string.Join(" | ", events.Transcript.TakeLast(2)));
         CollectionAssert.AreEqual((string[])[Overlap, Closing], events.Transcript.TakeLast(2).ToArray());
     }
 
@@ -138,6 +151,7 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync(
             greeting + replies + "+OK\r\n.\r\n+OK Bye\r\n", "user", null, null, path: string.Empty);
 
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* SASL", StringComparison.Ordinal)));
     }
@@ -148,11 +162,12 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync(
             TimestampGreeting + DefaultCapa + "-ERR denied\r\n", "user", null, null);
 
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
         CollectionAssert.AreEqual((string[])["< -ERR denied\r\n", Closing], events.Transcript.TakeLast(2).ToArray());
     }
 
-    private static async Task<(TransferResult Result, RecordingTransferEvents Events, byte[] Sent)> RunAsync(
+    private async Task<(TransferResult Result, RecordingTransferEvents Events, byte[] Sent)> RunAsync(
         string replies, string? user, string? bearerToken, string? loginOptions, string path = "1", string password = "secret")
     {
         var events = new RecordingTransferEvents();
@@ -168,8 +183,12 @@ public sealed class Pop3ProtocolHandlerNoLoginMechanismTests
         // As curl's, the authenticator offers PLAIN for a user name and XOAUTH2 for a bearer token.
         var sasl = new ScriptedSaslAuthenticator((bearerToken is null ? "PLAIN" : "XOAUTH2", ["\0user\0secret"]));
 
+        Diagnostics.ArrangeRun(Url + path, connection.Script);
+        Diagnostics.Arrange("credentials", $"user {Pop3Diagnostics.Show(user)}, bearer {Pop3Diagnostics.Show(bearerToken)}, login options {Pop3Diagnostics.Show(loginOptions)}");
+
         TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider(), sasl)
             .ExecuteAsync(context);
+        Diagnostics.ActTransfer(result, events, connection.Sent);
 
         return (result, events, connection.Sent);
     }

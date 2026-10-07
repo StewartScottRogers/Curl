@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Pop3;
 
 /// <summary>
@@ -6,6 +8,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3SessionMessagesTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(Pop3SessionMessages.ResponseReadingFailed, true)]
     [DataRow(Pop3SessionMessages.UnexpectedResponse, true)]
@@ -20,6 +27,11 @@ public sealed class Pop3SessionMessagesTests
     [DataRow(Pop3SessionMessages.ResponseLineTooLarge, false)]
     public void IsWrittenByVerbose_EachFailureMessage_IsWrittenOnlyWhenCurlFormatsIt(string message, bool written)
     {
+        Diagnostics.Arrange("message", message);
+        bool actual = Pop3SessionMessages.IsWrittenByVerbose(message);
+        Diagnostics.Act("written by verbose", actual);
+
+        Diagnostics.Assert("written by verbose", written, actual);
         Assert.AreEqual(written, Pop3SessionMessages.IsWrittenByVerbose(message));
     }
 }

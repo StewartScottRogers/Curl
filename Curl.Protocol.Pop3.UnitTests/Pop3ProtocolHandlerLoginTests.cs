@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -15,6 +16,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerLoginTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/";
 
     private const string Greeting = "+OK POP3 ready <1896.697170952@localhost>\r\n";
@@ -55,7 +61,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         var sasl = PlainAndLogin();
         Pop3Run run = await RunAsync(Greeting + CapaReply + "+ \r\n+OK Authenticated\r\n" + ListReply + Bye, sasl: sasl);
 
+        Diagnostics.Diff("sent", Capa + "AUTH PLAIN\r\nAHUAcA==\r\n" + List + Quit, run.Sent);
         Assert.AreEqual(Capa + "AUTH PLAIN\r\nAHUAcA==\r\n" + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
         CollectionAssert.AreEqual(new[] { "PLAIN", "LOGIN" }, sasl.Offers.Single());
     }
@@ -67,6 +75,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
         var mail = new MailRequestOptions { SaslAuthorizationIdentity = "z", BearerToken = "tok" };
         await RunAsync(Greeting + CapaReply + "+ \r\n+OK\r\n" + ListReply + Bye, mail: mail, sasl: sasl);
 
+        Diagnostics.AssertValues("sasl request", new SaslRequest(UserP, "z", "tok", null, "pop", "127.0.0.1", 18110), sasl.Requests.Single());
         Assert.AreEqual(new SaslRequest(UserP, "z", "tok", null, "pop", "127.0.0.1", 18110), sasl.Requests.Single());
     }
 
@@ -78,6 +87,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
         var sasl = PlainAndLogin();
         await RunAsync(Greeting + CapaReply + "+ \r\n+OK\r\n" + ListReply + Bye, sasl: sasl, url: url);
 
+        Diagnostics.AssertValues("sasl.Requests.Single().Port", expected, sasl.Requests.Single().Port);
         Assert.AreEqual(expected, sasl.Requests.Single().Port);
     }
 
@@ -87,6 +97,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
         var sasl = PlainAndLogin();
         await RunAsync(Greeting + CapaReply + "+ \r\n+OK\r\n" + ListReply + Bye, mail: new MailRequestOptions { ServiceName = "pop3" }, sasl: sasl);
 
+        Diagnostics.AssertValues("sasl.Requests.Single().ServiceName", "pop3", sasl.Requests.Single().ServiceName);
         Assert.AreEqual("pop3", sasl.Requests.Single().ServiceName);
     }
 
@@ -97,7 +108,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Pop3Run run = await RunAsync(
             Greeting + CapaReply + "+OK Authenticated\r\n" + ListReply + Bye, mail: new MailRequestOptions { SaslInitialResponse = true }, sasl: PlainAndLogin());
 
+        Diagnostics.Diff("sent", Capa + "AUTH PLAIN AHUAcA==\r\n" + List + Quit, run.Sent);
         Assert.AreEqual(Capa + "AUTH PLAIN AHUAcA==\r\n" + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -115,6 +128,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
             Greeting + CapaReply + replies + ListReply + Bye, new NetworkCredential("u", password), new MailRequestOptions { SaslInitialResponse = true }, sasl);
 
         string expected = inline ? $"AUTH PLAIN {encoded}\r\n" : $"AUTH PLAIN\r\n{encoded}\r\n";
+        Diagnostics.Diff("sent", Capa + expected + List + Quit, run.Sent);
         Assert.AreEqual(Capa + expected + List + Quit, run.Sent);
     }
 
@@ -128,8 +142,11 @@ public sealed class Pop3ProtocolHandlerLoginTests
             mail: new MailRequestOptions { LoginOptions = "AUTH=LOGIN" },
             sasl: sasl);
 
+        Diagnostics.Diff("sent", Capa + "AUTH LOGIN\r\ndQ==\r\ncA==\r\n" + List + Quit, run.Sent);
         Assert.AreEqual(Capa + "AUTH LOGIN\r\ndQ==\r\ncA==\r\n" + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
+        Diagnostics.AssertValues("sasl.Requests.Single().RequiredMechanism", "LOGIN", sasl.Requests.Single().RequiredMechanism);
         Assert.AreEqual("LOGIN", sasl.Requests.Single().RequiredMechanism);
         CollectionAssert.AreEqual(new[] { "Password:" }, sasl.Challenges);
     }
@@ -144,7 +161,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
             mail: new MailRequestOptions { LoginOptions = "AUTH=LOGIN" },
             sasl: sasl);
 
+        Diagnostics.Diff("sent", Capa + "AUTH LOGIN\r\ndQ==\r\n", run.Sent);
         Assert.AreEqual(Capa + "AUTH LOGIN\r\ndQ==\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
     }
 
@@ -159,7 +178,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Pop3Run run = await RunAsync(
             Greeting + CapaReply + authReplies, mail: new MailRequestOptions { SaslInitialResponse = initialResponse }, sasl: PlainAndLogin());
 
+        Diagnostics.Diff("sent", Capa + sent, run.Sent);
         Assert.AreEqual(Capa + sent, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
     }
 
@@ -174,7 +195,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
             mail: new MailRequestOptions { BearerToken = "tok", SaslInitialResponse = true },
             sasl: sasl);
 
+        Diagnostics.Diff("sent", Capa + "AUTH XOAUTH2 dXNlcj0BYXV0aD1CZWFyZXIgdG9rAQE=\r\n" + List + Quit, run.Sent);
         Assert.AreEqual(Capa + "AUTH XOAUTH2 dXNlcj0BYXV0aD1CZWFyZXIgdG9rAQE=\r\n" + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -185,7 +208,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Pop3Run run = await RunAsync(
             PlainGreeting + UserOnlyCapaReply, noCredential: true, mail: new MailRequestOptions { BearerToken = "tok" }, sasl: PlainAndLogin());
 
+        Diagnostics.Diff("sent", Capa, run.Sent);
         Assert.AreEqual(Capa, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
     }
 
@@ -198,6 +223,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
             mail: new MailRequestOptions { LoginOptions = "AUTH=LOGIN" },
             sasl: sasl);
 
+        Diagnostics.Diff("sent", Capa + "AUTH LOGIN\r\ndQ==\r\ncA==\r\n" + List + Quit, run.Sent);
         Assert.AreEqual(Capa + "AUTH LOGIN\r\ndQ==\r\ncA==\r\n" + List + Quit, run.Sent);
         CollectionAssert.AreEqual(new[] { string.Empty }, sasl.Challenges);
     }
@@ -216,6 +242,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
             new MailRequestOptions { SaslInitialResponse = initialResponse },
             sasl);
 
+        Diagnostics.Diff("sent", Capa + sent + List + Quit, run.Sent);
         Assert.AreEqual(Capa + sent + List + Quit, run.Sent);
     }
 
@@ -229,7 +256,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         // Recordings "useronly", "userlowonly", "capaerr", "capasaslnomech".
         Pop3Run run = await RunAsync(greeting + capaReply + "+OK User accepted\r\n+OK Logged in\r\n" + ListReply + Bye, sasl: PlainAndLogin());
 
+        Diagnostics.Diff("sent", Capa + UserAndPass + List + Quit, run.Sent);
         Assert.AreEqual(Capa + UserAndPass + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -240,6 +269,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Pop3Run run = await RunAsync(
             PlainGreeting + UserOnlyCapaReply + "+OK\r\n+OK\r\n" + ListReply + Bye, new NetworkCredential(string.Empty, "p"));
 
+        Diagnostics.Diff("sent", Capa + "USER \r\nPASS p\r\n" + List + Quit, run.Sent);
         Assert.AreEqual(Capa + "USER \r\nPASS p\r\n" + List + Quit, run.Sent);
     }
 
@@ -253,7 +283,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         // Recordings "apop", "tsuseronly", "capaerr-ts", "saslunusable".
         Pop3Run run = await RunAsync(Greeting + capaReply + "+OK Logged in\r\n" + ListReply + Bye, sasl: PlainAndLogin());
 
+        Diagnostics.Diff("sent", Capa + Apop + List + Quit, run.Sent);
         Assert.AreEqual(Capa + Apop + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -262,6 +294,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
     {
         Pop3Run run = await RunAsync(Greeting + CapaReply + "+OK Logged in\r\n" + ListReply + Bye);
 
+        Diagnostics.Diff("sent", Capa + Apop + List + Quit, run.Sent);
         Assert.AreEqual(Capa + Apop + List + Quit, run.Sent);
     }
 
@@ -277,7 +310,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         Pop3Run run = await RunAsync(
             Greeting + CapaReply + "+OK Logged in\r\n" + ListReply + Bye, mail: new MailRequestOptions { LoginOptions = loginOptions }, sasl: sasl, url: url ?? Url);
 
+        Diagnostics.Diff("sent", Capa + Apop + List + Quit, run.Sent);
         Assert.AreEqual(Capa + Apop + List + Quit, run.Sent);
+        Diagnostics.AssertValues("sasl.Requests count", 0, sasl.Requests.Count());
         Assert.IsEmpty(sasl.Requests);
     }
 
@@ -290,7 +325,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         // Recordings "forceapop-nots", "crammissing", "nothing": nothing sent after CAPA.
         Pop3Run run = await RunAsync(greeting + capaReply, mail: new MailRequestOptions { LoginOptions = loginOptions }, sasl: PlainAndLogin());
 
+        Diagnostics.Diff("sent", Capa, run.Sent);
         Assert.AreEqual(Capa, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
     }
 
@@ -299,7 +336,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
     {
         Pop3Run run = await RunAsync(Greeting + CapaReply, mail: new MailRequestOptions { LoginOptions = "AUTH=PLAIN" });
 
+        Diagnostics.Diff("sent", Capa, run.Sent);
         Assert.AreEqual(Capa, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
     }
 
@@ -313,7 +352,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         // Recordings "usererr", "userplus", "passerr", "passplus": no QUIT.
         Pop3Run run = await RunAsync(PlainGreeting + UserOnlyCapaReply + replies);
 
+        Diagnostics.Diff("sent", Capa + sent, run.Sent);
         Assert.AreEqual(Capa + sent, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, message), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, message), run.Result);
     }
 
@@ -325,7 +366,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         // Recordings "apoperr", "apopplus": no QUIT.
         Pop3Run run = await RunAsync(Greeting + UserOnlyCapaReply + reply);
 
+        Diagnostics.Diff("sent", Capa + Apop, run.Sent);
         Assert.AreEqual(Capa + Apop, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, message), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, message), run.Result);
     }
 
@@ -336,7 +379,9 @@ public sealed class Pop3ProtocolHandlerLoginTests
         var sasl = PlainAndLogin();
         Pop3Run run = await RunAsync(Greeting + CapaReply + ListReply + Bye, noCredential: true, sasl: sasl);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertValues("sasl.Requests count", 0, sasl.Requests.Count());
         Assert.IsEmpty(sasl.Requests);
     }
 
@@ -348,6 +393,7 @@ public sealed class Pop3ProtocolHandlerLoginTests
         // Recordings "forceuser", "othopt": exit 3, nothing sent.
         Pop3Run run = await RunAsync(Greeting + CapaReply, mail: new MailRequestOptions { LoginOptions = loginOptions });
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"), run.Result);
@@ -358,14 +404,16 @@ public sealed class Pop3ProtocolHandlerLoginTests
     {
         Pop3Run run = await RunAsync(PlainGreeting + UserOnlyCapaReply);
 
+        Diagnostics.Diff("sent", Capa + "USER u\r\n", run.Sent);
         Assert.AreEqual(Capa + "USER u\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
 
     private static ScriptedSaslAuthenticator PlainAndLogin() =>
         new(("PLAIN", ["\0u\0p"]), ("LOGIN", ["u", "p"]));
 
-    private static async Task<Pop3Run> RunAsync(
+    private async Task<Pop3Run> RunAsync(
         string replies,
         NetworkCredential? credential = null,
         MailRequestOptions? mail = null,
@@ -389,8 +437,15 @@ public sealed class Pop3ProtocolHandlerLoginTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection));
         var tls = new QueuedTlsProvider();
 
+        Diagnostics.ArrangeRun(url, connection.Script);
+        Diagnostics.Arrange("credentials", context.Credentials is null ? "(none)" : context.Credentials.UserName + ":" + context.Credentials.Password);
+        Diagnostics.Arrange("mail options", mail is null ? "(none)" : $"login options {Pop3Diagnostics.Show(mail.LoginOptions)}, bearer {Pop3Diagnostics.Show(mail.BearerToken)}, sasl ir {mail.SaslInitialResponse}");
+        Diagnostics.Arrange("sasl", sasl is null ? "(no authenticator)" : "scripted");
+
         TransferResult result = await new Pop3ProtocolHandler(connector, tls, sasl).ExecuteAsync(context);
 
-        return new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        var run = new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        Diagnostics.ActRun(run);
+        return run;
     }
 }

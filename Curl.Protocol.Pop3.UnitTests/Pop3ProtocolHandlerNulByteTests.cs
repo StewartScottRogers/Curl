@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -14,6 +15,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerNulByteTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/";
 
     private const string Greeting = "+OK hi\r\n";
@@ -33,7 +39,9 @@ public sealed class Pop3ProtocolHandlerNulByteTests
     {
         NulByteRun run = await RunAsync(string.Empty, "+OK hel\0lo\r\n");
 
+        Diagnostics.AssertResult(NulByteFailure, run.Result);
         Assert.AreEqual(NulByteFailure, run.Result);
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
         CollectionAssert.AreEqual(
             (string[])["* " + NulByteInLine, "* closing connection #0"],
@@ -45,7 +53,9 @@ public sealed class Pop3ProtocolHandlerNulByteTests
     {
         NulByteRun run = await RunAsync(string.Empty, Greeting, "+OK ca\0pa\r\n");
 
+        Diagnostics.AssertResult(NulByteFailure, run.Result);
         Assert.AreEqual(NulByteFailure, run.Result);
+        Diagnostics.Diff("sent", Capa, run.Sent);
         Assert.AreEqual(Capa, run.Sent);
         CollectionAssert.AreEqual(
             (string[])["< +OK hi\r\n", "> CAPA\r\n", "* " + NulByteInLine, "* closing connection #0"],
@@ -57,7 +67,9 @@ public sealed class Pop3ProtocolHandlerNulByteTests
     {
         NulByteRun run = await RunAsync(string.Empty, Greeting, "+OK\r\nUS\0ER\r\n.\r\n");
 
+        Diagnostics.AssertResult(NulByteFailure, run.Result);
         Assert.AreEqual(NulByteFailure, run.Result);
+        Diagnostics.Diff("sent", Capa, run.Sent);
         Assert.AreEqual(Capa, run.Sent);
         CollectionAssert.AreEqual(
             (string[])["< +OK hi\r\n", "> CAPA\r\n", "< +OK\r\n", "* " + NulByteInLine, "* closing connection #0"],
@@ -69,8 +81,11 @@ public sealed class Pop3ProtocolHandlerNulByteTests
     {
         NulByteRun run = await RunAsync("1", Greeting, CapaReply, "+OK 6 octets\r\nab\0c\r\n.\r\n", Bye);
 
+        Diagnostics.AssertResult(TransferResult.Success(6), run.Result);
         Assert.AreEqual(TransferResult.Success(6), run.Result);
+        Diagnostics.AssertValues("run.Output", "ab\0c\r\n", run.Output);
         Assert.AreEqual("ab\0c\r\n", run.Output);
+        Diagnostics.Diff("sent", Capa + "RETR 1\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Capa + "RETR 1\r\nQUIT\r\n", run.Sent);
     }
 
@@ -79,19 +94,25 @@ public sealed class Pop3ProtocolHandlerNulByteTests
     {
         NulByteRun run = await RunAsync("1", Greeting, CapaReply, "+OK 3 octets\r\nabc\r\n.\r\n", "+OK B\0ye\r\n");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
+        Diagnostics.Diff("sent", Capa + "RETR 1\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Capa + "RETR 1\r\nQUIT\r\n", run.Sent);
     }
 
-    private static async Task<NulByteRun> RunAsync(string path, params string[] reads)
+    private async Task<NulByteRun> RunAsync(string path, params string[] reads)
     {
         var events = new RecordingTransferEvents();
         using var output = new MemoryStream();
         var connection = new ScriptedConnection([.. reads.Select(Encoding.Latin1.GetBytes)]);
         var context = new TransferContext { Url = CurlUrl.Parse(Url + path), Output = output, Events = events };
 
+        Diagnostics.ArrangeRun(Url + path, connection.Script);
+
         TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider())
             .ExecuteAsync(context);
+        Diagnostics.ActTransfer(result, events, connection.Sent);
+        Diagnostics.Bytes("output", output.ToArray());
 
         return new NulByteRun(
             result, events, Encoding.Latin1.GetString(connection.Sent), Encoding.Latin1.GetString(output.ToArray()));
