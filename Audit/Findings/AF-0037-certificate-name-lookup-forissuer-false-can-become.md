@@ -3,15 +3,19 @@ id: AF-0037
 title: Certificate name lookup `forIssuer: false` can become true with no test failing
 auditor: quality
 severity: High
-status: accepted
-reason: 
-key: quality:Curl.Networking.UnitLibrary/TlsFailureMessages.cs:SubjectNameLookup-forIssuer:surviving-mutant
+status: closed
+reason: Duplicate of AF-0031: the same surviving mutant (TlsFailureMessages.cs OpenSslPeerFailedVerification, forIssuer false -> true), whose mechanical key both now carry (ADR-0422).
+key: quality:Curl.Networking.UnitLibrary/TlsFailureMessages.cs:OpenSslPeerFailedVerification-false:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/TlsFailureMessages.cs:320:false
 task: BL-1380
+tasks: BL-1380, BL-1608
 found: 2026-10-03
 found-at: 2c24c2d74dc2c9775b64948efc3ca57b8937627e
 scorecard: 2026-10-03_1459.md
-closed:
-closed-by:
+duplicate-of: AF-0031
+closed: 2026-10-07
+closed-how: duplicate
+closed-by: session
 ---
 # AF-0037 - Certificate name lookup `forIssuer: false` can become true with no test failing
 
@@ -30,7 +34,7 @@ Mutant `GetNameInfo(SimpleName, forIssuer: true)` survived at seed 0. The subjec
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TlsFailureMessages.cs:320:false -Member OpenSslPeerFailedVerification -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at TlsFailureMessages.cs:320 is killed.
@@ -44,3 +48,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 - 2026-10-03: filed proposed.
 - 2026-10-03: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Duplicate of AF-0031: the same surviving mutant (TlsFailureMessages.cs OpenSslPeerFailedVerification, forIssuer false -> true), whose mechanical key both now carry (ADR-0422).

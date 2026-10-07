@@ -6,11 +6,15 @@ severity: Low
 status: proposed
 reason:
 key: process:logs:BL-1458:cost-outlier
+reproduction: none
 task: none
+tasks:
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0052 - BL-1458 cost 5.96 US dollars, 3.85 times the median run, and stopped at the per-task budget cap with its work stashed

@@ -20,28 +20,37 @@
 //                  that answers "x", a data reader that finds no file). The input is the
 //                  arguments as UTF-8 joined by NUL bytes, seeded from real option names in
 //                  CommandLineOptionTable. A refusal is expected; an exception is not.
-//   ssh            Curl.Protocol.Ssh exposes no public reader or decoder of raw bytes: its
-//                  public types are SshProtocolHandler, SshAlgorithmPreferences,
-//                  ISshRandomSource and SystemSshRandomSource, and every packet and message
-//                  reader is internal. The target says so and exits 2 (a finding for BL-1010).
+//   ssh            Curl.Protocol.Ssh: every SshWireDecoders method on the whole input -
+//                  CountWholePacketsAsync (unprotected binary packets, back to back),
+//                  TryInflatePayload (one zlib-compressed packet payload), TryDecodeKexInit
+//                  (a KEXINIT payload, message number 20 first), TryDecodeSftpAttributes (SFTP
+//                  attributes, flags first) and TryDecodeHostKeySignature (strings: host-key
+//                  algorithm, host key blob, signature blob; then the exchange hash). Seeded
+//                  with one well-formed input per method. A refusal (false, or a packet count
+//                  short of the whole input) is expected; an exception is not (AF-0011,
+//                  BL-1285).
 //
 // Mutations, one to three per input: bit flip; a byte set to 0x00, 0xFF, 0x7F or 0x80; a
 // length field (one or two bytes) inflated or deflated; truncate; duplicate a slice; splice
 // two seeds. Each input runs on a worker with a --max-ms limit: an exception is a crash, over
 // the limit is a hang. Each is saved once per distinct exception type and top stack frame (one
 // key for all hangs) as <out>/<target>-<n>.bin with <target>-<n>.txt: the exception, its stack,
-// the seed and the iteration. Exit 0 when nothing was found, 1 when something was, 2 for a
-// target with nothing to fuzz or bad arguments.
+// the seed and the iteration. Exit 0 when nothing was found, 1 when something was, 2 for an
+// unknown target or bad arguments.
 //
 // The same --seed and --iterations give the same iterations, crashes and hangs; only the
 // inputs per second depend on the machine.
 
 #:project ../../../Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj
 #:project ../../../Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj
+#:project ../../../Curl.Protocol.Ssh.UnitLibrary/Curl.Protocol.Ssh.UnitLibrary.csproj
 
+using System.Buffers.Binary;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text;
 using Curl.Cli;
+using Curl.Protocol.Ssh;
 using Curl.Tls;
 
 return FuzzApp.Run(args);
@@ -53,13 +62,6 @@ static class FuzzApp
         var options = ParseArguments(args);
         if (options is null) { return 2; }
         if (options.SelfTest) { return SelfTest.Run(); }
-
-        if (options.Target == "ssh")
-        {
-            Console.WriteLine("ssh: Curl.Protocol.Ssh.UnitLibrary exposes no public reader or decoder of raw bytes "
-                + "(public types: SshProtocolHandler, SshAlgorithmPreferences, ISshRandomSource, SystemSshRandomSource); nothing to fuzz.");
-            return 2;
-        }
 
         var target = Targets.Find(options.Target);
         if (target is null)
@@ -286,8 +288,105 @@ static class Targets
     {
         "tls-handshake" => TlsHandshake,
         "cli" => Cli,
+        "ssh" => Ssh,
         _ => null,
     };
+
+    static readonly FuzzTarget Ssh = new("ssh", SshSeeds, RunSsh);
+
+    public static SshSeedSet SshSeedsForTest() => new();
+
+    static void RunSsh(byte[] input)
+    {
+        // The packet reader's connection completes synchronously over an array, and the
+        // worker is already off the fuzzing thread, so blocking here costs nothing.
+        _ = SshWireDecoders.CountWholePacketsAsync(input, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+        _ = SshWireDecoders.TryInflatePayload(input);
+        _ = SshWireDecoders.TryDecodeKexInit(input);
+        _ = SshWireDecoders.TryDecodeSftpAttributes(input);
+        _ = SshWireDecoders.TryDecodeHostKeySignature(input);
+    }
+
+    static IEnumerable<byte[]> SshSeeds()
+    {
+        var seeds = new SshSeedSet();
+        yield return seeds.Packets;
+        yield return seeds.CompressedPayload;
+        yield return seeds.KexInit;
+        yield return seeds.SftpAttributes;
+        yield return seeds.Ed25519HostKeySignature;
+    }
+
+    /// <summary>One well-formed input for each SshWireDecoders method.</summary>
+    public sealed class SshSeedSet
+    {
+        // Two unprotected packets: SSH_MSG_IGNORE with a string, then SSH_MSG_NEWKEYS.
+        public byte[] Packets { get; } = [.. Packet([2, .. SshString("fuzz"u8.ToArray())]), .. Packet([21])];
+
+        // A KEXINIT payload, zlib-compressed as the first packet after compression starts.
+        // CompressionLevel.Optimal gives the same bytes every run.
+        public byte[] CompressedPayload { get; } = Compress(KexInitPayload());
+
+        public byte[] KexInit { get; } = KexInitPayload();
+
+        // Flags size, uid/gid, permissions, times and one extended pair, with their fields.
+        public byte[] SftpAttributes { get; } =
+        [
+            .. UInt32(0x8000000F), .. UInt32(0), .. UInt32(1234), .. UInt32(1000), .. UInt32(1000), .. UInt32(0x81A4),
+            .. UInt32(1700000000), .. UInt32(1700000001), .. UInt32(1), .. SshString("a@b"u8.ToArray()), .. SshString("c"u8.ToArray()),
+        ];
+
+        // RFC 8032 section 7.1 test 1: the public key and its signature over the empty
+        // message, which stands for the exchange hash.
+        public byte[] Ed25519HostKeySignature { get; } =
+        [
+            .. SshString("ssh-ed25519"u8.ToArray()),
+            .. SshString([.. SshString("ssh-ed25519"u8.ToArray()), .. SshString(Convert.FromHexString("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"))]),
+            .. SshString([.. SshString("ssh-ed25519"u8.ToArray()), .. SshString(Convert.FromHexString(
+                "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"))]),
+        ];
+
+        static byte[] KexInitPayload()
+        {
+            string[] lists =
+            [
+                "curve25519-sha256,ecdh-sha2-nistp256", "ssh-ed25519,rsa-sha2-256", "aes128-ctr,chacha20-poly1305@openssh.com",
+                "aes128-ctr,chacha20-poly1305@openssh.com", "hmac-sha2-256", "hmac-sha2-256", "none,zlib@openssh.com",
+                "none,zlib@openssh.com", "", "",
+            ];
+            return [20, .. Enumerable.Range(1, 16).Select(i => (byte)i), .. lists.SelectMany(l => SshString(Encoding.ASCII.GetBytes(l))), 0, .. UInt32(0)];
+        }
+
+        static byte[] Compress(byte[] payload)
+        {
+            using var output = new MemoryStream();
+            using (var zlib = new ZLibStream(output, CompressionLevel.Optimal, leaveOpen: true))
+            {
+                zlib.Write(payload);
+                zlib.Flush();
+            }
+
+            return output.ToArray();
+        }
+
+        // RFC 4253 section 6: length, padding length, payload, at least 4 bytes of padding,
+        // length field included in a multiple of 8.
+        static byte[] Packet(byte[] payload)
+        {
+            int padding = 8 - ((4 + 1 + payload.Length) % 8);
+            if (padding < 4) { padding += 8; }
+            return [.. UInt32((uint)(1 + payload.Length + padding)), (byte)padding, .. payload, .. new byte[padding]];
+        }
+
+        static byte[] SshString(byte[] value) => [.. UInt32((uint)value.Length), .. value];
+
+        static byte[] UInt32(uint value)
+        {
+            var bytes = new byte[4];
+            BinaryPrimitives.WriteUInt32BigEndian(bytes, value);
+            return bytes;
+        }
+    }
 
     static readonly FuzzTarget TlsHandshake = new("tls-handshake", TlsSeeds, RunTls);
 
@@ -428,6 +527,16 @@ static class SelfTest
             Check("every TLS handshake seed reads as a complete message", complete == tlsSeeds.Count - 1, $"{complete} of {tlsSeeds.Count - 1} (the last seed is an ECHConfigList)");
             Check("the ECHConfigList seed decodes", EchConfigList.Decode(tlsSeeds[^1]).Succeeded, "EchConfigList.Decode");
             Check("the ServerHello seed decodes", ServerHello.Decode(HandshakeMessageReader.Read(tlsSeeds[0]).Message!.Body).Succeeded, "ServerHello.Decode");
+
+            var ssh = Targets.SshSeedsForTest();
+            int packets = SshWireDecoders.CountWholePacketsAsync(ssh.Packets, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+            Check("the SSH packet seed reads as two whole packets", packets == 2, $"{packets} packets");
+            Check("the SSH compressed-payload seed inflates", SshWireDecoders.TryInflatePayload(ssh.CompressedPayload), "TryInflatePayload");
+            Check("the SSH KEXINIT seed decodes", SshWireDecoders.TryDecodeKexInit(ssh.KexInit), "TryDecodeKexInit");
+            Check("the SFTP attributes seed decodes", SshWireDecoders.TryDecodeSftpAttributes(ssh.SftpAttributes), "TryDecodeSftpAttributes");
+            Check("the ssh-ed25519 host key and signature seed decodes", SshWireDecoders.TryDecodeHostKeySignature(ssh.Ed25519HostKeySignature), "TryDecodeHostKeySignature");
+            byte[] cut = ssh.KexInit[..^5];
+            Check("a cut-short KEXINIT is refused, not thrown", !SshWireDecoders.TryDecodeKexInit(cut), "TryDecodeKexInit on the seed minus 5 bytes");
 
             var again = Runner.Fuzz(thrower, thrower.Seeds().ToList(), 5000, 1, 1000, Path.Combine(dir, "again"));
             Check("the same seed gives the same counts", again.Crashes == summary.Crashes && again.Saved == summary.Saved, $"{again.Crashes}/{summary.Crashes}");

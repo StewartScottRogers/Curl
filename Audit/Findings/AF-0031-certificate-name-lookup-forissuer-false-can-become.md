@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: accepted
 reason: 
-key: quality:Curl.Networking.UnitLibrary/TlsFailureMessages.cs:CertificateSubjectName:surviving-mutant
-task: BL-1373
+key: quality:Curl.Networking.UnitLibrary/TlsFailureMessages.cs:OpenSslPeerFailedVerification-false:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/TlsFailureMessages.cs:320:false
+task: BL-1608
+tasks: BL-1373, BL-1380, BL-1608
 found: 2026-10-03
 found-at: d1db9881553d55cd92c0e74bb41561c3dea9ea84
 scorecard: 2026-10-03_1233.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0031 - Certificate name lookup `forIssuer: false` can become true with no test failing
@@ -30,7 +34,7 @@ Mutation seed 0 changed `certificate.GetNameInfo(X509NameType.SimpleName, forIss
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-net.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/TlsFailureMessages.cs:320:false -Member OpenSslPeerFailedVerification -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: Mutant at TlsFailureMessages.cs:320 is killed.

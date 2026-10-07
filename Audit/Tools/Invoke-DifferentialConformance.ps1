@@ -30,9 +30,13 @@
       Date headers     a "Date: ..." line's value becomes DATE
       boundary         a multipart boundary (20 or more dashes and 16 or more alphanumerics)
                        becomes BOUNDARY; curl randomises it per run
-      source port      the first port of a --haproxy-protocol PROXY line, curl's own ephemeral
-                       port, becomes SOURCEPORT
-      progress meter   progress-meter header and row lines in stderr are dropped; curl prints
+      source port      the first port of a --haproxy-protocol PROXY line, and the port after
+                       "from <address> port" in -v's "* Established connection" line, curl's
+                       own ephemeral port, become SOURCEPORT
+      elapsed time     "after <n> ms" and "after <n> milliseconds" in error and verbose text
+                       become "after N ms" and "after N milliseconds"
+      progress meter   progress-meter header and row lines in stderr are dropped, and a meter
+                       row run into the start of a message line is cut off it; curl prints
                        the meter when stdout is not a terminal, with that run's timings
     The report lists the normalisations. State the reference curl's version with every
     comparison: summary.json carries `curl --version`'s first line.
@@ -125,8 +129,10 @@ $Normalisations = @(
     'loopback port -> PORT',
     'Date header value -> DATE',
     'multipart boundary -> BOUNDARY',
-    'progress-meter header and row lines in stderr dropped',
-    'the source port in a --haproxy-protocol PROXY line -> SOURCEPORT'
+    'progress-meter header and row lines in stderr dropped; a meter row run into a message line cut off it',
+    'the source port in a --haproxy-protocol PROXY line -> SOURCEPORT',
+    'the source port in -v''s "* Established connection ... from <address> port N" -> SOURCEPORT',
+    'elapsed "after N ms" / "after N milliseconds" -> after N ms / after N milliseconds'
 )
 
 function Get-ReferenceCurl {
@@ -233,13 +239,23 @@ function Get-Normalised([string]$Path, [string]$Kind, [int]$Port, [string]$Progr
     $text = $latin1.GetString([IO.File]::ReadAllBytes($Path))
     # --haproxy-protocol's PROXY line names curl's own ephemeral source port first.
     $text = [regex]::Replace($text, '(?m)^(PROXY TCP[46] \S+ \S+ )\d+( \d+\r?)$', '${1}SOURCEPORT${2}')
+    # -v's "* Established connection to ... from 127.0.0.1 port N" names the same ephemeral
+    # source port. Masked before the server port, which could be a substring of it.
+    $text = [regex]::Replace($text, '(?m)^(\* Established connection .* from \S+ port )\d+', '${1}SOURCEPORT')
     $text = $text.Replace("$Port", 'PORT')
+    # Elapsed time in error and verbose text: "Failed to connect to ... after N ms",
+    # "timed out after N milliseconds".
+    $text = [regex]::Replace($text, '\bafter \d+ ms\b', 'after N ms')
+    $text = [regex]::Replace($text, '\bafter \d+ milliseconds\b', 'after N milliseconds')
     $text = [regex]::Replace($text, '(?im)^(Date:\s*)[^\r\n]*', '${1}DATE')
     $text = [regex]::Replace($text, '-{20,}[0-9A-Za-z]{16,}', 'BOUNDARY')
     if ($Kind -eq 'stderr') {
         if ($ProgramName -and $ProgramName -ne 'curl') { $text = [regex]::Replace($text, "(?m)^$([regex]::Escape($ProgramName)):", 'curl:') }
         $kept = foreach ($line in ($text -split "\r\n|\r|\n")) {
             if ($line -match '^\s*%\s+Total\s' -or $line -match '^\s*Dload\s+Upload' -or $line -match '^\s*DL%\s+UL%') { continue }
+            # A meter row with no line end before a message ("... --:--:--     0Warning: ...")
+            # lands wherever that run's timing put it; keep only the message.
+            $line = [regex]::Replace($line, '^[\s\d.:kMGTP-]*(?:--:--:--|\d+:\d\d:\d\d)[\s\d.:kMGTP-]*?(?=[A-Za-z*])', '')
             # A meter row is only numbers, units, dashes and colons; curl's own messages
             # ("curl: (N) ...", "* ...") always hold letters.
             if ($line -match '^[\s\d.:kMGTP-]+$' -and $line -match '\d') { continue }

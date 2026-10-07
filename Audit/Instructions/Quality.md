@@ -77,8 +77,36 @@ makes. Skip survivors in code that cannot change behaviour (logging text no test
 equivalent mutants such as `x >= 0` where `x` is never negative), and say in the finding's
 evidence why a kept one matters.
 
-For a surviving-mutant finding, the reproduction is the mutation command with the same
-`-Seed`, and the expected result is that the mutant at that file and line is `killed`.
+For a surviving-mutant finding, the reproduction targets that one mutant, never the sample:
+
+- `reproduction.mutation` is `<file>:<line>:<operator>`, copied from the tool's JSON for the
+  mutant (`file`, `line`, `operator`), e.g.
+  `Curl.Networking.UnitLibrary/TcpPendingConnection.cs:77:true`. Always write it: it is what
+  lets the audit run rerun the mutant itself and close the finding on that evidence (ADR-0422).
+- `reproduction.command` is
+  `powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site <file>:<line>:<operator> -Member <member> -ExcludeBaselineFailures -TimeoutSeconds <limit>`,
+  with `<member>` the mutant's `member` from the JSON.
+- The expected result is that the mutant is `killed`; the actual, that it `survived`.
+
+The findings writer replaces the key of a finding with a `reproduction.mutation` by one built
+from the site: `quality:<file>:<member>-<operator word>:surviving-mutant`. Write the key as
+below anyway; it is used when the site is missing.
+
+A library whose unmutated tests already fail: run it with `-ExcludeBaselineFailures`, which
+leaves out the failing tests and names them in `excludedTests`, rather than skipping the
+library. Report the failing tests as a finding of their own if they are not one already.
+
+### Re-auditing a surviving-mutant finding
+
+Run the finding's reproduction command - the targeted `-Site` run - on the tree you audit,
+never a fresh sample. A sample that did not include the site says nothing about it. Report:
+
+- `"reproduces": true` when the mutant `survived`;
+- `"reproduces": false` when it was `killed` or `timedOut`;
+- `"reproduces": null` when you could not tell - the outcome was `site-missing` or
+  `stillborn`, the baseline stopped the run, or the finding's reproduction is the old sampled
+  command and its site was not in your sample. `null` is recorded as "not re-audited"; never
+  report a site you did not run as `false`.
 
 Report `mutationScore.<Library>` in `metrics` for every library you mutated: the `score` the
 tool printed.
@@ -94,7 +122,7 @@ Follow the key rule in [Report-Format.md](Report-Format.md). Use these kinds:
 | `no-assertion` | Step 2: a test with no assertion. |
 | `ignored-test` | Step 2: `[Ignore]` or `Assert.Inconclusive`. |
 | `swallowed-failure` | Step 2: a catch-all that hides the failure. |
-| `surviving-mutant` | Step 3: a mutant no test killed. Its `<what>` is `<method>-<operator>`, not a line number. |
+| `surviving-mutant` | Step 3: a mutant no test killed. Its `<what>` is `<member>-<operator word>` (the tool's `member`; `eq`, `ne`, `lt`, `gt`, `le`, `ge`, `and`, `or`, `plus1`, `minus1`, `true`, `false`, `not`), not a line number. |
 
 ## Severity
 

@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: proposed
 reason:
-key: quality:Curl.Protocol.Http.UnitLibrary/Http2Session.cs:LogPeerConnectionFrames-AndToOr:surviving-mutant
+key: quality:Curl.Protocol.Http.UnitLibrary/Http2Session.cs:LogPeerConnectionFrames-and:surviving-mutant
+reproduction: mutation Curl.Protocol.Http.UnitLibrary/Http2Session.cs:432:&&
 task: none
+tasks:
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0046 - HTTP/2 'SETTINGS received' log condition `!wasSettingsReceived && Frames.IsPeerSettingsReceived` can become || with no test failing
@@ -30,7 +34,7 @@ Invoke-MutationTest.ps1 -Library Curl.Protocol.Http.UnitLibrary -MaxMutants 40 -
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Protocol.Http.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-http.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Protocol.Http.UnitLibrary/Http2Session.cs:432:&& -Member LogPeerConnectionFrames -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at Curl.Protocol.Http.UnitLibrary/Http2Session.cs:432 (&& to ||) is killed.

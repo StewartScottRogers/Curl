@@ -39,10 +39,9 @@ holds the exception and stack. Its reproduction is:
 dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --replay <saved .bin> --target <target>
 ```
 
-The `ssh` target exits 2 because `Curl.Protocol.Ssh.UnitLibrary` exposes no public reader or
-decoder of raw bytes, so its parsers cannot be fuzzed from outside. Report that once, as a Low
-finding (key `security:Curl.Protocol.Ssh.UnitLibrary:ssh-parsers:unfuzzable`), until the
-library offers a byte-level entry point.
+The `ssh` target fuzzes `Curl.Protocol.Ssh.UnitLibrary`'s readers of server bytes through
+its public `SshWireDecoders` (ADR-0394): the packet reader, zlib inflation, `KEXINIT`, SFTP
+attributes and host-key signatures, every method on every input.
 
 Report `fuzzIterations.<target>` and `fuzzCrashes.<target>` in `metrics` for every target run.
 

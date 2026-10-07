@@ -5,12 +5,16 @@ auditor: quality
 severity: Medium
 status: accepted
 reason: 
-key: quality:Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:Decode-or-to-and:surviving-mutant
+key: quality:Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:TryDecode-or:surviving-mutant
+reproduction: mutation Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:161:||
 task: BL-1261
+tasks: BL-1261
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
+duplicate-of:
 closed:
+closed-how:
 closed-by:
 ---
 # AF-0005 - Brainpool point decoding: changing || to && in the below-modulus check is not caught by any test
@@ -30,7 +34,7 @@ Mutant survived (seed 0): `if (!domain.Field.IsBelowModulus(x) || !domain.Field.
 Run from the repository root:
 
 ```powershell
-powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Cryptography.UnitLibrary -MaxMutants 40 -Seed 0 -TimeoutSeconds 300 -OutFile $env:TEMP\mutation-crypto.json
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:161:|| -Member TryDecode -ExcludeBaselineFailures -TimeoutSeconds 600
 ```
 
 - Expected: The mutant at Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs:161 (||) is killed.
