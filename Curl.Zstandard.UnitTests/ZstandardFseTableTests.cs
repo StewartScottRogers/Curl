@@ -1,4 +1,5 @@
 using System.Numerics;
+using Curl.Testing;
 using static Curl.Zstandard.ZstandardTestLiterals;
 
 namespace Curl.Zstandard;
@@ -11,6 +12,8 @@ namespace Curl.Zstandard;
 [TestClass]
 public sealed class ZstandardFseTableTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     /// <summary>RFC 8878 section 3.1.1.3.2.2.1: <c>literalsLength_defaultDistribution</c>.</summary>
     private static readonly short[] LiteralsLengthDefaultDistribution =
     [
@@ -35,8 +38,14 @@ public sealed class ZstandardFseTableTests
     [TestMethod]
     public void Build_LiteralsLengthDefaultDistribution_IsRfc8878AppendixA1()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("distribution", string.Join(", ", LiteralsLengthDefaultDistribution));
+        diagnostics.Arrange("accuracy log", 6);
+
         var table = ZstandardFseTable.Build(LiteralsLengthDefaultDistribution, 6);
 
+        diagnostics.Act("accuracy log", table.AccuracyLog);
+        diagnostics.Diff("states 0 to 63 as (symbol, bits, baseline)", Describe(LiteralsLengthCodeTable), Describe(table, 64));
         Assert.AreEqual(6, table.AccuracyLog);
         for (var state = 0; state < 64; state++)
         {
@@ -54,8 +63,20 @@ public sealed class ZstandardFseTableTests
     {
         var description = FseTableDescription(counts, accuracyLog);
         var expected = ZstandardFseTable.Build(counts, accuracyLog);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("counts", string.Join(", ", counts));
+        diagnostics.Arrange("accuracy log", accuracyLog);
+        diagnostics.Bytes("description, then 0xAA", [.. description, 0xAA]);
 
         var table = ZstandardFseTable.Read([.. description, 0xAA], 6, 11, out var bytesRead);
+
+        diagnostics.Act("table read", table is not null);
+        diagnostics.Act("bytes read", bytesRead);
+        diagnostics.Assert("bytes read", description.Length, bytesRead);
+        if (table is not null)
+        {
+            diagnostics.Diff("states as (symbol, bits, baseline)", Describe(expected, 1 << accuracyLog), Describe(table, 1 << table.AccuracyLog));
+        }
 
         Assert.IsNotNull(table);
         Assert.AreEqual(description.Length, bytesRead);
@@ -77,8 +98,20 @@ public sealed class ZstandardFseTableTests
     public void Read_LibzstdDescriptionOfCounts28And4_BuildsThatTable()
     {
         var expected = ZstandardFseTable.Build([28, 4], 5);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Bytes("description", [0xD0, 0x0F]);
+        diagnostics.Arrange("counts it describes", "28, 4 at accuracy log 5");
+        diagnostics.Bytes("description written from those counts", FseTableDescription([28, 4], 5));
 
         var table = ZstandardFseTable.Read([0xD0, 0x0F], 6, 11, out var bytesRead);
+
+        diagnostics.Act("table read", table is not null);
+        diagnostics.Act("bytes read", bytesRead);
+        diagnostics.Assert("bytes read", 2, bytesRead);
+        if (table is not null)
+        {
+            diagnostics.Diff("states as (symbol, bits, baseline)", Describe(expected, 32), Describe(table, 1 << table.AccuracyLog));
+        }
 
         Assert.IsNotNull(table);
         Assert.AreEqual(2, bytesRead);
@@ -94,7 +127,9 @@ public sealed class ZstandardFseTableTests
     {
         var description = FseTableDescription([100, 28], 7);
 
-        Assert.IsNull(ZstandardFseTable.Read(description, 6, 11, out _));
+        var table = ReadWritingDiagnostics("counts 100, 28 at accuracy log 7, limit 6", description, 11, expectTable: false);
+
+        Assert.IsNull(table);
     }
 
     [TestMethod]
@@ -102,7 +137,9 @@ public sealed class ZstandardFseTableTests
     {
         var description = FseTableDescription([10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22], 5);
 
-        Assert.IsNull(ZstandardFseTable.Read(description, 6, 11, out _));
+        var table = ReadWritingDiagnostics("counts 10, fourteen zeros, 22 at accuracy log 5", description, 11, expectTable: false);
+
+        Assert.IsNull(table);
     }
 
     [TestMethod]
@@ -110,9 +147,36 @@ public sealed class ZstandardFseTableTests
     {
         var description = FseTableDescription([.. Enumerable.Repeat((short)-1, 32)], 5);
 
-        Assert.IsNotNull(ZstandardFseTable.Read(description, 6, 255, out _));
-        Assert.IsNull(ZstandardFseTable.Read(description[..1], 6, 255, out _));
+        var whole = ReadWritingDiagnostics("thirty-two counts of -1 at accuracy log 5, whole", description, 255, expectTable: true);
+        var cut = ReadWritingDiagnostics("the same description cut to its first byte", description[..1], 255, expectTable: false);
+
+        Assert.IsNotNull(whole);
+        Assert.IsNull(cut);
     }
+
+    /// <summary>Writes a description, reads it with Accuracy_Log limit 6 and <paramref name="maxSymbol" />, and writes whether a table came back against <paramref name="expectTable" />.</summary>
+    private ZstandardFseTable? ReadWritingDiagnostics(string name, byte[] description, int maxSymbol, bool expectTable)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("case", name);
+        diagnostics.Bytes("description", description);
+        diagnostics.Arrange("max symbol", maxSymbol);
+
+        var table = ZstandardFseTable.Read(description, 6, maxSymbol, out var bytesRead);
+
+        diagnostics.Act("table read", table is not null);
+        diagnostics.Act("bytes read", bytesRead);
+        diagnostics.Assert("table read", expectTable, table is not null);
+        return table;
+    }
+
+    /// <summary>Lists RFC rows as "state: (symbol, bits, baseline)" lines for a DIFF.</summary>
+    private static string Describe((int Symbol, int NumberOfBits, int Base)[] rows) =>
+        string.Join("\n", rows.Select((row, state) => $"{state}: {row}"));
+
+    /// <summary>Lists the first <paramref name="states" /> states of <paramref name="table" /> the way the RFC rows are listed.</summary>
+    private static string Describe(ZstandardFseTable table, int states) =>
+        Describe([.. Enumerable.Range(0, states).Select(state => (table.Symbol(state), NumberOfBits(table, state), Baseline(table, state)))]);
 
     /// <summary>The state after <paramref name="state" /> when the bits read are all 0: its baseline.</summary>
     private static int Baseline(ZstandardFseTable table, int state)

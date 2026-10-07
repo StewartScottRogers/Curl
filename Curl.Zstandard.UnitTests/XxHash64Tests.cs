@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Zstandard;
 
@@ -12,6 +13,8 @@ public sealed class XxHash64Tests
 {
     /// <summary>xxhsum's non-zero sanity seed, <c>XXH_PRIME32_1</c>.</summary>
     internal const ulong SanitySeed = 2654435761;
+
+    public TestContext TestContext { get; set; } = null!;
 
     // xxhsum's sanity table: the first N bytes of its generated test buffer.
     [TestMethod]
@@ -28,8 +31,10 @@ public sealed class XxHash64Tests
     {
         var data = SanityBuffer(length);
 
-        Assert.AreEqual(expected, XxHash64.Hash(data, seed));
-        Assert.AreEqual(expected, HashOneByteAtATime(data, seed));
+        var (oneShot, byteAtATime) = HashBothWays(data, seed, expected);
+
+        Assert.AreEqual(expected, oneShot);
+        Assert.AreEqual(expected, byteAtATime);
     }
 
     // python-xxhash's README.
@@ -41,14 +46,40 @@ public sealed class XxHash64Tests
     {
         var data = Encoding.ASCII.GetBytes(text);
 
-        Assert.AreEqual(expected, XxHash64.Hash(data, seed));
-        Assert.AreEqual(expected, HashOneByteAtATime(data, seed));
+        var (oneShot, byteAtATime) = HashBothWays(data, seed, expected);
+
+        Assert.AreEqual(expected, oneShot);
+        Assert.AreEqual(expected, byteAtATime);
     }
 
     [TestMethod]
     public void Hash_NoSeed_UsesSeedZero()
     {
-        Assert.AreEqual(0xEF46DB3751D8E999UL, XxHash64.Hash([]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("input", "empty, no seed argument");
+
+        var hash = XxHash64.Hash([]);
+
+        diagnostics.Act("hash", XxHash64AccumulatorTests.Hex(hash));
+        diagnostics.Assert("hash (seed 0, empty input)", XxHash64AccumulatorTests.Hex(0xEF46DB3751D8E999UL), XxHash64AccumulatorTests.Hex(hash));
+        Assert.AreEqual(0xEF46DB3751D8E999UL, hash);
+    }
+
+    /// <summary>Hashes <paramref name="data" /> in one shot and a byte at a time, writing both results against <paramref name="expected" />.</summary>
+    private (ulong OneShot, ulong ByteAtATime) HashBothWays(byte[] data, ulong seed, ulong expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("seed", seed);
+        diagnostics.Bytes("input", data);
+
+        var oneShot = XxHash64.Hash(data, seed);
+        var byteAtATime = HashOneByteAtATime(data, seed);
+
+        diagnostics.Act("one-shot hash", XxHash64AccumulatorTests.Hex(oneShot));
+        diagnostics.Act("byte-at-a-time hash", XxHash64AccumulatorTests.Hex(byteAtATime));
+        diagnostics.Assert("one-shot hash", XxHash64AccumulatorTests.Hex(expected), XxHash64AccumulatorTests.Hex(oneShot));
+        diagnostics.Assert("byte-at-a-time hash", XxHash64AccumulatorTests.Hex(expected), XxHash64AccumulatorTests.Hex(byteAtATime));
+        return (oneShot, byteAtATime);
     }
 
     private static ulong HashOneByteAtATime(byte[] data, ulong seed)

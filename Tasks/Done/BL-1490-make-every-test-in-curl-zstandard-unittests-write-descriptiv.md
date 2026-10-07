@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Zstandard.UnitTests]
 requirement: none
 created: 2026-10-04
-completed:
+completed: 2026-10-07
 ---
 # BL-1490 — Make every test in Curl.Zstandard.UnitTests write descriptive diagnostic output
 
@@ -27,17 +27,22 @@ Every test in `Curl.Zstandard.UnitTests` writes, through BL-1457's shared `TestD
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in `Curl.Zstandard.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Zstandard.UnitTests -warnaserror` is clean and `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Zstandard.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Zstandard.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Zstandard.UnitTests -warnaserror` is clean and `dotnet test Curl.Zstandard.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Zstandard.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 50 test methods in 9 files.
+- Done 2026-10-07. A new shared helper, `ZstandardTestDiagnostics.cs`, writes a source as `BYTES` plus an `ARRANGE frames` line that decodes every frame (descriptor, checksum flag, window size, dictionary ID, content size, each block's type and size, checksum, or where it is cut short, a reserved block type or an unknown magic) and output as `BYTES` with a `DIFF` against the expected bytes. Corrupt-input tests write the `OperationStatus` and the `ZstandardDecodeError` raised; libzstd frames write a `DIFF` of the SHA-256; FSE and sequence-field table tests write a `DIFF` of every state as (symbol, bits, baseline); XXH64 tests write each hash in hex. Golden-corpus tests time `PHASE decompress`.
+- Counts before -> after (`Select-String -AllMatches`, excluding `obj`): `Assert.` 136 -> 136, `[TestMethod` 50 -> 50, `[DataRow(` 36 -> 36. Removed lines in the diff are only assertions hoisted into a variable so the value can be written before it is asserted; no data row or data source changed.
+- Detailed run: 276 tests, 276 `END` lines, none with arrange, act or assert 0; all passed. Total unchanged at 276: no `[TestMethod]`, `[DataRow]` or `DynamicData` source line changed.
+- `SLOW:` lines: none. The slowest test took 65 ms (golden `rle-first-block.zst`, 1 MiB).
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Zstandard.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF diagnostics, with decoded frame headers and output diffs
