@@ -234,7 +234,9 @@ function Update-FindingTasks($Finding, [string[]]$History, [string]$Current) {
     # they differ from what the file says. task keeps meaning "the current task" (ADR-0422).
     if (-not $History.Count) { return }
     $sorted = @($History | Sort-Object { [int]($_ -replace '\D', '') } -Unique)
-    $newest = if ($Current) { $Current } else { $sorted[-1] }
+    # The current task: the one given (newly filed, or the newest still open), else the recorded
+    # one when it is in the history, else the newest.
+    $newest = if ($Current) { $Current } elseif ($sorted -contains $Finding.Task) { $Finding.Task } else { $sorted[-1] }
     $recorded = @(@($Finding.Tasks) + @($Finding.Task) | Where-Object { $_ -match '^BL-\d+$' } | Sort-Object { [int]($_ -replace '\D', '') } -Unique)
     # A finding whose task alone names its one task is left as it is.
     if ((($recorded -join ',') -eq ($sorted -join ',')) -and $Finding.Task -eq $newest) { return }
