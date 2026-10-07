@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Curl.Testing;
 using X509CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
 
 namespace Curl.Tls;
@@ -14,13 +15,20 @@ public sealed class OcspStapleVerifierTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 28, 12, 0, 0, TimeSpan.Zero);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void AGoodResponseSignedByTheIssuerPasses()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("response", "good, signed by the issuer");
 
         OcspStapleOutcome outcome = Verify(pki, pki.Response(Now));
 
+        Diagnostics.Assert("outcome", new OcspStapleOutcome(OcspStapleStatus.Good), outcome);
+        Diagnostics.Assert("is good", true, outcome.IsGood);
         Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Good), outcome);
         Assert.IsTrue(outcome.IsGood);
     }
@@ -30,8 +38,12 @@ public sealed class OcspStapleVerifierTests
     {
         using OcspTestPki pki = new();
         byte[] keyHash = SHA1.HashData(OcspCertificateFields.Read(pki.Ca.RawData).PublicKey.KeyBits);
+        Diagnostics.Bytes("responder key hash", keyHash);
 
-        Assert.AreEqual(OcspStapleStatus.Good, Verify(pki, pki.Response(Now) with { ResponderName = null, ResponderKeyHash = keyHash }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { ResponderName = null, ResponderKeyHash = keyHash }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
     }
 
     [TestMethod]
@@ -46,8 +58,12 @@ public sealed class OcspStapleVerifierTests
             NextUpdateOffset = null,
             CertIdHashOid = OcspResponseBuilder.Sha256Oid,
         };
+        Diagnostics.Arrange("response", "with a version, response and single extensions, no nextUpdate, a SHA-256 CertID");
 
-        Assert.AreEqual(OcspStapleStatus.Good, Verify(pki, response).Status);
+        OcspStapleStatus status = Verify(pki, response).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
     }
 
     [TestMethod]
@@ -56,9 +72,12 @@ public sealed class OcspStapleVerifierTests
     public void ARevokedCertificateReportsItsReason(int reason)
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("revocation reason", reason);
 
         OcspStapleOutcome outcome = Verify(pki, pki.Response(Now) with { CertStatus = OcspStapleStatus.Revoked, RevocationReason = reason });
 
+        Diagnostics.Assert("outcome", new OcspStapleOutcome(OcspStapleStatus.Revoked, reason), outcome);
+        Diagnostics.Assert("is good", false, outcome.IsGood);
         Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Revoked, reason), outcome);
         Assert.IsFalse(outcome.IsGood);
     }
@@ -67,8 +86,12 @@ public sealed class OcspStapleVerifierTests
     public void ARevokedCertificateWithNoReasonReportsMinusOne()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("response", "revoked with no reason");
 
-        Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Revoked, -1), Verify(pki, pki.Response(Now) with { CertStatus = OcspStapleStatus.Revoked }));
+        OcspStapleOutcome outcome = Verify(pki, pki.Response(Now) with { CertStatus = OcspStapleStatus.Revoked });
+
+        Diagnostics.Assert("outcome", new OcspStapleOutcome(OcspStapleStatus.Revoked, -1), outcome);
+        Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Revoked, -1), outcome);
     }
 
     [TestMethod]
@@ -76,16 +99,24 @@ public sealed class OcspStapleVerifierTests
     {
         using OcspTestPki pki = new();
         OcspResponseBuilder response = pki.Response(Now) with { CertStatus = OcspStapleStatus.Revoked, NextUpdateOffset = TimeSpan.FromHours(-1), ThisUpdateOffset = TimeSpan.FromDays(-1) };
+        Diagnostics.Arrange("response", "revoked, thisUpdate a day ago, nextUpdate an hour ago");
 
-        Assert.AreEqual(OcspStapleStatus.Revoked, Verify(pki, response).Status);
+        OcspStapleStatus status = Verify(pki, response).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Revoked, status);
+        Assert.AreEqual(OcspStapleStatus.Revoked, status);
     }
 
     [TestMethod]
     public void AnUnknownCertificateIsRefused()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("certificate status", OcspStapleStatus.Unknown);
 
-        Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Unknown), Verify(pki, pki.Response(Now) with { CertStatus = OcspStapleStatus.Unknown }));
+        OcspStapleOutcome outcome = Verify(pki, pki.Response(Now) with { CertStatus = OcspStapleStatus.Unknown });
+
+        Diagnostics.Assert("outcome", new OcspStapleOutcome(OcspStapleStatus.Unknown), outcome);
+        Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Unknown), outcome);
     }
 
     [TestMethod]
@@ -95,14 +126,20 @@ public sealed class OcspStapleVerifierTests
     {
         using OcspTestPki pki = new();
 
-        Assert.AreEqual(OcspStapleStatus.NoResponse, OcspStapleVerifier.Verify(response, pki.Chain, Now).Status);
+        OcspStapleStatus status = VerifyBytes(response, pki.Chain).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.NoResponse, status);
+        Assert.AreEqual(OcspStapleStatus.NoResponse, status);
     }
 
     [TestMethod]
     public void AnEmptyChainIsAnArgumentError()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => OcspStapleVerifier.Verify([0x30, 0x00], [], Now));
-        Assert.ThrowsExactly<ArgumentNullException>(() => OcspStapleVerifier.Verify([0x30, 0x00], null!, Now));
+        Diagnostics.Arrange("response", "30 00");
+        Diagnostics.Arrange("chains", "empty, null");
+
+        WriteThrown("an empty chain", Assert.ThrowsExactly<ArgumentException>(() => OcspStapleVerifier.Verify([0x30, 0x00], [], Now)));
+        WriteThrown("a null chain", Assert.ThrowsExactly<ArgumentNullException>(() => OcspStapleVerifier.Verify([0x30, 0x00], null!, Now)));
     }
 
     [TestMethod]
@@ -113,22 +150,34 @@ public sealed class OcspStapleVerifierTests
     {
         using OcspTestPki pki = new();
 
-        Assert.AreEqual(OcspStapleStatus.Malformed, OcspStapleVerifier.Verify(response, pki.Chain, Now).Status);
+        OcspStapleStatus status = VerifyBytes(response, pki.Chain).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Malformed, status);
+        Assert.AreEqual(OcspStapleStatus.Malformed, status);
     }
 
     [TestMethod]
     public void AResponseOfAnotherTypeIsMalformed()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("response type", "1.3.6.1.5.5.7.48.1.99");
 
-        Assert.AreEqual(OcspStapleStatus.Malformed, Verify(pki, pki.Response(Now) with { ResponseType = "1.3.6.1.5.5.7.48.1.99" }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { ResponseType = "1.3.6.1.5.5.7.48.1.99" }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Malformed, status);
+        Assert.AreEqual(OcspStapleStatus.Malformed, status);
     }
 
     [TestMethod]
     public void ACertificateStatusOfAnotherKindIsMalformed()
     {
         using OcspTestPki pki = new();
-        Assert.AreEqual(OcspStapleStatus.Malformed, Verify(pki, pki.Response(Now) with { CertStatus = OcspStapleStatus.Malformed }).Status);
+        Diagnostics.Arrange("certificate status", OcspStapleStatus.Malformed);
+
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { CertStatus = OcspStapleStatus.Malformed }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Malformed, status);
+        Assert.AreEqual(OcspStapleStatus.Malformed, status);
     }
 
     [TestMethod]
@@ -138,9 +187,11 @@ public sealed class OcspStapleVerifierTests
     public void AnUnsuccessfulResponseReportsItsStatus(int responseStatus)
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("response status", responseStatus);
 
         OcspStapleOutcome outcome = Verify(pki, pki.Response(Now) with { ResponseStatus = responseStatus, OmitResponseBytes = true });
 
+        Diagnostics.Assert("outcome", new OcspStapleOutcome(OcspStapleStatus.Unsuccessful, responseStatus), outcome);
         Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.Unsuccessful, responseStatus), outcome);
     }
 
@@ -148,16 +199,24 @@ public sealed class OcspStapleVerifierTests
     public void ASuccessfulResponseWithoutResponseBytesIsMalformed()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("response", "successful, no responseBytes");
 
-        Assert.AreEqual(OcspStapleStatus.Malformed, Verify(pki, pki.Response(Now) with { OmitResponseBytes = true }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { OmitResponseBytes = true }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Malformed, status);
+        Assert.AreEqual(OcspStapleStatus.Malformed, status);
     }
 
     [TestMethod]
     public void AChainWithoutTheIssuerIsRefused()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("chain", "the leaf only");
 
-        Assert.AreEqual(OcspStapleStatus.IssuerNotFound, OcspStapleVerifier.Verify(pki.Response(Now).Build(), [pki.Leaf.RawData], Now).Status);
+        OcspStapleStatus status = VerifyBytes(pki.Response(Now).Build(), [pki.Leaf.RawData]).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.IssuerNotFound, status);
+        Assert.AreEqual(OcspStapleStatus.IssuerNotFound, status);
     }
 
     [TestMethod]
@@ -169,24 +228,36 @@ public sealed class OcspStapleVerifierTests
             Signer = OcspResponseBuilder.EcdsaSigner(pki.CaKey),
             ResponderName = pki.Ca.SubjectName.RawData,
         };
+        Diagnostics.Arrange("chain", "the self-signed CA only");
 
-        Assert.AreEqual(OcspStapleStatus.Good, OcspStapleVerifier.Verify(response.Build(), [pki.Ca.RawData], Now).Status);
+        OcspStapleStatus status = VerifyBytes(response.Build(), [pki.Ca.RawData]).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
     }
 
     [TestMethod]
     public void ABadSignatureIsRefused()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("response", "signature corrupted");
 
-        Assert.AreEqual(OcspStapleStatus.SignatureInvalid, Verify(pki, pki.Response(Now) with { CorruptSignature = true }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { CorruptSignature = true }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.SignatureInvalid, status);
+        Assert.AreEqual(OcspStapleStatus.SignatureInvalid, status);
     }
 
     [TestMethod]
     public void ASignatureByAnotherKeyIsRefused()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("signer", "the leaf's key, not the issuer's");
 
-        Assert.AreEqual(OcspStapleStatus.SignatureInvalid, Verify(pki, pki.Response(Now) with { Signer = OcspResponseBuilder.EcdsaSigner(pki.LeafKey) }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { Signer = OcspResponseBuilder.EcdsaSigner(pki.LeafKey) }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.SignatureInvalid, status);
+        Assert.AreEqual(OcspStapleStatus.SignatureInvalid, status);
     }
 
     [TestMethod]
@@ -195,40 +266,60 @@ public sealed class OcspStapleVerifierTests
         using OcspTestPki pki = new();
         OcspResponseBuilder response = pki.Response(Now);
         response = response with { Signer = (OcspResponseBuilder.AlgorithmIdentifier("1.2.840.10045.4.3.9", null), response.Signer.Sign) };
+        Diagnostics.Arrange("signature algorithm", "1.2.840.10045.4.3.9");
 
-        Assert.AreEqual(OcspStapleStatus.SignatureInvalid, Verify(pki, response).Status);
+        OcspStapleStatus status = Verify(pki, response).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.SignatureInvalid, status);
+        Assert.AreEqual(OcspStapleStatus.SignatureInvalid, status);
     }
 
     [TestMethod]
     public void AResponseForAnotherSerialNumberIsNotFound()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("serial number", "09");
 
-        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, Verify(pki, pki.Response(Now) with { SerialNumber = [0x09] }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { SerialNumber = [0x09] }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.CertificateNotFound, status);
+        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, status);
     }
 
     [TestMethod]
     public void AResponseForAnotherIssuerNameIsNotFound()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("issuer name hash", "20 zero bytes");
 
-        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, Verify(pki, pki.Response(Now) with { IssuerNameHash = new byte[20] }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { IssuerNameHash = new byte[20] }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.CertificateNotFound, status);
+        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, status);
     }
 
     [TestMethod]
     public void AResponseForAnotherIssuerKeyIsNotFound()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("issuer key hash", "20 zero bytes");
 
-        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, Verify(pki, pki.Response(Now) with { IssuerKeyHash = new byte[20] }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { IssuerKeyHash = new byte[20] }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.CertificateNotFound, status);
+        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, status);
     }
 
     [TestMethod]
     public void ACertIdHashTheClientDoesNotKnowIsNotFound()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("CertID hash", "2.16.840.1.101.3.4.2.99");
 
-        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, Verify(pki, pki.Response(Now) with { CertIdHashOid = "2.16.840.1.101.3.4.2.99" }).Status);
+        OcspStapleStatus status = Verify(pki, pki.Response(Now) with { CertIdHashOid = "2.16.840.1.101.3.4.2.99" }).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.CertificateNotFound, status);
+        Assert.AreEqual(OcspStapleStatus.CertificateNotFound, status);
     }
 
     [TestMethod]
@@ -243,8 +334,12 @@ public sealed class OcspStapleVerifierTests
             ThisUpdateOffset = TimeSpan.FromMinutes(thisUpdateMinutes),
             NextUpdateOffset = TimeSpan.FromMinutes(nextUpdateMinutes),
         };
+        Diagnostics.Arrange("thisUpdate and nextUpdate", $"{thisUpdateMinutes} and {nextUpdateMinutes} minutes from now");
 
-        Assert.AreEqual(OcspStapleStatus.Good, Verify(pki, response).Status);
+        OcspStapleStatus status = Verify(pki, response).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
     }
 
     [TestMethod]
@@ -259,8 +354,12 @@ public sealed class OcspStapleVerifierTests
             ThisUpdateOffset = TimeSpan.FromMinutes(thisUpdateMinutes),
             NextUpdateOffset = TimeSpan.FromMinutes(nextUpdateMinutes),
         };
+        Diagnostics.Arrange("thisUpdate and nextUpdate", $"{thisUpdateMinutes} and {nextUpdateMinutes} minutes from now");
 
-        Assert.AreEqual(OcspStapleStatus.Expired, Verify(pki, response).Status);
+        OcspStapleStatus status = Verify(pki, response).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Expired, status);
+        Assert.AreEqual(OcspStapleStatus.Expired, status);
     }
 
     [TestMethod]
@@ -269,8 +368,12 @@ public sealed class OcspStapleVerifierTests
         using OcspTestPki pki = new();
         using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using X509Certificate2 responder = pki.IssueResponder(responderKey, "1.3.6.1.5.5.7.3.1", OcspTestPki.OcspSigningOid);
+        Diagnostics.Arrange("responder", "issued by the CA for serverAuth and OCSPSigning");
 
-        Assert.AreEqual(OcspStapleStatus.Good, Verify(pki, Delegated(pki, responder, responderKey)).Status);
+        OcspStapleStatus status = Verify(pki, Delegated(pki, responder, responderKey)).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
     }
 
     [TestMethod]
@@ -280,9 +383,15 @@ public sealed class OcspStapleVerifierTests
         using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using X509Certificate2 serverAuthOnly = pki.IssueResponder(responderKey, "1.3.6.1.5.5.7.3.1");
         using X509Certificate2 noKeyUsage = pki.IssueResponder(responderKey);
+        Diagnostics.Arrange("responders", "serverAuth only, no extended key usage");
 
-        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, Verify(pki, Delegated(pki, serverAuthOnly, responderKey)).Status);
-        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, Verify(pki, Delegated(pki, noKeyUsage, responderKey)).Status);
+        OcspStapleStatus serverAuthStatus = Verify(pki, Delegated(pki, serverAuthOnly, responderKey)).Status;
+        OcspStapleStatus noKeyUsageStatus = Verify(pki, Delegated(pki, noKeyUsage, responderKey)).Status;
+
+        Diagnostics.Assert("serverAuth-only status", OcspStapleStatus.ResponderNotAuthorised, serverAuthStatus);
+        Diagnostics.Assert("no-key-usage status", OcspStapleStatus.ResponderNotAuthorised, noKeyUsageStatus);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, serverAuthStatus);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, noKeyUsageStatus);
     }
 
     [TestMethod]
@@ -291,8 +400,12 @@ public sealed class OcspStapleVerifierTests
         using OcspTestPki pki = new();
         using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using X509Certificate2 forged = pki.ForgeResponder(responderKey);
+        Diagnostics.Arrange("responder", "forged, not signed by the CA");
 
-        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, Verify(pki, Delegated(pki, forged, responderKey)).Status);
+        OcspStapleStatus status = Verify(pki, Delegated(pki, forged, responderKey)).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.ResponderNotAuthorised, status);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, status);
     }
 
     [TestMethod]
@@ -302,18 +415,30 @@ public sealed class OcspStapleVerifierTests
         using OcspTestPki other = new();
         using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using X509Certificate2 responder = other.IssueResponder(responderKey, OcspTestPki.OcspSigningOid);
+        Diagnostics.Arrange("responder", "issued for OCSPSigning by another CA");
 
-        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, Verify(pki, Delegated(pki, responder, responderKey)).Status);
+        OcspStapleStatus status = Verify(pki, Delegated(pki, responder, responderKey)).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.ResponderNotAuthorised, status);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, status);
     }
 
     [TestMethod]
     public void AResponderNoCertificateMatchesIsNotAuthorised()
     {
         using OcspTestPki pki = new();
+        Diagnostics.Arrange("responder IDs", "the leaf's name, a zero key hash, the leaf's name with only the CA's certificate included");
 
-        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, Verify(pki, pki.Response(Now) with { ResponderName = pki.Leaf.SubjectName.RawData }).Status);
-        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, Verify(pki, pki.Response(Now) with { ResponderName = null, ResponderKeyHash = new byte[20] }).Status);
-        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, Verify(pki, pki.Response(Now) with { ResponderName = pki.Leaf.SubjectName.RawData, Certificates = [pki.Ca.RawData] }).Status);
+        OcspStapleStatus leafName = Verify(pki, pki.Response(Now) with { ResponderName = pki.Leaf.SubjectName.RawData }).Status;
+        OcspStapleStatus zeroKeyHash = Verify(pki, pki.Response(Now) with { ResponderName = null, ResponderKeyHash = new byte[20] }).Status;
+        OcspStapleStatus caOnly = Verify(pki, pki.Response(Now) with { ResponderName = pki.Leaf.SubjectName.RawData, Certificates = [pki.Ca.RawData] }).Status;
+
+        Diagnostics.Assert("leaf name status", OcspStapleStatus.ResponderNotAuthorised, leafName);
+        Diagnostics.Assert("zero key hash status", OcspStapleStatus.ResponderNotAuthorised, zeroKeyHash);
+        Diagnostics.Assert("CA certificate only status", OcspStapleStatus.ResponderNotAuthorised, caOnly);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, leafName);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, zeroKeyHash);
+        Assert.AreEqual(OcspStapleStatus.ResponderNotAuthorised, caOnly);
     }
 
     [TestMethod]
@@ -329,8 +454,13 @@ public sealed class OcspStapleVerifierTests
         {
             Signer = OcspResponseBuilder.RsaPssSigner(rsa, hashOid, new HashAlgorithmName(hashName)),
         };
+        Diagnostics.Arrange("PSS hash", $"{hashName} (OID {hashOid ?? "absent"})");
+        Diagnostics.Arrange("responder key certified as PSS", certifiedAsPss);
 
-        Assert.AreEqual(OcspStapleStatus.Good, Verify(pki, response).Status);
+        OcspStapleStatus status = Verify(pki, response).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
     }
 
     [TestMethod]
@@ -340,8 +470,12 @@ public sealed class OcspStapleVerifierTests
         using RSA rsa = RSA.Create(2048);
         using X509Certificate2 responder = RsaResponder(pki, rsa, false);
         OcspResponseBuilder response = Delegated(pki, responder, pki.CaKey) with { Signer = OcspResponseBuilder.RsaSigner(rsa) };
+        Diagnostics.Arrange("signer", "RSA PKCS#1 v1.5 delegated responder");
 
-        Assert.AreEqual(OcspStapleStatus.Good, Verify(pki, response).Status);
+        OcspStapleStatus status = Verify(pki, response).Status;
+
+        Diagnostics.Assert("status", OcspStapleStatus.Good, status);
+        Assert.AreEqual(OcspStapleStatus.Good, status);
     }
 
     [TestMethod]
@@ -350,7 +484,13 @@ public sealed class OcspStapleVerifierTests
         using RSA rsa = RSA.Create(2048);
         TlsCertificatePublicKey key = TlsCertificatePublicKey.ReadSubjectPublicKeyInfo(rsa.ExportSubjectPublicKeyInfo());
         byte[] saltOnly = OcspResponseBuilder.AlgorithmIdentifier(OcspResponseBuilder.RsaPssOid, [0x30, 0x05, 0xa2, 0x03, 0x02, 0x01, 0x20]);
+        Diagnostics.Arrange("unknown hash", "2.16.840.1.101.3.4.2.99");
+        Diagnostics.Bytes("salt-only algorithm identifier", saltOnly);
+        Diagnostics.Act("salt-only rule", OcspSignatureAlgorithm.FindRule(saltOnly, key)?.ToString() ?? "null");
 
+        Diagnostics.Assert("rule for the unknown hash", "null", OcspSignatureAlgorithm.FindRule(OcspResponseBuilder.PssAlgorithmIdentifier("2.16.840.1.101.3.4.2.99"), key)?.ToString() ?? "null");
+        Diagnostics.Assert("salt-only hash", HashAlgorithmName.SHA1, OcspSignatureAlgorithm.FindRule(saltOnly, key)?.Hash);
+        Diagnostics.Assert("salt-only key OID", TlsSignatureScheme.RsaEncryptionOid, OcspSignatureAlgorithm.FindRule(saltOnly, key)?.KeyOid);
         Assert.IsNull(OcspSignatureAlgorithm.FindRule(OcspResponseBuilder.PssAlgorithmIdentifier("2.16.840.1.101.3.4.2.99"), key));
         Assert.AreEqual(HashAlgorithmName.SHA1, OcspSignatureAlgorithm.FindRule(saltOnly, key)!.Hash);
         Assert.AreEqual(TlsSignatureScheme.RsaEncryptionOid, OcspSignatureAlgorithm.FindRule(saltOnly, key)!.KeyOid);
@@ -362,18 +502,47 @@ public sealed class OcspStapleVerifierTests
         using OcspTestPki pki = new();
         using ECDsa responderKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using X509Certificate2 responder = pki.IssueResponder(responderKey, OcspTestPki.OcspSigningOid);
+        Diagnostics.Arrange("certificates", "the leaf without a version, the responder with an issuer unique ID, the responder without extensions");
 
         OcspCertificateFields versionless = OcspCertificateFields.Read(OcspTestPki.Rewrite(pki.Leaf.RawData, version: false, issuerUniqueId: false, extensions: false));
         OcspCertificateFields uniqueId = OcspCertificateFields.Read(OcspTestPki.Rewrite(responder.RawData, version: true, issuerUniqueId: true, extensions: true));
         OcspCertificateFields bare = OcspCertificateFields.Read(OcspTestPki.Rewrite(responder.RawData, version: true, issuerUniqueId: false, extensions: false));
 
+        Diagnostics.Act("versionless serial number", Convert.ToHexStringLower(versionless.SerialNumber));
+        Diagnostics.Act("can sign OCSP (unique ID, bare)", $"{uniqueId.CanSignOcspResponses}, {bare.CanSignOcspResponses}");
+        Diagnostics.Diff("versionless serial number", [0x01, 0x23, 0x45], versionless.SerialNumber);
+        Diagnostics.Assert("unique-ID responder can sign OCSP", true, uniqueId.CanSignOcspResponses);
+        Diagnostics.Assert("bare responder can sign OCSP", false, bare.CanSignOcspResponses);
         CollectionAssert.AreEqual(new byte[] { 0x01, 0x23, 0x45 }, versionless.SerialNumber);
         Assert.IsTrue(uniqueId.CanSignOcspResponses);
         Assert.IsFalse(bare.CanSignOcspResponses);
     }
 
-    private static OcspStapleOutcome Verify(OcspTestPki pki, OcspResponseBuilder response) =>
-        OcspStapleVerifier.Verify(response.Build(), pki.Chain, Now);
+    private OcspStapleOutcome Verify(OcspTestPki pki, OcspResponseBuilder response) =>
+        VerifyBytes(response.Build(), pki.Chain);
+
+    private OcspStapleOutcome VerifyBytes(byte[]? response, IReadOnlyList<byte[]> chain)
+    {
+        Diagnostics.Arrange("chain", $"{chain.Count} certificate(s)");
+        if (response is null)
+        {
+            Diagnostics.Arrange("response", "null");
+        }
+        else
+        {
+            Diagnostics.Bytes("response", response);
+        }
+
+        OcspStapleOutcome outcome = OcspStapleVerifier.Verify(response, chain, Now);
+        Diagnostics.Act("outcome", outcome);
+        return outcome;
+    }
+
+    private void WriteThrown(string input, Exception thrown)
+    {
+        Diagnostics.Act($"{input} threw", $"{thrown.GetType().Name}: {thrown.Message}");
+        Diagnostics.Assert($"{input} exception", thrown.GetType().Name, thrown.GetType().Name);
+    }
 
     private static OcspResponseBuilder Delegated(OcspTestPki pki, X509Certificate2 responder, ECDsa responderKey) =>
         pki.Response(Now) with
