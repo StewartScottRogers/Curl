@@ -83,6 +83,7 @@ internal sealed class FakeGssAcceptor
     /// <summary>Reads the initial context token: the framing, token ID 01 00, the AP-REQ and its authenticator.</summary>
     public void Accept(byte[] token)
     {
+        DiagnosticAssertionLines.WriteExchangedMessage($"GSS initial context token (AP-REQ, etype {EncryptionType}, authenticator key usage 11)", token);
         byte[] inner = Unframe(token);
         CollectionAssert.AreEqual(new byte[] { 0x01, 0x00 }, inner[..2]);
         Request = KerberosApRequest.Decode(inner[2..]);
@@ -101,7 +102,9 @@ internal sealed class FakeGssAcceptor
             SequenceNumber = AcceptorSequence,
         };
         byte[] cipher = Encryption.Encrypt(replyKey ?? SessionKey, 12, part.Encode());
-        return ReplyToken(new KerberosApReply(new KerberosEncryptedData((int)EncryptionType, null, cipher)).Encode());
+        byte[] token = ReplyToken(new KerberosApReply(new KerberosEncryptedData((int)EncryptionType, null, cipher)).Encode());
+        DiagnosticAssertionLines.WriteExchangedMessage($"GSS reply token (AP-REP, etype {EncryptionType}, key usage 12, client time {part.ClientTime:O})", token);
+        return token;
     }
 
     public static byte[] ReplyToken(byte[] body) => Frame([0x02, 0x00, .. body]);

@@ -24,6 +24,7 @@ internal sealed class FakeKcm : IKerberosKcmConnector
         BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4), status);
         replies.Write(header);
         replies.Write(payload);
+        DiagnosticAssertionLines.WriteExchangedMessage($"KCM reply queued (status {status})", payload);
         return this;
     }
 
@@ -32,6 +33,7 @@ internal sealed class FakeKcm : IKerberosKcmConnector
     public FakeKcm RawReply(byte[] bytes)
     {
         replies.Write(bytes);
+        DiagnosticAssertionLines.WriteExchangedMessage("KCM raw reply queued", bytes);
         return this;
     }
 

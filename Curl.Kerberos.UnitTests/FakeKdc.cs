@@ -142,8 +142,17 @@ internal sealed class FakeKdc : IKerberosKdcTransport, IKerberosKdcProxyTranspor
     {
         KerberosKdcRequest request = KerberosKdcRequest.Decode(bytes);
         Requests.Add(request);
-        return Override(request) ?? (request.MessageType == KerberosMessageType.AsRequest ? AnswerAs(request) : AnswerTgs(request));
+        DiagnosticAssertionLines.WriteExchangedMessage($"KDC request {Describe(request)}", bytes);
+        byte[] reply = Override(request) ?? (request.MessageType == KerberosMessageType.AsRequest ? AnswerAs(request) : AnswerTgs(request));
+        DiagnosticAssertionLines.WriteExchangedMessage($"KDC reply to {request.MessageType}", reply);
+        return reply;
     }
+
+    private static string Describe(KerberosKdcRequest request) =>
+        $"{request.MessageType}, client {Name(request.Body.ClientName)}, server {Name(request.Body.ServerName)}, realm {request.Body.Realm}, "
+        + $"etypes [{string.Join(", ", request.Body.EncryptionTypes)}], padata [{string.Join(", ", request.PreAuthenticationData.Select(data => data.DataType))}]";
+
+    private static string Name(KerberosPrincipalName? name) => name is null ? "none" : string.Join("/", name.Components);
 
     private void ThrowWhenUnreachable(string host)
     {
