@@ -30,6 +30,8 @@ public sealed partial class TcpConnectorTests
         byte[] reply = kind == ProxyKind.Socks4 ? Socks4Granted : [.. Socks5NoAuthentication, .. Socks5Succeeded];
         var (result, _) = await ConnectThroughSocksAsync(kind, "127.0.0.1", reply);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(result.MappedHost);
         Assert.AreEqual(0, result.MappedPort);
@@ -43,9 +45,12 @@ public sealed partial class TcpConnectorTests
         // curl -x socks4://127.0.0.1:19080 http://127.0.0.1:8080/ sent 04 01 1f 90 7f 00 00 01 00
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks4, "127.0.0.1", [.. Socks4Granted, .. BytesAfterTheHandshake]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(proxyConnection, result.Connection);
         Assert.AreEqual(0, result.ProxyConnectResponseCode);
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x04, 0x01, 0x1F, 0x90, 0x7F, 0x00, 0x00, 0x01, 0x00 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x04, 0x01, 0x1F, 0x90, 0x7F, 0x00, 0x00, 0x01, 0x00 }, proxyConnection.Written);
         Assert.AreEqual(BytesAfterTheHandshake.Length, proxyConnection.UnreadCount);
         Assert.IsFalse(proxyConnection.IsDisposed);
@@ -62,7 +67,10 @@ public sealed partial class TcpConnectorTests
             new NetworkCredential("bob", "pw"),
             "target.example:8080:10.1.2.3");
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x04, 0x01, 0x1F, 0x90, 10, 1, 2, 3, 0x62, 0x6F, 0x62, 0x00 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x04, 0x01, 0x1F, 0x90, 10, 1, 2, 3, 0x62, 0x6F, 0x62, 0x00 }, proxyConnection.Written);
     }
 
@@ -75,6 +83,7 @@ public sealed partial class TcpConnectorTests
             Socks4Granted,
             resolveEntry: "target.example:8080:[::1],10.1.2.3,10.9.9.9");
 
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x04, 0x01, 0x1F, 0x90, 10, 1, 2, 3, 0x00 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x04, 0x01, 0x1F, 0x90, 10, 1, 2, 3, 0x00 }, proxyConnection.Written);
     }
 
@@ -108,6 +117,8 @@ public sealed partial class TcpConnectorTests
         // curl -x socks4://127.0.0.1:19080 http://nosuch.invalid:8080/ -> curl: (6) Could not resolve host: nosuch.invalid
         var (result, proxyConnection) = await ConnectThroughSocksAsync(kind, "nosuch.invalid", Socks5NoAuthentication);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Could not resolve host: nosuch.invalid", result.ErrorMessage);
         Assert.IsTrue(proxyConnection.IsDisposed);
@@ -129,6 +140,8 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_ThroughSocks4WithAUserNameOf255Bytes_SendsIt()
     {
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks4, "127.0.0.1", Socks4Granted, new NetworkCredential(new string('a', 255), string.Empty));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.HasCount(8 + 255 + 1, proxyConnection.Written);
@@ -177,6 +190,8 @@ public sealed partial class TcpConnectorTests
         // 04 01 1f 90 00 00 00 01 00 65 78 61 6d 70 6c 65 2e 74 65 73 74 00
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks4a, "example.test", Socks4Granted);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             (byte[])[0x04, 0x01, 0x1F, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, .. "example.test"u8, 0x00],
@@ -191,6 +206,7 @@ public sealed partial class TcpConnectorTests
         // curl -x socks4a://127.0.0.1:19080 http://127.0.0.1:8080/ sent 04 01 1f 90 00 00 00 01 00 31 32 37 2e 30 2e 30 2e 31 00
         var (_, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks4a, host, Socks4Granted);
 
+        Diagnostics.Assert("bytes sent to proxy", 9 + host.Length + 1, proxyConnection.Written.Count);
         CollectionAssert.AreEqual(
             (byte[])[0x04, 0x01, 0x1F, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, .. System.Text.Encoding.ASCII.GetBytes(host), 0x00],
             proxyConnection.Written);
@@ -203,6 +219,7 @@ public sealed partial class TcpConnectorTests
         // 04 01 1f 90 00 00 00 01 62 6f 62 00 65 78 61 6d 70 6c 65 2e 74 65 73 74 00
         var (_, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks4a, "example.test", Socks4Granted, new NetworkCredential("bob", "pw"));
 
+        Diagnostics.Assert("bytes sent to proxy", 25, proxyConnection.Written.Count);
         CollectionAssert.AreEqual(
             (byte[])[0x04, 0x01, 0x1F, 0x90, 0x00, 0x00, 0x00, 0x01, 0x62, 0x6F, 0x62, 0x00, .. "example.test"u8, 0x00],
             proxyConnection.Written);
@@ -215,6 +232,8 @@ public sealed partial class TcpConnectorTests
     {
         // A 254-byte name went through; 255 -> curl: (97) SOCKS4: too long hostname
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks4a, new string('a', length), Socks4Granted);
+
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
 
         Assert.AreEqual(exitCode, result.ExitCode);
         if (exitCode == CurlExitCode.Proxy)
@@ -235,6 +254,8 @@ public sealed partial class TcpConnectorTests
             "127.0.0.1",
             [.. Socks5NoAuthentication, .. Socks5Succeeded, .. BytesAfterTheHandshake]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(proxyConnection, result.Connection);
         CollectionAssert.AreEqual(
@@ -251,6 +272,8 @@ public sealed partial class TcpConnectorTests
         var resolver = new FakeDnsResolver(ProxyAddress);
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], resolver: resolver);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             (byte[])[0x05, 0x02, 0x00, 0x01, 0x05, 0x01, 0x00, 0x03, 0x0C, .. "example.test"u8, 0x1F, 0x90],
@@ -266,6 +289,7 @@ public sealed partial class TcpConnectorTests
         // curl -x socks5h://127.0.0.1:19080 http://127.0.0.1:8080/ sent 05 01 00 01 7f 00 00 01 1f 90
         var (_, proxyConnection) = await ConnectThroughSocksAsync(kind, "127.0.0.1", [.. Socks5NoAuthentication, .. Socks5Succeeded]);
 
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x01, 0x00, 0x01, 0x7F, 0x00, 0x00, 0x01, 0x1F, 0x90 }, [.. proxyConnection.Written[4..]]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x01, 0x00, 0x01, 0x7F, 0x00, 0x00, 0x01, 0x1F, 0x90 }, proxyConnection.Written[4..]);
     }
 
@@ -275,6 +299,7 @@ public sealed partial class TcpConnectorTests
         // curl -x socks5://127.0.0.1:19080 http://[::1]:8080/ sent 05 01 00 04 00 .. 00 01 1f 90
         var (_, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks5Hostname, "::1", [.. Socks5NoAuthentication, .. Socks5Succeeded]);
 
+        Diagnostics.Assert("bytes sent after the greeting", 22, proxyConnection.Written.Count - 4);
         CollectionAssert.AreEqual(
             new byte[] { 0x05, 0x01, 0x00, 0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0x1F, 0x90 },
             proxyConnection.Written[4..]);
@@ -289,6 +314,7 @@ public sealed partial class TcpConnectorTests
             [.. Socks5NoAuthentication, .. Socks5Succeeded],
             resolveEntry: "target.example:8080:10.1.2.3,[::1]");
 
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x01, 0x00, 0x01, 10, 1, 2, 3, 0x1F, 0x90 }, [.. proxyConnection.Written[4..]]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x01, 0x00, 0x01, 10, 1, 2, 3, 0x1F, 0x90 }, proxyConnection.Written[4..]);
     }
 
@@ -302,6 +328,7 @@ public sealed partial class TcpConnectorTests
             [.. Socks5NoAuthentication, .. Socks5Succeeded],
             resolveEntry: "1:8080:10.1.2.3");
 
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x01, 0x00, 0x01, 10, 1, 2, 3, 0x1F, 0x90 }, [.. proxyConnection.Written[4..]]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x01, 0x00, 0x01, 10, 1, 2, 3, 0x1F, 0x90 }, proxyConnection.Written[4..]);
     }
 
@@ -314,6 +341,8 @@ public sealed partial class TcpConnectorTests
             "127.0.0.1",
             [0x05, 0x02, 0x01, 0x00, .. Socks5Succeeded],
             new NetworkCredential("bob", "pw"));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
@@ -330,7 +359,10 @@ public sealed partial class TcpConnectorTests
             [.. Socks5NoAuthentication, .. Socks5Succeeded],
             new NetworkCredential("bob", "pw"));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x03, 0x00, 0x01, 0x02, 0x05, 0x01 }, [.. proxyConnection.Written[..7]]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x03, 0x00, 0x01, 0x02, 0x05, 0x01 }, proxyConnection.Written[..7]);
     }
 
@@ -340,7 +372,10 @@ public sealed partial class TcpConnectorTests
         // The proxy picked 02 after 05 02 00 01 -> curl sent 01 00 00
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks5, "127.0.0.1", [0x05, 0x02, 0x01, 0x00, .. Socks5Succeeded]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x02, 0x00, 0x01, 0x01, 0x00, 0x00, 0x05 }, [.. proxyConnection.Written[..8]]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x02, 0x00, 0x01, 0x01, 0x00, 0x00, 0x05 }, proxyConnection.Written[..8]);
     }
 
@@ -391,6 +426,7 @@ public sealed partial class TcpConnectorTests
             new NetworkCredential(new string('a', userLength), new string('p', passwordLength)));
 
         AssertProxyFailure(result, proxyConnection, message);
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x03, 0x00, 0x01, 0x02 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x03, 0x00, 0x01, 0x02 }, proxyConnection.Written);
     }
 
@@ -403,6 +439,8 @@ public sealed partial class TcpConnectorTests
             [0x05, 0x02, 0x01, 0x00, .. Socks5Succeeded],
             new NetworkCredential(new string('a', 255), new string('p', 255)));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -414,6 +452,8 @@ public sealed partial class TcpConnectorTests
         // A 255-byte name went through; 256 sent nothing ->
         // curl: (97) SOCKS5: the destination hostname is too long to be resolved remotely by the proxy.
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks5Hostname, new string('a', length), [.. Socks5NoAuthentication, .. Socks5Succeeded]);
+
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
 
         Assert.AreEqual(exitCode, result.ExitCode);
         if (exitCode == CurlExitCode.Proxy)
@@ -470,6 +510,8 @@ public sealed partial class TcpConnectorTests
         // Measured: both replies opened the tunnel and the HTTP request followed.
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks5, "127.0.0.1", [.. Socks5NoAuthentication, .. reply, .. BytesAfterTheHandshake]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(BytesAfterTheHandshake.Length, proxyConnection.UnreadCount);
     }
@@ -494,9 +536,11 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             resolveOverrides: ResolveOverrides.Parse(["socks.example:1080:192.0.2.10", "target.example:8080:10.1.2.3"]));
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("target.example", 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null), Events = events },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("target.example", 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null), Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.Contains(events.Info, "Opened SOCKS connection from 127.0.0.1 port 50000 to target.example port 8080 (via 192.0.2.10 port 1080)");
@@ -514,9 +558,11 @@ public sealed partial class TcpConnectorTests
             new FakeTlsProvider(),
             new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("h.test", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "socks.example", 1080, null), Events = events },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("h.test", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "socks.example", 1080, null), Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Proxy, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("Opened SOCKS connection", StringComparison.Ordinal)));
@@ -531,9 +577,11 @@ public sealed partial class TcpConnectorTests
         var tlsProvider = new FakeTlsProvider();
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), new FakeTcpDialer { DialOutcome = _ => proxyConnection }, tlsProvider, new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.test", 443, UseTls: true) { Proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "socks.example", 1080, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.test", 443, UseTls: true) { Proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "socks.example", 1080, null) });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(tlsProvider.SecuredConnection, result.Connection);
@@ -556,10 +604,11 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), dialer, new FakeTlsProvider(), timeProvider);
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("127.0.0.1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks4, "socks.example", 1080, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("127.0.0.1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks4, "socks.example", 1080, null) });
 
+        Diagnostics.Assert("timings", new ConnectTimings(0, 0, 5, null), result.Timings);
         Assert.AreEqual(new ConnectTimings(0, 0, 5, null), result.Timings);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(ProxyAddress, 1080) }, dialer.DialedEndPoints);
     }
@@ -570,11 +619,13 @@ public sealed partial class TcpConnectorTests
         var proxyConnection = new ScriptedConnection([]) { ReadException = new IOException("reset") };
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), new FakeTcpDialer { DialOutcome = _ => proxyConnection }, new FakeTlsProvider(), new ManualTimeProvider());
 
-        await Assert.ThrowsExactlyAsync<IOException>(
-            async () => await connector.ConnectAsync(
-                new ConnectTarget("127.0.0.1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks5, "socks.example", 1080, null) },
-                CancellationToken.None));
+        var exception = await Assert.ThrowsExactlyAsync<IOException>(
+            async () => await ConnectLoggedAsync(
+                connector,
+                new ConnectTarget("127.0.0.1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks5, "socks.example", 1080, null) }));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("proxy connection disposed", true, proxyConnection.IsDisposed);
         Assert.IsTrue(proxyConnection.IsDisposed);
     }
 
@@ -585,16 +636,21 @@ public sealed partial class TcpConnectorTests
         // curl: (7) Failed to connect to 127.0.0.1:8080 over proxy 127.0.0.1 after 2040 ms: Could not connect to server
         var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("127.0.0.1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks5, "127.0.0.1", 1, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("127.0.0.1", 8080, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Socks5, "127.0.0.1", 1, null) });
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1:8080 over proxy 127.0.0.1 after 0 ms: Could not connect to server", result.ErrorMessage);
     }
 
-    private static void AssertProxyFailure(ConnectResult result, ScriptedConnection proxyConnection, string message)
+    private void AssertProxyFailure(ConnectResult result, ScriptedConnection proxyConnection, string message)
     {
+        Diagnostics.Assert("exit code", CurlExitCode.Proxy, result.ExitCode);
+        Diagnostics.Assert("error message", message, result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.Proxy, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Proxy, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         Assert.IsNull(result.Connection);
@@ -603,7 +659,7 @@ public sealed partial class TcpConnectorTests
 
     // Connects to host:8080 through a SOCKS proxy at socks.example:1080 that answers with proxyReply.
     // The proxy resolves through --resolve, so the resolver answers only for the target.
-    private static async Task<(ConnectResult Result, ScriptedConnection ProxyConnection)> ConnectThroughSocksAsync(
+    private async Task<(ConnectResult Result, ScriptedConnection ProxyConnection)> ConnectThroughSocksAsync(
         ProxyKind kind,
         string host,
         byte[] proxyReply,
@@ -623,9 +679,12 @@ public sealed partial class TcpConnectorTests
             resolveOverrides: resolver is null ? ResolveOverrides.Parse(entries) : null,
             socks5Authentication: socks5Authentication);
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, credential), Events = events ?? new RecordingTransferEvents() },
-            CancellationToken.None);
+        Diagnostics.Arrange("proxy", $"{kind} at socks.example:1080, {(credential is null ? "no credential" : $"a {credential.UserName.Length}-character user name")}");
+        Diagnostics.Bytes("proxy reply", proxyReply);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget(host, 8080, UseTls: false) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, credential), Events = events ?? new RecordingTransferEvents() });
+        Diagnostics.Bytes("sent to proxy", [.. proxyConnection.Written]);
         return (result, proxyConnection);
     }
 }

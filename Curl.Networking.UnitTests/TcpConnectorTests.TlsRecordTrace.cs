@@ -28,10 +28,11 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47195, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47195, UseTls: true) { Events = events, PoolScheme = "https" });
         await result.Connection!.WriteAsync(new byte[108], CancellationToken.None);
         await result.Connection.ReadAsync(new byte[72], CancellationToken.None);
 
+        Diagnostics.Assert("traced calls after the first five", 9, events.Calls.Count - 5);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -61,7 +62,9 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = true,
         };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47195, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47195, UseTls: true) { Events = events, PoolScheme = "https" });
+
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "[TCP] send(len=429) -> 0, 429", "[TCP] recv(len=4096) -> 0, 7" }, events.Calls.Where(line => line.Contains("(len=", StringComparison.Ordinal)).ToArray());
@@ -75,8 +78,9 @@ public sealed partial class TcpConnectorTests
         var provider = new FakeTlsProvider();
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new FakeTcpDialer { DialOutcome = _ => dialled }, provider, new ManualTimeProvider());
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47195, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47195, UseTls: true) { Events = events, PoolScheme = "https" });
 
+        Diagnostics.Assert("handshake was handed the dialled connection", true, ReferenceEquals(dialled, provider.ReceivedPlaintext));
         Assert.AreSame(dialled, provider.ReceivedPlaintext);
     }
 
@@ -85,6 +89,9 @@ public sealed partial class TcpConnectorTests
     {
         var trace = TcpConnector.TlsRecordTraceFor(new ScriptedConnection([]), tracesTcpFilter: true, new ConnectTarget("example.com", 443, UseTls: true) { PoolScheme = "https" });
 
+        Diagnostics.Arrange("target", "example.com:443, TLS, pool scheme https, tracing the TCP filter");
+        Diagnostics.Act("trace lines", trace?.Lines);
+        Diagnostics.Assert("trace lines", TcpIoTraceConnection.HttpsHandshakeLines, trace?.Lines);
         Assert.AreSame(TcpIoTraceConnection.HttpsHandshakeLines, trace!.Lines);
     }
 
@@ -103,12 +110,19 @@ public sealed partial class TcpConnectorTests
             IsForwardProxy = isForwardProxy,
         };
 
+        Diagnostics.Arrange("target", $"tracing the TCP filter {tracesTcpFilter}, pool scheme {poolScheme ?? "none"}, through a proxy {throughProxy}, forward proxy {isForwardProxy}");
+        Diagnostics.Act("trace lines", TcpConnector.TlsRecordTraceFor(new ScriptedConnection([]), tracesTcpFilter, target)?.Lines);
+        Diagnostics.Assert("trace", null, TcpConnector.TlsRecordTraceFor(new ScriptedConnection([]), tracesTcpFilter, target));
         Assert.IsNull(TcpConnector.TlsRecordTraceFor(new ScriptedConnection([]), tracesTcpFilter, target));
     }
 
     [TestMethod]
     public void HttpsLines_AreCurlsSchannelBuffers()
     {
+        Diagnostics.Arrange("lines", "the HTTPS handshake and application data trace lines");
+        Diagnostics.Act("handshake lines", TcpIoTraceConnection.HttpsHandshakeLines);
+        Diagnostics.Assert("handshake lines", new TcpIoTraceLines("TCP", 4096, WritesWouldBlockReads: true), TcpIoTraceConnection.HttpsHandshakeLines);
+        Diagnostics.Assert("application data lines", new TcpIoTraceLines("TCP", 103424, WritesWouldBlockReads: true), TcpIoTraceConnection.HttpsApplicationDataLines);
         Assert.AreEqual(new TcpIoTraceLines("TCP", 4096, WritesWouldBlockReads: true), TcpIoTraceConnection.HttpsHandshakeLines);
         Assert.AreEqual(new TcpIoTraceLines("TCP", 103424, WritesWouldBlockReads: true), TcpIoTraceConnection.HttpsApplicationDataLines);
     }

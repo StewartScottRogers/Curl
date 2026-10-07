@@ -31,6 +31,9 @@ public sealed partial class TcpConnectorTests
         await stalled.Task;
         time.Advance(60_000);
 
+        Diagnostics.Arrange("target", "10.255.255.1:1025 with a 1 s connect timeout, the dial stalled, 60 s later");
+        Diagnostics.Act("connect completed", connect.IsCompleted);
+        Diagnostics.Assert("connect completed", false, connect.IsCompleted);
         Assert.IsFalse(connect.IsCompleted);
         await cancellation.CancelAsync();
         await Assert.ThrowsAsync<OperationCanceledException>(() => connect);
@@ -42,9 +45,10 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
 
-        var first = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 21, UseTls: false), CancellationToken.None);
+        var first = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 21, UseTls: false));
         var second = await connector.WithoutConnectTimeout().ConnectAsync(new ConnectTarget("127.0.0.1", 1025, UseTls: false), CancellationToken.None);
 
+        Diagnostics.Assert("connection numbers", (0L, 1L), (first.ConnectionNumber, second.ConnectionNumber));
         Assert.AreEqual(0L, first.ConnectionNumber);
         Assert.AreEqual(1L, second.ConnectionNumber);
     }
@@ -57,6 +61,9 @@ public sealed partial class TcpConnectorTests
         var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
             async () => await connector.WithoutConnectTimeout().ConnectAsync(null!, CancellationToken.None));
 
+        Diagnostics.Arrange("target", null);
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "target", exception.ParamName);
         Assert.AreEqual("target", exception.ParamName);
     }
 
@@ -75,7 +82,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(IPAddress.Parse("10.255.255.1")), dialer, new FakeTlsProvider(), time);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("10.255.255.1", 1025, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("10.255.255.1", 1025, UseTls: false) { Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Failed to connect to 10.255.255.1:1025 after 21047 ms: Could not connect to server", result.ErrorMessage);

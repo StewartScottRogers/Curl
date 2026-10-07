@@ -26,8 +26,9 @@ public sealed partial class TcpConnectorTests
         var socket = new UnixSocketAddress("/run/app.sock", IsAbstract: false);
         var connector = CreateUnixSocketConnector(resolver, dialer, new FakeTlsProvider(), socket);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 8080, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 8080, UseTls: false));
 
+        Diagnostics.Assert("dialed unix sockets", 1, dialer.DialedUnixSockets.Count);
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(new[] { socket }, dialer.DialedUnixSockets);
         Assert.IsEmpty(dialer.DialedEndPoints);
@@ -45,8 +46,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress(path, IsAbstract: false));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 8080, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 8080, UseTls: false));
 
+        Diagnostics.Assert("unix socket path", path, result.UnixSocketPath);
         Assert.AreEqual(path, result.UnixSocketPath);
     }
 
@@ -56,8 +58,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress("app", IsAbstract: true));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 80, UseTls: false));
 
+        Diagnostics.Assert("unix socket path", "app", result.UnixSocketPath);
         Assert.AreEqual("app", result.UnixSocketPath);
     }
 
@@ -70,8 +73,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress(@"C:\Users\Public\s.sock", IsAbstract: false));
 
-        await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("info lines", @"  Trying C:\Users\Public\s.sock:0...", string.Join("\n", events.Info));
         CollectionAssert.AreEqual(new[] { @"  Trying C:\Users\Public\s.sock:0..." }, events.Info);
         Assert.AreEqual(
             new ConnectionOpenedEvent
@@ -94,8 +98,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress(path, IsAbstract: false));
 
-        await connector.ConnectAsync(new ConnectTarget("example.com", 8080, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 8080, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("info lines", @"  Trying C:\Users\Stewart Rogers\AppData\Local\Temp\bl:0...", string.Join("\n", events.Info));
         CollectionAssert.AreEqual(new[] { @"  Trying C:\Users\Stewart Rogers\AppData\Local\Temp\bl:0..." }, events.Info);
         Assert.AreEqual(path, events.Opened.Single().HostName);
         Assert.AreEqual(@"C:\Users\Stewart Rogers\AppData\Local\Temp\bl", events.Opened.Single().UnixSocketRemoteIp);
@@ -116,7 +121,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), time, unixSocket: new UnixSocketAddress("s.sock", IsAbstract: false));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false) { Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsTrue(result.IsConnectionRefused);
@@ -144,7 +151,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => throw new SocketException((int)SocketError.NetworkDown) };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress("C:/nope/x.sock", IsAbstract: false));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false) { Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsFalse(result.IsConnectionRefused);
@@ -164,7 +173,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => throw new SocketException((int)SocketError.InvalidArgument) };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress("x", IsAbstract: true));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false) { Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to localhost:80 over unix://x after 0 ms: Could not connect to server", result.ErrorMessage);
@@ -189,8 +200,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress("abs1", IsAbstract: true));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("info lines", "  Trying :0...", string.Join("\n", events.Info));
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(new[] { "  Trying :0..." }, events.Info);
         Assert.AreEqual(string.Empty, events.Opened.Single().UnixSocketRemoteIp);
@@ -204,7 +216,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer();
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress(path, IsAbstract: false));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false));
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual($"Unix socket path too long: '{path}'", result.ErrorMessage);
@@ -222,8 +236,9 @@ public sealed partial class TcpConnectorTests
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), new UnixSocketAddress("/tmp/l.sock", IsAbstract: false));
         var target = new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 9, null) };
 
-        var result = await connector.ConnectAsync(target, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("bytes written", 0, connection.Written.Count);
         Assert.AreSame(connection, result.Connection);
         Assert.IsEmpty(connection.Written);
         Assert.IsEmpty(dialer.DialedEndPoints);
@@ -237,8 +252,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { UnixSocketDialOutcome = _ => new FakeConnection() };
         var connector = CreateUnixSocketConnector(new FakeDnsResolver(), dialer, tls, new UnixSocketAddress("/run/app.sock", IsAbstract: false));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { Events = events });
 
+        Diagnostics.Assert("TLS target host", "example.com", tls.ReceivedTargetHost);
         Assert.AreSame(tls.SecuredConnection, result.Connection);
         Assert.AreEqual("example.com", tls.ReceivedTargetHost);
         Assert.IsNotNull(result.Timings!.TlsHandshakeCompleted);
@@ -253,7 +269,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new StallingTcpDialer { OnStalled = () => time.Advance(1001) };
         var connector = new TcpConnector(new FakeDnsResolver(), dialer, new FakeTlsProvider(), time, connectTimeout: OneSecond, unixSocket: new UnixSocketAddress("s.sock", IsAbstract: false));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false));
+
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 1001 milliseconds", result.ErrorMessage);
@@ -264,6 +282,9 @@ public sealed partial class TcpConnectorTests
     {
         var socket = new UnixSocketAddress("/run/app.sock", IsAbstract: false);
 
+        Diagnostics.Arrange("socket", socket);
+        Diagnostics.Act("connector's unix socket", CreateUnixSocketConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), socket).UnixSocket);
+        Diagnostics.Assert("connector's unix socket", socket, CreateUnixSocketConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), socket).UnixSocket);
         Assert.AreSame(socket, CreateUnixSocketConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), socket).UnixSocket);
         Assert.IsNull(CreateConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider()).UnixSocket);
     }
