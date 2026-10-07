@@ -1,6 +1,7 @@
 using System.Globalization;
 using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core.AltSvc;
 
@@ -19,92 +20,96 @@ public sealed class AltSvcCacheTests
 
     private static readonly HashSet<AltSvcAlpn> AnyAlpn = [AltSvcAlpn.H1, AltSvcAlpn.H2, AltSvcAlpn.H3];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void FormatFile_AfterTwoAlternatives_WritesCurlsFile()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
-
-        cache.ApplyHeader("h2=\":8443\"; ma=60, h3=\":443\"", AltSvcAlpn.H1, "localhost", 18443);
-
-        Assert.AreEqual(
-            Header
+        var expected = Header
             + "h1 localhost 18443 h2 localhost 8443 \"20260929 05:21:05\" 0 0\r\n"
-            + "h1 localhost 18443 h3 localhost 443 \"20260930 05:20:05\" 0 0\r\n",
-            cache.FormatFile("\r\n"));
+            + "h1 localhost 18443 h3 localhost 443 \"20260930 05:20:05\" 0 0\r\n";
+
+        Apply(cache, "h2=\":8443\"; ma=60, h3=\":443\"", AltSvcAlpn.H1, "localhost", 18443);
+
+        Assert.AreEqual(expected, FormatFile(cache, "\r\n", expected));
     }
 
     [TestMethod]
     public void FormatFile_WithLineFeed_EndsEveryLineInLineFeed()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
+        var expected = string.Join('\n', AltSvcCache.FileHeaderLines) + "\nh1 localhost 18443 h3 localhost 443 \"20260930 05:20:05\" 0 0\n";
 
-        cache.ApplyHeader("h3=\":443\"", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "h3=\":443\"", AltSvcAlpn.H1, "localhost", 18443);
 
-        Assert.AreEqual(
-            string.Join('\n', AltSvcCache.FileHeaderLines) + "\nh1 localhost 18443 h3 localhost 443 \"20260930 05:20:05\" 0 0\n",
-            cache.FormatFile("\n"));
+        Assert.AreEqual(expected, FormatFile(cache, "\n", expected));
     }
 
     [TestMethod]
     public void ApplyHeader_ClearAfterReadingCurlsFile_LeavesOnlyTheComments()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 17);
-        cache.ReadFile(
+        Read(
+            cache,
             Header
             + "h1 localhost 18443 h2 localhost 8443 \"20260929 05:21:05\" 0 0\r\n"
             + "h1 localhost 18443 h3 localhost 443 \"20260930 05:20:05\" 0 0\r\n");
 
-        cache.ApplyHeader("clear", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "clear", AltSvcAlpn.H1, "localhost", 18443);
 
-        Assert.AreEqual(Header, cache.FormatFile("\r\n"));
+        Assert.AreEqual(Header, FormatFile(cache, "\r\n", Header));
     }
 
     [TestMethod]
     public void ApplyHeader_Clear_RemovesOnlyTheOriginsEntries()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 50);
-        cache.ReadFile(
+        Read(
+            cache,
             "h1 other.example 443 h2 x.example 443 \"20300101 00:00:00\" 0 0\n"
             + "h2 localhost 18443 h2 x.example 443 \"20300101 00:00:00\" 0 0\n"
             + "h1 localhost 18444 h2 x.example 443 \"20300101 00:00:00\" 0 0\n"
             + "h1 localhost 18443 h2 x.example 443 \"20300101 00:00:00\" 0 0\n");
-
-        cache.ApplyHeader("clear", AltSvcAlpn.H1, "localhost", 18443);
-
-        Assert.AreEqual(
-            Header
+        var expected = Header
             + "h1 other.example 443 h2 x.example 443 \"20300101 00:00:00\" 0 0\r\n"
             + "h2 localhost 18443 h2 x.example 443 \"20300101 00:00:00\" 0 0\r\n"
-            + "h1 localhost 18444 h2 x.example 443 \"20300101 00:00:00\" 0 0\r\n",
-            cache.FormatFile("\r\n"));
+            + "h1 localhost 18444 h2 x.example 443 \"20300101 00:00:00\" 0 0\r\n";
+
+        Apply(cache, "clear", AltSvcAlpn.H1, "localhost", 18443);
+
+        Assert.AreEqual(expected, FormatFile(cache, "\r\n", expected));
     }
 
     [TestMethod]
     public void ApplyHeader_AfterReadingASeededFile_ReplacesTheOriginAndKeepsTheRest()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 26);
-        cache.ReadFile(
+        Read(
+            cache,
             "# comment\n"
             + "h1 other.example 443 h2 x.example 443 \"20200101 00:00:00\" 0 0\n"
             + "h1 keep.example 443 h2 y.example 443 \"20300101 00:00:00\" 1 0\n"
             + "bogus line\n"
             + "h9 a 1 h2 b 2 \"20300101 00:00:00\" 0 0\n"
             + "  h1 LOCALHOST. 18443 h3 z.example 443 \"20300101 00:00:00\" 0 0\n");
-
-        cache.ApplyHeader("h2=\":8443\"; persist=1; ma=10", AltSvcAlpn.H1, "localhost", 18443);
-
-        Assert.AreEqual(
-            Header
+        var expected = Header
             + "h1 keep.example 443 h2 y.example 443 \"20300101 00:00:00\" 1 0\r\n"
-            + "h1 localhost 18443 h2 localhost 8443 \"20260929 05:21:36\" 1 0\r\n",
-            cache.FormatFile("\r\n"));
+            + "h1 localhost 18443 h2 localhost 8443 \"20260929 05:21:36\" 1 0\r\n";
+
+        Apply(cache, "h2=\":8443\"; persist=1; ma=10", AltSvcAlpn.H1, "localhost", 18443);
+
+        Assert.AreEqual(expected, FormatFile(cache, "\r\n", expected));
     }
 
     [TestMethod]
     public void FormatFile_AfterReadingASeededFile_WritesWhatCurlKept()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 52);
-        cache.ReadFile(
+        Read(
+            cache,
             "h1 localhost 18443 h1 localhost 18443 \"20300101 00:00:00\" 0 0\n"
             + "h1 other.example 443 h2 x.example 443 \"20200101 00:00:00\" 0 0\n"
             + "h1 ::1 443 h2 ::1 443 \"20300101 00:00:00\" 0 0\n"
@@ -116,15 +121,16 @@ public sealed class AltSvcCacheTests
             + "h1  e.example 443 h2 b.example 443 \"20300101 00:00:00\" 0 0\n"
             + "h1 f.example. 443 h2 b.example. 443 \"20300101 00:00:00\" 0 0\n"
             + "h1 g.example 443 h2 b.example 443 \"20300101 00:00:00\" 0 0");
-
-        Assert.AreEqual(
-            Header
+        var expected = Header
             + "h1 localhost 18443 h1 localhost 18443 \"20300101 00:00:00\" 0 0\r\n"
             + "h1 [::1] 443 h2 [::1] 443 \"20300101 00:00:00\" 0 0\r\n"
             + "h1 [::2] 443 h2 [::3] 443 \"20300101 00:00:00\" 0 0\r\n"
             + "h1 f.example 443 h2 b.example. 443 \"20300101 00:00:00\" 0 0\r\n"
-            + "h1 g.example 443 h2 b.example 443 \"20300101 00:00:00\" 0 0\r\n",
-            cache.FormatFile("\r\n"));
+            + "h1 g.example 443 h2 b.example 443 \"20300101 00:00:00\" 0 0\r\n";
+
+        var file = FormatFile(cache, "\r\n", expected);
+
+        Assert.AreEqual(expected, file);
     }
 
     [TestMethod]
@@ -134,11 +140,17 @@ public sealed class AltSvcCacheTests
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 40, 0);
         string longest = $"h1 {new string('a', 2048)} 1 h2 {new string('b', 2008)} 443 \"20300101 00:00:00\" 0 0";
+        Diagnostics.Arrange("line ending", Visible(lineEnding));
+        Diagnostics.Arrange("longest line length", longest.Length);
 
-        cache.ReadFile($"h1 c 1 h2 d 2 \"20300101 00:00:00\" 0 0{lineEnding}{longest}{lineEnding}h1 e 1 h2 d 2 \"20300101 00:00:00\" 0 0{lineEnding}");
+        Read(cache, $"h1 c 1 h2 d 2 \"20300101 00:00:00\" 0 0{lineEnding}{longest}{lineEnding}h1 e 1 h2 d 2 \"20300101 00:00:00\" 0 0{lineEnding}");
 
+        var sourceHostLengths = cache.Entries.Select(entry => entry.SourceHost.Length).ToArray();
+        Diagnostics.Act("source host lengths", string.Join(", ", sourceHostLengths));
+        Diagnostics.Assert("longest line length", AltSvcCache.MaxFileLineLength, longest.Length);
+        Diagnostics.Assert("source host lengths", "1, 2048, 1", string.Join(", ", sourceHostLengths));
         Assert.AreEqual(AltSvcCache.MaxFileLineLength, longest.Length);
-        CollectionAssert.AreEqual(new[] { 1, 2048, 1 }, cache.Entries.Select(entry => entry.SourceHost.Length).ToArray());
+        CollectionAssert.AreEqual(new[] { 1, 2048, 1 }, sourceHostLengths);
     }
 
     [TestMethod]
@@ -148,9 +160,12 @@ public sealed class AltSvcCacheTests
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 40, 0);
         string tooLong = string.Format(CultureInfo.InvariantCulture, format, new string('a', 2048), new string('b', 2045));
+        Diagnostics.Arrange("too long line length", tooLong.Length);
 
-        cache.ReadFile($"h1 c 1 h2 d 2 \"20300101 00:00:00\" 0 0\n{tooLong}\nh1 e 1 h2 d 2 \"20300101 00:00:00\" 0 0\n");
+        Read(cache, $"h1 c 1 h2 d 2 \"20300101 00:00:00\" 0 0\n{tooLong}\nh1 e 1 h2 d 2 \"20300101 00:00:00\" 0 0\n");
 
+        Diagnostics.Assert("longer than the longest", true, tooLong.Length > AltSvcCache.MaxFileLineLength);
+        Diagnostics.Assert("only source host", "c", cache.Entries.Single().SourceHost);
         Assert.IsTrue(tooLong.Length > AltSvcCache.MaxFileLineLength);
         Assert.AreEqual("c", cache.Entries.Single().SourceHost);
     }
@@ -159,10 +174,14 @@ public sealed class AltSvcCacheTests
     public void FormatFile_ScopedIpv6Host_WritesItWithoutBrackets()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 40, 0);
+        const string ExpectedEnd = "h1 fe80::1%4 443 h2 fe80::1%4 1 \"20260930 05:40:00\" 0 0\n";
 
-        cache.ApplyHeader("h2=\":1\"", AltSvcAlpn.H1, "fe80::1%4", 443);
+        Apply(cache, "h2=\":1\"", AltSvcAlpn.H1, "fe80::1%4", 443);
 
-        StringAssert.EndsWith(cache.FormatFile("\n"), "h1 fe80::1%4 443 h2 fe80::1%4 1 \"20260930 05:40:00\" 0 0\n");
+        var file = cache.FormatFile("\n");
+        Diagnostics.Act("file", Visible(file));
+        Diagnostics.Assert("ends with " + Visible(ExpectedEnd), true, file.EndsWith(ExpectedEnd, StringComparison.Ordinal));
+        StringAssert.EndsWith(file, ExpectedEnd);
     }
 
     [TestMethod]
@@ -170,8 +189,9 @@ public sealed class AltSvcCacheTests
     {
         AltSvcCache cache = CacheAt(2030, 1, 1, 0, 0, 0);
 
-        cache.ReadFile("h1 a 1 h2 b 2 \"20300101 00:00:00\" 0 0\nh1 a 1 h2 b 2 \"20291231 23:59:59\" 0 0\n");
+        Read(cache, "h1 a 1 h2 b 2 \"20300101 00:00:00\" 0 0\nh1 a 1 h2 b 2 \"20291231 23:59:59\" 0 0\n");
 
+        Diagnostics.Assert("entry count", 1, cache.Entries.Count);
         Assert.AreEqual(1, cache.Entries.Count);
     }
 
@@ -179,36 +199,37 @@ public sealed class AltSvcCacheTests
     public void FormatFile_Ipv6Destination_WritesItInBrackets()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 44);
+        var expected = Header + "h1 localhost 18443 h2 [::1] 8443 \"20260930 05:21:44\" 0 0\r\n";
 
-        cache.ApplyHeader("h2=\"[::1]:8443\"", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "h2=\"[::1]:8443\"", AltSvcAlpn.H1, "localhost", 18443);
 
-        Assert.AreEqual(Header + "h1 localhost 18443 h2 [::1] 8443 \"20260930 05:21:44\" 0 0\r\n", cache.FormatFile("\r\n"));
+        Assert.AreEqual(expected, FormatFile(cache, "\r\n", expected));
     }
 
     [TestMethod]
     public void ApplyHeader_SecondHeader_ReplacesTheFirstHeadersEntries()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 24);
+        var expected = Header + "h1 localhost 18443 h3 b.example 1 \"20260930 05:21:24\" 0 0\r\n";
 
-        cache.ApplyHeader("h2=\"[::1]:8443\"; ma=\"30\"", AltSvcAlpn.H1, "localhost", 18443);
-        cache.ApplyHeader("h3=\"b.example:1\"", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "h2=\"[::1]:8443\"; ma=\"30\"", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "h3=\"b.example:1\"", AltSvcAlpn.H1, "localhost", 18443);
 
-        Assert.AreEqual(Header + "h1 localhost 18443 h3 b.example 1 \"20260930 05:21:24\" 0 0\r\n", cache.FormatFile("\r\n"));
+        Assert.AreEqual(expected, FormatFile(cache, "\r\n", expected));
     }
 
     [TestMethod]
     public void ApplyHeader_ZeroAndUnreadableMaxAges_WritesNowAndADayAhead()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-
-        cache.ApplyHeader("h2=\":1\";ma=abc, h3=\":2\";ma=0, h2=\":3\"; ma=99999999999999999999", AltSvcAlpn.H1, "localhost", 18443);
-
-        Assert.AreEqual(
-            Header
+        var expected = Header
             + "h1 localhost 18443 h2 localhost 1 \"20260930 05:21:46\" 0 0\r\n"
             + "h1 localhost 18443 h3 localhost 2 \"20260929 05:21:46\" 0 0\r\n"
-            + "h1 localhost 18443 h2 localhost 3 \"20260930 05:21:46\" 0 0\r\n",
-            cache.FormatFile("\r\n"));
+            + "h1 localhost 18443 h2 localhost 3 \"20260930 05:21:46\" 0 0\r\n";
+
+        Apply(cache, "h2=\":1\";ma=abc, h3=\":2\";ma=0, h2=\":3\"; ma=99999999999999999999", AltSvcAlpn.H1, "localhost", 18443);
+
+        Assert.AreEqual(expected, FormatFile(cache, "\r\n", expected));
     }
 
     [TestMethod]
@@ -216,19 +237,23 @@ public sealed class AltSvcCacheTests
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 22, 25);
 
-        cache.ApplyHeader("h2=\":8443\"; ma=999999999999999", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "h2=\":8443\"; ma=999999999999999", AltSvcAlpn.H1, "localhost", 18443);
 
-        Assert.AreEqual(DateTimeOffset.MaxValue.ToUnixTimeSeconds(), cache.Entries[0].Expires.ToUnixTimeSeconds());
+        var expires = cache.Entries[0].Expires.ToUnixTimeSeconds();
+        Diagnostics.Act("expires (unix seconds)", expires);
+        Diagnostics.Assert("expires (unix seconds)", DateTimeOffset.MaxValue.ToUnixTimeSeconds(), expires);
+        Assert.AreEqual(DateTimeOffset.MaxValue.ToUnixTimeSeconds(), expires);
     }
 
     [TestMethod]
     public void ApplyHeader_NoKnownAlternative_KeepsTheOriginsEntries()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-        cache.ApplyHeader("h2=\":1\"", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "h2=\":1\"", AltSvcAlpn.H1, "localhost", 18443);
 
-        cache.ApplyHeader("foo=\":2\"", AltSvcAlpn.H1, "localhost", 18443);
+        Apply(cache, "foo=\":2\"", AltSvcAlpn.H1, "localhost", 18443);
 
+        Diagnostics.Assert("entry count", 1, cache.Entries.Count);
         Assert.AreEqual(1, cache.Entries.Count);
     }
 
@@ -237,8 +262,9 @@ public sealed class AltSvcCacheTests
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
 
-        cache.ApplyHeader("h2=\":1\"", AltSvcAlpn.H1, ".", 443);
+        Apply(cache, "h2=\":1\"", AltSvcAlpn.H1, ".", 443);
 
+        Diagnostics.Assert("entry count", 0, cache.Entries.Count);
         Assert.AreEqual(0, cache.Entries.Count);
     }
 
@@ -246,11 +272,19 @@ public sealed class AltSvcCacheTests
     public void Find_OriginInAnyCaseWithATrailingDot_GivesTheFirstAllowedEntry()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-        cache.ApplyHeader("h3=\":1\", h2=\":2\"", AltSvcAlpn.H1, "Example.com.", 443);
+        Apply(cache, "h3=\":1\", h2=\":2\"", AltSvcAlpn.H1, "Example.com.", 443);
         HashSet<AltSvcAlpn> onlyH2 = [AltSvcAlpn.H2];
+        Diagnostics.Arrange("allowed", "h2");
 
-        Assert.AreEqual(2, cache.Find(AltSvcAlpn.H1, "EXAMPLE.com", 443, onlyH2)?.DestinationPort);
-        Assert.AreEqual(2, cache.Find(AltSvcAlpn.H1, "example.COM.", 443, onlyH2)?.DestinationPort);
+        var upperFirst = cache.Find(AltSvcAlpn.H1, "EXAMPLE.com", 443, onlyH2)?.DestinationPort;
+        var upperLast = cache.Find(AltSvcAlpn.H1, "example.COM.", 443, onlyH2)?.DestinationPort;
+
+        Diagnostics.Act("EXAMPLE.com destination port", upperFirst);
+        Diagnostics.Act("example.COM. destination port", upperLast);
+        Diagnostics.Assert("EXAMPLE.com destination port", 2, upperFirst);
+        Diagnostics.Assert("example.COM. destination port", 2, upperLast);
+        Assert.AreEqual(2, upperFirst);
+        Assert.AreEqual(2, upperLast);
     }
 
     [TestMethod]
@@ -260,23 +294,35 @@ public sealed class AltSvcCacheTests
     public void Find_AnotherOrigin_GivesNull(AltSvcAlpn sourceAlpn, string sourceHost, int sourcePort)
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-        cache.ApplyHeader("h3=\":1\"", AltSvcAlpn.H1, "example.com", 443);
+        Apply(cache, "h3=\":1\"", AltSvcAlpn.H1, "example.com", 443);
+        Diagnostics.Arrange("looked-up origin", $"{sourceAlpn} {sourceHost}:{sourcePort}");
 
-        Assert.IsNull(cache.Find(sourceAlpn, sourceHost, sourcePort, AnyAlpn));
+        var entry = cache.Find(sourceAlpn, sourceHost, sourcePort, AnyAlpn);
+
+        Diagnostics.Act("entry", entry?.ToString() ?? "(null)");
+        Diagnostics.Assert("entry", "(null)", entry?.ToString() ?? "(null)");
+        Assert.IsNull(entry);
     }
 
     [TestMethod]
     public void Find_ExpiredEntries_RemovesThosePassedAndKeepsThoseAfterTheMatch()
     {
         FakeTimeProvider clock = new(new DateTimeOffset(2026, 9, 29, 5, 21, 46, TimeSpan.Zero));
+        Diagnostics.Arrange("clock", clock.GetUtcNow().ToString("u", CultureInfo.InvariantCulture));
         AltSvcCache cache = new(clock);
-        cache.ApplyHeader("h2=\":1\"; ma=10", AltSvcAlpn.H1, "a.example", 443);
-        cache.ApplyHeader("h2=\":2\"", AltSvcAlpn.H1, "b.example", 443);
-        cache.ApplyHeader("h2=\":3\"; ma=10", AltSvcAlpn.H1, "c.example", 443);
+        Apply(cache, "h2=\":1\"; ma=10", AltSvcAlpn.H1, "a.example", 443);
+        Apply(cache, "h2=\":2\"", AltSvcAlpn.H1, "b.example", 443);
+        Apply(cache, "h2=\":3\"; ma=10", AltSvcAlpn.H1, "c.example", 443);
         clock.Advance(TimeSpan.FromSeconds(11));
+        Diagnostics.Arrange("clock advanced (s)", 11);
 
         AltSvcEntry? entry = cache.Find(AltSvcAlpn.H1, "b.example", 443, AnyAlpn);
 
+        var heldHosts = string.Join(", ", cache.Entries.Select(held => held.SourceHost));
+        Diagnostics.Act("entry", entry?.ToString() ?? "(null)");
+        Diagnostics.Act("held source hosts", heldHosts);
+        Diagnostics.Assert("destination port", 2, entry?.DestinationPort);
+        Diagnostics.Assert("held source hosts", "b.example, c.example", heldHosts);
         Assert.AreEqual(2, entry?.DestinationPort);
         CollectionAssert.AreEqual(new[] { "b.example", "c.example" }, cache.Entries.Select(held => held.SourceHost).ToArray());
     }
@@ -285,22 +331,33 @@ public sealed class AltSvcCacheTests
     public void Find_EntryExpiringThisSecond_StillMatches()
     {
         FakeTimeProvider clock = new(new DateTimeOffset(2026, 9, 29, 5, 21, 46, TimeSpan.Zero));
+        Diagnostics.Arrange("clock", clock.GetUtcNow().ToString("u", CultureInfo.InvariantCulture));
         AltSvcCache cache = new(clock);
-        cache.ApplyHeader("h2=\":1\"; ma=10", AltSvcAlpn.H1, "a.example", 443);
+        Apply(cache, "h2=\":1\"; ma=10", AltSvcAlpn.H1, "a.example", 443);
         clock.Advance(TimeSpan.FromSeconds(10.9));
+        Diagnostics.Arrange("clock advanced (s)", 10.9);
 
-        Assert.IsNotNull(cache.Find(AltSvcAlpn.H1, "a.example", 443, AnyAlpn));
+        var entry = cache.Find(AltSvcAlpn.H1, "a.example", 443, AnyAlpn);
+
+        Diagnostics.Act("entry", entry?.ToString() ?? "(null)");
+        Diagnostics.Assert("entry found", true, entry is not null);
+        Assert.IsNotNull(entry);
     }
 
     [TestMethod]
     public void FindForOrigin_EntriesUnderTwoVersions_GivesTheFirstVersionsEntry()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-        cache.ApplyHeader("h2=\":1\"", AltSvcAlpn.H1, "example.com", 443);
-        cache.ApplyHeader("h3=\":2\"", AltSvcAlpn.H2, "example.com", 443);
+        Apply(cache, "h2=\":1\"", AltSvcAlpn.H1, "example.com", 443);
+        Apply(cache, "h3=\":2\"", AltSvcAlpn.H2, "example.com", 443);
+        Diagnostics.Arrange("versions", "h3, h2, h1");
 
         AltSvcMatch? match = cache.FindForOrigin([AltSvcAlpn.H3, AltSvcAlpn.H2, AltSvcAlpn.H1], "example.com", 443, AnyAlpn);
 
+        Diagnostics.Act("match", match?.ToString() ?? "(null)");
+        Diagnostics.Assert("source alpn", AltSvcAlpn.H2, match?.SourceAlpn);
+        Diagnostics.Assert("destination port", 2, match?.Entry.DestinationPort);
+        Diagnostics.Assert("is same destination", false, match?.IsSameDestination);
         Assert.AreEqual(AltSvcAlpn.H2, match?.SourceAlpn);
         Assert.AreEqual(2, match?.Entry.DestinationPort);
         Assert.IsFalse(match?.IsSameDestination);
@@ -310,12 +367,17 @@ public sealed class AltSvcCacheTests
     public void FindForOrigin_OnlyADisallowedVersionsEntry_FallsThroughToTheNextVersion()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-        cache.ApplyHeader("h3=\":2\"", AltSvcAlpn.H2, "example.com", 443);
-        cache.ApplyHeader("h2=\":1\"", AltSvcAlpn.H1, "example.com", 443);
+        Apply(cache, "h3=\":2\"", AltSvcAlpn.H2, "example.com", 443);
+        Apply(cache, "h2=\":1\"", AltSvcAlpn.H1, "example.com", 443);
+        Diagnostics.Arrange("versions", "h2, h1");
+        Diagnostics.Arrange("allowed", "h1, h2");
 
         AltSvcMatch? match = cache.FindForOrigin([AltSvcAlpn.H2, AltSvcAlpn.H1], "example.com", 443, new HashSet<AltSvcAlpn> { AltSvcAlpn.H1, AltSvcAlpn.H2 });
 
-        Assert.AreEqual(new AltSvcMatch(AltSvcAlpn.H1, cache.Entries[1], false), match);
+        var expected = new AltSvcMatch(AltSvcAlpn.H1, cache.Entries[1], false);
+        Diagnostics.Act("match", match?.ToString() ?? "(null)");
+        Diagnostics.Assert("match", expected, match?.ToString() ?? "(null)");
+        Assert.AreEqual(expected, match);
     }
 
     [TestMethod]
@@ -326,19 +388,31 @@ public sealed class AltSvcCacheTests
     public void FindForOrigin_DestinationTheOrigin_IsTheSameDestination(string header, string origin, bool same)
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-        cache.ApplyHeader(header, AltSvcAlpn.H1, "example.com", 443);
+        Apply(cache, header, AltSvcAlpn.H1, "example.com", 443);
+        Diagnostics.Arrange("looked-up origin", origin + ":443");
 
-        Assert.AreEqual(same, cache.FindForOrigin([AltSvcAlpn.H1], origin, 443, AnyAlpn)?.IsSameDestination);
+        var isSame = cache.FindForOrigin([AltSvcAlpn.H1], origin, 443, AnyAlpn)?.IsSameDestination;
+
+        Diagnostics.Act("is same destination", isSame);
+        Diagnostics.Assert("is same destination", same, isSame);
+        Assert.AreEqual(same, isSame);
     }
 
     [TestMethod]
     public void FindForOrigin_NoVersionsOrNoEntry_GivesNull()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
-        cache.ApplyHeader("h3=\":2\"", AltSvcAlpn.H1, "example.com", 443);
+        Apply(cache, "h3=\":2\"", AltSvcAlpn.H1, "example.com", 443);
 
-        Assert.IsNull(cache.FindForOrigin([], "example.com", 443, AnyAlpn));
-        Assert.IsNull(cache.FindForOrigin([AltSvcAlpn.H2], "example.com", 443, AnyAlpn));
+        var noVersions = cache.FindForOrigin([], "example.com", 443, AnyAlpn);
+        var noEntry = cache.FindForOrigin([AltSvcAlpn.H2], "example.com", 443, AnyAlpn);
+
+        Diagnostics.Act("no versions", noVersions?.ToString() ?? "(null)");
+        Diagnostics.Act("h2 only", noEntry?.ToString() ?? "(null)");
+        Diagnostics.Assert("no versions", "(null)", noVersions?.ToString() ?? "(null)");
+        Diagnostics.Assert("h2 only", "(null)", noEntry?.ToString() ?? "(null)");
+        Assert.IsNull(noVersions);
+        Assert.IsNull(noEntry);
     }
 
     [TestMethod]
@@ -346,41 +420,41 @@ public sealed class AltSvcCacheTests
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 21, 46);
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.ReadFile(null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader("clear", AltSvcAlpn.H1, null!, 443));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader(null!, AltSvcAlpn.H1, "a", 443));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(AltSvcAlpn.H1, null!, 443, AnyAlpn));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(AltSvcAlpn.H1, "a", 443, null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.FindForOrigin(null!, "a", 443, AnyAlpn));
-        Assert.ThrowsExactly<ArgumentNullException>(() => cache.FormatFile(null!));
+        WriteThrown("ReadFile(null)", Assert.ThrowsExactly<ArgumentNullException>(() => cache.ReadFile(null!)));
+        WriteThrown("ApplyHeader(clear, null host)", Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader("clear", AltSvcAlpn.H1, null!, 443)));
+        WriteThrown("ApplyHeader(null header)", Assert.ThrowsExactly<ArgumentNullException>(() => cache.ApplyHeader(null!, AltSvcAlpn.H1, "a", 443)));
+        WriteThrown("Find(null host)", Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(AltSvcAlpn.H1, null!, 443, AnyAlpn)));
+        WriteThrown("Find(null allowed)", Assert.ThrowsExactly<ArgumentNullException>(() => cache.Find(AltSvcAlpn.H1, "a", 443, null!)));
+        WriteThrown("FindForOrigin(null versions)", Assert.ThrowsExactly<ArgumentNullException>(() => cache.FindForOrigin(null!, "a", 443, AnyAlpn)));
+        WriteThrown("FormatFile(null)", Assert.ThrowsExactly<ArgumentNullException>(() => cache.FormatFile(null!)));
     }
 
     [TestMethod]
     public void ApplyHeader_GoodAlternativeThenBadPort_ReturnsTheAddedOneThenUnknownPortNumber()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
+        var expected = new[]
+        {
+            AltSvcHeaderOutcome.Adding(new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "a.test", 443)),
+            AltSvcHeaderOutcome.Skipping(AltSvcSkipReason.UnknownPortNumber),
+        };
 
-        IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.ApplyHeader("h2=\"a.test:443\", h2=\":abc\"", AltSvcAlpn.H1, "localhost", 18443);
+        IReadOnlyList<AltSvcHeaderOutcome> outcomes = Apply(cache, "h2=\"a.test:443\", h2=\":abc\"", AltSvcAlpn.H1, "localhost", 18443);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                AltSvcHeaderOutcome.Adding(new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "a.test", 443)),
-                AltSvcHeaderOutcome.Skipping(AltSvcSkipReason.UnknownPortNumber),
-            },
-            outcomes.ToArray());
+        Diagnostics.Assert("outcomes", string.Join("; ", expected.AsEnumerable()), string.Join("; ", outcomes));
+        CollectionAssert.AreEqual(expected, outcomes.ToArray());
     }
 
     [TestMethod]
     public void ApplyHeader_ReadableHeaderWithoutAStop_ReturnsOnlyTheAddedAlternatives()
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
+        var expected = new[] { AltSvcHeaderOutcome.Adding(new Curl.Protocol.Abstractions.AltSvcAlternative("h3", "::1", 8443)) };
 
-        IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.ApplyHeader("h3=\"[::1]:8443\"", AltSvcAlpn.H1, "localhost", 18443);
+        IReadOnlyList<AltSvcHeaderOutcome> outcomes = Apply(cache, "h3=\"[::1]:8443\"", AltSvcAlpn.H1, "localhost", 18443);
 
-        CollectionAssert.AreEqual(
-            new[] { AltSvcHeaderOutcome.Adding(new Curl.Protocol.Abstractions.AltSvcAlternative("h3", "::1", 8443)) },
-            outcomes.ToArray());
+        Diagnostics.Assert("outcomes", string.Join("; ", expected.AsEnumerable()), string.Join("; ", outcomes));
+        CollectionAssert.AreEqual(expected, outcomes.ToArray());
     }
 
     [TestMethod]
@@ -388,12 +462,53 @@ public sealed class AltSvcCacheTests
     {
         AltSvcCache cache = CacheAt(2026, 9, 29, 5, 20, 5);
 
-        IReadOnlyList<AltSvcHeaderOutcome> outcomes = cache.ApplyHeader("h2=\":443\"", AltSvcAlpn.H1, string.Empty, 18443);
+        IReadOnlyList<AltSvcHeaderOutcome> outcomes = Apply(cache, "h2=\":443\"", AltSvcAlpn.H1, string.Empty, 18443);
 
+        Diagnostics.Assert("outcome count", 0, outcomes.Count);
+        Diagnostics.Assert("entry count", 0, cache.Entries.Count);
         Assert.IsEmpty(outcomes);
         Assert.IsEmpty(cache.Entries);
     }
 
-    private static AltSvcCache CacheAt(int year, int month, int day, int hour, int minute, int second) =>
-        new(new FakeTimeProvider(new DateTimeOffset(year, month, day, hour, minute, second, TimeSpan.Zero)));
+    private AltSvcCache CacheAt(int year, int month, int day, int hour, int minute, int second)
+    {
+        var now = new DateTimeOffset(year, month, day, hour, minute, second, TimeSpan.Zero);
+        Diagnostics.Arrange("clock", now.ToString("u", CultureInfo.InvariantCulture));
+        return new(new FakeTimeProvider(now));
+    }
+
+    private IReadOnlyList<AltSvcHeaderOutcome> Apply(AltSvcCache cache, string header, AltSvcAlpn alpn, string host, int port)
+    {
+        Diagnostics.Arrange("header", $"{Visible(header)} from {alpn} {host}:{port}");
+        var outcomes = cache.ApplyHeader(header, alpn, host, port);
+        Diagnostics.Act("outcomes", string.Join("; ", outcomes));
+        Diagnostics.Act("entry count", cache.Entries.Count);
+        return outcomes;
+    }
+
+    private void Read(AltSvcCache cache, string file)
+    {
+        Diagnostics.Arrange("file length", file.Length);
+        Diagnostics.Bytes("file", System.Text.Encoding.ASCII.GetBytes(file));
+        cache.ReadFile(file);
+        Diagnostics.Act("entry count", cache.Entries.Count);
+    }
+
+    private string FormatFile(AltSvcCache cache, string lineEnding, string expected)
+    {
+        var file = cache.FormatFile(lineEnding);
+        Diagnostics.Act("file", Visible(file));
+        Diagnostics.Diff("file", expected, file);
+        return file;
+    }
+
+    private void WriteThrown(string call, ArgumentNullException exception)
+    {
+        Diagnostics.Arrange("call", call);
+        Diagnostics.Act("exception", exception.GetType().Name + " (" + exception.ParamName + ")");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
+
+    private static string Visible(string text) =>
+        "\"" + text.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal) + "\"";
 }

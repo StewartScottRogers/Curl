@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core.AltSvc;
 
@@ -11,6 +12,8 @@ namespace Curl.Core.AltSvc;
 public sealed class AltSvcHeaderParserTests
 {
     private const long Day = AltSvcHeaderParser.DefaultMaxAgeSeconds;
+
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     public void Parse_TwoAlternatives_GivesEachItsOwnMaxAge() =>
@@ -117,6 +120,7 @@ public sealed class AltSvcHeaderParserTests
     public void Parse_BracketedHostOf47Characters_Stops() =>
         AssertAlternatives($"h2=\"[{new string('1', 47)}]:1\"");
 
+
     [TestMethod]
     [DataRow("clear")]
     [DataRow(" CLEAR\t")]
@@ -124,15 +128,25 @@ public sealed class AltSvcHeaderParserTests
     [DataRow("clear\r\n")]
     public void Parse_Clear_IsClear(string value)
     {
-        AltSvcHeader header = AltSvcHeaderParser.Parse(value);
+        AltSvcHeader header = Parse(value, out var diagnostics);
 
+        diagnostics.Assert("is clear", true, header.IsClear);
+        diagnostics.Assert("alternative count", 0, header.Alternatives.Count);
         Assert.IsTrue(header.IsClear);
         Assert.AreEqual(0, header.Alternatives.Count);
     }
 
     [TestMethod]
-    public void Parse_Null_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => AltSvcHeaderParser.Parse(null!));
+    public void Parse_Null_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("call", "Parse(null)");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => AltSvcHeaderParser.Parse(null!));
+
+        diagnostics.Act("exception", exception.GetType().Name + " (" + exception.ParamName + ")");
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 
     [TestMethod]
     [DataRow("h2=\":abc\"")]
@@ -141,27 +155,30 @@ public sealed class AltSvcHeaderParserTests
     [DataRow("h2=\"[::1]443\"")]
     [DataRow("h2=\"host\"")]
     public void Parse_EmptyBadOrMissingPort_SaysUnknownPortNumber(string value) =>
-        Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, AltSvcHeaderParser.Parse(value).SkipReason);
+        Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, SkipReason(value, AltSvcSkipReason.UnknownPortNumber));
 
     [TestMethod]
     public void Parse_UnclosedIpv6Literal_SaysBadIpv6Hostname() =>
-        Assert.AreEqual(AltSvcSkipReason.BadIpv6Hostname, AltSvcHeaderParser.Parse("h2=\"[::1:443\"").SkipReason);
+        Assert.AreEqual(AltSvcSkipReason.BadIpv6Hostname, SkipReason("h2=\"[::1:443\"", AltSvcSkipReason.BadIpv6Hostname));
 
     [TestMethod]
     public void Parse_HostOneCharacterOverTheLimit_SaysBadHostname() =>
         Assert.AreEqual(
             AltSvcSkipReason.BadHostname,
-            AltSvcHeaderParser.Parse($"h2=\"{new string('a', AltSvcEntry.MaxHostLength + 1)}:443\"").SkipReason);
+            SkipReason($"h2=\"{new string('a', AltSvcEntry.MaxHostLength + 1)}:443\"", AltSvcSkipReason.BadHostname));
 
     [TestMethod]
     public void Parse_HostAtTheLimit_ReadsItWithNoSkipReason()
     {
         string host = new('a', AltSvcEntry.MaxHostLength);
+        var expected = new[] { new AltSvcAlternative(AltSvcAlpn.H2, host, 443, Day, false) };
 
-        AltSvcHeader header = AltSvcHeaderParser.Parse($"h2=\"{host}:443\"");
+        AltSvcHeader header = Parse($"h2=\"{host}:443\"", out var diagnostics);
 
+        diagnostics.Assert("skip reason", "(none)", header.SkipReason?.ToString() ?? "(none)");
+        diagnostics.Assert("alternatives", Describe(expected), Describe(header.Alternatives));
         Assert.IsNull(header.SkipReason);
-        CollectionAssert.AreEqual(new[] { new AltSvcAlternative(AltSvcAlpn.H2, host, 443, Day, false) }, header.Alternatives.ToArray());
+        CollectionAssert.AreEqual(expected, header.Alternatives.ToArray());
     }
 
     [TestMethod]
@@ -169,22 +186,68 @@ public sealed class AltSvcHeaderParserTests
     [DataRow("h2=\":443")]
     [DataRow("h2=:443")]
     public void Parse_GoodAlternativeOrStopWithoutACurlLine_HasNoSkipReason(string value) =>
-        Assert.IsNull(AltSvcHeaderParser.Parse(value).SkipReason);
+        Assert.IsNull(SkipReason(value, null));
 
     [TestMethod]
     public void Parse_BadPortAfterAGoodAlternative_KeepsTheGoodOneAndSaysWhy()
     {
-        AltSvcHeader header = AltSvcHeaderParser.Parse("h2=\"a.test:443\", h2=\":abc\"");
+        var expected = new[] { new AltSvcAlternative(AltSvcAlpn.H2, "a.test", 443, Day, false) };
 
+        AltSvcHeader header = Parse("h2=\"a.test:443\", h2=\":abc\"", out var diagnostics);
+
+        diagnostics.Assert("skip reason", AltSvcSkipReason.UnknownPortNumber, header.SkipReason);
+        diagnostics.Assert("alternatives", Describe(expected), Describe(header.Alternatives));
         Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, header.SkipReason);
-        CollectionAssert.AreEqual(new[] { new AltSvcAlternative(AltSvcAlpn.H2, "a.test", 443, Day, false) }, header.Alternatives.ToArray());
+        CollectionAssert.AreEqual(expected, header.Alternatives.ToArray());
     }
 
-    private static void AssertAlternatives(string value, params AltSvcAlternative[] expected)
+    private void AssertAlternatives(string value, params AltSvcAlternative[] expected)
     {
-        AltSvcHeader header = AltSvcHeaderParser.Parse(value);
+        AltSvcHeader header = Parse(value, out var diagnostics);
 
+        diagnostics.Assert("is clear", false, header.IsClear);
+        diagnostics.Assert("alternatives", Describe(expected), Describe(header.Alternatives));
         Assert.IsFalse(header.IsClear);
         CollectionAssert.AreEqual(expected, header.Alternatives.ToArray());
     }
+
+    private AltSvcSkipReason? SkipReason(string value, AltSvcSkipReason? expected)
+    {
+        AltSvcHeader header = Parse(value, out var diagnostics);
+
+        diagnostics.Assert("skip reason", expected?.ToString() ?? "(none)", header.SkipReason?.ToString() ?? "(none)");
+        return header.SkipReason;
+    }
+
+    private AltSvcHeader Parse(string value, out TestDiagnostics diagnostics)
+    {
+        diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("value length", value.Length);
+        diagnostics.Arrange("value", Visible(value));
+
+        AltSvcHeader header = AltSvcHeaderParser.Parse(value);
+
+        diagnostics.Act("is clear", header.IsClear);
+        diagnostics.Act("skip reason", header.SkipReason?.ToString() ?? "(none)");
+        diagnostics.Act("alternatives", Describe(header.Alternatives));
+        return header;
+    }
+
+    // Hosts at the length limit run to hundreds of characters; the length line above carries
+    // their size, so the text shows only the start.
+    private static string Visible(string text)
+    {
+        var shown = text.Length > 80 ? text[..80] + "..." : text;
+        return "\"" + shown.Replace("\r", "\r", StringComparison.Ordinal).Replace("\n", "\n", StringComparison.Ordinal).Replace("\t", "\t", StringComparison.Ordinal) + "\"";
+    }
+
+    private static string Describe(IEnumerable<AltSvcAlternative> alternatives) =>
+        "[" + string.Join("; ", alternatives.Select(a => $"{a.Alpn} {ShortHost(a.Host)}:{a.Port} ma={a.MaxAgeSeconds} persist={a.Persist}")) + "]";
+
+    private static string ShortHost(string? host) => host switch
+    {
+        null => "(origin host)",
+        { Length: > 40 } => $"{host[..8]}... ({host.Length} characters)",
+        _ => host,
+    };
 }
