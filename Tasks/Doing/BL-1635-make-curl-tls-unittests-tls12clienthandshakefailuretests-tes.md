@@ -34,3 +34,4 @@ Every test in `Curl.Tls.UnitTests`' `Tls12ClientHandshakeFailureTests` (1 file, 
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
