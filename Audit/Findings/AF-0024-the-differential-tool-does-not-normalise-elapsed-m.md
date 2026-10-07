@@ -39,6 +39,7 @@ Select-String -Path Audit/Tools/Invoke-DifferentialConformance.ps1 -Pattern 'aft
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Ran the reproduction: the count is 0. Invoke-DifferentialConformance.ps1's Get-Normalised still normalises only the port, Date, boundary, meter lines and the PROXY source port. In this audit's run (seed 1162681642), 4 of the 5 reported differences are this gap alone. Cases 152, 179 and 254 differ only in 'after 0 ms' (curl) vs 'after 7/6/42 ms' (Curl) in an otherwise identical exit-7 message. Case 157 differs only in the -v 'Established connection ... from 127.0.0.1 port 55548/55549' source port.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | Ran the reproduction: count 0. Invoke-DifferentialConformance.ps1 still has no normalisation for 'after N ms' or the -v 'Established ... port N' source port. In this audit's run (seed 1516403247) 8 of the 14 differing cases are only that noise: 35, 71, 79, 137, 202, 223 and 227 differ only in 'after N ms', and 154 (--get -v) differs only in 'from 127.0.0.1 port 51113' versus '51114'.
 
 ## Log
 

@@ -39,6 +39,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | Seed-0 mutation run: CertificateRevocationListFile.cs:116 `<` to `<=` survived.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | CertificateRevocationListFile.cs:117 now reads 'list.NextUpdate <= now'. By hand, same method as AF-0006: the reverse mutant '<=' -> '<' is killed by Refusal_AtTheListsExpiryMoment_HasExpired, so the expiry boundary is now pinned.
 
 ## Log
 

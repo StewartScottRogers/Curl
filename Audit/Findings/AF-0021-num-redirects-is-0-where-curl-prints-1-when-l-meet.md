@@ -3,15 +3,15 @@ id: AF-0021
 title: %{num_redirects} is 0 where curl prints 1 when -L meets a Location it cannot parse
 auditor: conformance
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.
 key: conformance:Curl.Core.UnitLibrary/RedirectFollower.cs:num_redirects:stdout
 task: BL-1277
 found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
-closed:
-closed-by:
+closed: 2026-10-07
+closed-by: 2026-10-07_0844.md
 ---
 # AF-0021 - %{num_redirects} is 0 where curl prints 1 when -L meets a Location it cannot parse
 
@@ -39,8 +39,10 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($x in @(@
 ## Re-audits
 
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel. Location http://127.0.0.1:x/z gives exit 3, num_redirects 1 from both binaries. Location /z gives exit 0, num_redirects 1 from both.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: num_redirects is 1 for both curl and candidate, for Location http://127.0.0.1:x/z and for /z. The same run shows a different defect: for the unparsable Location, curl exits 3 and candidate exits 2. It is reported as the new finding conformance:Curl.Core.UnitLibrary/RedirectFollower.cs:redirect-target-unparsable:exit-code.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_0844.md: the reproduction no longer reproduces.

@@ -38,6 +38,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | Same two sites as AF-0031: the TlsFailureMessages.cs:320 mutant is now killed, but SchannelCommonNameCheck.cs:30 'forIssuer: false' -> 'true' still survives (all 2996 filtered Networking tests pass), because every test certificate is self-signed.
+
 ## Log
 
 - 2026-10-03: filed proposed.

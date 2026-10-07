@@ -38,6 +38,8 @@ Select-String -Path Curl.Networking.UnitTests/SslStreamTlsProviderTests.Revocati
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: Select-String finds no 'Assert.IsNotNull(failure)' in SslStreamTlsProviderTests.RevocationBestEffort.cs. The test now asserts Assert.AreEqual((CurlExitCode.PeerFailedVerification, UntrustedRootLine), failure).
+
 ## Log
 
 - 2026-10-03: filed proposed.

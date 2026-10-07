@@ -41,6 +41,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Same red baseline, no mutants run. ConnectToMappings (ConnectDestination.cs) still creates IsMapped: false at lines 66 and 135. A fix is not shown.
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Networking run, seed 0: no mutant sampled in ConnectToMappings.cs (line 135 still has IsMapped: false); not shown surviving by the reproduction, unverified.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run did not sample the site. Hand-mutated ConnectToMappings.Failure to IsMapped: true in a scratch copy: Map_WhenTheMatchingDestinationDoesNotParse_ReportsCurlsExit49Message failed, so the mutant is killed.
+- 2026-10-07 | 2026-10-07_0844.md | reproduces: no | By hand, same method as AF-0006: ConnectToMappings.cs:135 Failure's 'IsMapped: false' -> 'IsMapped: true'. Killed: 9 failures, including Map_WhenTheMatchingDestinationDoesNotParse_ReportsCurlsExit49Message (three rows).
 
 ## Log
 
