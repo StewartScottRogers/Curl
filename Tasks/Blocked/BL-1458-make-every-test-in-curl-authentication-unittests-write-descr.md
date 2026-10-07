@@ -41,3 +41,4 @@ Every test in `Curl.Authentication.UnitTests` writes, through BL-1457's shared `
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Blocked. Stewart: dark factory stopped at its 5.91 US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd), so split the task; see Z:\repos\Curl.logs\BL-1458-20261006-200306-L1.jsonl
