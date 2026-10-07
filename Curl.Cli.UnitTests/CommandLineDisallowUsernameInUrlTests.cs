@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -10,11 +12,14 @@ public sealed class CommandLineDisallowUsernameInUrlTests
 {
     private const string Url = "http://u@127.0.0.1:1/";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Parse_NoSpelling_AllowsAUserName()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        TestDiagnostics.For(TestContext).Assert("disallow username in url", false, result.Options?.DisallowUsernameInUrl);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.DisallowUsernameInUrl);
     }
@@ -24,8 +29,9 @@ public sealed class CommandLineDisallowUsernameInUrlTests
     [DataRow("--no-disallow-username-in-url", false)]
     public void Parse_OneSpelling_SetsDisallowUsernameInUrl(string spelling, bool disallow)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = Parse([spelling, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("disallow username in url", disallow, result.Options?.DisallowUsernameInUrl);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(disallow, result.Options.DisallowUsernameInUrl);
     }
@@ -35,8 +41,9 @@ public sealed class CommandLineDisallowUsernameInUrlTests
     [DataRow("--disallow-username-in-url", "--no-disallow-username-in-url", false)]
     public void Parse_TwoSpellings_LastOneWins(string first, string second, bool disallow)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+        CommandLineParseResult result = Parse([first, second, Url]);
 
+        TestDiagnostics.For(TestContext).Assert("disallow username in url", disallow, result.Options?.DisallowUsernameInUrl);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(disallow, result.Options.DisallowUsernameInUrl);
     }
@@ -44,10 +51,23 @@ public sealed class CommandLineDisallowUsernameInUrlTests
     [TestMethod]
     public void Parse_DisallowBeforeNext_DoesNotCarryIntoTheNextGroup()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--disallow-username-in-url", Url, "--next", Url]);
+        CommandLineParseResult result = Parse(["--disallow-username-in-url", Url, "--next", Url]);
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        diagnostics.Assert("group 0 disallow username in url", true, result.Groups[0].DisallowUsernameInUrl);
+        diagnostics.Assert("group 1 disallow username in url", false, result.Groups[1].DisallowUsernameInUrl);
         Assert.IsTrue(result.Groups[0].DisallowUsernameInUrl);
         Assert.IsFalse(result.Groups[1].DisallowUsernameInUrl);
+    }
+
+    private CommandLineParseResult Parse(string[] arguments)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+        return result;
     }
 }

@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -17,6 +18,8 @@ public sealed class CommandLineDataFileTests
 {
     private const string Url = "http://example.com/";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Parse_DataAtFile_ReadsTheFileWithoutCarriageReturnsLineFeedsAndNuls()
     {
@@ -24,7 +27,9 @@ public sealed class CommandLineDataFileTests
 
         CommandLineParseResult result = Parse(["-d", "@body.txt", Url], reader);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertPostData("abc"u8.ToArray(), result);
         CollectionAssert.AreEqual(new byte[] { 0x61, 0x62, 0x63 }, result.Options.PostData!.Value.ToArray());
         CollectionAssert.AreEqual(new[] { "body.txt" }, reader.Reads);
     }
@@ -36,7 +41,9 @@ public sealed class CommandLineDataFileTests
 
         CommandLineParseResult result = Parse(["--data", "@-", Url], reader);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertPostData("q r"u8.ToArray(), result);
         CollectionAssert.AreEqual(new byte[] { 0x71, 0x20, 0x72 }, result.Options.PostData!.Value.ToArray());
         CollectionAssert.AreEqual(new[] { "-" }, reader.Reads);
     }
@@ -48,7 +55,9 @@ public sealed class CommandLineDataFileTests
 
         CommandLineParseResult result = Parse(["-d", "abc", Url], reader);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertPostData("abc"u8.ToArray(), result);
         CollectionAssert.AreEqual(new byte[] { 0x61, 0x62, 0x63 }, result.Options.PostData!.Value.ToArray());
         Assert.IsEmpty(reader.Reads);
     }
@@ -60,7 +69,9 @@ public sealed class CommandLineDataFileTests
 
         CommandLineParseResult result = Parse(["-d", "a", "-d@b", Url], reader);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertPostData("a&b"u8.ToArray(), result);
         CollectionAssert.AreEqual("a&b"u8.ToArray(), result.Options.PostData!.Value.ToArray());
     }
 
@@ -71,7 +82,9 @@ public sealed class CommandLineDataFileTests
 
         CommandLineParseResult result = Parse(["-d", "@blank", Url], reader);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        AssertPostData([], result);
         Assert.AreEqual(0, result.Options.PostData!.Value.Length);
     }
 
@@ -80,6 +93,9 @@ public sealed class CommandLineDataFileTests
     {
         CommandLineParseResult result = Parse(["-d", "@missing", Url], new RecordingDataFileReader());
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("accepted", false, result.IsAccepted);
+        diagnostics.Assert("exit code", CurlExitCode.ReadError, result.Refusal?.ExitCode);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -99,6 +115,12 @@ public sealed class CommandLineDataFileTests
     {
         CommandLineParseResult result = Parse([argument, Url], new RecordingDataFileReader());
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("exit code", CurlExitCode.ReadError, result.Refusal?.ExitCode);
+        diagnostics.Assert(
+            "second stderr line",
+            $"curl: option {argument}: error encountered when reading a file",
+            result.Refusal?.StandardErrorLines.ElementAtOrDefault(1));
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         Assert.AreEqual($"curl: option {argument}: error encountered when reading a file", result.Refusal!.StandardErrorLines[1]);
     }
@@ -108,6 +130,9 @@ public sealed class CommandLineDataFileTests
     {
         CommandLineParseResult result = Parse(["-s", "-d", "@missing", Url], new RecordingDataFileReader());
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("exit code", CurlExitCode.ReadError, result.Refusal?.ExitCode);
+        diagnostics.Assert("stderr line count", 2, result.Refusal?.StandardErrorLines.Count);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -121,14 +146,41 @@ public sealed class CommandLineDataFileTests
     [TestMethod]
     public void Parse_NullDataFileReader_Throws()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments([Url]);
+        diagnostics.Arrange("data file reader", "null");
+
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CommandLineParser.Parse([Url], _ => true, new UnexpectedPasswordPrompt(), null!));
 
+        diagnostics.Act("exception", $"{exception.GetType().Name} for {exception.ParamName}");
+        diagnostics.Assert("parameter name", "dataFileReader", exception.ParamName);
         Assert.AreEqual("dataFileReader", exception.ParamName);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, RecordingDataFileReader reader)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        foreach (KeyValuePair<string, byte[]> file in reader.Files)
+        {
+            diagnostics.Bytes($"file {file.Key}", file.Value);
+        }
+
+        diagnostics.Bytes("standard input", reader.StandardInput);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        diagnostics.ActParse(result);
+        diagnostics.Act("reads", CommandLineParseDiagnostics.QuoteEach(reader.Reads));
+        return result;
+    }
+
+    private void AssertPostData(byte[] expected, CommandLineParseResult result)
+    {
+        byte[] actual = result.Options?.PostData?.ToArray() ?? [];
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Bytes("post data", actual);
+        diagnostics.Diff("post data", expected, actual);
+    }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

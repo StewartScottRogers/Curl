@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -15,6 +16,8 @@ public sealed class CommandLineContinueAtWithBodyTests
 
     private const string FailedInitialization = "curl: (2) Failed initialization";
 
+    public TestContext TestContext { get; set; } = null!;
+
     // curl -C 10 -d x URL, -d x -C 10 URL, --data-binary, --data-urlencode, --json, -sS: names --data.
     [TestMethod]
     [DataRow(new[] { "-C", "10", "-d", "x", Url })]
@@ -28,7 +31,7 @@ public sealed class CommandLineContinueAtWithBodyTests
     public void Parse_OffsetWithData_IsRefusedNamingData(string[] arguments)
     {
         AssertRefusedAtTransferSetup(
-            CommandLineParser.Parse(arguments),
+            Parse(arguments),
             "curl: cannot mix --continue-at with --data",
             FailedInitialization);
     }
@@ -40,7 +43,7 @@ public sealed class CommandLineContinueAtWithBodyTests
     public void Parse_OffsetWithForm_IsRefusedNamingForm(string[] arguments)
     {
         AssertRefusedAtTransferSetup(
-            CommandLineParser.Parse(arguments),
+            Parse(arguments),
             "curl: cannot mix --continue-at with --form",
             FailedInitialization);
     }
@@ -51,15 +54,16 @@ public sealed class CommandLineContinueAtWithBodyTests
     [DataRow(new[] { "-C", "10", "-F", "a=b", "-s", Url })]
     public void Parse_OffsetWithBodyAndSilent_PrintsNothing(string[] arguments)
     {
-        AssertRefusedAtTransferSetup(CommandLineParser.Parse(arguments));
+        AssertRefusedAtTransferSetup(Parse(arguments));
     }
 
     // curl -C 10 -d x -F a=b URL: the form-and-data warning wins.
     [TestMethod]
     public void Parse_OffsetWithFormAndData_GivesTheFormAndDataRefusal()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-C", "10", "-d", "x", "-F", "a=b", Url]);
+        CommandLineParseResult result = Parse(["-C", "10", "-d", "x", "-F", "a=b", Url]);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", false, result.IsAccepted);
         Assert.IsFalse(result.IsAccepted);
         Assert.StartsWith("Warning: You can only select one HTTP request method!", result.Refusal.StandardErrorLines[0]);
     }
@@ -73,8 +77,9 @@ public sealed class CommandLineContinueAtWithBodyTests
     [DataRow(new[] { "-C", "10", Url })]
     public void Parse_NoOffsetOrNoPostBody_IsAccepted(string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted, result.Refusal is null ? string.Empty : string.Join('\n', result.Refusal.StandardErrorLines));
     }
 
@@ -82,8 +87,11 @@ public sealed class CommandLineContinueAtWithBodyTests
     [TestMethod]
     public void Parse_OffsetWithDataInALaterGroup_RunsTheEarlierGroupFirst()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--next", "-C", "10", "-d", "x", Url]);
+        CommandLineParseResult result = Parse([Url, "--next", "-C", "10", "-d", "x", Url]);
 
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Act("refusal after groups", CommandLineParseDiagnostics.QuoteEach(result.RefusalAfterGroups?.StandardErrorLines ?? []));
+        diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNotNull(result.RefusalAfterGroups);
         CollectionAssert.AreEqual(
@@ -94,11 +102,30 @@ public sealed class CommandLineContinueAtWithBodyTests
     [TestMethod]
     public void ContinueAtWithBody_NullBodyOption_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtWithBody(null!, false));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("body option", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtWithBody(null!, false));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
-    private static void AssertRefusedAtTransferSetup(CommandLineParseResult result, params string[] refusalLines)
+    private CommandLineParseResult Parse(string[] arguments)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertRefusedAtTransferSetup(CommandLineParseResult result, params string[] refusalLines)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Assert("accepted", false, result.IsAccepted);
+        diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
+        diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(refusalLines), CommandLineParseDiagnostics.QuoteEach(result.Refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         Assert.IsTrue(result.Refusal.FoundAtTransferSetup);
