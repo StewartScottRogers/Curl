@@ -25,6 +25,7 @@ public sealed partial class HttpProtocolHandlerTests
         int status = all.IndexOf($"< {statusLine}\r\n");
         Assert.AreEqual("* " + RewindLine, all[status + 1], string.Join('\n', all));
         Assert.AreEqual("< Location: /b\r\n", all[status + 2]);
+        WriteRewindCount(events, 1);
         Assert.AreEqual(1, events.Info.Count(line => line == RewindLine));
     }
 
@@ -33,6 +34,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = await PostToRedirectAsync("HTTP/1.1 302 Found", "ab", followsRedirects: false);
 
+        WriteRewindCount(events, 0);
         CollectionAssert.DoesNotContain(events.Info.ToList(), RewindLine);
     }
 
@@ -41,6 +43,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = await PostToRedirectAsync("HTTP/1.1 302 Found", string.Empty, followsRedirects: true);
 
+        WriteRewindCount(events, 0);
         CollectionAssert.DoesNotContain(events.Info.ToList(), RewindLine);
     }
 
@@ -51,6 +54,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = await PostToRedirectAsync(statusLine, "ab", followsRedirects: true);
 
+        WriteRewindCount(events, 0);
         CollectionAssert.DoesNotContain(events.Info.ToList(), RewindLine);
     }
 
@@ -58,14 +62,17 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_FollowedRedirectWithoutABody_ReportsNoRewind()
     {
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("scripted response", "302 Found, Location: /b, Content-Length: 0; no request body, following");
 
-        await Handler(QueueConnector.For(Connection("HTTP/1.1 302 Found\r\nLocation: /b\r\nContent-Length: 0\r\n\r\n", 65536)))
+        TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 302 Found\r\nLocation: /b\r\nContent-Length: 0\r\n\r\n", 65536)))
             .ExecuteAsync(EventsContext("http://127.0.0.1:47811/a", events, new HttpRequestOptions { FollowRedirects = true }));
 
+        WriteResult(result);
+        WriteRewindCount(events, 0);
         CollectionAssert.DoesNotContain(events.Info.ToList(), RewindLine);
     }
 
-    private static async Task<RecordingTransferEvents> PostToRedirectAsync(string statusLine, string body, bool followsRedirects)
+    private async Task<RecordingTransferEvents> PostToRedirectAsync(string statusLine, string body, bool followsRedirects)
     {
         RecordingTransferEvents events = new();
         HttpRequestOptions options = new()
@@ -73,10 +80,18 @@ public sealed partial class HttpProtocolHandlerTests
             Body = new BytesBody(System.Text.Encoding.ASCII.GetBytes(body), "application/x-www-form-urlencoded"),
             FollowRedirects = followsRedirects,
         };
+        Diagnostics.Arrange("scripted response", $"{statusLine}, Location: /b, Content-Length: 0");
+        Diagnostics.Arrange("request body", body.Length == 0 ? "(empty)" : body);
+        Diagnostics.Arrange("follows redirects", followsRedirects);
 
-        await Handler(QueueConnector.For(Connection($"{statusLine}\r\nLocation: /b\r\nContent-Length: 0\r\n\r\n", 65536)))
+        TransferResult result = await Handler(QueueConnector.For(Connection($"{statusLine}\r\nLocation: /b\r\nContent-Length: 0\r\n\r\n", 65536)))
             .ExecuteAsync(EventsContext("http://127.0.0.1:47811/a", events, options));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
         return events;
     }
+
+    private void WriteRewindCount(RecordingTransferEvents events, int expected) =>
+        Diagnostics.Assert("rewind lines", expected, events.Info.Count(line => line == RewindLine));
 }

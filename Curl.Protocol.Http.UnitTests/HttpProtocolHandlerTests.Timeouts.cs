@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
@@ -36,14 +37,22 @@ public sealed partial class HttpProtocolHandlerTests
                 TimeProvider = time,
                 MaxTime = TimeSpan.FromSeconds(1),
             };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response before the stall", OneLine(response));
+            Diagnostics.Arrange("max time", "1000 ms");
 
             Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
             await connection.Stalled;
             time.Advance(TimeSpan.FromMilliseconds(999));
+            Diagnostics.Assert("completed after 999 ms", false, transfer.IsCompleted);
             Assert.IsFalse(transfer.IsCompleted, $"Chunk size {chunkSize}: ended before -m passed.");
             time.Advance(TimeSpan.FromMilliseconds(1));
             TransferResult result = await transfer;
 
+            WriteResult(result);
+            Diagnostics.Act("bytes transferred", result.BytesTransferred);
+            Diagnostics.Assert("error text", "Operation timed out after 1000 milliseconds with " + received, result.ErrorMessage);
+            Diagnostics.Assert("bytes transferred", output.Length, result.BytesTransferred);
             Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("Operation timed out after 1000 milliseconds with " + received, result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual(output.Length, result.BytesTransferred, $"Chunk size {chunkSize}");
@@ -67,12 +76,16 @@ public sealed partial class HttpProtocolHandlerTests
             MaxTime = TimeSpan.FromSeconds(1),
             CancellationToken = runnerWatchdog.Token,
         };
+        Diagnostics.Arrange("scripted response before the stall", "200, Content-Length: 100, body hello");
+        Diagnostics.Arrange("max time and watchdog", "1000 ms each");
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
         await connection.Stalled;
         time.Advance(TimeSpan.FromSeconds(1));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("error text", "Operation timed out after 1000 milliseconds with 5 out of 100 bytes received", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Operation timed out after 1000 milliseconds with 5 out of 100 bytes received", result.ErrorMessage);
     }
@@ -91,11 +104,15 @@ public sealed partial class HttpProtocolHandlerTests
             MaxTime = TimeSpan.FromSeconds(1),
             CancellationToken = transferCancellation.Token,
         };
+        Diagnostics.Arrange("scripted response before the stall", "200, Content-Length: 100, body hello");
+        Diagnostics.Arrange("max time", "1000 ms, cancelled before it passes");
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
         await connection.Stalled;
         await transferCancellation.CancelAsync();
 
+        Diagnostics.Act("transfer cancelled", transferCancellation.IsCancellationRequested);
+        Diagnostics.Assert("exception", nameof(OperationCanceledException), "awaited below");
         await Assert.ThrowsAsync<OperationCanceledException>(() => transfer);
     }
 
@@ -112,12 +129,17 @@ public sealed partial class HttpProtocolHandlerTests
             TimeProvider = time,
             MaxTime = TimeSpan.FromMilliseconds(2500),
         };
+        Diagnostics.Arrange("scripted response before the stall", "200, Content-Length: 100, body hello");
+        Diagnostics.Arrange("max time", "2500 ms");
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
         await connection.Stalled;
         time.Advance(TimeSpan.FromMilliseconds(2500));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Act("report", $"response code {result.Report?.ResponseCode}, download size {result.Report?.DownloadSize}");
+        Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("Operation timed out after 2500 milliseconds with 5 out of 100 bytes received", result.ErrorMessage);
         Assert.AreEqual("hello", Latin1(output.ToArray()));
         Assert.AreEqual(200, result.Report!.ResponseCode);
@@ -142,14 +164,18 @@ public sealed partial class HttpProtocolHandlerTests
             MaxTime = TimeSpan.FromSeconds(2),
             OperationStarted = operationStarted,
         };
+        Diagnostics.Arrange("max time", "2000 ms, operation started 1500 ms earlier");
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
         await connection.Stalled;
         time.Advance(TimeSpan.FromMilliseconds(499));
+        Diagnostics.Assert("completed after 1999 ms", false, transfer.IsCompleted);
         Assert.IsFalse(transfer.IsCompleted, "Ended before -m passed since the operation started.");
         time.Advance(TimeSpan.FromMilliseconds(1));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("error text", "Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Operation timed out after 2000 milliseconds with 0 bytes received", result.ErrorMessage);
     }
@@ -169,9 +195,12 @@ public sealed partial class HttpProtocolHandlerTests
             MaxTime = TimeSpan.FromSeconds(2),
             OperationStarted = operationStarted,
         };
+        Diagnostics.Arrange("max time", "2000 ms, operation started 3000 ms earlier, connect never completes");
 
         TransferResult result = await new HttpProtocolHandler(new StalledConnector(), new SilentAuthenticator()).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("error text", "Connection timed out after 0 milliseconds", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual("Connection timed out after 0 milliseconds", result.ErrorMessage);
     }
@@ -191,12 +220,15 @@ public sealed partial class HttpProtocolHandlerTests
             MaxTime = TimeSpan.Zero,
             CancellationToken = cancellation.Token,
         };
+        Diagnostics.Arrange("max time", "0 (no limit), server stalls");
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
         await connection.Stalled;
         time.Advance(TimeSpan.FromDays(1));
+        Diagnostics.Assert("completed after a day", false, transfer.IsCompleted);
         Assert.IsFalse(transfer.IsCompleted, "-m 0 ended the transfer.");
         await cancellation.CancelAsync();
+        Diagnostics.Act("transfer cancelled", cancellation.IsCancellationRequested);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => transfer);
     }
@@ -215,11 +247,14 @@ public sealed partial class HttpProtocolHandlerTests
             MaxTime = TimeSpan.FromSeconds(1),
             CancellationToken = cancellation.Token,
         };
+        Diagnostics.Arrange("max time", "1000 ms, server stalls, cancelled before it passes");
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection)).ExecuteAsync(context).AsTask();
         await connection.Stalled;
         await cancellation.CancelAsync();
 
+        Diagnostics.Act("transfer cancelled", cancellation.IsCancellationRequested);
+        Diagnostics.Assert("exception", nameof(OperationCanceledException), "awaited below");
         await Assert.ThrowsAsync<OperationCanceledException>(() => transfer);
     }
 
@@ -243,14 +278,20 @@ public sealed partial class HttpProtocolHandlerTests
             ConnectTimeout = connectTimeout is { } connect ? TimeSpan.FromMilliseconds(connect) : null,
             MaxTime = maxTime is { } max ? TimeSpan.FromMilliseconds(max) : null,
         };
+        Diagnostics.Arrange("connect timeout ms", connectTimeout?.ToString(CultureInfo.InvariantCulture) ?? "(none)");
+        Diagnostics.Arrange("max time ms", maxTime?.ToString(CultureInfo.InvariantCulture) ?? "(none)");
+        Diagnostics.Arrange("expected limit ms", limit);
 
         Task<TransferResult> transfer = new HttpProtocolHandler(connector, new SilentAuthenticator()).ExecuteAsync(context).AsTask();
         await connector.Started;
         time.Advance(TimeSpan.FromMilliseconds(limit - 1));
+        Diagnostics.Assert("completed one ms before the limit", false, transfer.IsCompleted);
         Assert.IsFalse(transfer.IsCompleted, "The connect ended before its limit.");
         time.Advance(TimeSpan.FromMilliseconds(1));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("error text", $"Connection timed out after {limit} milliseconds", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual($"Connection timed out after {limit} milliseconds", result.ErrorMessage);
     }
@@ -267,11 +308,14 @@ public sealed partial class HttpProtocolHandlerTests
             TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
             CancellationToken = cancellation.Token,
         };
+        Diagnostics.Arrange("connect", "never completes, cancelled while connecting");
 
         Task<TransferResult> transfer = new HttpProtocolHandler(connector, new SilentAuthenticator()).ExecuteAsync(context).AsTask();
         await connector.Started;
         await cancellation.CancelAsync();
 
+        Diagnostics.Act("transfer cancelled", cancellation.IsCancellationRequested);
+        Diagnostics.Assert("exception", nameof(OperationCanceledException), "awaited below");
         await Assert.ThrowsAsync<OperationCanceledException>(() => transfer);
     }
 
@@ -310,15 +354,20 @@ public sealed partial class HttpProtocolHandlerTests
         await AssertSendFailsAsync(0, new IOException("Broken."), "Failed sending data to the peer");
     }
 
-    private static async Task AssertSendFailsAsync(int? writesBeforeFailure, IOException failure, string message)
+    private async Task AssertSendFailsAsync(int? writesBeforeFailure, IOException failure, string message)
     {
         // The body outgrows the upload buffer the head shares, so it takes a second write (BL-1215).
         FailingSendConnection connection = new(failure, writesBeforeFailure);
         HttpRequestOptions options = new() { Body = new BytesBody(new byte[HttpRequestBodyWriter.UploadBufferSize], "a/b") };
+        Diagnostics.Arrange("writes before the failure", writesBeforeFailure?.ToString(CultureInfo.InvariantCulture) ?? "(never fails)");
+        Diagnostics.Arrange("request body bytes", HttpRequestBodyWriter.UploadBufferSize);
 
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(BodyContext("http://127.0.0.1:18174/", options));
 
+        // The error text holds the operating system's socket error words, so only whether it matched is written.
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("error text matches", true, message == result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         Assert.IsNotNull(result.Report);
@@ -329,10 +378,13 @@ public sealed partial class HttpProtocolHandlerTests
     {
         // --tls-earlydata defers the handshake to the request's write (BL-1105); its failure is the connect's.
         FailingSendConnection connection = new(new DeferredTlsHandshakeFailedException(CurlExitCode.SslConnectError, "TLS connect error"), 0);
+        Diagnostics.Arrange("first write", "throws deferred TLS handshake failure, SslConnectError");
 
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(BodyContext("https://127.0.0.1:18174/", new HttpRequestOptions()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("TLS connect error", result.ErrorMessage);
     }
@@ -364,17 +416,23 @@ public sealed partial class HttpProtocolHandlerTests
         await AssertReceiveFailsAsync(() => new IOException("Broken."), "Failure when receiving data from the peer");
     }
 
-    private static async Task AssertReceiveFailsAsync(Func<IOException> newFailure, string message)
+    private async Task AssertReceiveFailsAsync(Func<IOException> newFailure, string message)
     {
         foreach (int chunkSize in ChunkSizes)
         {
             IOException failure = newFailure();
             ScriptedConnection connection = new(Encoding.Latin1.GetBytes(ContentLengthHead + "hello"), chunkSize, null, failure);
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, Content-Length: 100, body hello, then the read fails");
 
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(Context("http://example.com/", output));
 
+            // The error text holds the operating system's socket error words, so only whether it matched is written.
+            Diagnostics.Act("exit code", result.ExitCode);
+            Diagnostics.Assert("error text matches", true, message == result.ErrorMessage);
+            Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");

@@ -27,10 +27,14 @@ public sealed partial class HttpProtocolHandlerTests
         {
             MemoryStream output = new();
             ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello", chunkSize, expected);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("expected request", OneLine(expected));
 
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { Version = HttpVersionPreference.Http10 }));
 
+            WriteResult(result);
+            Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
@@ -50,9 +54,13 @@ public sealed partial class HttpProtocolHandlerTests
         {
             MemoryStream output = new();
             ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello", chunkSize, expected);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("expected request", OneLine(expected));
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EncodingContext(output, options));
 
+            WriteResult(result);
+            Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
@@ -72,9 +80,13 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello", chunkSize, expected);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("expected request", OneLine(expected));
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EncodingContext(new MemoryStream(), options));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
         }
     }
@@ -90,9 +102,13 @@ public sealed partial class HttpProtocolHandlerTests
         };
         ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello", 65536);
         MemoryStream output = new();
+        Diagnostics.Arrange("request", "HTTP/1.0 PUT of a 3-byte stream of unknown length");
 
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EncodingContext(output, options));
 
+        WriteResult(result);
+        Diagnostics.Assert("bytes written to the connection", 0, connection.Written.Length);
+        Diagnostics.Assert("output length", 0L, output.Length);
         Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
         Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
         Assert.IsEmpty(connection.Written);
@@ -122,10 +138,17 @@ public sealed partial class HttpProtocolHandlerTests
         {
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted head", OneLine(head));
+            Diagnostics.Arrange("scripted body", OneLine(body));
 
             TransferResult result = await Handler(QueueConnector.For(Connection(head + body, chunkSize, LoopbackGet)))
                 .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { Raw = true }, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("body", OneLine(body), OneLine(Latin1(output.ToArray())));
+            Diagnostics.Assert("bytes transferred", (long)body.Length, result.BytesTransferred);
+            Diagnostics.Assert("header output", OneLine(head), OneLine(Latin1(headerOutput.ToArray())));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(body, Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual((long)body.Length, result.BytesTransferred, $"Chunk size {chunkSize}");
@@ -139,10 +162,14 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "200, Content-Length: 3, body hello; --raw");
 
             TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nhello", chunkSize)))
                 .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { Raw = true }));
 
+            WriteResult(result);
+            Diagnostics.Assert("body", "hel", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("hel", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
@@ -158,10 +185,15 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", OneLine(response));
 
             TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize, LoopbackGet)))
                 .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { IgnoreContentLength = true }));
 
+            WriteResult(result);
+            Diagnostics.Assert("body", OneLine(body), OneLine(Latin1(output.ToArray())));
+            Diagnostics.Assert("bytes transferred", (long)body.Length, result.BytesTransferred);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(body, Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual((long)body.Length, result.BytesTransferred, $"Chunk size {chunkSize}");
@@ -174,10 +206,14 @@ public sealed partial class HttpProtocolHandlerTests
         const string expected = "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "Accept-Encoding: deflate, gzip, br, zstd\r\n\r\n";
         const string response = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 5\r\n\r\nhello";
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted response", OneLine(response));
+        Diagnostics.Arrange("options", "--raw --compressed");
 
         TransferResult result = await Handler(QueueConnector.For(Connection(response, 65536, expected)))
             .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { Raw = true, Compressed = true }));
 
+        WriteResult(result);
+        Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }

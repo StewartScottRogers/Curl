@@ -8,7 +8,7 @@ depends-on: [BL-1457]
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1617 — Make Curl.Protocol.Http.UnitTests' HttpProtocolHandlerTests.ServerAnswerConnectionEnd to HttpProtocolHandlerTests.UploadRewind tests write descriptive diagnostic output
 
@@ -23,15 +23,22 @@ Every test in these `Curl.Protocol.Http.UnitTests` files (12 files, 82 test meth
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
-- [ ] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
-- [ ] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
-- [ ] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+- [x] `dotnet test Curl.Protocol.Http.UnitTests --filter "<its filter>" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none for a test method declared in these files matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Protocol.Http.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Http.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Http.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
 
 ## Notes
+
+- Counts in the twelve files, before -> after: `Assert.` 202 -> 202, `[TestMethod` 82 -> 82, `[DataRow(` 93 -> 93. No assertion, test method or data row changed; the diagnostics sit beside them.
+- Shared helpers in these files that run the exchange or the assertion (`SkipExchangeAsync`, `AssertJustBefore`, `AssertSendFailsAsync`, `AssertReceiveFailsAsync`, `AssertTooManyHeadersAsync`, `StoredHeadersContext`, `AssertNoUndeliveredBodyLine`, `PostToRedirectAsync`, `ResumedUploadContext`, `UnknownOffsetUploadContext`) became instance methods so they write the lines for every test that uses them; new local helpers: `WriteTimings`, `WriteEncodingArrange`, `WriteRewindCount`, `WriteUploadOutcome`.
+- Nothing printed depends on the operating system: the send and receive failure helpers write the exit code and whether the error text matched, not the text, because it carries the platform's socket error words.
+- `dotnet test Curl.Protocol.Http.UnitTests --filter "FullyQualifiedName~Curl.Protocol.Http.HttpProtocolHandlerTests." --logger "console;verbosity=detailed"`: 785 passed, 13 skipped (OS conditions), an `END` line for every test run, and none of the 82 methods in these files has an `arrange 0`, `act 0` or `assert 0` (the two `OSCondition` non-Windows tests do not run on Windows; their helpers write all three kinds).
+- No test printed a `SLOW:` line.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. All 82 test methods in the twelve files write ARRANGE, ACT and ASSERT lines; build clean, fast tests green
