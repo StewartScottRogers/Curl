@@ -171,8 +171,10 @@ Namespace `Curl.Cryptography`. It holds:
   as `MontgomeryModulus` and the constants in Montgomery form - `For(curve)`,
   `InvertField`, `InvertOrder` (Fermat), `TryReadScalar` ([1, q - 1]) and `ReduceHash`.
 - `BrainpoolPoint` (internal, static): projective points in Montgomery form - `Add` by
-  Renes-Costello-Batina's complete formulas, `MultiplyScalar` (fixed 4-bit window, the
-  table read whole), `TryDecode` of an uncompressed point with the on-curve check,
+  Renes-Costello-Batina's complete formulas, `Double` by the same paper's complete
+  doubling, `MultiplyScalar` (fixed 4-bit window, the table read whole),
+  `MultiplyAndAddPublic` (Shamir's trick for ECDSA verification, skipping zero windows,
+  public values only), `TryDecode` of an uncompressed point with the on-curve check,
   `ToAffine` and `EncodeUncompressed` (ADR-0217).
 - `BrainpoolEcdh` (public, static): ECDH on those curves - `GeneratePrivateKey`,
   `ComputePublicKey` (uncompressed `0x04 || x || y`), `TryComputeSharedSecret` (the

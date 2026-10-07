@@ -17,6 +17,8 @@ namespace Curl.Cryptography;
 /// that is correct for doubling, for the point at infinity (0 : 1 : 0) and for a point
 /// and its negative, on every curve of odd order, which the brainpool r1 curves are
 /// (cofactor 1). So scalar multiplication never has a special case to branch on.
+/// <see cref="Double" /> is the same paper's algorithm 3, the complete doubling formulas,
+/// equally branch-free and four field multiplications cheaper than adding a point to itself.
 /// </para>
 /// <para>
 /// <see cref="MultiplyScalar" /> is constant-time in the scalar and the point: a fixed
@@ -24,6 +26,11 @@ namespace Curl.Cryptography;
 /// its value, the table entry chosen by masks while reading all 16 entries, so no branch,
 /// loop bound or table index depends on a secret. Its working memory is zeroed before it
 /// returns.
+/// </para>
+/// <para>
+/// <see cref="MultiplyAndAddPublic" /> is not: it computes u1 * P + u2 * Q for ECDSA
+/// verification, where every value is public, sharing one run of doublings and skipping
+/// zero windows (ADR-0217's verification path; BL-1559).
 /// </para>
 /// </remarks>
 internal static class BrainpoolPoint
@@ -98,6 +105,91 @@ internal static class BrainpoolPoint
         f.Multiply(z3, t5, z3, s);
         f.Add(z3, z3, t0, s);
         work.Slice(6 * n, 3 * n).CopyTo(result);
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to 2 * <paramref name="point" /> by the complete
+    /// doubling formulas (Renes, Costello and Batina, algorithm 3): the same answer as
+    /// <see cref="Add" /> of a point to itself, branch-free, with four fewer multiplications.
+    /// <paramref name="result" /> may alias <paramref name="point" />.
+    /// </summary>
+    /// <param name="domain">The curve.</param>
+    /// <param name="result">Receives the double, 3 * n limbs.</param>
+    /// <param name="point">The point, 3 * n limbs.</param>
+    /// <param name="work">At least <see cref="AddWorkLength" /> limbs of working space.</param>
+    public static void Double(BrainpoolDomainParameters domain, Span<uint> result, ReadOnlySpan<uint> point, Span<uint> work)
+    {
+        int n = domain.LimbCount;
+        MontgomeryModulus f = domain.Field;
+        ReadOnlySpan<uint> x = point[..n], y = point.Slice(n, n), z = point.Slice(2 * n, n);
+        Span<uint> t0 = work[..n], t1 = work.Slice(n, n), t2 = work.Slice(2 * n, n), t3 = work.Slice(3 * n, n);
+        Span<uint> x3 = work.Slice(4 * n, n), y3 = work.Slice(5 * n, n), z3 = work.Slice(6 * n, n);
+        Span<uint> s = work.Slice(7 * n, n + 2);
+        f.Multiply(t0, x, x, s);
+        f.Multiply(t1, y, y, s);
+        f.Multiply(t2, z, z, s);
+        f.Multiply(t3, x, y, s);
+        f.Add(t3, t3, t3, s);
+        f.Multiply(z3, x, z, s);
+        f.Add(z3, z3, z3, s);
+        f.Multiply(x3, domain.A, z3, s);
+        f.Multiply(y3, domain.ThreeB, t2, s);
+        f.Add(y3, x3, y3, s);
+        f.Subtract(x3, t1, y3);
+        f.Add(y3, t1, y3, s);
+        f.Multiply(y3, x3, y3, s);
+        f.Multiply(x3, t3, x3, s);
+        f.Multiply(z3, domain.ThreeB, z3, s);
+        f.Multiply(t2, domain.A, t2, s);
+        f.Subtract(t3, t0, t2);
+        f.Multiply(t3, domain.A, t3, s);
+        f.Add(t3, t3, z3, s);
+        f.Add(z3, t0, t0, s);
+        f.Add(t0, z3, t0, s);
+        f.Add(t0, t0, t2, s);
+        f.Multiply(t0, t0, t3, s);
+        f.Add(y3, y3, t0, s);
+        f.Multiply(t2, y, z, s);
+        f.Add(t2, t2, t2, s);
+        f.Multiply(t0, t2, t3, s);
+        f.Subtract(x3, x3, t0);
+        f.Multiply(z3, t2, t1, s);
+        f.Add(z3, z3, z3, s);
+        f.Add(z3, z3, z3, s);
+        work.Slice(4 * n, 3 * n).CopyTo(result);
+    }
+
+    /// <summary>
+    /// Sets <paramref name="result" /> to <paramref name="firstScalar" /> * <paramref name="firstPoint" />
+    /// + <paramref name="secondScalar" /> * <paramref name="secondPoint" /> by Shamir's trick:
+    /// one run of doublings shared by both scalars, a 4-bit window of each added per four
+    /// doublings, and a zero window skipped. That skip makes the running time depend on the
+    /// scalars, so this is for public values only - ECDSA verification - never a secret.
+    /// </summary>
+    /// <param name="domain">The curve.</param>
+    /// <param name="firstScalar">The first big-endian scalar.</param>
+    /// <param name="firstPoint">The first point, 3 * n limbs.</param>
+    /// <param name="secondScalar">The second big-endian scalar, the same length as the first.</param>
+    /// <param name="secondPoint">The second point, 3 * n limbs.</param>
+    /// <param name="result">Receives the sum, 3 * n limbs.</param>
+    public static void MultiplyAndAddPublic(BrainpoolDomainParameters domain, ReadOnlySpan<byte> firstScalar, ReadOnlySpan<uint> firstPoint, ReadOnlySpan<byte> secondScalar, ReadOnlySpan<uint> secondPoint, Span<uint> result)
+    {
+        int size = 3 * domain.LimbCount;
+        uint[] memory = new uint[(((2 * TableSize) + 1) * size) + AddWorkLength(domain.LimbCount)];
+        Span<uint> firstTable = memory.AsSpan(0, TableSize * size);
+        Span<uint> secondTable = memory.AsSpan(TableSize * size, TableSize * size);
+        Span<uint> accumulator = memory.AsSpan(2 * TableSize * size, size);
+        Span<uint> work = memory.AsSpan(((2 * TableSize) + 1) * size);
+        FillTable(domain, firstPoint, firstTable, work);
+        FillTable(domain, secondPoint, secondTable, work);
+        firstTable[..size].CopyTo(accumulator);
+        for (int index = 0; index < firstScalar.Length; index++)
+        {
+            ApplyPublicWindows(domain, accumulator, firstTable, (uint)firstScalar[index] >> WindowBits, secondTable, (uint)secondScalar[index] >> WindowBits, work);
+            ApplyPublicWindows(domain, accumulator, firstTable, firstScalar[index] & 0xFu, secondTable, secondScalar[index] & 0xFu, work);
+        }
+
+        accumulator.CopyTo(result);
     }
 
     /// <summary>
@@ -240,7 +332,7 @@ internal static class BrainpoolPoint
     {
         for (int doubling = 0; doubling < WindowBits; doubling++)
         {
-            Add(domain, accumulator, accumulator, accumulator, work);
+            Double(domain, accumulator, accumulator, work);
         }
 
         SelectEntry(table, window, selected);
@@ -260,6 +352,28 @@ internal static class BrainpoolPoint
             {
                 destination[limb] |= candidate[limb] & mask;
             }
+        }
+    }
+
+    /// <summary>Doubles the accumulator four times, then adds each table's entry for its window, skipping a zero window: public values only.</summary>
+    private static void ApplyPublicWindows(BrainpoolDomainParameters domain, Span<uint> accumulator, ReadOnlySpan<uint> firstTable, uint firstWindow, ReadOnlySpan<uint> secondTable, uint secondWindow, Span<uint> work)
+    {
+        for (int doubling = 0; doubling < WindowBits; doubling++)
+        {
+            Double(domain, accumulator, accumulator, work);
+        }
+
+        AddEntryUnlessZero(domain, accumulator, firstTable, firstWindow, work);
+        AddEntryUnlessZero(domain, accumulator, secondTable, secondWindow, work);
+    }
+
+    /// <summary>Adds table entry <paramref name="window" /> to the accumulator, or nothing when the window is 0: a branch on a public window.</summary>
+    private static void AddEntryUnlessZero(BrainpoolDomainParameters domain, Span<uint> accumulator, ReadOnlySpan<uint> table, uint window, Span<uint> work)
+    {
+        if (window != 0)
+        {
+            int size = accumulator.Length;
+            Add(domain, accumulator, accumulator, table.Slice((int)window * size, size), work);
         }
     }
 }

@@ -23,7 +23,9 @@ namespace Curl.Cryptography;
 /// <see cref="Dispose" />, and every intermediate before each call returns.
 /// </para>
 /// <para>
-/// Verification works on public values only. Anything a peer can send wrong - a public key
+/// Verification works on public values only, so u1 * G + u2 * Q is
+/// <see cref="BrainpoolPoint.MultiplyAndAddPublic" />'s Shamir's trick, which skips zero
+/// windows and is not constant-time. Anything a peer can send wrong - a public key
 /// that is not an uncompressed point of the curve, a signature of the wrong length, r or s
 /// of 0 or not below q, or a signature that does not match - is a <see langword="false" />
 /// return, the typed failure ADR-0118 names.
@@ -164,15 +166,13 @@ public sealed class BrainpoolEcdsa : IDisposable
     {
         int n = domain.LimbCount;
         int length = domain.Length;
-        uint[] memory = new uint[(11 * n) + BrainpoolPoint.AddWorkLength(n)];
+        uint[] memory = new uint[8 * n];
         Span<uint> w = memory.AsSpan(0, n);
         Span<uint> u1 = memory.AsSpan(n, n);
         Span<uint> u2 = memory.AsSpan(2 * n, n);
-        Span<uint> first = memory.AsSpan(3 * n, 3 * n);
-        Span<uint> second = memory.AsSpan(6 * n, 3 * n);
-        Span<uint> x = memory.AsSpan(9 * n, n);
-        Span<uint> y = memory.AsSpan(10 * n, n);
-        Span<uint> work = memory.AsSpan(11 * n);
+        Span<uint> sum = memory.AsSpan(3 * n, 3 * n);
+        Span<uint> x = memory.AsSpan(6 * n, n);
+        Span<uint> y = memory.AsSpan(7 * n, n);
         domain.InvertOrder(s, w);
         domain.ReduceHash(hash, u1);
         domain.Order.MultiplyModulo(u1, u1, w);
@@ -180,10 +180,8 @@ public sealed class BrainpoolEcdsa : IDisposable
         byte[] scalars = new byte[2 * length];
         MontgomeryModulus.FromLimbs(u1, scalars.AsSpan(0, length));
         MontgomeryModulus.FromLimbs(u2, scalars.AsSpan(length));
-        BrainpoolPoint.MultiplyScalar(domain, scalars.AsSpan(0, length), domain.Generator, first);
-        BrainpoolPoint.MultiplyScalar(domain, scalars.AsSpan(length), publicPoint, second);
-        BrainpoolPoint.Add(domain, first, first, second, work);
-        bool finite = BrainpoolPoint.ToAffine(domain, first, x, y);
+        BrainpoolPoint.MultiplyAndAddPublic(domain, scalars.AsSpan(0, length), domain.Generator, scalars.AsSpan(length), publicPoint, sum);
+        bool finite = BrainpoolPoint.ToAffine(domain, sum, x, y);
         domain.Order.Reduce(x, w);
         return finite && w.SequenceEqual(r);
     }
