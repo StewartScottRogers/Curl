@@ -40,3 +40,4 @@ Every test in `Curl.Networking.UnitTests` writes, through BL-1457's shared `Test
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
