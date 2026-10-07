@@ -56,3 +56,4 @@ Every test in all 33 `.UnitTests` projects writes a `START` line, an `END` line 
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
