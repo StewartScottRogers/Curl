@@ -43,7 +43,7 @@ On Windows, a server that resets the connection right after accepting it makes C
   before the write gave 10054. Real curl's `recv` runs inside the window: 9 of 10 interleaved runs
   printed the reset (5 of 8 back-to-back runs printed the abort, so curl races too). Curl's first
   read comes later and printed the abort 10 of 10.
-- Fix (ADR-0417): on Windows `StreamConnection.ReadAsync` reports a read failing with
+- Fix (ADR-0419): on Windows `StreamConnection.ReadAsync` reports a read failing with
   `ConnectionAborted` as an `IOException` carrying `ConnectionReset` (`ReportsAbortedReadAsReset`,
   internal init property, so `StreamConnectionTests` pins both settings on every platform).
   Reading earlier (a read posted before the request) was rejected: it reorders every protocol's
