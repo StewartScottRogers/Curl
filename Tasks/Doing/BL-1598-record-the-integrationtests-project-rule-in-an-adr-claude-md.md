@@ -57,3 +57,4 @@ Out of scope, each its own task: `Measure-CodeQuality.ps1` (BL-1605), `RunDarkFa
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
