@@ -24,6 +24,13 @@
 
     Speech is Windows' built-in System.Speech. The key press restores volume and mute.
 
+    While %LOCALAPPDATA%\Curl\audio-off exists (Stewart's audio switch, BL-1317), the
+    alarm, the out-of-tokens notices and the audit notice behave as under -QuietAlarm:
+    banner and notices on screen, no chime, siren or speech, and the volume and mute are
+    never touched. The file is checked at each sound, so creating or deleting it reaches a
+    shift that is already running, and -QuietAlarm is then not needed (BL-1456).
+    -TestAudioOff proves it without playing a sound.
+
     KEEPING THE BOARD MOVING
 
     Runs decide design and behaviour questions themselves (Stewart delegated them; see
@@ -51,7 +58,7 @@
     claimed, the shift waits for the new session and then runs the same task again,
     telling it to carry on from the partial work. Stewart is told three times, each
     with a coloured notice, a chime and one spoken sentence (screen only under
-    -QuietAlarm), never the escalating alarm:
+    -QuietAlarm or the audio-off file), never the escalating alarm:
 
       at once              out of tokens, when the new session starts and how long until then
       -LimitWarnSeconds    before the reset: the new session is about to start
@@ -352,6 +359,9 @@ param(
     [switch]$TestTaskBudget,
     # Prove the audit cadence: the shift-end audit check and the start refusal (BL-1022), and exit.
     [switch]$TestAuditCadence,
+    # Prove the audio-off file silences the alarm, chimes and spoken notices, and that they
+    # sound as before without it, playing nothing (BL-1456), and exit.
+    [switch]$TestAudioOff,
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
     # launcher, and that a claude -p run inherits it, and exit.
     [switch]$TestLaneMarker,
@@ -981,9 +991,19 @@ function Restore-AlarmVolume {
     $script:SavedVolume = $null
 }
 
+# Stewart's audio switch (BL-1317, BL-1456): while this file exists every sound Curl makes is
+# off - the whisper hook's and this script's alarm, chimes, speech and volume changes. Read
+# at each sound, so creating or deleting it reaches a shift that is already running.
+$script:AudioOffFile = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Curl\audio-off' } else { $null }
+function Test-AudioOff { return [bool]($script:AudioOffFile -and (Test-Path -LiteralPath $script:AudioOffFile)) }
+
+# True when the factory must stay silent: -QuietAlarm, or the audio-off file. The banner
+# and notices still show on screen; nothing plays, speaks or touches the volume.
+function Test-AlarmSilent { return ($QuietAlarm -or (Test-AudioOff)) }
+
 function Invoke-AlarmSound {
     param([string[]]$Reasons, [int]$Stage)
-    if ($QuietAlarm) { return }
+    if (Test-AlarmSilent) { return }
     if ($Stage -ge 2) { Set-AlarmVolume }
     switch ($Stage) { 0 { Invoke-Chime } 1 { Invoke-Chime } 2 { Invoke-Siren 2 } default { Invoke-Siren 3 } }
     $voice = Get-Voice
@@ -1547,7 +1567,7 @@ function Show-LimitNotice {
     $bar = '=' * 78
     foreach ($l in @($bar, "  $Headline", "  $Detail", $bar)) { Write-Host $l.PadRight(78) -ForegroundColor Black -BackgroundColor $Color }
     Write-Trace '-' 'TOKENS' "$Headline  $Detail" $Color
-    if ($QuietAlarm) { return }
+    if (Test-AlarmSilent) { return }
     Invoke-Chime
     $voice = Get-Voice
     if ($voice) {
@@ -2087,7 +2107,7 @@ function Show-AuditNotice {
     param([string]$Line)
     Write-Host ("  $Line  ".PadRight(78)) -ForegroundColor Black -BackgroundColor Cyan
     Write-Trace '-' 'AUDIT' $Line 'Cyan'
-    if ($QuietAlarm) { return }
+    if (Test-AlarmSilent) { return }
     Invoke-Chime
     $voice = Get-Voice
     if ($voice) { $voice.SpeakAsyncCancelAll(); [void]$voice.SpeakAsync("Curl dark factory: $($Line.ToLowerInvariant() -replace ':', '.' -replace 'milestone\.', 'milestone ')") }
@@ -2112,6 +2132,47 @@ if ($TestAuditCadence) {
     & $check 'with -Continuous it waits instead' ((Get-ShiftStartDecision @($audit) $true) -eq 'wait') 'wait'
     & $check 'a dry run or no audit lets the shift start' ((Get-ShiftStartDecision @($dry) $false) -eq 'start') 'start'
     exit $(if ($script:auditCadenceFailed) { 1 } else { 0 })
+}
+
+if ($TestAudioOff) {
+    # Proves the audio-off file silences the alarm and every notice (BL-1456) without a sound:
+    # the chime, siren, volume and voice are replaced by recorders, and the file is a
+    # throwaway one in a temporary folder, never Stewart's real switch.
+    $script:audioOffFailed = 0
+    $check = { param([string]$Name, [bool]$Ok, [string]$Detail) if (-not $Ok) { $script:audioOffFailed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" -ForegroundColor $(if ($Ok) { 'Green' } else { 'Red' }) }
+    $script:Sounds = [System.Collections.Generic.List[string]]::new()
+    function Invoke-Chime { $script:Sounds.Add('chime') }
+    function Invoke-Siren { param([int]$Sweeps) $script:Sounds.Add("siren $Sweeps") }
+    function Set-AlarmVolume { $script:Sounds.Add('volume') }
+    function Get-Voice {
+        $v = [pscustomobject]@{ Volume = 0; Rate = 0 }
+        $v | Add-Member ScriptMethod SpeakAsyncCancelAll { }
+        $v | Add-Member ScriptMethod SpeakAsync { param($Text) $script:Sounds.Add('speech') }
+        return $v
+    }
+    $QuietAlarm = $false
+    $dir = Join-Path ([IO.Path]::GetTempPath()) "curl-audio-off-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    $script:AudioOffFile = Join-Path $dir 'audio-off'
+    $makeSounds = {
+        $script:Sounds.Clear()
+        Invoke-AlarmSound -Reasons @('BL-004 DECIDE   Decide the licence') -Stage 3
+        Show-LimitNotice 'OUT OF TOKENS' 'Rehearsal.' 'Rehearsal.' 'Yellow'
+        Show-AuditNotice 'Rehearsal of the due notice'
+        return ($script:Sounds -join ', ')
+    }
+    $loud = 'volume, siren 3, speech, chime, speech, chime, speech'
+    try {
+        $heard = & $makeSounds
+        & $check 'without the file the alarm and notices sound as before' ($heard -eq $loud) $heard
+        Set-Content -LiteralPath $script:AudioOffFile -Value ''
+        $heard = & $makeSounds
+        & $check 'with the file nothing plays, speaks or changes the volume' (-not $heard) "'$heard'"
+        Remove-Item -LiteralPath $script:AudioOffFile
+        $heard = & $makeSounds
+        & $check 'deleting the file while running brings the sound back' ($heard -eq $loud) $heard
+    } finally { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
+    exit $(if ($script:audioOffFailed) { 1 } else { 0 })
 }
 
 function Invoke-MergeToMaster {
