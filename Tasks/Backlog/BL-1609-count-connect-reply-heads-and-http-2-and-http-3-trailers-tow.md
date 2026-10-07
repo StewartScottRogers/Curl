@@ -1,5 +1,5 @@
 ---
-id: BL-1608
+id: BL-1609
 title: Count CONNECT reply heads and HTTP/2 and HTTP/3 trailers toward curl's 5000 response header limit
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-067
 created: 2026-10-07
 completed:
 ---
-# BL-1608 — Count CONNECT reply heads and HTTP/2 and HTTP/3 trailers toward curl's 5000 response header limit
+# BL-1609 — Count CONNECT reply heads and HTTP/2 and HTTP/3 trailers toward curl's 5000 response header limit
 
 ## Goal
 
