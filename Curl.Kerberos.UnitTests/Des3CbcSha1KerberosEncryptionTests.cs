@@ -159,6 +159,45 @@ public sealed class Des3CbcSha1KerberosEncryptionTests
         CollectionAssert.AreEqual(expected, output);
     }
 
+    // BL-1649, ADR-0424: a key whose first and second, or second and third, 8-byte parts are
+    // equal apart from their parity bits is single DES, which .NET's TripleDES refuses; Curl
+    // refuses it first, as WeakKey.
+    [TestMethod]
+    [DataRow("000000000000000000000000000000000000000000000000")]
+    [DataRow("0123456789ABCDEF0123456789ABCDEFFEDCBA9876543210")]
+    [DataRow("FEDCBA98765432100123456789ABCDEF0123456789ABCDEF")]
+    [DataRow("0123456789ABCDEF0022446688AACCEEFEDCBA9876543210")]
+    public void EncryptDecryptChecksumAndPseudoRandom_WeakKey_ThrowWeakKey(string weakKey)
+    {
+        byte[] key = Hex.Bytes(weakKey);
+        KerberosEncryption encryption = Encryption();
+
+        Action[] operations =
+        [
+            () => encryption.Encrypt(key, 1, []),
+            () => encryption.Decrypt(key, 1, new byte[28]),
+            () => encryption.ComputeChecksum(key, 1, "data"u8),
+            () => encryption.ComputePseudoRandom(key, "prf input"u8),
+        ];
+        foreach (Action operation in operations)
+        {
+            KerberosCryptographyException exception = Assert.ThrowsExactly<KerberosCryptographyException>(operation);
+            Assert.AreEqual(KerberosCryptographyError.WeakKey, exception.Error);
+        }
+    }
+
+    [TestMethod]
+    public void CreateTripleDes_StrongKey_EncryptsAsTripleDes()
+    {
+        byte[] key = Hex.Bytes(ChecksumKey);
+
+        using TripleDES created = Des3CbcSha1KerberosEncryption.CreateTripleDes(key);
+
+        using TripleDES expected = TripleDES.Create();
+        expected.SetKey(key);
+        CollectionAssert.AreEqual(expected.EncryptEcb(new byte[8], PaddingMode.None), created.EncryptEcb(new byte[8], PaddingMode.None));
+    }
+
     private static KerberosEncryption Encryption() =>
         KerberosEncryption.Create(KerberosEncryptionType.Des3CbcSha1, new FixedKerberosRandomSource([.. Enumerable.Range(1, 8).Select(value => (byte)value)]));
 }

@@ -62,6 +62,37 @@ internal sealed class Des3CbcSha1KerberosEncryption : KerberosEncryption
     }
 
     /// <summary>
+    /// A triple DES cipher under the 24-byte key, refusing with
+    /// <see cref="KerberosCryptographyError.WeakKey" /> a key .NET's <see cref="TripleDES" />
+    /// calls weak - its first and second, or second and third, 8-byte parts equal apart from
+    /// their parity bits, which makes it single DES - before .NET's own check can throw its
+    /// <see cref="CryptographicException" /> (ADR-0424).
+    /// </summary>
+    internal static TripleDES CreateTripleDes(ReadOnlySpan<byte> key)
+    {
+        if (PartsEqualIgnoringParity(key[..BlockSize], key[BlockSize..(2 * BlockSize)])
+            || PartsEqualIgnoringParity(key[BlockSize..(2 * BlockSize)], key[(2 * BlockSize)..]))
+        {
+            throw new KerberosCryptographyException(KerberosCryptographyError.WeakKey);
+        }
+
+        TripleDES tripleDes = TripleDES.Create();
+        tripleDes.SetKey(key);
+        return tripleDes;
+    }
+
+    private static bool PartsEqualIgnoringParity(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second)
+    {
+        int difference = 0;
+        for (int index = 0; index < BlockSize; index++)
+        {
+            difference |= (first[index] ^ second[index]) & 0xFE;
+        }
+
+        return difference == 0;
+    }
+
+    /// <summary>
     /// RFC 3961 section 5.1's <c>DR(key, constant)</c> for triple DES: the n-fold of the
     /// constant to one block, encrypted again and again, the blocks concatenated and cut to
     /// the 21 bytes random-to-key takes.
@@ -71,8 +102,7 @@ internal sealed class Des3CbcSha1KerberosEncryption : KerberosEncryption
         byte[] blocks = new byte[3 * BlockSize];
         Span<byte> block = stackalloc byte[BlockSize];
         KerberosNFold.Fold(constant, block);
-        using TripleDES tripleDes = TripleDES.Create();
-        tripleDes.SetKey(key);
+        using TripleDES tripleDes = CreateTripleDes(key);
         for (int offset = 0; offset < blocks.Length; offset += BlockSize)
         {
             tripleDes.EncryptEcb(block, blocks.AsSpan(offset, BlockSize), PaddingMode.None);
@@ -137,8 +167,7 @@ internal sealed class Des3CbcSha1KerberosEncryption : KerberosEncryption
             RandomSource.Fill(confounded.AsSpan(0, BlockSize));
             plaintext.CopyTo(confounded.AsSpan(BlockSize));
             byte[] ciphertext = new byte[paddedLength + HmacSize];
-            using TripleDES tripleDes = TripleDES.Create();
-            tripleDes.SetKey(encryptionKey);
+            using TripleDES tripleDes = CreateTripleDes(encryptionKey);
             tripleDes.EncryptCbc(confounded, new byte[BlockSize], ciphertext.AsSpan(0, paddedLength), PaddingMode.None);
             HMACSHA1.HashData(integrityKey, confounded, ciphertext.AsSpan(paddedLength));
             return ciphertext;
@@ -170,8 +199,7 @@ internal sealed class Des3CbcSha1KerberosEncryption : KerberosEncryption
         Span<byte> expectedHmac = stackalloc byte[HmacSize];
         try
         {
-            using TripleDES tripleDes = TripleDES.Create();
-            tripleDes.SetKey(encryptionKey);
+            using TripleDES tripleDes = CreateTripleDes(encryptionKey);
             tripleDes.DecryptCbc(encrypted, new byte[BlockSize], confounded, PaddingMode.None);
             HMACSHA1.HashData(integrityKey, confounded, expectedHmac);
             if (!CryptographicOperations.FixedTimeEquals(expectedHmac, ciphertext[^HmacSize..]))
@@ -214,8 +242,7 @@ internal sealed class Des3CbcSha1KerberosEncryption : KerberosEncryption
         byte[] hash = SHA1.HashData(input);
         try
         {
-            using TripleDES tripleDes = TripleDES.Create();
-            tripleDes.SetKey(pseudoRandomKey);
+            using TripleDES tripleDes = CreateTripleDes(pseudoRandomKey);
             return tripleDes.EncryptCbc(hash.AsSpan(0, 2 * BlockSize), new byte[BlockSize], PaddingMode.None);
         }
         finally
