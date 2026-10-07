@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -38,17 +40,26 @@ public sealed class AeadAriaGcmTests
         "5BF772C7610EA4C23006878F0EE69A8397703169A419303F40B72E4573714D19E2697DF61E7C7252E5ABC6BADE876AC4" +
         "961BFAC4D5E867AFCA351A48AED52822E210D6CED2CF430FF841472915E7EF48";
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(Key128, Sealed128)]
     [DataRow(Key256, Sealed256)]
     public void Encrypt_Rfc8269AppendixA2Vector_GivesThePublishedCiphertextAndTag(string key, string sealedPayload)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadAriaGcm aead = new(Convert.FromHexString(key));
         byte[] ciphertext = new byte[Plaintext.Length / 2];
         byte[] tag = new byte[AeadAriaGcm.TagSize];
+        diagnostics.Arrange("vector source", "RFC 8269 Appendix A.2");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("nonce", Convert.FromHexString(Nonce));
 
         aead.Encrypt(Convert.FromHexString(Nonce), Convert.FromHexString(Plaintext), ciphertext, tag, Convert.FromHexString(AssociatedData));
+        diagnostics.Act("ciphertext and tag", Convert.ToHexString(ciphertext) + Convert.ToHexString(tag));
 
+        diagnostics.Diff("ciphertext and tag", sealedPayload, Convert.ToHexString(ciphertext) + Convert.ToHexString(tag));
         Assert.AreEqual(sealedPayload, Convert.ToHexString(ciphertext) + Convert.ToHexString(tag));
     }
 
@@ -57,11 +68,18 @@ public sealed class AeadAriaGcmTests
     [DataRow(Key256, Sealed256)]
     public void TryDecrypt_Rfc8269AppendixA2Vector_GivesThePublishedPlaintext(string key, string sealedPayload)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] sealedBytes = Convert.FromHexString(sealedPayload);
         byte[] plaintext = new byte[sealedBytes.Length - AeadAriaGcm.TagSize];
+        diagnostics.Arrange("vector source", "RFC 8269 Appendix A.2");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
 
         bool succeeded = TryDecrypt(key, sealedBytes, Convert.FromHexString(AssociatedData), plaintext);
+        diagnostics.Act("succeeded", succeeded);
+        diagnostics.Act("plaintext", Convert.ToHexString(plaintext));
 
+        diagnostics.Assert("succeeded", true, succeeded);
+        diagnostics.Diff("plaintext", Plaintext, Convert.ToHexString(plaintext));
         Assert.IsTrue(succeeded);
         Assert.AreEqual(Plaintext, Convert.ToHexString(plaintext));
     }
@@ -76,6 +94,7 @@ public sealed class AeadAriaGcmTests
     [DataRow("associatedData", 11)]
     public void TryDecrypt_Rfc8269VectorWithAFlippedBit_ReturnsFalseAndWritesNoPlaintext(string flipped, int index)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         Dictionary<string, byte[]> inputs = new()
         {
             ["sealed"] = Convert.FromHexString(Sealed128),
@@ -84,9 +103,14 @@ public sealed class AeadAriaGcmTests
         inputs[flipped][index] ^= 0x01;
         byte[] plaintext = new byte[(Sealed128.Length / 2) - AeadAriaGcm.TagSize];
         Array.Fill(plaintext, (byte)0xAA);
+        diagnostics.Arrange("vector source", "RFC 8269 Appendix A.2.1 with one bit flipped");
+        diagnostics.Arrange("flipped input and index", $"{flipped}, {index}");
 
         bool succeeded = TryDecrypt(Key128, inputs["sealed"], inputs["associatedData"], plaintext);
+        diagnostics.Act("succeeded", succeeded);
 
+        diagnostics.Assert("succeeded", false, succeeded);
+        diagnostics.Diff("plaintext left all zero", new byte[plaintext.Length], plaintext);
         Assert.IsFalse(succeeded);
         Assert.IsTrue(plaintext.All(value => value == 0));
     }
@@ -94,13 +118,20 @@ public sealed class AeadAriaGcmTests
     [TestMethod]
     public void EncryptThenTryDecrypt_EmptyPlaintextAndNoAssociatedData_RoundTrips()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadAriaGcm aead = new(Convert.FromHexString(Key128));
         byte[] nonce = Convert.FromHexString(Nonce);
         byte[] tag = new byte[AeadAriaGcm.TagSize];
+        diagnostics.Arrange("input", "empty plaintext, no associated data, RFC 8269 key and nonce");
+        diagnostics.Bytes("nonce", nonce);
 
         aead.Encrypt(nonce, [], [], tag);
         bool succeeded = aead.TryDecrypt(nonce, [], tag, []);
+        diagnostics.Bytes("tag", tag);
+        diagnostics.Act("succeeded", succeeded);
 
+        diagnostics.Assert("succeeded", true, succeeded);
+        diagnostics.Assert("tag is not all zero", true, !tag.All(value => value == 0));
         Assert.IsTrue(succeeded);
         Assert.IsFalse(tag.All(value => value == 0));
     }
@@ -110,8 +141,13 @@ public sealed class AeadAriaGcmTests
     [DataRow(33)]
     public void Constructor_KeyNotSixteenTwentyFourOrThirtyTwoBytes_Throws(int keyLength)
     {
-        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new AeadAriaGcm(new byte[keyLength]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", keyLength);
 
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new AeadAriaGcm(new byte[keyLength]));
+        diagnostics.Act("ParamName", exception.ParamName);
+
+        diagnostics.Assert("ParamName", "key", exception.ParamName);
         Assert.AreEqual("key", exception.ParamName);
     }
 
@@ -121,13 +157,19 @@ public sealed class AeadAriaGcmTests
     [DataRow(12, 4, 4, 15, "tag")]
     public void EncryptAndTryDecrypt_WrongLength_Throws(int nonceLength, int sourceLength, int destinationLength, int tagLength, string parameterName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadAriaGcm aead = new(new byte[16]);
+        diagnostics.Arrange("nonce, source, destination and tag lengths", $"{nonceLength}, {sourceLength}, {destinationLength}, {tagLength}");
 
         ArgumentException encrypt = Assert.ThrowsExactly<ArgumentException>(
             () => aead.Encrypt(new byte[nonceLength], new byte[sourceLength], new byte[destinationLength], new byte[tagLength]));
         ArgumentException decrypt = Assert.ThrowsExactly<ArgumentException>(
             () => aead.TryDecrypt(new byte[nonceLength], new byte[sourceLength], new byte[tagLength], new byte[destinationLength]));
+        diagnostics.Act("encrypt ParamName", encrypt.ParamName);
+        diagnostics.Act("decrypt ParamName", decrypt.ParamName);
 
+        diagnostics.Assert("encrypt ParamName", parameterName, encrypt.ParamName);
+        diagnostics.Assert("decrypt ParamName", parameterName, decrypt.ParamName);
         Assert.AreEqual(parameterName, encrypt.ParamName);
         Assert.AreEqual(parameterName, decrypt.ParamName);
     }
@@ -135,12 +177,19 @@ public sealed class AeadAriaGcmTests
     [TestMethod]
     public void Dispose_LaterCallsThrow()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         AeadAriaGcm aead = new(new byte[32]);
+        diagnostics.Arrange("state", "disposed 32-byte-key instance");
 
         aead.Dispose();
 
-        Assert.ThrowsExactly<ObjectDisposedException>(() => aead.Encrypt(new byte[12], [], [], new byte[16]));
-        Assert.ThrowsExactly<ObjectDisposedException>(() => aead.TryDecrypt(new byte[12], [], new byte[16], []));
+        var encrypt = Assert.ThrowsExactly<ObjectDisposedException>(() => aead.Encrypt(new byte[12], [], [], new byte[16]));
+        var decrypt = Assert.ThrowsExactly<ObjectDisposedException>(() => aead.TryDecrypt(new byte[12], [], new byte[16], []));
+        diagnostics.Act("encrypt exception", encrypt.GetType().Name);
+        diagnostics.Act("decrypt exception", decrypt.GetType().Name);
+
+        diagnostics.Assert("encrypt exception", nameof(ObjectDisposedException), encrypt.GetType().Name);
+        diagnostics.Assert("decrypt exception", nameof(ObjectDisposedException), decrypt.GetType().Name);
     }
 
     private static bool TryDecrypt(string key, byte[] sealedBytes, byte[] associatedData, byte[] plaintext)

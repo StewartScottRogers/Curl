@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cryptography;
 
@@ -12,11 +13,18 @@ namespace Curl.Cryptography;
 [TestClass]
 public sealed class BcryptPbkdfTests
 {
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     // Go bcrypt_pbkdf_test.go, golden[0]: 12 rounds, a 32-byte key.
     [TestMethod]
     public void DeriveKey_GoGoldenVector0_GivesThePublishedKey()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "Go bcrypt_pbkdf_test.go golden[0]");
+
         AssertDerives(
+            diagnostics,
             "password"u8.ToArray(),
             "salt"u8.ToArray(),
             12,
@@ -27,7 +35,11 @@ public sealed class BcryptPbkdfTests
     [TestMethod]
     public void DeriveKey_GoGoldenVector1_GivesThePublishedKey()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "Go bcrypt_pbkdf_test.go golden[1]");
+
         AssertDerives(
+            diagnostics,
             "passwordy\0PASSWORD\0"u8.ToArray(),
             "salty\0SALT\0"u8.ToArray(),
             3,
@@ -39,7 +51,11 @@ public sealed class BcryptPbkdfTests
     [TestMethod]
     public void DeriveKey_GoGoldenVector2_GivesThePublishedKey()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("vector source", "Go bcrypt_pbkdf_test.go golden[2]");
+
         AssertDerives(
+            diagnostics,
             Encoding.UTF8.GetBytes("секретное слово"),
             Encoding.UTF8.GetBytes("посолить немножко"),
             8,
@@ -50,6 +66,7 @@ public sealed class BcryptPbkdfTests
     [TestMethod]
     public void ComputeHash_GoBcryptHashVector_GivesThePublishedHash()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] passwordHash = new byte[64];
         byte[] saltHash = new byte[64];
         for (int index = 0; index < 64; index++)
@@ -59,20 +76,39 @@ public sealed class BcryptPbkdfTests
         }
 
         byte[] hash = new byte[BcryptPbkdf.HashSize];
+        diagnostics.Arrange("vector source", "Go bcrypt_pbkdf_test.go TestBcryptHash");
+        diagnostics.Bytes("password", passwordHash);
+        diagnostics.Bytes("salt", saltHash);
 
-        BcryptPbkdf.ComputeHash(new BlowfishState(), passwordHash, saltHash, hash);
+        using (diagnostics.Phase("hash"))
+        {
+            BcryptPbkdf.ComputeHash(new BlowfishState(), passwordHash, saltHash, hash);
+        }
 
-        Assert.AreEqual("87904870eef9deddf8e7611a140106e6aaf1a363d9a2c504db356443721eb555", Convert.ToHexStringLower(hash));
+        const string expectedHash = "87904870eef9deddf8e7611a140106e6aaf1a363d9a2c504db356443721eb555";
+        diagnostics.Act("hash", Convert.ToHexStringLower(hash));
+        diagnostics.Diff("hash", expectedHash, Convert.ToHexStringLower(hash));
+        Assert.AreEqual(expectedHash, Convert.ToHexStringLower(hash));
     }
 
     [TestMethod]
     public void DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] key = new byte[BcryptPbkdf.MaximumKeySize];
+        diagnostics.Arrange("rounds", 1);
+        diagnostics.Arrange("key size", key.Length);
 
-        BcryptPbkdf.DeriveKey("password"u8, "salt"u8, 1, key);
+        using (diagnostics.Phase("derive"))
+        {
+            BcryptPbkdf.DeriveKey("password"u8, "salt"u8, 1, key);
+        }
 
-        Assert.AreNotEqual(0, key[^1] | key[0] | key[31]);
+        int probe = key[^1] | key[0] | key[31];
+        diagnostics.Bytes("derived key", key);
+        diagnostics.Act("first, middle and last bytes ORed", probe);
+        diagnostics.Assert("probe is not zero", "not 0", probe);
+        Assert.AreNotEqual(0, probe);
     }
 
     [TestMethod]
@@ -83,27 +119,48 @@ public sealed class BcryptPbkdfTests
     [DataRow(8, 4, BcryptPbkdf.MaximumKeySize + 1, "destination")]
     public void DeriveKey_LengthOpenBsdRefuses_ThrowsArgumentException(int passwordLength, int saltLength, int keyLength, string parameterName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("password length", passwordLength);
+        diagnostics.Arrange("salt length", saltLength);
+        diagnostics.Arrange("key length", keyLength);
+
         ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(
             () => BcryptPbkdf.DeriveKey(new byte[passwordLength], new byte[saltLength], 1, new byte[keyLength]));
+        diagnostics.Act("exception ParamName", exception.ParamName);
 
+        diagnostics.Assert("ParamName", parameterName, exception.ParamName);
         Assert.AreEqual(parameterName, exception.ParamName);
     }
 
     [TestMethod]
     public void DeriveKey_ZeroRounds_ThrowsArgumentOutOfRangeException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("rounds", 0);
+
         ArgumentOutOfRangeException exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(
             () => BcryptPbkdf.DeriveKey("password"u8, "salt"u8, 0, new byte[32]));
+        diagnostics.Act("exception ParamName", exception.ParamName);
 
+        diagnostics.Assert("ParamName", "rounds", exception.ParamName);
         Assert.AreEqual("rounds", exception.ParamName);
     }
 
-    private static void AssertDerives(byte[] password, byte[] salt, int rounds, string expectedKey)
+    private static void AssertDerives(TestDiagnostics diagnostics, byte[] password, byte[] salt, int rounds, string expectedKey)
     {
         byte[] key = new byte[expectedKey.Length / 2];
+        diagnostics.Bytes("password", password);
+        diagnostics.Bytes("salt", salt);
+        diagnostics.Arrange("rounds", rounds);
+        diagnostics.Arrange("key length", key.Length);
 
-        BcryptPbkdf.DeriveKey(password, salt, rounds, key);
+        using (diagnostics.Phase("derive"))
+        {
+            BcryptPbkdf.DeriveKey(password, salt, rounds, key);
+        }
 
+        diagnostics.Act("derived key", Convert.ToHexStringLower(key));
+        diagnostics.Diff("derived key", expectedKey, Convert.ToHexStringLower(key));
         Assert.AreEqual(expectedKey, Convert.ToHexStringLower(key));
     }
 }

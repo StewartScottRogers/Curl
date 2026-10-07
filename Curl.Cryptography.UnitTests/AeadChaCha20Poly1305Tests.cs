@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -31,13 +33,20 @@ public sealed class AeadChaCha20Poly1305Tests
     private const string DraftPlaintext =
         "496e7465726e65742d4472616674732061726520647261667420646f63756d656e74732076616c696420666f722061206d6178696d756d206f6620736978206d6f6e74687320616e64206d617920626520757064617465642c207265706c616365642c206f72206f62736f6c65746564206279206f7468657220646f63756d656e747320617420616e792074696d652e20497420697320696e617070726f70726961746520746f2075736520496e7465726e65742d447261667473206173207265666572656e6365206d6174657269616c206f7220746f2063697465207468656d206f74686572207468616e206173202fe2809c776f726b20696e2070726f67726573732e2fe2809d";
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     // RFC 8439 section 2.8.2.
     [TestMethod]
     public void Encrypt_Rfc8439Section282Vector_GivesThePublishedCiphertextAndTag()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadChaCha20Poly1305 aead = new(Convert.FromHexString(SunscreenKey));
         byte[] ciphertext = new byte[SunscreenPlaintext.Length / 2];
         byte[] tag = new byte[AeadChaCha20Poly1305.TagSize];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.8.2");
+        diagnostics.Bytes("key", Convert.FromHexString(SunscreenKey));
+        diagnostics.Bytes("nonce", Convert.FromHexString(SunscreenNonce));
 
         aead.Encrypt(
             Convert.FromHexString(SunscreenNonce),
@@ -45,7 +54,11 @@ public sealed class AeadChaCha20Poly1305Tests
             ciphertext,
             tag,
             Convert.FromHexString(SunscreenAssociatedData));
+        diagnostics.Act("ciphertext", Convert.ToHexStringLower(ciphertext));
+        diagnostics.Act("tag", Convert.ToHexStringLower(tag));
 
+        diagnostics.Diff("ciphertext", Convert.FromHexString(SunscreenCiphertext), ciphertext);
+        diagnostics.Diff("tag", Convert.FromHexString(SunscreenTag), tag);
         Assert.AreEqual(SunscreenCiphertext, Convert.ToHexStringLower(ciphertext));
         Assert.AreEqual(SunscreenTag, Convert.ToHexStringLower(tag));
     }
@@ -54,8 +67,12 @@ public sealed class AeadChaCha20Poly1305Tests
     [TestMethod]
     public void TryDecrypt_Rfc8439Section282Vector_GivesThePublishedPlaintext()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadChaCha20Poly1305 aead = new(Convert.FromHexString(SunscreenKey));
         byte[] plaintext = new byte[SunscreenCiphertext.Length / 2];
+        diagnostics.Arrange("vector source", "RFC 8439 section 2.8.2");
+        diagnostics.Bytes("key", Convert.FromHexString(SunscreenKey));
+        diagnostics.Bytes("tag", Convert.FromHexString(SunscreenTag));
 
         bool succeeded = aead.TryDecrypt(
             Convert.FromHexString(SunscreenNonce),
@@ -63,7 +80,11 @@ public sealed class AeadChaCha20Poly1305Tests
             Convert.FromHexString(SunscreenTag),
             plaintext,
             Convert.FromHexString(SunscreenAssociatedData));
+        diagnostics.Act("succeeded", succeeded);
+        diagnostics.Act("plaintext", Convert.ToHexStringLower(plaintext));
 
+        diagnostics.Assert("succeeded", true, succeeded);
+        diagnostics.Diff("plaintext", SunscreenPlaintext, Convert.ToHexStringLower(plaintext));
         Assert.IsTrue(succeeded);
         Assert.AreEqual(SunscreenPlaintext, Convert.ToHexStringLower(plaintext));
     }
@@ -72,10 +93,17 @@ public sealed class AeadChaCha20Poly1305Tests
     [TestMethod]
     public void TryDecrypt_Rfc8439AppendixA5Vector_GivesThePublishedPlaintext()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] plaintext = new byte[DraftCiphertext.Length / 2];
+        diagnostics.Arrange("vector source", "RFC 8439 Appendix A.5");
+        diagnostics.Bytes("tag", Convert.FromHexString(DraftTag));
 
         bool succeeded = TryDecryptDraft(Convert.FromHexString(DraftCiphertext), Convert.FromHexString(DraftTag), Convert.FromHexString(DraftAssociatedData), plaintext);
+        diagnostics.Act("succeeded", succeeded);
+        diagnostics.Act("plaintext", Convert.ToHexStringLower(plaintext));
 
+        diagnostics.Assert("succeeded", true, succeeded);
+        diagnostics.Diff("plaintext", DraftPlaintext, Convert.ToHexStringLower(plaintext));
         Assert.IsTrue(succeeded);
         Assert.AreEqual(DraftPlaintext, Convert.ToHexStringLower(plaintext));
     }
@@ -90,6 +118,7 @@ public sealed class AeadChaCha20Poly1305Tests
     [DataRow("associatedData", 11)]
     public void TryDecrypt_Rfc8439AppendixA5VectorWithAFlippedBit_ReturnsFalseAndWritesNoPlaintext(string flipped, int index)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         Dictionary<string, byte[]> inputs = new()
         {
             ["tag"] = Convert.FromHexString(DraftTag),
@@ -99,9 +128,14 @@ public sealed class AeadChaCha20Poly1305Tests
         inputs[flipped][index] ^= 0x01;
         byte[] plaintext = new byte[DraftCiphertext.Length / 2];
         Array.Fill(plaintext, (byte)0xAA);
+        diagnostics.Arrange("vector source", "RFC 8439 Appendix A.5 with one bit flipped");
+        diagnostics.Arrange("flipped input and index", $"{flipped}, {index}");
 
         bool succeeded = TryDecryptDraft(inputs["ciphertext"], inputs["tag"], inputs["associatedData"], plaintext);
+        diagnostics.Act("succeeded", succeeded);
 
+        diagnostics.Assert("succeeded", false, succeeded);
+        diagnostics.Diff("plaintext left all zero", new byte[plaintext.Length], plaintext);
         Assert.IsFalse(succeeded);
         Assert.IsTrue(plaintext.All(value => value == 0));
     }
@@ -109,13 +143,20 @@ public sealed class AeadChaCha20Poly1305Tests
     [TestMethod]
     public void EncryptThenTryDecrypt_EmptyPlaintextAndNoAssociatedData_RoundTrips()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadChaCha20Poly1305 aead = new(Convert.FromHexString(SunscreenKey));
         byte[] nonce = Convert.FromHexString(SunscreenNonce);
         byte[] tag = new byte[AeadChaCha20Poly1305.TagSize];
+        diagnostics.Arrange("input", "empty plaintext, no associated data, RFC 8439 key and nonce");
+        diagnostics.Bytes("nonce", nonce);
 
         aead.Encrypt(nonce, [], [], tag);
         bool succeeded = aead.TryDecrypt(nonce, [], tag, []);
+        diagnostics.Bytes("tag", tag);
+        diagnostics.Act("succeeded", succeeded);
 
+        diagnostics.Assert("succeeded", true, succeeded);
+        diagnostics.Assert("tag is not all zero", true, !tag.All(value => value == 0));
         Assert.IsTrue(succeeded);
         Assert.IsFalse(tag.All(value => value == 0));
     }
@@ -123,7 +164,13 @@ public sealed class AeadChaCha20Poly1305Tests
     [TestMethod]
     public void Constructor_KeyIsNot32Bytes_Throws()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => new AeadChaCha20Poly1305(new byte[AeadChaCha20Poly1305.KeySize - 1]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", AeadChaCha20Poly1305.KeySize - 1);
+
+        var exception = Assert.ThrowsExactly<ArgumentException>(() => new AeadChaCha20Poly1305(new byte[AeadChaCha20Poly1305.KeySize - 1]));
+        diagnostics.Act("exception ParamName", exception.ParamName);
+
+        diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -132,10 +179,15 @@ public sealed class AeadChaCha20Poly1305Tests
     [DataRow(12, 16, 16, 12)]
     public void Encrypt_WrongLength_Throws(int nonceLength, int plaintextLength, int ciphertextLength, int tagLength)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadChaCha20Poly1305 aead = new(new byte[AeadChaCha20Poly1305.KeySize]);
+        diagnostics.Arrange("nonce, plaintext, ciphertext and tag lengths", $"{nonceLength}, {plaintextLength}, {ciphertextLength}, {tagLength}");
 
-        Assert.ThrowsExactly<ArgumentException>(
+        var exception = Assert.ThrowsExactly<ArgumentException>(
             () => aead.Encrypt(new byte[nonceLength], new byte[plaintextLength], new byte[ciphertextLength], new byte[tagLength]));
+        diagnostics.Act("exception ParamName", exception.ParamName);
+
+        diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -144,30 +196,45 @@ public sealed class AeadChaCha20Poly1305Tests
     [DataRow(12, 16, 16, 17)]
     public void TryDecrypt_WrongLength_Throws(int nonceLength, int ciphertextLength, int plaintextLength, int tagLength)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using AeadChaCha20Poly1305 aead = new(new byte[AeadChaCha20Poly1305.KeySize]);
+        diagnostics.Arrange("nonce, ciphertext, plaintext and tag lengths", $"{nonceLength}, {ciphertextLength}, {plaintextLength}, {tagLength}");
 
-        Assert.ThrowsExactly<ArgumentException>(
+        var exception = Assert.ThrowsExactly<ArgumentException>(
             () => aead.TryDecrypt(new byte[nonceLength], new byte[ciphertextLength], new byte[tagLength], new byte[plaintextLength]));
+        diagnostics.Act("exception ParamName", exception.ParamName);
+
+        diagnostics.Assert("exception type", nameof(ArgumentException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void Encrypt_AfterDispose_ThrowsObjectDisposedException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         AeadChaCha20Poly1305 aead = new(new byte[AeadChaCha20Poly1305.KeySize]);
         aead.Dispose();
+        diagnostics.Arrange("state", "disposed instance");
 
-        Assert.ThrowsExactly<ObjectDisposedException>(
+        var exception = Assert.ThrowsExactly<ObjectDisposedException>(
             () => aead.Encrypt(new byte[AeadChaCha20Poly1305.NonceSize], [], [], new byte[AeadChaCha20Poly1305.TagSize]));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception type", nameof(ObjectDisposedException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void TryDecrypt_AfterDispose_ThrowsObjectDisposedException()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         AeadChaCha20Poly1305 aead = new(new byte[AeadChaCha20Poly1305.KeySize]);
         aead.Dispose();
+        diagnostics.Arrange("state", "disposed instance");
 
-        Assert.ThrowsExactly<ObjectDisposedException>(
+        var exception = Assert.ThrowsExactly<ObjectDisposedException>(
             () => aead.TryDecrypt(new byte[AeadChaCha20Poly1305.NonceSize], [], new byte[AeadChaCha20Poly1305.TagSize], []));
+        diagnostics.Act("exception", exception.GetType().Name);
+
+        diagnostics.Assert("exception type", nameof(ObjectDisposedException), exception.GetType().Name);
     }
 
     private static bool TryDecryptDraft(byte[] ciphertext, byte[] tag, byte[] associatedData, byte[] plaintext)

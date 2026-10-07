@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cryptography;
 
 /// <summary>
@@ -10,6 +12,9 @@ public sealed class AriaTests
 {
     private const string AppendixPlaintext = "00112233445566778899AABBCCDDEEFF";
 
+    /// <summary>Gets or sets the MSTest context the diagnostics write to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     // RFC 5794 Appendix A.1 to A.3: key, then the ciphertext of 00112233445566778899aabbccddeeff.
     [TestMethod]
     [DataRow("000102030405060708090A0B0C0D0E0F", "D718FBD6AB644C739DA95F3BE6451778")]
@@ -17,13 +22,22 @@ public sealed class AriaTests
     [DataRow("000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F", "F92BD7C79FB72E2F2B8F80C1972D24FC")]
     public void EncryptBlockAndDecryptBlock_AppendixAVector_GiveThePublishedCiphertextAndPlaintext(string key, string ciphertext)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Aria aria = new(Convert.FromHexString(key));
         byte[] encrypted = new byte[Aria.BlockSize];
         byte[] decrypted = new byte[Aria.BlockSize];
+        diagnostics.Arrange("source", "RFC 5794 Appendix A vector");
+        diagnostics.Bytes("key", Convert.FromHexString(key));
+        diagnostics.Bytes("plaintext", Convert.FromHexString(AppendixPlaintext));
+        diagnostics.Bytes("ciphertext", Convert.FromHexString(ciphertext));
 
         aria.EncryptBlock(Convert.FromHexString(AppendixPlaintext), encrypted);
         aria.DecryptBlock(Convert.FromHexString(ciphertext), decrypted);
+        diagnostics.Act("encrypted", Convert.ToHexString(encrypted));
+        diagnostics.Act("decrypted", Convert.ToHexString(decrypted));
 
+        diagnostics.Diff("ciphertext", ciphertext, Convert.ToHexString(encrypted));
+        diagnostics.Diff("plaintext", AppendixPlaintext, Convert.ToHexString(decrypted));
         Assert.AreEqual(ciphertext, Convert.ToHexString(encrypted));
         Assert.AreEqual(AppendixPlaintext, Convert.ToHexString(decrypted));
     }
@@ -34,8 +48,15 @@ public sealed class AriaTests
     [DataRow(32, 17)]
     public void Constructor_KeyLength_GivesOneRoundKeyMoreThanTheRounds(int keyLength, int roundKeys)
     {
-        using Aria aria = new(new byte[keyLength]);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", keyLength);
 
+        using Aria aria = new(new byte[keyLength]);
+        diagnostics.Act("encryption round keys", aria.EncryptionRoundKeys.Length);
+        diagnostics.Act("decryption round keys", aria.DecryptionRoundKeys.Length);
+
+        diagnostics.Assert("encryption round keys", roundKeys, aria.EncryptionRoundKeys.Length);
+        diagnostics.Assert("decryption round keys", roundKeys, aria.DecryptionRoundKeys.Length);
         Assert.AreEqual(roundKeys, aria.EncryptionRoundKeys.Length);
         Assert.AreEqual(roundKeys, aria.DecryptionRoundKeys.Length);
     }
@@ -43,13 +64,20 @@ public sealed class AriaTests
     [TestMethod]
     public void EncryptBlockThenDecryptBlock_InPlace_RoundTrips()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Aria aria = new(Convert.FromHexString("000102030405060708090A0B0C0D0E0F"));
         byte[] buffer = Convert.FromHexString(AppendixPlaintext);
+        diagnostics.Arrange("source", "RFC 5794 Appendix A.1 vector, encrypted and decrypted in place");
+        diagnostics.Bytes("plaintext", buffer);
 
         aria.EncryptBlock(buffer, buffer);
+        diagnostics.Act("encrypted in place", Convert.ToHexString(buffer));
+        diagnostics.Diff("ciphertext", "D718FBD6AB644C739DA95F3BE6451778", Convert.ToHexString(buffer));
         Assert.AreEqual("D718FBD6AB644C739DA95F3BE6451778", Convert.ToHexString(buffer));
         aria.DecryptBlock(buffer, buffer);
+        diagnostics.Act("decrypted in place", Convert.ToHexString(buffer));
 
+        diagnostics.Diff("plaintext", AppendixPlaintext, Convert.ToHexString(buffer));
         Assert.AreEqual(AppendixPlaintext, Convert.ToHexString(buffer));
     }
 
@@ -58,8 +86,17 @@ public sealed class AriaTests
     [TestMethod]
     public void Substitute_Section242Examples_GiveThePublishedOutputs()
     {
-        UInt128 substituted = Aria.Substitute(new UInt128(0x230000EF00000000UL, 0), oddRound: true);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("source", "RFC 5794 section 2.4.2 examples, input 0x230000EF00000000 in the high half");
 
+        UInt128 substituted = Aria.Substitute(new UInt128(0x230000EF00000000UL, 0), oddRound: true);
+        ulong byteZero = (ulong)(substituted >> 120);
+        ulong byteThree = (ulong)(substituted >> 96) & 0xFF;
+        diagnostics.Act("byte 0 through SB1", byteZero);
+        diagnostics.Act("byte 3 through SB4", byteThree);
+
+        diagnostics.Assert("byte 0 through SB1", 0x26UL, byteZero);
+        diagnostics.Assert("byte 3 through SB4", 0xD3UL, byteThree);
         Assert.AreEqual(0x26UL, (ulong)(substituted >> 120));
         Assert.AreEqual(0xD3UL, (ulong)(substituted >> 96) & 0xFF);
     }
@@ -68,22 +105,41 @@ public sealed class AriaTests
     [TestMethod]
     public void Substitute_EveryByteThroughSl1ThenSl2_GivesTheByteBack()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("source", "RFC 5794 section 2.4.2: SL2 inverts SL1; every byte value 0 to 255 repeated across the block");
+        int checkedValues = 0;
+
         for (int value = 0; value < 256; value++)
         {
             UInt128 input = UInt128.MaxValue / 255 * (uint)value;
 
             Assert.AreEqual(input, Aria.Substitute(Aria.Substitute(input, oddRound: true), oddRound: false));
             Assert.AreEqual(input, Aria.Substitute(Aria.Substitute(input, oddRound: false), oddRound: true));
+            checkedValues++;
         }
+
+        diagnostics.Act("byte values round-tripped", checkedValues);
+        diagnostics.Assert("byte values round-tripped", 256, checkedValues);
     }
 
     // RFC 5794 section 2.4.3: A is an involution, and x0 feeds y3, y4, y6, y8, y9, y13 and y14.
     [TestMethod]
     public void Diffuse_AppliedTwice_GivesTheInputBackAndSetsTheBytesSection243Lists()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         UInt128 input = new(0x0123456789ABCDEFUL, 0xFEDCBA9876543210UL);
         UInt128 byteZero = new(0x0100000000000000UL, 0);
+        diagnostics.Arrange("source", "RFC 5794 section 2.4.3: A is an involution");
+        diagnostics.Arrange("input", input);
+        diagnostics.Arrange("byte zero set", byteZero);
 
+        UInt128 twice = Aria.Diffuse(Aria.Diffuse(input));
+        UInt128 fromByteZero = Aria.Diffuse(byteZero);
+        diagnostics.Act("diffused twice", twice);
+        diagnostics.Act("diffused byte zero", fromByteZero);
+
+        diagnostics.Assert("diffused twice", input, twice);
+        diagnostics.Assert("diffused byte zero", new UInt128(0x0000000101000100UL, 0x0101000000010100UL), fromByteZero);
         Assert.AreEqual(input, Aria.Diffuse(Aria.Diffuse(input)));
         Assert.AreEqual(new UInt128(0x0000000101000100UL, 0x0101000000010100UL), Aria.Diffuse(byteZero));
     }
@@ -95,8 +151,13 @@ public sealed class AriaTests
     [DataRow(33)]
     public void Constructor_KeyNotSixteenTwentyFourOrThirtyTwoBytes_Throws(int keyLength)
     {
-        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new Aria(new byte[keyLength]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("key length", keyLength);
 
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => new Aria(new byte[keyLength]));
+        diagnostics.Act("ParamName", exception.ParamName);
+
+        diagnostics.Assert("ParamName", "key", exception.ParamName);
         Assert.AreEqual("key", exception.ParamName);
     }
 
@@ -105,11 +166,18 @@ public sealed class AriaTests
     [DataRow(16, 17, "destination")]
     public void EncryptBlockAndDecryptBlock_WrongLength_Throws(int sourceLength, int destinationLength, string parameterName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         using Aria aria = new(new byte[16]);
+        diagnostics.Arrange("source length", sourceLength);
+        diagnostics.Arrange("destination length", destinationLength);
 
         ArgumentException encrypt = Assert.ThrowsExactly<ArgumentException>(() => aria.EncryptBlock(new byte[sourceLength], new byte[destinationLength]));
         ArgumentException decrypt = Assert.ThrowsExactly<ArgumentException>(() => aria.DecryptBlock(new byte[sourceLength], new byte[destinationLength]));
+        diagnostics.Act("encrypt ParamName", encrypt.ParamName);
+        diagnostics.Act("decrypt ParamName", decrypt.ParamName);
 
+        diagnostics.Assert("encrypt ParamName", parameterName, encrypt.ParamName);
+        diagnostics.Assert("decrypt ParamName", parameterName, decrypt.ParamName);
         Assert.AreEqual(parameterName, encrypt.ParamName);
         Assert.AreEqual(parameterName, decrypt.ParamName);
     }
@@ -117,10 +185,18 @@ public sealed class AriaTests
     [TestMethod]
     public void Dispose_ZeroesTheRoundKeysAndLaterCallsThrow()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         Aria aria = new(Convert.FromHexString("000102030405060708090A0B0C0D0E0F"));
+        diagnostics.Arrange("key", "RFC 5794 Appendix A.1 128-bit key");
 
         aria.Dispose();
+        bool encryptionZeroed = aria.EncryptionRoundKeys.ToArray().All(key => key == UInt128.Zero);
+        bool decryptionZeroed = aria.DecryptionRoundKeys.ToArray().All(key => key == UInt128.Zero);
+        diagnostics.Act("encryption round keys zeroed", encryptionZeroed);
+        diagnostics.Act("decryption round keys zeroed", decryptionZeroed);
 
+        diagnostics.Assert("encryption round keys zeroed", true, encryptionZeroed);
+        diagnostics.Assert("decryption round keys zeroed", true, decryptionZeroed);
         Assert.IsTrue(aria.EncryptionRoundKeys.ToArray().All(key => key == UInt128.Zero));
         Assert.IsTrue(aria.DecryptionRoundKeys.ToArray().All(key => key == UInt128.Zero));
         Assert.ThrowsExactly<ObjectDisposedException>(() => aria.EncryptBlock(new byte[16], new byte[16]));
