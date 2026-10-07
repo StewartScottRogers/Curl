@@ -3,8 +3,8 @@ id: AF-0046
 title: HTTP/2 'SETTINGS received' log condition `!wasSettingsReceived && Frames.IsPeerSettingsReceived` can become || with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/Http2Session.cs:LogPeerConnectionFrames-and:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/Http2Session.cs:432:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
