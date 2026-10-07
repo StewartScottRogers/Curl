@@ -4,7 +4,7 @@ title: Make every test in Curl.Console.UnitTests write descriptive diagnostic ou
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1457]
+depends-on: [BL-1457, BL-1577, BL-1578, BL-1579, BL-1580, BL-1581, BL-1582, BL-1583, BL-1584, BL-1585, BL-1586, BL-1587, BL-1588, BL-1589, BL-1590, BL-1591, BL-1592, BL-1593, BL-1594, BL-1595, BL-1596]
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-04
@@ -36,8 +36,10 @@ Every test in `Curl.Console.UnitTests` writes, through BL-1457's shared `TestDia
 ## Notes
 
 - Large: 1927 test methods in 221 files is probably more than one `/task-run` can finish. Stewart asked for one task per project, so it is filed whole. If the runner judges it too big, it splits it before changing any test: it files tasks that each cover a range of the project's files by name (each `-Pipeline direct -DependsOn BL-1457 -Touches Curl.Console.UnitTests`, with these criteria limited to its files' classes through `--filter "FullyQualifiedName~<class>"`), adds them to this task's `depends-on`, and moves this task back to `Backlog`; this task then only runs the whole-project checks above.
+- 2026-10-07 (lane 1): split before any test changed. Recounted: 221 test files, 1936 `[TestMethod`/`[DataTestMethod` matches. Filed BL-1577 to BL-1596, twenty contiguous ranges of the files in name order, about 90 to 126 test methods each (BL-1542's size, which finished in one run; BL-1458 hit its cost cap whole), with a partial class's files kept in one task so its class filter covers them all. Each names its files and the three that already write output carry the note to move it onto the helper. This task now waits on all twenty and then only runs the whole-project checks.
 
 ## Log
 
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Split into BL-1577 to BL-1596 (twenty file ranges of Curl.Console.UnitTests); waits on them, then runs the whole-project checks
