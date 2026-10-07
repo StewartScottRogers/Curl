@@ -3,6 +3,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -22,6 +23,10 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("https-connect", "h2")]
     [DataRow("https-connect", "h1", "--http1.1")]
@@ -30,24 +35,26 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         // curl -s -k -v --trace-config https-connect https://127.0.0.1:18443/ (BL-1192 Notes).
         int exitCode = await RunAsync([.. options, "-k", "-v", "--trace-config", components, "https://127.0.0.1:18443/"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         List<string> lines = StandardErrorLines();
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "* [HTTPS-CONNECT] added",
-                "* [HTTPS-CONNECT] connect, init",
-                $"* [HTTPS-CONNECT] 1st attempt uses {version} from wanted versions",
-                "*   Trying 127.0.0.1:18443...",
-                "* [HTTPS-CONNECT] connect -> 0, done=0",
-                "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
-                "* [HTTPS-CONNECT] connect -> 0, done=1",
-                "* Established connection to 127.0.0.1 (127.0.0.1 port 18443) from 127.0.0.1 port 50000 ",
-                "* [HTTPS-CONNECT] removing connected setup filter",
-                "* [HTTPS-CONNECT] destroy",
-                "* using HTTP/1.x",
-            },
-            lines.Take(lines.IndexOf("* using HTTP/1.x") + 1).ToArray());
+        string[] expectedLines =
+        [
+            "* [HTTPS-CONNECT] added",
+            "* [HTTPS-CONNECT] connect, init",
+            $"* [HTTPS-CONNECT] 1st attempt uses {version} from wanted versions",
+            "*   Trying 127.0.0.1:18443...",
+            "* [HTTPS-CONNECT] connect -> 0, done=0",
+            "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
+            "* [HTTPS-CONNECT] connect -> 0, done=1",
+            "* Established connection to 127.0.0.1 (127.0.0.1 port 18443) from 127.0.0.1 port 50000 ",
+            "* [HTTPS-CONNECT] removing connected setup filter",
+            "* [HTTPS-CONNECT] destroy",
+            "* using HTTP/1.x",
+        ];
+        string[] actualLines = [.. lines.Take(lines.IndexOf("* using HTTP/1.x") + 1)];
+        Diagnostics.Diff("stderr lines up to the HTTP/1.x line", Lf(expectedLines), Lf(actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -60,19 +67,19 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
 
         string[] httpsConnectLines = [.. StandardErrorLines().Where(line => line.Contains("* [HTTPS-CONNECT] ", StringComparison.Ordinal))
             .Select(line => line[line.IndexOf("[HTTPS-CONNECT]", StringComparison.Ordinal)..])];
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "[HTTPS-CONNECT] added",
-                "[HTTPS-CONNECT] connect, init",
-                "[HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
-                "[HTTPS-CONNECT] connect -> 0, done=0",
-                "[HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
-                "[HTTPS-CONNECT] connect -> 0, done=1",
-                "[HTTPS-CONNECT] removing connected setup filter",
-                "[HTTPS-CONNECT] destroy",
-            },
-            httpsConnectLines);
+        string[] expectedLines =
+        [
+            "[HTTPS-CONNECT] added",
+            "[HTTPS-CONNECT] connect, init",
+            "[HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
+            "[HTTPS-CONNECT] connect -> 0, done=0",
+            "[HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
+            "[HTTPS-CONNECT] connect -> 0, done=1",
+            "[HTTPS-CONNECT] removing connected setup filter",
+            "[HTTPS-CONNECT] destroy",
+        ];
+        Diagnostics.Diff("HTTPS-CONNECT lines", Lf(expectedLines), Lf(httpsConnectLines));
+        CollectionAssert.AreEqual(expectedLines, httpsConnectLines);
     }
 
     [TestMethod]
@@ -85,7 +92,9 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     {
         await RunAsync(["-k", .. arguments]);
 
-        Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("[HTTPS-CONNECT]", StringComparison.Ordinal)));
+        bool anyHttpsConnectLine = StandardErrorLines().Any(line => line.Contains("[HTTPS-CONNECT]", StringComparison.Ordinal));
+        Diagnostics.Assert("any [HTTPS-CONNECT] line", false, anyHttpsConnectLine);
+        Assert.IsFalse(anyHttpsConnectLine);
     }
 
     [TestMethod]
@@ -98,7 +107,16 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     [DataRow(RequestedHttpVersion.Http3Only, "h3")]
     public void HttpsConnectFirstAttemptVersionOf_EachVersionOption_NamesTheFirstAttemptsVersion(RequestedHttpVersion? version, string expected)
     {
-        Assert.AreEqual(expected, CurlComposition.HttpsConnectFirstAttemptVersionOf(version));
+        Diagnostics.Arrange("requested version", version?.ToString() ?? "(none)");
+        string actual;
+        using (Diagnostics.Phase("run"))
+        {
+            actual = CurlComposition.HttpsConnectFirstAttemptVersionOf(version);
+        }
+
+        Diagnostics.Act("first attempt version", actual);
+        Diagnostics.Assert("first attempt version", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -108,17 +126,29 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     public void CreateTcpConnector_UnderTraceConfigHttpsConnect_NamesTheAttemptsCurlsNgtcp2BuildNames(string option, string firstAttempt, string? secondAttempt)
     {
         // curl.se's curl 8.22.0 ngtcp2 build: --http3 names "2nd attempt uses h2", --http3-only none (BL-1284 Notes).
+        Diagnostics.Arrange("option", option);
         CommandLineParseResult parsed = OpenSslBuildParser.Parse(["-k", "-v", "--trace-config", "https-connect", option, "https://127.0.0.1:18713/"], _ => true);
+        Diagnostics.Assert("parse accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
 
-        TcpConnector connector = CurlComposition.CreateTcpConnector(
-            parsed.Options!,
-            new LoopbackDnsResolver(),
-            new ScriptedTcpDialer(new ScriptedConnector([Response])),
-            new PassThroughTlsProvider(),
-            TimeProvider.System,
-            HttpProxyTunnelOptions.Default);
+        TcpConnector connector;
+        using (Diagnostics.Phase("run"))
+        {
+            connector = CurlComposition.CreateTcpConnector(
+                parsed.Options!,
+                new LoopbackDnsResolver(),
+                new ScriptedTcpDialer(new ScriptedConnector([Response])),
+                new PassThroughTlsProvider(),
+                TimeProvider.System,
+                HttpProxyTunnelOptions.Default);
+        }
 
+        Diagnostics.Act("traces https-connect filter", connector.TracesHttpsConnectFilter);
+        Diagnostics.Act("first attempt version", connector.HttpsConnectFirstAttemptVersion);
+        Diagnostics.Act("second attempt version", connector.HttpsConnectSecondAttemptVersion);
+        Diagnostics.Assert("traces https-connect filter", true, connector.TracesHttpsConnectFilter);
+        Diagnostics.Assert("first attempt version", firstAttempt, connector.HttpsConnectFirstAttemptVersion);
+        Diagnostics.Assert("second attempt version", secondAttempt, connector.HttpsConnectSecondAttemptVersion);
         Assert.IsTrue(connector.TracesHttpsConnectFilter);
         Assert.AreEqual(firstAttempt, connector.HttpsConnectFirstAttemptVersion);
         Assert.AreEqual(secondAttempt, connector.HttpsConnectSecondAttemptVersion);
@@ -133,26 +163,28 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         // curl -s -k -v --trace-config https-connect,setup -x <proxy> https://example.test/ (BL-1254 Notes).
         int exitCode = await RunAsync([Encoding.Latin1.GetBytes(proxyReply), Response], "-k", "-v", "--trace-config", "https-connect,setup", option, proxy, "https://example.test/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            (string[])
-            [
-                "* [HTTPS-CONNECT] added",
-                "* [HTTPS-CONNECT] connect, init",
-                "* [HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
-                $"* {eyeballing}",
-                "* [HTTPS-CONNECT] connect -> 0, done=0",
-                "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
-                $"* {tunnelFilterAdded}",
-                .. Enumerable.Repeat(new[] { "* [HTTPS-CONNECT] connect -> 0, done=0", "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks" }, tunnelPollRounds).SelectMany(pair => pair),
-                "* [SETUP] added SSL filter for origin",
-                "* [HTTPS-CONNECT] connect -> 0, done=1",
-                "* [HTTPS-CONNECT] removing connected setup filter",
-                "* [HTTPS-CONNECT] destroy",
-                "* [SETUP] removing connected setup filter",
-                "* [SETUP] destroy",
-            ],
-            FilterLines());
+        string[] expectedLines =
+        [
+            "* [HTTPS-CONNECT] added",
+            "* [HTTPS-CONNECT] connect, init",
+            "* [HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
+            $"* {eyeballing}",
+            "* [HTTPS-CONNECT] connect -> 0, done=0",
+            "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
+            $"* {tunnelFilterAdded}",
+            .. Enumerable.Repeat(new[] { "* [HTTPS-CONNECT] connect -> 0, done=0", "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks" }, tunnelPollRounds).SelectMany(pair => pair),
+            "* [SETUP] added SSL filter for origin",
+            "* [HTTPS-CONNECT] connect -> 0, done=1",
+            "* [HTTPS-CONNECT] removing connected setup filter",
+            "* [HTTPS-CONNECT] destroy",
+            "* [SETUP] removing connected setup filter",
+            "* [SETUP] destroy",
+        ];
+        string[] actualLines = FilterLines();
+        Diagnostics.Diff("filter lines", Lf(expectedLines), Lf(actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -165,18 +197,20 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         // so no [SETUP] added line, and its SSL filter is added once the tunnel is open.
         int exitCode = await RunAsync([Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), Response], "-k", "--proxy-insecure", "-v", "--trace-config", components, "-x", "https://127.0.0.1:18458", "https://example.test/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "[SETUP] happy eyeballing to proxy 127.0.0.1:18458",
-                "[SETUP] added SSL filter for HTTP proxy",
-                "[SETUP] added HTTP proxy tunnel filter",
-                "[SETUP] added SSL filter for origin",
-                "[SETUP] removing connected setup filter",
-                "[SETUP] destroy",
-            },
-            SetupLines());
+        string[] expectedLines =
+        [
+            "[SETUP] happy eyeballing to proxy 127.0.0.1:18458",
+            "[SETUP] added SSL filter for HTTP proxy",
+            "[SETUP] added HTTP proxy tunnel filter",
+            "[SETUP] added SSL filter for origin",
+            "[SETUP] removing connected setup filter",
+            "[SETUP] destroy",
+        ];
+        string[] actualLines = SetupLines();
+        Diagnostics.Diff("setup lines", Lf(expectedLines), Lf(actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -188,18 +222,20 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         // http://example.test/x (BL-1255 Notes): the setup filter is added first, and no origin SSL filter.
         int exitCode = await RunAsync([Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), Response], "--proxy-insecure", "-v", "--trace-config", components, "-p", "-x", "https://127.0.0.1:18955", "http://example.test/x");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "[SETUP] added",
-                "[SETUP] happy eyeballing to proxy 127.0.0.1:18955",
-                "[SETUP] added SSL filter for HTTP proxy",
-                "[SETUP] added HTTP proxy tunnel filter",
-                "[SETUP] removing connected setup filter",
-                "[SETUP] destroy",
-            },
-            SetupLines());
+        string[] expectedLines =
+        [
+            "[SETUP] added",
+            "[SETUP] happy eyeballing to proxy 127.0.0.1:18955",
+            "[SETUP] added SSL filter for HTTP proxy",
+            "[SETUP] added HTTP proxy tunnel filter",
+            "[SETUP] removing connected setup filter",
+            "[SETUP] destroy",
+        ];
+        string[] actualLines = SetupLines();
+        Diagnostics.Diff("setup lines", Lf(expectedLines), Lf(actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -207,6 +243,8 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     {
         int exitCode = await RunAsync([Encoding.ASCII.GetBytes("HTTP/1.1 200 Connection established\r\n\r\n"), Response], "-k", "--proxy-insecure", "-v", "--trace-config", "proxy", "-x", "https://127.0.0.1:18458", "https://example.test/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("setup line count", 0, SetupLines().Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(0, SetupLines().Length);
     }
@@ -217,24 +255,26 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         // curl -s -k -v --trace-config https-connect,setup --unix-socket <path> https://example.test/ (BL-1254 Notes).
         int exitCode = await RunAsync([Response], "-k", "-v", "--trace-config", "https-connect,setup", "--unix-socket", "/tmp/bl1254.sock", "https://example.test/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "* [HTTPS-CONNECT] added",
-                "* [HTTPS-CONNECT] connect, init",
-                "* [HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
-                "* [SETUP] happy eyeballing to origin /tmp/bl1254.sock:0",
-                "* [HTTPS-CONNECT] connect -> 0, done=0",
-                "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
-                "* [SETUP] added SSL filter for origin",
-                "* [HTTPS-CONNECT] connect -> 0, done=1",
-                "* [HTTPS-CONNECT] removing connected setup filter",
-                "* [HTTPS-CONNECT] destroy",
-                "* [SETUP] removing connected setup filter",
-                "* [SETUP] destroy",
-            },
-            FilterLines());
+        string[] expectedLines =
+        [
+            "* [HTTPS-CONNECT] added",
+            "* [HTTPS-CONNECT] connect, init",
+            "* [HTTPS-CONNECT] 1st attempt uses h2 from wanted versions",
+            "* [SETUP] happy eyeballing to origin /tmp/bl1254.sock:0",
+            "* [HTTPS-CONNECT] connect -> 0, done=0",
+            "* [HTTPS-CONNECT] adjust_pollset -> 0, 1 socks",
+            "* [SETUP] added SSL filter for origin",
+            "* [HTTPS-CONNECT] connect -> 0, done=1",
+            "* [HTTPS-CONNECT] removing connected setup filter",
+            "* [HTTPS-CONNECT] destroy",
+            "* [SETUP] removing connected setup filter",
+            "* [SETUP] destroy",
+        ];
+        string[] actualLines = FilterLines();
+        Diagnostics.Diff("filter lines", Lf(expectedLines), Lf(actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -244,26 +284,28 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
         // provider reports no handshake, so its schannel and ALPN lines are not among them.
         int exitCode = await RunAsync("-k", "-v", "--trace-config", "ssl", "--http1.1", "https://127.0.0.1:18443/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         List<string> lines = StandardErrorLines();
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "*   Trying 127.0.0.1:18443...",
-                "* [SSL] cf_connect()",
-                "* [SSL] cf_connect() -> 0, done=0",
-                "* [SSL] adjust_pollset, POLLIN fd=3",
-                "* [SSL] cf_connect()",
-                "* [SSL] cf_connect() -> 0, done=0",
-                "* [SSL] adjust_pollset, POLLIN fd=3",
-                "* [SSL] cf_connect()",
-                "* [SSL] cf_connect() -> 0, done=1",
-                "* Established connection to 127.0.0.1 (127.0.0.1 port 18443) from 127.0.0.1 port 50000 ",
-                "* [SSL] query ALPN",
-                "* [SSL] query ALPN: returning '(nil)'",
-                "* using HTTP/1.x",
-            },
-            lines.Take(lines.IndexOf("* using HTTP/1.x") + 1).ToArray());
+        string[] expectedLines =
+        [
+            "*   Trying 127.0.0.1:18443...",
+            "* [SSL] cf_connect()",
+            "* [SSL] cf_connect() -> 0, done=0",
+            "* [SSL] adjust_pollset, POLLIN fd=3",
+            "* [SSL] cf_connect()",
+            "* [SSL] cf_connect() -> 0, done=0",
+            "* [SSL] adjust_pollset, POLLIN fd=3",
+            "* [SSL] cf_connect()",
+            "* [SSL] cf_connect() -> 0, done=1",
+            "* Established connection to 127.0.0.1 (127.0.0.1 port 18443) from 127.0.0.1 port 50000 ",
+            "* [SSL] query ALPN",
+            "* [SSL] query ALPN: returning '(nil)'",
+            "* using HTTP/1.x",
+        ];
+        string[] actualLines = [.. lines.Take(lines.IndexOf("* using HTTP/1.x") + 1)];
+        Diagnostics.Diff("stderr lines up to the HTTP/1.x line", Lf(expectedLines), Lf(actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -274,7 +316,9 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     {
         await RunAsync(["-k", .. arguments, "https://127.0.0.1:18443/"]);
 
-        Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("[SSL", StringComparison.Ordinal)));
+        bool anySslLine = StandardErrorLines().Any(line => line.Contains("[SSL", StringComparison.Ordinal));
+        Diagnostics.Assert("any [SSL line", false, anySslLine);
+        Assert.IsFalse(anySslLine);
     }
 
     private string[] FilterLines() =>
@@ -284,6 +328,8 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     private string[] SetupLines() =>
         [.. StandardErrorLines().Where(line => line.Contains("* [SETUP] ", StringComparison.Ordinal))
             .Select(line => line[line.IndexOf("[SETUP]", StringComparison.Ordinal)..])];
+
+    private static string Lf(IEnumerable<string> lines) => string.Join('\n', lines);
 
     private List<string> StandardErrorLines() =>
         [.. Encoding.ASCII.GetString(standardError.ToArray())
@@ -299,6 +345,9 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
     /// <summary>Runs <paramref name="arguments" /> as above over connections that replay <paramref name="reads" />.</summary>
     private async Task<int> RunAsync(byte[][] reads, params string[] arguments)
     {
+        string[] fullArguments = ["-s", .. arguments];
+        Diagnostics.Arrange("command line", string.Join(' ', fullArguments));
+        Diagnostics.Arrange("scripted reads", string.Join(" | ", reads.Select(read => Encoding.Latin1.GetString(read).Replace("\r\n", "\\r\\n", StringComparison.Ordinal))));
         CommandLineParseResult parsed = CommandLineParser.Parse(["-s", .. arguments], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
@@ -310,17 +359,25 @@ public sealed class CurlCommandRunnerHttpsConnectTraceTests
             HttpProxyTunnelOptions.Default);
         InMemoryFileSystem files = new();
 
-        return await new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
-                    [],
-                    loadResolveEntries: connector.LoadResolveEntries),
-                files,
-                files,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(["-s", .. arguments]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        [],
+                        loadResolveEntries: connector.LoadResolveEntries),
+                    files,
+                    files,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(["-s", .. arguments]);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        return exitCode;
     }
 }

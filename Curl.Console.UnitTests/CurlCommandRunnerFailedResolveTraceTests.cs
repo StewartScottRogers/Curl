@@ -4,6 +4,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -21,12 +22,21 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
 {
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_UnderTraceConfigDns_WritesCurlsFailedResolveLines()
     {
         // curl -s -v --trace-config dns http://nonexistent.invalid:47114/
         int exitCode = await RunAsync("-s", "-v", "--trace-config", "dns", "http://nonexistent.invalid:47114/");
 
+        List<string> actualLines = StandardErrorLines();
+        Diagnostics.Assert("exit code", (int)CurlExitCode.CouldntResolveHost, exitCode);
+        Diagnostics.Assert("stderr line count", 13, actualLines.Count);
+        Diagnostics.Assert("first stderr line", "* [DNS] created DNS filter for nonexistent.invalid:47114, transport=3, queries=3", actualLines[0]);
+        Diagnostics.Assert("last stderr line", "* [DNS] [1] destroy async", actualLines[^1]);
         Assert.AreEqual((int)CurlExitCode.CouldntResolveHost, exitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -55,6 +65,8 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
         await RunAsync("-s", "-v", "-4", "--trace-config", "dns", "http://nonexistent.invalid:47114/");
 
         List<string> lines = StandardErrorLines();
+        Diagnostics.Assert("first stderr line", "* [DNS] created DNS filter for nonexistent.invalid:47114, transport=3, queries=1", lines[0]);
+        Diagnostics.Assert("A-only negative cache line present", true, lines.Contains("* [DNS] cache negative name resolve for nonexistent.invalid:47114 type=A"));
         Assert.AreEqual("* [DNS] created DNS filter for nonexistent.invalid:47114, transport=3, queries=1", lines[0]);
         Assert.Contains("* [DNS] cache negative name resolve for nonexistent.invalid:47114 type=A", lines);
     }
@@ -65,6 +77,9 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
         // curl -s -v http://nonexistent.invalid:47114/
         await RunAsync("-s", "-v", "http://nonexistent.invalid:47114/");
 
+        List<string> actualLines = StandardErrorLines();
+        Diagnostics.Assert("stderr line count", 4, actualLines.Count);
+        Diagnostics.Assert("last stderr line", "* closing connection #0", actualLines[^1]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -85,6 +100,7 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
     /// </summary>
     private async Task<int> RunAsync(params string[] arguments)
     {
+        Diagnostics.Arrange("command line", "curl " + string.Join(" ", arguments));
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
@@ -96,18 +112,27 @@ public sealed class CurlCommandRunnerFailedResolveTraceTests
             HttpProxyTunnelOptions.Default);
         InMemoryFileSystem files = new();
 
-        return await new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new UnresolvingDnsResolver())),
-                    [],
-                    loadResolveEntries: connector.LoadResolveEntries),
-                files,
-                files,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(arguments);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new UnresolvingDnsResolver())),
+                        [],
+                        loadResolveEntries: connector.LoadResolveEntries),
+                    files,
+                    files,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+
+        return exitCode;
     }
 
     /// <summary>A resolver that answers no address for any name.</summary>
