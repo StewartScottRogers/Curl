@@ -28,12 +28,20 @@ public sealed partial class TcpConnectorTests
         await using var pending = listened.PendingConnection!;
         var port = ((IPEndPoint)pending.LocalEndPoint).Port;
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new TcpDialer(), new FakeTlsProvider(), TimeProvider.System);
+        Diagnostics.Arrange("target", "127.0.0.1 on a loopback listener's port, TLS False");
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: false), cancellation.Token);
+        ConnectResult result;
+        using (Diagnostics.Phase("connect"))
+        {
+            result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: false), cancellation.Token);
+        }
+
         await using var connection = result.Connection!;
         var accepted = await pending.AcceptAsync(cancellation.Token);
         await using var serverSide = accepted.Connection!;
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("local end point is the server's remote end point", true, Equals(serverSide.RemoteEndPoint, connection.LocalEndPoint));
         Assert.IsNotNull(connection.LocalEndPoint);
         Assert.AreEqual(result.LocalEndPoint, connection.LocalEndPoint);
         Assert.AreEqual(serverSide.RemoteEndPoint, connection.LocalEndPoint);
@@ -52,13 +60,21 @@ public sealed partial class TcpConnectorTests
         var connector = new TcpConnector(
             new FakeDnsResolver(Loopback), new TcpDialer(), new SslStreamTlsProvider(new TlsClientOptions(Insecure: true)), TimeProvider.System);
         var server = AcceptTlsAsync(pending, serverCertificate, cancellation.Token);
+        Diagnostics.Arrange("target", "127.0.0.1 on a loopback TLS listener's port, TLS True, insecure");
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: true), cancellation.Token);
+        ConnectResult result;
+        using (Diagnostics.Phase("connect and TLS handshake"))
+        {
+            result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", port, UseTls: true), cancellation.Token);
+        }
+
         await using var connection = result.Connection!;
         var (serverSide, serverStream) = await server;
         await using var serverConnection = serverSide;
         await using var serverTls = serverStream;
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("connection is secure", true, connection.IsSecure);
         Assert.IsTrue(connection.IsSecure);
         Assert.IsNotNull(connection.LocalEndPoint);
         Assert.AreEqual(result.LocalEndPoint, connection.LocalEndPoint);

@@ -21,6 +21,7 @@ public sealed partial class TcpConnectorTests
         // address family 2", "Name '127.0.0.1' family 2 resolved to '127.0.0.1' family 2", "Local port: 0".
         var lines = await DeviceBindLinesAsync(new LocalBinding("lo", "lo", null, 0, 1), deviceBinds: false, connects: true);
 
+        Diagnostics.Assert("local interface line", "Local Interface lo is ip 127.0.0.1 using address family 2", lines[1]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -38,6 +39,7 @@ public sealed partial class TcpConnectorTests
         // address family 2", then "Local port: 0" with no Name line.
         var lines = await DeviceBindLinesAsync(new LocalBinding("lo", null, null, 0, 1), deviceBinds: false, connects: true);
 
+        Diagnostics.Assert("local interface line", "Local Interface lo is ip 127.0.0.1 using address family 2", lines[1]);
         Assert.AreEqual("Local Interface lo is ip 127.0.0.1 using address family 2", lines[1]);
         Assert.IsFalse(lines.Any(line => line.StartsWith("Name ", StringComparison.Ordinal)));
     }
@@ -50,6 +52,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.22.0 Linux, --interface ifhost!lo!127.0.0.1: the Name line alone.
         var lines = await DeviceBindLinesAsync(new LocalBinding(null, "127.0.0.1", "lo", 0, 1), deviceBinds, connects: true);
 
+        Diagnostics.Assert("local interface line written", false, lines.Any(line => line.StartsWith("Local Interface ", StringComparison.Ordinal)));
         Assert.IsFalse(lines.Any(line => line.StartsWith("Local Interface ", StringComparison.Ordinal)));
     }
 
@@ -58,6 +61,7 @@ public sealed partial class TcpConnectorTests
     {
         var lines = await DeviceBindLinesAsync(new LocalBinding("lo", "lo", null, 0, 1), deviceBinds: true, connects: true);
 
+        Diagnostics.Assert("local interface line written", false, lines.Any(line => line.StartsWith("Local Interface ", StringComparison.Ordinal)));
         Assert.IsFalse(lines.Any(line => line.StartsWith("Local Interface ", StringComparison.Ordinal)));
     }
 
@@ -73,8 +77,9 @@ public sealed partial class TcpConnectorTests
             new LocalBinding("lo", "lo", null, 0, 1),
             Interfaces(("lo", [IPAddress.IPv6Loopback, IPAddress.Loopback])));
 
-        await connector.ConnectAsync(new ConnectTarget("::1", 47599, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("::1", 47599, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("local interface line", "Local Interface lo is ip ::1 using address family 10", LinesFromTheFirstTrying(events).ElementAtOrDefault(1));
         CollectionAssert.AreEqual(
             new[]
             {

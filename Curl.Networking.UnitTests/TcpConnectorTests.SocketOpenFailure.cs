@@ -26,8 +26,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { SocketOpenOutcome = _ => ProtocolNotSupported };
         var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 41647, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 41647, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         const string failure = "Failed to connect to 127.0.0.1:41647 after 0 ms: Could not connect to server";
         CollectionAssert.AreEqual(
             AddressFamilyRace.SocketOpenFailedLines(ProtocolNotSupported, OperatingSystem.IsWindows()).Append(failure).ToArray(),
@@ -48,8 +49,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = CreateConnector(new FakeDnsResolver(IPAddress.IPv6Loopback, Loopback), dialer, new FakeTlsProvider());
 
-        var result = await connector.ConnectAsync(new ConnectTarget("localhost", 80, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("localhost", 80, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 80) }, dialer.DialedEndPoints);
         CollectionAssert.Contains(events.Info, "  Trying 127.0.0.1:80...");
@@ -59,20 +61,32 @@ public sealed partial class TcpConnectorTests
     [TestMethod]
     public void SocketOpenFailedLines_OnWindows_AreTheSchannelBuildsTwoLines()
     {
+        Diagnostics.Arrange("socket error", "ProtocolNotSupported, on Windows");
+
+        var lines = AddressFamilyRace.SocketOpenFailedLines(ProtocolNotSupported, onWindows: true).ToArray();
+
+        Diagnostics.Act("line count", lines.Length);
+        Diagnostics.Assert("line count", 2, lines.Length);
         CollectionAssert.AreEqual(
             new[]
             {
                 "failed to open socket: The system could not find the environment option that was entered.",
                 "connect to  port 0 from  port 0 failed: No error",
             },
-            AddressFamilyRace.SocketOpenFailedLines(ProtocolNotSupported, onWindows: true).ToArray());
+            lines);
     }
 
     [TestMethod]
     public void SocketOpenFailedLines_Elsewhere_IsTheOneLineWithTheSystemsReason()
     {
+        Diagnostics.Arrange("socket error", "ProtocolNotSupported, elsewhere");
+
+        var lines = AddressFamilyRace.SocketOpenFailedLines(ProtocolNotSupported, onWindows: false).ToArray();
+
+        Diagnostics.Act("line count", lines.Length);
+        Diagnostics.Assert("line count", 1, lines.Length);
         CollectionAssert.AreEqual(
             new[] { $"failed to open socket: {ProtocolNotSupported.Message}" },
-            AddressFamilyRace.SocketOpenFailedLines(ProtocolNotSupported, onWindows: false).ToArray());
+            lines);
     }
 }

@@ -25,8 +25,9 @@ public sealed partial class TcpConnectorTests
             resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(),
             resolveOverrides: ResolveOverrides.Parse(["a:80:127.0.0.1"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("connection is the dialled one", true, ReferenceEquals(connection, result.Connection));
         Assert.AreSame(connection, result.Connection);
         Assert.IsEmpty(resolver.ResolvedHosts);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 80) }, dialer.DialedEndPoints);
@@ -41,8 +42,9 @@ public sealed partial class TcpConnectorTests
             resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(),
             resolveOverrides: ResolveOverrides.Parse(["a:81:127.0.0.1"]));
 
-        await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("resolved hosts", "a", string.Join(",", resolver.ResolvedHosts));
         CollectionAssert.AreEqual(new[] { "a" }, resolver.ResolvedHosts);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Parse("192.0.2.99"), 80) }, dialer.DialedEndPoints);
     }
@@ -57,8 +59,9 @@ public sealed partial class TcpConnectorTests
             resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(),
             resolveOverrides: ResolveOverrides.Parse(["garbage"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual("Could not parse CURLOPT_RESOLVE entry 'garbage'", result.ErrorMessage);
         Assert.IsEmpty(resolver.ResolvedHosts);
@@ -76,8 +79,9 @@ public sealed partial class TcpConnectorTests
             resolver, dialer, tlsProvider, new ManualTimeProvider(),
             connectToMappings: new ConnectToMappings(["a:443:b.example:8443"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("a", 443, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("a", 443, UseTls: true));
 
+        Diagnostics.Assert("TLS target host", "a", tlsProvider.ReceivedTargetHost);
         Assert.AreSame(tlsProvider.SecuredConnection, result.Connection);
         CollectionAssert.AreEqual(new[] { "b.example" }, resolver.ResolvedHosts);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 8443) }, dialer.DialedEndPoints);
@@ -94,8 +98,9 @@ public sealed partial class TcpConnectorTests
             new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(),
             connectToMappings: new ConnectToMappings(["example.invalid:80:127.0.0.1:18499"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.invalid", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.invalid", 80, UseTls: false));
 
+        Diagnostics.Assert("mapped destination", ("127.0.0.1", 18499), (result.MappedHost, result.MappedPort));
         Assert.AreEqual(("127.0.0.1", 18499), (result.MappedHost, result.MappedPort));
     }
 
@@ -107,8 +112,9 @@ public sealed partial class TcpConnectorTests
             new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(),
             connectToMappings: new ConnectToMappings(["other:80:127.0.0.1:18499"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.invalid", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.invalid", 80, UseTls: false));
 
+        Diagnostics.Assert("mapped host", null, result.MappedHost);
         Assert.IsNull(result.MappedHost);
         Assert.AreEqual(0, result.MappedPort);
     }
@@ -124,8 +130,9 @@ public sealed partial class TcpConnectorTests
             resolveOverrides: ResolveOverrides.Parse(["a:9:127.0.0.5"]),
             connectToMappings: new ConnectToMappings(["a:80::9"]));
 
-        await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("dialed end points", "127.0.0.5:9", string.Join(",", dialer.DialedEndPoints));
         Assert.IsEmpty(resolver.ResolvedHosts);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.5"), 9) }, dialer.DialedEndPoints);
     }
@@ -139,8 +146,9 @@ public sealed partial class TcpConnectorTests
             new FakeDnsResolver(IPAddress.Parse("127.0.0.8")), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider(),
             connectToMappings: new ConnectToMappings(["a:80:127.0.0.8:0"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to a:80 via 127.0.0.8:0 after 0 ms: Could not connect to server", result.ErrorMessage);
     }
@@ -153,8 +161,9 @@ public sealed partial class TcpConnectorTests
             new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider(),
             connectToMappings: new ConnectToMappings(["a:80:nosuch.invalid:81"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Could not resolve host: nosuch.invalid", result.ErrorMessage);
     }
@@ -168,8 +177,9 @@ public sealed partial class TcpConnectorTests
             resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider(),
             connectToMappings: new ConnectToMappings(["a:80:b:x"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("exit code", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual("No valid port number in 'b:x'", result.ErrorMessage);
         Assert.IsEmpty(resolver.ResolvedHosts);
@@ -189,8 +199,9 @@ public sealed partial class TcpConnectorTests
             connectToMappings: new ConnectToMappings(["a:80:b.example:81"]));
         var target = new ConnectTarget("a", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "p.example", 38123, null) };
 
-        var result = await connector.ConnectAsync(target, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, target);
 
+        Diagnostics.Assert("connection is the proxy connection", true, ReferenceEquals(proxyConnection, result.Connection));
         Assert.AreSame(proxyConnection, result.Connection);
         Assert.IsEmpty(resolver.ResolvedHosts);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 38123) }, dialer.DialedEndPoints);
@@ -206,8 +217,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(), null, null, null);
 
-        await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("dialed end points", "127.0.0.1:80", string.Join(",", dialer.DialedEndPoints));
         CollectionAssert.AreEqual(new[] { "a" }, resolver.ResolvedHosts);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(Loopback, 80) }, dialer.DialedEndPoints);
     }
@@ -226,8 +238,9 @@ public sealed partial class TcpConnectorTests
             resolveOverrides: ResolveOverrides.Parse(["b:9:127.0.0.3,127.0.0.4"]),
             connectToMappings: new ConnectToMappings(["a:80:b:9"]));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("a", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("a", 80, UseTls: false));
 
+        Diagnostics.Assert("dialed end point count", 2, dialer.DialedEndPoints.Count);
         Assert.AreSame(connection, result.Connection);
         Assert.HasCount(2, dialer.DialedEndPoints);
     }

@@ -43,8 +43,9 @@ public sealed partial class TcpConnectorTests
         var tokens = NtlmTunnelTokens();
         var (connector, dialer) = CreateTokenConnector(HttpAuthSchemes.Ntlm, tokens, matchesSspiBuild: false, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(connection, result.Connection);
         Assert.AreEqual(TokenConnect("NTLM " + TunnelNtlmType1) + TokenConnect("NTLM " + TunnelNtlmType3), Encoding.Latin1.GetString([.. connection.Written]));
@@ -60,8 +61,9 @@ public sealed partial class TcpConnectorTests
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(NtlmChallenge + NtlmRejection));
         var (connector, _) = CreateTokenConnector(HttpAuthSchemes.Ntlm, NtlmTunnelTokens(), matchesSspiBuild: false, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("CONNECT tunnel failed, response 407", result.ErrorMessage);
         Assert.AreEqual(TokenConnect("NTLM " + TunnelNtlmType1) + TokenConnect("NTLM " + TunnelNtlmType3), Encoding.Latin1.GetString([.. connection.Written]));
@@ -76,9 +78,10 @@ public sealed partial class TcpConnectorTests
         var second = new ScriptedConnection(Encoding.Latin1.GetBytes(NtlmRejection));
         var (connector, dialer) = CreateTokenConnector(HttpAuthSchemes.Ntlm, NtlmTunnelTokens(), matchesSspiBuild: false, first, second);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
         // The Type 3 went out as an answer, so the bare NTLM 407 to it ends the handshake.
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(TokenConnect("NTLM " + TunnelNtlmType3), Encoding.Latin1.GetString([.. second.Written]));
         Assert.IsTrue(first.IsDisposed);
@@ -95,8 +98,9 @@ public sealed partial class TcpConnectorTests
             new SecurityContextStep(SecurityContextStatus.Refused, []));
         var (connector, _) = CreateTokenConnector(HttpAuthSchemes.Ntlm, tokens, matchesSspiBuild: true, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.AuthError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.AuthError, result.ExitCode);
         Assert.AreEqual(NtlmHttpAuthenticator.AuthErrorMessage, result.ErrorMessage);
         Assert.IsTrue(connection.IsDisposed);
@@ -112,8 +116,9 @@ public sealed partial class TcpConnectorTests
             new SecurityContextStep(SecurityContextStatus.Completed, [7, 8, 9]));
         var (connector, _) = CreateTokenConnector(HttpAuthSchemes.Negotiate, tokens, matchesSspiBuild: false, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(TokenConnect("Negotiate AQID") + TokenConnect("Negotiate BwgJ"), Encoding.Latin1.GetString([.. connection.Written]));
         CollectionAssert.AreEqual(new byte[] { 4, 5, 6 }, tokens.IncomingTokens[1]);
@@ -128,8 +133,9 @@ public sealed partial class TcpConnectorTests
         var tokens = new ScriptedTokenSource(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [1, 2, 3]));
         var (connector, _) = CreateTokenConnector(HttpAuthSchemes.Negotiate, tokens, matchesSspiBuild: false, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(TokenConnect("Negotiate AQID"), Encoding.Latin1.GetString([.. connection.Written]));
         Assert.AreEqual(1, tokens.ContextsDisposed);
@@ -142,8 +148,9 @@ public sealed partial class TcpConnectorTests
         var tokens = new ScriptedTokenSource(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [1, 2, 3]));
         var (connector, _) = CreateTokenConnector(HttpAuthSchemes.Negotiate, tokens, matchesSspiBuild: false, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("CONNECT tunnel failed, response 403", result.ErrorMessage);
         Assert.AreEqual(1, tokens.ContextsDisposed);
@@ -158,8 +165,9 @@ public sealed partial class TcpConnectorTests
         var tokens = new ScriptedTokenSource(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
         var (connector, dialer) = CreateTokenConnector(HttpAuthSchemes.Any, tokens, matchesSspiBuild: false, connection);
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. connection.Written]));
         Assert.HasCount(1, dialer.DialedEndPoints);
@@ -173,6 +181,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.21.0's SSPI build writes the failure with failf, the error buffer's first (BL-1033 Notes).
         var (result, connection, events) = await ConnectRefusedNegotiateTunnelAsync();
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(NegotiateNoCredentialsSspiLine, result.ErrorMessage);
         Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. connection.Written]));
@@ -186,6 +195,7 @@ public sealed partial class TcpConnectorTests
         // curl 8.18.0's GSS-API build writes the failure with infof, so the 407 stays the message (BL-1033 Notes).
         var (result, connection, events) = await ConnectRefusedNegotiateTunnelAsync();
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("CONNECT tunnel failed, response 407", result.ErrorMessage);
         Assert.AreEqual(UnauthenticatedConnect, Encoding.Latin1.GetString([.. connection.Written]));
@@ -194,7 +204,7 @@ public sealed partial class TcpConnectorTests
 
     // curl -s -S -v -p -x http://127.0.0.1:18733 --proxy-negotiate -U : http://example.test/ against
     // a proxy answering 407 with a bare Negotiate challenge, the context wording failures as the platform's curl.
-    private static async Task<(ConnectResult Result, ScriptedConnection Connection, RecordingTransferEvents Events)> ConnectRefusedNegotiateTunnelAsync()
+    private async Task<(ConnectResult Result, ScriptedConnection Connection, RecordingTransferEvents Events)> ConnectRefusedNegotiateTunnelAsync()
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(
             "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Negotiate\r\nContent-Length: 4\r\n\r\ndeny"));
@@ -215,7 +225,7 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var proxy = AuthenticatingProxy with { Credential = new NetworkCredential(string.Empty, string.Empty) };
 
-        var result = await connector.ConnectAsync(AuthenticatingTarget with { Proxy = proxy, Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget with { Proxy = proxy, Events = events });
         return (result, connection, events);
     }
 

@@ -24,8 +24,9 @@ public sealed partial class TcpConnectorTests
             TracesSetupFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47320, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47320, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("call count", 6, events.Calls.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -50,8 +51,9 @@ public sealed partial class TcpConnectorTests
             TracesDnsFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47313, UseTls: false) { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47313, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("call count", 14, events.Calls.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -81,8 +83,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider()) { TracesSetupFilter = true };
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false) { Events = events });
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "[SETUP] added", "[SETUP] happy eyeballing to origin 127.0.0.1:1" },

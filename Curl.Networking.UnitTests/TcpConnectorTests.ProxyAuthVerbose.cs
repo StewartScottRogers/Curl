@@ -50,7 +50,7 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Basic, new ScriptedConnection(Encoding.Latin1.GetBytes(BasicChallengeClosing)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -71,7 +71,7 @@ public sealed partial class TcpConnectorTests
             new ScriptedConnection(Encoding.Latin1.GetBytes(DigestChallengeClosing)),
             new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -95,7 +95,7 @@ public sealed partial class TcpConnectorTests
                 "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nContent-Length: 6\r\n\r\ndenied"
                 + EstablishedReply)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -119,7 +119,7 @@ public sealed partial class TcpConnectorTests
                 "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nContent-Length: 0\r\n\r\n"
                 + EstablishedReply)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -142,7 +142,7 @@ public sealed partial class TcpConnectorTests
             new ScriptedConnection(Encoding.Latin1.GetBytes(
                 ChunkedDigestChallenge + "5;ext=1\r\nhello\r\n3\r\nabc\r\n0\r\nX-Trailer: t\r\n\r\n" + EstablishedReply)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -167,7 +167,7 @@ public sealed partial class TcpConnectorTests
             HttpAuthSchemes.Digest,
             new ScriptedConnection(Encoding.Latin1.GetBytes(ChunkedDigestChallenge + body)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -191,7 +191,7 @@ public sealed partial class TcpConnectorTests
             new ScriptedConnection(Encoding.Latin1.GetBytes(isBasic ? BasicChallengeClosing : DigestChallengeClosing)),
             new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -218,7 +218,7 @@ public sealed partial class TcpConnectorTests
             new ScriptedConnection(Encoding.Latin1.GetBytes(challenge)),
             new ScriptedConnection(Encoding.Latin1.GetBytes(challenge)));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -251,7 +251,7 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             AuthenticatingOptions(HttpAuthSchemes.Digest, matchesSchannelBuild: false));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
         AssertTranscript(
             Lines(
@@ -280,15 +280,19 @@ public sealed partial class TcpConnectorTests
             new ManualTimeProvider(),
             AuthenticatingOptions(HttpAuthSchemes.Digest, matchesSchannelBuild: false));
 
-        await connector.ConnectAsync(AuthenticatingTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, AuthenticatingTarget with { Events = events });
 
+        Diagnostics.Assert("allocate connect buffer lines", 1, events.Transcript.Count(line => line == "* allocate connect buffer"));
         Assert.AreEqual(1, events.Transcript.Count(line => line == "* allocate connect buffer"));
         Assert.AreEqual("* allocate connect buffer", events.Transcript[2]);
         CollectionAssert.AreEqual(EstablishedLines, events.Transcript.TakeLast(4).ToArray());
     }
 
-    private static void AssertTranscript(string[] expected, List<string> transcript) =>
+    private void AssertTranscript(string[] expected, List<string> transcript)
+    {
+        Diagnostics.Diff("transcript", string.Join("\n", expected), string.Join("\n", transcript));
         Assert.AreEqual(string.Join("\n", expected), string.Join("\n", transcript));
+    }
 
     private static string[] RequestLines(string head) => [.. head[..^2].Split("\r\n").Select(line => "> " + line)];
 
