@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Dict.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Dict;
 
@@ -18,6 +19,11 @@ public sealed class DictProtocolHandlerBodyLimitTests
 
     private const string MeasuredRequest = "CLIENT libcurl 8.21.0\r\nDEFINE ! hello\r\nQUIT\r\n";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_NoBody_SendsTheRequestAndEndsWithoutReading()
     {
@@ -26,10 +32,18 @@ public sealed class DictProtocolHandlerBodyLimitTests
         TranscriptTransferEvents events = new();
         ScriptedConnection connection = new(Latin1(MeasuredReply));
         MemoryStream output = new();
+        Diagnostics.Arrange("URL", "dict://h/d:hello, -I (NoBody)");
+        Diagnostics.Arrange("server reply", DiagnosticText.Escape(MeasuredReply));
 
         TransferResult result = await new DictProtocolHandler(Connector(connection)).ExecuteAsync(
             new TransferContext { Url = CurlUrl.Parse("dict://h/d:hello"), Output = output, Events = events, NoBody = true });
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("reads", connection.ReadCount);
+        Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("request sent", MeasuredRequest, Encoding.Latin1.GetString(connection.Sent));
+        Diagnostics.Assert("reads", 0, connection.ReadCount);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(MeasuredRequest, Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual(0, connection.ReadCount);
@@ -44,10 +58,17 @@ public sealed class DictProtocolHandlerBodyLimitTests
         // "* Exceeded the maximum allowed file size (3) with 3 bytes" then "* closing connection #0".
         TranscriptTransferEvents events = new();
         MemoryStream output = new();
+        Diagnostics.Arrange("URL", "dict://h/d:hello, --max-filesize 3");
+        Diagnostics.Arrange("server reply", DiagnosticText.Escape(MeasuredReply));
 
         TransferResult result = await new DictProtocolHandler(Connector(new ScriptedConnection(Latin1(MeasuredReply)))).ExecuteAsync(
             Context(output, events, 3));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
 
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Diff("output", "220", Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual("Exceeded the maximum allowed file size (3) with 3 bytes", result.ErrorMessage);
         Assert.AreEqual(3, result.BytesTransferred);
@@ -62,10 +83,16 @@ public sealed class DictProtocolHandlerBodyLimitTests
     {
         MemoryStream output = new();
         ScriptedConnection connection = new(Latin1("220 hi\r\n"), Latin1("250 ok\r\n"));
+        Diagnostics.Arrange("URL", "dict://h/d:hello, --max-filesize 11");
+        Diagnostics.Arrange("server reads", DiagnosticText.Lines(["220 hi\r\n", "250 ok\r\n"]));
 
         TransferResult result = await new DictProtocolHandler(Connector(connection)).ExecuteAsync(
             Context(output, new TranscriptTransferEvents(), 11));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("output", output.ToArray());
 
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Diff("output", "220 hi\r\n250", Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual("Exceeded the maximum allowed file size (11) with 11 bytes", result.ErrorMessage);
         Assert.AreEqual("220 hi\r\n250", Encoding.Latin1.GetString(output.ToArray()));
@@ -76,10 +103,16 @@ public sealed class DictProtocolHandlerBodyLimitTests
     {
         MemoryStream output = new();
         ScriptedConnection connection = new(Latin1("220 hi\r\n"), Latin1("250 ok\r\n"));
+        Diagnostics.Arrange("URL", "dict://h/d:hello, --max-filesize 8");
+        Diagnostics.Arrange("server reads", DiagnosticText.Lines(["220 hi\r\n", "250 ok\r\n"]));
 
         TransferResult result = await new DictProtocolHandler(Connector(connection)).ExecuteAsync(
             Context(output, new TranscriptTransferEvents(), 8));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("output", output.ToArray());
 
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Diff("output", "220 hi\r\n", Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual("Exceeded the maximum allowed file size (8) with 8 bytes", result.ErrorMessage);
         Assert.AreEqual("220 hi\r\n", Encoding.Latin1.GetString(output.ToArray()));
@@ -93,10 +126,16 @@ public sealed class DictProtocolHandlerBodyLimitTests
     {
         Assert.AreEqual(52, MeasuredReply.Length);
         MemoryStream output = new();
+        Diagnostics.Arrange("URL", "dict://h/d:hello, --max-filesize " + (maxFileSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unset"));
+        Diagnostics.Arrange("server reply", DiagnosticText.Escape(MeasuredReply));
 
         TransferResult result = await new DictProtocolHandler(Connector(new ScriptedConnection(Latin1(MeasuredReply)))).ExecuteAsync(
             Context(output, new TranscriptTransferEvents(), maxFileSize));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("output", output.ToArray());
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", MeasuredReply, Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(MeasuredReply, Encoding.Latin1.GetString(output.ToArray()));
     }
