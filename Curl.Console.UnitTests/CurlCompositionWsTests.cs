@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -27,16 +28,24 @@ public sealed class CurlCompositionWsTests
 
     private static readonly Encoding Latin1 = Encoding.Latin1;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("ws", false)]
     [DataRow("wss", true)]
     public async Task CreateRunner_UserAndHeader_SendsCurlsUpgradeRequestAndWritesTheFramePayloads(string scheme, bool useTls)
     {
         ScriptedConnector connector = new([Latin1.GetBytes(SwitchingHead + HelloAndClose)]);
+        Diagnostics.Arrange("use tls", useTls);
+        Diagnostics.Bytes("scripted response", Latin1.GetBytes(SwitchingHead + HelloAndClose));
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             connector, ["-u", "user:pw", "-H", "X-Test: 1", "-w", SizesFormat, $"{scheme}://127.0.0.1:47912/p"]);
 
+        Diagnostics.Assert("standard output", "hello\x03\xe8" + "101 11 102 239", standardOutput);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(
             "GET /p HTTP/1.1\r\nHost: 127.0.0.1:47912\r\nAuthorization: Basic dXNlcjpwdw==\r\nUser-Agent: curl/8.21.0\r\n"
                 + "Accept: */*\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: <key>\r\n"
@@ -52,9 +61,12 @@ public sealed class CurlCompositionWsTests
     public async Task CreateRunner_IncludeHeaders_WritesOnlyThePayloads()
     {
         ScriptedConnector connector = new([Latin1.GetBytes(SwitchingHead + HelloAndClose)]);
+        Diagnostics.Bytes("scripted response", Latin1.GetBytes(SwitchingHead + HelloAndClose));
 
         (int exitCode, string standardOutput, _) = await RunAsync(connector, ["-i", "ws://127.0.0.1:47901/chat"]);
 
+        Diagnostics.Assert("standard output", "hello\x03\xe8", standardOutput);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual("hello\x03\xe8", standardOutput);
         Assert.AreEqual(0, exitCode);
     }
@@ -63,9 +75,12 @@ public sealed class CurlCompositionWsTests
     public async Task CreateRunner_DumpHeaderToStandardOutput_WritesTheHeadThenThePayloads()
     {
         ScriptedConnector connector = new([Latin1.GetBytes(SwitchingHead + "\x81\x05hello\x88\x00")]);
+        Diagnostics.Bytes("scripted response", Latin1.GetBytes(SwitchingHead + "\x81\x05hello\x88\x00"));
 
         (int exitCode, string standardOutput, _) = await RunAsync(connector, ["-D", "-", "ws://127.0.0.1:47901/"]);
 
+        Diagnostics.Diff("standard output", SwitchingHead + "hello", standardOutput);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(SwitchingHead + "hello", standardOutput);
         Assert.AreEqual(0, exitCode);
     }
@@ -74,9 +89,12 @@ public sealed class CurlCompositionWsTests
     public async Task CreateRunner_UpgradeRefused_PrintsRefusedAndReturns22()
     {
         ScriptedConnector connector = new([Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")]);
+        Diagnostics.Arrange("scripted response", "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, ["ws://127.0.0.1:47901/"]);
 
+        Diagnostics.Assert("standard error", "curl: (22) Refused WebSocket upgrade: 200\n", Unix(standardError));
+        Diagnostics.Assert("exit code", 22, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual("curl: (22) Refused WebSocket upgrade: 200" + Environment.NewLine, standardError);
         Assert.AreEqual(22, exitCode);
@@ -86,10 +104,14 @@ public sealed class CurlCompositionWsTests
     public async Task CreateRunner_ServerClosesAfterTheUpgrade_PrintsEmptyReplyAndReturns52()
     {
         ScriptedConnector connector = new([Latin1.GetBytes(SwitchingHead)]);
+        Diagnostics.Arrange("scripted response", SwitchingHead);
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             connector, ["-w", "%{http_code} %{size_download}", "ws://127.0.0.1:47901/"]);
 
+        Diagnostics.Assert("standard output", "101 0", standardOutput);
+        Diagnostics.Assert("standard error", "curl: (52) Empty reply from server\n", Unix(standardError));
+        Diagnostics.Assert("exit code", 52, exitCode);
         Assert.AreEqual("101 0", standardOutput);
         Assert.AreEqual("curl: (52) Empty reply from server" + Environment.NewLine, standardError);
         Assert.AreEqual(52, exitCode);
@@ -103,6 +125,8 @@ public sealed class CurlCompositionWsTests
         Directory.CreateDirectory(directory);
         string upload = Path.Combine(directory, "abc.bin");
         await System.IO.File.WriteAllBytesAsync(upload, "abc"u8.ToArray());
+        Diagnostics.Arrange("upload file", "<temp>/abc.bin holding \"abc\"");
+        Diagnostics.Bytes("scripted response", Latin1.GetBytes(SwitchingHead + "\x81\x02ok"));
 
         (int exitCode, string standardOutput, string standardError) result;
         try
@@ -117,6 +141,10 @@ public sealed class CurlCompositionWsTests
         byte[] written = connector.Written;
         int frameStart = Latin1.GetString(written).IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4;
         byte[] frame = written[frameStart..];
+        Diagnostics.Bytes("upload frame", frame);
+        Diagnostics.Assert("upload frame length", 9, frame.Length);
+        Diagnostics.Assert("standard output", "ok9 4", result.standardOutput);
+        Diagnostics.Assert("exit code", 0, result.exitCode);
         Assert.AreEqual(9, frame.Length);
         Assert.AreEqual((0x82, 0x83), (frame[0], frame[1]));
         byte[] payload = [.. frame[6..].Select((masked, index) => (byte)(masked ^ frame[2 + index]))];
@@ -134,6 +162,9 @@ public sealed class CurlCompositionWsTests
         (int exitCode, string standardOutput, _) = await RunAsync(connector, ["-V"]);
 
         string protocols = standardOutput.Split(Environment.NewLine).Single(line => line.StartsWith("Protocols:", StringComparison.Ordinal));
+        Diagnostics.Act("protocols line", protocols);
+        Diagnostics.Assert("protocols line", CurlVersionText.ProtocolsLine, protocols);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(CurlVersionText.ProtocolsLine, protocols);
         StringAssert.EndsWith(protocols, " telnet tftp ws wss");
         Assert.AreEqual(0, exitCode);
@@ -152,9 +183,14 @@ public sealed class CurlCompositionWsTests
         return text.Replace(key.Groups[1].Value, "<key>", StringComparison.Ordinal);
     }
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
+    private static string Unix(string text) => text.Replace("\r", string.Empty, StringComparison.Ordinal);
+
+    private async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
         ScriptedConnector connector, string[] arguments)
     {
+        Diagnostics.Arrange(
+            "command line arguments",
+            string.Join(" ", ["-sS", .. arguments]).Replace(Path.GetTempPath(), "<temp>/", StringComparison.Ordinal).Replace('\\', '/'));
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
@@ -163,6 +199,10 @@ public sealed class CurlCompositionWsTests
             .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
             .RunAsync(["-sS", .. arguments]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", Unix(Latin1.GetString(standardOutput.ToArray())));
+        Diagnostics.Act("standard error", Unix(Encoding.UTF8.GetString(standardError.ToArray())));
+        Diagnostics.Bytes("request written", connector.Written);
         return (exitCode, Latin1.GetString(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()));
     }
 }

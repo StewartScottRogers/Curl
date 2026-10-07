@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -16,36 +17,62 @@ public sealed class CurlCompositionWsTraceTests
     private const string Head101AndText =
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: x\r\n\r\n\x81\x02hi";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("-v", "--trace-config", "ws")]
     [DataRow("-v", "--trace-config", "protocol")]
     [DataRow("-v", "--trace-config", "all")]
     [DataRow("-v", "--trace-config", "tls,WS")]
     [DataRow("-vv")]
-    public void TracesWs_WithTheWsComponent_IsTrue(params string[] arguments) =>
+    public void TracesWs_WithTheWsComponent_IsTrue(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+
+        bool tracesWs = CurlComposition.TracesWs(Parse(arguments));
+        Diagnostics.Act("traces ws", tracesWs);
+
+        Diagnostics.Assert("traces ws", true, tracesWs);
         Assert.IsTrue(CurlComposition.TracesWs(Parse(arguments)));
+    }
 
     [TestMethod]
     [DataRow("-v")]
     [DataRow("-v", "--trace-config", "smtp")]
     [DataRow("-v", "--trace-config", "ws,-ws")]
     [DataRow("-v", "--trace-config", "network")]
-    public void TracesWs_WithoutTheWsComponent_IsFalse(params string[] arguments) =>
+    public void TracesWs_WithoutTheWsComponent_IsFalse(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+
+        bool tracesWs = CurlComposition.TracesWs(Parse(arguments));
+        Diagnostics.Act("traces ws", tracesWs);
+
+        Diagnostics.Assert("traces ws", false, tracesWs);
         Assert.IsFalse(CurlComposition.TracesWs(Parse(arguments)));
+    }
 
     [TestMethod]
     public void CreateTransports_UnderTraceConfigWs_TracesWs()
     {
+        Diagnostics.Arrange("command line arguments", "-v --trace-config ws");
         CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "ws"), TimeProvider.System);
+        Diagnostics.Act("traces ws", transports.TracesWs);
 
+        Diagnostics.Assert("traces ws", true, transports.TracesWs);
         Assert.IsTrue(transports.TracesWs);
     }
 
     [TestMethod]
     public void CreateTransports_WithoutTheWsComponent_DoesNotTraceWs()
     {
+        Diagnostics.Arrange("command line arguments", "-v");
         CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
+        Diagnostics.Act("traces ws", transports.TracesWs);
 
+        Diagnostics.Assert("traces ws", false, transports.TracesWs);
         Assert.IsFalse(transports.TracesWs);
     }
 
@@ -55,6 +82,8 @@ public sealed class CurlCompositionWsTraceTests
     public async Task CreateProtocolHandlers_WsTransfer_WritesTheWsLinesOnlyWhenTraced(bool tracesWs)
     {
         ScriptedConnector server = new([Encoding.Latin1.GetBytes(Head101AndText)]);
+        Diagnostics.Arrange("traces ws", tracesWs);
+        Diagnostics.Bytes("scripted response", Encoding.Latin1.GetBytes(Head101AndText));
         IProtocolHandler ws = CurlComposition
             .CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesWs: tracesWs)
             .Single(handler => handler.SupportedSchemes.Contains("ws"));
@@ -66,7 +95,11 @@ public sealed class CurlCompositionWsTraceTests
             Output = new MemoryStream(),
             Events = events,
         });
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("[WS] lines", tracesWs ? 6 : 1, events.Info.Count(line => line.StartsWith("[WS] ", StringComparison.Ordinal)));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(tracesWs, events.Info.Contains("[WS] websocket established, callback mode"));
         // The switch line every -v writes, then the five a traced text frame adds (BL-1164 Notes).
