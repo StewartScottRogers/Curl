@@ -32,6 +32,12 @@ Every test in these `Curl.Cryptography.UnitTests` files writes, through BL-1457'
 
 ## Notes
 
+- All 69 test methods in the seven files write their diagnostics through `TestDiagnostics`: the vector's source (NIST SP 500-20, Grabbe, FIPS 74, RFC 6979 A.2.1/A.2.2, NIST CAVP FIPS 186-4 SigVer, FIPS 180-2 appendix B, RFC 8032 sections 5.1.3, 5.1.7, 5.2.3, 5.2.7, 7.1 and 7.4, RFC 7748) as `ARRANGE`, keys, messages, contexts and signatures as `BYTES`, and a `DIFF` for every ciphertext, k, digest, public key, signature and field encoding compared. Throw tests capture the exception and `ASSERT` its type; boolean results (`Verify`, `TryDecode`) get an `ASSERT`. `PHASE` timings wrap the CAVP SigVer loop and the 64-trial BCL comparison; inside loops, `BYTES`/`DIFF` are written only for a failing vector so passing runs stay short. The RFC 6979 signing helper became an instance method taking the vector source so it can reach `TestContext`.
+- Acceptance filter run: 199 tests, 199 `END` lines, none with a zero count.
+- Counts (`Assert.` / `[TestMethod` / `[DataRow(`), before and after, unchanged: Des 7/6/9, DeterministicDsaNonce 2/2/7, DsaSignature 19/17/50, Ed25519 17/12/19, Ed448 21/14/26, Edwards25519 10/6/5, Field25519 13/12/14; total 89/69/130.
+- No test printed a `SLOW:` line. The slowest is `DsaSignatureTests.VerifyHash_CavpSigVer_GivesPublishedResult` for L=3072 at 2267 ms (`PHASE verify: 2264 ms`, 15 vectors of 3072-bit modular exponentiation), under the 3000 ms budget; the L=2048 rows took 1013 and 911 ms. No follow-up filed.
+- `dotnet build Curl.Cryptography.UnitTests -warnaserror` clean; `dotnet test Curl.Cryptography.UnitTests --filter "TestCategory!=Integration"`: 1335 passed.
+
 ## Log
 
 - 2026-10-07: Created.
