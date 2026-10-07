@@ -17,10 +17,22 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var options = new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls13);
         var sessions = CacheHoldingASessionFor(options);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, MinimumVersion: Tls13");
+        Diagnostics.Arrange("cache", "holds one unexpired TLS 1.3 session for the peer");
 
-        var hello = DecodeClientHello(await CaptureClientHelloWithSessionsAsync(options, sessions));
+        byte[] clientHello;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            clientHello = await CaptureClientHelloWithSessionsAsync(options, sessions);
+        }
 
+        var hello = DecodeClientHello(clientHello);
+        Diagnostics.Bytes("ClientHello record", clientHello);
+        Diagnostics.Act("extension types", string.Join(",", ExtensionTypes(hello)));
+        Diagnostics.Assert("offers pre_shared_key", true, ExtensionTypes(hello).Contains(TlsExtensionType.PreSharedKey));
         CollectionAssert.Contains(ExtensionTypes(hello), TlsExtensionType.PreSharedKey);
+        Diagnostics.Assert("session left in the cache", true, sessions.Take(PeerKeyOf(options)) is null);
         Assert.IsNull(sessions.Take(PeerKeyOf(options)), "the offered session was taken out of the cache");
     }
 
@@ -29,18 +41,40 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var options = new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls13, NoSessionId: true);
         var sessions = CacheHoldingASessionFor(options);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, MinimumVersion: Tls13, NoSessionId: true");
+        Diagnostics.Arrange("cache", "holds one unexpired TLS 1.3 session for the peer");
 
-        var hello = DecodeClientHello(await CaptureClientHelloWithSessionsAsync(options, sessions));
+        byte[] clientHello;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            clientHello = await CaptureClientHelloWithSessionsAsync(options, sessions);
+        }
 
+        var hello = DecodeClientHello(clientHello);
+        Diagnostics.Bytes("ClientHello record", clientHello);
+        Diagnostics.Act("extension types", string.Join(",", ExtensionTypes(hello)));
+        Diagnostics.Assert("offers pre_shared_key", false, ExtensionTypes(hello).Contains(TlsExtensionType.PreSharedKey));
         CollectionAssert.DoesNotContain(ExtensionTypes(hello), TlsExtensionType.PreSharedKey);
-        Assert.IsNotNull(sessions.Take(PeerKeyOf(options)), "--no-sessionid neither takes nor keeps a session");
+        var keptSession = sessions.Take(PeerKeyOf(options));
+        Diagnostics.Assert("session kept in the cache", true, keptSession is not null);
+        Assert.IsNotNull(keptSession, "--no-sessionid neither takes nor keeps a session");
     }
 
     [TestMethod]
     [DataRow(false, true)]
     [DataRow(true, false)]
-    public void InsertsEmptyFragment_IsOnUnlessSslAllowBeast(bool allowBeast, bool expected) =>
-        Assert.AreEqual(expected, HandBuiltTlsProvider.InsertsEmptyFragment(new TlsClientOptions(AllowBeast: allowBeast)));
+    public void InsertsEmptyFragment_IsOnUnlessSslAllowBeast(bool allowBeast, bool expected)
+    {
+        Diagnostics.Arrange("AllowBeast", allowBeast);
+        Diagnostics.Arrange("expected empty fragment", expected);
+
+        var actual = HandBuiltTlsProvider.InsertsEmptyFragment(new TlsClientOptions(AllowBeast: allowBeast));
+
+        Diagnostics.Act("inserts empty fragment", actual);
+        Diagnostics.Assert("inserts empty fragment", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
 
     private static string PeerKeyOf(TlsClientOptions options) =>
         TlsSessionCache.PeerKey(ResumedHost, ServerEndPoint.Port, options);

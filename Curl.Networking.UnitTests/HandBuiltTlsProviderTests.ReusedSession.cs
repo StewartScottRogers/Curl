@@ -18,41 +18,92 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_OfferingASessionWithAlpn_WritesTheReusingSessionLineOnce()
     {
-        var events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), OpenSslBuild, "http/1.1");
+        ArrangeResumption("OpenSSL", "Insecure: true, AllowEarlyData: true", "http/1.1", seedSession: true);
 
+        RecordingTransferEvents events;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), OpenSslBuild, "http/1.1");
+        }
+
+        var lines = ReusedSessionLines(events);
+        Diagnostics.Act("reusing session lines", string.Join(" | ", lines));
+        Diagnostics.Assert("reusing session lines", "SSL reusing session with ALPN 'http/1.1'", string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { "SSL reusing session with ALPN 'http/1.1'" }, ReusedSessionLines(events));
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_OfferingASessionWithoutAlpn_WritesADashForTheAlpn()
     {
-        var events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), OpenSslBuild, null);
+        ArrangeResumption("OpenSSL", "Insecure: true, AllowEarlyData: true", null, seedSession: true);
 
+        RecordingTransferEvents events;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), OpenSslBuild, null);
+        }
+
+        var lines = ReusedSessionLines(events);
+        Diagnostics.Act("reusing session lines", string.Join(" | ", lines));
+        Diagnostics.Assert("reusing session lines", "SSL reusing session with ALPN '-'", string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { "SSL reusing session with ALPN '-'" }, ReusedSessionLines(events));
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithoutACachedSession_WritesNoReusingSessionLine()
     {
-        var events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), OpenSslBuild, "http/1.1", seedSession: false);
+        ArrangeResumption("OpenSSL", "Insecure: true, AllowEarlyData: true", "http/1.1", seedSession: false);
 
+        RecordingTransferEvents events;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), OpenSslBuild, "http/1.1", seedSession: false);
+        }
+
+        Diagnostics.Act("reusing session lines", ReusedSessionLines(events).Length);
+        Diagnostics.Assert("reusing session line count", 0, ReusedSessionLines(events).Length);
         Assert.IsEmpty(ReusedSessionLines(events));
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_UnderNoSessionId_WritesNoReusingSessionLine()
     {
-        var events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true, NoSessionId: true), OpenSslBuild, "http/1.1");
+        ArrangeResumption("OpenSSL", "Insecure: true, AllowEarlyData: true, NoSessionId: true", "http/1.1", seedSession: true);
 
+        RecordingTransferEvents events;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true, NoSessionId: true), OpenSslBuild, "http/1.1");
+        }
+
+        Diagnostics.Act("reusing session lines", ReusedSessionLines(events).Length);
+        Diagnostics.Assert("reusing session line count", 0, ReusedSessionLines(events).Length);
         Assert.IsEmpty(ReusedSessionLines(events));
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_OfferingASessionAsTheSchannelBuild_WritesNoReusingSessionLine()
     {
-        var events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), SchannelBuild, "http/1.1");
+        ArrangeResumption("Schannel", "Insecure: true, AllowEarlyData: true", "http/1.1", seedSession: true);
 
+        RecordingTransferEvents events;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            events = await ResumeWithTestServerAsync(new TlsClientOptions(Insecure: true, AllowEarlyData: true), SchannelBuild, "http/1.1");
+        }
+
+        Diagnostics.Act("reusing session lines", ReusedSessionLines(events).Length);
+        Diagnostics.Assert("reusing session line count", 0, ReusedSessionLines(events).Length);
         Assert.IsEmpty(ReusedSessionLines(events));
+    }
+
+    private void ArrangeResumption(string build, string options, string? sessionApplicationProtocol, bool seedSession)
+    {
+        Diagnostics.Arrange("build", build);
+        Diagnostics.Arrange("options", options);
+        Diagnostics.Arrange("server TLS protocol", "TLS 1.3, resumes the seeded ticket 05 05 05 05");
+        Diagnostics.Arrange("session ALPN", sessionApplicationProtocol ?? "(none)");
+        Diagnostics.Arrange("session seeded in the cache", seedSession);
     }
 
     private static string[] ReusedSessionLines(RecordingTransferEvents events) =>

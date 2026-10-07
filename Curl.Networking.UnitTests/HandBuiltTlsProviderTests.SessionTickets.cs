@@ -19,10 +19,27 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task ReadAsync_SchannelBuildAfterTwoTicketRecords_ReportsOneReceivedNewSessionTicketPerRecord()
     {
-        var (messages, read) = await ReadAfterTicketRecordsAsync(SchannelBuild, ticketRecords: 2);
+        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("options", "Insecure: true, MinimumVersion: Tls13");
+        Diagnostics.Arrange("server", "TLS 1.3 sends 2 NewSessionTicket records, then 'hello'");
 
+        List<TlsMessageEvent> messages;
+        string read;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (messages, read) = await ReadAfterTicketRecordsAsync(SchannelBuild, ticketRecords: 2);
+        }
+
+        Diagnostics.Act("text read", read);
+        Diagnostics.Act("TLS messages reported", messages.Count);
+        Diagnostics.Assert("text read", "hello", read);
         Assert.AreEqual("hello", read);
+        Diagnostics.Assert("TLS messages reported", 2, messages.Count);
         Assert.HasCount(2, messages);
+        Diagnostics.Assert(
+            "every message is a received NewSessionTicket handshake record",
+            true,
+            messages.TrueForAll(message => !message.Sent && message.ContentType == Curl.Protocol.Abstractions.TlsContentType.Handshake && message.ProtocolVersion == 0x0304 && message.Bytes.Span[0] == 4));
         Assert.IsTrue(messages.TrueForAll(message =>
             !message.Sent && message.ContentType == Curl.Protocol.Abstractions.TlsContentType.Handshake && message.ProtocolVersion == 0x0304 && message.Bytes.Span[0] == 4));
     }
@@ -30,9 +47,22 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task ReadAsync_OpenSslBuildAfterTicketRecords_ReportsNoTicket()
     {
-        var (messages, read) = await ReadAfterTicketRecordsAsync(OpenSslBuild, ticketRecords: 2);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, MinimumVersion: Tls13");
+        Diagnostics.Arrange("server", "TLS 1.3 sends 2 NewSessionTicket records, then 'hello'");
 
+        List<TlsMessageEvent> messages;
+        string read;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (messages, read) = await ReadAfterTicketRecordsAsync(OpenSslBuild, ticketRecords: 2);
+        }
+
+        Diagnostics.Act("text read", read);
+        Diagnostics.Act("TLS messages reported", messages.Count);
+        Diagnostics.Assert("text read", "hello", read);
         Assert.AreEqual("hello", read);
+        Diagnostics.Assert("TLS messages reported", 0, messages.Count);
         Assert.IsEmpty(messages);
     }
 
@@ -45,8 +75,19 @@ public sealed partial class HandBuiltTlsProviderTests
         {
             TicketEvents = events,
         };
+        Diagnostics.Arrange("stream", "a MemoryStream of 3 bytes, not TLS 1.3");
 
-        Assert.AreEqual(3, await connection.ReadAsync(new byte[8], CancellationToken.None));
+        int read;
+        using (Diagnostics.Phase("read"))
+        {
+            read = await connection.ReadAsync(new byte[8], CancellationToken.None);
+        }
+
+        Diagnostics.Act("bytes read", read);
+        Diagnostics.Act("TLS messages reported", events.TlsMessages.Count);
+        Diagnostics.Assert("bytes read", 3, read);
+        Assert.AreEqual(3, read);
+        Diagnostics.Assert("TLS messages reported", 0, events.TlsMessages.Count);
         Assert.IsEmpty(events.TlsMessages);
     }
 

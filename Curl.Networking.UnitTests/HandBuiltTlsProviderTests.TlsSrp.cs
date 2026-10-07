@@ -26,29 +26,70 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(OpenSslBuild)]
     public async Task AuthenticateAsClientAsync_WithTlsUser_OffersTheSrpUserAndOpenSslsSrpCipherList(bool matchesSchannelBuild)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(SrpOptions(), matchesSchannelBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, TlsUser: alice, TlsPassword: secret");
+        Diagnostics.Arrange("host", ProfileHost);
 
+        byte[] clientHello;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            clientHello = await CaptureClientHelloAsync(SrpOptions(), matchesSchannelBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(clientHello);
+        Diagnostics.Bytes("ClientHello record", clientHello);
+        var srpUser = SrpExtension.Decode(ExtensionData(hello, TlsExtensionType.Srp)).Value;
+        Diagnostics.Act("srp user", System.Text.Encoding.UTF8.GetString(srpUser));
+        Diagnostics.Assert("srp user", "alice", System.Text.Encoding.UTF8.GetString(srpUser));
         CollectionAssert.AreEqual("alice"u8.ToArray(), SrpExtension.Decode(ExtensionData(hello, TlsExtensionType.Srp)).Value);
         ushort[] tls13Suites = [.. ProfileOf(matchesSchannelBuild).CipherSuites.Where(Tls13RecordProtection.CanProtect)];
         ushort[] expected = [.. tls13Suites, 0xc022, 0xc021, 0xc020, 0xc01f, 0xc01e, 0xc01d];
+        Diagnostics.Act("cipher suites", string.Join(",", hello.CipherSuites.ToArray().Select(suite => "0x" + suite.ToString("x4"))));
+        Diagnostics.Assert("cipher suites", string.Join(",", expected.Select(suite => "0x" + suite.ToString("x4"))), string.Join(",", hello.CipherSuites.ToArray().Select(suite => "0x" + suite.ToString("x4"))));
         CollectionAssert.AreEqual(expected, hello.CipherSuites.ToArray());
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithTlsUserAndCiphers_OffersTheCiphersInPlaceOfTheSrpList()
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(Tls12Only(SrpOptions("SRP-AES-128-CBC-SHA:ECDHE-RSA-AES128-GCM-SHA256")), OpenSslBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, TlsUser: alice, TlsPassword: secret, MaximumVersion: Tls12, Ciphers: SRP-AES-128-CBC-SHA:ECDHE-RSA-AES128-GCM-SHA256");
+        Diagnostics.Arrange("host", ProfileHost);
 
+        byte[] clientHello;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            clientHello = await CaptureClientHelloAsync(Tls12Only(SrpOptions("SRP-AES-128-CBC-SHA:ECDHE-RSA-AES128-GCM-SHA256")), OpenSslBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(clientHello);
+        Diagnostics.Bytes("ClientHello record", clientHello);
+        Diagnostics.Act("cipher suites", string.Join(",", hello.CipherSuites.ToArray().Select(suite => "0x" + suite.ToString("x4"))));
+        Diagnostics.Assert("offers 0xc022", false, hello.CipherSuites.ToArray().Contains((ushort)0xc022));
         Assert.DoesNotContain((ushort)0xc022, hello.CipherSuites.ToArray());
+        Diagnostics.Assert("offers 0xc02f", true, hello.CipherSuites.ToArray().Contains((ushort)0xc02f));
         Assert.Contains((ushort)0xc02f, hello.CipherSuites.ToArray());
     }
 
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithoutTlsUser_OffersNoSrp()
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(TlsPassword: "secret"), OpenSslBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "TlsPassword: secret, no TlsUser");
+        Diagnostics.Arrange("host", ProfileHost);
 
+        byte[] clientHello;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            clientHello = await CaptureClientHelloAsync(new TlsClientOptions(TlsPassword: "secret"), OpenSslBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(clientHello);
+        Diagnostics.Bytes("ClientHello record", clientHello);
+        Diagnostics.Act("cipher suites", string.Join(",", hello.CipherSuites.ToArray().Select(suite => "0x" + suite.ToString("x4"))));
+        Diagnostics.Assert("offers the srp extension", false, hello.Extensions.Any(extension => extension.Type == TlsExtensionType.Srp));
         Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.Srp));
+        Diagnostics.Assert("offers 0xc020", false, hello.CipherSuites.ToArray().Contains((ushort)0xc020));
         Assert.DoesNotContain((ushort)0xc020, hello.CipherSuites.ToArray());
     }
 
@@ -60,10 +101,22 @@ public sealed partial class HandBuiltTlsProviderTests
         var (client, server) = InMemoryDuplexStream.CreatePair();
         await server.DisposeAsync();
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, TlsUser: alice, TlsPassword: secret");
+        Diagnostics.Arrange("ciphers", ciphers ?? "(none)");
+        Diagnostics.Arrange("server", "closed before it answers");
+        Diagnostics.Arrange("expected verbose lines", string.Join(" | ", expected));
 
-        await Provider(SrpOptions(ciphers), OpenSslBuild).AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), ProfileHost, events, false, Http11, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(SrpOptions(ciphers), OpenSslBuild).AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), ProfileHost, events, false, Http11, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("verbose lines", string.Join(" | ", events.Info.Take(expected.Length)));
+        Diagnostics.Assert("verbose lines", string.Join(" | ", expected), string.Join(" | ", events.Info.Take(expected.Length)));
         CollectionAssert.AreEqual(expected, events.Info.Take(expected.Length).ToArray());
     }
 
@@ -75,13 +128,25 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var (client, _) = InMemoryDuplexStream.CreatePair();
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, TlsUser: alice, no TlsPassword");
 
-        var result = await Provider(new TlsClientOptions(Insecure: true, TlsUser: "alice"), matchesSchannelBuild).AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), ProfileHost, events, false, Http11, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Insecure: true, TlsUser: "alice"), matchesSchannelBuild).AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), ProfileHost, events, false, Http11, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("verbose lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, result.ExitCode);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
+        Diagnostics.Assert("error message", "failed setting SRP password", result.ErrorMessage);
         Assert.AreEqual("failed setting SRP password", result.ErrorMessage);
+        Diagnostics.Assert("username line written", true, events.Info.Contains("Using TLS-SRP username: alice"));
         Assert.Contains("Using TLS-SRP username: alice", events.Info);
+        Diagnostics.Assert("cipher list line written", false, events.Info.Contains("Setting cipher list SRP"));
         Assert.DoesNotContain("Setting cipher list SRP", events.Info);
     }
 
@@ -104,9 +169,21 @@ public sealed partial class HandBuiltTlsProviderTests
             _ => HandshakeFailureAlert,
         };
 
-        var result = await HandshakeWithServerAnsweringAsync(matchesSchannelBuild, answer, SrpOptions());
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, TlsUser: alice, TlsPassword: secret");
+        Diagnostics.Arrange("server alert", alert);
+        Diagnostics.Bytes("canned server answer", answer);
 
+        (ConnectResult Result, bool PlaintextDisposed) result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await HandshakeWithServerAnsweringAsync(matchesSchannelBuild, answer, SrpOptions());
+        }
+
+        ActConnectResult(result.Result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
+        Diagnostics.Assert("error message", expected, result.Result.ErrorMessage);
         Assert.AreEqual(expected, result.Result.ErrorMessage);
     }
 }

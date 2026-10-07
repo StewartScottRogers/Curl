@@ -25,8 +25,23 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithEchGrease_SendsAGreaseExtensionLastUnderTheTargetHost()
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: "grease", EchConfigList: EchConfigListBase64()), OpenSslBuild, EchHost, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", "grease");
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
+        Diagnostics.Arrange("target host", EchHost);
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Ech: "grease", EchConfigList: EchConfigListBase64()), OpenSslBuild, EchHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("last extension", ExtensionTypes(hello)[^1]);
+        Diagnostics.Act("server_name", ServerNameOf(hello));
+        Diagnostics.Assert("last extension", TlsExtensionType.EncryptedClientHello, ExtensionTypes(hello)[^1]);
+        Diagnostics.Assert("server_name", EchHost, ServerNameOf(hello));
         Assert.AreEqual(TlsExtensionType.EncryptedClientHello, ExtensionTypes(hello)[^1]);
         Assert.AreEqual(EchHost, ServerNameOf(hello));
         Assert.AreEqual(0, ExtensionData(hello, TlsExtensionType.EncryptedClientHello)[0]);
@@ -37,8 +52,21 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(null)]
     public async Task AuthenticateAsClientAsync_WithEchOff_SendsNoEchExtension(string? mode)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode), OpenSslBuild, EchHost, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", mode ?? "(none)");
+        Diagnostics.Arrange("target host", EchHost);
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode), OpenSslBuild, EchHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("extension types", string.Join(",", ExtensionTypes(hello)));
+        Diagnostics.Assert("ECH extension offered", false, ExtensionTypes(hello).Contains(TlsExtensionType.EncryptedClientHello));
+        Diagnostics.Assert("server_name", EchHost, ServerNameOf(hello));
         Assert.IsFalse(ExtensionTypes(hello).Contains(TlsExtensionType.EncryptedClientHello));
         Assert.AreEqual(EchHost, ServerNameOf(hello));
     }
@@ -48,11 +76,23 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(null)]
     public async Task AuthenticateAsClientAsync_WithOnlyAPublicName_FailsAsHardWithExit35(string? mode)
     {
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", mode ?? "(none)");
+        Diagnostics.Arrange("EchPublicName", "pn.test");
         var (plaintext, stream) = Unanswered();
 
-        var result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchPublicName: "pn.test"), OpenSslBuild)
-            .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchPublicName: "pn.test"), OpenSslBuild)
+                .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("connection disposed", stream.IsDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("error message", "SSL connect error", result.ErrorMessage);
+        Diagnostics.Assert("connection disposed", true, stream.IsDisposed);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("SSL connect error", result.ErrorMessage);
         Assert.IsTrue(stream.IsDisposed);
@@ -66,9 +106,23 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithAnEclList_SendsTheOuterHelloForItsConfig(string? mode)
     {
         var lookup = new FakeEchConfigListLookup(EchConfigListBytes("dns.test"));
+        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("Ech", mode ?? "(none)");
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
+        Diagnostics.Arrange("DNS lookup", "fake lookup answering a config list for dns.test");
 
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode, EchConfigList: EchConfigListBase64()), SchannelBuild, EchHost, Http11, lookup));
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode, EchConfigList: EchConfigListBase64()), SchannelBuild, EchHost, Http11, lookup);
+        }
 
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("server_name", ServerNameOf(hello));
+        Diagnostics.Act("DNS lookups asked", lookup.Asked.ToArray().Length);
+        Diagnostics.Assert("server_name", EchPublicName, ServerNameOf(hello));
+        Diagnostics.Assert("DNS lookups asked", 0, lookup.Asked.ToArray().Length);
         AssertOffersTheTestConfig(hello, EchPublicName);
         Assert.IsEmpty(lookup.Asked);
     }
@@ -76,8 +130,21 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithAPublicName_NamesItInTheOuterHello()
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: "true", EchPublicName: "pn.test", EchConfigList: EchConfigListBase64()), OpenSslBuild, EchHost, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", "true");
+        Diagnostics.Arrange("EchPublicName", "pn.test");
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Ech: "true", EchPublicName: "pn.test", EchConfigList: EchConfigListBase64()), OpenSslBuild, EchHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("server_name", ServerNameOf(hello));
+        Diagnostics.Assert("server_name", "pn.test", ServerNameOf(hello));
         AssertOffersTheTestConfig(hello, "pn.test");
     }
 
@@ -88,8 +155,22 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var lookup = new FakeEchConfigListLookup(EchConfigListBytes("dns.test"));
 
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode), OpenSslBuild, EchHost, Http11, lookup));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", mode);
+        Diagnostics.Arrange("DNS lookup", "fake lookup answering a config list for dns.test");
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Ech: mode), OpenSslBuild, EchHost, Http11, lookup);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("server_name", ServerNameOf(hello));
+        Diagnostics.Act("DNS lookups asked", lookup.Asked.ToArray().Length);
+        Diagnostics.Assert("server_name", "dns.test", ServerNameOf(hello));
+        Diagnostics.Assert("DNS lookups asked", 1, lookup.Asked.ToArray().Length);
         AssertOffersTheTestConfig(hello, "dns.test");
         CollectionAssert.AreEqual(new[] { (EchHost, 443) }, lookup.Asked.ToArray());
     }
@@ -108,8 +189,22 @@ public sealed partial class HandBuiltTlsProviderTests
     [DynamicData(nameof(UnusableEchSources))]
     public async Task AuthenticateAsClientAsync_WithEchTrueAndNoUsableList_SendsAPlainHello(string? eclList, FakeEchConfigListLookup? lookup)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Ech: "true", EchConfigList: eclList), OpenSslBuild, EchHost, Http11, lookup));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", "true");
+        Diagnostics.Arrange("EchConfigList", eclList ?? "(none)");
+        Diagnostics.Arrange("DNS lookup", lookup is null ? "(none)" : "fake lookup");
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Ech: "true", EchConfigList: eclList), OpenSslBuild, EchHost, Http11, lookup);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("extension types", string.Join(",", ExtensionTypes(hello)));
+        Diagnostics.Assert("ECH extension offered", false, ExtensionTypes(hello).Contains(TlsExtensionType.EncryptedClientHello));
+        Diagnostics.Assert("server_name", EchHost, ServerNameOf(hello));
         Assert.IsFalse(ExtensionTypes(hello).Contains(TlsExtensionType.EncryptedClientHello));
         Assert.AreEqual(EchHost, ServerNameOf(hello));
     }
@@ -118,11 +213,24 @@ public sealed partial class HandBuiltTlsProviderTests
     [DynamicData(nameof(UnusableEchSources))]
     public async Task AuthenticateAsClientAsync_WithEchHardAndNoUsableList_FailsWithExit35BeforeSendingAByte(string? eclList, FakeEchConfigListLookup? lookup)
     {
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", "hard");
+        Diagnostics.Arrange("EchConfigList", eclList ?? "(none)");
+        Diagnostics.Arrange("DNS lookup", lookup is null ? "(none)" : "fake lookup");
         var (plaintext, stream) = Unanswered();
 
-        var result = await Provider(new TlsClientOptions(Insecure: true, Ech: "hard", EchConfigList: eclList), OpenSslBuild, lookup)
-            .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Insecure: true, Ech: "hard", EchConfigList: eclList), OpenSslBuild, lookup)
+                .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("connection disposed", stream.IsDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("error message", "SSL connect error", result.ErrorMessage);
+        Diagnostics.Assert("connection disposed", true, stream.IsDisposed);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("SSL connect error", result.ErrorMessage);
         Assert.IsTrue(stream.IsDisposed);
@@ -133,11 +241,24 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow("true", OpenSslBuild)]
     public async Task AuthenticateAsClientAsync_WithAUsableListBelowTls13_FailsWithOpenSslsNoProtocolsAvailable(string mode, bool matchesSchannelBuild)
     {
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Ech", mode);
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
+        Diagnostics.Arrange("MaximumVersion", "TLS 1.2 ceiling");
         var (plaintext, stream) = Unanswered();
 
-        var result = await Provider(Tls12Only(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64())), matchesSchannelBuild)
-            .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(Tls12Only(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64())), matchesSchannelBuild)
+                .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("connection disposed", stream.IsDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("error message", "TLS connect error: error:0A0000BF:SSL routines::no protocols available", result.ErrorMessage);
+        Diagnostics.Assert("connection disposed", true, stream.IsDisposed);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("TLS connect error: error:0A0000BF:SSL routines::no protocols available", result.ErrorMessage);
         Assert.IsTrue(stream.IsDisposed);
@@ -146,8 +267,20 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithEchGreaseBelowTls13_SendsAPlainTls12Hello()
     {
-        var record = await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Ech: "grease", EchConfigList: EchConfigListBase64())), OpenSslBuild, EchHost, Http11);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", "grease");
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
+        Diagnostics.Arrange("MaximumVersion", "TLS 1.2 ceiling");
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Ech: "grease", EchConfigList: EchConfigListBase64())), OpenSslBuild, EchHost, Http11);
+        }
+
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("extension types", string.Join(",", ExtensionTypes(DecodeClientHello(record))));
+        Diagnostics.Assert("ECH extension offered", false, ExtensionTypes(DecodeClientHello(record)).Contains(TlsExtensionType.EncryptedClientHello));
         Assert.IsFalse(ExtensionTypes(DecodeClientHello(record)).Contains(TlsExtensionType.EncryptedClientHello));
     }
 
@@ -163,13 +296,27 @@ public sealed partial class HandBuiltTlsProviderTests
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12);
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", mode ?? "(none)");
+        Diagnostics.Arrange("server TLS protocol", SslProtocols.Tls12);
+        Diagnostics.Arrange("expected ECH result", expected ?? "(none)");
 
-        var result = await Provider(Tls12Only(new TlsClientOptions(Insecure: true, Ech: mode)), OpenSslBuild)
-            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(Tls12Only(new TlsClientOptions(Insecure: true, Ech: mode)), OpenSslBuild)
+                .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("handshake event count", events.Handshakes.Count());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         await using var connection = result.Connection!;
-        Assert.AreEqual(expected, Assert.ContainsSingle(events.Handshakes).EchResult);
+        var echResult = Assert.ContainsSingle(events.Handshakes).EchResult;
+        Diagnostics.Act("ECH result", echResult ?? "(none)");
+        Diagnostics.Assert("ECH result", expected, echResult);
+        Assert.AreEqual(expected, echResult);
         await connection.DisposeAsync();
         await IgnoreFailureAsync(serverTask);
     }
@@ -215,10 +362,22 @@ public sealed partial class HandBuiltTlsProviderTests
         var events = new RecordingTransferEvents();
         var (client, server) = InMemoryDuplexStream.CreatePair();
         await server.DisposeAsync();
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", options.Ech ?? "(none)");
+        Diagnostics.Arrange("EchPublicName", options.EchPublicName ?? "(none)");
+        Diagnostics.Arrange("EchConfigList", options.EchConfigList ?? "(none)");
+        Diagnostics.Arrange("DNS lookup", lookup is null ? "(none)" : "fake lookup");
+        Diagnostics.Arrange("expected ECH lines", string.Join(" | ", expected));
 
-        _ = await Provider(options with { Insecure = true }, OpenSslBuild, lookup)
-            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), EchHost, events, false, Http11, CancellationToken.None);
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            _ = await Provider(options with { Insecure = true }, OpenSslBuild, lookup)
+                .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), EchHost, events, false, Http11, CancellationToken.None);
+        }
 
+        var echLines = events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal)).ToArray();
+        Diagnostics.Act("ECH lines", string.Join(" | ", echLines));
+        Diagnostics.Assert("ECH lines", string.Join(" | ", expected), string.Join(" | ", echLines));
         CollectionAssert.AreEqual(expected, events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal)).ToArray());
     }
 
@@ -227,10 +386,22 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         var file = WriteFile("ech-client.p12", s_clientCertificate.Export(X509ContentType.Pkcs12));
         var (plaintext, stream) = Unanswered();
+        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("Ech", "hard");
+        Diagnostics.Arrange("EchConfigList", "(none)");
+        ArrangeCertificate("client certificate", s_clientCertificate);
 
-        var result = await Provider(new TlsClientOptions(Insecure: true, Ech: "hard", ClientCertificate: file), SchannelBuild)
-            .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Insecure: true, Ech: "hard", ClientCertificate: file), SchannelBuild)
+                .AuthenticateAsClientAsync(plaintext, EchHost, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("connection disposed", stream.IsDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("connection disposed", true, stream.IsDisposed);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.IsTrue(stream.IsDisposed);
     }
@@ -254,10 +425,25 @@ public sealed partial class HandBuiltTlsProviderTests
         });
 
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("Ech", mode);
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
+        Diagnostics.Arrange("server TLS protocol", SslProtocols.Tls13);
+        ArrangeCertificate("server certificate", s_serverCertificate);
 
-        var result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64()), SchannelBuild)
-            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, false, Http11, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64()), SchannelBuild)
+                .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, false, Http11, CancellationToken.None);
+        }
 
+        var echLines = events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal)).ToArray();
+        ActConnectResult(result);
+        Diagnostics.Act("ECH lines", string.Join(" | ", echLines));
+        Diagnostics.Assert("exit code", CurlExitCode.EchRequired, result.ExitCode);
+        Diagnostics.Assert("error message", "ECH required: error:0A0001A8:SSL routines::ech required", result.ErrorMessage);
+        Diagnostics.Assert("ECH lines", "ECH: ECHConfig from command line | ECH: no retry_configs (rv = 1)", string.Join(" | ", echLines));
         Assert.AreEqual(CurlExitCode.EchRequired, result.ExitCode);
         Assert.AreEqual("ECH required: error:0A0001A8:SSL routines::ech required", result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -275,11 +461,24 @@ public sealed partial class HandBuiltTlsProviderTests
         var retryConfigs = EchConfigListBytes("other.test");
         var events = new RecordingTransferEvents();
 
-        var (result, _) = await HandshakeWithTestServerAsync(
-            Provider(new TlsClientOptions(Insecure: true, Ech: "hard", EchConfigList: EchConfigListBase64()), OpenSslBuild),
-            new Tls13TestServer(pki.LeafCredential) { EchRetryConfigs = retryConfigs },
-            events);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", "hard");
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
+        Diagnostics.Arrange("server TLS protocol", "TLS 1.3 test server");
+        Diagnostics.Bytes("server retry_configs", retryConfigs);
 
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithTestServerAsync(
+                Provider(new TlsClientOptions(Insecure: true, Ech: "hard", EchConfigList: EchConfigListBase64()), OpenSslBuild),
+                new Tls13TestServer(pki.LeafCredential) { EchRetryConfigs = retryConfigs },
+                events);
+        }
+
+        ActConnectResult(result);
+        Diagnostics.Act("ECH lines", string.Join(" | ", events.Info.Where(line => line.StartsWith("ECH:", StringComparison.Ordinal))));
+        Diagnostics.Assert("exit code", CurlExitCode.EchRequired, result.ExitCode);
         Assert.AreEqual(CurlExitCode.EchRequired, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -300,13 +499,26 @@ public sealed partial class HandBuiltTlsProviderTests
         var retryConfigs = EchConfigListBytes("other.test");
         var events = new RecordingTransferEvents();
 
-        var (result, _) = await HandshakeWithTestServerAsync(
-            Provider(new TlsClientOptions(Insecure: true, Ech: "grease"), OpenSslBuild),
-            new Tls13TestServer(pki.LeafCredential) { EchRetryConfigs = retryConfigs },
-            events);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", "grease");
+        Diagnostics.Arrange("server TLS protocol", "TLS 1.3 test server");
+        Diagnostics.Bytes("server retry_configs", retryConfigs);
 
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithTestServerAsync(
+                Provider(new TlsClientOptions(Insecure: true, Ech: "grease"), OpenSslBuild),
+                new Tls13TestServer(pki.LeafCredential) { EchRetryConfigs = retryConfigs },
+                events);
+        }
+
+        ActConnectResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         var handshake = events.Handshakes.Single();
+        Diagnostics.Act("ECH result", handshake.EchResult ?? "(none)");
+        Diagnostics.Assert("ECH result", "status is sent GREASE, got retry-configs, inner is NULL, outer is NULL", handshake.EchResult);
         Assert.AreEqual("status is sent GREASE, got retry-configs, inner is NULL, outer is NULL", handshake.EchResult);
         CollectionAssert.AreEqual(
             new[] { "ECH: retry_configs " + Convert.ToBase64String(retryConfigs), "ECH: retry_configs for NULL from NULL, 0 3" },

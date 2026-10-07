@@ -44,8 +44,23 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(SchannelBuild, "P-384:X25519", new ushort[] { 0x0018, 0x001d }, new ushort[] { 0x0018 })]
     public async Task AuthenticateAsClientAsync_WithCurves_OffersTheMeasuredGroupsAndKeyShares(bool matchesSchannelBuild, string curves, ushort[] groups, ushort[] keyShares)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Curves: curves), matchesSchannelBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", curves);
+        Diagnostics.Arrange("expected groups", string.Join(",", groups));
+        Diagnostics.Arrange("expected key shares", string.Join(",", keyShares));
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Curves: curves), matchesSchannelBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("groups", string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
+        Diagnostics.Act("key shares", string.Join(",", KeySharesOf(hello).Select(share => share.Group)));
+        Diagnostics.Assert("groups", string.Join(",", groups), string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
+        Diagnostics.Assert("key shares", string.Join(",", keyShares), string.Join(",", KeySharesOf(hello).Select(share => share.Group)));
         CollectionAssert.AreEqual(groups, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
         CollectionAssert.AreEqual(keyShares, KeySharesOf(hello).Select(share => share.Group).ToArray());
         var profile = ProfileOf(matchesSchannelBuild);
@@ -68,9 +83,22 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow("brainpoolP256r1:X25519", new ushort[] { 0xff01, 0x0000, 0x000b, 0x000a, 0x0010, 0x0016, 0x0017, 0x0031, 0x000d, 0x002b, 0x002d, 0x0033, 0x001b, 0x0015 }, new ushort[] { 0x001a, 0x001d })]
     public async Task AuthenticateAsClientAsync_WithCurvesInTheOpenSslBuild_SendsTheMeasuredExtensionsAndGroups(string curves, ushort[] extensionTypes, ushort[] groups)
     {
-        var record = await CaptureClientHelloAsync(new TlsClientOptions(Curves: curves), OpenSslBuild, ProfileHost, Http11);
-        var hello = DecodeClientHello(record);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Curves", curves);
+        Diagnostics.Arrange("expected extension types", string.Join(",", extensionTypes));
+        Diagnostics.Arrange("expected groups", string.Join(",", groups));
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Curves: curves), OpenSslBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("extension types", string.Join(",", ExtensionTypes(hello).Select(type => (ushort)type)));
+        Diagnostics.Assert("extension types", string.Join(",", extensionTypes), string.Join(",", ExtensionTypes(hello).Select(type => (ushort)type)));
+        Diagnostics.Assert("groups", string.Join(",", groups), string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
         CollectionAssert.AreEqual(extensionTypes, ExtensionTypes(hello).Select(type => (ushort)type).ToArray());
         CollectionAssert.AreEqual(groups, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
         if (extensionTypes[^1] == (ushort)TlsExtensionType.Padding)
@@ -94,9 +122,22 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(SchannelBuild, "ECDSA+SHA256", new ushort[] { 0x0403 })]
     public async Task AuthenticateAsClientAsync_WithSigalgs_OffersTheMeasuredSchemesAndTheProfilesGroups(bool matchesSchannelBuild, string signatureAlgorithms, ushort[] schemes)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(SignatureAlgorithms: signatureAlgorithms), matchesSchannelBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("SignatureAlgorithms", signatureAlgorithms);
+        Diagnostics.Arrange("expected schemes", string.Join(",", schemes));
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(SignatureAlgorithms: signatureAlgorithms), matchesSchannelBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
         var profile = ProfileOf(matchesSchannelBuild);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("schemes", string.Join(",", SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray()));
+        Diagnostics.Assert("schemes", string.Join(",", schemes), string.Join(",", SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray()));
+        Diagnostics.Assert("groups", string.Join(",", profile.SupportedGroups.ToArray()), string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
         CollectionAssert.AreEqual(schemes, SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray());
         CollectionAssert.AreEqual(profile.SupportedGroups.ToArray(), SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
         CollectionAssert.AreEqual(profile.KeyShareGroups.ToArray(), KeySharesOf(hello).Select(share => share.Group).ToArray());
@@ -109,9 +150,23 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCurvesAndSigalgsUnderATls12Ceiling_OffersThemInTheTls12Hello(bool matchesSchannelBuild)
     {
         var options = Tls12Only(new TlsClientOptions(Curves: "X25519", SignatureAlgorithms: "ECDSA+SHA256"));
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", "X25519");
+        Diagnostics.Arrange("SignatureAlgorithms", "ECDSA+SHA256");
+        Diagnostics.Arrange("MaximumVersion", "TLS 1.2 ceiling");
 
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(options, matchesSchannelBuild, ProfileHost, Http11));
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(options, matchesSchannelBuild, ProfileHost, Http11);
+        }
 
+        var hello = DecodeClientHello(record);
+        var keyShareOffered = hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("groups", string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
+        Diagnostics.Act("schemes", string.Join(",", SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray()));
+        Diagnostics.Assert("key_share offered", false, keyShareOffered);
         CollectionAssert.AreEqual(new ushort[] { 0x001d }, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
         CollectionAssert.AreEqual(new ushort[] { 0x0403 }, SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray());
         Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare));
@@ -125,8 +180,23 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(LongHostName, new ushort[] { 0xff01, 0x0000, 0x000b, 0x000a, 0x0010, 0x0016, 0x0017, 0x000d, 0x0015 })]
     public async Task AuthenticateAsClientAsync_WithCurvesUnderATls12CeilingInTheOpenSslBuild_SendsTheMeasuredExtensions(string host, ushort[] extensionTypes)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: "X25519")), OpenSslBuild, host, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Curves", "X25519");
+        Diagnostics.Arrange("MaximumVersion", "TLS 1.2 ceiling");
+        Diagnostics.Arrange("host length", host.Length);
+        Diagnostics.Arrange("expected extension types", string.Join(",", extensionTypes));
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: "X25519")), OpenSslBuild, host, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("extension types", string.Join(",", ExtensionTypes(hello).Select(type => (ushort)type)));
+        Diagnostics.Assert("extension types", string.Join(",", extensionTypes), string.Join(",", ExtensionTypes(hello).Select(type => (ushort)type)));
+        Diagnostics.Assert("padded to 512", extensionTypes[^1] == (ushort)TlsExtensionType.Padding, hello.Encode().Length == 512);
         CollectionAssert.AreEqual(extensionTypes, ExtensionTypes(hello).Select(type => (ushort)type).ToArray());
         Assert.AreEqual(extensionTypes[^1] == (ushort)TlsExtensionType.Padding, hello.Encode().Length == 512);
     }
@@ -135,8 +205,20 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCurvesAndALongHostInTheOpenSslBuild_SendsOnePadding()
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Curves: "X25519"), OpenSslBuild, LongHostName, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Curves", "X25519");
+        Diagnostics.Arrange("host length", LongHostName.Length);
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Curves: "X25519"), OpenSslBuild, LongHostName, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("padding extension count", hello.Extensions.Count(extension => extension.Type == TlsExtensionType.Padding));
+        Diagnostics.Assert("padding extension count", 1, hello.Extensions.Count(extension => extension.Type == TlsExtensionType.Padding));
         Assert.AreEqual(1, hello.Extensions.Count(extension => extension.Type == TlsExtensionType.Padding));
     }
 
@@ -168,17 +250,33 @@ public sealed partial class HandBuiltTlsProviderTests
         CurlExitCode exitCode,
         string expected)
     {
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", curves ?? "(none)");
+        Diagnostics.Arrange("SignatureAlgorithms", signatureAlgorithms ?? "(none)");
+        Diagnostics.Arrange("expected exit code", exitCode);
+        Diagnostics.Arrange("expected error message", expected);
         var (client, server) = InMemoryDuplexStream.CreatePair();
 
-        var result = await Provider(new TlsClientOptions(Curves: curves, SignatureAlgorithms: signatureAlgorithms), matchesSchannelBuild)
-            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Curves: curves, SignatureAlgorithms: signatureAlgorithms), matchesSchannelBuild)
+                .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
 
+        var sentToServer = await ReadUntilClosedAsync(server);
+        ActConnectResult(result);
+        Diagnostics.Act("client disposed", client.IsDisposed);
+        Diagnostics.Bytes("bytes the server received", sentToServer);
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
+        Diagnostics.Assert("error message", expected, result.ErrorMessage);
+        Diagnostics.Assert("client disposed", true, client.IsDisposed);
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual(expected, result.ErrorMessage);
         Assert.IsTrue(client.IsDisposed);
         // A refused list (exit 59) fails before connecting; nothing left to offer (exit 35) is
         // announced with OpenSSL's internal_error alert in both builds (ADR-0303).
-        CollectionAssert.AreEqual(exitCode == CurlExitCode.SslCipher ? Array.Empty<byte>() : InternalErrorAlert, await ReadUntilClosedAsync(server));
+        CollectionAssert.AreEqual(exitCode == CurlExitCode.SslCipher ? Array.Empty<byte>() : InternalErrorAlert, sentToServer);
     }
 
     // Under a TLS 1.2 ceiling, a list leaving no group sends the ClientHello without
@@ -190,9 +288,23 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(OpenSslBuild, "X25519MLKEM768")]
     public async Task AuthenticateAsClientAsync_WithCurvesLeavingNoGroupUnderATls12Ceiling_SendsTheHelloWithoutGroups(bool matchesSchannelBuild, string curves)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: curves)), matchesSchannelBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", curves);
+        Diagnostics.Arrange("MaximumVersion", "TLS 1.2 ceiling");
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: curves)), matchesSchannelBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
         var types = ExtensionTypes(hello);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("extension types", string.Join(",", types));
+        Diagnostics.Assert("supported_groups offered", false, types.Contains(TlsExtensionType.SupportedGroups));
+        Diagnostics.Assert("ec_point_formats offered", false, types.Contains(TlsExtensionType.EcPointFormats));
+        Diagnostics.Assert("signature_algorithms offered", true, types.Contains(TlsExtensionType.SignatureAlgorithms));
         CollectionAssert.DoesNotContain(types, TlsExtensionType.SupportedGroups);
         CollectionAssert.DoesNotContain(types, TlsExtensionType.EcPointFormats);
         CollectionAssert.Contains(types, TlsExtensionType.SignatureAlgorithms);
@@ -211,15 +323,30 @@ public sealed partial class HandBuiltTlsProviderTests
         string? curves,
         string signatureAlgorithms)
     {
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", curves ?? "(none)");
+        Diagnostics.Arrange("SignatureAlgorithms", signatureAlgorithms);
+        Diagnostics.Arrange("MaximumVersion", "TLS 1.2 ceiling");
         var (client, server) = InMemoryDuplexStream.CreatePair();
 
-        var result = await Provider(Tls12Only(new TlsClientOptions(Curves: curves, SignatureAlgorithms: signatureAlgorithms)), matchesSchannelBuild)
-            .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(Tls12Only(new TlsClientOptions(Curves: curves, SignatureAlgorithms: signatureAlgorithms)), matchesSchannelBuild)
+                .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
 
+        var sentToServer = await ReadUntilClosedAsync(server);
+        ActConnectResult(result);
+        Diagnostics.Act("client disposed", client.IsDisposed);
+        Diagnostics.Bytes("bytes the server received", sentToServer);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("error message", "TLS connect error: error:0A0000B5:SSL routines::no ciphers available", result.ErrorMessage);
+        Diagnostics.Assert("client disposed", true, client.IsDisposed);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("TLS connect error: error:0A0000B5:SSL routines::no ciphers available", result.ErrorMessage);
         Assert.IsTrue(client.IsDisposed);
-        CollectionAssert.AreEqual(InternalErrorAlert, await ReadUntilClosedAsync(server));
+        CollectionAssert.AreEqual(InternalErrorAlert, sentToServer);
     }
 
     // A peer already gone when the alert is written leaves the failure as it was.
@@ -227,10 +354,22 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithNothingToOfferAndAWriteThatFails_StillFailsWithTheMeasuredLine()
     {
         var plaintext = new WriteFailingConnection(new IOException("Unable to write data to the transport connection."));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Curves", "?bogus");
+        Diagnostics.Arrange("write failure", "IOException on every write");
 
-        var result = await Provider(new TlsClientOptions(Curves: "?bogus"), OpenSslBuild)
-            .AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Curves: "?bogus"), OpenSslBuild)
+                .AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("connection disposed", plaintext.IsDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("error message", "TLS connect error: error:0A000127:SSL routines::no suitable groups", result.ErrorMessage);
+        Diagnostics.Assert("connection disposed", true, plaintext.IsDisposed);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
         Assert.AreEqual("TLS connect error: error:0A000127:SSL routines::no suitable groups", result.ErrorMessage);
         Assert.IsTrue(plaintext.IsDisposed);
@@ -242,10 +381,21 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithNothingToOfferAndTheAlertWriteCancelled_DisposesAndThrows()
     {
         var plaintext = new WriteFailingConnection(new OperationCanceledException());
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Curves", "?bogus");
+        Diagnostics.Arrange("write failure", "OperationCanceledException on every write");
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () =>
-            await Provider(new TlsClientOptions(Curves: "?bogus"), OpenSslBuild).AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None));
+        OperationCanceledException thrown;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () =>
+                await Provider(new TlsClientOptions(Curves: "?bogus"), OpenSslBuild).AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None));
+        }
 
+        Diagnostics.Act("exception type", thrown.GetType().Name);
+        Diagnostics.Act("connection disposed", plaintext.IsDisposed);
+        Diagnostics.Assert("exception type", nameof(OperationCanceledException), thrown.GetType().Name);
+        Diagnostics.Assert("connection disposed", true, plaintext.IsDisposed);
         Assert.IsTrue(plaintext.IsDisposed);
     }
 
@@ -284,8 +434,19 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithATls12OnlyAndATls13GroupStarred_SharesTheTls13Group()
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(new TlsClientOptions(Curves: "*brainpoolP256r1:*P-384"), OpenSslBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Curves", "*brainpoolP256r1:*P-384");
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Curves: "*brainpoolP256r1:*P-384"), OpenSslBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("key shares", string.Join(",", KeySharesOf(hello).Select(share => share.Group)));
+        Diagnostics.Assert("key shares", "24", string.Join(",", KeySharesOf(hello).Select(share => share.Group)));
         CollectionAssert.AreEqual(new ushort[] { 0x0018 }, KeySharesOf(hello).Select(share => share.Group).ToArray());
     }
 
@@ -297,8 +458,22 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow("*brainpoolP256r1", new ushort[] { 0x001a })]
     public async Task AuthenticateAsClientAsync_WithOnlyTls12OnlyGroupsStarredUnderATls12Ceiling_OffersTheGroups(string curves, ushort[] groups)
     {
-        var hello = DecodeClientHello(await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: curves)), OpenSslBuild, ProfileHost, Http11));
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Curves", curves);
+        Diagnostics.Arrange("MaximumVersion", "TLS 1.2 ceiling");
+        Diagnostics.Arrange("expected groups", string.Join(",", groups));
 
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(Tls12Only(new TlsClientOptions(Curves: curves)), OpenSslBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Act("groups", string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
+        Diagnostics.Assert("groups", string.Join(",", groups), string.Join(",", SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray()));
+        Diagnostics.Assert("key_share offered", false, hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare));
         CollectionAssert.AreEqual(groups, SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray());
         Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare));
     }
@@ -319,9 +494,20 @@ public sealed partial class HandBuiltTlsProviderTests
         string expected)
     {
         var options = new TlsClientOptions(Insecure: true, Curves: curves, SignatureAlgorithms: signatureAlgorithms);
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", curves ?? "(none)");
+        Diagnostics.Arrange("SignatureAlgorithms", signatureAlgorithms ?? "(none)");
+        Diagnostics.Bytes("server answer (handshake_failure alert)", HandshakeFailureAlert);
 
-        var result = await HandshakeWithServerAnsweringAsync(matchesSchannelBuild, HandshakeFailureAlert, options);
+        (ConnectResult Result, bool PlaintextDisposed) result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await HandshakeWithServerAnsweringAsync(matchesSchannelBuild, HandshakeFailureAlert, options);
+        }
 
+        ActConnectResult(result.Result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
+        Diagnostics.Assert("error message", expected, result.Result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(expected, result.Result.ErrorMessage);
     }
@@ -331,8 +517,19 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCurvesInTheSchannelBuildWhenTheServerCloses_ReportsSchannelsLine()
     {
-        var result = await HandshakeWithServerAnsweringAsync(SchannelBuild, answer: null, new TlsClientOptions(Insecure: true, Curves: "X25519"));
+        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("Curves", "X25519");
+        Diagnostics.Arrange("server answer", "closes without answering");
 
+        (ConnectResult Result, bool PlaintextDisposed) result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await HandshakeWithServerAnsweringAsync(SchannelBuild, answer: null, new TlsClientOptions(Insecure: true, Curves: "X25519"));
+        }
+
+        ActConnectResult(result.Result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
+        Diagnostics.Assert("error message", "schannel: failed to receive handshake, SSL/TLS connection failed", result.Result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual("schannel: failed to receive handshake, SSL/TLS connection failed", result.Result.ErrorMessage);
     }
@@ -345,13 +542,26 @@ public sealed partial class HandBuiltTlsProviderTests
         var (client, server) = InMemoryDuplexStream.CreatePair();
         var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12);
         var options = Tls12Only(new TlsClientOptions(Insecure: true, Curves: "P-256:X25519", SignatureAlgorithms: "RSA+SHA256:rsa_pss_rsae_sha256"));
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("Curves", "P-256:X25519");
+        Diagnostics.Arrange("SignatureAlgorithms", "RSA+SHA256:rsa_pss_rsae_sha256");
+        Diagnostics.Arrange("server TLS protocol", SslProtocols.Tls12);
 
-        var result = await Provider(options, matchesSchannelBuild).AuthenticateAsClientAsync(
-            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(options, matchesSchannelBuild).AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         await using var connection = result.Connection!;
-        Assert.AreEqual("ping", Encoding.ASCII.GetString(await EchoAsync(connection, "ping")));
+        var echoed = Encoding.ASCII.GetString(await EchoAsync(connection, "ping"));
+        Diagnostics.Act("echoed", echoed);
+        Diagnostics.Assert("echoed", "ping", echoed);
+        Assert.AreEqual("ping", echoed);
         await connection.DisposeAsync();
         await IgnoreFailureAsync(serverTask);
     }
