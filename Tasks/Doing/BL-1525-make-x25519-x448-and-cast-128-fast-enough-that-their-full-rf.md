@@ -120,3 +120,4 @@ completed:
 - 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: X25519 4.9x, X448 not yet 5x (Field448 needs unrolled limbs), CAST B.2 3.1x (masked scan near its limit); quality measure not run. See Notes.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: bench vs HEAD X25519 3.5x, X448 2.7x (needs Karatsuba or more JIT inlining work), CAST 7.5x; Integration TRX timings and Measure-CodeQuality not yet run. See Notes.
+- 2026-10-07: Backlog -> Doing.
