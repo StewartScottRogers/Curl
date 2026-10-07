@@ -43,3 +43,4 @@ Every test in `Curl.Kerberos.UnitTests` writes, through BL-1457's shared `TestDi
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Lane 4 could not integrate: build failed after rebasing onto the other lanes' work. The work is on branch factory/BL-1467-lane-4-20261006-200306; start with git cherry-pick --no-commit factory/BL-1467-lane-4-20261006-200306 and fix it.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Lane 5 could not integrate: build failed after rebasing onto the other lanes' work. The work is on branch factory/BL-1467-lane-5-20261006-200306; start with git cherry-pick --no-commit factory/BL-1467-lane-5-20261006-200306 and fix it.
