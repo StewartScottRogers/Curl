@@ -1,5 +1,5 @@
 ---
-id: BL-1526
+id: BL-1527
 title: Write curl's stop-sending and abort-upload -v lines for an error status that arrives while the body is sent
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: FR-090
 created: 2026-10-07
 completed:
 ---
-# BL-1526 — Write curl's stop-sending and abort-upload -v lines for an error status that arrives while the body is sent
+# BL-1527 — Write curl's stop-sending and abort-upload -v lines for an error status that arrives while the body is sent
 
 ## Goal
 

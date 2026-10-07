@@ -52,7 +52,7 @@ After a 417 that arrives while the body is being sent, Curl's `-v` lines between
   ```
   The byte count is however much curl had handed the socket (timing-dependent); Curl writes `HttpRequestBodyWriter.BytesSent`.
 - Changes in `HttpProtocolHandler`: `RetryOfAsync` writes `Need to rewind upload for next request` and the new `HttpConnectionInfoLines.AbortUpload(n)` after `Got HTTP failure 417 while sending data`; `ReportIgnoredBody` writes nothing once the upload was cut short (the connection is shut down, so curl never ignores a body on it); `ReportConnectionEnd` writes `Issue another request to this URL` after any retry on a new connection, not only after a connection that died - no other test pinned its absence. The DNS-cache, Trying and Established lines are the connector's (Curl.Networking), which the test's fake connector does not write; the test pins the rest, `using HTTP/1.x` included.
-- The same run's second connection, answered 417 with no `Expect` on the resend, showed curl's `HTTP error before end of send, stop sending` / `abort upload after having sent N bytes` for a plain error while sending, which Curl does not write: filed as BL-1526.
+- The same run's second connection, answered 417 with no `Expect` on the resend, showed curl's `HTTP error before end of send, stop sending` / `abort upload after having sent N bytes` for a plain error while sending, which Curl does not write: filed as BL-1527.
 - `dotnet test --filter "TestCategory!=Integration"`: every project green (Http 1839 passed). Measure-CodeQuality -Library Curl.Protocol.Http.UnitLibrary: 0 failing members.
 
 ## Log
