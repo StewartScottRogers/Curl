@@ -81,6 +81,37 @@ completed:
     bitsliced S-box - or an ADR, under Stewart's delegation, that sets CAST's target at
     what a constant-time scan can reach. (4) Measure-CodeQuality.ps1 not yet run on the
     changed library. (5) The task's timings must be re-taken on an unloaded machine.
+- 2026-10-07, lane 1 (unfinished; code again left for the shift's stash, on top of lane 8's):
+  - Bench now compares HEAD's sources and the working copy in one run, back to back
+    (two throwaway console projects in %TEMP% compiling the library's `*.cs` directly, so
+    internals are reachable; best of 5 rounds, Release). The machine is loaded by the
+    other lanes, so only the HEAD/WORK ratio in one run means anything; absolute
+    microseconds drift by 2x between runs.
+  - Found the real cost: `DOTNET_JitDisasm` showed Tier1 `Field448.Multiply` (unrolled
+    or as lane 8's loop over a `Span<Int128>`) calling `Int128.op_Addition` 36 times and
+    `Math.BigMul(long, long, out long)` 23 times - the method exceeds the JIT's inline
+    budget, so the 128-bit arithmetic becomes real calls. Signed `Math.BigMul` is not an
+    intrinsic either.
+  - Done: `Field448.Multiply` / `Square` now fold and carry 15 column sums each computed
+    by a small `Column` / `SquareColumn` method (a loop with public bounds; two inline
+    sites, so the JIT inlines them); `FoldAndCarry` and `CarryColumns` are locals, no
+    `Span<Int128>` to clear. `Product` in both fields uses the unsigned `Math.BigMul`
+    intrinsic plus the two-term signed correction. New `MultiplySmall(result, value,
+    small)` in both fields replaces SetSmall + Multiply for a24. X25519 and X448's
+    `LadderStep` no longer stackalloc and zero 9 elements per bit: `ScalarMultiply`
+    allocates them once beside the ladder (`LadderScratchElements`) and clears them with
+    it. All 1335 fast tests of Curl.Cryptography.UnitTests pass.
+  - Bench, HEAD vs work, same run: X25519 453-480 vs 132-137 us (3.5x), X448 1698-1739 vs
+    613-652 us (2.7x), CAST-128 rekey + 2 blocks 48-52 vs 6.5 us (7.5x - so lane 8's
+    3.1x for B.2 in the TRX was machine load or the test's own work; check the test).
+  - Left: (1) X448 to 5x: next, give `Field25519.Multiply`/`Square` and the Column
+    methods the same JIT-disasm check (`DOTNET_JitDisasm=Multiply`, count `call`s in the
+    Tier1 listing), and try Karatsuba on 2^224 (48 products) for X448. (2) Integration
+    TRX timings and (3) Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary
+    still not run - start them early: the measure takes 30-45 min under load. (4) New
+    members `MultiplySmall` need nothing beyond the ladder's tests for coverage, but
+    `SquareColumn`'s even/odd branch must show both arms covered (it does by construction:
+    columns 0-14).
 
 ## Log
 
@@ -88,3 +119,4 @@ completed:
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: X25519 4.9x, X448 not yet 5x (Field448 needs unrolled limbs), CAST B.2 3.1x (masked scan near its limit); quality measure not run. See Notes.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Partly done, code in the shift's stash: bench vs HEAD X25519 3.5x, X448 2.7x (needs Karatsuba or more JIT inlining work), CAST 7.5x; Integration TRX timings and Measure-CodeQuality not yet run. See Notes.
