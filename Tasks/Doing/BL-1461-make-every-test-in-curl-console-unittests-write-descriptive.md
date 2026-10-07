@@ -40,3 +40,4 @@ Every test in `Curl.Console.UnitTests` writes, through BL-1457's shared `TestDia
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
