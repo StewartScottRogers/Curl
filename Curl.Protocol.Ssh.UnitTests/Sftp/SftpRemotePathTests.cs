@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -9,6 +10,8 @@ namespace Curl.Protocol.Ssh.Sftp;
 [TestClass]
 public sealed class SftpRemotePathTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("/a%20b.txt", "2F6120622E747874", DisplayName = "escaped space")]
     [DataRow("/x%2fy", "2F782F79", DisplayName = "lower-case escape")]
@@ -20,7 +23,15 @@ public sealed class SftpRemotePathTests
     [DataRow("/%4g", "2F253467", DisplayName = "second not a hex digit")]
     public void Decode_UrlPath_TurnsEscapesIntoBytes(string urlPath, string expectedHex)
     {
-        CollectionAssert.AreEqual(Convert.FromHexString(expectedHex), SftpRemotePath.Decode(urlPath));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("URL path", urlPath);
+
+        byte[] decoded = SftpRemotePath.Decode(urlPath);
+        diagnostics.Bytes("decoded path", decoded);
+        diagnostics.Act("decoded path hex", Convert.ToHexString(decoded));
+
+        diagnostics.Diff("decoded path", Convert.FromHexString(expectedHex), decoded);
+        CollectionAssert.AreEqual(Convert.FromHexString(expectedHex), decoded);
     }
 
     [TestMethod]
@@ -33,7 +44,14 @@ public sealed class SftpRemotePathTests
     [DataRow("", false, DisplayName = "empty")]
     public void NamesDirectory_UrlPath_IsTrueWhenTheDecodedPathEndsWithASlash(string urlPath, bool expected)
     {
-        Assert.AreEqual(expected, SftpRemotePath.NamesDirectory(urlPath));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("URL path", urlPath);
+
+        bool namesDirectory = SftpRemotePath.NamesDirectory(urlPath);
+        diagnostics.Act("names a directory", namesDirectory);
+
+        diagnostics.Assert("names a directory", expected, namesDirectory);
+        Assert.AreEqual(expected, namesDirectory);
     }
 
     [TestMethod]
@@ -43,7 +61,14 @@ public sealed class SftpRemotePathTests
     [DataRow("~", false, DisplayName = "tilde without the slash")]
     public void NamesDirectory_TildePath_IsTrueOnlyForTheHomeDirectory(string urlPath, bool expected)
     {
-        Assert.AreEqual(expected, SftpRemotePath.NamesDirectory(urlPath));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("URL path", urlPath);
+
+        bool namesDirectory = SftpRemotePath.NamesDirectory(urlPath);
+        diagnostics.Act("names a directory", namesDirectory);
+
+        diagnostics.Assert("names a directory", expected, namesDirectory);
+        Assert.AreEqual(expected, namesDirectory);
     }
 
     [TestMethod]
@@ -58,8 +83,15 @@ public sealed class SftpRemotePathTests
     [DataRow("/x/~/f", "/home/fake", "/x/~/f", DisplayName = "tilde further in")]
     public void Resolve_Path_ReplacesALeadingHomeDirectoryAsCurlDoes(string path, string homeDirectory, string expected)
     {
-        byte[] resolved = SftpRemotePath.Resolve(Encoding.UTF8.GetBytes(path), Encoding.UTF8.GetBytes(homeDirectory));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("path", path);
+        diagnostics.Arrange("home directory", homeDirectory);
 
+        byte[] resolved = SftpRemotePath.Resolve(Encoding.UTF8.GetBytes(path), Encoding.UTF8.GetBytes(homeDirectory));
+        string actual = Encoding.UTF8.GetString(resolved);
+        diagnostics.Act("resolved path", actual);
+
+        diagnostics.Diff("resolved path", expected, actual);
         Assert.AreEqual(expected, Encoding.UTF8.GetString(resolved));
     }
 
@@ -68,8 +100,15 @@ public sealed class SftpRemotePathTests
     [DataRow("/~", "/home/fake/", DisplayName = "tilde alone")]
     public void ResolveUrlPath_UrlPath_DecodesThenResolves(string urlPath, string expected)
     {
-        byte[] resolved = SftpRemotePath.ResolveUrlPath(urlPath, Encoding.UTF8.GetBytes("/home/fake"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("URL path", urlPath);
+        diagnostics.Arrange("home directory", "/home/fake");
 
+        byte[] resolved = SftpRemotePath.ResolveUrlPath(urlPath, Encoding.UTF8.GetBytes("/home/fake"));
+        string actual = Encoding.UTF8.GetString(resolved);
+        diagnostics.Act("resolved path", actual);
+
+        diagnostics.Diff("resolved path", expected, actual);
         Assert.AreEqual(expected, Encoding.UTF8.GetString(resolved));
     }
 
@@ -78,9 +117,15 @@ public sealed class SftpRemotePathTests
     [DataRow("/%00", DisplayName = "zero byte alone")]
     public void ResolveUrlPath_ZeroByte_ThrowsExit3AsMeasured(string urlPath)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("URL path", urlPath);
+
         SshTransferException failure = Assert.ThrowsExactly<SshTransferException>(
             () => SftpRemotePath.ResolveUrlPath(urlPath, Encoding.UTF8.GetBytes("/home/fake")));
+        diagnostics.Act("failure", $"exit {failure.ExitCode}: {failure.Message} (verbose line {failure.IsVerboseLine})");
 
+        diagnostics.Assert("exit code", Curl.Protocol.Abstractions.CurlExitCode.UrlMalformat, failure.ExitCode);
+        diagnostics.Diff("message", "URL using bad/illegal format or missing URL", failure.Message);
         Assert.AreEqual(Curl.Protocol.Abstractions.CurlExitCode.UrlMalformat, failure.ExitCode);
         Assert.AreEqual("URL using bad/illegal format or missing URL", failure.Message);
         Assert.IsFalse(failure.IsVerboseLine);

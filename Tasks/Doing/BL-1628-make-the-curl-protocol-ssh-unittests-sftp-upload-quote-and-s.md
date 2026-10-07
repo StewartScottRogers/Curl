@@ -32,6 +32,13 @@ Every test in these files of `Curl.Protocol.Ssh.UnitTests` writes, through BL-14
 
 ## Notes
 
+- Added `Curl.Protocol.Ssh.UnitTests/Sftp/SftpDiagnostics.cs` (scripted server bytes, SFTP requests with decoded packet type and request id, transfer results, `SshTransferException`s). The other Sftp split tasks can reuse it.
+- Choice: where a class routes its tests through shared helpers (`UploadAsync`, `AssertRequests`, `AssertStartFailsAsync`, `RunAsync`, the `Outcome` record), the helpers write the ARRANGE/ACT/ASSERT lines, so each test still writes all three without the same lines copied into every method. The helpers became instance methods so they can reach `TestContext`. Tests that pass no assertion (session start accepted) write an `ASSERT session started` line and gain no new `Assert.` call, so their logic stays as it was.
+- The upload helper wraps the transfer in `PHASE upload`.
+- Filtered run: 219 tests before and after, every one prints `END` with arrange, act and assert above 0.
+- `Assert.` / `[TestMethod` / `[DataRow(` counts, before = after: SftpFileUploadTests 50/27/24, SftpQuoteCommandsTests 21/32/34, SftpQuoteCommandTests 14/5/39, SftpRemotePathTests 9/6/32, SftpSessionTests 7/11/6, SftpStatusCodeTests 2/1/23, SftpTransferQuoteTests 21/8/0.
+- No test printed `SLOW:`. The slowest was `UploadAsync_ThreeMegabytes_SendsEach64KiBBlockAsWritesOf30000BytesAsMeasured`, at 1889 ms, inside the 3000 ms budget.
+
 ## Log
 
 - 2026-10-07: Created.
