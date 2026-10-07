@@ -1,5 +1,6 @@
 using Curl.Core.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Core;
@@ -21,108 +22,162 @@ public sealed class RedirectFollowerMethodSwitchLineTests
 
     private readonly RecordingTransferEvents events = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task FollowAsync_FollowWithCustomPostOn303_ReportsSwitchToGet()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true, CustomMethod = "POST" }, FollowPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine, "Switch to GET because of 303 response" }, events.Infos);
+        var expected = new[] { IssueLine, "Switch to GET because of 303 response" };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_FollowWithPostBodyOn302_ReportsSwitchToGet()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(302, new HttpRequestOptions { FollowRedirects = true, Body = PostBody }, FollowPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine, "Switch to GET because of 302 response" }, events.Infos);
+        var expected = new[] { IssueLine, "Switch to GET because of 302 response" };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_FollowWithUploadOn303_ReportsSwitchToGet()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true }, FollowPolicy(), upload: true);
 
-        CollectionAssert.AreEqual(new[] { IssueLine, "Switch to GET because of 303 response" }, events.Infos);
+        var expected = new[] { IssueLine, "Switch to GET because of 303 response" };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_LocationWithCustomPostOn303_ReportsStickToPost()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true, CustomMethod = "POST" }, new RedirectPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine, "Stick to POST instead of GET" }, events.Infos);
+        var expected = new[] { IssueLine, "Stick to POST instead of GET" };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_LocationWithCustomPostAndBodyOn303_ReportsStickToPost()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true, CustomMethod = "POST", Body = PostBody }, new RedirectPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine, "Stick to POST instead of GET" }, events.Infos);
+        var expected = new[] { IssueLine, "Stick to POST instead of GET" };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_LocationWithPostBodyOn303_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true, Body = PostBody }, new RedirectPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_LocationWithCustomPutOn302_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(302, new HttpRequestOptions { FollowRedirects = true, CustomMethod = "PUT" }, new RedirectPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_PostUnderPost302On302_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(302, new HttpRequestOptions { FollowRedirects = true, Body = PostBody }, FollowPolicy() with { KeepPostOn302 = true });
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_PostUnderPost301On301_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(301, new HttpRequestOptions { FollowRedirects = true, Body = PostBody }, FollowPolicy() with { KeepPostOn301 = true });
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_PostUnderPost303On303_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true, CustomMethod = "POST", Body = PostBody }, FollowPolicy() with { KeepPostOn303 = true });
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_GetOn301_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(301, new HttpRequestOptions { FollowRedirects = true }, FollowPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_GetOn303_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(303, new HttpRequestOptions { FollowRedirects = true }, FollowPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     [TestMethod]
     public async Task FollowAsync_CustomPostOn307_ReportsNoSwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         await FollowAsync(307, new HttpRequestOptions { FollowRedirects = true, CustomMethod = "POST", Body = PostBody }, FollowPolicy());
 
-        CollectionAssert.AreEqual(new[] { IssueLine }, events.Infos);
+        var expected = new[] { IssueLine };
+        diagnostics.Assert("infos", string.Join(" | ", expected), string.Join(" | ", events.Infos));
+        CollectionAssert.AreEqual(expected, events.Infos);
     }
 
     private static string IssueLine => RedirectFollower.IssueAnotherRequestMessagePrefix + Target + "'";
@@ -131,19 +186,34 @@ public sealed class RedirectFollowerMethodSwitchLineTests
 
     private async Task FollowAsync(int status, HttpRequestOptions http, RedirectPolicy policy, bool upload = false)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(status, Target), Response(200));
-        TransferResult result = await new RedirectFollower(new ProtocolDispatcher([handler]))
-            .FollowAsync(
-                new TransferContext
-                {
-                    Url = CurlUrl.Parse(Start),
-                    Output = Stream.Null,
-                    Http = http,
-                    Upload = upload ? new MemoryStream([1, 2, 3]) : null,
-                    TimeProvider = TimeProvider.System,
-                    Events = events,
-                },
-                policy);
+        diagnostics.Arrange("start url", Start);
+        diagnostics.Arrange("script", status + " to " + Target + " | 200");
+        diagnostics.Arrange("custom method", http.CustomMethod ?? "(none)");
+        diagnostics.Arrange("has body", http.Body is not null);
+        diagnostics.Arrange("upload", upload);
+
+        TransferResult result;
+        using (diagnostics.Phase("follow"))
+        {
+            result = await new RedirectFollower(new ProtocolDispatcher([handler]))
+                .FollowAsync(
+                    new TransferContext
+                    {
+                        Url = CurlUrl.Parse(Start),
+                        Output = Stream.Null,
+                        Http = http,
+                        Upload = upload ? new MemoryStream([1, 2, 3]) : null,
+                        TimeProvider = TimeProvider.System,
+                        Events = events,
+                    },
+                    policy);
+        }
+
+        diagnostics.Act("exit code", result.ExitCode);
+        diagnostics.Act("infos", string.Join(" | ", events.Infos));
+        diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 

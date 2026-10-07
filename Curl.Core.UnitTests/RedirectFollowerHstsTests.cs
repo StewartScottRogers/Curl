@@ -1,5 +1,6 @@
 using Curl.Core.Fakes;
 using Curl.Core.Hsts;
+using Curl.Testing;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -25,13 +26,27 @@ public sealed class RedirectFollowerHstsTests
 
     private readonly RecordingTransferEvents events = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task FollowAsync_HttpTargetOfAHostTheHopTaught_IsSwitchedReportedAndCountedAsFollowed()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(301, HttpTarget, "max-age=60"), Response(200));
+        diagnostics.Arrange("start url", Start);
+        diagnostics.Arrange("script", "301 to " + HttpTarget + " with max-age=60 | 200");
 
-        TransferResult result = await FollowAsync(handler, Start, new RedirectPolicy());
+        TransferResult result;
+        using (diagnostics.Phase("follow"))
+        {
+            result = await FollowAsync(handler, Start, new RedirectPolicy());
+        }
 
+        diagnostics.Act("urls requested", string.Join(" | ", handler.Urls.Select(url => url.OriginalString)));
+        diagnostics.Act("effective url", result.Report!.EffectiveUrl);
+        diagnostics.Act("redirect count", result.Report.RedirectCount);
+        diagnostics.Act("infos", string.Join(" | ", events.Infos));
+        diagnostics.Assert("second url", "https://localhost:18443/x", handler.Urls[1].OriginalString);
         Assert.AreEqual("https://localhost:18443/x", handler.Urls[1].OriginalString);
         Assert.AreEqual("https://localhost:18443/x", result.Report!.EffectiveUrl);
         Assert.AreEqual(1, result.Report.RedirectCount);
@@ -43,10 +58,19 @@ public sealed class RedirectFollowerHstsTests
     [TestMethod]
     public async Task FollowAsync_HttpTargetOfAnUnknownHost_IsFollowedAsItIsWithoutASwitchLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(301, HttpTarget), Response(200));
+        diagnostics.Arrange("start url", Start);
+        diagnostics.Arrange("script", "301 to " + HttpTarget + " | 200");
 
-        await FollowAsync(handler, Start, new RedirectPolicy());
+        using (diagnostics.Phase("follow"))
+        {
+            await FollowAsync(handler, Start, new RedirectPolicy());
+        }
 
+        diagnostics.Act("urls requested", string.Join(" | ", handler.Urls.Select(url => url.OriginalString)));
+        diagnostics.Act("infos", string.Join(" | ", events.Infos));
+        diagnostics.Assert("second url", HttpTarget, handler.Urls[1].OriginalString);
         Assert.AreEqual(HttpTarget, handler.Urls[1].OriginalString);
         CollectionAssert.AreEqual(new[] { RedirectFollower.IssueAnotherRequestMessagePrefix + HttpTarget + "'" }, events.Infos);
     }
@@ -54,10 +78,21 @@ public sealed class RedirectFollowerHstsTests
     [TestMethod]
     public async Task FollowAsync_SwitchedTarget_IsCheckedAgainstProtoRedirAsHttps()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(301, HttpTarget, "max-age=60"), Response(200));
+        diagnostics.Arrange("start url", Start);
+        diagnostics.Arrange("policy", "allowed schemes: http");
 
-        TransferResult result = await FollowAsync(handler, Start, new RedirectPolicy { AllowedSchemes = new HashSet<string> { "http" } });
+        TransferResult result;
+        using (diagnostics.Phase("follow"))
+        {
+            result = await FollowAsync(handler, Start, new RedirectPolicy { AllowedSchemes = new HashSet<string> { "http" } });
+        }
 
+        diagnostics.Act("exit code", result.ExitCode);
+        diagnostics.Act("error message", result.ErrorMessage);
+        diagnostics.Act("urls requested", string.Join(" | ", handler.Urls.Select(url => url.OriginalString)));
+        diagnostics.Assert("exit code", CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.ExitCode);
         Assert.AreEqual("Protocol \"https\" is disabled (in redirect)", result.ErrorMessage);
         Assert.HasCount(1, handler.Urls);
@@ -66,10 +101,20 @@ public sealed class RedirectFollowerHstsTests
     [TestMethod]
     public async Task FollowAsync_UnparsableTarget_IsRefusedWithoutASwitch()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(301, "http://local host/", "max-age=60"));
+        diagnostics.Arrange("start url", Start);
+        diagnostics.Arrange("script", "301 to http://local host/ with max-age=60");
 
-        TransferResult result = await FollowAsync(handler, Start, new RedirectPolicy());
+        TransferResult result;
+        using (diagnostics.Phase("follow"))
+        {
+            result = await FollowAsync(handler, Start, new RedirectPolicy());
+        }
 
+        diagnostics.Act("exit code", result.ExitCode);
+        diagnostics.Act("infos", string.Join(" | ", events.Infos));
+        diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.IsEmpty(events.Infos);
     }
@@ -77,22 +122,40 @@ public sealed class RedirectFollowerHstsTests
     [TestMethod]
     public async Task FollowAsync_WithoutLocation_StillLearnsFromTheResponse()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(200, header: "max-age=60"));
+        diagnostics.Arrange("start url", Start);
+        diagnostics.Arrange("script", "200 with max-age=60");
 
-        await new RedirectFollower(new ProtocolDispatcher([handler]), hsts: hsts)
-            .FollowAsync(Context(Start, new HttpRequestOptions()), new RedirectPolicy());
+        using (diagnostics.Phase("follow"))
+        {
+            await new RedirectFollower(new ProtocolDispatcher([handler]), hsts: hsts)
+                .FollowAsync(Context(Start, new HttpRequestOptions()), new RedirectPolicy());
+        }
 
-        Assert.IsTrue(hsts.TrySwitchToHttps("http://localhost/", CurlUrl.Parse("http://localhost/"), out _));
+        bool switched = hsts.TrySwitchToHttps("http://localhost/", CurlUrl.Parse("http://localhost/"), out _);
+        diagnostics.Act("urls requested", string.Join(" | ", handler.Urls.Select(url => url.OriginalString)));
+        diagnostics.Act("switched to https", switched);
+        diagnostics.Assert("switched to https", true, switched);
+        Assert.IsTrue(switched);
     }
 
     [TestMethod]
     public async Task FollowAsync_WithoutACache_FollowsAsBefore()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(301, HttpTarget, "max-age=60"), Response(200));
+        diagnostics.Arrange("start url", Start);
+        diagnostics.Arrange("script", "301 to " + HttpTarget + " with max-age=60 | 200");
 
-        await new RedirectFollower(new ProtocolDispatcher([handler]))
-            .FollowAsync(Context(Start, new HttpRequestOptions { FollowRedirects = true }), new RedirectPolicy());
+        using (diagnostics.Phase("follow"))
+        {
+            await new RedirectFollower(new ProtocolDispatcher([handler]))
+                .FollowAsync(Context(Start, new HttpRequestOptions { FollowRedirects = true }), new RedirectPolicy());
+        }
 
+        diagnostics.Act("urls requested", string.Join(" | ", handler.Urls.Select(url => url.OriginalString)));
+        diagnostics.Assert("second url", HttpTarget, handler.Urls[1].OriginalString);
         Assert.AreEqual(HttpTarget, handler.Urls[1].OriginalString);
     }
 

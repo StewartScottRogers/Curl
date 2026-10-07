@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Core;
 
 /// <summary>
@@ -9,6 +11,8 @@ namespace Curl.Core;
 [TestClass]
 public sealed class NoProxyMatcherTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("example.com", "example.com")]
     [DataRow("example.com", "www.example.com")]
@@ -49,7 +53,15 @@ public sealed class NoProxyMatcherTests
     [DataRow("fe80::/64", "fe80::1")]
     public void Matches_MeasuredExemption_IsDirect(string noProxy, string hostName)
     {
-        Assert.IsTrue(NoProxyMatcher.Matches(hostName, noProxy));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("no_proxy list", noProxy);
+        diagnostics.Arrange("host", hostName);
+
+        bool matches = NoProxyMatcher.Matches(hostName, noProxy);
+
+        diagnostics.Act("matches", matches);
+        diagnostics.Assert("matches", true, matches);
+        Assert.IsTrue(matches);
     }
 
     [TestMethod]
@@ -94,7 +106,15 @@ public sealed class NoProxyMatcherTests
     [DataRow("::1", "127.0.0.1")]
     public void Matches_MeasuredNonExemption_UsesProxy(string noProxy, string hostName)
     {
-        Assert.IsFalse(NoProxyMatcher.Matches(hostName, noProxy));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("no_proxy list", noProxy);
+        diagnostics.Arrange("host", hostName);
+
+        bool matches = NoProxyMatcher.Matches(hostName, noProxy);
+
+        diagnostics.Act("matches", matches);
+        diagnostics.Assert("matches", false, matches);
+        Assert.IsFalse(matches);
     }
 
     [TestMethod]
@@ -105,32 +125,73 @@ public sealed class NoProxyMatcherTests
     [DataRow("1.2.3.4/99999999999", "1.2.3.4")]
     public void Matches_AddressEntryThatCannotMatch_IsFalse(string noProxy, string hostName)
     {
-        Assert.IsFalse(NoProxyMatcher.Matches(hostName, noProxy));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("no_proxy list", noProxy);
+        diagnostics.Arrange("host", hostName);
+
+        bool matches = NoProxyMatcher.Matches(hostName, noProxy);
+
+        diagnostics.Act("matches", matches);
+        diagnostics.Assert("matches", false, matches);
+        Assert.IsFalse(matches);
     }
 
     [TestMethod]
     public void Matches_PrefixBitsWithinAByte_ComparesThoseBits()
     {
-        Assert.IsTrue(NoProxyMatcher.Matches("10.0.0.130", "10.0.0.128/25"));
-        Assert.IsFalse(NoProxyMatcher.Matches("10.0.0.127", "10.0.0.128/25"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("no_proxy list", "10.0.0.128/25");
+        diagnostics.Arrange("hosts", "10.0.0.130, 10.0.0.127");
+
+        bool inside = NoProxyMatcher.Matches("10.0.0.130", "10.0.0.128/25");
+        bool outside = NoProxyMatcher.Matches("10.0.0.127", "10.0.0.128/25");
+
+        diagnostics.Act("10.0.0.130 matches", inside);
+        diagnostics.Act("10.0.0.127 matches", outside);
+        diagnostics.Assert("10.0.0.130 matches", true, inside);
+        Assert.IsTrue(inside);
+        diagnostics.Assert("10.0.0.127 matches", false, outside);
+        Assert.IsFalse(outside);
     }
 
     [TestMethod]
     public void Matches_NullList_IsFalse()
     {
-        Assert.IsFalse(NoProxyMatcher.Matches("example.com", null));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("no_proxy list", "(null)");
+
+        bool matches = NoProxyMatcher.Matches("example.com", null);
+
+        diagnostics.Act("matches", matches);
+        diagnostics.Assert("matches", false, matches);
+        Assert.IsFalse(matches);
     }
 
     [TestMethod]
     public void Matches_EmptyHost_IsFalse()
     {
-        Assert.IsFalse(NoProxyMatcher.Matches(string.Empty, "*"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("host", "(empty)");
+        diagnostics.Arrange("no_proxy list", "*");
+
+        bool matches = NoProxyMatcher.Matches(string.Empty, "*");
+
+        diagnostics.Act("matches", matches);
+        diagnostics.Assert("matches", false, matches);
+        Assert.IsFalse(matches);
     }
 
     [TestMethod]
     public void Matches_NullHost_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => NoProxyMatcher.Matches(null!, "*"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("host", "(null)");
+        diagnostics.Arrange("no_proxy list", "*");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => NoProxyMatcher.Matches(null!, "*"));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -139,7 +200,15 @@ public sealed class NoProxyMatcherTests
     [DataRow("*", "a.test", "*")]
     public void MatchingEntry_AMatch_ReturnsTheEntryAsWritten(string noProxy, string host, string expected)
     {
-        Assert.AreEqual(expected, NoProxyMatcher.MatchingEntry(host, noProxy));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("no_proxy list", noProxy);
+        diagnostics.Arrange("host", host);
+
+        string? entry = NoProxyMatcher.MatchingEntry(host, noProxy);
+
+        diagnostics.Act("matching entry", entry);
+        diagnostics.Assert("matching entry", expected, entry);
+        Assert.AreEqual(expected, entry);
     }
 
     [TestMethod]
@@ -149,6 +218,14 @@ public sealed class NoProxyMatcherTests
     [DataRow("*", "")]
     public void MatchingEntry_NoMatch_ReturnsNull(string? noProxy, string host)
     {
-        Assert.IsNull(NoProxyMatcher.MatchingEntry(host, noProxy));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("no_proxy list", noProxy ?? "(null)");
+        diagnostics.Arrange("host", host);
+
+        string? entry = NoProxyMatcher.MatchingEntry(host, noProxy);
+
+        diagnostics.Act("matching entry", entry ?? "(null)");
+        diagnostics.Assert("matching entry", "(null)", entry ?? "(null)");
+        Assert.IsNull(entry);
     }
 }

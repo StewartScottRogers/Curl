@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Core;
 
@@ -11,6 +12,8 @@ namespace Curl.Core;
 [TestClass]
 public sealed class ProxyUrlParserTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("127.0.0.1", ProxyKind.Http, "127.0.0.1", 80)]
     [DataRow("http://127.0.0.1", ProxyKind.Http, "127.0.0.1", 80)]
@@ -43,9 +46,20 @@ public sealed class ProxyUrlParserTests
     [DataRow("http://@127.0.0.1:1111", ProxyKind.Http, "127.0.0.1", 1111)]
     public void TryParse_MeasuredProxy_GivesKindHostAndPort(string text, ProxyKind kind, string host, int port)
     {
-        Assert.IsTrue(ProxyUrlParser.TryParse(text, out ProxyEndpoint? proxy, out TransferResult? failure));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+
+        bool parsed = ProxyUrlParser.TryParse(text, out ProxyEndpoint? proxy, out TransferResult? failure);
+
+        var expected = new ProxyEndpoint(kind, host, port, null);
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("proxy", proxy);
+        diagnostics.Act("failure", failure?.ToString() ?? "(null)");
+        diagnostics.Assert("parsed", true, parsed);
+        Assert.IsTrue(parsed);
         Assert.IsNull(failure);
-        Assert.AreEqual(new ProxyEndpoint(kind, host, port, null), proxy);
+        diagnostics.Assert("proxy", expected, proxy);
+        Assert.AreEqual(expected, proxy);
     }
 
     [TestMethod]
@@ -58,24 +72,57 @@ public sealed class ProxyUrlParserTests
     [DataRow(ProxyKind.Socks5Hostname, 1080)]
     public void TryParse_NoSchemeWithAnOptionKind_IsThatKindOnItsDefaultPort(ProxyKind kind, int port)
     {
-        Assert.IsTrue(ProxyUrlParser.TryParse("127.0.0.1", kind, out ProxyEndpoint? proxy, out TransferResult? failure));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "127.0.0.1");
+        diagnostics.Arrange("option kind", kind);
+
+        bool parsed = ProxyUrlParser.TryParse("127.0.0.1", kind, out ProxyEndpoint? proxy, out TransferResult? failure);
+
+        var expected = new ProxyEndpoint(kind, "127.0.0.1", port, null);
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("proxy", proxy);
+        diagnostics.Assert("parsed", true, parsed);
+        Assert.IsTrue(parsed);
         Assert.IsNull(failure);
-        Assert.AreEqual(new ProxyEndpoint(kind, "127.0.0.1", port, null), proxy);
+        diagnostics.Assert("proxy", expected, proxy);
+        Assert.AreEqual(expected, proxy);
     }
 
     [TestMethod]
     public void TryParse_SchemeWithAnOptionKind_IsTheSchemesKind()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "http://127.0.0.1:1111");
+        diagnostics.Arrange("option kind", ProxyKind.Socks5);
+
         // Measured: --socks5 http://127.0.0.1:P speaks HTTP to the proxy.
-        Assert.IsTrue(ProxyUrlParser.TryParse("http://127.0.0.1:1111", ProxyKind.Socks5, out ProxyEndpoint? proxy, out _));
-        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1111, null), proxy);
+        bool parsed = ProxyUrlParser.TryParse("http://127.0.0.1:1111", ProxyKind.Socks5, out ProxyEndpoint? proxy, out _);
+
+        var expected = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 1111, null);
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("proxy", proxy);
+        diagnostics.Assert("parsed", true, parsed);
+        Assert.IsTrue(parsed);
+        diagnostics.Assert("proxy", expected, proxy);
+        Assert.AreEqual(expected, proxy);
     }
 
     [TestMethod]
     public void TryParse_NoSchemeWithAnOptionKindAndAPort_KeepsThePort()
     {
-        Assert.IsTrue(ProxyUrlParser.TryParse("127.0.0.1:1111", ProxyKind.Socks4, out ProxyEndpoint? proxy, out _));
-        Assert.AreEqual(new ProxyEndpoint(ProxyKind.Socks4, "127.0.0.1", 1111, null), proxy);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "127.0.0.1:1111");
+        diagnostics.Arrange("option kind", ProxyKind.Socks4);
+
+        bool parsed = ProxyUrlParser.TryParse("127.0.0.1:1111", ProxyKind.Socks4, out ProxyEndpoint? proxy, out _);
+
+        var expected = new ProxyEndpoint(ProxyKind.Socks4, "127.0.0.1", 1111, null);
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("proxy", proxy);
+        diagnostics.Assert("parsed", true, parsed);
+        Assert.IsTrue(parsed);
+        diagnostics.Assert("proxy", expected, proxy);
+        Assert.AreEqual(expected, proxy);
     }
 
     [TestMethod]
@@ -86,9 +133,20 @@ public sealed class ProxyUrlParserTests
     [DataRow("http://u:p@[::1]:1111", "u", "p")]
     public void TryParse_UserInformation_IsTheDecodedCredential(string text, string user, string password)
     {
-        Assert.IsTrue(ProxyUrlParser.TryParse(text, out ProxyEndpoint? proxy, out _));
-        Assert.AreEqual(user, proxy.Credential!.UserName);
-        Assert.AreEqual(password, proxy.Credential.Password);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+
+        bool parsed = ProxyUrlParser.TryParse(text, out ProxyEndpoint? proxy, out _);
+
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("user name", proxy?.Credential?.UserName);
+        diagnostics.Act("password", proxy?.Credential?.Password);
+        diagnostics.Assert("parsed", true, parsed);
+        Assert.IsTrue(parsed);
+        diagnostics.Assert("user name", user, proxy!.Credential!.UserName);
+        Assert.AreEqual(user, proxy!.Credential!.UserName);
+        diagnostics.Assert("password", password, proxy!.Credential!.Password);
+        Assert.AreEqual(password, proxy!.Credential!.Password);
     }
 
     [TestMethod]
@@ -140,10 +198,24 @@ public sealed class ProxyUrlParserTests
     [DataRow("http://a{b:1111", ProxyUrlParser.BadHostnameReason)]
     public void TryParse_MeasuredSyntaxError_IsExit5WithCurlsReason(string text, string reason)
     {
-        Assert.IsFalse(ProxyUrlParser.TryParse(text, out ProxyEndpoint? proxy, out TransferResult? failure));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+        diagnostics.Arrange("reason", reason);
+
+        bool parsed = ProxyUrlParser.TryParse(text, out ProxyEndpoint? proxy, out TransferResult? failure);
+
+        string expectedMessage = $"Unsupported proxy syntax in '{text}': {reason}";
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("proxy", proxy?.ToString() ?? "(null)");
+        diagnostics.Act("exit code", failure?.ExitCode);
+        diagnostics.Act("error message", failure?.ErrorMessage);
+        diagnostics.Assert("parsed", false, parsed);
+        Assert.IsFalse(parsed);
         Assert.IsNull(proxy);
-        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, failure.ExitCode);
-        Assert.AreEqual($"Unsupported proxy syntax in '{text}': {reason}", failure.ErrorMessage);
+        diagnostics.Assert("exit code", CurlExitCode.CouldntResolveProxy, failure!.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, failure!.ExitCode);
+        diagnostics.Assert("error message", expectedMessage, failure!.ErrorMessage);
+        Assert.AreEqual(expectedMessage, failure!.ErrorMessage);
     }
 
     [TestMethod]
@@ -152,24 +224,52 @@ public sealed class ProxyUrlParserTests
     [DataRow("foo:/x")]
     public void TryParse_UnknownScheme_IsExit7(string text)
     {
-        Assert.IsFalse(ProxyUrlParser.TryParse(text, out _, out TransferResult? failure));
-        Assert.AreEqual(CurlExitCode.CouldntConnect, failure.ExitCode);
-        Assert.AreEqual($"Unsupported proxy scheme for '{text}'", failure.ErrorMessage);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", text);
+
+        bool parsed = ProxyUrlParser.TryParse(text, out _, out TransferResult? failure);
+
+        string expectedMessage = $"Unsupported proxy scheme for '{text}'";
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("exit code", failure?.ExitCode);
+        diagnostics.Act("error message", failure?.ErrorMessage);
+        diagnostics.Assert("parsed", false, parsed);
+        Assert.IsFalse(parsed);
+        diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, failure!.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, failure!.ExitCode);
+        diagnostics.Assert("error message", expectedMessage, failure!.ErrorMessage);
+        Assert.AreEqual(expectedMessage, failure!.ErrorMessage);
     }
 
     [TestMethod]
     public void TryParse_PortZero_IsTheMeasuredConnectFailure()
     {
-        Assert.IsFalse(ProxyUrlParser.TryParse("http://localhost:0", out _, out TransferResult? failure));
-        Assert.AreEqual(CurlExitCode.CouldntConnect, failure.ExitCode);
-        Assert.AreEqual(
-            "Failed to connect to localhost:0 over proxy localhost after 0 ms: Could not connect to server",
-            failure.ErrorMessage);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "http://localhost:0");
+
+        bool parsed = ProxyUrlParser.TryParse("http://localhost:0", out _, out TransferResult? failure);
+
+        const string ExpectedMessage = "Failed to connect to localhost:0 over proxy localhost after 0 ms: Could not connect to server";
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("exit code", failure?.ExitCode);
+        diagnostics.Act("error message", failure?.ErrorMessage);
+        diagnostics.Assert("parsed", false, parsed);
+        Assert.IsFalse(parsed);
+        diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, failure!.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, failure!.ExitCode);
+        diagnostics.Assert("error message", ExpectedMessage, failure!.ErrorMessage);
+        Assert.AreEqual(ExpectedMessage, failure!.ErrorMessage);
     }
 
     [TestMethod]
     public void TryParse_NullText_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => ProxyUrlParser.TryParse(null!, out _, out _));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", "(null)");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => ProxyUrlParser.TryParse(null!, out _, out _));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 }
