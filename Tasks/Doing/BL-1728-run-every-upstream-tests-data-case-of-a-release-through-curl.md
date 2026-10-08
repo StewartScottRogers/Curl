@@ -83,3 +83,4 @@ Retargeting (BL-1748) changes it.
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Waits on BL-1750: Curl.Console has no public in-process entry point, and the app may not use InternalsVisibleTo
+- 2026-10-08: Backlog -> Doing.
