@@ -124,3 +124,4 @@ PowerShell 5.1 reads the files the same as PowerShell 7.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
