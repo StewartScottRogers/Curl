@@ -46,6 +46,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- Fix is a test only; no production change. `ClientCertificateLoaderTests.Load_OpenSslBuildDriveLetterLikeCert_SplitsAtTheDriveLetterColon`
+  calls `Load` with `matchesSchannelBuild: false` and `--cert q:/cert.pem`, and pins exit 58 with
+  OpenSSL's `could not load PEM client certificate from q, ...` text: the OpenSSL build splits at the
+  drive letter's colon, so the file is `q` and `/cert.pem` the passphrase. The mutant
+  (`recognisesDriveLetters: true`) loads `q:/cert.pem` instead and the test fails.
+- Added `Curl.Networking.UnitTests` to `touches`: the test lives there, and no other task in Doing on
+  `origin/work/dark-factory` named it.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (the audit-path guard), so the reproduction
+  was checked by hand: applying the mutant at line 74 made the new test fail (1 failed of 4), reverting
+  it made all 4 pass. The quality auditor's re-audit closes the finding.
+
 ## Log
 
 - 2026-10-08: Created.
