@@ -36,3 +36,4 @@ completed:
 ## Log
 
 - 2026-10-06: Created.
+- 2026-10-08: Backlog -> Doing.
