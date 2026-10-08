@@ -42,7 +42,7 @@ Select-String -Path Curl.Protocol.Http.UnitTests/HttpResponseBodyFramingTests.cs
 
 ## Re-audits
 
-- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-004 in Curl.Protocol.Http.UnitTests/HttpFrameLogTests.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the Select-String reproduction: HttpResponseBodyFramingTests.cs:50 Of_UnsolicitedCodingWithoutRaw_ThrowsExit61() => Assert.ThrowsExactly<HttpTransferException>(...). The body never checks ExitCode 61 (BadContentEncoding).
+- 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the Select-String reproduction: HttpResponseBodyFramingTests.cs:50 Of_UnsolicitedCodingWithoutRaw_ThrowsExit61() => Assert.ThrowsExactly<HttpTransferException>(...). The body never checks ExitCode 61 (BadContentEncoding).
 
 ## Log
 

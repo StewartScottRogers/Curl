@@ -42,7 +42,7 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 
 ## Re-audits
 
-- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-004 in Curl.Protocol.Http.UnitTests/HttpFrameLogTests.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction with 20 iterations: large-get curl median 195.5 ms, Curl median 263.0 ms, a ratio of 1.35x. That is over the 1.25x Medium threshold, so the slowdown still reproduces, though the 1.81x in the finding was not matched on this run. Cause is the whole-body MemoryStream in HttpResponseBodyReader.CopyFramedAsync (lines 327-347).
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction with 20 iterations: large-get curl median 195.5 ms, Curl median 263.0 ms, a ratio of 1.35x. That is over the 1.25x Medium threshold, so the slowdown still reproduces, though the 1.81x in the finding was not matched on this run. Cause is the whole-body MemoryStream in HttpResponseBodyReader.CopyFramedAsync (lines 327-347).
 
 ## Log
 

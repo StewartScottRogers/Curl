@@ -42,7 +42,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
-- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-004 in Curl.Protocol.Http.UnitTests/HttpFrameLogTests.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the -Site reproduction: resolvedLine 211, outcome survived.
+- 2026-10-07 | 2026-10-07_1336.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction: resolvedLine 211, outcome survived. Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 
