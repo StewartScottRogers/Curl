@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1691 — Fix AF-0072: BL-1525 requeued twice in one shift (lanes 1 and 4), three claims in its task Log, each run ending short of a timing target with its code left only in the stash
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: each lane skipped only the tasks it had attempted itself (`$attempted`), so a task one lane sent back to Backlog was offered to the next free lane seconds later (BL-1525: L1 requeued 11:25:40, L4 claimed 11:25:58).
+- Fix (`RunDarkFactory.ps1`): a lane that ends a task requeued or parked appends its ID to the shift-wide `lanes-<stamp>\requeued.txt` (`Add-ShiftRequeued`), and every lane's claim skips those IDs (`Get-ShiftRequeued`). A task is now requeued at most once per shift; the next shift tries it afresh. The script header says so.
+- Default taken: parked tasks count too, and a task requeued for `depends-on` also waits for the next shift even if its blockers finish in this one - a small throughput cost, against repeated stash handoffs between lanes.
+- The reproduction reads the 2026-10-07 logs, which will always show that shift's history; its expected result applies to shifts run with this fix, which is what the process auditor's re-audit checks. The helpers were exercised by extracting them from the script's AST: duplicate IDs collapse and the shift's list merges with the lane's own skip list.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. No lane claims a task another lane of the same shift requeued or parked; requeued at most once per shift

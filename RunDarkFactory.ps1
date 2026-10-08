@@ -39,7 +39,9 @@
     run that needs a project outside `touches` widens it, checking the overlap against
     the shared branch's Doing rather than its own stale copy; a new ADR or a newly filed
     task never needs `touches` and never sends a task back (BL-1069). Before each claim the shift
-    also requeues any Blocked task whose reason names only tasks that are now Done.
+    also requeues any Blocked task whose reason names only tasks that are now Done. A task
+    a lane sends back to Backlog (requeued or parked) is not claimed again by any lane of
+    the same shift (lanes-<stamp>\requeued.txt); the next shift tries it afresh (AF-0072).
 
     COST CAP
 
@@ -3489,6 +3491,26 @@ function Get-LaneState {
     return ''
 }
 
+# Tasks a lane of this shift sent back to Backlog (requeued or parked), one ID a line in
+# <repo>.logs\lanes-<stamp>\requeued.txt. No lane of the same shift claims one again: a
+# task that fell short once - BL-1525 missed its timing target under eight lanes' load -
+# would only fall short again on the next lane, handing its work through the stash each
+# time (AF-0072). The next shift tries it afresh.
+function Get-ShiftRequeuedPath { return (Join-Path (Join-Path $LogDir "lanes-$Stamp") 'requeued.txt') }
+
+function Add-ShiftRequeued {
+    param([string]$Id)
+    $path = Get-ShiftRequeuedPath
+    New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+    Add-Content -Path $path -Value $Id -Encoding ASCII
+}
+
+function Get-ShiftRequeued {
+    $path = Get-ShiftRequeuedPath
+    if (-not (Test-Path $path)) { return @() }
+    return @(Get-Content $path | ForEach-Object { "$_".Trim() } | Where-Object { $_ } | Select-Object -Unique)
+}
+
 function Test-LaneAlive {
     # True while lane <n>'s process runs. No pid file yet means it is still starting.
     param([int]$N, [string]$ForStamp = $Stamp)
@@ -4336,7 +4358,7 @@ while ($true) {
         Set-HeartbeatTask ''
         Set-OwnTabLabel 'empty'
         Write-Heartbeat 'claim'
-        $claim = Invoke-Claim -Skip @($attempted.Keys)
+        $claim = Invoke-Claim -Skip (@($attempted.Keys) + @(Get-ShiftRequeued) | Select-Object -Unique)
         if ($claim.None) { $stopWhy = 'nothing ready'; break }
         if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Write-Heartbeat 'wait' (Get-Short $claim.Why 80); Start-Sleep -Seconds 60; continue }
         $id = $claim.Id
@@ -4439,6 +4461,7 @@ while ($true) {
         # in the queue for a later run, not a stall.
         $requeued++; $failStreak = 0
         $outcome = 'requeued'
+        if ($Lane) { Add-ShiftRequeued $id }
         Write-Trace $id 'REQUEUE' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } else {
         $failStreak++
