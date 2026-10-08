@@ -51,7 +51,8 @@
     because claude checks the cap between turns, so a run can end one turn's cost above
     it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A turn that waits
     on subagents spends all of theirs before the next check, so the prompt allows one
-    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap). What the
+    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap; AF-0097:
+    five Sonnet test-writers in one message cost BL-1486 $2.97 of its $4.65). What the
     task's own runs of the last 24 hours cost comes off its next run's cap, down to $1, so a
     requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56). Once
     those runs leave less than $1 of the cap, a fresh claim of the task is not run at all but
