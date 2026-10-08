@@ -14,8 +14,14 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     /// <summary>Gets the schemes <see cref="Handler" /> serves.</summary>
     public IReadOnlyCollection<string> SupportedSchemes => handler.SupportedSchemes;
 
-    /// <summary>Gets the handler that performs the transfer.</summary>
-    internal IProtocolHandler Handler => handler;
+    /// <summary>
+    /// Gets the handler that performs the transfer: a <see cref="LazyProtocolHandler" />'s
+    /// built handler, building it if it has not been yet.
+    /// </summary>
+    internal IProtocolHandler Handler => handler is LazyProtocolHandler lazy ? lazy.Handler : handler;
+
+    /// <summary>Gets the handler as given, a <see cref="LazyProtocolHandler" /> left unbuilt.</summary>
+    internal IProtocolHandler GivenHandler => handler;
 
     /// <summary>
     /// Clears the recorder, performs the transfer with <see cref="Handler" />, and puts the

@@ -104,7 +104,7 @@ internal static class CurlComposition
     /// <see cref="FtpDataConnectorOf" />'s in production, which does not hold them to
     /// <c>--connect-timeout</c> (BL-797); <paramref name="connector" /> when not given.
     /// </param>
-    /// <returns>Every registered handler.</returns>
+    /// <returns>Every registered handler, each built on its first transfer (<see cref="LazyProtocolHandler" />, BL-1715).</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
     /// <param name="tracesFtp">Whether the FTP handler writes the <c>--trace-config ftp</c> lines (<see cref="TracesFtp" />, BL-1162).</param>
     /// <param name="tracesSmtp">Whether the SMTP handler writes the <c>--trace-config smtp</c> lines (<see cref="TracesSmtp" />, BL-1163).</param>
@@ -136,36 +136,35 @@ internal static class CurlComposition
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
         EndPointRecordingDatagramConnector recordingDatagramConnector = new(NumberedDatagramsOf(connector, datagramConnector), recorder);
-        ISecurityContextFactory contexts = securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog);
-        RankedHttpAuthenticator httpAuthenticator = CreateHttpAuthenticator(contexts, negotiateOptions, diagnosticLog);
+        Lazy<ISecurityContextFactory> contexts = new(() => securityContexts ?? CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog));
+        Lazy<RankedHttpAuthenticator> httpAuthenticator = new(() => CreateHttpAuthenticator(contexts.Value, negotiateOptions, diagnosticLog));
         SecurityDelegation saslDelegation = (negotiateOptions ?? NegotiateOptions.Default).Delegation;
-        AwsSigV4Signer signer = new(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog);
-        HttpProtocolHandler http = new(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator, signer), cookieStore, proxyAuthSchemes) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead };
+        LazyProtocolHandler http = new(["http", "https"], () => new HttpProtocolHandler(recordingConnector, new AwsSigV4HttpAuthenticator(httpAuthenticator.Value, new AwsSigV4Signer(signingClock ?? TimeProvider.System, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), diagnosticLog)), cookieStore, proxyAuthSchemes) { TracesHttp2Frames = tracesHttp2, TracesHttp3Streams = tracesHttp3, TracesClientReaders = tracesRead });
 
         IProtocolHandler[] handlers =
         [
-            new FileProtocolHandler(new PhysicalFileSystem(), ConnectionNumbersOf(connector)),
-            new DictProtocolHandler(recordingConnector),
-            new GopherProtocolHandler(recordingConnector),
-            new TelnetProtocolHandler(recordingConnector),
-            new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())),
-            new MqttProtocolHandler(recordingConnector),
-            new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
-            new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)),
-            new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp },
-            new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows())),
-            new WsProtocolHandler(recordingConnector, httpAuthenticator, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs },
-            new RtspProtocolHandler(recordingConnector, httpAuthenticator),
-            new SmbProtocolHandler(recordingConnector),
-            new SshProtocolHandler(
+            new LazyProtocolHandler(["file"], () => new FileProtocolHandler(new PhysicalFileSystem(), ConnectionNumbersOf(connector))),
+            new LazyProtocolHandler(["dict"], () => new DictProtocolHandler(recordingConnector)),
+            new LazyProtocolHandler(["gopher", "gophers"], () => new GopherProtocolHandler(recordingConnector)),
+            new LazyProtocolHandler(["telnet"], () => new TelnetProtocolHandler(recordingConnector)),
+            new LazyProtocolHandler(["tftp"], () => new TftpProtocolHandler(recordingDatagramConnector, recordingConnector, CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()))),
+            new LazyProtocolHandler(["mqtt", "mqtts"], () => new MqttProtocolHandler(recordingConnector)),
+            new LazyProtocolHandler(["imap", "imaps"], () => new ImapProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
+            new LazyProtocolHandler(["pop3", "pop3s"], () => new Pop3ProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog))),
+            new LazyProtocolHandler(["smtp", "smtps"], () => new SmtpProtocolHandler(recordingConnector, tlsProvider, CreateSaslAuthenticator(contexts.Value, saslDelegation, diagnosticLog)) { TracesStateMachine = tracesSmtp }),
+            new LazyProtocolHandler(["ldap", "ldaps"], () => new LdapProtocolHandler(recordingConnector, LdapDialectFor(OperatingSystem.IsWindows()))),
+            new LazyProtocolHandler(["ws", "wss"], () => new WsProtocolHandler(recordingConnector, httpAuthenticator.Value, new SystemWebSocketRandomSource()) { TracesFrames = tracesWs }),
+            new LazyProtocolHandler(["rtsp"], () => new RtspProtocolHandler(recordingConnector, httpAuthenticator.Value)),
+            new LazyProtocolHandler(["smb", "smbs"], () => new SmbProtocolHandler(recordingConnector)),
+            new LazyProtocolHandler(["scp", "sftp"], () => new SshProtocolHandler(
                 recordingConnector,
                 new PhysicalFileSystem(),
                 SshAlgorithmPreferencesFor(OperatingSystem.IsWindows()),
-                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())) { TracesStateMachine = tracesSsh },
+                CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())) { TracesStateMachine = tracesSsh }),
             http,
-            new RoutingFtpProtocolHandler(
+            new LazyProtocolHandler(["ftp", "ftps"], () => new RoutingFtpProtocolHandler(
                 http,
-                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp)),
+                CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp))),
         ];
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];

@@ -55,6 +55,43 @@ public sealed partial class CurlCompositionTests
     }
 
     [TestMethod]
+    public void CreateProtocolHandlers_HttpHandlerUsed_BuildsNoOtherHandler()
+    {
+        IReadOnlyList<EndPointReportingProtocolHandler> handlers = [.. CurlComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver()).Cast<EndPointReportingProtocolHandler>()];
+        LazyProtocolHandler http = (LazyProtocolHandler)handlers.Single(handler => handler.SupportedSchemes.Contains("http")).GivenHandler;
+        Diagnostics.Arrange("handlers", handlers.Count);
+
+        _ = http.Handler;
+        string[] built = [.. handlers.Select(handler => (LazyProtocolHandler)handler.GivenHandler).Where(lazy => lazy.IsCreated).SelectMany(lazy => lazy.SupportedSchemes)];
+        Diagnostics.Act("built handlers' schemes", string.Join(",", built));
+
+        Diagnostics.Assert("built handlers' schemes", "http,https", string.Join(",", built));
+        CollectionAssert.AreEqual(new[] { "http", "https" }, built);
+    }
+
+    [TestMethod]
+    public void CreateProtocolHandlers_EachLazyHandler_ReportsTheSchemesItsBuiltHandlerServes()
+    {
+        IReadOnlyList<EndPointReportingProtocolHandler> handlers = [.. CurlComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver()).Cast<EndPointReportingProtocolHandler>()];
+        Diagnostics.Arrange("handlers", handlers.Count);
+
+        string[] lazySchemes = [.. handlers.SelectMany(handler => handler.SupportedSchemes)];
+        string[] builtSchemes = [.. handlers.SelectMany(handler => handler.Handler.SupportedSchemes)];
+        Diagnostics.Act("lazy schemes", string.Join(",", lazySchemes));
+
+        Diagnostics.Assert("built schemes", string.Join(",", lazySchemes), string.Join(",", builtSchemes));
+        CollectionAssert.AreEqual(lazySchemes, builtSchemes);
+    }
+
+    [TestMethod]
     public void CreateProtocolHandlers_ServesEachSchemeThroughItsHandlerOnce()
     {
         Diagnostics.Arrange("connect failure scripted into both connectors", ConnectFailure);
@@ -950,10 +987,16 @@ public sealed partial class CurlCompositionTests
 
     /// <summary>
     /// Reads every connector <paramref name="handler" /> holds in a private field, and those of
-    /// any handler it forwards to, so a test can check which connector each handler was given.
+    /// any handler it forwards to (a <see cref="LazyProtocolHandler" /> built first), so a test can
+    /// check which connector each handler was given.
     /// </summary>
     private static IEnumerable<IConnector> ConnectorsOf(IProtocolHandler handler)
     {
+        if (handler is LazyProtocolHandler lazy)
+        {
+            handler = lazy.Handler;
+        }
+
         foreach (FieldInfo field in handler.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic))
         {
             switch (field.GetValue(handler))

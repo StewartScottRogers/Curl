@@ -31,7 +31,10 @@ an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`
 each handler in an `EndPointReportingProtocolHandler`, which puts the end points of the
 transfer's first connection (FTP's control connection) on its report when the handler reported
 neither, so `%{local_ip}`, `%{local_port}`, `%{remote_ip}` and `%{remote_port}` work for every
-scheme without handler code; HTTP keeps its own (ADR-0119, BL-515).
+scheme without handler code; HTTP keeps its own (ADR-0119, BL-515). Each handler sits behind a
+`LazyProtocolHandler` that names its schemes and builds the handler on its first transfer, as do the
+security context factory and the HTTP authenticator, so a run builds only what its URLs' schemes use
+(BL-1715, AF-0063); `EndPointReportingProtocolHandler.Handler` gives the built handler.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
