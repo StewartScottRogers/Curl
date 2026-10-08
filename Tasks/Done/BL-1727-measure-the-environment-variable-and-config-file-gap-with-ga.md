@@ -8,7 +8,7 @@ depends-on: [BL-1721, BL-1722]
 touches: [Gap/Tools/Measure-EnvironmentGap.ps1, Gap/Tools/Fixtures/environment, Gap/Upstream/8.21.0/environment.json]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1727 — Measure the environment variable and config file gap with Gap/Tools/Measure-EnvironmentGap.ps1
 
@@ -74,15 +74,33 @@ Commit `Gap/Upstream/8.21.0/environment.json`.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Measure-EnvironmentGap.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks: a variable named in both documents is one item; config locations keep the document's order; equal recipe results give `match` and different ones give `gap`; an item with no recipe is `unmeasured` with `no-recipe`; another platform's location is `excluded` with `other-platform`.
-- [ ] `Gap/Upstream/8.21.0/environment.json` is committed and valid against `Gap-Format.md`.
-- [ ] A real run on Windows measures the four proxy variables and every config location through both binaries. Its counts, and the list of `no-recipe` items, are recorded in this task's Notes.
-- [ ] No recipe reads or writes the user's real `.curlrc`, `_curlrc` or environment: every one runs in the probe's temporary home.
-- [ ] The header help documents every parameter and lists the recipes. The script is ASCII only.
+- [x] `Gap/Tools/Measure-EnvironmentGap.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks: a variable named in both documents is one item; config locations keep the document's order; equal recipe results give `match` and different ones give `gap`; an item with no recipe is `unmeasured` with `no-recipe`; another platform's location is `excluded` with `other-platform`.
+- [x] `Gap/Upstream/8.21.0/environment.json` is committed and valid against `Gap-Format.md`.
+- [x] A real run on Windows measures the four proxy variables and every config location through both binaries. Its counts, and the list of `no-recipe` items, are recorded in this task's Notes.
+- [x] No recipe reads or writes the user's real `.curlrc`, `_curlrc` or environment: every one runs in the probe's temporary home.
+- [x] The header help documents every parameter and lists the recipes. The script is ASCII only.
 
 ## Notes
+
+- Real run on Windows (2026-10-08, reference curl 8.21.0 Schannel from Git for Windows,
+  candidate Curl.Console Release build): match 24, gap 0, unmeasured 18, excluded 1,
+  X/Y 24/42. http_proxy, HTTPS_PROXY, ALL_PROXY and NO_PROXY and config locations 1 to 6
+  and 8 were measured through both binaries; location 7 (getpwuid) is excluded with
+  platform:unix.
+- no-probe items (18): APPDATA, COLUMNS, CURL_CA_BUNDLE, CURL_HOME, CURL_SSL_BACKEND,
+  HOME, NETRC, QLOGDIR, SHELL, SSLKEYLOGFILE, SSL_CERT_DIR, SSL_CERT_FILE, USERPROFILE,
+  XDG_CONFIG_HOME, [scheme]_proxy, [url-protocol]_PROXY, config-syntax:line-length-limit,
+  config-syntax:one-option-per-line.
+- Reasons follow Gap-Format.md: no-probe in place of no-recipe and no-reference, and
+  platform:<os> in place of other-platform (ADR-0435).
+- HTTPS_PROXY is probed with http://gap.invalid/ as the task says, so the comparison is
+  that neither binary sends the request to the proxy (both exit 6). On Windows variable
+  names are not case sensitive, so the lower and upper case forms are one variable.
+- Location 8 (the executable's folder) runs copies of both binaries in a temporary
+  folder; nothing is written beside an installed curl.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Measure-EnvironmentGap.ps1 measures 42 environment items, 24 match, through both binaries
