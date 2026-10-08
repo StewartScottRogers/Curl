@@ -95,3 +95,4 @@ call), and `-NoCommit` (write everything into the gap worktree but skip steps 9 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
