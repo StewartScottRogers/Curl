@@ -1,5 +1,5 @@
 ---
-id: BL-1755
+id: BL-1791
 title: Normalise random multipart boundaries before Measure-ReferenceCrossCheck.ps1 compares request bytes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-08
 completed:
 ---
-# BL-1755 — Normalise random multipart boundaries before Measure-ReferenceCrossCheck.ps1 compares request bytes
+# BL-1791 — Normalise random multipart boundaries before Measure-ReferenceCrossCheck.ps1 compares request bytes
 
 ## Goal
 

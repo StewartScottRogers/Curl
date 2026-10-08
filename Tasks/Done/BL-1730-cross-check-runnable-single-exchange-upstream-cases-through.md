@@ -102,7 +102,7 @@ is needed. Cover the four combinations in step 3.
   server-not-http-alone 2, reply-not-one-data 23; reference-diverges 3 (test17, test56,
   test73); disagreements 6 (test9, test39, test44 in-process match now gap; test60, test62,
   test71 stay gap with the reference's output as expected). test9/39/44 differ only in the
-  random multipart boundary: filed BL-1755 to normalise it.
+  random multipart boundary: filed BL-1791 to normalise it.
 - Self-test: 10 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7.
 
 
