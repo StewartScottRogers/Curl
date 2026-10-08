@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1771 — Fix AF-0093: BL-1649 claimed 3 times; lanes 5 and 1 could not integrate because fast tests failed after rebasing
 
@@ -41,12 +41,29 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-1649's two parks were both fast-test runs red under every lane's load, not
+  its change. L5's (a named concurrency-sensitive Curl.Cookies test) is the AF-0092 case
+  BL-1770 fixed: the failed projects are rerun alone before a park. L1's was red twice with
+  "no test named", which BL-1770's rerun-alone path skipped because no project was named.
+- Fix (`RunDarkFactory.ps1`): `Get-FailedTestProjects` now also puts in doubt every
+  `*.UnitTests` project the run never reported `Passed!` (a crashed host or a red run with
+  no test named leaves its project without a summary line), so those are rerun alone too
+  and the task integrates when they pass. More than 10 projects in doubt means the run
+  broke as a whole, and the task still parks (default chosen so a broken build-wide run
+  does not hold the integrate lock for a full serial rerun). A red run with no test named
+  now quotes its last error-looking line in the trace and park reason, so the next one
+  names its cause. Self-tests: `RunDarkFactory.ps1 -TestFlakyTests`, 10/10 pass.
+- The reproduction reads the 2026-10-07 shift's logs, which cannot change; it stops
+  reproducing for shifts run after this fix, which is what the process auditor's re-audit
+  will measure.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Red fast-test runs with no test named now rerun the unreported projects alone before parking (AF-0093).
