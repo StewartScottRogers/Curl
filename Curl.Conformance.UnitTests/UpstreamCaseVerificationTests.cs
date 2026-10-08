@@ -79,7 +79,7 @@ public sealed class UpstreamCaseVerificationTests
     {
         string sections = "<verify>\n<protocol>\nx\n</protocol>\n<strip>\n^(a+)+$\n</strip>\n</verify>\n";
 
-        string? difference = Verify(sections, Run(received: new string('a', 40) + "!\n"));
+        string? difference = Verify(sections, Run(received: new string('a', 40) + "!\n"), TimeSpan.FromSeconds(1));
 
         ExpectDifference("the strip pattern ^(a+)+$ took longer than 1 seconds", difference);
         Assert.AreEqual("the strip pattern ^(a+)+$ took longer than 1 seconds", difference);
@@ -199,11 +199,13 @@ public sealed class UpstreamCaseVerificationTests
         Assert.AreEqual("<verify><errorcode>: expected exit code 0, got 6", difference2);
     }
 
-    private string? Verify(string sections, UpstreamCaseRun run)
+    private string? Verify(string sections, UpstreamCaseRun run) => Verify(sections, run, UpstreamRegex.MatchTimeout);
+
+    private string? Verify(string sections, UpstreamCaseRun run, TimeSpan stripMatchTimeout)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("test sections", Neutral(sections));
-        string? difference = UpstreamCaseVerification.FindFirstDifference(ParsedTestCase.From(sections), run);
+        string? difference = UpstreamCaseVerification.FindFirstDifference(ParsedTestCase.From(sections), run, stripMatchTimeout);
         diagnostics.Act("first difference", Neutral(difference));
         return difference;
     }
