@@ -3,8 +3,8 @@ id: AF-0067
 title: CLAUDE.md says Integration tests live only in *.IntegrationTests projects; 17 sit in five *.UnitTests projects
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:IntegrationTestPlacement:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
