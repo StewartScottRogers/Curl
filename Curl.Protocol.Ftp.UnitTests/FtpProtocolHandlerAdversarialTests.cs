@@ -125,6 +125,37 @@ public sealed class FtpProtocolHandlerAdversarialTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_PasvPortZero_DialsPortZeroAndFailsWithExit7()
+    {
+        // curl 8.21.0: curl: (7) Failed to connect to 127.0.0.1:<control port> via 127.0.0.1:0
+        // after 126 ms: Could not connect to server (measured 2026-10-07, BL-1660).
+        string replies = LoggedIn + "500 no EPSV\r\n" + "227 Entering Passive Mode (127,0,0,1,0,0)\r\n" + Bye;
+
+        FtpRun run = await RunAsync(replies);
+
+        AssertFailure(run, CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1:18321 via 127.0.0.1:0 after 0 ms: Could not connect to server");
+        Assert.HasCount(1, run.Connector.Targets);
+    }
+
+    [TestMethod]
+    [DataRow("0001,1")]
+    [DataRow("00000001,1")]
+    [DataRow("0000000000000000000001,0000000000000000000001")]
+    public async Task ExecuteAsync_PasvNumbersWithLeadingZerosPastThreeDigits_DialsTheirValue(string portNumbers)
+    {
+        // curl 8.21.0 reads (127,0,0,1,0001,1) and (127,0,0,1,0000000000000000000001,1) as
+        // port 257 and dials it (measured 2026-10-07, BL-1660).
+        string replies = LoggedIn + "500 no EPSV\r\n" + $"227 Entering Passive Mode (127,0,0,1,{portNumbers})\r\n" + TypeSet + "213 1\r\n" + Opening + Complete + Bye;
+
+        FtpRun run = await RunAsync(replies, "x");
+
+        Assert.AreEqual(TransferResult.Success(1), run.Result);
+        Assert.AreEqual(257, run.Connector.Targets[1].Port);
+    }
+
+    [TestMethod]
+    [DataRow("127,0,0,1,0256,0")]
+    [DataRow("127,0,0,1,1000,0")]
     [DataRow("127,0,0,1,256,0")]
     [DataRow("127,0,0,1,0,256")]
     [DataRow("256,0,0,1,4,1")]

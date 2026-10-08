@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1660 — Dial a PASV reply's port 0 and read PASV numbers with leading zeros past three digits, as curl does
 
@@ -25,9 +25,9 @@ A `227` reply naming port 0 (`(127,0,0,1,0,0)`) or a number written with more th
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Ftp.UnitTests` pins a `227` reply with port 0 dialling port 0 and the connector's failure ending the transfer as curl 8.21.0's exit 7 does.
-- [ ] A test pins `(127,0,0,1,0001,1)` dialling port 257.
-- [ ] `dotnet build` is clean and the fast tests pass, `FtpProtocolHandlerAdversarialTests` included.
+- [x] A test in `Curl.Protocol.Ftp.UnitTests` pins a `227` reply with port 0 dialling port 0 and the connector's failure ending the transfer as curl 8.21.0's exit 7 does.
+- [x] A test pins `(127,0,0,1,0001,1)` dialling port 257.
+- [x] `dotnet build` is clean and the fast tests pass, `FtpProtocolHandlerAdversarialTests` included.
 
 ## Notes
 
@@ -35,3 +35,4 @@ A `227` reply naming port 0 (`(127,0,0,1,0,0)`) or a number written with more th
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A 227 reply's port 0 is dialled (exit 7) and PASV numbers with any leading zeros are read by value, as curl 8.21.0 does
