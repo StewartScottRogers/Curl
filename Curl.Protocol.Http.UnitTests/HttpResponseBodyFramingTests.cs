@@ -75,7 +75,8 @@ public sealed class HttpResponseBodyFramingTests
             () => HttpResponseBodyFraming.Of(Headers("gzip", null), passesTransferCoding: false, ignoresContentLength: true));
 
         Diagnostics.Act("exception", $"{thrown.GetType().Name}, exit {(int)thrown.ExitCode} ({thrown.ExitCode}): {thrown.Message}");
-        Diagnostics.Assert("exception type", typeof(HttpTransferException).Name, thrown.GetType().Name);
+        Diagnostics.Assert("exit code", CurlExitCode.BadContentEncoding, thrown.ExitCode);
+        Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode);
     }
 
     [TestMethod]

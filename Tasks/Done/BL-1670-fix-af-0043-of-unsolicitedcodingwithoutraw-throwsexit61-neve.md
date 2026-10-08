@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1670 — Fix AF-0043: Of_UnsolicitedCodingWithoutRaw_ThrowsExit61 never checks exit code 61
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The test already captured the exception but only asserted its type; it now asserts `CurlExitCode.BadContentEncoding` (61) with `Assert.AreEqual` and a matching `Diagnostics.Assert`, like `Of_InvalidContentLength_ThrowsExit8`. Test-only change: no library code changed, so no coverage measurement was needed.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Of_UnsolicitedCodingWithoutRaw_ThrowsExit61 now asserts exit code 61 (BadContentEncoding)
