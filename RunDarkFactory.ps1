@@ -55,7 +55,7 @@
     five Sonnet test-writers in one message cost BL-1486 $2.97 of its $4.65; AF-0098: three
     test-writers, then on Opus, in one message took BL-1585 to $4.49; AF-0100: three Sonnet
     test-writers, each started in the background in its own message, took BL-1555 to
-    $4.33). What the
+    $4.33; AF-0102: three test-writers on Opus in one message took BL-1586 to $4.23). What the
     task's own runs of the last 24 hours cost comes off its next run's cap, down to $1, so a
     requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56; AF-0099:
     BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more). Once
@@ -3277,7 +3277,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    Run at most one subagent at a time, and never start several in one message or
    start one in the background while another runs: the
    shift's cost cap is checked only between your own turns, so subagents running in
-   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100).
+   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3367,7 +3367,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    Run at most one subagent at a time, and never start several in one message or
    start one in the background while another runs: the
    shift's cost cap is checked only between your own turns, so subagents running in
-   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100).
+   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
