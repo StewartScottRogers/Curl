@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1766 — Fix AF-0088: ADR-0410 decision 3 says file:// reads a source's time with stat off Windows; off Windows the code reads nothing
 
@@ -41,12 +41,22 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fixed the ADR, not the code: this is a docs task whose `touches` is Documentation only.
+  ADR-0410 decision 3 now says Windows reads the raw `FILETIME` with `GetFileTime` and off
+  Windows `NoRawSourceLastWriteReader` reads nothing yet; decision 4 now names `utimes`, the
+  call `NativeFileTimeSetter` imports. The missing off-Windows `stat` reader is filed as BL-1790.
+- Reproduction now: the first command prints nothing (the ADR no longer claims `stat` off
+  Windows); the handler line still matches, which the expected result's "either" allows.
+- Edited directly rather than through align-and-document: a two-sentence ADR correction.
+- Build clean; fast tests green (0 failing assemblies).
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. ADR-0410 decisions 3 and 4 describe the code as it is: FILETIME read on Windows only, no stat read off Windows yet (BL-1790), utimes off Windows
