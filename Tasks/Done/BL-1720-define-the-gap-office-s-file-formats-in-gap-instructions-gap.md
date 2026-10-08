@@ -9,7 +9,7 @@ touches: [Gap/Instructions/Gap-Format.md, Gap/Findings/README.md, Gap/Findings/F
 model: opus
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1720 — Define the gap office's file formats in Gap/Instructions/Gap-Format.md
 
@@ -112,16 +112,26 @@ PowerShell 5.1 reads the files the same as PowerShell 7.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Instructions/Gap-Format.md` has one section for each of the ten formats above. Each has a field table and a complete example, and each JSON example parses with `ConvertFrom-Json` in Windows PowerShell 5.1.
-- [ ] The item key rule lists the seven area names exactly as above, with an example key per area.
-- [ ] Each area's closed vocabulary of `unmeasured` and `excluded` reasons is listed. For behaviour it includes at least `needs-server:<protocol>`, `harness-unsupported`, `unknown-variable`, `libcurl-api`, `libcurl-unit-test`, `debug-build-only` and `reference-lacks:<feature>`.
-- [ ] `Gap/Findings/README.md` states the closing and reopening rule of ADR-0433 decision 5 and the statuses `open`, `closed` and `rejected`. `Gap/Findings/FINDING-TEMPLATE.md` has exactly the front matter and sections listed in item 7.
-- [ ] `Gap/Scorecards/README.md` lists the scorecard's fixed sections and the `history.json` entry shape.
-- [ ] No file in this task names an `Audit/` path as something a gap tool reads.
+- [x] `Gap/Instructions/Gap-Format.md` has one section for each of the ten formats above. Each has a field table and a complete example, and each JSON example parses with `ConvertFrom-Json` in Windows PowerShell 5.1.
+- [x] The item key rule lists the seven area names exactly as above, with an example key per area.
+- [x] Each area's closed vocabulary of `unmeasured` and `excluded` reasons is listed. For behaviour it includes at least `needs-server:<protocol>`, `harness-unsupported`, `unknown-variable`, `libcurl-api`, `libcurl-unit-test`, `debug-build-only` and `reference-lacks:<feature>`.
+- [x] `Gap/Findings/README.md` states the closing and reopening rule of ADR-0433 decision 5 and the statuses `open`, `closed` and `rejected`. `Gap/Findings/FINDING-TEMPLATE.md` has exactly the front matter and sections listed in item 7.
+- [x] `Gap/Scorecards/README.md` lists the scorecard's fixed sections and the `history.json` entry shape.
+- [x] No file in this task names an `Audit/` path as something a gap tool reads.
 
 ## Notes
+
+- Choices made where the task left them open, all sensible defaults:
+  - Reasons every area may use: `no-probe` (unmeasured) and `reference-lacks:<feature>` (excluded).
+  - Other reasons added beyond the task list: `timeout` (behaviour), `source-not-found` and `obsolete-code` (exitcodes), `platform:<os>` (options, environment, behaviour).
+  - A reason that needs a value takes it after a colon (`needs-server:smtp`).
+  - Finding `task` is the open task (or empty), `tasks` is every task ever filed. A finding's group key is not an item key.
+  - Scorecard "Change" is percentage points since the last run on the same platform.
+  - Against the newest version, items marked `excluded` leave Y as they do in the target score.
+  - The dashboard `url` points at the finding on the `gap` branch, where findings are committed (ADR-0433 decision 7).
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Gap-Format.md defines all ten formats; findings and scorecards READMEs and the finding template written; JSON examples parse in PowerShell 5.1
