@@ -130,6 +130,12 @@
     pull request, by Stewart's standing permission - only when the CI workflow passed on
     Windows, Linux and macOS for the exact commit being merged.
 
+    A commit that only changes the board and is pushed on its own - a claim, requeue,
+    park, return or CI-watch filing - says [skip ci], so it starts no CI run and cancels
+    none: with lanes claiming every minute or two, every run was once cancelled for two
+    hours after a fix was in (AF-0089). When the commit to merge is one of those, the
+    coordinator starts a CI run on it by hand before it waits for the result.
+
     CI WATCH
 
     Lanes test only on Windows, so a lane shift's coordinator watches CI for them (BL-987).
@@ -2421,6 +2427,13 @@ if ($TestAudioOff) {
     exit $(if ($script:audioOffFailed) { 1 } else { 0 })
 }
 
+# The body of every commit that changes only the board and is pushed on its own - a claim,
+# requeue, park, return or CI-watch filing. CI's concurrency group cancels the run in
+# progress at each push, and with lanes claiming every minute or two no run finished for
+# two hours after a fix was in (AF-0089); GitHub starts no run for a push whose head
+# commit says this, so board pushes no longer cancel the run that tests the code.
+$SkipCiNote = '[skip ci] Board change only; the run on the code before it stands.'
+
 function Invoke-MergeToMaster {
     # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
     # into master through a pull request - only when the CI workflow passed, on every
@@ -2434,6 +2447,8 @@ function Invoke-MergeToMaster {
     # CI on the last push takes a few minutes; wait for the run on this exact commit.
     $deadline = (Get-Date).AddMinutes(30)
     $run = $null
+    # A board-only head commit started no run (AF-0089), so start one on it by hand.
+    if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
     while ($true) {
         $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
         if ($run.Count -and $run[0].status -eq 'completed') { break }
@@ -2852,7 +2867,7 @@ function New-CiFailureTasks {
             }
             if (-not $filed.Count) { return }
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
-            git -C $CiWatchDir commit -q -m "chore(tasks): file $(($filed | ForEach-Object { $_.Id }) -join ', ') for CI failures" -m "Filed by the dark factory's CI watch (BL-987)." 2>&1 | Out-Null
+            git -C $CiWatchDir commit -q -m "chore(tasks): file $(($filed | ForEach-Object { $_.Id }) -join ', ') for CI failures" -m "Filed by the dark factory's CI watch (BL-987)." -m $SkipCiNote 2>&1 | Out-Null
             git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { continue }
             foreach ($task in $filed) {
@@ -3614,7 +3629,7 @@ function Invoke-Claim {
             $requeued = @(Invoke-Requeue)
             if ($requeued.Count) {
                 Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-                Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done") | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done", '-m', $SkipCiNote) | Out-Null
                 if (-not (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))) { continue }
             }
             $boardArgs = @('next')
@@ -3628,7 +3643,7 @@ function Invoke-Claim {
             Invoke-Board @('move', '-Id', $id, '-To', 'Doing') | Out-Null
             if ((Get-TaskState $id) -ne 'Doing') { continue }
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-            Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane") | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane", '-m', $SkipCiNote) | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return @{ Id = $id } }
             # Only a claim that was pushed is traced as 'claim', so the log counts claims
             # truly; a refused push is 'race', and an unheard one is no race at all.
@@ -3786,7 +3801,7 @@ function Invoke-Park {
             if ((Get-TaskState $Id) -ne 'Doing') { return '' }
             Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane could not integrate: $Why. The work is on branch $park; start with git cherry-pick --no-commit $park and fix it.") | Out-Null
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-            Invoke-Git @('commit', '-q', '-m', "chore(tasks): park $Id - $Why") | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): park $Id - $Why", '-m', $SkipCiNote) | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
         }
     } finally { $lock.Dispose() }
@@ -4360,7 +4375,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             }
             if ($returned.Count) {
                 git -C $Root add -A Tasks 2>&1 | Out-Null
-                git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" 2>&1 | Out-Null
+                git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" -m $SkipCiNote 2>&1 | Out-Null
                 git -C $Root push -q origin "HEAD:$branch" 2>&1 | Out-Null
                 if ($LASTEXITCODE -ne 0) {
                     git -C $Root reset -q --hard "origin/$branch" 2>&1 | Out-Null

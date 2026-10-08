@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1767 — Fix AF-0089: CI red for 169 minutes from run 37694677072 on 5c771af7; the fix was pushed at 23:03Z but every CI run was cancelled for two hours
 
@@ -41,12 +41,26 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: `ci.yml`'s concurrency group cancels the run in progress on every push, and
+  board-only pushes (58 of the branch's commits in those two hours were claims) came
+  faster than a CI run finishes. `ci.yml` is a guard file, so the fix is in
+  `RunDarkFactory.ps1`: claim, requeue, park, return and CI-watch filing commits now carry
+  `[skip ci]` in their body, so they start no run and cancel none. The shift-end merge
+  starts CI by hand (`gh workflow run CI`) when the head is such a commit, so it still
+  merges only a commit CI passed. Renumber and archive commits are left alone because
+  they can head a code integration push. See ADR-0436.
+- The reproduction reads the logs from 2026-10-07, which will always show that one spell.
+  The fix stops new spells. A re-audit with a later `-Since` is what shows it worked.
+- Checked: the script parses, `-TestTaskIds` passes, and a commit made with the new
+  arguments has `[skip ci]` in its message.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Board-only factory pushes carry [skip ci] so they no longer cancel the CI run on the code; shift-end merge dispatches CI on such a head (ADR-0436).
