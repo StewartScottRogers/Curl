@@ -1,0 +1,38 @@
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    Gap - a Visual Studio Shared Project (.shproj) holding the gap analysis office.
+
+    The office measures Curl against upstream curl's own release data, area by
+    area (ADR-0433); README.md maps its folders.
+
+    A shared project produces no build output; it is a browsable container that
+    surfaces the office as a first-class node in Solution Explorer. The actual file
+    list lives in Gap.projitems.
+
+    Every CodeSharing import below is guarded with Condition="Exists(...)" for the
+    same reason as in Documentation.shproj: those .props/.targets ship with Visual
+    Studio, not with the .NET SDK, so an unguarded import fails on a machine that
+    only has the SDK installed.
+  -->
+
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8AD9ABE3-ECE3-4DD6-A9F6-C0D86B3C82DF}</ProjectGuid>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props"
+          Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.Default.props"
+          Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.Default.props')" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.props"
+          Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.Common.props')" />
+
+  <PropertyGroup />
+
+  <Import Project="Gap.projitems" Label="Shared" />
+
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.CSharp.targets"
+          Condition="Exists('$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\CodeSharing\Microsoft.CodeSharing.CSharp.targets')" />
+
+</Project>

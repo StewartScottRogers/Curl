@@ -5,7 +5,7 @@
     the legacy .sln never was. Requires .NET SDK 9.0.200+ or Visual Studio 17.13+;
     this repo is on SDK 10.0.401.
 
-    Documentation, Tasks, .claude/Claude and Audit are shared projects: they carry no build output, so they add
+    Documentation, Tasks, .claude/Claude, Audit and Gap are shared projects: they carry no build output, so they add
     nothing to build time while keeping the product and planning documents
     visible in Solution Explorer.
   -->
@@ -123,5 +123,6 @@
   <Project Path=".claude/Claude.shproj" />
   <Project Path="Tasks/Tasks.shproj" />
   <Project Path="Audit/Audit.shproj" />
+  <Project Path="Gap/Gap.shproj" />
 
 </Solution>

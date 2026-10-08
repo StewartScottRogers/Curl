@@ -1,0 +1,36 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    Shared-items manifest for the Gap shared project.
+
+    SharedGUID must match the ProjectGuid in Gap.shproj; Visual Studio pairs the
+    two files by that value.
+
+    The glob is recursive and takes every file, and here it is load-bearing rather
+    than a convenience: the gap analysis office's scripts write upstream
+    inventories, findings and scorecards into new folders outside Visual Studio on
+    every run, in several file types. An explicit <None> list would be wrong after
+    every run. With the glob, every file shows up on the next project reload. The
+    two project files are excluded so they do not list themselves.
+
+    If Visual Studio ever rewrites the glob below into a list of individual files
+    (it can do this when files are added or moved through Solution Explorer),
+    restore the single wildcard line.
+  -->
+
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>{8AD9ABE3-ECE3-4DD6-A9F6-C0D86B3C82DF}</SharedGUID>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Gap</Import_RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)**\*"
+          Exclude="$(MSBuildThisFileDirectory)Gap.shproj;$(MSBuildThisFileDirectory)Gap.projitems" />
+  </ItemGroup>
+
+</Project>
