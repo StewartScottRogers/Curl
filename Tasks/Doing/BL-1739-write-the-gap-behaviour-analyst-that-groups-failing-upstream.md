@@ -67,3 +67,4 @@ The agent uses `model: opus` and `tools: Read, Grep, Glob, Bash`.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
