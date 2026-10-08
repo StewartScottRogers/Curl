@@ -202,6 +202,25 @@ public sealed class HttpChunkedDecoderTests
     }
 
     [TestMethod]
+    [DataRow(4095, 18, "transfer closed with outstanding read data remaining", DisplayName = "4095 bytes, closed")]
+    [DataRow(4096, 100, "Out of memory in chunked-encoding", DisplayName = "4096 bytes, closed")]
+    public async Task CopyAsync_UnendedTrailerThenClose_FailsTooLargeOnlyAtThe4096thByte(int length, int exitCode, string message)
+    {
+        string trailer = "X: " + new string('a', length - 3);
+        Diagnostics.Arrange("unended trailer length", length);
+        foreach (int chunkSize in ChunkSizes)
+        {
+            HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+                async () => await CopyAsync(ChunkedHead + $"5\r\nhello\r\n0\r\n{trailer}", chunkSize));
+
+            Diagnostics.Act($"exit at chunk size {chunkSize}", $"{thrown.ExitCode}: {thrown.Message}");
+            Diagnostics.Assert($"exit at chunk size {chunkSize}", (CurlExitCode)exitCode, thrown.ExitCode);
+            Assert.AreEqual((CurlExitCode)exitCode, thrown.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(message, thrown.Message, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
     public async Task CopyAsync_TrailerFailsAfterAnother_KeepsTheOneBefore()
     {
         Diagnostics.Arrange("trailers", Visible("X-T: 1\r\nbad\r\n\r\n"));
