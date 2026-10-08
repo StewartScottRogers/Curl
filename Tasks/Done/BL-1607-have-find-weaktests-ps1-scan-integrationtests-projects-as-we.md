@@ -9,7 +9,7 @@ touches: [Audit/Tools/Find-WeakTests.ps1]
 lane: no
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-08
 ---
 # BL-1607 — Have Find-WeakTests.ps1 scan IntegrationTests projects as well as UnitTests projects
 
@@ -41,3 +41,5 @@ completed:
 - 2026-10-07: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master
+- 2026-10-08: Blocked -> Doing.
+- 2026-10-08: Doing -> Done. Merged to master in PR #72 with CI green on all three platforms

@@ -9,7 +9,7 @@ touches: []
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1690 — Fix AF-0071: Report-Format.md calls seven audit tools 'planned' that already exist in Audit/Tools
 
@@ -56,3 +56,5 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-07: Doing -> Backlog. The fix edits an audit-office file, which lanes may not touch (ADR-0267); marked lane: no for an interactive session on the audit branch
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master
+- 2026-10-08: Blocked -> Doing.
+- 2026-10-08: Doing -> Done. Merged to master in PR #72 with CI green on all three platforms

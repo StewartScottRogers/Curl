@@ -9,7 +9,7 @@ touches: [Audit/PlantedDefects, .claude/agents/audit-seeder.md]
 lane: no
 requirement: none
 created: 2026-10-03
-completed:
+completed: 2026-10-08
 ---
 # BL-1369 — Plant conformance defects only where the differential tool reaches, and record each one's trigger
 
@@ -36,3 +36,5 @@ Every planted conformance defect is reachable by the conformance auditor's gener
 - 2026-10-03: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master
+- 2026-10-08: Blocked -> Doing.
+- 2026-10-08: Doing -> Done. Merged to master in PR #72 with CI green on all three platforms

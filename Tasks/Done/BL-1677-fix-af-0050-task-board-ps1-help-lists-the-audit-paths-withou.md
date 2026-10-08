@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude/skills/task-board/task-board.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1677 — Fix AF-0050: task-board.ps1 help lists the audit paths without the four guard files the code also treats as audit paths
 
@@ -55,3 +55,5 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-07: Doing -> Backlog. Interactive only: the fix edits .claude/skills/task-board/task-board.ps1, a guard file no lane may change; an interactive session does it on the audit branch
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master
+- 2026-10-08: Blocked -> Doing.
+- 2026-10-08: Doing -> Done. Merged to master in PR #72 with CI green on all three platforms
