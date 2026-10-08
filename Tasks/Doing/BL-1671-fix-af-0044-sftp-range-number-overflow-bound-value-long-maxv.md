@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Needs Curl.Protocol.Ssh.UnitTests for the boundary tests, which BL-1518 (Doing) touches; resume once BL-1518 is Done.
+- 2026-10-07: Backlog -> Doing.
