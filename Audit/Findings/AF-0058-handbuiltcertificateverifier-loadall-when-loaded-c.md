@@ -3,8 +3,8 @@ id: AF-0058
 title: HandBuiltCertificateVerifier.LoadAll: 'when (loaded.Count > 0)' can become >= 0 with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs:LoadAll-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs:82:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
