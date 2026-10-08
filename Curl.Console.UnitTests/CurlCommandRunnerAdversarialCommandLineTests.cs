@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text;
+using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
@@ -33,7 +35,6 @@ public sealed class CurlCommandRunnerAdversarialCommandLineTests
     [DataRow("--max-filesize", "-1")]
     [DataRow("--max-redirs", "-2")]
     [DataRow("--retry", "1.5")]
-    [DataRow("--retry", "2147483648")]
     public async Task RunAsync_NumericOptionWithValueOutsideItsValidPartition_PrintsProperNumericalParameterAndExitsFailedInit(
         string option, string value)
     {
@@ -52,6 +53,31 @@ public sealed class CurlCommandRunnerAdversarialCommandLineTests
         AssertRefusedBeforeAnyTransfer(
             result,
             "curl: option --retry: expected a positive numerical parameter" + Environment.NewLine + TryHelpLine);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_RetryOnePastThePlatformLongMaximum_PrintsProperNumericalParameterAndExitsFailedInit()
+    {
+        // curl reads --retry into a C long: 2^31-1 at most on Windows, 2^63-1 on Linux and macOS.
+        string onePastTheCeiling = ((ulong)CommandLineNumber.PlatformLongMaximum + 1).ToString(CultureInfo.InvariantCulture);
+
+        RunResult result = await RunAsync(["--retry", onePastTheCeiling, Url]);
+
+        AssertRefusedBeforeAnyTransfer(
+            result,
+            "curl: option --retry: expected a proper numerical parameter" + Environment.NewLine + TryHelpLine);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task RunAsync_RetryOnePastIntMaxValueOffWindows_RunsTheTransfer()
+    {
+        RunResult result = await RunAsync(["--retry", "2147483648", "--retry-max-time", "0", Url], handlerExitCode: CurlExitCode.Ok);
+
+        Diagnostics.Assert("exit code", (int)CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual((int)CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("transfers run", 1, result.TransfersRun);
+        Assert.AreEqual(1, result.TransfersRun);
     }
 
     [TestMethod]
