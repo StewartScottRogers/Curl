@@ -36,11 +36,19 @@ internal static class UpstreamCaseVerification
     /// <param name="testCase">The expanded case.</param>
     /// <param name="run">What the run produced.</param>
     /// <returns>A sentence naming the first difference, or <see langword="null"/> when the run matches.</returns>
-    public static string? FindFirstDifference(UpstreamTestCase testCase, UpstreamCaseRun run)
+    public static string? FindFirstDifference(UpstreamTestCase testCase, UpstreamCaseRun run) =>
+        FindFirstDifference(testCase, run, UpstreamRegex.MatchTimeout);
+
+    /// <summary>Finds the first way the run differs from what the case expects.</summary>
+    /// <param name="testCase">The expanded case.</param>
+    /// <param name="run">What the run produced.</param>
+    /// <param name="stripMatchTimeout">How long one <c>&lt;strip&gt;</c> pattern match may run.</param>
+    /// <returns>A sentence naming the first difference, or <see langword="null"/> when the run matches.</returns>
+    public static string? FindFirstDifference(UpstreamTestCase testCase, UpstreamCaseRun run, TimeSpan stripMatchTimeout)
     {
         Func<string?>[] checks =
         [
-            () => CompareProtocol(testCase, run.ReceivedBytes),
+            () => CompareProtocol(testCase, run.ReceivedBytes, stripMatchTimeout),
             () => CompareReplyData(testCase, run.OutputFileBytes),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
             () => CompareOutput(testCase, "stderr", "stripfile", run.StandardError),
@@ -58,7 +66,7 @@ internal static class UpstreamCaseVerification
         }
     }
 
-    private static string? CompareProtocol(UpstreamTestCase testCase, byte[] received)
+    private static string? CompareProtocol(UpstreamTestCase testCase, byte[] received, TimeSpan stripMatchTimeout)
     {
         if (testCase.Find("verify", "protocol") is not { } part)
         {
@@ -66,7 +74,7 @@ internal static class UpstreamCaseVerification
         }
 
         Regex[] strips = UpstreamTestPartBodies.Lines(testCase.Find("verify", "strip"))
-            .Select(line => UpstreamRegex.TryCreate(line, RegexOptions.None)).OfType<Regex>().ToArray();
+            .Select(line => UpstreamRegex.TryCreate(line, RegexOptions.None, stripMatchTimeout)).OfType<Regex>().ToArray();
         byte[] expected = Strip(Expected(part), strips, []);
         byte[] actual = Strip(received, strips, Substitutions(testCase, "strippart"));
         return UpstreamFirstDifference.Describe("<verify><protocol>", expected, actual);

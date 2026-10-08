@@ -117,6 +117,23 @@ public sealed class ConnectResultTests
     }
 
     [TestMethod]
+    [DataRow(0, DisplayName = "default")]
+    [DataRow(3, DisplayName = "3 headers")]
+    public void Connected_WithAConnectReplyHeaderCount_CarriesItAndDefaultsToZero(int count)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("connect reply headers stored", count);
+
+        var result = count == 0
+            ? ConnectResult.Connected(new UnusedConnection())
+            : ConnectResult.Connected(new UnusedConnection(), null, connectReplyHeadersStored: count);
+
+        diagnostics.Act("connect reply headers stored", result.ConnectReplyHeadersStored);
+        diagnostics.Assert("connect reply headers stored", count, result.ConnectReplyHeadersStored);
+        Assert.AreEqual(count, result.ConnectReplyHeadersStored);
+    }
+
+    [TestMethod]
     public void Connected_WithTimingsOnly_CarriesThemAndDefaultsTheRest()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

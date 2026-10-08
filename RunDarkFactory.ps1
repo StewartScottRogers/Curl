@@ -39,7 +39,9 @@
     run that needs a project outside `touches` widens it, checking the overlap against
     the shared branch's Doing rather than its own stale copy; a new ADR or a newly filed
     task never needs `touches` and never sends a task back (BL-1069). Before each claim the shift
-    also requeues any Blocked task whose reason names only tasks that are now Done.
+    also requeues any Blocked task whose reason names only tasks that are now Done. A task
+    a lane sends back to Backlog (requeued or parked) is not claimed again by any lane of
+    the same shift (lanes-<stamp>\requeued.txt); the next shift tries it afresh (AF-0072).
 
     COST CAP
 
@@ -47,10 +49,34 @@
     of the newest 40 task runs in the log folder, never below $2 and never above
     -TaskBudgetUsd (default $6; AF-0004, AF-0033, ADR-0288, ADR-0407). 2.7 rather than 3
     because claude checks the cap between turns, so a run can end one turn's cost above
-    it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A task run that
+    it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A turn that waits
+    on subagents spends all of theirs before the next check, so the prompt allows one
+    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed and the task
     goes to Blocked for Stewart, since it is too big for one run and wants splitting.
     -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
+
+    THE MODEL PER TASK
+
+    Each run uses the Claude model its task calls for (BL-1705), chosen in this order:
+      1. -Model other than auto (its default; a CLAUDE_MODEL environment value counts as
+         given) forces that model for every task, as before. The shift start, the
+         -Continuous hand-over and -Restart forward -Model unchanged, so auto stays auto.
+      2. Otherwise the task's own front-matter model: haiku | sonnet | opus wins. Any other
+         value is ignored with a "model" trace warning and the rule below applies.
+      3. Otherwise opus when the task's touches name a hand-built security or crypto
+         library (Curl.Cryptography, Curl.Tls, Curl.Quic, Curl.Kerberos, Curl.Ntlm,
+         Curl.Protocol.Ssh, or their .UnitTests or .IntegrationTests twin), its pipeline is
+         feature or protocol, its Log shows an earlier claim that came back ("Doing ->
+         Backlog" or "Doing -> Blocked": a requeue, a park, a hand-back or a failed run),
+         or it is a High "Fix CI failure ..." or "Fix flaky CI test ..." task; sonnet for
+         everything else. The rule never picks haiku.
+    The resolver's, overtime and resumed runs use their task's model; the --max-turns 1
+    probes use sonnet under auto. The claim and end trace lines say "[model <m>: <why>]",
+    the heartbeat and status.json lane objects carry model and modelWhy, each run log's
+    first line is {"type":"factory","model":...,"why":...}, and the lane SUMMARY lines and
+    the shift's closing trace print runs, tasks and US dollars per model.
+    -TestModelChoice proves the rule.
 
     OUT OF TOKENS
 
@@ -165,8 +191,10 @@
       run        /task-run in the lane's worktree. The run commits but never pushes.
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
-                 failing test names traced as "flaky?"; only red twice parks (BL-898). A conflict gets one headless run to resolve
-                 it. Work that still will not integrate is pushed to its own branch,
+                 failing test names traced as "flaky?"; only red twice counts (BL-898). A conflict gets one headless run to resolve
+                 it, and a finished task whose build or tests go red on the rebased
+                 tree gets one headless repair run there, still holding the lock,
+                 traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
                  factory/<ID>-lane-<n>-<stamp>, and the task goes back to Backlog on the
                  shared branch, retried for several minutes; a park whose move is never
                  pushed is in the lane's summary and the end-of-shift report (BL-1071).
@@ -299,6 +327,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestCiWatch
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskIds
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskBudget
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice
 #>
 [CmdletBinding()]
 param(
@@ -313,8 +342,9 @@ param(
     # --max-budget-usd); the cap is 2.7 times the median recent run up to this, and a run
     # that reaches it has its task filed as Blocked. 0 means no cap (ADR-0288, ADR-0407).
     [double]$TaskBudgetUsd = 6,
-    # Model for each run. "opus" is the moving alias RunClaude.cmd also uses.
-    [string]$Model = $(if ($env:CLAUDE_MODEL) { $env:CLAUDE_MODEL } else { 'opus' }),
+    # Model for every run, or auto (the default) to choose one per task; see THE MODEL PER
+    # TASK above. "opus" is the moving alias RunClaude.cmd also uses.
+    [string]$Model = $(if ($env:CLAUDE_MODEL) { $env:CLAUDE_MODEL } else { 'auto' }),
     # Show the attention banner and exit, to check it can be seen across the room.
     [switch]$TestAlarm,
     # Multiplies the alarm's stage timings; 0.1 runs the whole ladder in about 90 seconds.
@@ -357,6 +387,8 @@ param(
     [switch]$TestTaskIds,
     # Prove the cost cap follows 2.7 times the median recent run cost (AF-0033), and exit.
     [switch]$TestTaskBudget,
+    # Prove the choice of model per task (BL-1705), and exit.
+    [switch]$TestModelChoice,
     # Prove the audit cadence: the shift-end audit check and the start refusal (BL-1022), and exit.
     [switch]$TestAuditCadence,
     # Prove the audio-off file silences the alarm, chimes and spoken notices, and that they
@@ -441,6 +473,8 @@ $Board = Join-Path $Root '.claude\skills\task-board\task-board.ps1'
 $LogDir = if ($LogRoot) { $LogRoot } else { "$Root.logs" }
 $Stamp = if ($ShiftStamp) { $ShiftStamp } else { Get-Date -Format 'yyyyMMdd-HHmmss' }
 $LaneTag = if ($Lane) { "-L$Lane" } else { '' }
+# The --max-turns 1 probes need no reasoning, so under -Model auto they use sonnet (BL-1705).
+$ProbeModel = if ($Model -eq 'auto') { 'sonnet' } else { $Model }
 $TraceFile = Join-Path $LogDir "DarkFactory-$Stamp$LaneTag.log"
 # Lanes live beside the checkout: Z:\repos\Curl -> Z:\repos\Curl.lanes\lane-1. A lane
 # is itself one of those folders, so its lanes directory is its parent.
@@ -474,7 +508,7 @@ function Get-Short {
 # publish. The coordinator of a multi-lane shift runs no task and writes none, and nor
 # does the out-of-tokens rehearsal.
 $WritesHeartbeat = ($Lane -or (-not $AutoLanes -and $LaneCount -le 1)) -and -not $TestOutOfTokens
-$script:Beat = @{ Task = $null; Title = $null; Phase = 'starting'; Step = ''; TaskStartedAt = $null; WrittenAt = [datetime]::MinValue; FailureTraced = $false }
+$script:Beat = @{ Task = $null; Title = $null; Model = $null; ModelWhy = $null; Phase = 'starting'; Step = ''; TaskStartedAt = $null; WrittenAt = [datetime]::MinValue; FailureTraced = $false }
 
 function Get-UtcStamp {
     param([datetime]$When = (Get-Date))
@@ -485,7 +519,7 @@ function Set-HeartbeatTask {
     # The task the heartbeat names; '' when the runner holds none. A lane resuming a task it
     # held keeps the time it claimed it, which is when its lane-<n>.task file was written.
     param([string]$Id, [string]$Title = $null)
-    if (-not $Id) { $script:Beat.Task = $null; $script:Beat.Title = $null; $script:Beat.TaskStartedAt = $null; return }
+    if (-not $Id) { $script:Beat.Task = $null; $script:Beat.Title = $null; $script:Beat.Model = $null; $script:Beat.ModelWhy = $null; $script:Beat.TaskStartedAt = $null; return }
     if ($script:Beat.Task -eq $Id) { return }
     $started = Get-Date
     if ($Lane) {
@@ -512,6 +546,8 @@ function Write-Heartbeat {
             lane = $Lane
             task = $script:Beat.Task
             title = $script:Beat.Title
+            model = $script:Beat.Model
+            modelWhy = $script:Beat.ModelWhy
             phase = $script:Beat.Phase
             step = $script:Beat.Step
             taskStartedAt = $script:Beat.TaskStartedAt
@@ -1643,7 +1679,7 @@ function Invoke-LimitProbe {
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $env:ComSpec
-        $psi.Arguments = "/d /c claude -p --model $Model --output-format stream-json --verbose --max-turns 1 2>nul"
+        $psi.Arguments = "/d /c claude -p --model $ProbeModel --output-format stream-json --verbose --max-turns 1 2>nul"
         $psi.WorkingDirectory = $Root
         $psi.UseShellExecute = $false
         $psi.RedirectStandardInput = $true
@@ -1866,6 +1902,165 @@ function Get-RecentRunCosts {
         $evt = try { $line | ConvertFrom-Json } catch { $null }
         if ($evt -and $evt.type -eq 'result') { [double]$evt.total_cost_usd }
     }
+}
+
+# ---- the model per task (BL-1705; THE MODEL PER TASK in the header)
+
+$ModelNames = 'haiku', 'sonnet', 'opus'
+# The hand-built security and crypto libraries; a task touching one, or its test twin, runs on opus.
+$OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 'Curl.Ntlm', 'Curl.Protocol.Ssh'
+$OpusLibraryPattern = '^(' + (($OpusLibraries | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')(\.(UnitLibrary|UnitTests|IntegrationTests))?([\\/].*)?$'
+$script:ModelChoice = @{ Id = ''; Model = ''; Why = '' }
+
+function Get-ModelChoice {
+    # The model a task runs on and why: a forced -Model, else the task's own model:, else
+    # opus for security, crypto, feature, protocol, retried and CI-fix work and sonnet for
+    # the rest. The rule never picks haiku. Warning names an ignored model: value.
+    param([string]$Forced, [string]$TaskModel = '', [string]$Pipeline = '', [string]$Priority = '',
+        [string[]]$Touches = @(), [string]$Title = '', [switch]$Retried)
+    if ($Forced -and $Forced -ne 'auto') { return [pscustomobject]@{ Model = $Forced; Why = '-Model forces it'; Warning = '' } }
+    $warning = ''
+    if ($TaskModel) {
+        if ($TaskModel -in $ModelNames) { return [pscustomobject]@{ Model = $TaskModel.ToLowerInvariant(); Why = 'task model field'; Warning = '' } }
+        $warning = "model: $TaskModel is not haiku, sonnet or opus; ignored"
+    }
+    $library = @($Touches | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match $OpusLibraryPattern }) | Select-Object -First 1
+    $why = if ($library) { "touches $library" }
+        elseif ($Pipeline -in 'feature', 'protocol') { "$Pipeline pipeline" }
+        elseif ($Retried) { 'retry after a run that came back' }
+        elseif ($Priority -eq 'High' -and $Title -match '^Fix (CI failure|flaky CI test)') { 'CI failure fix' }
+        else { '' }
+    if ($why) { return [pscustomobject]@{ Model = 'opus'; Why = $why; Warning = $warning } }
+    $why = if ($Pipeline) { "$Pipeline pipeline" } else { 'no pipeline' }
+    return [pscustomobject]@{ Model = 'sonnet'; Why = $why; Warning = $warning }
+}
+
+function Test-TaskRetried {
+    # Whether a task's Log shows an earlier claim that came back, as task-board.ps1 writes
+    # it: "Doing -> Backlog" (a requeue, a park, a hand-back) or "Doing -> Blocked" (a
+    # failed, stalled or killed run).
+    param([string[]]$Lines)
+    return [bool](@($Lines | Where-Object { $_ -match '^\s*-\s.*\bDoing -> (Backlog|Blocked)\b' }).Count)
+}
+
+function Get-TaskModelChoice {
+    # Get-ModelChoice for a task file's lines: its front matter and its Log.
+    param([string]$Forced, [string[]]$Lines)
+    $fields = @{}
+    $dashes = 0
+    foreach ($line in $Lines) {
+        if ($line -match '^---\s*$') { if (++$dashes -ge 2) { break }; continue }
+        if ($dashes -eq 1 -and $line -match '^([A-Za-z-]+):\s*(.*)$') { $fields[$Matches[1]] = $Matches[2].Trim().Trim('"', "'") }
+    }
+    $touches = @("$($fields['touches'])".Trim('[', ']', ' ') -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    return Get-ModelChoice -Forced $Forced -TaskModel "$($fields['model'])" -Pipeline "$($fields['pipeline'])" -Priority "$($fields['priority'])" `
+        -Touches $touches -Title "$($fields['title'])" -Retried:(Test-TaskRetried $Lines)
+}
+
+function Set-ModelChoice {
+    # Chooses the model for the task about to run and puts it in the heartbeat.
+    param([string]$Id)
+    $file = Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" | Select-Object -First 1
+    $choice = Get-TaskModelChoice -Forced $Model -Lines $(if ($file) { @(Get-Content $file.FullName) } else { @() })
+    if ($choice.Warning) { Write-Trace $Id 'model' $choice.Warning 'DarkYellow' }
+    $script:ModelChoice = @{ Id = $Id; Model = $choice.Model; Why = $choice.Why }
+    $script:Beat.Model = $choice.Model
+    $script:Beat.ModelWhy = $choice.Why
+}
+
+function Format-ModelChoice {
+    # The model and why, for the claim and end trace lines: [model sonnet: docs pipeline].
+    if (-not $script:ModelChoice.Model) { return '' }
+    return "  [model $($script:ModelChoice.Model): $($script:ModelChoice.Why)]"
+}
+
+function Get-ModelCostSummary {
+    # Runs, tasks and US dollars per model over the run logs in -Dir whose names match
+    # -NamePattern: each log's first line names its model, its result event its cost.
+    param([string]$Dir, [string]$NamePattern)
+    $byModel = @{}
+    foreach ($log in @(Get-ChildItem $Dir -Filter 'BL-*.jsonl' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $NamePattern })) {
+        $head = try { Get-Content $log.FullName -TotalCount 1 | ConvertFrom-Json } catch { $null }
+        if (-not $head -or $head.type -ne 'factory' -or -not $head.model) { continue }
+        $name = "$($head.model)"
+        if (-not $byModel.ContainsKey($name)) { $byModel[$name] = @{ Runs = 0; Tasks = @{}; Usd = 0.0 } }
+        $byModel[$name].Runs++
+        $byModel[$name].Tasks[(Get-TaskIdFromFileName $log.Name)] = $true
+        $line = Get-Content $log.FullName -Tail 5 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"total_cost_usd"' } | Select-Object -Last 1
+        $evt = try { $line | ConvertFrom-Json } catch { $null }
+        if ($evt -and $evt.type -eq 'result') { $byModel[$name].Usd += [double]$evt.total_cost_usd }
+    }
+    if (-not $byModel.Count) { return 'models: none' }
+    return 'models: ' + ((@($byModel.Keys | Sort-Object) | ForEach-Object {
+        "$_ $($byModel[$_].Runs) runs $($byModel[$_].Tasks.Count) tasks `$" + $byModel[$_].Usd.ToString('0.00', [System.Globalization.CultureInfo]::InvariantCulture)
+    }) -join '; ')
+}
+
+if ($TestModelChoice) {
+    function Get-CaseModel {
+        param([string]$Forced = 'auto', [string]$TaskModel = '', [string]$Pipeline = 'direct', [string]$Priority = 'Normal', [string[]]$Touches = @('Curl.Cli.UnitLibrary'), [string]$Title = 'Do a thing', [switch]$Retried)
+        $c = Get-ModelChoice -Forced $Forced -TaskModel $TaskModel -Pipeline $Pipeline -Priority $Priority -Touches $Touches -Title $Title -Retried:$Retried
+        return "$($c.Model)$(if ($c.Warning) { ' (warned)' })"
+    }
+    function Format-Choice { param($Choice) return "$($Choice.Model): $($Choice.Why)" }
+    $cases = @(
+        ,@('forced -Model beats the task model field', 'sonnet', (Get-CaseModel -Forced 'sonnet' -TaskModel 'opus' -Pipeline 'feature'))
+        ,@('forced haiku is honoured', 'haiku', (Get-CaseModel -Forced 'haiku'))
+        ,@('model: haiku wins over the rule', 'haiku', (Get-CaseModel -TaskModel 'haiku' -Pipeline 'feature'))
+        ,@('model: sonnet wins over the rule', 'sonnet', (Get-CaseModel -TaskModel 'sonnet' -Touches 'Curl.Tls.UnitLibrary'))
+        ,@('model: opus wins over the rule', 'opus', (Get-CaseModel -TaskModel 'Opus' -Pipeline 'docs'))
+        ,@('an invalid model: falls back to the rule', 'sonnet (warned)', (Get-CaseModel -TaskModel 'gpt'))
+        ,@('an invalid model: on feature work falls back to opus', 'opus (warned)', (Get-CaseModel -TaskModel 'fable' -Pipeline 'feature'))
+        ,@('feature pipeline', 'opus', (Get-CaseModel -Pipeline 'feature'))
+        ,@('protocol pipeline', 'opus', (Get-CaseModel -Pipeline 'protocol'))
+        ,@('a retried task', 'opus', (Get-CaseModel -Retried))
+        ,@('a High Fix CI failure task', 'opus', (Get-CaseModel -Priority 'High' -Title 'Fix CI failure Foo_Bar on Linux and macOS'))
+        ,@('a High Fix flaky CI test task', 'opus', (Get-CaseModel -Priority 'High' -Title 'Fix flaky CI test Foo_Bar'))
+        ,@('a Normal Fix CI failure task', 'sonnet', (Get-CaseModel -Title 'Fix CI failure Foo_Bar'))
+        ,@('docs pipeline', 'sonnet', (Get-CaseModel -Pipeline 'docs'))
+        ,@('a direct diagnostic-output task', 'sonnet', (Get-CaseModel -Title 'Print the lane diagnostics in the trace' -Touches 'RunDarkFactory.ps1'))
+        ,@('a Normal ordinary direct task', 'sonnet', (Get-CaseModel))
+        ,@('a lookalike library is not a crypto library', 'sonnet', (Get-CaseModel -Touches 'Curl.TlsSettings.UnitLibrary'))
+        ,@('-Model defaults to auto without CLAUDE_MODEL', 'auto', $(if ($env:CLAUDE_MODEL) { 'auto' } else { $Model }))
+        ,@('probes use sonnet under auto', 'sonnet', $(if ($Model -eq 'auto') { $ProbeModel } else { 'sonnet' })))
+    foreach ($library in $OpusLibraries) {
+        $cases += ,@("touches $library.UnitLibrary", 'opus', (Get-CaseModel -Touches 'Curl.Cli.UnitLibrary', "$library.UnitLibrary"))
+        $cases += ,@("touches $library.UnitTests", 'opus', (Get-CaseModel -Touches "$library.UnitTests"))
+    }
+    # The task file reading: front matter, touches list and the Log's retry test.
+    $front = @('---', 'id: BL-9', 'title: "Tidy names"', 'priority: Normal', 'pipeline: direct', 'touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]', '---', '## Log', '', '- 2026-10-07: Created.', '- 2026-10-07: Backlog -> Doing.')
+    $requeued = $front + @('- 2026-10-07: Doing -> Backlog: depends on BL-8.', '- 2026-10-07: Backlog -> Doing.')
+    $blockedOnce = $front + @('- 2026-10-07: Doing -> Blocked: Stewart: dark factory timed out.', '- 2026-10-07: Blocked -> Doing.')
+    $cases += ,@('a task file with an ordinary first claim', 'sonnet: direct pipeline', (Format-Choice (Get-TaskModelChoice -Forced 'auto' -Lines $front)))
+    $cases += ,@('a task file requeued once', 'opus: retry after a run that came back', (Format-Choice (Get-TaskModelChoice -Forced 'auto' -Lines $requeued)))
+    $cases += ,@('a task file blocked by a run', 'opus', (Get-TaskModelChoice -Forced 'auto' -Lines $blockedOnce).Model)
+    $cases += ,@('a task file touching Curl.Quic.UnitTests', 'opus', (Get-TaskModelChoice -Forced 'auto' -Lines ($front -replace 'Curl\.Cli\.UnitTests', 'Curl.Quic.UnitTests')).Model)
+    $cases += ,@('a task file with model: haiku', 'haiku', (Get-TaskModelChoice -Forced 'auto' -Lines ($front[0..5] + @('model: haiku') + $front[6..10])).Model)
+    $cases += ,@('a Log line in the body text is not a retry', 'False', "$(Test-TaskRetried 'Notes say Doing -> Backlog happens.')")
+    # -Model is forwarded as given by the shift start and the -Continuous hand-over, and
+    # -Restart reuses the coordinator's own command line, so auto stays auto.
+    $own = Get-Content -Raw $PSCommandPath
+    $cases += ,@('shift start and hand-over forward -Model as given', '2', "$(([regex]::Matches($own, "'-Model', \`$Model\b")).Count)")
+    # Cost per model from a made-up shift's logs.
+    $dir = Join-Path ([IO.Path]::GetTempPath()) "DarkFactoryModels-$PID"
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    Set-Content (Join-Path $dir 'BL-1-20261007-100000-L1.jsonl') '{"type":"factory","model":"sonnet","why":"docs pipeline"}', '{"type":"result","total_cost_usd":1.25}'
+    Set-Content (Join-Path $dir 'BL-1-20261007-100000-L1-resumed.jsonl') '{"type":"factory","model":"sonnet","why":"docs pipeline"}', '{"type":"result","total_cost_usd":0.5}'
+    Set-Content (Join-Path $dir 'BL-2-20261007-100000-L2.jsonl') '{"type":"factory","model":"opus","why":"feature pipeline"}', '{"type":"result","total_cost_usd":4}'
+    Set-Content (Join-Path $dir 'BL-3-20261006-100000-L1.jsonl') '{"type":"factory","model":"opus","why":"feature pipeline"}', '{"type":"result","total_cost_usd":9}'
+    $cases += ,@('runs, tasks and dollars per model for a shift', 'models: opus 1 runs 1 tasks $4.00; sonnet 2 runs 1 tasks $1.75', (Get-ModelCostSummary $dir '^BL-\d+-20261007-100000(-L\d+)?[-.]'))
+    $cases += ,@('the same for one lane', 'models: sonnet 2 runs 1 tasks $1.75', (Get-ModelCostSummary $dir '^BL-\d+-20261007-100000-L1[-.]'))
+    $cases += ,@('the model line leaves costs readable', '0.5,1.25,4,9', ((@(Get-RecentRunCosts $dir) | Sort-Object) -join ','))
+    Remove-Item -Recurse -Force $dir
+    $failed = 0
+    foreach ($case in $cases) {
+        if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+    }
+    # No case may give haiku unless haiku was asked for.
+    $unasked = @($cases | Where-Object { "$($_[2])" -like 'haiku*' -and $_[0] -notmatch 'haiku' })
+    if ($unasked.Count) { Write-Host "FAIL haiku chosen unasked: $($unasked[0][0])" -ForegroundColor Red; $failed++ }
+    exit $(if ($failed) { 1 } else { 0 })
 }
 
 if ($TestTaskBudget) {
@@ -2276,7 +2471,8 @@ function Get-CiFailures {
             $awaitingMessage[$job] = $false
             continue
         }
-        if (-not $entry.Project -and $text -match '\sin\s.*?[/\\](Curl[\w.]*\.UnitTests)[/\\]') { $entry.Project = $Matches[1] }
+        # A stack-trace frame under a test project's folder, either suffix: *.UnitTests or *.IntegrationTests.
+        if (-not $entry.Project -and $text -match '\sin\s.*?[/\\](Curl[\w.]*\.(?:UnitTests|IntegrationTests))[/\\]') { $entry.Project = $Matches[1] }
         if ($text -match '^Failed!\s.*-\s+([\w.]+)\.dll') {
             if (-not $entry.Project) { $entry.Project = $Matches[1] }
             $current[$job] = $null
@@ -2357,10 +2553,12 @@ function Get-CiTaskNewArgs {
 function Get-CiTouches {
     # The test project and the library it tests, or for a build error the project that did not
     # build and its twin, as far as they exist in -Repo. Empty when the project is unknown.
+    # Both test-project suffixes map to their library: X.UnitTests and X.IntegrationTests each
+    # give X.UnitLibrary and X (the latter for Curl.Console).
     param([string]$Project, [string]$Repo)
     if (-not $Project) { return @() }
     $pair = @($Project)
-    if ($Project -match '^(.+)\.UnitTests$') { $pair += @("$($Matches[1]).UnitLibrary", $Matches[1]) }
+    if ($Project -match '^(.+)\.(?:UnitTests|IntegrationTests)$') { $pair += @("$($Matches[1]).UnitLibrary", $Matches[1]) }
     elseif ($Project -match '^(.+)\.UnitLibrary$') { $pair += "$($Matches[1]).UnitTests" }
     else { $pair += "$Project.UnitTests" }
     return @($pair | Where-Object { Test-Path (Join-Path $Repo $_) -PathType Container })
@@ -2676,6 +2874,16 @@ if ($TestCiWatch) {
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f 'error CS1002 in X.cs' @('Linux') 'build')))))
     & $check 'flaky title' 'Fix flaky CI test A that failed once on Linux' (Get-CiTaskTitle ([pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'flaky'; Platforms = @('Linux') }))
     & $check 'touches' 'Curl.Protocol.Ssh.UnitTests,Curl.Protocol.Ssh.UnitLibrary' ((Get-CiTouches -Project 'Curl.Protocol.Ssh.UnitTests' -Repo $Root) -join ',')
+    & $check 'integration touches' 'Curl.Networking.IntegrationTests,Curl.Networking.UnitLibrary' ((Get-CiTouches -Project 'Curl.Networking.IntegrationTests' -Repo $Root) -join ',')
+    & $check 'console integration touches' 'Curl.Console.IntegrationTests,Curl.Console' ((Get-CiTouches -Project 'Curl.Console.IntegrationTests' -Repo $Root) -join ',')
+    $integrationLog = @(
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000000Z   Failed Connect_Loopback_Succeeds [12 ms]"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000001Z   Error Message:"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000002Z    Assert.AreEqual failed."
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000003Z      at Curl.Networking.TcpDialerTests.Connect_Loopback_Succeeds() in /home/runner/work/Curl/Curl/Curl.Networking.IntegrationTests/TcpDialerTests.cs:line 12"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000004Z Failed!  - Failed:     1, Passed:     3 - SomethingElse.dll (net10.0)")
+    & $check 'integration test failure parsed' 'Connect_Loopback_Succeeds|Curl.Networking.IntegrationTests' `
+        ((@(Get-CiFailures $integrationLog) | ForEach-Object { "$($_.Key)|$($_.Project)" }) -join ';')
     $body = Join-Path ([IO.Path]::GetTempPath()) "df-ci-body-$PID.md"
     Copy-Item (Join-Path $Root '.claude\skills\task-board\TASK-TEMPLATE.md') $body
     Set-CiTaskBody -Path $body -RunUrl 'https://github.com/o/r/actions/runs/9' -Verdict ([pscustomobject]@{
@@ -2854,6 +3062,9 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+   Run at most one subagent at a time, and never start several in one message: the
+   shift's cost cap is checked only between your own turns, so subagents running in
+   parallel all spend inside one turn and carry the run past the cap (AF-0052).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -2936,6 +3147,9 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+   Run at most one subagent at a time, and never start several in one message: the
+   shift's cost cap is checked only between your own turns, so subagents running in
+   parallel all spend inside one turn and carry the run past the cap (AF-0052).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -2976,6 +3190,40 @@ End your reply with exactly one line, either
 FACTORY: RESOLVED {ID}
 or
 FACTORY: UNRESOLVED {ID} <why>
+'@
+
+# A finished task whose build or fast tests went red only once the rebase put other
+# lanes' work under it is repaired there and then, by a run that sees the red tree, rather
+# than parked for a later run that starts from a green one. BL-1467 was claimed three
+# times: its second run rebuilt its own branch, found it green and changed nothing, and
+# was parked again for the same break (AF-0051).
+$RepairPrompt = @'
+DARK FACTORY SHIFT, LANE {LANE}. Stewart is away; never ask a question.
+
+Task {ID} is finished in this checkout and its commits have just been rebased onto
+origin/{BRANCH}, where other lanes pushed work meanwhile. The rebase went cleanly, but
+on the combined tree {RED}: this lane's change and theirs do not fit together (a type,
+member or test helper renamed, moved or deleted on one side, for instance). Fix it here:
+
+1. Run `dotnet build`, and `dotnet test --filter "TestCategory!=Integration"` once it
+   builds, to see what is red. It is red only on this combined tree, so do not judge
+   the task by its own commits alone.
+2. Fix the code so both sides' work survives: the other lanes' work is already shared,
+   and task {ID} must still do what its commits say. Adapt this lane's code to theirs;
+   change theirs only where nothing else fits.
+3. Build and run the fast tests again until both are green, then commit the fix
+   (Conventional Commits, naming {ID}). Do not move the task: it stays in Done.
+4. Never run git push, git pull, git fetch, git rebase, git reset, or git checkout of
+   another branch: the shift integrates your commit.
+5. This run ends the moment your reply ends, and anything still in the background dies
+   with it. Run dotnet build and dotnet test in the foreground with the Bash tool and a
+   timeout of up to 3600000 ms, and never end your reply to wait for a notification.
+   It is killed at {DEADLINE}.
+
+End your reply with exactly one line, either
+FACTORY: REPAIRED {ID}
+or
+FACTORY: UNREPAIRED {ID} <why>
 '@
 
 $script:ToolLabels = @{}
@@ -3077,7 +3325,7 @@ function Write-Event {
         'result' {
             $mins = [math]::Round($Evt.duration_ms / 60000, 1)
             $script:RunResult = $Evt
-            Write-Trace $Id 'end' "$($Evt.num_turns) turns, $mins min"
+            Write-Trace $Id 'end' "$($Evt.num_turns) turns, $mins min$(Format-ModelChoice)"
         }
     }
 }
@@ -3111,7 +3359,12 @@ function Invoke-TaskRun {
     # recent run, at most -TaskBudgetUsd.
     $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir)
     $budget = if ($script:RunBudgetUsd -gt 0) { ' --max-budget-usd ' + $script:RunBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
-    $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $Model --dangerously-skip-permissions --output-format stream-json --verbose$budget --disallowedTools $denied 2>`"$err`""
+    # The task's model (BL-1705); the resolver's, overtime and resumed runs keep it. The
+    # log's first line names it, so cost per model can be read back (Get-ModelCostSummary).
+    if ($script:ModelChoice.Id -ne $Id) { Set-ModelChoice $Id }
+    $runModel = $script:ModelChoice.Model
+    if (-not (Test-Path $raw)) { Add-Content -Path $raw -Value ([pscustomobject][ordered]@{ type = 'factory'; model = $runModel; why = $script:ModelChoice.Why } | ConvertTo-Json -Compress) -Encoding UTF8 }
+    $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $runModel --dangerously-skip-permissions --output-format stream-json --verbose$budget --disallowedTools $denied 2>`"$err`""
     $p = [System.Diagnostics.Process]::Start($psi)
     $p.StandardInput.Write($Text)
     $p.StandardInput.Close()
@@ -3132,7 +3385,7 @@ function Invoke-TaskRun {
             $timedOut = $true
             # A killed run sends no result event, so its end is traced here: without it the
             # lane log's last line for the run is whatever step it was in (AF-0034).
-            Write-Trace $Id 'end' "killed: timed out after $Minutes min" 'Red'
+            Write-Trace $Id 'end' "killed: timed out after $Minutes min$(Format-ModelChoice)" 'Red'
             break
         }
     }
@@ -3273,6 +3526,26 @@ function Test-Green {
     return "fast tests failed twice ($($first.Failed); then $($second.Failed))"
 }
 
+function Repair-IntegrationBreak {
+    # One repair run for a finished task that went red only on the rebased tree (AF-0051),
+    # while this lane still holds the integrate lock, so no other lane's push moves the tree
+    # under it. Returns '' once build and fast tests are green and committed, or why not.
+    param([string]$Id, [string]$Red)
+    Write-Trace $Id 'repair' "$Red after the rebase; one run to fix it on the combined tree" 'DarkYellow'
+    Set-HeartbeatStep @('repair', "$Red on the shared branch")
+    $text = $RepairPrompt.Replace('{RED}', $Red)
+    Invoke-TaskRun -Id $Id -Text $text -Deny $LaneForbidden -Suffix '-repair' -Minutes 30 | Out-Null
+    # The repair's work counts only once committed: what is pushed is HEAD, not the worktree.
+    if (Test-WorktreeDirty $Root) {
+        Invoke-Git @('add', '-A') | Out-Null
+        Invoke-Git @('commit', '-q', '-m', "fix: repair $Id on top of the other lanes' work") | Out-Null
+    }
+    $still = Test-Green -Id $Id
+    if ($still) { return "$Red, and still $still after a repair run" }
+    Write-Trace $Id 'repair' 'green on the combined tree after the repair run' 'Green'
+    return ''
+}
+
 function Invoke-Integrate {
     # Rebases this lane's commits onto the shared branch, checks them, and pushes. Returns
     # '' on success or why it could not.
@@ -3315,6 +3588,7 @@ function Invoke-Integrate {
             if ($State -eq 'Done') {
                 Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
                 $red = Test-Green -Id $Id
+                if ($red) { $red = Repair-IntegrationBreak -Id $Id -Red $red }
                 if ($red) { return "$red after rebasing onto the other lanes' work" }
                 Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
             }
@@ -3489,6 +3763,26 @@ function Get-LaneState {
     return ''
 }
 
+# Tasks a lane of this shift sent back to Backlog (requeued or parked), one ID a line in
+# <repo>.logs\lanes-<stamp>\requeued.txt. No lane of the same shift claims one again: a
+# task that fell short once - BL-1525 missed its timing target under eight lanes' load -
+# would only fall short again on the next lane, handing its work through the stash each
+# time (AF-0072). The next shift tries it afresh.
+function Get-ShiftRequeuedPath { return (Join-Path (Join-Path $LogDir "lanes-$Stamp") 'requeued.txt') }
+
+function Add-ShiftRequeued {
+    param([string]$Id)
+    $path = Get-ShiftRequeuedPath
+    New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+    Add-Content -Path $path -Value $Id -Encoding ASCII
+}
+
+function Get-ShiftRequeued {
+    $path = Get-ShiftRequeuedPath
+    if (-not (Test-Path $path)) { return @() }
+    return @(Get-Content $path | ForEach-Object { "$_".Trim() } | Where-Object { $_ } | Select-Object -Unique)
+}
+
 function Test-LaneAlive {
     # True while lane <n>'s process runs. No pid file yet means it is still starting.
     param([int]$N, [string]$ForStamp = $Stamp)
@@ -3504,7 +3798,7 @@ function Test-TokensAvailable {
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName = $env:ComSpec
-        $psi.Arguments = "/d /c claude -p --model $Model --output-format stream-json --verbose --max-turns 1 2>nul"
+        $psi.Arguments = "/d /c claude -p --model $ProbeModel --output-format stream-json --verbose --max-turns 1 2>nul"
         $psi.WorkingDirectory = $Root
         $psi.UseShellExecute = $false
         $psi.RedirectStandardInput = $true
@@ -3566,6 +3860,8 @@ if ($TestHeartbeat) {
         Write-Heartbeat 'claim'
         Get-Content -Raw $heartbeatFile
         Set-HeartbeatTask 'BL-000' -Title 'Rehearse the heartbeat file'
+        # The model fields Set-ModelChoice fills from the task file (BL-1705).
+        $script:Beat.Model = 'sonnet'; $script:Beat.ModelWhy = 'direct pipeline'
         Write-Heartbeat 'run'
         Set-HeartbeatStep @('build', '')
         Get-Content -Raw $heartbeatFile
@@ -3584,6 +3880,7 @@ if ($TestHeartbeat) {
             $Lane = $fake.Lane
             $script:Beat.Task = $null
             Set-HeartbeatTask $fake.Task -Title $fake.Title
+            if ($fake.Task) { $script:Beat.Model = 'opus'; $script:Beat.ModelWhy = 'feature pipeline' }
             Write-Heartbeat $fake.Phase $fake.Step
         }
         # A made-up Auto step, so the merged file carries an autoLanes object.
@@ -4218,6 +4515,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         elseif ($report.Summary -match 'blocked=[1-9]') { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'BLOCKED, read') }
         else { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'STALLED, read') }
     }
+    # Runs, tasks and US dollars per model across every lane of the shift (BL-1705).
+    Write-Trace '-' 'shift' (Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp-L\d+[-.]") 'Cyan'
     foreach ($n in @($startedLanes)) {
         if (-not (Test-Path (Join-Path $summaries "lane-$n.txt"))) { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'no report, read') }
     }
@@ -4336,7 +4635,7 @@ while ($true) {
         Set-HeartbeatTask ''
         Set-OwnTabLabel 'empty'
         Write-Heartbeat 'claim'
-        $claim = Invoke-Claim -Skip @($attempted.Keys)
+        $claim = Invoke-Claim -Skip (@($attempted.Keys) + @(Get-ShiftRequeued) | Select-Object -Unique)
         if ($claim.None) { $stopWhy = 'nothing ready'; break }
         if ($claim.Wait) { Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Write-Heartbeat 'wait' (Get-Short $claim.Why 80); Start-Sleep -Seconds 60; continue }
         $id = $claim.Id
@@ -4359,7 +4658,8 @@ while ($true) {
     Set-HeartbeatTask $id
     if ($Lane) { Set-LaneState 'task' $id }
 
-    if (-not $resuming) { Write-Trace $id 'claim' (Get-Short (Get-TaskTitle $id)) 'Cyan' }
+    Set-ModelChoice $id
+    if (-not $resuming) { Write-Trace $id 'claim' "$(Get-Short (Get-TaskTitle $id))$(Format-ModelChoice)" 'Cyan' }
     if ($Lane) { Set-OwnTabLabel "$id $(Get-TaskTitle $id)" }
     Write-Heartbeat 'run'
     $inOvertime = $overtimeId -eq $id
@@ -4439,6 +4739,7 @@ while ($true) {
         # in the queue for a later run, not a stall.
         $requeued++; $failStreak = 0
         $outcome = 'requeued'
+        if ($Lane) { Add-ShiftRequeued $id }
         Write-Trace $id 'REQUEUE' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } else {
         $failStreak++
@@ -4457,6 +4758,7 @@ while ($true) {
 }
 
 Write-Trace '-' 'shift' "end ($stopWhy)  done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)" 'Cyan'
+Write-Trace '-' 'shift' (Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]") 'Cyan'
 if ($stopWhy -eq 'runs failing') { $stalls = @('FACTORY STALLED - two runs in a row failed; check ' + $LogDir) + $stalls }
 Set-HeartbeatTask ''
 Write-Heartbeat 'finished' (Get-Short $stopWhy 80)
@@ -4466,7 +4768,7 @@ if ($Lane) {
     # The coordinator raises one alarm for every lane; a lane only reports.
     # Every line after SUMMARY reaches the coordinator's end-of-shift report: stalls, and
     # parks whose move to Backlog was never pushed (BL-1071).
-    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)") + $stalls + $parkLines)
+    Write-LaneSummary (@("SUMMARY lane $Lane ended ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)  $(Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp$LaneTag[-.]")") + $stalls + $parkLines)
     # A clean lane leaves an empty tab to close; one that blocked, stalled or could not park says read.
     $endLine = "Lane $Lane ended at $(Get-Date -Format 'HH:mm') ($stopWhy): done=$done blocked=$blocked requeued=$requeued stalled=$($stalls.Count)"
     if (-not $stalls.Count -and -not $parkLines.Count -and -not $blocked) { Show-LaneEmpty $endLine 'empty, close' }

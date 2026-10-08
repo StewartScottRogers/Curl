@@ -14,6 +14,11 @@ public sealed class UpstreamCaseRunnerTests
 {
     public TestContext TestContext { get; set; } = null!;
 
+    // A case on the real clock needs a busy CI runner's thread pool to fire its waits, and a
+    // runner that stalls the whole process for over ten seconds (BL-1717) would otherwise fail
+    // a case that needs well under one.
+    private static readonly TimeSpan RealClockTimeLimit = TimeSpan.FromMinutes(2);
+
     private const string HttpCase =
         "<testcase>\n<reply>\n<data crlf=\"headers\">\nHTTP/1.1 200 OK\n\nbody\n</data>\n</reply>\n"
         + "<client>\n<server>\nhttp\n</server>\n<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER\n</command>\n</client>\n"
@@ -254,7 +259,7 @@ public sealed class UpstreamCaseRunnerTests
         {
             await ExchangeAsync(invocation.Connector, "GET /5 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nUser-Agent: curl/8.21.0\r\n\r\n", invocation.Arguments[1]);
             return 0;
-        });
+        }, RealClockTimeLimit);
         long startedAt = TimeProvider.System.GetTimestamp();
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
@@ -338,7 +343,10 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     private static UpstreamCaseRunner Runner(Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
-        new(runCurl, UpstreamCurlPlatform.Unix, TimeProvider.System, TimeSpan.FromSeconds(10));
+        Runner(runCurl, TimeSpan.FromSeconds(10));
+
+    private static UpstreamCaseRunner Runner(Func<UpstreamCurlInvocation, Task<int>> runCurl, TimeSpan timeLimit) =>
+        new(runCurl, UpstreamCurlPlatform.Unix, TimeProvider.System, timeLimit);
 
     private Task<UpstreamCaseOutcome> RunAsync(UpstreamCaseRunner runner, string testFile) =>
         RunWithLogDirectoryAsync(runner, testFile, CreateLogDirectory());

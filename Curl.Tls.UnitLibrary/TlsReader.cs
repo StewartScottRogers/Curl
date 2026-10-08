@@ -53,6 +53,21 @@ internal sealed class TlsReader
     /// <summary>Reads a variable-length vector's bytes, preceded by a length of <paramref name="lengthBytes" /> bytes.</summary>
     public byte[] ReadOpaque(int lengthBytes) => ReadBytes((int)ReadUnsigned(lengthBytes));
 
+    /// <summary>
+    /// Reads a variable-length vector's bytes as <see cref="ReadOpaque" /> does, failing with
+    /// <see cref="TlsAlertDescription.DecodeError" /> when the vector is empty: for a field whose range starts at 1.
+    /// </summary>
+    public byte[] ReadNonEmptyOpaque(int lengthBytes)
+    {
+        byte[] bytes = ReadOpaque(lengthBytes);
+        if (bytes.Length == 0)
+        {
+            Fail(TlsAlertDescription.DecodeError);
+        }
+
+        return bytes;
+    }
+
     /// <summary>Returns a reader over a variable-length vector, preceded by a length of <paramref name="lengthBytes" /> bytes.</summary>
     public TlsReader ReadVector(int lengthBytes)
     {

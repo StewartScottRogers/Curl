@@ -289,6 +289,20 @@ public sealed class HttpProxyTunnelTests
     }
 
     [TestMethod]
+    [DataRow("", 0)]
+    [DataRow("HTTP/1.1 200 OK\r\n\r\n", 0)]
+    [DataRow("HTTP/1.1 200 OK\r\nX-A: 1\r\nX-B: 2\r\nX-C: 3\r\n\r\n", 3)]
+    public void HeaderCount_IsTheHeadsLinesLessTheStatusLineAndTheBlankLine(string head, int expected)
+    {
+        var reply = new HttpProxyTunnelReply(200, null) { Head = Encoding.Latin1.GetBytes(head) };
+
+        Diagnostics.Arrange("head", head.Replace("\r\n", "|", StringComparison.Ordinal));
+        Diagnostics.Act("header count", reply.HeaderCount);
+        Diagnostics.Assert("header count", expected, reply.HeaderCount);
+        Assert.AreEqual(expected, reply.HeaderCount);
+    }
+
+    [TestMethod]
     [DataRow("HTTP/1.1 200 Connection established\r\nX-Proxy: yes\r\n\r\n")]
     [DataRow("HTTP/1.0 200 OK\n\n")]
     public async Task ReadReplyAsync_ReturnsTheHeadExactlyAsReadAndNothingAfterIt(string head)

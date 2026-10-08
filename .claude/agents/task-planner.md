@@ -41,7 +41,11 @@ You turn intent into tasks. You write files under `Tasks/` and nothing else.
    `touches` rules in the skill; leaving it empty makes the task run alone),
    then fill `Goal`, `Context` and `Acceptance criteria` with an edit. Replace every
    template comment; no `<!-- -->` survives in a filed task. File in dependency order
-   so every `-DependsOn` ID already exists.
+   so every `-DependsOn` ID already exists. When a task is clearly easy (a rename, a
+   doc fix, one test) add `model: sonnet` to its front matter, after `touches`; when it is
+   clearly hard (new crypto, a protocol state machine, a subtle concurrency fix) add
+   `model: opus`. Otherwise leave `model:` out and the dark factory's rule chooses
+   (BL-1705; the `model` row in the skill).
 6. **Re-read each task as a stranger.** Could you finish it without asking a single
    question? If not, fix it before you report.
 

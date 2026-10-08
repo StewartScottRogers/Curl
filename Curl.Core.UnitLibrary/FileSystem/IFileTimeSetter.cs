@@ -24,9 +24,14 @@ public interface IFileTimeSetter
     /// <c>2</c> (<c>ERROR_FILE_NOT_FOUND</c>) for a missing file, which curl 8.21.0 prints in
     /// its <c>Warning: GetLastError 0x%08x</c> line.
     /// </param>
+    /// <param name="failedStep">
+    /// <see cref="FileTimeFailedStep.None" /> when the time was set; otherwise whether opening
+    /// the file or setting its time failed, which picks curl's Windows <c>CreateFile failed</c>
+    /// or <c>SetFileTime failed</c> line (BL-1453).
+    /// </param>
     /// <returns>
     /// <see langword="true" /> when the time was set; <see langword="false" /> when it could
     /// not be, for example because the file does not exist.
     /// </returns>
-    bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode);
+    bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode, out FileTimeFailedStep failedStep);
 }

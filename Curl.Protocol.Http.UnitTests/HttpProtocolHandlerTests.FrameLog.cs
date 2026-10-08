@@ -49,6 +49,25 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http2ServerSettingsThenHeadersAndData_LogsTheSettingsLineExactlyOnce()
+    {
+        // AF-0046: the line is written when the first SETTINGS arrives, not again after the HEADERS and DATA after it.
+        RecordingDiagnosticLog log = new();
+
+        Diagnostics.Arrange("url, version, log level", $"{LogUrl}, Http2PriorKnowledge, Verbose");
+        Diagnostics.Arrange("response", "SETTINGS, HTTP/2 HEADERS :status 200 content-length 5, DATA hello");
+
+        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536)))
+            .ExecuteAsync(Http2LogContext(log));
+
+        WriteResult(result);
+        WriteLogLines(log);
+        int settingsLines = log.MessagesAt(DiagnosticLogLevel.Info).Count(line => line.StartsWith("SETTINGS received: ", StringComparison.Ordinal));
+        Diagnostics.Assert("SETTINGS received lines", 1, settingsLines);
+        Assert.AreEqual(1, settingsLines, string.Join('\n', log.MessagesAt(DiagnosticLogLevel.Info)));
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http2GetAtVerbose_LogsNoHeaderValueInAFrameLine()
     {
         RecordingDiagnosticLog log = new();

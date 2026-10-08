@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -19,35 +20,65 @@ public sealed class NtlmInNegotiateTests
     private const string MeasuredBareNtlm =
         "TlRMTVNTUAABAAAAl7II4gkACQA3AAAADwAPACgAAAAKAPRlAAAAD1NURVdBUlQtUk9HRVJTLVdPUktHUk9VUA==";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(MeasuredSpnegoWithNtlm, DisplayName = "NegTokenInit carrying NTLM")]
     [DataRow(MeasuredBareNtlm, DisplayName = "Bare NTLM")]
     public void Carries_MeasuredNtlmFallback_IsTrue(string base64)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] token = Convert.FromBase64String(base64);
+        diagnostics.Arrange("token base64", base64);
+        diagnostics.Bytes("token", token);
+
+        bool carries = NtlmInNegotiate.Carries(token);
+
+        diagnostics.Act("carries NTLM", carries);
+        diagnostics.Assert("carries NTLM", true, carries);
         Assert.IsTrue(NtlmInNegotiate.Carries(Convert.FromBase64String(base64)));
     }
 
     [TestMethod]
     public void Carries_NegTokenInitCarryingKerberos_IsFalse()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism types", "MIT Kerberos");
+        byte[] token = SpnegoInitialToken.Encode(SpnegoMechanism.MitKerberosMechanismTypes, [0x60, 0x01, 0x00]);
+        diagnostics.Bytes("token", token);
+
+        bool carries = NtlmInNegotiate.Carries(token);
+
+        diagnostics.Act("carries NTLM", carries);
+        diagnostics.Assert("carries NTLM", false, carries);
         Assert.IsFalse(NtlmInNegotiate.Carries(SpnegoInitialToken.Encode(SpnegoMechanism.MitKerberosMechanismTypes, [0x60, 0x01, 0x00])));
     }
 
     [TestMethod]
     public void Carries_BareKerberosGssToken_IsFalse()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token shape", "application 0 sequence with the Kerberos V5 object identifier");
         AsnWriter writer = new(AsnEncodingRules.DER);
         using (writer.PushSequence(new Asn1Tag(TagClass.Application, 0, isConstructed: true)))
         {
             writer.WriteObjectIdentifier(SpnegoMechanism.KerberosV5);
         }
 
+        byte[] token = writer.Encode();
+        diagnostics.Bytes("token", token);
+        bool carries = NtlmInNegotiate.Carries(token);
+
+        diagnostics.Act("carries NTLM", carries);
+        diagnostics.Assert("carries NTLM", false, carries);
         Assert.IsFalse(NtlmInNegotiate.Carries(writer.Encode()));
     }
 
     [TestMethod]
     public void Carries_NegTokenInitWithoutMechToken_IsFalse()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token shape", "NegTokenInit offering NTLMSSP with no mechanism token");
         AsnWriter writer = new(AsnEncodingRules.DER);
         using (writer.PushSequence(new Asn1Tag(TagClass.Application, 0, isConstructed: true)))
         {
@@ -61,6 +92,12 @@ public sealed class NtlmInNegotiateTests
             }
         }
 
+        byte[] token = writer.Encode();
+        diagnostics.Bytes("token", token);
+        bool carries = NtlmInNegotiate.Carries(token);
+
+        diagnostics.Act("carries NTLM", carries);
+        diagnostics.Assert("carries NTLM", false, carries);
         Assert.IsFalse(NtlmInNegotiate.Carries(writer.Encode()));
     }
 
@@ -69,6 +106,14 @@ public sealed class NtlmInNegotiateTests
     [DataRow(new byte[] { 0x60, 0x05, 0x01 }, DisplayName = "Truncated")]
     public void Carries_NotAToken_IsFalse(byte[] token)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token length", token.Length);
+        diagnostics.Bytes("token", token);
+
+        bool carries = NtlmInNegotiate.Carries(token);
+
+        diagnostics.Act("carries NTLM", carries);
+        diagnostics.Assert("carries NTLM", false, carries);
         Assert.IsFalse(NtlmInNegotiate.Carries(token));
     }
 }

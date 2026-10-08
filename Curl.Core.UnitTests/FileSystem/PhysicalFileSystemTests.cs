@@ -8,10 +8,10 @@ namespace Curl.Core.FileSystem;
 
 /// <summary>
 /// Drives <see cref="PhysicalFileSystem" /> against the real disk, in a fresh temporary
-/// directory per test, or against the null device. Only the pin of curl 8.21.0's measured
-/// <c>file:///NUL</c> header date is <c>[TestCategory("Integration")]</c>; the rest need no
-/// network, and the fast run must reach every line of <see cref="PhysicalFileSystem" />
-/// for its coverage gate.
+/// directory per test, or against the null device. None is <c>[TestCategory("Integration")]</c>:
+/// the pin of curl 8.21.0's measured <c>file:///NUL</c> header date lives in
+/// <c>Curl.Core.IntegrationTests</c>' <c>PhysicalFileSystemIntegrationTests</c>, and the fast
+/// run must reach every line of <see cref="PhysicalFileSystem" /> for its coverage gate.
 /// </summary>
 [TestClass]
 public sealed partial class PhysicalFileSystemTests
@@ -272,31 +272,6 @@ public sealed partial class PhysicalFileSystemTests
         Assert.IsNull(result.LastWriteTimeUtc);
     }
 
-    // curl 8.21.0 on Windows, measured: `curl -sI file:///NUL` prints
-    // "Content-Length: 0", "Accept-ranges: bytes" and "Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT".
-    // FileProtocolHandler writes the date with the "R" format, so this pins its bytes.
-    [TestMethod]
-    [TestCategory("Integration")]
-    [OSCondition(OperatingSystems.Windows)]
-    public async Task OpenForReadAsync_WindowsNullDevice_ReportsCurlsMeasuredLastModifiedDate()
-    {
-        var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("path", "NUL");
-
-        var result = await new PhysicalFileSystem().OpenForReadAsync("NUL", CancellationToken.None);
-
-        ActResult(diagnostics, result);
-        await result.Content!.DisposeAsync();
-        diagnostics.Assert("length", 0L, result.Length);
-        Assert.AreEqual(0L, result.Length);
-        Assert.IsNotNull(result.LastWriteTimeUtc);
-        string lastModified = result.LastWriteTimeUtc.Value.UtcDateTime.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-        diagnostics.Assert("last modified", "Thu, 01 Jan 1970 00:00:00 GMT", lastModified);
-        Assert.AreEqual(
-            "Thu, 01 Jan 1970 00:00:00 GMT",
-            lastModified);
-    }
-
     [TestMethod]
     public async Task OpenForWriteAsync_DestinationDirectoryMissing_IsNotFound()
     {
@@ -544,7 +519,7 @@ public sealed partial class PhysicalFileSystemTests
         diagnostics.Arrange("path", "out.txt");
         diagnostics.Arrange("unix seconds", lastWriteTimeUtc.ToUnixTimeSeconds());
 
-        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, lastWriteTimeUtc.ToUnixTimeSeconds(), out int errorCode);
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, lastWriteTimeUtc.ToUnixTimeSeconds(), out int errorCode, out _);
 
         diagnostics.Act("set", set);
         diagnostics.Act("error code", errorCode);
@@ -565,7 +540,7 @@ public sealed partial class PhysicalFileSystemTests
         diagnostics.Arrange("path", "missing.txt");
         diagnostics.Arrange("unix seconds", 0);
 
-        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(directory.Combine("missing.txt"), 0, out int errorCode);
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(directory.Combine("missing.txt"), 0, out int errorCode, out _);
 
         diagnostics.Act("set", set);
         diagnostics.Act("error code", errorCode);
@@ -593,7 +568,7 @@ public sealed partial class PhysicalFileSystemTests
         diagnostics.Arrange("path", "out.txt");
         diagnostics.Arrange("unix seconds", 910670515199);
 
-        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, 910670515199, out int errorCode);
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, 910670515199, out int errorCode, out _);
 
         diagnostics.Act("set", set);
         diagnostics.Act("error code", errorCode);
@@ -615,7 +590,7 @@ public sealed partial class PhysicalFileSystemTests
         diagnostics.Arrange("path", "missing.txt");
         diagnostics.Arrange("unix seconds", 910670515199);
 
-        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(directory.Combine("missing.txt"), 910670515199, out int errorCode);
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(directory.Combine("missing.txt"), 910670515199, out int errorCode, out _);
 
         diagnostics.Act("set", set);
         diagnostics.Act("error code", errorCode);
@@ -623,6 +598,68 @@ public sealed partial class PhysicalFileSystemTests
         Assert.IsFalse(set);
         diagnostics.Assert("error code", 2, errorCode);
         Assert.AreEqual(2, errorCode);
+    }
+
+    /// <summary>
+    /// On Windows a missing file fails at the open, curl's <c>CreateFile</c> step, and a time
+    /// before 1601 that <c>SetFileTime</c> refuses on an open file fails at the stamp, so the two
+    /// are reported apart (BL-1453).
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task TrySetLastWriteUnixSeconds_OnWindowsOpenOrStampFailure_ReportsWhichStepFailed()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("out.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Content);
+        const long Before1601 = -11644473601;
+        diagnostics.Arrange("missing path", "missing.txt");
+        diagnostics.Arrange("existing path", "out.txt");
+        diagnostics.Arrange("stamp unix seconds", Before1601);
+
+        bool opened = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(directory.Combine("missing.txt"), 0, out int openErrorCode, out FileTimeFailedStep openStep);
+        bool stamped = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, Before1601, out int stampErrorCode, out FileTimeFailedStep stampStep);
+
+        diagnostics.Act("missing file set", opened);
+        diagnostics.Act("missing file step", openStep);
+        diagnostics.Act("missing file error code", openErrorCode);
+        diagnostics.Act("refused time set", stamped);
+        diagnostics.Act("refused time step", stampStep);
+        diagnostics.Act("refused time error code", stampErrorCode);
+        diagnostics.Assert("missing file set", false, opened);
+        Assert.IsFalse(opened);
+        diagnostics.Assert("missing file step", FileTimeFailedStep.Open, openStep);
+        Assert.AreEqual(FileTimeFailedStep.Open, openStep);
+        diagnostics.Assert("missing file error code", 2, openErrorCode);
+        Assert.AreEqual(2, openErrorCode);
+        diagnostics.Assert("refused time set", false, stamped);
+        Assert.IsFalse(stamped);
+        diagnostics.Assert("refused time step", FileTimeFailedStep.SetTime, stampStep);
+        Assert.AreEqual(FileTimeFailedStep.SetTime, stampStep);
+        diagnostics.Assert("refused time error code", 87, stampErrorCode);
+        Assert.AreEqual(87, stampErrorCode);
+    }
+
+    [TestMethod]
+    public async Task TrySetLastWriteUnixSeconds_TimeSet_ReportsNoFailedStep()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        using var directory = new TemporaryDirectory();
+        string path = directory.Combine("out.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Content);
+        diagnostics.Arrange("path", "out.txt");
+        diagnostics.Arrange("unix seconds", 1577959445);
+
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, 1577959445, out _, out FileTimeFailedStep failedStep);
+
+        diagnostics.Act("set", set);
+        diagnostics.Act("failed step", failedStep);
+        diagnostics.Assert("set", true, set);
+        Assert.IsTrue(set);
+        diagnostics.Assert("failed step", FileTimeFailedStep.None, failedStep);
+        Assert.AreEqual(FileTimeFailedStep.None, failedStep);
     }
 
     /// <summary>
@@ -644,7 +681,7 @@ public sealed partial class PhysicalFileSystemTests
         diagnostics.Arrange("path", "out.txt");
         diagnostics.Arrange("unix seconds", unixSeconds);
 
-        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, unixSeconds, out int errorCode);
+        bool set = new PhysicalFileSystem().TrySetLastWriteUnixSeconds(path, unixSeconds, out int errorCode, out _);
 
         diagnostics.Act("set", set);
         diagnostics.Act("error code", errorCode);

@@ -59,6 +59,7 @@
   <Project Path="Curl.Console/Curl.Console.csproj" />
   <Project Path="Curl.Cookies.UnitLibrary/Curl.Cookies.UnitLibrary.csproj" />
   <Project Path="Curl.Cookies.UnitTests/Curl.Cookies.UnitTests.csproj" />
+  <Project Path="Curl.Core.IntegrationTests/Curl.Core.IntegrationTests.csproj" />
   <Project Path="Curl.Core.UnitLibrary/Curl.Core.UnitLibrary.csproj" />
   <Project Path="Curl.Core.UnitTests/Curl.Core.UnitTests.csproj" />
   <Project Path="Curl.Cryptography.UnitLibrary/Curl.Cryptography.UnitLibrary.csproj" />
@@ -102,6 +103,7 @@
   <Project Path="Curl.Protocol.Smb.UnitTests/Curl.Protocol.Smb.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Smtp.UnitLibrary/Curl.Protocol.Smtp.UnitLibrary.csproj" />
   <Project Path="Curl.Protocol.Smtp.UnitTests/Curl.Protocol.Smtp.UnitTests.csproj" />
+  <Project Path="Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj" />
   <Project Path="Curl.Protocol.Ssh.UnitLibrary/Curl.Protocol.Ssh.UnitLibrary.csproj" />
   <Project Path="Curl.Protocol.Ssh.UnitTests/Curl.Protocol.Ssh.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Telnet.UnitLibrary/Curl.Protocol.Telnet.UnitLibrary.csproj" />

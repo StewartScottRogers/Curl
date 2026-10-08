@@ -15,7 +15,9 @@ internal static class FtpPassiveReply
 {
     private const int PasvNumberCount = 6;
 
-    private const int MaxPasvDigits = 3;
+    private const int MaxPasvNumber = 255;
+
+    private const int MaxPasvSignificantDigits = 3;
 
     /// <summary>
     /// Reads the port from an <c>EPSV</c> reply such as
@@ -65,10 +67,14 @@ internal static class FtpPassiveReply
     /// The dotted address, such as <c>127.0.0.1</c>, when this returns <see langword="true" />;
     /// only <c>--no-ftp-skip-pasv-ip</c> connects to it.
     /// </param>
-    /// <param name="port">The port, from 1 to 65535, when this returns <see langword="true" />.</param>
+    /// <param name="port">
+    /// The port, from 0 to 65535, when this returns <see langword="true" />; curl 8.21.0
+    /// accepts 0 and dials it (measured, BL-1660).
+    /// </param>
     /// <returns>
-    /// <see langword="true" /> when the line holds six comma-separated numbers of at most
-    /// three digits, each at most 255, naming a port other than 0.
+    /// <see langword="true" /> when the line holds six comma-separated numbers, each at most
+    /// 255 however many leading zeros it is written with, as curl 8.21.0 reads them
+    /// (measured, BL-1660: <c>0000000000000000000001</c> is read as 1).
     /// </returns>
     public static bool TryParsePasv(string lastLine, out string address, out int port)
     {
@@ -82,7 +88,7 @@ internal static class FtpPassiveReply
             {
                 address = string.Create(CultureInfo.InvariantCulture, $"{numbers[0]}.{numbers[1]}.{numbers[2]}.{numbers[3]}");
                 port = (numbers[4] * 256) + numbers[5];
-                return numbers.IndexOfAnyExceptInRange(0, 255) < 0 && port >= 1;
+                return true;
             }
         }
 
@@ -124,14 +130,15 @@ internal static class FtpPassiveReply
     {
         number = 0;
         int digits = CountLeadingDigits(text);
-        if (digits is 0 or > MaxPasvDigits)
+        ReadOnlySpan<char> significant = text[..digits].TrimStart('0');
+        if (digits == 0 || significant.Length > MaxPasvSignificantDigits)
         {
             return false;
         }
 
-        number = int.Parse(text[..digits], NumberStyles.None, CultureInfo.InvariantCulture);
+        number = significant.IsEmpty ? 0 : int.Parse(significant, NumberStyles.None, CultureInfo.InvariantCulture);
         text = text[digits..];
-        return true;
+        return number <= MaxPasvNumber;
     }
 
     private static bool TrySkipComma(ref ReadOnlySpan<char> text)

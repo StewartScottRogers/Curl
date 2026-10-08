@@ -14,10 +14,12 @@ namespace Curl.Cryptography;
 /// </summary>
 /// <remarks>
 /// Constant-time in the private exponent: the exponentiation is a fixed 4-bit window
-/// over Montgomery multiplication on fixed-width 32-bit limbs, every window squares four
-/// times and multiplies once (by base^0 when the window is zero), the table look-up reads
-/// all 16 entries and keeps one by mask, and the final reduction subtracts by mask - no
-/// branch, loop bound, array index or address depends on the exponent. Only its length,
+/// over Montgomery multiplication and squaring on fixed-width 64-bit limbs, every window
+/// squares four times, reads all 16 table entries and keeps one by mask, and multiplies
+/// once (by base^0 when the window is zero), so the sequence of operations is the same
+/// whatever the exponent's bits; carries are flag values, never branches, and the final
+/// reduction subtracts by mask - no branch, loop bound, array index or address depends on
+/// the exponent. Only its length,
 /// which is public, shapes the running time. <see cref="System.Numerics.BigInteger" />
 /// touches public values only. The private exponent is zeroed on <see cref="Dispose" />,
 /// and every intermediate before each method returns.

@@ -80,6 +80,57 @@ public sealed class TftpProtocolHandlerAdversarialTests
         CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, AcknowledgedBlocks(channel));
     }
 
+    /// <summary>
+    /// Measured against curl 8.21.0 (Schannel) with Record-CurlExchange.ps1 -Tftp: it
+    /// answers the late OACK with ACK 0, ignores DATA 2, writes the next DATA 1 after the
+    /// first block (514 bytes), acknowledges it as block 1 and exits 0 (BL-1666).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_OptionAcknowledgementAfterData1_AcknowledgesBlock0AndWritesTheNextData1AsNewData()
+    {
+        var channel = Channel(
+            Data(1, Payload(512, 'a')),
+            OptionAcknowledgement("blksize\0512\0"),
+            Data(1, "bb"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes written", 514L, output.Length);
+        Assert.AreEqual(Payload(512, 'a') + "bb", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(514, result.BytesTransferred);
+        CollectionAssert.AreEqual(new ushort[] { 1, 0, 1 }, AcknowledgedBlocks(channel));
+    }
+
+    /// <summary>
+    /// Measured against curl 8.21.0 (Schannel) with Record-CurlExchange.ps1 -Tftp
+    /// -TftpNoOack and an injected OACK before a 256-byte DATA 1 (BL-1667): curl compares
+    /// the whole option name, not its prefix, so it ignores <c>blksizex=256</c> (keeping
+    /// 512 and ending after block 1, exit 0, where <c>blksize=256</c> waits for block 2)
+    /// and <c>tsizex=0</c> (exit 0, where <c>tsize=0</c> exits 71).
+    /// </summary>
+    [TestMethod]
+    [DataRow("blksizex\0256\0", DisplayName = "blksizex")]
+    [DataRow("tsizex\00\0", DisplayName = "tsizex")]
+    public async Task ExecuteAsync_OptionAcknowledgementNameOnlyStartsWithAKnownOption_IgnoresTheOption(string options)
+    {
+        var channel = Channel(
+            OptionAcknowledgement(options),
+            Data(1, Payload(256, 'a')),
+            Data(2, "b"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes written", 256L, output.Length);
+        Assert.AreEqual(Payload(256, 'a'), Encoding.ASCII.GetString(output.ToArray()));
+        CollectionAssert.AreEqual(new ushort[] { 0, 1 }, AcknowledgedBlocks(channel));
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_MaxFileSizeExactlyTheFirstBlockAndASecondBlockFollows_WritesTheFirstAndExits63()
     {
@@ -335,6 +386,42 @@ public sealed class TftpProtocolHandlerAdversarialTests
         Diagnostics.Act("thrown", thrown.GetType().Name);
         Diagnostics.Assert("clock", TimeSpan.Zero, clock.Now);
         Assert.AreEqual(TimeSpan.Zero, clock.Now);
+    }
+
+    /// <summary>
+    /// Linux and macOS (BL-1668): curl 8.21.0 receives into the block size plus four, so
+    /// the kernel cuts a 600-byte DATA payload to 512 bytes and curl writes and ACKs those.
+    /// The scripted channel cuts a datagram to the buffer as those sockets do.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DataLongerThanDefaultBlockSize_CutsItToTheBlockSizeAsLinuxAndMacOSDo()
+    {
+        var channel = Channel(Data(1, Payload(600, 'a')), Data(2, "b"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output written", Payload(512, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(Payload(512, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(513, result.BytesTransferred);
+        CollectionAssert.AreEqual(new ushort[] { 1, 2 }, AcknowledgedBlocks(channel));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DataLongerThanAcknowledgedBlockSize_CutsItToTheAcknowledgedBlockSize()
+    {
+        var channel = Channel(OptionAcknowledgement("blksize\016\0"), Data(1, Payload(40, 'a')), Data(2, "b"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output, tftpBlockSize: 16));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output written", Payload(16, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(Payload(16, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, AcknowledgedBlocks(channel));
     }
 
     private static string Payload(int length, char fill) => new(fill, length);

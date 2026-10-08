@@ -51,8 +51,10 @@ public sealed class FallsSilentDatagramChannel(
                 throw new SocketException((int)refused.Error);
             }
 
-            next.Datagram.CopyTo(buffer);
-            return ValueTask.FromResult(new DatagramReceived(next.Datagram.Length, next.Source));
+            // A datagram longer than the buffer is cut to it, as a Linux or macOS socket cuts it.
+            var length = Math.Min(next.Datagram.Length, buffer.Length);
+            next.Datagram.AsSpan(0, length).CopyTo(buffer.Span);
+            return ValueTask.FromResult(new DatagramReceived(length, next.Source));
         }
 
         while (clock.AdvanceToNextTimer())

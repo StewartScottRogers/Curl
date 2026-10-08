@@ -19,6 +19,12 @@ public sealed class NtlmChallengeAnswerer(TimeProvider timeProvider, INtlmRandom
     /// <c>-u</c> <paramref name="userName" /> (split by <see cref="NtlmUserName.SplitDomain" />)
     /// and <paramref name="password" />.
     /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="challenge" /> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// The challenge's <see cref="NtlmChallengeMessage.ServerChallenge" /> is not
+    /// <see cref="NtlmResponseComputation.ChallengeLength" /> bytes. A decoded challenge
+    /// always has that many, so only one built by hand reaches this.
+    /// </exception>
     public NtlmAuthenticateMessage Answer(NtlmChallengeMessage challenge, string userName, string password)
     {
         ArgumentNullException.ThrowIfNull(challenge);

@@ -1440,8 +1440,8 @@ internal sealed class FtpSession(
         var failure = new FtpDataConnectFailure(host, shownHost, port, controlName);
         if (port == 0)
         {
-            // A ConnectTarget carries ports 1 to 65535; curl 8.21.0 dials a 229's port 0 and
-            // the dial fails at once, writing its -v failure line (measured, BL-1240, BL-1250).
+            // A ConnectTarget carries ports 1 to 65535; curl 8.21.0 dials a 229 or 227 reply's port 0 and
+            // the dial fails at once, writing its -v failure line (measured, BL-1240, BL-1250, BL-1660).
             string message = failure.Rewrite($"Failed to connect to {host}:0 after 0 ms: Could not connect to server");
             context.Events.ReportInfo(message);
             return TransferResult.Failure(CurlExitCode.CouldntConnect, message);

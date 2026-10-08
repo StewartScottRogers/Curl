@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -10,6 +11,8 @@ namespace Curl.Authentication;
 [TestClass]
 public sealed class HttpChallengeSchemesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("Basic realm=\"r\"", HttpAuthSchemes.Basic, DisplayName = "Basic with a realm")]
     [DataRow("basic", HttpAuthSchemes.Basic, DisplayName = "Lower case, nothing after")]
@@ -25,12 +28,28 @@ public sealed class HttpChallengeSchemesTests
     [DataRow("", HttpAuthSchemes.None, DisplayName = "Empty")]
     public void Offered_OneValue_ReturnsItsSchemes(string challenge, HttpAuthSchemes expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+        diagnostics.Arrange("expected", expected);
+
+        HttpAuthSchemes actual = HttpChallengeSchemes.Offered([challenge]);
+
+        diagnostics.Act("offered", actual);
+        diagnostics.Assert("schemes", expected, actual);
         Assert.AreEqual(expected, HttpChallengeSchemes.Offered([challenge]));
     }
 
     [TestMethod]
     public void Offered_SeveralValues_CombinesThem()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[] challenges = ["Digest realm=\"r\"", "Basic realm=\"r\""];
+        diagnostics.Arrange("challenges", string.Join(" | ", challenges));
+
+        HttpAuthSchemes actual = HttpChallengeSchemes.Offered(challenges);
+
+        diagnostics.Act("offered", actual);
+        diagnostics.Assert("schemes", HttpAuthSchemes.Digest | HttpAuthSchemes.Basic, actual);
         Assert.AreEqual(
             HttpAuthSchemes.Digest | HttpAuthSchemes.Basic,
             HttpChallengeSchemes.Offered(["Digest realm=\"r\"", "Basic realm=\"r\""]));
@@ -39,6 +58,13 @@ public sealed class HttpChallengeSchemesTests
     [TestMethod]
     public void Offered_NoValues_ReturnsNone()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenges", "(none)");
+
+        HttpAuthSchemes actual = HttpChallengeSchemes.Offered([]);
+
+        diagnostics.Act("offered", actual);
+        diagnostics.Assert("schemes", HttpAuthSchemes.None, actual);
         Assert.AreEqual(HttpAuthSchemes.None, HttpChallengeSchemes.Offered([]));
     }
 
@@ -51,6 +77,14 @@ public sealed class HttpChallengeSchemesTests
     [DataRow(new string[0], null, DisplayName = "No challenges")]
     public void NtlmTokenOf_Challenges_ReturnsTheFirstNtlmToken(string[] challenges, string? expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenges", string.Join(" | ", challenges));
+        diagnostics.Arrange("expected", expected ?? "(null)");
+
+        string? actual = HttpChallengeSchemes.NtlmTokenOf(challenges);
+
+        diagnostics.Act("token", actual ?? "(null)");
+        diagnostics.Diff("token", expected ?? "(null)", actual ?? "(null)");
         Assert.AreEqual(expected, HttpChallengeSchemes.NtlmTokenOf(challenges));
     }
 
@@ -61,6 +95,14 @@ public sealed class HttpChallengeSchemesTests
     [DataRow(new[] { "NTLM TlRM", "Basic realm=\"r\"" }, null, DisplayName = "No Negotiate challenge")]
     public void NegotiateTokenOf_Challenges_ReturnsTheFirstNegotiateToken(string[] challenges, string? expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenges", string.Join(" | ", challenges));
+        diagnostics.Arrange("expected", expected ?? "(null)");
+
+        string? actual = HttpChallengeSchemes.NegotiateTokenOf(challenges);
+
+        diagnostics.Act("token", actual ?? "(null)");
+        diagnostics.Diff("token", expected ?? "(null)", actual ?? "(null)");
         Assert.AreEqual(expected, HttpChallengeSchemes.NegotiateTokenOf(challenges));
     }
 }

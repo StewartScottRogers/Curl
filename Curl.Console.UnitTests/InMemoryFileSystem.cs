@@ -12,7 +12,7 @@ namespace Curl.Console;
 /// path in <see cref="UntruncatablePaths" /> opened with <see cref="FileWriteMode.Truncate" />.
 /// Each last-write time set is recorded in <see cref="LastWriteTimesSet" />, with whether the
 /// path's written stream was still open at the time; setting one fails with
-/// <see cref="FileTimeErrorCode" /> when that is not zero. A <see cref="FileWriteMode.CreateNew" />
+/// <see cref="FileTimeErrorCode" /> at <see cref="FileTimeFailedStep" /> when that is not zero. A <see cref="FileWriteMode.CreateNew" />
 /// open fails with <c>AlreadyExists</c> for a path in <see cref="ExistingPaths" /> (kept apart from
 /// <see cref="ExistingContent" />, which only feeds reads); a path added to it by
 /// <see cref="BeforeCreateNew" /> just before the open counts too. As <see cref="IOutputPaths" />,
@@ -66,6 +66,8 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
 
     public int FileTimeErrorCode { get; init; }
 
+    public FileTimeFailedStep FileTimeFailedStep { get; init; } = FileTimeFailedStep.Open;
+
     public List<string> ReadPaths { get; } = [];
 
     public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
@@ -116,11 +118,12 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
         return ValueTask.FromResult(FileOpenResult.Opened(stream, 0, null));
     }
 
-    public bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode)
+    public bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode, out FileTimeFailedStep failedStep)
     {
         bool whileOpen = Written.TryGetValue(path, out MemoryStream? stream) && stream.CanWrite;
         LastWriteTimesSet.Add((path, unixSeconds, whileOpen));
         errorCode = FileTimeErrorCode;
+        failedStep = errorCode == 0 ? FileTimeFailedStep.None : FileTimeFailedStep;
 
         return errorCode == 0;
     }

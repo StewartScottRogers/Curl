@@ -57,6 +57,9 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   transfer with exit 56 `Data received from another address` and the stranger is sent
   nothing. Every wait goes through `ITransferContext.TimeProvider`.
 - Download only: a repeated last block is re-ACKed and not written twice.
+- Download only: an OACK that arrives after DATA is answered with ACK 0 and the block
+  count restarts, as curl 8.21.0's `tftp_rx` sets its block to 0, so the next DATA 1 is
+  written as new data (BL-1666; measured: ACK 1, ACK 0, ACK 1, both blocks written).
 - Download and upload: a datagram under four bytes re-sends the last packet (RRQ, WRQ,
   ACK or DATA) at once and counts a retry without moving the next scheduled re-send;
   whatever failure then ends the transfer says `Received too short packet` (curl keeps
@@ -66,6 +69,11 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   port-unreachable for the datagram sent - is answered the same way
   (`TftpTimeLimits.RefusedReceive`, BL-1452), so a port where nothing listens ends with
   exit 7 `Received too short packet` once the retries run out.
+- Download only: each receive may fill only the block size in force plus four bytes, as
+  curl 8.21.0's `tftp_receive_packet` asks `recvfrom` for (BL-1668, ADR-0430). A longer
+  DATA packet is cut to the block size on Linux and macOS and written; on Windows the
+  receive fails with `SocketError.MessageSize`, answered as a datagram under four bytes
+  (measured: nothing written, `Received too short packet`).
 - Upload only: an ACK of the wrong block re-sends the last packet at once and counts a
   retry (one too many is exit 55 `tftp_tx: giving up waiting for block N ack`), without
   moving the next scheduled re-send. Before DATA 1, a re-send after an ACK is the WRQ's

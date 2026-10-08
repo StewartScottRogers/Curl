@@ -17,9 +17,9 @@ internal sealed class RsaSshPrivateKey : SshPrivateKey
 
     private readonly RSAParameters parameters;
 
-    private RsaSshPrivateKey(RSAParameters parameters)
+    private RsaSshPrivateKey(RSAParameters parameters, byte[] pkcs1Encoding)
     {
-        this.parameters = parameters;
+        (this.parameters, Pkcs1Encoding) = (parameters, pkcs1Encoding);
         SshWireWriter blob = new();
         blob.WriteString(Encoding.ASCII.GetBytes(RsaKeyType));
         blob.WriteMpint(parameters.Exponent);
@@ -49,7 +49,7 @@ internal sealed class RsaSshPrivateKey : SshPrivateKey
     {
         using RSA rsa = RSA.Create();
         rsa.ImportRSAPrivateKey(der, out _);
-        return new RsaSshPrivateKey(rsa.ExportParameters(includePrivateParameters: true));
+        return new RsaSshPrivateKey(rsa.ExportParameters(includePrivateParameters: true), der.ToArray());
     }
 
     /// <summary>
@@ -103,6 +103,13 @@ internal sealed class RsaSshPrivateKey : SshPrivateKey
 
         return FromPkcs1(writer.Encode());
     }
+
+    /// <summary>
+    /// Gets the PKCS #1 <c>RSAPrivateKey</c> encoding the key was imported from, before the
+    /// platform's RSA read it: for a key built by <see cref="FromComponents" />, the CRT
+    /// exponents as computed here, which some platforms recompute on import.
+    /// </summary>
+    internal byte[] Pkcs1Encoding { get; }
 
     /// <inheritdoc />
     private protected override byte[] SignRaw(string algorithm, byte[] data)

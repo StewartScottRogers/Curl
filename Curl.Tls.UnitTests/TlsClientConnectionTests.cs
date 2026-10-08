@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using Curl.Testing;
 
 namespace Curl.Tls;
 
@@ -17,15 +18,24 @@ public sealed class TlsClientConnectionTests
 
     private static readonly TlsClientSettings Settings = new(Tls13PipeDriver.DefaultSettings, Tls12Offer);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ClientHelloOffersBothVersionsTheirSuitesSchemesAndTls12Extensions()
     {
         (Task<TlsConnectResult> pending, Stream serverEnd) = Start(Settings);
+        Diagnostics.Arrange("settings", "default TLS 1.3 and TLS 1.2 offers; the server reads the ClientHello and closes");
 
         ClientHello hello = await ReadClientHelloAsync(serverEnd);
         await serverEnd.DisposeAsync();
         TlsConnectResult result = await pending;
+        Diagnostics.Act("client hello", $"legacy version 0x{hello.LegacyVersion:x4}, {hello.CipherSuites.Count} suites, {hello.Extensions.Count} extensions");
 
+        Diagnostics.Assert("legacy version", (ushort)0x0303, hello.LegacyVersion);
+        Diagnostics.Assert("extension order", "ServerName, SupportedGroups, SignatureAlgorithms, SupportedVersions, KeyShare, RenegotiationInfo, EcPointFormats, SessionTicket, EncryptThenMac, ExtendedMasterSecret", string.Join(", ", hello.Extensions.Select(extension => extension.Type)));
+        Diagnostics.Assert("failure origin", TlsHandshakeFailureOrigin.TransportClosed, result.Failure?.Origin);
         Assert.AreEqual((ushort)0x0303, hello.LegacyVersion);
         CollectionAssert.AreEqual(
             new ushort[] { 0x0304, 0x0303, 0x0302, 0x0301 },
@@ -53,12 +63,16 @@ public sealed class TlsClientConnectionTests
         TlsExtension fixedPointFormats = new(TlsExtensionType.EcPointFormats, [2, 0, 1]);
         TlsClientSettings settings = Settings with { Tls13 = Tls13PipeDriver.DefaultSettings with { FixedExtensions = [fixedPointFormats] } };
         (Task<TlsConnectResult> pending, Stream serverEnd) = Start(settings);
+        Diagnostics.Arrange("fixed extension", "ec_point_formats 020001 in the TLS 1.3 settings");
+        Diagnostics.Bytes("fixed ec_point_formats data", fixedPointFormats.Data);
 
         ClientHello hello = await ReadClientHelloAsync(serverEnd);
         await serverEnd.DisposeAsync();
         await pending;
-
         TlsExtension pointFormats = hello.Extensions.Single(extension => extension.Type == TlsExtensionType.EcPointFormats);
+        Diagnostics.Act("last extension", hello.Extensions[^1].Type);
+
+        Diagnostics.Diff("ec_point_formats data", fixedPointFormats.Data, pointFormats.Data);
         CollectionAssert.AreEqual(fixedPointFormats.Data, pointFormats.Data);
         Assert.AreSame(hello.Extensions[^1], pointFormats);
     }
@@ -68,16 +82,32 @@ public sealed class TlsClientConnectionTests
     {
         (Stream clientEnd, Stream serverEnd) = InMemoryPipe.Create();
         Tls13RecordTestServer server = new(serverEnd, new Tls13TestServer(TestServerCredential.Ed25519()));
-        Task serverHandshake = server.HandshakeAsync();
+        Diagnostics.Arrange("server", "TLS 1.3 record test server, Ed25519 credential");
 
-        TlsConnectResult result = await ConnectAsync(clientEnd, Settings);
-        await serverHandshake;
+        TlsConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            Task serverHandshake = server.HandshakeAsync();
+            result = await ConnectAsync(clientEnd, Settings);
+            await serverHandshake;
+        }
+
         await using Tls13ClientStream stream = result.Tls13Stream!;
-        await stream.WriteAsync("up"u8.ToArray());
-        byte[] up = await server.ReceiveApplicationDataAsync(2);
-        await server.SendAsync(TlsContentType.ApplicationData, "down"u8.ToArray());
-        byte[] down = await Tls13PipeDriver.ReadAsync(stream, 4);
+        byte[] up;
+        byte[] down;
+        using (Diagnostics.Phase("exchange"))
+        {
+            await stream.WriteAsync("up"u8.ToArray());
+            up = await server.ReceiveApplicationDataAsync(2);
+            await server.SendAsync(TlsContentType.ApplicationData, "down"u8.ToArray());
+            down = await Tls13PipeDriver.ReadAsync(stream, 4);
+        }
 
+        Diagnostics.Act("succeeded", result.Succeeded);
+
+        Diagnostics.Assert("tls 1.2 stream", null, result.Tls12Stream);
+        Diagnostics.Diff("data up", "up"u8.ToArray(), up);
+        Diagnostics.Diff("data down", "down"u8.ToArray(), down);
         Assert.IsTrue(result.Succeeded);
         Assert.IsNull(result.Tls12Stream);
         Assert.IsTrue(stream.Handshake.IsComplete);
@@ -92,17 +122,33 @@ public sealed class TlsClientConnectionTests
     {
         (Stream clientEnd, Stream serverEnd) = InMemoryPipe.Create();
         Tls12RecordTestServer server = new(serverEnd, new Tls12TestServer(TestServerCredential.Ed25519())) { HandshakeRecordLength = handshakeRecordLength };
-        Task serverHandshake = server.HandshakeAsync();
+        Diagnostics.Arrange("handshake record length", handshakeRecordLength);
 
-        TlsConnectResult result = await ConnectAsync(clientEnd, Settings);
-        await serverHandshake;
+        TlsConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            Task serverHandshake = server.HandshakeAsync();
+            result = await ConnectAsync(clientEnd, Settings);
+            await serverHandshake;
+        }
+
         await using Tls12ClientStream stream = result.Tls12Stream!;
-        await stream.WriteAsync("up"u8.ToArray());
-        byte[] up = await server.ReceiveApplicationDataAsync(2);
-        await server.SendAsync(TlsContentType.ApplicationData, "down"u8.ToArray());
+        byte[] up;
         byte[] down = new byte[4];
-        await stream.ReadExactlyAsync(down);
+        using (Diagnostics.Phase("exchange"))
+        {
+            await stream.WriteAsync("up"u8.ToArray());
+            up = await server.ReceiveApplicationDataAsync(2);
+            await server.SendAsync(TlsContentType.ApplicationData, "down"u8.ToArray());
+            await stream.ReadExactlyAsync(down);
+        }
 
+        Diagnostics.Act("succeeded", result.Succeeded);
+
+        Diagnostics.Assert("version", TlsProtocolVersion.Tls12, stream.Handshake.Version);
+        Diagnostics.Assert("extended master secret", true, stream.Handshake.ExtendedMasterSecret);
+        Diagnostics.Diff("data up", "up"u8.ToArray(), up);
+        Diagnostics.Diff("data down", "down"u8.ToArray(), down);
         Assert.IsTrue(result.Succeeded);
         Assert.IsNull(result.Tls13Stream);
         Assert.AreEqual(TlsProtocolVersion.Tls12, stream.Handshake.Version);
@@ -116,24 +162,37 @@ public sealed class TlsClientConnectionTests
     {
         (Stream clientEnd, Stream serverEnd) = InMemoryPipe.Create();
         Tls12RecordTestServer server = new(serverEnd, new Tls12TestServer(TestServerCredential.Ed25519()));
-        Task serverHandshake = server.HandshakeAsync();
+        Diagnostics.Arrange("early data", "early, to a TLS 1.2 server");
 
-        TlsConnectResult result = await TlsClientConnection.ConnectWithEarlyDataAsync(
-            clientEnd, Settings, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), "early"u8.ToArray(), CancellationToken.None);
-        await serverHandshake;
+        TlsConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            Task serverHandshake = server.HandshakeAsync();
+            result = await TlsClientConnection.ConnectWithEarlyDataAsync(
+                clientEnd, Settings, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), "early"u8.ToArray(), CancellationToken.None);
+            await serverHandshake;
+        }
 
+        byte[] received = await server.ReceiveApplicationDataAsync(5);
+        Diagnostics.Act("succeeded", result.Succeeded);
+
+        Diagnostics.Diff("data after the handshake", "early"u8.ToArray(), received);
         Assert.IsNotNull(result.Tls12Stream);
-        CollectionAssert.AreEqual("early"u8.ToArray(), await server.ReceiveApplicationDataAsync(5));
+        CollectionAssert.AreEqual("early"u8.ToArray(), received);
     }
 
     [TestMethod]
     public async Task ConnectWithEarlyDataResumingATls13SessionSendsItAsEarlyData()
     {
         Tls13TestTicketCache tickets = new();
-        TlsSessionRecord session = await Tls13ResumptionConnectionTests.FirstSessionAsync(tickets);
+        TlsSessionRecord session;
+        using (Diagnostics.Phase("first session"))
+        {
+            session = await Tls13ResumptionConnectionTests.FirstSessionAsync(tickets);
+        }
+
         (Stream clientEnd, Stream serverEnd) = InMemoryPipe.Create();
         Tls13RecordTestServer server = new(serverEnd, new Tls13TestServer(TestServerCredential.Ed25519()) { Tickets = tickets });
-        Task serverHandshake = server.HandshakeAsync();
         TlsClientSettings settings = Settings with
         {
             Tls13 = Tls13PipeDriver.DefaultSettings with
@@ -143,11 +202,20 @@ public sealed class TlsClientConnectionTests
                 OfferEarlyData = true,
             },
         };
+        Diagnostics.Arrange("resumption", "TLS 1.3 session from a first handshake, early data offered");
 
-        TlsConnectResult result = await TlsClientConnection.ConnectWithEarlyDataAsync(
-            clientEnd, settings, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), "early"u8.ToArray(), CancellationToken.None);
-        await serverHandshake;
+        TlsConnectResult result;
+        using (Diagnostics.Phase("resumed handshake"))
+        {
+            Task serverHandshake = server.HandshakeAsync();
+            result = await TlsClientConnection.ConnectWithEarlyDataAsync(
+                clientEnd, settings, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier(), "early"u8.ToArray(), CancellationToken.None);
+            await serverHandshake;
+        }
 
+        Diagnostics.Act("early data accepted", result.Tls13Stream?.Handshake.EarlyDataAccepted);
+
+        Diagnostics.Diff("early data", "early"u8.ToArray(), server.EarlyData.ToArray());
         Assert.IsTrue(result.Tls13Stream!.Handshake.EarlyDataAccepted);
         CollectionAssert.AreEqual("early"u8.ToArray(), server.EarlyData.ToArray());
     }
@@ -166,16 +234,21 @@ public sealed class TlsClientConnectionTests
             SendTls12DowngradeSentinel = tls12Sentinel,
         };
         Tls12RecordTestServer server = new(serverEnd, testServer);
+        Diagnostics.Arrange("server", $"version {version}, TLS 1.1 sentinel {tls11Sentinel}, TLS 1.2 sentinel {tls12Sentinel}");
         Task<TlsConnectResult> pending = ConnectAsync(clientEnd, Settings);
         await server.SendFlightAsync(await server.AnswerClientHelloAsync());
 
         TlsConnectResult result = await pending;
+        Diagnostics.Act("failure", $"{result.Failure?.Alert}, {result.Failure?.Origin}");
 
+        TlsAlertDescription received = await Tls12PipeDriver.ReceiveFatalAlertAsync(server);
+        Diagnostics.Assert("alert", TlsAlertDescription.IllegalParameter, result.Failure?.Alert);
+        Diagnostics.Assert("alert the server received", TlsAlertDescription.IllegalParameter, received);
         Assert.IsFalse(result.Succeeded);
         Assert.IsNull(result.Tls12Stream);
         Assert.AreEqual(TlsAlertDescription.IllegalParameter, result.Failure!.Alert);
         Assert.AreEqual(TlsHandshakeFailureOrigin.AlertSent, result.Failure.Origin);
-        Assert.AreEqual(TlsAlertDescription.IllegalParameter, await Tls12PipeDriver.ReceiveFatalAlertAsync(server));
+        Assert.AreEqual(TlsAlertDescription.IllegalParameter, received);
     }
 
     [TestMethod]
@@ -183,10 +256,16 @@ public sealed class TlsClientConnectionTests
     {
         (Task<TlsConnectResult> pending, Stream serverEnd) = Start(Settings);
         await ReadClientHelloAsync(serverEnd);
+        byte[] alert = Record(TlsContentType.Alert, [2, (byte)TlsAlertDescription.HandshakeFailure]);
+        Diagnostics.Arrange("server answer", "fatal handshake_failure alert record");
+        Diagnostics.Bytes("alert record", alert);
 
-        await serverEnd.WriteAsync(Record(TlsContentType.Alert, [2, (byte)TlsAlertDescription.HandshakeFailure]));
+        await serverEnd.WriteAsync(alert);
         TlsConnectResult result = await pending;
+        Diagnostics.Act("failure", $"{result.Failure?.Alert}, {result.Failure?.Origin}");
 
+        Diagnostics.Assert("alert", TlsAlertDescription.HandshakeFailure, result.Failure?.Alert);
+        Diagnostics.Assert("origin", TlsHandshakeFailureOrigin.AlertReceived, result.Failure?.Origin);
         Assert.AreEqual(TlsAlertDescription.HandshakeFailure, result.Failure!.Alert);
         Assert.AreEqual(TlsHandshakeFailureOrigin.AlertReceived, result.Failure.Origin);
         Assert.IsNull(result.Tls13Stream);
@@ -200,10 +279,15 @@ public sealed class TlsClientConnectionTests
     {
         (Task<TlsConnectResult> pending, Stream serverEnd) = Start(Settings);
         await ReadClientHelloAsync(serverEnd);
+        Diagnostics.Bytes("first handshake message", message);
+        Diagnostics.Arrange("expected alert", expected);
 
         await serverEnd.WriteAsync(Record(TlsContentType.Handshake, message));
         TlsConnectResult result = await pending;
+        Diagnostics.Act("failure", $"{result.Failure?.Alert}, {result.Failure?.Origin}");
 
+        Diagnostics.Assert("alert", expected, result.Failure?.Alert);
+        Diagnostics.Assert("origin", TlsHandshakeFailureOrigin.AlertSent, result.Failure?.Origin);
         Assert.AreEqual(expected, result.Failure!.Alert);
         Assert.AreEqual(TlsHandshakeFailureOrigin.AlertSent, result.Failure.Origin);
     }
@@ -213,10 +297,13 @@ public sealed class TlsClientConnectionTests
     {
         (Task<TlsConnectResult> pending, Stream serverEnd) = Start(Settings);
         await ReadClientHelloAsync(serverEnd);
+        Diagnostics.Arrange("record content length", Tls13RecordProtection.MaximumPlaintextLength + 1);
 
         await serverEnd.WriteAsync(Record(TlsContentType.Handshake, new byte[Tls13RecordProtection.MaximumPlaintextLength + 1]));
         TlsConnectResult result = await pending;
+        Diagnostics.Act("failure alert", result.Failure?.Alert);
 
+        Diagnostics.Assert("alert", TlsAlertDescription.RecordOverflow, result.Failure?.Alert);
         Assert.AreEqual(TlsAlertDescription.RecordOverflow, result.Failure!.Alert);
     }
 
@@ -225,11 +312,16 @@ public sealed class TlsClientConnectionTests
     {
         (Task<TlsConnectResult> pending, Stream serverEnd) = Start(Settings);
         await ReadClientHelloAsync(serverEnd);
+        byte[] partial = Record(TlsContentType.Handshake, [2, 0, 0, 40])[..7];
+        Diagnostics.Arrange("server answer", "first 7 bytes of a ServerHello record, then close");
+        Diagnostics.Bytes("partial record", partial);
 
-        await serverEnd.WriteAsync(Record(TlsContentType.Handshake, [2, 0, 0, 40])[..7]);
+        await serverEnd.WriteAsync(partial);
         await serverEnd.DisposeAsync();
         TlsConnectResult result = await pending;
+        Diagnostics.Act("failure origin", result.Failure?.Origin);
 
+        Diagnostics.Assert("origin", TlsHandshakeFailureOrigin.TransportClosed, result.Failure?.Origin);
         Assert.AreEqual(TlsHandshakeFailureOrigin.TransportClosed, result.Failure!.Origin);
     }
 
@@ -238,6 +330,7 @@ public sealed class TlsClientConnectionTests
     {
         (Stream clientEnd, _) = InMemoryPipe.Create();
         Tls12Session session = new(TlsProtocolVersion.Tls12, 0xc02b, [1], null, 0, new byte[48], true);
+        Diagnostics.Arrange("cases", "null stream, null settings, null TLS 1.3 or 1.2 settings, TLS 1.2 maximum below 1.2, a session to resume, no cipher suites");
 
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => ConnectAsync(null!, Settings));
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => ConnectAsync(clientEnd, null!));
@@ -245,7 +338,10 @@ public sealed class TlsClientConnectionTests
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => ConnectAsync(clientEnd, Settings with { Tls12 = null! }));
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => ConnectAsync(clientEnd, Settings with { Tls12 = Tls12Offer with { MaximumVersion = TlsProtocolVersion.Tls11 } }));
         await Assert.ThrowsExactlyAsync<ArgumentException>(() => ConnectAsync(clientEnd, Settings with { Tls12 = Tls12Offer with { SessionToResume = session } }));
-        await Assert.ThrowsExactlyAsync<ArgumentException>(() => ConnectAsync(clientEnd, Settings with { Tls12 = Tls12Offer with { CipherSuites = [] } }));
+        ArgumentException last = await Assert.ThrowsExactlyAsync<ArgumentException>(() => ConnectAsync(clientEnd, Settings with { Tls12 = Tls12Offer with { CipherSuites = [] } }));
+        Diagnostics.Act("last refusal", last.GetType().Name);
+
+        Diagnostics.Assert("last refusal type", nameof(ArgumentException), last.GetType().Name);
     }
 
     [TestMethod]
@@ -253,8 +349,12 @@ public sealed class TlsClientConnectionTests
     {
         Tls12ClientHandshake handshake = new(Tls12Offer, SystemTlsRandomSource.Instance, new RecordingCertificateVerifier());
         handshake.Start();
+        Diagnostics.Arrange("handshake", "TLS 1.2 client handshake already started");
 
-        Assert.ThrowsExactly<InvalidOperationException>(() => handshake.StartFrom(null!));
+        InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(() => handshake.StartFrom(null!));
+        Diagnostics.Act("exception", exception.GetType().Name);
+
+        Diagnostics.Assert("exception type", nameof(InvalidOperationException), exception.GetType().Name);
     }
 
     private static Task<TlsConnectResult> ConnectAsync(Stream clientEnd, TlsClientSettings settings) =>

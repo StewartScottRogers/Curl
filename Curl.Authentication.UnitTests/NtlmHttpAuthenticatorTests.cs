@@ -2,6 +2,7 @@ using System.Net;
 using Curl.Kerberos;
 using Curl.Ntlm;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -29,14 +30,25 @@ public sealed partial class NtlmHttpAuthenticatorTests
 
     private static readonly string Type2Challenge = "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task CreateAuthorizationAsync_BeforeAnyChallenge_SendsType1()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("sent before any challenge", false);
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1));
         ScriptedSecurityContextFactory contexts = new(context);
 
         string? value = await Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Act("context request", contexts.Requests.Single());
+        diagnostics.Diff("Authorization", "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, value ?? "(null)");
+        diagnostics.Assert("context request", new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" }, contexts.Requests.Single());
+        diagnostics.Assert("context disposed", true, context.IsDisposed);
         Assert.AreEqual("NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, value);
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1") { UserName = "u", Password = "p" }, contexts.Requests.Single());
         Assert.IsTrue(context.IsDisposed);
@@ -47,20 +59,36 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow("NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, true, DisplayName = "Type 1 sent before any challenge")]
     public async Task CreateAuthorizationAsync_BareNtlmChallenge_SendsType1(string? sent, bool sentBeforeAnyChallenge)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("value sent", sent);
+        diagnostics.Arrange("sent before any challenge", sentBeforeAnyChallenge);
+        diagnostics.Arrange("server challenges", "Basic realm=\"r\" | NTLM");
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1)));
 
         string? value = await Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), sent, sentBeforeAnyChallenge, ["Basic realm=\"r\"", "NTLM"], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Diff("Authorization", "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, value ?? "(null)");
         Assert.AreEqual("NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, value);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_BareNtlmChallengeToType1AnsweringAChallenge_SendsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("value sent", "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1);
+        diagnostics.Arrange("server challenges", "NTLM");
         ScriptedSecurityContextFactory contexts = new();
 
         string? value = await Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: false, ["NTLM"], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Act("contexts requested", contexts.Requests.Count);
+        diagnostics.Assert("Authorization", null, value);
+        diagnostics.Assert("contexts requested", 0, contexts.Requests.Count);
         Assert.IsNull(value);
         Assert.IsEmpty(contexts.Requests);
     }
@@ -70,10 +98,18 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow("NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge, DisplayName = "Another Type 2")]
     public async Task CreateAuthorizationAsync_AfterType3_SendsNothing(string challenge)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("value sent", "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredType3);
+        diagnostics.Arrange("server challenge", challenge);
         ScriptedSecurityContextFactory contexts = new();
 
         string? value = await Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredType3, sentBeforeAnyChallenge: false, [challenge], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Act("contexts requested", contexts.Requests.Count);
+        diagnostics.Assert("Authorization", null, value);
+        diagnostics.Assert("contexts requested", 0, contexts.Requests.Count);
         Assert.IsNull(value);
         Assert.IsEmpty(contexts.Requests);
     }
@@ -86,12 +122,24 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow("NTLM AAAA", DisplayName = "An NTLM value too short to be a message")]
     public async Task CreateAuthorizationAsync_Type2Challenge_SendsType3FromAFreshContextSteppedThroughType1(string? sent)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("value sent", sent);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Bytes("scripted Type 1", Type1);
+        diagnostics.Bytes("scripted Type 3", Type3);
         ScriptedSecurityContext context = new(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.Completed, Type3));
 
         string? value = await Authenticator(new ScriptedSecurityContextFactory(context)).CreateAuthorizationAsync(Request("u:p"), sent, sentBeforeAnyChallenge: false, [Type2Challenge], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Bytes("incoming token 1", context.IncomingTokens[0]);
+        diagnostics.Bytes("incoming token 2", context.IncomingTokens[1]);
+        diagnostics.Diff("Authorization", "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredType3, value ?? "(null)");
+        diagnostics.Diff("incoming token 2", Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.MeasuredChallenge), context.IncomingTokens[1]);
+        diagnostics.Assert("context disposed", true, context.IsDisposed);
         Assert.AreEqual("NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredType3, value);
         Assert.IsEmpty(context.IncomingTokens[0]);
         CollectionAssert.AreEqual(Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.MeasuredChallenge), context.IncomingTokens[1]);
@@ -103,10 +151,18 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(true, DisplayName = "SSPI: curl's base64 decoder rejects it first")]
     public async Task CreateAuthorizationAsync_ChallengeNotBase64_SendsNothing(bool matchesSspiBuild)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("matches SSPI build", matchesSspiBuild);
+        diagnostics.Arrange("server challenge", "NTLM @@@notbase64");
         ScriptedSecurityContextFactory contexts = new();
 
         string? value = await new NtlmHttpAuthenticator(contexts, matchesSspiBuild).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, ["NTLM @@@notbase64"], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Act("contexts requested", contexts.Requests.Count);
+        diagnostics.Assert("Authorization", null, value);
+        diagnostics.Assert("contexts requested", 0, contexts.Requests.Count);
         Assert.IsNull(value);
         Assert.IsEmpty(contexts.Requests);
     }
@@ -114,12 +170,19 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_Type2CurlsOwnNtlmCannotRead_SendsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Arrange("scripted statuses", "ContinueNeeded, MalformedToken");
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
 
         string? value = await Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Assert("Authorization", null, value);
         Assert.IsNull(value);
     }
 
@@ -131,11 +194,18 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_Type3PastCurlsBufferWithCurlsOwnNtlm_FailsWithExit100()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "600 a characters : p");
+        diagnostics.Arrange("server challenge", Type2Challenge);
         NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
 
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(new string('a', 600) + ":p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Assert("exit code", CurlExitCode.TooLarge, failure.ExitCode);
+        diagnostics.Diff("message", "user + domain + hostname too big for NTLM", failure.Message);
         Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
         Assert.AreEqual("user + domain + hostname too big for NTLM", failure.Message);
     }
@@ -143,22 +213,34 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_LargestType3ThatFitsWithCurlsOwnNtlm_AnswersIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", $"{LargestFittingUserLength} a characters : p");
+        diagnostics.Arrange("server challenge", Type2Challenge);
         NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
 
         string? value = await authenticator.CreateAuthorizationAsync(Request(new string('a', LargestFittingUserLength) + ":p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None);
 
+        diagnostics.Act("Authorization length", value?.Length);
         Assert.IsNotNull(value);
+        byte[] type3 = Convert.FromBase64String(value["NTLM ".Length..]);
+        diagnostics.Act("Type 3 length", type3.Length);
+        diagnostics.Assert("Type 3 length", NtlmAuthenticateMessage.CurlBufferSize - 2, type3.Length);
         Assert.HasCount(NtlmAuthenticateMessage.CurlBufferSize - 2, Convert.FromBase64String(value["NTLM ".Length..]));
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_OneCharacterPastTheLargestType3_FailsWithExit100()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", $"{LargestFittingUserLength + 1} a characters : p");
+        diagnostics.Arrange("server challenge", Type2Challenge);
         NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
 
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(new string('a', LargestFittingUserLength + 1) + ":p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Assert("exit code", CurlExitCode.TooLarge, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
     }
 
@@ -170,11 +252,17 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_TargetInformationPushesResponsesPastCurlsBuffer_FailsWithIncomingMessageTooBig()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("target information length", 1000);
         NtlmHttpAuthenticator authenticator = Authenticator(new HandBuiltNtlmContexts());
 
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [ChallengeWithTargetInformation(1000)], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Assert("exit code", CurlExitCode.TooLarge, failure.ExitCode);
+        diagnostics.Diff("message", "incoming NTLM message too big", failure.Message);
         Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
         Assert.AreEqual("incoming NTLM message too big", failure.Message);
     }
@@ -182,6 +270,11 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_OtherContextRefusesType3_FailsWithTheNamesMessage()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Arrange("scripted statuses", "ContinueNeeded, Refused");
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.Refused, [])));
@@ -189,6 +282,9 @@ public sealed partial class NtlmHttpAuthenticatorTests
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => Authenticator(contexts).CreateAuthorizationAsync(Request("u:p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Assert("exit code", CurlExitCode.TooLarge, failure.ExitCode);
+        diagnostics.Diff("message", NtlmHttpAuthenticator.Type3TooLargeMessage, failure.Message);
         Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
         Assert.AreEqual(NtlmHttpAuthenticator.Type3TooLargeMessage, failure.Message);
     }
@@ -196,6 +292,12 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_ContextRefusesType2WithSspi_FailsWithExit94()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("matches SSPI build", true);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Arrange("scripted statuses", "ContinueNeeded, MalformedToken");
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
@@ -204,6 +306,9 @@ public sealed partial class NtlmHttpAuthenticatorTests
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request("u:p"), "NTLM x", sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Assert("exit code", CurlExitCode.AuthError, failure.ExitCode);
+        diagnostics.Diff("message", "An authentication function returned an error", failure.Message);
         Assert.AreEqual(CurlExitCode.AuthError, failure.ExitCode);
         Assert.AreEqual("An authentication function returned an error", failure.Message);
     }
@@ -213,6 +318,11 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(true, DisplayName = "SSPI")]
     public async Task CreateAuthorizationAsync_NoType1ForAType2Challenge_SendsNothingOrFails(bool matchesSspiBuild)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("matches SSPI build", matchesSspiBuild);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Arrange("scripted status", SecurityContextStatus.NoCredentials);
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
         NtlmHttpAuthenticator authenticator = new(new ScriptedSecurityContextFactory(context), matchesSspiBuild);
 
@@ -220,33 +330,52 @@ public sealed partial class NtlmHttpAuthenticatorTests
 
         if (matchesSspiBuild)
         {
-            await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(() => answer);
+            var failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(() => answer);
+            diagnostics.Act("exception", failure.Message);
+            diagnostics.Assert("exception type", typeof(HttpAuthenticationFailedException), failure.GetType());
         }
         else
         {
-            Assert.IsNull(await answer);
+            string? value = await answer;
+            diagnostics.Act("Authorization", value);
+            diagnostics.Assert("Authorization", null, value);
+            Assert.IsNull(value);
         }
 
+        diagnostics.Assert("incoming token count", 1, context.IncomingTokens.Count);
         Assert.HasCount(1, context.IncomingTokens);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_NoType1BeforeAnyChallenge_SendsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "u:p");
+        diagnostics.Arrange("matches SSPI build", true);
+        diagnostics.Arrange("scripted status", SecurityContextStatus.NoCredentials);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
 
         string? value = await new NtlmHttpAuthenticator(contexts, matchesSspiBuild: true).CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
 
+        diagnostics.Act("Authorization", value);
+        diagnostics.Assert("Authorization", null, value);
         Assert.IsNull(value);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_NullArguments_Throw()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("arguments", "null request, then null challenges");
         NtlmHttpAuthenticator authenticator = Authenticator(new ScriptedSecurityContextFactory());
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => authenticator.CreateAuthorizationAsync(null!, null, false, [], CancellationToken.None).AsTask());
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => authenticator.CreateAuthorizationAsync(Request("u:p"), null, false, null!, CancellationToken.None).AsTask());
+        var first = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => authenticator.CreateAuthorizationAsync(null!, null, false, [], CancellationToken.None).AsTask());
+        var second = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => authenticator.CreateAuthorizationAsync(Request("u:p"), null, false, null!, CancellationToken.None).AsTask());
+
+        diagnostics.Act("exception 1", first.Message);
+        diagnostics.Act("exception 2", second.Message);
+        diagnostics.Assert("exception 1 type", typeof(ArgumentNullException), first.GetType());
+        diagnostics.Assert("exception 2 type", typeof(ArgumentNullException), second.GetType());
     }
 
     [TestMethod]
@@ -256,8 +385,21 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow("a/b\\c:p", "a/b", "c", DisplayName = "The backslash splits first, as curl's ntlm.c splits")]
     public void ContextRequestFor_UserName_SplitsTheDomainAsCurlDoes(string userColonPassword, string? domain, string user)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-u", userColonPassword);
+        diagnostics.Arrange("expected domain", domain);
+        diagnostics.Arrange("expected user", user);
+
         SecurityContextRequest request = NtlmHttpAuthenticator.ContextRequestFor(Request(userColonPassword));
 
+        diagnostics.Act("mechanism", request.Mechanism);
+        diagnostics.Act("domain", request.Domain);
+        diagnostics.Act("user name", request.UserName);
+        diagnostics.Act("password", request.Password);
+        diagnostics.Assert("mechanism", SecurityMechanism.Ntlm, request.Mechanism);
+        diagnostics.Assert("domain", domain, request.Domain);
+        diagnostics.Assert("user name", user, request.UserName);
+        diagnostics.Assert("password", "p", request.Password);
         Assert.AreEqual(SecurityMechanism.Ntlm, request.Mechanism);
         Assert.AreEqual(domain, request.Domain);
         Assert.AreEqual(user, request.UserName);
@@ -269,26 +411,43 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(":p", DisplayName = "-u :p")]
     public void ContextRequestFor_NoUserName_AsksForTheDefaultCredentials(string userColonPassword)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-u", userColonPassword);
+
         SecurityContextRequest request = NtlmHttpAuthenticator.ContextRequestFor(Request(userColonPassword));
 
+        diagnostics.Act("request", request);
+        diagnostics.Assert("request", new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1"), request);
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1"), request);
     }
 
     [TestMethod]
     public void ContextRequestFor_NoCredential_AsksForTheDefaultCredentials()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "null");
+
         SecurityContextRequest request = NtlmHttpAuthenticator.ContextRequestFor(Request("u:p") with { Credential = null });
 
+        diagnostics.Act("request", request);
+        diagnostics.Assert("request", new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1"), request);
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Ntlm, "HTTP", "127.0.0.1"), request);
     }
 
     [TestMethod]
     public void ContextRequestFor_CredentialWithItsOwnDomain_KeepsIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "CORP\\u:p");
+        diagnostics.Arrange("url", "http://[::1]:18526/x");
         HttpAuthRequest request = Request("u:p") with { Credential = new NetworkCredential("u", "p", "CORP"), Url = CurlUrl.Parse("http://[::1]:18526/x") };
 
         SecurityContextRequest contextRequest = NtlmHttpAuthenticator.ContextRequestFor(request);
 
+        diagnostics.Act("domain", contextRequest.Domain);
+        diagnostics.Act("host name", contextRequest.HostName);
+        diagnostics.Assert("domain", "CORP", contextRequest.Domain);
+        diagnostics.Assert("host name", "::1", contextRequest.HostName);
         Assert.AreEqual("CORP", contextRequest.Domain);
         Assert.AreEqual("::1", contextRequest.HostName);
     }

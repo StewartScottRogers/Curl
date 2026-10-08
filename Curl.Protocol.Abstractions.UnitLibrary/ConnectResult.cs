@@ -123,6 +123,13 @@ public sealed class ConnectResult
     public int MappedPort { get; private init; }
 
     /// <summary>
+    /// Gets how many header lines the reply to the CONNECT that opened a tunnel held, which curl
+    /// 8.21.0 stores and counts toward its limit of 5000 response headers (measured, BL-1609 Notes);
+    /// <c>0</c> when there was no CONNECT, the connection was reused, or the connect failed.
+    /// </summary>
+    public int ConnectReplyHeadersStored { get; private init; }
+
+    /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
     /// CONNECT code.
     /// </summary>
@@ -171,6 +178,9 @@ public sealed class ConnectResult
     /// <see langword="null" /> when it went to the target's own host.
     /// </param>
     /// <param name="mappedPort">The port beside <paramref name="mappedHost" />; <c>0</c> when there is none.</param>
+    /// <param name="connectReplyHeadersStored">
+    /// How many header lines the reply to a tunnelling CONNECT held; <c>0</c> when there was none.
+    /// </param>
     /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
@@ -187,7 +197,8 @@ public sealed class ConnectResult
         string? applicationProtocol = null,
         string? unixSocketPath = null,
         string? mappedHost = null,
-        int mappedPort = 0)
+        int mappedPort = 0,
+        int connectReplyHeadersStored = 0)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -203,6 +214,7 @@ public sealed class ConnectResult
             UnixSocketPath = unixSocketPath,
             MappedHost = mappedHost,
             MappedPort = mappedPort,
+            ConnectReplyHeadersStored = connectReplyHeadersStored,
         };
     }
 

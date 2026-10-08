@@ -27,13 +27,13 @@ public static class ServerNameExtension
 
     /// <summary>Decodes a ClientHello's <c>server_name</c> data holding one host name.</summary>
     /// <param name="data">The extension data.</param>
-    /// <returns>The host name, or the alert the bytes call for (<see cref="TlsAlertDescription.IllegalParameter" /> for a name type other than <c>host_name</c>).</returns>
+    /// <returns>The host name, or the alert the bytes call for (<see cref="TlsAlertDescription.IllegalParameter" /> for a name type other than <c>host_name</c>, <see cref="TlsAlertDescription.DecodeError" /> for an empty name).</returns>
     public static TlsDecodeResult<string> DecodeHostName(byte[] data)
     {
         TlsReader reader = new(data);
         TlsReader list = reader.ReadVector(2);
         byte nameType = list.ReadUInt8();
-        byte[] name = list.ReadOpaque(2);
+        byte[] name = list.ReadNonEmptyOpaque(2);
         list.ExpectEnd();
         if (nameType != HostNameType)
         {

@@ -24,7 +24,7 @@ public sealed record Tls12CertificateMessage(IReadOnlyList<byte[]> CertificateLi
 
     /// <summary>Decodes a Certificate body (the bytes after the handshake header).</summary>
     /// <param name="body">The message body.</param>
-    /// <returns>The Certificate, or the alert the bytes call for.</returns>
+    /// <returns>The Certificate, or the alert the bytes call for (<see cref="TlsAlertDescription.DecodeError" /> for an empty certificate).</returns>
     public static TlsDecodeResult<Tls12CertificateMessage> Decode(byte[] body)
     {
         TlsReader reader = new(body);
@@ -32,7 +32,7 @@ public sealed record Tls12CertificateMessage(IReadOnlyList<byte[]> CertificateLi
         List<byte[]> certificates = [];
         while (list.HasMore)
         {
-            certificates.Add(list.ReadOpaque(3));
+            certificates.Add(list.ReadNonEmptyOpaque(3));
         }
 
         return reader.Finish(new Tls12CertificateMessage(certificates));

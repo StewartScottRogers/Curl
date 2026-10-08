@@ -130,7 +130,9 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <summary>
     /// Waits for every started transfer to end, writes the deferred reports in command-line order and
     /// the meter's final line, then closes the option groups' dispatches. Every transfer has been
-    /// started when it is called, so the meter first draws when due.
+    /// started when it is called, so the meter first draws when due. A run that started no transfer,
+    /// one a bad glob or a refused <c>-T</c> upload ended first, draws no meter at all, as curl 8.21.0
+    /// draws none (measured 2026-10-07, BL-1683).
     /// </summary>
     /// <returns>A task that completes when the run has ended.</returns>
     /// <remarks>
@@ -140,21 +142,33 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// </remarks>
     internal async Task EndAsync()
     {
-        using ParallelProgressMeter? meter = ProgressMeter;
+        using ParallelProgressMeter? ownedMeter = ProgressMeter;
+        ParallelProgressMeter? meter = Queue.HasStartedAny ? ownedMeter : null;
         meter?.DrawIfDue();
         await Queue.WhenAllEndedAsync().ConfigureAwait(false);
+        await WriteDeferredReportsAsync().ConfigureAwait(false);
+        meter?.DrawFinal();
+        await CloseDispatchesAsync().ConfigureAwait(false);
+        abort.Dispose();
+    }
+
+    /// <summary>Writes the deferred reports in command-line order.</summary>
+    /// <returns>A task that completes when every report is written.</returns>
+    private async Task WriteDeferredReportsAsync()
+    {
         foreach ((_, Func<Task> report) in deferredReports.OrderBy(deferred => deferred.TransferId))
         {
             await report().ConfigureAwait(false);
         }
+    }
 
-        meter?.DrawFinal();
-
+    /// <summary>Closes the option groups' dispatches.</summary>
+    /// <returns>A task that completes when every dispatch is closed.</returns>
+    private async Task CloseDispatchesAsync()
+    {
         foreach (TransferDispatch dispatch in dispatches)
         {
             await dispatch.DisposeAsync().ConfigureAwait(false);
         }
-
-        abort.Dispose();
     }
 }

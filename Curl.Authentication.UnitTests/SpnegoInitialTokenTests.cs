@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Authentication;
 
 /// <summary>
@@ -17,25 +19,45 @@ public sealed class SpnegoInitialTokenTests
     // thisMech, the [0] choice, the SEQUENCE, mechTypes and the mechToken headers.
     private const int MeasuredMechanismTokenOffset = 43;
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Encode_MitKerberosListAndMeasuredApRequest_ReturnsCurlsBytes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] measured = Convert.FromBase64String(MeasuredMitToken);
+        diagnostics.Arrange("mechanism token offset", MeasuredMechanismTokenOffset);
+        diagnostics.Bytes("measured token", measured);
 
         byte[] encoded = SpnegoInitialToken.Encode(
             SpnegoMechanism.MitKerberosMechanismTypes,
             measured.AsSpan(MeasuredMechanismTokenOffset));
 
+        diagnostics.Bytes("encoded", encoded);
+        diagnostics.Act("encoded length", encoded.Length);
+        diagnostics.Diff("encoded base64", MeasuredMitToken, Convert.ToBase64String(encoded));
         Assert.AreEqual(MeasuredMitToken, Convert.ToBase64String(encoded));
     }
 
     [TestMethod]
     public void Encode_KerberosMicrosoftKerberosAndNtlmssp_OffersThemInOrder()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanisms", "KerberosV5, MicrosoftKerberosV5, Ntlmssp");
+        diagnostics.Bytes("mechanism token", new byte[] { 0x01, 0x02, 0x03 });
+
         byte[] encoded = SpnegoInitialToken.Encode(
             [SpnegoMechanism.KerberosV5, SpnegoMechanism.MicrosoftKerberosV5, SpnegoMechanism.Ntlmssp],
             [0x01, 0x02, 0x03]);
 
+        diagnostics.Bytes("encoded", encoded);
+        diagnostics.Act("encoded length", encoded.Length);
+        diagnostics.Diff(
+            "encoded hex",
+            "603906062B0601050502A02F302DA0243022"
+                + "06092A864886F71201020206092A864882F712010202060A2B06010401823702020A"
+                + "A2050403010203",
+            Convert.ToHexString(encoded));
         Assert.AreEqual(
             "603906062B0601050502A02F302DA0243022"
                 + "06092A864886F71201020206092A864882F712010202060A2B06010401823702020A"
@@ -46,8 +68,18 @@ public sealed class SpnegoInitialTokenTests
     [TestMethod]
     public void Encode_NtlmsspAlone_WrapsTheNtlmToken()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanisms", "Ntlmssp");
+        diagnostics.Bytes("mechanism token", new byte[] { 0xAA });
+
         byte[] encoded = SpnegoInitialToken.Encode([SpnegoMechanism.Ntlmssp], [0xAA]);
 
+        diagnostics.Bytes("encoded", encoded);
+        diagnostics.Act("encoded length", encoded.Length);
+        diagnostics.Diff(
+            "encoded hex",
+            "602106062B0601050502A0173015A00E300C060A2B06010401823702020AA2030401AA",
+            Convert.ToHexString(encoded));
         Assert.AreEqual(
             "602106062B0601050502A0173015A00E300C060A2B06010401823702020AA2030401AA",
             Convert.ToHexString(encoded));

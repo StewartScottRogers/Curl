@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Cryptography;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -49,43 +50,85 @@ public sealed class TlsServerEndPointChannelBindingsTests
 
     private static readonly byte[] Prefix = Encoding.ASCII.GetBytes("tls-server-end-point:");
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Of_Sha256RsaCertificate_IsThePrefixAndTheCertificatesSha256()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature hash", "SHA256 with PKCS#1 padding");
         byte[] certificate = RsaCertificate(HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        diagnostics.Bytes("certificate", certificate);
 
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(certificate);
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(SHA256.HashData(certificate)), binding ?? []);
         CollectionAssert.AreEqual(Expected(SHA256.HashData(certificate)), TlsServerEndPointChannelBindings.Of(certificate));
     }
 
     [TestMethod]
     public void Of_Sha1RsaCertificate_TakesSha256()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature algorithm", "1.2.840.113549.1.1.5");
         byte[] certificate = CertificateNaming("1.2.840.113549.1.1.5");
+        diagnostics.Bytes("certificate", certificate);
 
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(certificate);
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(SHA256.HashData(certificate)), binding ?? []);
         CollectionAssert.AreEqual(Expected(SHA256.HashData(certificate)), TlsServerEndPointChannelBindings.Of(certificate));
     }
 
     [TestMethod]
     public void Of_Sha384EcdsaCertificate_TakesSha384()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature hash", "SHA384 with ECDSA P-384");
         byte[] certificate = EcdsaCertificate(HashAlgorithmName.SHA384);
+        diagnostics.Bytes("certificate", certificate);
 
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(certificate);
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(SHA384.HashData(certificate)), binding ?? []);
         CollectionAssert.AreEqual(Expected(SHA384.HashData(certificate)), TlsServerEndPointChannelBindings.Of(certificate));
     }
 
     [TestMethod]
     public void Of_Sha512RsaCertificate_TakesSha512()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature hash", "SHA512 with PKCS#1 padding");
         byte[] certificate = RsaCertificate(HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1);
+        diagnostics.Bytes("certificate", certificate);
 
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(certificate);
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(SHA512.HashData(certificate)), binding ?? []);
         CollectionAssert.AreEqual(Expected(SHA512.HashData(certificate)), TlsServerEndPointChannelBindings.Of(certificate));
     }
 
     [TestMethod]
     public void Of_OpenSslSha224RsaCertificate_TakesSha224AsOpenSslHashesIt()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("openssl sha224 digest", "59abc99016d35ab0ac2d8f5b6205a8746607e4d8ded9b9a1f53f9140");
         byte[] certificate = Convert.FromBase64String(OpenSslSha224RsaCertificate);
+        diagnostics.Bytes("certificate", certificate);
 
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(certificate);
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(Convert.FromHexString("59abc99016d35ab0ac2d8f5b6205a8746607e4d8ded9b9a1f53f9140")), binding ?? []);
         CollectionAssert.AreEqual(Expected(Convert.FromHexString("59abc99016d35ab0ac2d8f5b6205a8746607e4d8ded9b9a1f53f9140")), TlsServerEndPointChannelBindings.Of(certificate));
     }
 
@@ -94,8 +137,16 @@ public sealed class TlsServerEndPointChannelBindingsTests
     [DataRow("2.16.840.1.101.3.4.3.1", DisplayName = "dsa-with-sha224")]
     public void Of_OtherSha224Certificate_TakesSha224(string signatureAlgorithm)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature algorithm", signatureAlgorithm);
         byte[] certificate = CertificateNaming(signatureAlgorithm);
+        diagnostics.Bytes("certificate", certificate);
 
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(certificate);
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(Sha224.HashData(certificate)), binding ?? []);
         CollectionAssert.AreEqual(Expected(Sha224.HashData(certificate)), TlsServerEndPointChannelBindings.Of(certificate));
     }
 
@@ -107,6 +158,16 @@ public sealed class TlsServerEndPointChannelBindingsTests
         DisplayName = "ecdsa_with_SHA3-512")]
     public void Of_OpenSslSha3Certificate_TakesItsSha3AsOpenSslHashesIt(string certificate, string expectedHash)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("certificate base64", certificate);
+        diagnostics.Arrange("expected hash", expectedHash);
+        diagnostics.Bytes("certificate", Convert.FromBase64String(certificate));
+
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(Convert.FromBase64String(certificate));
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(Convert.FromHexString(expectedHash)), binding ?? []);
         CollectionAssert.AreEqual(Expected(Convert.FromHexString(expectedHash)), TlsServerEndPointChannelBindings.Of(Convert.FromBase64String(certificate)));
     }
 
@@ -121,15 +182,26 @@ public sealed class TlsServerEndPointChannelBindingsTests
     [DataRow("2.16.840.1.101.3.4.3.16", 512, DisplayName = "id-rsassa-pkcs1-v1_5-with-sha3-512")]
     public void Of_Sha3Certificate_TakesThatSha3(string signatureAlgorithm, int bits)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature algorithm", signatureAlgorithm);
+        diagnostics.Arrange("bits", bits);
         byte[] certificate = CertificateNaming(signatureAlgorithm);
+        diagnostics.Bytes("certificate", certificate);
 
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(certificate);
+
+        diagnostics.Bytes("binding", binding ?? []);
+        diagnostics.Act("binding length", binding?.Length);
+        diagnostics.Diff("binding", Expected(Sha3Of(certificate, bits)), binding ?? []);
         CollectionAssert.AreEqual(Expected(Sha3Of(certificate, bits)), TlsServerEndPointChannelBindings.Of(certificate));
     }
 
     [TestMethod]
     public void Of_RsaPssCertificate_FailsWithExit91AsCurlWasMeasured()
     {
-        AssertFails(RsaCertificate(HashAlgorithmName.SHA256, RSASignaturePadding.Pss), TlsServerEndPointChannelBindings.NoDigestAlgorithmMessage);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature", "SHA256 with PSS padding");
+        AssertFails(diagnostics, RsaCertificate(HashAlgorithmName.SHA256, RSASignaturePadding.Pss), TlsServerEndPointChannelBindings.NoDigestAlgorithmMessage);
     }
 
     [TestMethod]
@@ -137,18 +209,29 @@ public sealed class TlsServerEndPointChannelBindingsTests
     [DataRow(OpenSslEd448Certificate, DisplayName = "Ed448")]
     public void Of_EdDsaCertificate_FailsWithExit91AsCurlWasMeasured(string certificate)
     {
-        AssertFails(Convert.FromBase64String(certificate), TlsServerEndPointChannelBindings.NoDigestAlgorithmMessage);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("certificate base64", certificate);
+        AssertFails(diagnostics, Convert.FromBase64String(certificate), TlsServerEndPointChannelBindings.NoDigestAlgorithmMessage);
     }
 
     [TestMethod]
     public void Of_SignatureAlgorithmOpenSslDoesNotKnow_FailsWithExit91AndNoDigestNid()
     {
-        AssertFails(CertificateNaming("1.2.840.113549.1.1.127"), TlsServerEndPointChannelBindings.NoDigestNidMessage);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("signature algorithm", "1.2.840.113549.1.1.127");
+        AssertFails(diagnostics, CertificateNaming("1.2.840.113549.1.1.127"), TlsServerEndPointChannelBindings.NoDigestNidMessage);
     }
 
     [TestMethod]
     public void Of_NoCertificate_IsNull()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("certificate", "empty");
+
+        byte[]? binding = TlsServerEndPointChannelBindings.Of(ReadOnlyMemory<byte>.Empty);
+
+        diagnostics.Act("binding", binding);
+        diagnostics.Assert("binding", null, binding);
         Assert.IsNull(TlsServerEndPointChannelBindings.Of(ReadOnlyMemory<byte>.Empty));
     }
 
@@ -185,10 +268,14 @@ public sealed class TlsServerEndPointChannelBindingsTests
         return hash;
     }
 
-    private static void AssertFails(byte[] certificate, string message)
+    private static void AssertFails(TestDiagnostics diagnostics, byte[] certificate, string message)
     {
+        diagnostics.Bytes("certificate", certificate);
         HttpAuthenticationFailedException failure = Assert.ThrowsExactly<HttpAuthenticationFailedException>(() => TlsServerEndPointChannelBindings.Of(certificate));
 
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Assert("exit code", CurlExitCode.SslInvalidCertStatus, failure.ExitCode);
+        diagnostics.Diff("message", message, failure.Message);
         Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, failure.ExitCode);
         Assert.AreEqual(message, failure.Message);
     }

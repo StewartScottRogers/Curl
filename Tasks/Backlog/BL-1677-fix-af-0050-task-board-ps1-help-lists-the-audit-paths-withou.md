@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [.claude]
+touches: [.claude/skills/task-board/task-board.ps1]
 requirement: none
 created: 2026-10-08
 completed:
@@ -46,6 +46,10 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+- 2026-10-07 (lane 5): the fix is an edit to `.claude/skills/task-board/task-board.ps1`, a guard file and so an audit path (ADR-0267, BL-1209). A dark factory lane may not read or change it: the PreToolUse guard refuses it and CI's audit-guard fails `work/dark-factory` for changing it. `touches` was the ancestor `.claude`, which let a lane claim it; it now names the file, which makes the task interactive only. Fix for an interactive session on the `audit` branch: extend the `next` help (lines 17-22) to list the four guard files Test-AuditPath names. No code was changed.
+
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Interactive only: the fix edits .claude/skills/task-board/task-board.ps1, a guard file no lane may change; an interactive session does it on the audit branch

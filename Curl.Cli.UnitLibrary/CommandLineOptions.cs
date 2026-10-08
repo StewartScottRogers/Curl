@@ -1997,6 +1997,20 @@ public sealed class CommandLineOptions
     public SelectedHttpMethod HttpMethodSelected { get; internal set; }
 
     /// <summary>
+    /// The HTTP request method a transfer that uploads a <c>-T</c> file finds selected when curl 8.21.0
+    /// sets it up: <see cref="HttpMethodSelected"/> when an option selected one; otherwise
+    /// <see cref="SelectedHttpMethod.Get"/> for a <see cref="PostData"/> body <c>-G</c> moves into the
+    /// query, <see cref="SelectedHttpMethod.Post"/> for one to be posted, and
+    /// <see cref="SelectedHttpMethod.None"/> without a body. Anything but <see cref="SelectedHttpMethod.None"/>
+    /// makes the upload refused with <see cref="CommandLineWarning.PutRequestedWith"/>'s line and exit 2.
+    /// </summary>
+    public SelectedHttpMethod HttpMethodBeforeUpload =>
+        HttpMethodSelected != SelectedHttpMethod.None ? HttpMethodSelected
+        : PostData is null ? SelectedHttpMethod.None
+        : DataInQuery ? SelectedHttpMethod.Get
+        : SelectedHttpMethod.Post;
+
+    /// <summary>
     /// <see langword="true"/> when <c>-s</c> / <c>--silent</c> has been read and <c>-S</c> /
     /// <c>--show-error</c> has not, so far: curl then hides error messages.
     /// </summary>

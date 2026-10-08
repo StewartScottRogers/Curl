@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using Curl.Testing;
 
 namespace Curl.Tls;
 
@@ -24,15 +25,31 @@ public sealed class TlsSessionCodecTests
         "3043" + "020101" + "02020304" + "04021301" + "04020102" + "04020304" + "a10602046553f100" + "a20402021c20" + "a4020400"
         + "a603040161" + "a90402021c20" + "aa0404020506" + "ae06020401020304" + "b30302011d";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
-    public void EncodeWritesOpenSslsLayoutAndLeavesOutZeroesAndAbsentFields() =>
-        Assert.AreEqual(SmallDer, Convert.ToHexStringLower(TlsSessionCodec.Encode(Small)));
+    public void EncodeWritesOpenSslsLayoutAndLeavesOutZeroesAndAbsentFields()
+    {
+        Diagnostics.Arrange("session", "TLS 1.3, suite 0x1301, server name a, X25519, lifetime 7200");
+
+        string encoded = Convert.ToHexStringLower(TlsSessionCodec.Encode(Small));
+        Diagnostics.Act("encoded length", encoded.Length / 2);
+
+        Diagnostics.Diff("encoded hex", SmallDer, encoded);
+        Assert.AreEqual(SmallDer, encoded);
+    }
 
     [TestMethod]
     public void DecodeReadsOpenSslsLayout()
     {
-        TlsSessionRecord session = TlsSessionCodec.Decode(Convert.FromHexString(SmallDer))!;
+        Diagnostics.Arrange("der", "the encoding of the small session");
 
+        TlsSessionRecord session = Decode(Convert.FromHexString(SmallDer))!;
+
+        Diagnostics.Assert("version", 0x0304, session.Version);
+        Diagnostics.Assert("server name", "a", session.ServerName);
         Assert.AreEqual(0x0304, session.Version);
         Assert.AreEqual(0x1301, session.CipherSuite);
         CollectionAssert.AreEqual(Small.SessionId, session.SessionId);
@@ -59,9 +76,13 @@ public sealed class TlsSessionCodecTests
             PeerCertificate = certificate,
             ServerName = null,
         };
+        Diagnostics.Arrange("session", "max early data 16384, ALPN h2, an Ed25519 peer certificate, no server name");
 
-        TlsSessionRecord decoded = TlsSessionCodec.Decode(TlsSessionCodec.Encode(session))!;
+        TlsSessionRecord decoded = Decode(TlsSessionCodec.Encode(session))!;
 
+        Diagnostics.Assert("max early data size", 16384u, decoded.MaxEarlyDataSize);
+        Diagnostics.Assert("application protocol", "h2", decoded.ApplicationProtocol);
+        Diagnostics.Diff("peer certificate", certificate, decoded.PeerCertificate ?? []);
         Assert.AreEqual(16384u, decoded.MaxEarlyDataSize);
         Assert.AreEqual("h2", decoded.ApplicationProtocol);
         Assert.IsNull(decoded.ServerName);
@@ -78,9 +99,12 @@ public sealed class TlsSessionCodecTests
         WriteExplicit(writer, 13, inner => inner.WriteInteger(1));
         WriteExplicit(writer, 20, inner => inner.WriteOctetString([8]));
         writer.PopSequence();
+        Diagnostics.Arrange("fields", "[0] cipher, [5] timeout, [10] ticket, [13] extended master secret, [20] unused");
 
-        TlsSessionRecord session = TlsSessionCodec.Decode(writer.Encode())!;
+        TlsSessionRecord session = Decode(writer.Encode())!;
 
+        Diagnostics.Diff("ticket", new byte[] { 7 }, session.Ticket);
+        Diagnostics.Assert("received at", DateTimeOffset.UnixEpoch, session.ReceivedAt);
         CollectionAssert.AreEqual(new byte[] { 7 }, session.Ticket);
         Assert.AreEqual(0, session.Group);
         Assert.AreEqual(DateTimeOffset.UnixEpoch, session.ReceivedAt);
@@ -90,25 +114,60 @@ public sealed class TlsSessionCodecTests
     [DataRow("", DisplayName = "no bytes")]
     [DataRow("010203", DisplayName = "not a sequence")]
     [DataRow("300302010200", DisplayName = "bytes after the sequence")]
-    public void DecodeRefusesWhatIsNotASession(string hex) =>
-        Assert.IsNull(TlsSessionCodec.Decode(Convert.FromHexString(hex)));
+    public void DecodeRefusesWhatIsNotASession(string hex)
+    {
+        Diagnostics.Arrange("hex", hex);
+
+        TlsSessionRecord? session = Decode(Convert.FromHexString(hex));
+
+        WriteRefused(session);
+        Assert.IsNull(session);
+    }
 
     [TestMethod]
-    public void DecodeRefusesAnotherFormatVersion() => Assert.IsNull(TlsSessionCodec.Decode(WithTicket(Header(2, 0x0304, [0x13, 0x01]))));
+    public void DecodeRefusesAnotherFormatVersion()
+    {
+        Diagnostics.Arrange("format version", 2);
+
+        TlsSessionRecord? session = Decode(WithTicket(Header(2, 0x0304, [0x13, 0x01])));
+
+        WriteRefused(session);
+        Assert.IsNull(session);
+    }
 
     [TestMethod]
-    public void DecodeRefusesACipherThatIsNotTwoBytes() => Assert.IsNull(TlsSessionCodec.Decode(WithTicket(Header(1, 0x0304, [0x13, 0x01, 0x00]))));
+    public void DecodeRefusesACipherThatIsNotTwoBytes()
+    {
+        Diagnostics.Arrange("cipher", "130100");
+
+        TlsSessionRecord? session = Decode(WithTicket(Header(1, 0x0304, [0x13, 0x01, 0x00])));
+
+        WriteRefused(session);
+        Assert.IsNull(session);
+    }
 
     [TestMethod]
-    public void DecodeRefusesAVersionPastSixteenBits() => Assert.IsNull(TlsSessionCodec.Decode(WithTicket(Header(1, 0x10000, [0x13, 0x01]))));
+    public void DecodeRefusesAVersionPastSixteenBits()
+    {
+        Diagnostics.Arrange("version", "0x10000");
+
+        TlsSessionRecord? session = Decode(WithTicket(Header(1, 0x10000, [0x13, 0x01])));
+
+        WriteRefused(session);
+        Assert.IsNull(session);
+    }
 
     [TestMethod]
     public void DecodeRefusesASessionWithoutATicket()
     {
         AsnWriter writer = Header(1, 0x0304, [0x13, 0x01]);
         writer.PopSequence();
+        Diagnostics.Arrange("fields", "the untagged fields only, no [10] ticket");
 
-        Assert.IsNull(TlsSessionCodec.Decode(writer.Encode()));
+        TlsSessionRecord? session = Decode(writer.Encode());
+
+        WriteRefused(session);
+        Assert.IsNull(session);
     }
 
     [TestMethod]
@@ -120,8 +179,12 @@ public sealed class TlsSessionCodecTests
         WriteExplicit(writer, first, inner => inner.WriteOctetString([7]));
         WriteExplicit(writer, second, inner => inner.WriteOctetString([7]));
         writer.PopSequence();
+        Diagnostics.Arrange("tags", $"[{first}] then [{second}]");
 
-        Assert.IsNull(TlsSessionCodec.Decode(writer.Encode()));
+        TlsSessionRecord? session = Decode(writer.Encode());
+
+        WriteRefused(session);
+        Assert.IsNull(session);
     }
 
     [TestMethod]
@@ -130,8 +193,12 @@ public sealed class TlsSessionCodecTests
         AsnWriter writer = Header(1, 0x0304, [0x13, 0x01]);
         writer.WriteInteger(5);
         writer.PopSequence();
+        Diagnostics.Arrange("extra field", "untagged INTEGER 5 after the master key");
 
-        Assert.IsNull(TlsSessionCodec.Decode(writer.Encode()));
+        TlsSessionRecord? session = Decode(writer.Encode());
+
+        WriteRefused(session);
+        Assert.IsNull(session);
     }
 
     [TestMethod]
@@ -139,8 +206,12 @@ public sealed class TlsSessionCodecTests
     {
         AsnWriter writer = Header(1, 0x0304, [0x13, 0x01]);
         WriteExplicit(writer, 1, inner => inner.WriteInteger(-1));
+        Diagnostics.Arrange("[1] time", -1);
 
-        Assert.IsNull(TlsSessionCodec.Decode(WithTicket(writer)));
+        TlsSessionRecord? session = Decode(WithTicket(writer));
+
+        WriteRefused(session);
+        Assert.IsNull(session);
     }
 
     [TestMethod]
@@ -150,16 +221,36 @@ public sealed class TlsSessionCodecTests
         WriteExplicit(writer, 10, inner => inner.WriteOctetString([7]));
         WriteExplicit(writer, 19, inner => inner.WriteInteger(70000));
         writer.PopSequence();
+        Diagnostics.Arrange("[19] group", 70000);
 
-        Assert.IsNull(TlsSessionCodec.Decode(writer.Encode()));
+        TlsSessionRecord? session = Decode(writer.Encode());
+
+        WriteRefused(session);
+        Assert.IsNull(session);
     }
 
     [TestMethod]
     public void EncodeAndDecodeRefuseNull()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => TlsSessionCodec.Encode(null!));
-        Assert.ThrowsExactly<ArgumentNullException>(() => TlsSessionCodec.Decode(null!));
+        Diagnostics.Arrange("argument", "null");
+
+        ArgumentNullException encodeException = Assert.ThrowsExactly<ArgumentNullException>(() => TlsSessionCodec.Encode(null!));
+        ArgumentNullException decodeException = Assert.ThrowsExactly<ArgumentNullException>(() => TlsSessionCodec.Decode(null!));
+        Diagnostics.Act("thrown", $"{encodeException.GetType().Name}, {decodeException.GetType().Name}");
+
+        Diagnostics.Assert("parameter names", "session, encoded", $"{encodeException.ParamName}, {decodeException.ParamName}");
     }
+
+    /// <summary>Decodes <paramref name="der" />, writing the bytes and whether a session came back.</summary>
+    private TlsSessionRecord? Decode(byte[] der)
+    {
+        Diagnostics.Bytes("der", der);
+        TlsSessionRecord? session = TlsSessionCodec.Decode(der);
+        Diagnostics.Act("decoded", session is null ? "null" : "a session");
+        return session;
+    }
+
+    private void WriteRefused(TlsSessionRecord? session) => Diagnostics.Assert("refused", true, session is null);
 
     /// <summary>Opens the session sequence and writes the untagged fields, leaving the sequence open.</summary>
     private static AsnWriter Header(int formatVersion, int version, byte[] cipher)

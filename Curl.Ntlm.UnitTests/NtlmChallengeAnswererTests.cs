@@ -101,6 +101,26 @@ public sealed class NtlmChallengeAnswererTests
         diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
+    [TestMethod]
+    [DataRow(0, NtlmNegotiateFlags.None)]
+    [DataRow(7, NtlmNegotiateFlags.None)]
+    [DataRow(9, NtlmNegotiateFlags.None)]
+    [DataRow(0, NtlmNegotiateFlags.NegotiateExtendedSessionSecurity)]
+    [DataRow(7, NtlmNegotiateFlags.NegotiateExtendedSessionSecurity)]
+    [DataRow(9, NtlmNegotiateFlags.NegotiateExtendedSessionSecurity)]
+    public void Answer_ServerChallengeNotEightBytes_ThrowsArgumentException(int length, NtlmNegotiateFlags flags)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        NtlmChallengeMessage challenge = new(flags, new byte[length], [], [], []);
+        ArrangeChallenge(diagnostics, challenge, "u", "pw");
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => CreateAnswerer().Answer(challenge, "u", "pw"));
+
+        diagnostics.Act("exception", $"{exception.GetType().Name} for {exception.ParamName}: {exception.Message}");
+        diagnostics.Assert("parameter name", "serverChallenge", exception.ParamName);
+        Assert.AreEqual("serverChallenge", exception.ParamName);
+    }
+
     private static void ArrangeChallenge(TestDiagnostics diagnostics, NtlmChallengeMessage challenge, string userName, string password)
     {
         diagnostics.Arrange("challenge flags", $"0x{(uint)challenge.Flags:X8} ({challenge.Flags})");

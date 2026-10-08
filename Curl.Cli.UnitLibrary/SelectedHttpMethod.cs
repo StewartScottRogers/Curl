@@ -24,4 +24,10 @@ public enum SelectedHttpMethod
     /// asks for it and a multipart form post both.
     /// </summary>
     Post,
+
+    /// <summary>
+    /// A <c>-T</c> / <c>--upload-file</c> upload: never stored, only named when a transfer that uploads a
+    /// file finds another method already selected.
+    /// </summary>
+    Put,
 }

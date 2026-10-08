@@ -265,6 +265,24 @@ public sealed class HttpResponseHeadReaderTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_ReaderWithoutDefersFrom_TellsEveryFinalHeaderBeforeReturning()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            Diagnostics.Arrange("scripted response", $"HTTP/1.1 200 OK, headers A and B, chunk size {chunkSize}, no DefersFrom");
+            ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nA: 1\r\nB: 2\r\n\r\nhi"), chunkSize);
+            List<string> told = [];
+            HttpResponseHeadReader reader = new(connection) { HeaderReceived = (_, header) => told.Add(header.Name) };
+
+            await reader.ReadAsync(CancellationToken.None);
+            Diagnostics.Act("headers told before ReportHeldLines", string.Join(",", told));
+
+            Diagnostics.Assert("headers told", "A,B", string.Join(",", told));
+            CollectionAssert.AreEqual(new[] { "A", "B" }, told, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
     public async Task ReadAsync_Http2StreamWithHttp09Accepted_ParsesTheHttp2StatusLine()
     {
         Diagnostics.Arrange("scripted response", "HTTP/2 200 \\r\\n\\r\\n, one read, HTTP/0.9 accepted, HTTP/2 or HTTP/3 stream");

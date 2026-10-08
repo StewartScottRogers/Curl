@@ -20,6 +20,9 @@ internal sealed class ParallelTransferQueue(int maxRunning)
     /// </summary>
     internal bool HasFreeSlot => running.Count < maxRunning;
 
+    /// <summary>Gets a value indicating whether any transfer has been started.</summary>
+    internal bool HasStartedAny => started.Count > 0;
+
     /// <summary>Waits until fewer than the maximum transfers are running.</summary>
     /// <returns>A task that completes when a transfer may start.</returns>
     internal async Task WaitForFreeSlotAsync()

@@ -554,7 +554,8 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             applicationProtocol: connect.ApplicationProtocol,
             unixSocketPath: entry.UnixSocketPath,
             mappedHost: entry.MappedHost,
-            mappedPort: entry.MappedPort);
+            mappedPort: entry.MappedPort,
+            connectReplyHeadersStored: connect.ConnectReplyHeadersStored);
     }
 
     private ConnectResult Reuse(ConnectTarget target, PoolEntry entry)

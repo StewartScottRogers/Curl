@@ -77,11 +77,17 @@ the environment variable `CURL_RUN_LONG_RUNNING_TESTS` is `1`. The fast command 
 long-running test that drops under 3 seconds in a Debug build loses both attributes and
 joins the fast run.
 
-The four such tests today are in `Curl.Cryptography.UnitTests`:
+The three such tests today are in `Curl.Cryptography.UnitTests`, each tagged
+`[TestCategory("LongRunning")]` and `[RunsOnlyWhenLongRunningTestsAreEnabled]` (the
+condition attribute, in `RunsOnlyWhenLongRunningTestsAreEnabledAttribute.cs`):
 `X25519Tests.TryComputeSharedSecret_Rfc7748Section52MillionIterations_GivesTheExpectedK`,
-`X448Tests.TryComputeSharedSecret_Rfc7748Section52MillionIterations_GivesTheExpectedK`,
-`Cast128Tests.EncryptBlock_Rfc2144AppendixB2FullMaintenanceTest_GivesThePublishedAAndB` and
-`BrainpoolEcdsaTests.VerifyHash_EveryWycheproofP384r1AndP512r1Vector_GivesItsExpectedResult`.
+`X448Tests.TryComputeSharedSecret_Rfc7748Section52MillionIterations_GivesTheExpectedK` and
+`Cast128Tests.EncryptBlock_Rfc2144AppendixB2FullMaintenanceTest_GivesThePublishedAAndB`.
+A fourth candidate,
+`BrainpoolEcdsaTests.VerifyHash_EveryWycheproofP384r1AndP512r1Vector_GivesItsExpectedResult`,
+measured under 3 seconds per row in a Debug build when BL-1604 retagged the others
+(2026-10-07: P-384r1 about 1 s, P-512r1 about 2 s), so by the rule above it carries
+neither attribute and runs in the fast run.
 
 **Why:** they cannot join the fast run - BL-1525's partial speed-up measured 5 min 40 s
 (X25519), 14 min 51 s (X448) and 32.9 s (CAST-128 B.2) on 2026-10-07, against
@@ -140,7 +146,8 @@ BL-1603 checks the rule at build time rather than in a test.
   they could return to the fast run untagged, which is a later choice, not a requirement.
 - BL-1603 fails the build when a `*.UnitTests` project holds an Integration test or an
   `*.IntegrationTests` project holds a test without the category.
-- BL-1604 retags the four Cryptography tests as LongRunning (decision 3).
+- BL-1604 retagged three of the four slow Cryptography tests as LongRunning and returned
+  the Brainpool test, by then under 3 seconds, to the fast run untagged (decision 3).
 - `Measure-CodeQuality.ps1` (BL-1605), `RunDarkFactory.ps1` (BL-1606) and
   `Audit/Tools/Find-WeakTests.ps1` (BL-1607, interactive only) learn the new projects.
 

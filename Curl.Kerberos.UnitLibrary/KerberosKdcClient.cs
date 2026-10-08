@@ -11,7 +11,9 @@ namespace Curl.Kerberos;
 /// exchange with <c>PA-ENC-TIMESTAMP</c> pre-authentication and then the service ticket by
 /// a TGS exchange, following the KDCs' cross-realm referrals (ADR-0256); and, for
 /// <c>--delegation</c>, a forwarded ticket-granting ticket from a forwardable one (ADR-0210). Every KRB-ERROR
-/// becomes a <see cref="KerberosKdcException" />.
+/// becomes a <see cref="KerberosKdcException" />, except the
+/// <c>KDC_ERR_PREAUTH_REQUIRED</c> answering the first AS-REQ, which instead sends a second
+/// AS-REQ with <c>PA-ENC-TIMESTAMP</c> built from the error's <c>PA-ETYPE-INFO2</c>.
 /// </summary>
 public sealed class KerberosKdcClient
 {

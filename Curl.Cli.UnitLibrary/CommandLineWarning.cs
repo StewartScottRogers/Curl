@@ -19,6 +19,7 @@ public static class CommandLineWarning
         "HEAD (-I, --head)",
         "multipart formpost (-F, --form)",
         "POST (-d, --data)",
+        "PUT (-T, --upload-file)",
     ];
 
     /// <summary>
@@ -213,6 +214,27 @@ public static class CommandLineWarning
     /// </summary>
     public static IReadOnlyList<string> PostRequestedWithGet { get; } =
         OnlyOneRequestMethod(SelectedHttpMethod.Post, SelectedHttpMethod.Get);
+
+    /// <summary>
+    /// The warning curl prints, at the setup of a transfer that uploads a <c>-T</c> / <c>--upload-file</c>
+    /// file rather than while reading the command line, when another method is already selected, after
+    /// which it ends with exit 2 and sends nothing more, as one unwrapped line; the console layer wraps it
+    /// at the terminal width. Measured with <c>curl -d a=1 -T f</c>, <c>-T f -d a=1</c>, <c>--json {} -T f</c>
+    /// (all <c>POST (-d, --data)</c>), <c>-F a=1 -T f</c>, <c>-I -T f</c>, <c>-G -d a=1 -T f</c> and
+    /// <c>--no-head -T f</c> (both <c>GET (-G, --get)</c>) against <c>http://127.0.0.1:50999/x</c>
+    /// (curl 8.21.0, Windows, 2026-10-07, BL-1683).
+    /// </summary>
+    /// <param name="selected">
+    /// The method the transfer finds selected: <see cref="CommandLineOptions.HttpMethodBeforeUpload"/>.
+    /// </param>
+    /// <returns>
+    /// The warning line, as the only element; <see langword="null"/> for <see cref="SelectedHttpMethod.None"/>
+    /// or <see cref="SelectedHttpMethod.Put"/>, which do not conflict with an upload.
+    /// </returns>
+    public static IReadOnlyList<string>? PutRequestedWith(SelectedHttpMethod selected) =>
+        selected is SelectedHttpMethod.None or SelectedHttpMethod.Put
+            ? null
+            : OnlyOneRequestMethod(SelectedHttpMethod.Put, selected);
 
     /// <summary>
     /// The line curl prints when <c>-0</c> / <c>--http1.0</c> or <c>--http1.1</c> asks for a different HTTP

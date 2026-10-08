@@ -37,6 +37,9 @@ public sealed class FakeConnector : IConnector
     /// <summary>Gets or sets the <c>--connect-to</c> port every connection reports beside <see cref="MappedHost" />.</summary>
     public int MappedPort { get; set; }
 
+    /// <summary>Gets or sets how many CONNECT reply header lines every connection reports.</summary>
+    public int ConnectReplyHeadersStored { get; set; }
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -62,6 +65,7 @@ public sealed class FakeConnector : IConnector
             peerCertificates: [new byte[] { (byte)number }],
             unixSocketPath: UnixSocketPath,
             mappedHost: MappedHost,
-            mappedPort: MappedPort));
+            mappedPort: MappedPort,
+            connectReplyHeadersStored: ConnectReplyHeadersStored));
     }
 }

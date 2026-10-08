@@ -231,12 +231,61 @@ public sealed class CurlCommandRunnerUploadTests
     }
 
     [TestMethod]
-    public async Task RunAsync_UploadWithForm_SendsTheFile()
+    public async Task RunAsync_UploadWithForm_WarnsSendsNothingAndExitsTwo()
     {
-        await RunAsync("-T", "a", "-F", "x=y", "http://h/1/");
+        int exitCode = await RunAsync("-T", "a", "-F", "x=y", "http://h/1/");
 
-        Diagnostics.Diff("upload", Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
-        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
+        string expected = "Warning: You can only select one HTTP request method! You asked for both PUT " + NewLine
+            + "Warning: (-T, --upload-file) and multipart formpost (-F, --form)." + NewLine;
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
+        Diagnostics.Diff("stderr", expected, StandardErrorText);
+        Assert.AreEqual(2, exitCode);
+        Assert.IsEmpty(dispatched);
+        Assert.AreEqual(expected, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DataWithUpload_WarnsSendsNothingAndExitsTwo()
+    {
+        int exitCode = await RunAsync("-d", "a=1", "-T", "a", "http://h/1/");
+
+        string expected = "Warning: You can only select one HTTP request method! You asked for both PUT " + NewLine
+            + "Warning: (-T, --upload-file) and POST (-d, --data)." + NewLine;
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
+        Diagnostics.Diff("stderr", expected, StandardErrorText);
+        Assert.AreEqual(2, exitCode);
+        Assert.IsEmpty(dispatched);
+        Assert.AreEqual(expected, StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SilentDataWithUpload_WritesNothingAndExitsTwo()
+    {
+        int exitCode = await RunAsync("-s", "-d", "a=1", "-T", "a", "http://h/1/");
+
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
+        Diagnostics.Assert("stderr", string.Empty, StandardErrorText);
+        Assert.AreEqual(2, exitCode);
+        Assert.IsEmpty(dispatched);
+        Assert.IsEmpty(StandardErrorText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EmptyUploadThenUploadWithData_PostsTheFirstUrlThenRefusesTheSecond()
+    {
+        int exitCode = await RunAsync("-T", string.Empty, "-T", "a", "-d", "a=1", "http://h/1/", "http://h/2/");
+
+        string expected = "Warning: You can only select one HTTP request method! You asked for both PUT " + NewLine
+            + "Warning: (-T, --upload-file) and POST (-d, --data)." + NewLine;
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Assert("dispatched count", 1, dispatched.Count);
+        Diagnostics.Diff("stderr", expected, StandardErrorText);
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual("http://h/1/", dispatched.Single().Url);
+        Assert.AreEqual(expected, StandardErrorText);
     }
 
     [TestMethod]

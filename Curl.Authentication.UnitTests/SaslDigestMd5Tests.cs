@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -18,6 +19,8 @@ public sealed class SaslDigestMd5Tests
 
     private static readonly Encoding Windows1252 = CodePagesEncodingProvider.Instance.GetEncoding(1252)!;
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(ChallengeWithoutCharset, "33c9355ee13cd9ce118ac5332dfff45e",
         "username=\"user\",realm=\"localhost\",nonce=\"OA6MG9tEQGm2hh\",cnonce=\"33c9355ee13cd9ce118ac5332dfff45e\",nc=\"00000001\",digest-uri=\"smtp/172.26.96.1\",response=3bd95e0256eb7fec7923e829f85c9339,qop=auth",
@@ -30,8 +33,15 @@ public sealed class SaslDigestMd5Tests
         DisplayName = "qop=\"auth-int,AUTH\": auth")]
     public void AnswerAsCurl_MatchesCurlOpenSsl(string challenge, string clientNonce, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+        diagnostics.Arrange("client nonce", clientNonce);
+        diagnostics.Arrange("credentials", "user:pencil");
+
         byte[]? answer = SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "user", "pencil", "smtp/172.26.96.1", clientNonce);
 
+        diagnostics.Act("answer", Encoding.Latin1.GetString(answer!));
+        diagnostics.Diff("answer", expected, Encoding.Latin1.GetString(answer!));
         Assert.AreEqual(expected, Encoding.Latin1.GetString(answer!));
     }
 
@@ -44,26 +54,44 @@ public sealed class SaslDigestMd5Tests
     [DataRow("", DisplayName = "Empty challenge: *")]
     public void AnswerAsCurl_ChallengeCurlCancels_AnswersNull(string challenge)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+        diagnostics.Arrange("credentials", "user:pencil");
+
+        byte[]? answer = SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "user", "pencil", "smtp/h", "c");
+
+        diagnostics.Act("answer", answer is null ? "(null)" : Encoding.Latin1.GetString(answer));
+        diagnostics.Assert("answer", null, answer);
         Assert.IsNull(SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "user", "pencil", "smtp/h", "c"));
     }
 
     [TestMethod]
     public void AnswerAsCurl_ValuesCutAtCurlsBufferSizes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string challenge = $"realm=\"{new string('r', 200)}\",nonce=\"{new string('n', 100)}\",qop=\"auth\",algorithm=md5-sess";
+        diagnostics.Arrange("realm length", 200);
+        diagnostics.Arrange("nonce length", 100);
 
         string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(Encoding.ASCII.GetBytes(challenge), Encoding.UTF8, "u", "p", "smtp/h", "c")!);
 
+        string expected = $",realm=\"{new string('r', 127)}\",nonce=\"{new string('n', 63)}\",";
+        diagnostics.Act("answer", answer);
+        diagnostics.Assert("contains cut values", true, answer.Contains(expected, StringComparison.Ordinal));
         StringAssert.Contains(answer, $",realm=\"{new string('r', 127)}\",nonce=\"{new string('n', 63)}\",");
     }
 
     [TestMethod]
     public void AnswerAsCurl_ChallengeEndsAtNul()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] challenge = [.. Encoding.ASCII.GetBytes(ChallengeWithoutCharset), 0, .. Encoding.ASCII.GetBytes(",realm=\"other\"")];
+        diagnostics.Arrange("challenge", ChallengeWithoutCharset + "\\0,realm=\"other\"");
 
         string answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsCurl(challenge, Encoding.UTF8, "u", "p", "smtp/h", "c")!);
 
+        diagnostics.Act("answer", answer);
+        diagnostics.Assert("contains realm", true, answer.Contains(",realm=\"localhost\",", StringComparison.Ordinal));
         StringAssert.Contains(answer, ",realm=\"localhost\",");
     }
 
@@ -93,8 +121,16 @@ public sealed class SaslDigestMd5Tests
     public void AnswerAsSspi_MatchesCurlSchannel(
         string challenge, string userWithDomain, string clientNonce, string user, string realm, string response, string charset)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+        diagnostics.Arrange("user", userWithDomain);
+        diagnostics.Arrange("client nonce", clientNonce);
+
         byte[]? answer = SaslDigestMd5.AnswerAsSspi(Encoding.ASCII.GetBytes(challenge), Windows1252, userWithDomain, "pencil", "smtp/127.0.0.1", clientNonce);
 
+        string expected = $"username=\"{user}\",realm=\"{realm}\",nonce=\"OA6MG9tEQGm2hh\",digest-uri=\"smtp/127.0.0.1\",cnonce=\"{clientNonce}\",nc=00000001,response={response},qop=auth{charset}";
+        diagnostics.Act("answer", Encoding.Latin1.GetString(answer!));
+        diagnostics.Diff("answer", expected, Encoding.Latin1.GetString(answer!));
         Assert.AreEqual(
             $"username=\"{user}\",realm=\"{realm}\",nonce=\"OA6MG9tEQGm2hh\",digest-uri=\"smtp/127.0.0.1\",cnonce=\"{clientNonce}\",nc=00000001,response={response},qop=auth{charset}",
             Encoding.Latin1.GetString(answer!));
@@ -107,8 +143,17 @@ public sealed class SaslDigestMd5Tests
         DisplayName = "No charset: the credential encoding")]
     public void AnswerAsSspi_NonAsciiUser_EncodedAsCurlSchannel(string challenge, string clientNonce, byte[] userBytes, string response)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+        diagnostics.Arrange("client nonce", clientNonce);
+        diagnostics.Bytes("expected user bytes", userBytes);
+
         byte[] answer = SaslDigestMd5.AnswerAsSspi(Encoding.ASCII.GetBytes(challenge), Windows1252, "usér", "pencil", "smtp/127.0.0.1", clientNonce)!;
 
+        diagnostics.Bytes("answer", answer);
+        diagnostics.Act("answer", Encoding.Latin1.GetString(answer));
+        diagnostics.Diff("user bytes", userBytes, answer[10..(10 + userBytes.Length)]);
+        diagnostics.Assert("response", true, Encoding.Latin1.GetString(answer).Contains($",response={response},", StringComparison.Ordinal));
         CollectionAssert.AreEqual(userBytes, answer[10..(10 + userBytes.Length)]);
         StringAssert.Contains(Encoding.Latin1.GetString(answer), $",response={response},");
     }
@@ -116,12 +161,18 @@ public sealed class SaslDigestMd5Tests
     [TestMethod]
     public void AnswerAsSspi_UserOutsideLatin1UnderUtf8_HashesTheUtf8Bytes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("users", "é and U+20AC");
         // RFC 2831 section 2.1.2.1, not measured: the reference build receives its arguments in
         // the ANSI code page, so it cannot be given a name outside ISO 8859-1.
         byte[] challenge = Encoding.ASCII.GetBytes(Challenge);
         string latin1Answer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsSspi(challenge, Windows1252, "é", "p", "smtp/h", "c")!);
         string outsideAnswer = Encoding.Latin1.GetString(SaslDigestMd5.AnswerAsSspi(challenge, Windows1252, "€", "p", "smtp/h", "c")!);
 
+        string expected = "username=\"â\u0082¬\",realm=\"\",nonce=\"OA6MG9tEQGm2hh\",digest-uri=\"smtp/h\",cnonce=\"c\",nc=00000001,response=" + ExpectedUtf8Response() + ",qop=auth,charset=utf-8";
+        diagnostics.Act("latin1 answer", latin1Answer);
+        diagnostics.Act("outside answer", outsideAnswer);
+        diagnostics.Diff("outside answer", expected, outsideAnswer);
         Assert.AreEqual(
             "username=\"â\u0082¬\",realm=\"\",nonce=\"OA6MG9tEQGm2hh\",digest-uri=\"smtp/h\",cnonce=\"c\",nc=00000001,response=" + ExpectedUtf8Response() + ",qop=auth,charset=utf-8",
             outsideAnswer);
@@ -134,6 +185,14 @@ public sealed class SaslDigestMd5Tests
     [DataRow("realm=\"localhost\",qop=\"auth\",algorithm=md5-sess", DisplayName = "No nonce: exit 94")]
     public void AnswerAsSspi_ChallengeSspiRejects_AnswersNull(string challenge)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+        diagnostics.Arrange("credentials", "user:pencil");
+
+        byte[]? answer = SaslDigestMd5.AnswerAsSspi(Encoding.ASCII.GetBytes(challenge), Windows1252, "user", "pencil", "smtp/h", "c");
+
+        diagnostics.Act("answer", answer is null ? "(null)" : Encoding.Latin1.GetString(answer));
+        diagnostics.Assert("answer", null, answer);
         Assert.IsNull(SaslDigestMd5.AnswerAsSspi(Encoding.ASCII.GetBytes(challenge), Windows1252, "user", "pencil", "smtp/h", "c"));
     }
 

@@ -1671,7 +1671,7 @@ public sealed partial class TcpConnector(
             var (reply, exception) = await RequestTunnelAsync(connection, tunnel, trace, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
-                return (await SecureOpenedTunnelAsync(dialed, trace, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), null);
+                return (WithConnectReplyHeaders(await SecureOpenedTunnelAsync(dialed, trace, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), reply.HeaderCount), null);
             }
 
             var (answer, onThisConnection, failure) = exception is null
@@ -1876,6 +1876,28 @@ public sealed partial class TcpConnector(
             return (null, ExceptionDispatchInfo.Capture(exception));
         }
     }
+
+    /// <summary>
+    /// Gives an opened tunnel's result carrying how many header lines the proxy's opening reply
+    /// held, which curl 8.21.0 counts toward its 5000 response headers (measured, BL-1609 Notes);
+    /// a failed result, such as a refused TLS handshake inside the tunnel, as it is.
+    /// </summary>
+    private static ConnectResult WithConnectReplyHeaders(ConnectResult opened, int headerCount) =>
+        opened.Connection is { } connection
+            ? ConnectResult.Connected(
+                connection,
+                opened.Timings,
+                opened.LocalEndPoint,
+                opened.ProxyConnectResponseCode,
+                opened.PeerCertificates,
+                opened.IsReused,
+                opened.ConnectionNumber,
+                opened.ApplicationProtocol,
+                opened.UnixSocketPath,
+                opened.MappedHost,
+                opened.MappedPort,
+                headerCount)
+            : opened;
 
     private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
         reply.FailureMessage is { } failureMessage

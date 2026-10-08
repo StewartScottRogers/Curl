@@ -31,7 +31,10 @@ an `EndPointRecordingDatagramConnector` sharing one `ConnectionEndPointRecorder`
 each handler in an `EndPointReportingProtocolHandler`, which puts the end points of the
 transfer's first connection (FTP's control connection) on its report when the handler reported
 neither, so `%{local_ip}`, `%{local_port}`, `%{remote_ip}` and `%{remote_port}` work for every
-scheme without handler code; HTTP keeps its own (ADR-0119, BL-515).
+scheme without handler code; HTTP keeps its own (ADR-0119, BL-515). Each handler sits behind a
+`LazyProtocolHandler` that names its schemes and builds the handler on its first transfer, as do the
+security context factory and the HTTP authenticator, so a run builds only what its URLs' schemes use
+(BL-1715, AF-0063); `EndPointReportingProtocolHandler.Handler` gives the built handler.
 
 `Program.Main` only opens the standard streams, builds the composition and hands the
 arguments to `CurlCommandRunner`, which parses them, runs each URL and prints curl's
@@ -187,7 +190,10 @@ refused at transfer setup, not while parsing, as curl 8.21.0 refuses it in `tool
 the parse is accepted and `-V` is handled, and before the group's dispatch is built, `RunAsync` writes
 `CommandLineWarning.PostRequestedWithHead` or `PostRequestedWithGet` (nothing under `-s`, even
 with `-S`), with no `curl: try` line, and exits 2, whatever order the options came in (BL-255);
-in a later option group, once the groups before it have run (BL-509).
+in a later option group, once the groups before it have run (BL-509). A URL with a `-T` file whose
+`CommandLineOptions.HttpMethodBeforeUpload` is not `None` (a `-d` / `--json` body, `-G`, `-I`,
+`--no-head` or `-F`) is refused the same way at that URL, after the URLs before it have run:
+`CommandLineWarning.PutRequestedWith`'s line unless `-s`, nothing sent, exit 2 (BL-1683).
 
 The `-:`/`--next` option groups (`CommandLineParseResult.Groups`) run in order, up to and
 including the first with an output option left over (ADR-0126, BL-509). Each group's URLs use
@@ -227,7 +233,8 @@ come from `Curl.Output`'s `ParallelProgressMeterText`, drawn when a handler repo
 transfer's `TransferProgressRecorder` passes them to its `ParallelTransferProgress`), when a transfer
 ends, when the runner has started every transfer it can, and after a second without a draw. A line
 is drawn only if more than 500 ms have passed since the last. The final line and its line ending
-come once the run's reports are written. `-s` and `--no-progress-meter` in the first option group
+come once the run's reports are written. A run that started no transfer (a bad glob or a refused
+`-T` upload came first) draws no meter at all, as curl 8.21.0 draws none (BL-1683). `-s` and `--no-progress-meter` in the first option group
 hide the meter, and `-#` is ignored, as in curl. So under `-Z` no transfer ever holds the `-v`
 `HoldableStream` below: a transfer the handler reported done never delays the `-v` lines of the
 transfers running beside it (BL-773).
@@ -331,7 +338,7 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`: the Windows
-build's `CreateFile failed: GetLastError` form on Windows, and elsewhere the POSIX build's
+build's `CreateFile failed: GetLastError` form on Windows when the file does not open and its `SetFileTime failed` form when the time is refused once it has (BL-1453), and elsewhere the POSIX build's
 `on '<file>': <strerror>`, worded from `utimes`'s errno by `CRuntimeErrorNumbers` (BL-1433). On Windows a
 time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
 minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given

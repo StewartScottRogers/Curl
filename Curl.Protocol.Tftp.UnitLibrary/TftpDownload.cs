@@ -135,7 +135,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     {
         while (true)
         {
-            var received = pending ?? await limits.ReceiveBeforeAsync(channel, buffer, resendAt).ConfigureAwait(false);
+            var received = pending ?? await limits.ReceiveBeforeAsync(channel, ReceiveBuffer(), resendAt).ConfigureAwait(false);
             pending = null;
             var outcome = received is not null
                 ? await AnswerAsync(received).ConfigureAwait(false)
@@ -148,6 +148,16 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             }
         }
     }
+
+    /// <summary>
+    /// The part of the buffer one receive may fill: the block size in force plus the DATA
+    /// header, as curl 8.21.0's <c>tftp_receive_packet</c> passes <c>blksize + 4</c> to
+    /// <c>recvfrom</c>, so a longer datagram is cut to it on Linux and macOS and fails the
+    /// receive on Windows (BL-1668).
+    /// </summary>
+    /// <returns>The first block size plus four bytes of the buffer.</returns>
+    private Memory<byte> ReceiveBuffer() =>
+        buffer.AsMemory(0, blockSize + TftpPackets.DataHeaderLength);
 
     /// <summary>
     /// Ends the transfer when the maximum time or the retries have run out, otherwise
@@ -323,7 +333,9 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
 
     /// <summary>
     /// Takes the block size an OACK grants and acknowledges it as block 0, or ends the
-    /// download with exit 71 and sends nothing when curl rejects the OACK.
+    /// download with exit 71 and sends nothing when curl rejects the OACK. As curl 8.21.0's
+    /// <c>tftp_rx</c> sets its block back to 0 on an OACK, block 1 is expected next even when
+    /// DATA has already arrived, so the next DATA 1 is written as new data (BL-1666).
     /// </summary>
     /// <param name="received">The OACK datagram's length and source.</param>
     /// <returns>The failure when the OACK is rejected, otherwise <see langword="null" />.</returns>
@@ -342,6 +354,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
         }
 
         blockSize = acknowledgement.BlockSize;
+        expectedBlock = 1;
         log.OptionsAgreed(body, requestedBlockSize, blockSize);
         await AcknowledgeNewAsync(0, received.RemoteEndPoint).ConfigureAwait(false);
         return null;

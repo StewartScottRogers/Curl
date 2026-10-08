@@ -110,15 +110,36 @@ public sealed class SshUserKeySourceTests
     [TestMethod]
     public async Task ReadPrivateKeyAsync_Passphrase_EncodedWithTheCredentialEncoding()
     {
-        SshUserKeySource source = Source(new Dictionary<string, string> { ["k"] = TestUserKeys.RsaPkcs1Aes128 }, Home, new SshOptions { PrivateKeyPath = "k", PrivateKeyPassphrase = TestUserKeys.Passphrase });
-        Diagnostics.Arrange("key file", "k: TestUserKeys.RsaPkcs1Aes128");
-        Diagnostics.Arrange("--pass", TestUserKeys.Passphrase);
+        SshUserKeySource source = PassphraseSource(Encoding.Unicode);
+        Diagnostics.Arrange("key file", "k: TestUserKeys.RsaPkcs1Aes128, encrypted with the ASCII bytes of \"secret\"");
+        Diagnostics.Arrange("--pass", "TestUserKeys.PassphraseWhoseUtf16BytesAreSecret (U+6573 U+7263 U+7465)");
+        Diagnostics.Arrange("credential encoding", "UTF-16LE");
 
         SshPrivateKey? key = await source.ReadPrivateKeyAsync(new SshUserKeyFiles("k", null), CancellationToken.None);
 
         Diagnostics.ActKey(key);
-        Diagnostics.Assert("key read", true, key is not null);
+        byte[] expected = SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob;
+        Diagnostics.AssertBytes("public key blob", expected, key?.PublicKey.Blob);
         Assert.IsNotNull(key);
+        CollectionAssert.AreEqual(expected, key.PublicKey.Blob);
+    }
+
+    [TestMethod]
+    [DataRow("utf-8", DisplayName = "UTF-8")]
+    [DataRow("iso-8859-1", DisplayName = "Latin-1")]
+    [DataRow("us-ascii", DisplayName = "ASCII")]
+    public async Task ReadPrivateKeyAsync_PassphraseInAnotherEncoding_DoesNotDecrypt(string encodingName)
+    {
+        SshUserKeySource source = PassphraseSource(Encoding.GetEncoding(encodingName));
+        Diagnostics.Arrange("key file", "k: TestUserKeys.RsaPkcs1Aes128, encrypted with the ASCII bytes of \"secret\"");
+        Diagnostics.Arrange("--pass", "TestUserKeys.PassphraseWhoseUtf16BytesAreSecret (U+6573 U+7263 U+7465)");
+        Diagnostics.Arrange("credential encoding", encodingName);
+
+        SshPrivateKey? key = await source.ReadPrivateKeyAsync(new SshUserKeyFiles("k", null), CancellationToken.None);
+
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key read", false, key is not null);
+        Assert.IsNull(key);
     }
 
     [TestMethod]
@@ -183,6 +204,13 @@ public sealed class SshUserKeySourceTests
 
     private static SshUserKeySource Source(Dictionary<string, string> files, string? home, SshOptions options) =>
         new(new InMemoryKeyFileSystem(files), name => name == "HOME" ? home : null, options, Encoding.UTF8);
+
+    private static SshUserKeySource PassphraseSource(Encoding credentialEncoding) =>
+        new(
+            new InMemoryKeyFileSystem(new Dictionary<string, string> { ["k"] = TestUserKeys.RsaPkcs1Aes128 }),
+            _ => null,
+            new SshOptions { PrivateKeyPath = "k", PrivateKeyPassphrase = TestUserKeys.PassphraseWhoseUtf16BytesAreSecret },
+            credentialEncoding);
 
     private static string Paths(IEnumerable<string> paths) => "[" + string.Join(", ", paths) + "]";
 

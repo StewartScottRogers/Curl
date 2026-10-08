@@ -837,7 +837,6 @@ public sealed class FtpProtocolHandlerTests
 
     [TestMethod]
     [DataRow("227 garbage")]
-    [DataRow("227 Entering Passive Mode (127,0,0,1,0,0)")]
     [DataRow("227 Entering Passive Mode (127,0,0,1,256,1)")]
     [DataRow("227 Entering Passive Mode (300,0,0,1,0,21)")]
     [DataRow("227 Entering Passive Mode (1234,0,0,1,0,21)")]

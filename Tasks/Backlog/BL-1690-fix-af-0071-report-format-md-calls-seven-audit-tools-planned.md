@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: docs
 depends-on: []
 touches: []
+lane: no
 requirement: none
 created: 2026-10-08
 completed:
@@ -46,6 +47,10 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+- 2026-10-07 (lane 8): The only file this fix changes is the audit office's report-format instructions, an audit path. Dark factory lanes may not read or change audit paths (CLAUDE.md "Audit office", ADR-0267); the audit guard hook refused the lane. Marked `lane: no` so only an interactive session, working on the `audit` branch, takes it.
+
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. The fix edits an audit-office file, which lanes may not touch (ADR-0267); marked lane: no for an interactive session on the audit branch
