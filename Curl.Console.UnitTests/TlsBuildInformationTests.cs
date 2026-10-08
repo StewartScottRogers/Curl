@@ -1,4 +1,5 @@
 using Curl.Cli;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -9,24 +10,45 @@ namespace Curl.Console;
 [TestClass]
 public sealed class TlsBuildInformationTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Lines_EngineList_ListsNoEngines()
     {
+        string[] lines = LinesFor("--engine", "list")!.ToArray();
+
+        Diagnostics.Assert("lines", "Build-time engines: |   <none>", string.Join(" | ", lines));
         CollectionAssert.AreEqual(
             new[] { "Build-time engines:", "  <none>" },
-            TlsBuildInformation.Lines(Parse("--engine", "list"))!.ToArray());
+            lines);
     }
 
     [TestMethod]
     public void Lines_DumpCaEmbed_IsNoLines()
     {
-        Assert.IsEmpty(TlsBuildInformation.Lines(Parse("--dump-ca-embed"))!);
+        IReadOnlyList<string> lines = LinesFor("--dump-ca-embed")!;
+
+        Diagnostics.Assert("line count", 0, lines.Count);
+        Assert.IsEmpty(lines);
     }
 
     [TestMethod]
     public void Lines_NeitherOption_IsNull()
     {
-        Assert.IsNull(TlsBuildInformation.Lines(Parse("--engine", "pkcs11", "https://example.com/")));
+        IReadOnlyList<string>? lines = LinesFor("--engine", "pkcs11", "https://example.com/");
+
+        Diagnostics.Assert("lines", "null", lines is null ? "null" : string.Join(" | ", lines));
+        Assert.IsNull(lines);
+    }
+
+    private IReadOnlyList<string>? LinesFor(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line", string.Join(' ', arguments));
+        IReadOnlyList<string>? lines = TlsBuildInformation.Lines(Parse(arguments));
+        Diagnostics.Act("lines", lines is null ? "null" : string.Join(" | ", lines));
+        return lines;
     }
 
     private static CommandLineOptions Parse(params string[] arguments)

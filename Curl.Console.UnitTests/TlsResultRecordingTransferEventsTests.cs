@@ -1,5 +1,6 @@
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -11,15 +12,23 @@ namespace Curl.Console;
 [TestClass]
 public sealed class TlsResultRecordingTransferEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ReportCertificateVerifyResult_OriginsAndProxys_RecordsEachOnTheRunningTransfer()
     {
         RunningTransferState state = NewState();
         ITransferEvents events = new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state);
 
+        Diagnostics.Arrange("verify results reported", "20 for the proxy, then 18 for the origin");
+
         events.ReportCertificateVerifyResult(20, isProxy: true);
         events.ReportCertificateVerifyResult(18, isProxy: false);
+        Diagnostics.Act("origin / proxy verify result", $"{state.SslVerifyResult} / {state.ProxySslVerifyResult}");
 
+        Diagnostics.Assert("origin / proxy verify result", "18 / 20", $"{state.SslVerifyResult} / {state.ProxySslVerifyResult}");
         Assert.AreEqual(18L, state.SslVerifyResult);
         Assert.AreEqual(20L, state.ProxySslVerifyResult);
     }
@@ -32,8 +41,11 @@ public sealed class TlsResultRecordingTransferEventsTests
         RunningTransferState state = NewState();
         ITransferEvents events = new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state);
 
+        Diagnostics.Arrange("early data bytes reported", bytes);
         events.ReportTlsEarlyData(bytes);
+        Diagnostics.Act("early data sent", state.TlsEarlyDataSent);
 
+        Diagnostics.Assert("early data sent", bytes, state.TlsEarlyDataSent);
         Assert.AreEqual(bytes, state.TlsEarlyDataSent);
     }
 
@@ -41,8 +53,12 @@ public sealed class TlsResultRecordingTransferEventsTests
     public void NothingReported_LeavesEveryResultZero()
     {
         RunningTransferState state = NewState();
+        Diagnostics.Arrange("events reported", "none");
         _ = new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state);
+        string results = $"{state.SslVerifyResult} / {state.ProxySslVerifyResult} / {state.TlsEarlyDataSent}";
+        Diagnostics.Act("origin / proxy verify result / early data sent", results);
 
+        Diagnostics.Assert("origin / proxy verify result / early data sent", "0 / 0 / 0", results);
         Assert.AreEqual(0L, state.SslVerifyResult);
         Assert.AreEqual(0L, state.ProxySslVerifyResult);
         Assert.AreEqual(0L, state.TlsEarlyDataSent);
@@ -53,6 +69,7 @@ public sealed class TlsResultRecordingTransferEventsTests
     {
         CallRecordingEvents inner = new();
         ITransferEvents events = new TlsResultRecordingTransferEvents(inner, NewState());
+        Diagnostics.Arrange("events reported", "all thirteen, in interface order");
 
         events.ReportInfo("text");
         events.ReportConnectionOpened(null!);
@@ -67,7 +84,9 @@ public sealed class TlsResultRecordingTransferEventsTests
         events.ReportResponseHeader([3]);
         events.ReportDataSent([4]);
         events.ReportDataReceived([5]);
+        Diagnostics.Act("inner calls", string.Join(", ", inner.Calls));
 
+        Diagnostics.Assert("inner call count", 13, inner.Calls.Count);
         CollectionAssert.AreEqual(
             new[]
             {

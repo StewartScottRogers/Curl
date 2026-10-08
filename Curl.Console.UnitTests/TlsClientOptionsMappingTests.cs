@@ -1,6 +1,7 @@
 using System.Security.Authentication;
 using Curl.Cli;
 using Curl.Networking;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -15,71 +16,77 @@ public sealed class TlsClientOptionsMappingTests
 {
     private const string Url = "gophers://example.com/";
 
+    private TlsClientOptions? _expected;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void FromCommandLine_NoTlsOptions_VerifiesAgainstSystemStoreAtSystemDefaultVersion()
     {
-        Assert.AreEqual(new TlsClientOptions(), Map(Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), Map(Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Insecure_SetsInsecureOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(Insecure: true), Map("-k", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(Insecure: true)), Map("-k", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_CaCertificateFile_CopiesThePathVerbatim()
     {
-        Assert.AreEqual(new TlsClientOptions(CaCertificateFile: "x.pem"), Map("--cacert", "x.pem", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(CaCertificateFile: "x.pem")), Map("--cacert", "x.pem", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_CaCertificateDirectory_CopiesThePathVerbatim()
     {
-        Assert.AreEqual(new TlsClientOptions(CaCertificateDirectory: "certs"), Map("--capath", "certs", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(CaCertificateDirectory: "certs")), Map("--capath", "certs", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_ClientCertificate_CopiesTheValueWithItsPassphraseVerbatim()
     {
-        Assert.AreEqual(new TlsClientOptions(ClientCertificate: "client.p12:secret"), Map("--cert", "client.p12:secret", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(ClientCertificate: "client.p12:secret")), Map("--cert", "client.p12:secret", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_PrivateKey_CopiesThePathVerbatim()
     {
-        Assert.AreEqual(new TlsClientOptions(PrivateKey: "client.key"), Map("--key", "client.key", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(PrivateKey: "client.key")), Map("--key", "client.key", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_CertType_CopiesItAsCertificateTypeVerbatim()
     {
-        Assert.AreEqual(new TlsClientOptions(CertificateType: "p12"), Map("--cert-type", "p12", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(CertificateType: "p12")), Map("--cert-type", "p12", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_KeyType_CopiesItAsPrivateKeyTypeVerbatim()
     {
-        Assert.AreEqual(new TlsClientOptions(PrivateKeyType: "DER"), Map("--key-type", "DER", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(PrivateKeyType: "DER")), Map("--key-type", "DER", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Pass_CopiesItAsPassphraseVerbatim()
     {
-        Assert.AreEqual(new TlsClientOptions(Passphrase: "secret"), Map("--pass", "secret", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(Passphrase: "secret")), Map("--pass", "secret", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_SslNoRevoke_SetsSkipRevocationCheckOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(SkipRevocationCheck: true), Map("--ssl-no-revoke", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(SkipRevocationCheck: true)), Map("--ssl-no-revoke", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_SslNoRevokeWithCaCertificateFile_SetsBoth()
     {
         Assert.AreEqual(
-            new TlsClientOptions(CaCertificateFile: "root.pem", SkipRevocationCheck: true),
+            Expect(new TlsClientOptions(CaCertificateFile: "root.pem", SkipRevocationCheck: true)),
             Map("--ssl-no-revoke", "--cacert", "root.pem", Url));
     }
 
@@ -87,7 +94,7 @@ public sealed class TlsClientOptionsMappingTests
     public void FromCommandLine_Ciphers_CopiesTheListVerbatim()
     {
         Assert.AreEqual(
-            new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256:BOGUS"),
+            Expect(new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256:BOGUS")),
             Map("--ciphers", "ECDHE-RSA-AES128-GCM-SHA256:BOGUS", Url));
     }
 
@@ -95,27 +102,27 @@ public sealed class TlsClientOptionsMappingTests
     public void FromCommandLine_Tls13Ciphers_CopiesTheListVerbatim()
     {
         Assert.AreEqual(
-            new TlsClientOptions(Tls13Ciphers: "TLS_AES_128_GCM_SHA256"),
+            Expect(new TlsClientOptions(Tls13Ciphers: "TLS_AES_128_GCM_SHA256")),
             Map("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Tlsv12_SetsMinimumVersionTls12()
     {
-        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsVersion.Tls12), Map("--tlsv1.2", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(MinimumVersion: TlsVersion.Tls12)), Map("--tlsv1.2", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Tlsv13_SetsMinimumVersionTls13()
     {
-        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsVersion.Tls13), Map("--tlsv1.3", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(MinimumVersion: TlsVersion.Tls13)), Map("--tlsv1.3", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Tlsv13ThenTlsv12_LastOneWinsAsTls12()
     {
         Assert.AreEqual(
-            new TlsClientOptions(MinimumVersion: TlsVersion.Tls12),
+            Expect(new TlsClientOptions(MinimumVersion: TlsVersion.Tls12)),
             Map("--tlsv1.3", "--tlsv1.2", Url));
     }
 
@@ -128,7 +135,7 @@ public sealed class TlsClientOptionsMappingTests
     [DataRow("--tlsv1.3", TlsVersion.Tls13)]
     public void FromCommandLine_MinimumVersionOption_SetsMinimumVersionOnly(string option, TlsVersion expected)
     {
-        Assert.AreEqual(new TlsClientOptions(MinimumVersion: expected), Map(option, Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(MinimumVersion: expected)), Map(option, Url));
     }
 
     [TestMethod]
@@ -139,43 +146,43 @@ public sealed class TlsClientOptionsMappingTests
     [DataRow("default", TlsVersion.SystemDefault)]
     public void FromCommandLine_TlsMax_SetsMaximumVersionOnly(string version, TlsVersion expected)
     {
-        Assert.AreEqual(new TlsClientOptions(MaximumVersion: expected), Map("--tls-max", version, Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(MaximumVersion: expected)), Map("--tls-max", version, Url));
     }
 
     [TestMethod]
     public void FromCommandLine_MinimumAndTlsMax_SetsBothEnds()
     {
         Assert.AreEqual(
-            new TlsClientOptions(MinimumVersion: TlsVersion.Tls10, MaximumVersion: TlsVersion.Tls11),
+            Expect(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10, MaximumVersion: TlsVersion.Tls11)),
             Map("--tlsv1.0", "--tls-max", "1.1", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_ProxyTlsv1_LeavesTheTargetsVersionsAlone()
     {
-        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-tlsv1", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), Map("--proxy-tlsv1", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_NoSessionIdAndSslAllowBeast_SetNoSessionIdAndAllowBeast()
     {
-        Assert.AreEqual(new TlsClientOptions(NoSessionId: true), Map("--no-sessionid", Url));
-        Assert.AreEqual(new TlsClientOptions(AllowBeast: true), Map("--ssl-allow-beast", Url));
-        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-ssl-allow-beast", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(NoSessionId: true)), Map("--no-sessionid", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(AllowBeast: true)), Map("--ssl-allow-beast", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), Map("--proxy-ssl-allow-beast", Url));
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_NoSessionIdAndProxySslAllowBeast_SetNoSessionIdAndAllowBeast()
     {
-        Assert.AreEqual(new TlsClientOptions(NoSessionId: true), MapProxy("--no-sessionid", Url));
-        Assert.AreEqual(new TlsClientOptions(AllowBeast: true), MapProxy("--proxy-ssl-allow-beast", Url));
-        Assert.AreEqual(new TlsClientOptions(), MapProxy("--ssl-allow-beast", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(NoSessionId: true)), MapProxy("--no-sessionid", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(AllowBeast: true)), MapProxy("--proxy-ssl-allow-beast", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), MapProxy("--ssl-allow-beast", Url));
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_ProxyTlsv1_SetsTheProxysMinimumVersionTls10()
     {
-        Assert.AreEqual(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10), MapProxy("--proxy-tlsv1", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10)), MapProxy("--proxy-tlsv1", Url));
     }
 
     [TestMethod]
@@ -184,13 +191,18 @@ public sealed class TlsClientOptionsMappingTests
         // curl 8.21.0 (Schannel) -x https://<a TLS 1.2-only proxy> --proxy-insecure with --tlsv1.3, with
         // --tls-max 1.1 and with --proxy-tlsv1 --tls-max 1.1 each completes the proxy handshake (BL-502).
         Assert.AreEqual(
-            new TlsClientOptions(MinimumVersion: TlsVersion.Tls10),
+            Expect(new TlsClientOptions(MinimumVersion: TlsVersion.Tls10)),
             MapProxy("--proxy-tlsv1", "--tlsv1.0", "--tls-max", "1.1", Url));
     }
 
     [TestMethod]
     public void ToTlsVersion_OtherNonNullVersion_MapsToSystemDefault()
     {
+        Diagnostics.Arrange("protocols", SslProtocols.None);
+        TlsVersion version = TlsClientOptionsMapping.ToTlsVersion(SslProtocols.None);
+        Diagnostics.Act("TLS version", version);
+
+        Diagnostics.Assert("TLS version", TlsVersion.SystemDefault, version);
         Assert.AreEqual(
             TlsVersion.SystemDefault,
             TlsClientOptionsMapping.ToTlsVersion(SslProtocols.None));
@@ -220,6 +232,7 @@ public sealed class TlsClientOptionsMappingTests
             "--ech", "pn:example.com", "--ech", "ecl:AEX+DQ==", "--ssl-sessions", "sess.bin", "--engine", "pkcs11",
             "--tlsuser", "user", "--tlspassword", "secret", "--tlsauthtype", "SRP", Url);
 
+        Diagnostics.Assert("target TLS options", expected, mapped);
         Assert.AreEqual(expected, mapped);
     }
 
@@ -227,7 +240,7 @@ public sealed class TlsClientOptionsMappingTests
     public void ProxyFromCommandLine_TheTenTlsOptionsOfAdr0151_NeverReachTheProxy()
     {
         Assert.AreEqual(
-            new TlsClientOptions(),
+            Expect(new TlsClientOptions()),
             MapProxy("--curves", "X25519", "--tls-earlydata", "--ech", "true", "--tlsuser", "user", "--tlspassword", "p", Url));
     }
 
@@ -235,7 +248,7 @@ public sealed class TlsClientOptionsMappingTests
     public void ProxyFromCommandLine_TheProxyTlsSrpOptions_CopiesEachVerbatim()
     {
         Assert.AreEqual(
-            new TlsClientOptions(TlsUser: "proxyuser", TlsPassword: "proxysecret", TlsAuthType: "SRP"),
+            Expect(new TlsClientOptions(TlsUser: "proxyuser", TlsPassword: "proxysecret", TlsAuthType: "SRP")),
             MapProxy("--proxy-tlsuser", "proxyuser", "--proxy-tlspassword", "proxysecret", "--proxy-tlsauthtype", "SRP", Url));
     }
 
@@ -243,7 +256,7 @@ public sealed class TlsClientOptionsMappingTests
     public void FromCommandLine_TheProxyTlsSrpOptions_NeverReachTheTarget()
     {
         Assert.AreEqual(
-            new TlsClientOptions(),
+            Expect(new TlsClientOptions()),
             Map("--proxy-tlsuser", "proxyuser", "--proxy-tlspassword", "proxysecret", "--proxy-tlsauthtype", "SRP", Url));
     }
 
@@ -252,14 +265,14 @@ public sealed class TlsClientOptionsMappingTests
     {
         // curl -s -S -k -x https://localhost:18462 https://example.com/ and the same with
         // --cacert <the proxy's certificate> both fail with exit 60 (curl 8.21.0, 2026-09-27, BL-362).
-        Assert.AreEqual(new TlsClientOptions(), MapProxy("-k", "--cacert", "x.pem", "--tlsv1.3", "--ssl-no-revoke", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), MapProxy("-k", "--cacert", "x.pem", "--tlsv1.3", "--ssl-no-revoke", Url));
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_ProxyInsecureAndProxyCacert_SetsInsecureAndCaCertificateFile()
     {
         Assert.AreEqual(
-            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem"),
+            Expect(new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem")),
             MapProxy("--proxy-insecure", "--proxy-cacert", "proxy.pem", Url));
     }
 
@@ -267,7 +280,7 @@ public sealed class TlsClientOptionsMappingTests
     public void ProxyFromCommandLine_ProxyCapathAndCapath_TakesProxyCapath()
     {
         Assert.AreEqual(
-            new TlsClientOptions(CaCertificateDirectory: "proxy-certs"),
+            Expect(new TlsClientOptions(CaCertificateDirectory: "proxy-certs")),
             MapProxy("--capath", "certs", "--proxy-capath", "proxy-certs", Url));
     }
 
@@ -276,25 +289,25 @@ public sealed class TlsClientOptionsMappingTests
     {
         // curl --capath <dir> -x https://localhost:18462 https://example.com/ warns
         // "ignoring setting the CA path for the proxy" as --proxy-capath does (curl 8.21.0, 2026-09-27).
-        Assert.AreEqual(new TlsClientOptions(CaCertificateDirectory: "certs"), MapProxy("--capath", "certs", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(CaCertificateDirectory: "certs")), MapProxy("--capath", "certs", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_SslRevokeBestEffort_SetsRevocationCheckBestEffortOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(RevocationCheckBestEffort: true), Map("--ssl-revoke-best-effort", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(RevocationCheckBestEffort: true)), Map("--ssl-revoke-best-effort", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_NoAlpn_TurnsAlpnOff()
     {
-        Assert.AreEqual(new TlsClientOptions(UseAlpn: false), Map("--no-alpn", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(UseAlpn: false)), Map("--no-alpn", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_NoAlpnThenAlpn_LeavesAlpnOn()
     {
-        Assert.AreEqual(new TlsClientOptions(UseAlpn: true), Map("--no-alpn", "--alpn", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(UseAlpn: true)), Map("--no-alpn", "--alpn", Url));
     }
 
     [TestMethod]
@@ -305,6 +318,9 @@ public sealed class TlsClientOptionsMappingTests
         string[] trustArguments = withCaCertificateFile ? ["--cacert", "root.pem"] : [];
         // Measured (BL-490): curl 8.21.0 Schannel and curl 8.18.0 OpenSSL on Ubuntu give the
         // same answer with and without --ca-native, with and without --cacert (ADR-0124).
+        TlsClientOptions without = Map([.. trustArguments, Url]);
+        TlsClientOptions with = Map([.. trustArguments, "--ca-native", Url]);
+        Diagnostics.Assert("target TLS options with --ca-native", without, with);
         Assert.AreEqual(
             Map([.. trustArguments, Url]),
             Map([.. trustArguments, "--ca-native", Url]));
@@ -313,46 +329,46 @@ public sealed class TlsClientOptionsMappingTests
     [TestMethod]
     public void FromCommandLine_CertStatus_SetsRequireCertificateStatusOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(RequireCertificateStatus: true), Map("--cert-status", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(RequireCertificateStatus: true)), Map("--cert-status", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_SslAutoClientCert_SetsAutoClientCertificateOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(AutoClientCertificate: true), Map("--ssl-auto-client-cert", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(AutoClientCertificate: true)), Map("--ssl-auto-client-cert", Url));
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_ProxySslAutoClientCert_SetsTheProxysAutoClientCertificateOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(AutoClientCertificate: true), MapProxy("--proxy-ssl-auto-client-cert", Url));
-        Assert.AreEqual(new TlsClientOptions(AutoClientCertificate: true), Map("--proxy-ssl-auto-client-cert", "--ssl-auto-client-cert", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(AutoClientCertificate: true)), MapProxy("--proxy-ssl-auto-client-cert", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(AutoClientCertificate: true)), Map("--proxy-ssl-auto-client-cert", "--ssl-auto-client-cert", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Pinnedpubkey_SetsTheTargetsPinnedPublicKeyOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(PinnedPublicKey: "sha256//a=;sha256//b="), Map("--pinnedpubkey", "sha256//a=;sha256//b=", Url));
-        Assert.AreEqual(new TlsClientOptions(), MapProxy("--pinnedpubkey", "sha256//a=", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(PinnedPublicKey: "sha256//a=;sha256//b=")), Map("--pinnedpubkey", "sha256//a=;sha256//b=", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), MapProxy("--pinnedpubkey", "sha256//a=", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_Crlfile_SetsTheTargetsCertificateRevocationListFileOnly()
     {
-        Assert.AreEqual(new TlsClientOptions(CertificateRevocationListFile: "revoked.crl"), Map("--crlfile", "revoked.crl", Url));
-        Assert.AreEqual(new TlsClientOptions(), MapProxy("--crlfile", "revoked.crl", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(CertificateRevocationListFile: "revoked.crl")), Map("--crlfile", "revoked.crl", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), MapProxy("--crlfile", "revoked.crl", Url));
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_ProxyClientCertificateOptions_ReachTheProxyVerbatim()
     {
         Assert.AreEqual(
-            new TlsClientOptions(
+            Expect(new TlsClientOptions(
                 ClientCertificate: @"proxy\:name.pem:se\:cret",
                 PrivateKey: "proxy-key.pem",
                 CertificateType: "P12",
                 PrivateKeyType: "DER",
-                Passphrase: "secret"),
+                Passphrase: "secret")),
             MapProxy(
                 "--proxy-cert", @"proxy\:name.pem:se\:cret", "--proxy-key", "proxy-key.pem", "--proxy-cert-type", "P12",
                 "--proxy-key-type", "DER", "--proxy-pass", "secret", Url));
@@ -362,7 +378,7 @@ public sealed class TlsClientOptionsMappingTests
     public void FromCommandLine_ProxyClientCertificateOptions_NeverReachTheTarget()
     {
         Assert.AreEqual(
-            new TlsClientOptions(),
+            Expect(new TlsClientOptions()),
             Map("--proxy-cert", "proxy.pem", "--proxy-key", "proxy-key.pem", "--proxy-cert-type", "P12",
                 "--proxy-key-type", "DER", "--proxy-pass", "secret", Url));
     }
@@ -371,21 +387,21 @@ public sealed class TlsClientOptionsMappingTests
     public void ProxyFromCommandLine_ProxyCipherLists_ReachTheProxyVerbatim()
     {
         Assert.AreEqual(
-            new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256", Tls13Ciphers: "TLS_AES_128_GCM_SHA256"),
+            Expect(new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256", Tls13Ciphers: "TLS_AES_128_GCM_SHA256")),
             MapProxy("--proxy-ciphers", "ECDHE-RSA-AES128-GCM-SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", Url));
     }
 
     [TestMethod]
     public void FromCommandLine_ProxyCipherLists_NeverReachTheTarget()
     {
-        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), Map("--proxy-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", Url));
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_TargetClientCertificateAndCipherOptions_NeverReachTheProxy()
     {
         Assert.AreEqual(
-            new TlsClientOptions(),
+            Expect(new TlsClientOptions()),
             MapProxy("--cert", "client.pem", "--key", "key.pem", "--cert-type", "P12", "--key-type", "DER", "--pass", "secret",
                 "--ciphers", "BOGUS", "--tls13-ciphers", "BOGUS", Url));
     }
@@ -393,16 +409,16 @@ public sealed class TlsClientOptionsMappingTests
     [TestMethod]
     public void ProxyFromCommandLine_CertStatusAndSslAutoClientCert_NeverReachTheProxy()
     {
-        Assert.AreEqual(new TlsClientOptions(), MapProxy("--cert-status", "--ssl-auto-client-cert", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), MapProxy("--cert-status", "--ssl-auto-client-cert", Url));
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_ProxyPinnedpubkeyAndProxyCrlfile_ReachTheProxyVerbatim()
     {
         Assert.AreEqual(
-            new TlsClientOptions(PinnedPublicKey: "sha256//a=;sha256//b=", CertificateRevocationListFile: "proxy.crl"),
+            Expect(new TlsClientOptions(PinnedPublicKey: "sha256//a=;sha256//b=", CertificateRevocationListFile: "proxy.crl")),
             MapProxy("--proxy-pinnedpubkey", "sha256//a=;sha256//b=", "--proxy-crlfile", "proxy.crl", Url));
-        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-pinnedpubkey", "sha256//a=", "--proxy-crlfile", "proxy.crl", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), Map("--proxy-pinnedpubkey", "sha256//a=", "--proxy-crlfile", "proxy.crl", Url));
     }
 
     [TestMethod]
@@ -410,22 +426,44 @@ public sealed class TlsClientOptionsMappingTests
     {
         // curl -v --no-alpn --proxy-insecure -x https://... http://... prints no ALPN line for the
         // proxy on both builds (curl 8.21.0, measured, BL-753).
-        Assert.AreEqual(new TlsClientOptions(UseAlpn: false), MapProxy("--no-alpn", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(UseAlpn: false)), MapProxy("--no-alpn", Url));
+        Diagnostics.Assert("proxy ALPN without --no-alpn", true, MapProxy(Url).UseAlpn);
         Assert.IsTrue(MapProxy(Url).UseAlpn);
     }
 
     [TestMethod]
     public void ProxyFromCommandLine_ProxyCaNativeChangesNothingAndProxySslAllowBeastOnlyTheProxysSplit()
     {
-        Assert.AreEqual(new TlsClientOptions(AllowBeast: true), MapProxy("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
-        Assert.AreEqual(new TlsClientOptions(), Map("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions(AllowBeast: true)), MapProxy("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
+        Assert.AreEqual(Expect(new TlsClientOptions()), Map("--proxy-ca-native", "--proxy-ssl-allow-beast", Url));
     }
 
-    private static TlsClientOptions Map(params string[] arguments) =>
-        TlsClientOptionsMapping.FromCommandLine(Parse(arguments));
+    private TlsClientOptions Map(params string[] arguments) =>
+        Mapped("target", arguments, TlsClientOptionsMapping.FromCommandLine(Parse(arguments)));
 
-    private static TlsClientOptions MapProxy(params string[] arguments) =>
-        TlsClientOptionsMapping.ProxyFromCommandLine(Parse(arguments));
+    private TlsClientOptions MapProxy(params string[] arguments) =>
+        Mapped("proxy", arguments, TlsClientOptionsMapping.ProxyFromCommandLine(Parse(arguments)));
+
+    /// <summary>Notes the options the next <see cref="Mapped" /> is expected to give, and returns them.</summary>
+    private TlsClientOptions Expect(TlsClientOptions expected)
+    {
+        _expected = expected;
+        return expected;
+    }
+
+    /// <summary>Writes the command line and the options it mapped to, against the expected options if any were noted.</summary>
+    private TlsClientOptions Mapped(string side, string[] arguments, TlsClientOptions mapped)
+    {
+        Diagnostics.Arrange("command line", string.Join(' ', arguments));
+        Diagnostics.Act(side + " TLS options", mapped);
+        if (_expected is not null)
+        {
+            Diagnostics.Assert(side + " TLS options", _expected, mapped);
+            _expected = null;
+        }
+
+        return mapped;
+    }
 
     private static CommandLineOptions Parse(string[] arguments)
     {
