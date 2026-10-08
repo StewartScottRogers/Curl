@@ -1,0 +1,2 @@
+curl: option --zzz-nonexistent: is unknown
+curl: try 'curl --help' or 'curl --manual' for more information

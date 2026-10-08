@@ -1,0 +1,11 @@
+{
+    "reference": null,
+    "candidate": {
+        "version": [
+            "curl 9.9.9 (x86_64-w64-mingw32) libcurl/9.9.9 Schannel",
+            "Protocols: dict gopher http https mqtt",
+            "Features: alt-svc HTTP3 Largefile"
+        ],
+        "exitCodes": {}
+    }
+}

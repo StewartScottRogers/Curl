@@ -1,0 +1,10 @@
+{
+  "reference": null,
+  "answers": {
+    "%{content_type}": { "reference": null, "candidate": { "exitCode": 0, "stdout": "", "stderr": "" } },
+    "%header{content-type}": { "reference": null, "candidate": { "exitCode": 0, "stdout": "", "stderr": "" } },
+    "%{http_code}": { "reference": null, "candidate": { "exitCode": 0, "stdout": "000", "stderr": "" } },
+    "%{time_total}": { "reference": null, "candidate": { "exitCode": 0, "stdout": "0.000987", "stderr": "" } },
+    "%{url}": { "reference": null, "candidate": { "exitCode": 0, "stdout": "", "stderr": "curl: unknown --write-out variable: 'url'" } }
+  }
+}

@@ -1,0 +1,617 @@
+{
+  "area": "writeout",
+  "version": "8.22.0",
+  "sources": [
+    "docs/cmdline-opts/write-out.md"
+  ],
+  "items": [
+    {
+      "key": "writeout:%header{}",
+      "name": "%header{}",
+      "introducedIn": "7.84.0",
+      "attributes": {
+        "name": "header"
+      }
+    },
+    {
+      "key": "writeout:%output{}",
+      "name": "%output{}",
+      "introducedIn": "8.3.0",
+      "attributes": {
+        "name": "output"
+      }
+    },
+    {
+      "key": "writeout:%time{}",
+      "name": "%time{}",
+      "introducedIn": "8.16.0",
+      "attributes": {
+        "name": "time"
+      }
+    },
+    {
+      "key": "writeout:certs",
+      "name": "certs",
+      "introducedIn": "7.88.0",
+      "attributes": {
+        "name": "certs"
+      }
+    },
+    {
+      "key": "writeout:conn_id",
+      "name": "conn_id",
+      "introducedIn": "8.2.0",
+      "attributes": {
+        "name": "conn_id"
+      }
+    },
+    {
+      "key": "writeout:content_type",
+      "name": "content_type",
+      "introducedIn": null,
+      "attributes": {
+        "name": "content_type"
+      }
+    },
+    {
+      "key": "writeout:errormsg",
+      "name": "errormsg",
+      "introducedIn": "7.75.0",
+      "attributes": {
+        "name": "errormsg"
+      }
+    },
+    {
+      "key": "writeout:exitcode",
+      "name": "exitcode",
+      "introducedIn": "7.75.0",
+      "attributes": {
+        "name": "exitcode"
+      }
+    },
+    {
+      "key": "writeout:filename_effective",
+      "name": "filename_effective",
+      "introducedIn": "7.26.0",
+      "attributes": {
+        "name": "filename_effective"
+      }
+    },
+    {
+      "key": "writeout:ftp_entry_path",
+      "name": "ftp_entry_path",
+      "introducedIn": "7.15.4",
+      "attributes": {
+        "name": "ftp_entry_path"
+      }
+    },
+    {
+      "key": "writeout:header_json",
+      "name": "header_json",
+      "introducedIn": "7.83.0",
+      "attributes": {
+        "name": "header_json"
+      }
+    },
+    {
+      "key": "writeout:http_code",
+      "name": "http_code",
+      "introducedIn": null,
+      "attributes": {
+        "name": "http_code"
+      }
+    },
+    {
+      "key": "writeout:http_connect",
+      "name": "http_connect",
+      "introducedIn": "7.12.4",
+      "attributes": {
+        "name": "http_connect"
+      }
+    },
+    {
+      "key": "writeout:http_version",
+      "name": "http_version",
+      "introducedIn": "7.50.0",
+      "attributes": {
+        "name": "http_version"
+      }
+    },
+    {
+      "key": "writeout:json",
+      "name": "json",
+      "introducedIn": "7.70.0",
+      "attributes": {
+        "name": "json"
+      }
+    },
+    {
+      "key": "writeout:local_ip",
+      "name": "local_ip",
+      "introducedIn": "7.29.0",
+      "attributes": {
+        "name": "local_ip"
+      }
+    },
+    {
+      "key": "writeout:local_port",
+      "name": "local_port",
+      "introducedIn": "7.29.0",
+      "attributes": {
+        "name": "local_port"
+      }
+    },
+    {
+      "key": "writeout:method",
+      "name": "method",
+      "introducedIn": "7.72.0",
+      "attributes": {
+        "name": "method"
+      }
+    },
+    {
+      "key": "writeout:num_certs",
+      "name": "num_certs",
+      "introducedIn": "7.88.0",
+      "attributes": {
+        "name": "num_certs"
+      }
+    },
+    {
+      "key": "writeout:num_connects",
+      "name": "num_connects",
+      "introducedIn": "7.12.3",
+      "attributes": {
+        "name": "num_connects"
+      }
+    },
+    {
+      "key": "writeout:num_headers",
+      "name": "num_headers",
+      "introducedIn": "7.73.0",
+      "attributes": {
+        "name": "num_headers"
+      }
+    },
+    {
+      "key": "writeout:num_redirects",
+      "name": "num_redirects",
+      "introducedIn": "7.12.3",
+      "attributes": {
+        "name": "num_redirects"
+      }
+    },
+    {
+      "key": "writeout:num_retries",
+      "name": "num_retries",
+      "introducedIn": "8.9.0",
+      "attributes": {
+        "name": "num_retries"
+      }
+    },
+    {
+      "key": "writeout:onerror",
+      "name": "onerror",
+      "introducedIn": "7.75.0",
+      "attributes": {
+        "name": "onerror"
+      }
+    },
+    {
+      "key": "writeout:proxy_ssl_verify_result",
+      "name": "proxy_ssl_verify_result",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "name": "proxy_ssl_verify_result"
+      }
+    },
+    {
+      "key": "writeout:proxy_used",
+      "name": "proxy_used",
+      "introducedIn": "8.7.0",
+      "attributes": {
+        "name": "proxy_used"
+      }
+    },
+    {
+      "key": "writeout:redirect_url",
+      "name": "redirect_url",
+      "introducedIn": "7.18.2",
+      "attributes": {
+        "name": "redirect_url"
+      }
+    },
+    {
+      "key": "writeout:referer",
+      "name": "referer",
+      "introducedIn": "7.76.0",
+      "attributes": {
+        "name": "referer"
+      }
+    },
+    {
+      "key": "writeout:remote_ip",
+      "name": "remote_ip",
+      "introducedIn": "7.29.0",
+      "attributes": {
+        "name": "remote_ip"
+      }
+    },
+    {
+      "key": "writeout:remote_port",
+      "name": "remote_port",
+      "introducedIn": "7.29.0",
+      "attributes": {
+        "name": "remote_port"
+      }
+    },
+    {
+      "key": "writeout:response_code",
+      "name": "response_code",
+      "introducedIn": "7.18.2",
+      "attributes": {
+        "name": "response_code"
+      }
+    },
+    {
+      "key": "writeout:scheme",
+      "name": "scheme",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "name": "scheme"
+      }
+    },
+    {
+      "key": "writeout:size_delivered",
+      "name": "size_delivered",
+      "introducedIn": null,
+      "attributes": {
+        "name": "size_delivered"
+      }
+    },
+    {
+      "key": "writeout:size_download",
+      "name": "size_download",
+      "introducedIn": null,
+      "attributes": {
+        "name": "size_download"
+      }
+    },
+    {
+      "key": "writeout:size_header",
+      "name": "size_header",
+      "introducedIn": null,
+      "attributes": {
+        "name": "size_header"
+      }
+    },
+    {
+      "key": "writeout:size_request",
+      "name": "size_request",
+      "introducedIn": null,
+      "attributes": {
+        "name": "size_request"
+      }
+    },
+    {
+      "key": "writeout:size_upload",
+      "name": "size_upload",
+      "introducedIn": null,
+      "attributes": {
+        "name": "size_upload"
+      }
+    },
+    {
+      "key": "writeout:speed_download",
+      "name": "speed_download",
+      "introducedIn": null,
+      "attributes": {
+        "name": "speed_download"
+      }
+    },
+    {
+      "key": "writeout:speed_upload",
+      "name": "speed_upload",
+      "introducedIn": null,
+      "attributes": {
+        "name": "speed_upload"
+      }
+    },
+    {
+      "key": "writeout:ssl_verify_result",
+      "name": "ssl_verify_result",
+      "introducedIn": "7.19.0",
+      "attributes": {
+        "name": "ssl_verify_result"
+      }
+    },
+    {
+      "key": "writeout:stderr",
+      "name": "stderr",
+      "introducedIn": "7.63.0",
+      "attributes": {
+        "name": "stderr"
+      }
+    },
+    {
+      "key": "writeout:stdout",
+      "name": "stdout",
+      "introducedIn": "7.63.0",
+      "attributes": {
+        "name": "stdout"
+      }
+    },
+    {
+      "key": "writeout:time_appconnect",
+      "name": "time_appconnect",
+      "introducedIn": "7.19.0",
+      "attributes": {
+        "name": "time_appconnect"
+      }
+    },
+    {
+      "key": "writeout:time_connect",
+      "name": "time_connect",
+      "introducedIn": null,
+      "attributes": {
+        "name": "time_connect"
+      }
+    },
+    {
+      "key": "writeout:time_namelookup",
+      "name": "time_namelookup",
+      "introducedIn": null,
+      "attributes": {
+        "name": "time_namelookup"
+      }
+    },
+    {
+      "key": "writeout:time_posttransfer",
+      "name": "time_posttransfer",
+      "introducedIn": "8.10.0",
+      "attributes": {
+        "name": "time_posttransfer"
+      }
+    },
+    {
+      "key": "writeout:time_pretransfer",
+      "name": "time_pretransfer",
+      "introducedIn": null,
+      "attributes": {
+        "name": "time_pretransfer"
+      }
+    },
+    {
+      "key": "writeout:time_queue",
+      "name": "time_queue",
+      "introducedIn": "8.12.0",
+      "attributes": {
+        "name": "time_queue"
+      }
+    },
+    {
+      "key": "writeout:time_redirect",
+      "name": "time_redirect",
+      "introducedIn": "7.12.3",
+      "attributes": {
+        "name": "time_redirect"
+      }
+    },
+    {
+      "key": "writeout:time_starttransfer",
+      "name": "time_starttransfer",
+      "introducedIn": null,
+      "attributes": {
+        "name": "time_starttransfer"
+      }
+    },
+    {
+      "key": "writeout:time_total",
+      "name": "time_total",
+      "introducedIn": null,
+      "attributes": {
+        "name": "time_total"
+      }
+    },
+    {
+      "key": "writeout:tls_earlydata",
+      "name": "tls_earlydata",
+      "introducedIn": "8.13.0",
+      "attributes": {
+        "name": "tls_earlydata"
+      }
+    },
+    {
+      "key": "writeout:url",
+      "name": "url",
+      "introducedIn": "7.75.0",
+      "attributes": {
+        "name": "url"
+      }
+    },
+    {
+      "key": "writeout:url.fragment",
+      "name": "url.fragment",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.fragment"
+      }
+    },
+    {
+      "key": "writeout:url.host",
+      "name": "url.host",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.host"
+      }
+    },
+    {
+      "key": "writeout:url.options",
+      "name": "url.options",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.options"
+      }
+    },
+    {
+      "key": "writeout:url.password",
+      "name": "url.password",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.password"
+      }
+    },
+    {
+      "key": "writeout:url.path",
+      "name": "url.path",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.path"
+      }
+    },
+    {
+      "key": "writeout:url.port",
+      "name": "url.port",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.port"
+      }
+    },
+    {
+      "key": "writeout:url.query",
+      "name": "url.query",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.query"
+      }
+    },
+    {
+      "key": "writeout:url.scheme",
+      "name": "url.scheme",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.scheme"
+      }
+    },
+    {
+      "key": "writeout:url.user",
+      "name": "url.user",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.user"
+      }
+    },
+    {
+      "key": "writeout:url.zoneid",
+      "name": "url.zoneid",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "url.zoneid"
+      }
+    },
+    {
+      "key": "writeout:url_effective",
+      "name": "url_effective",
+      "introducedIn": null,
+      "attributes": {
+        "name": "url_effective"
+      }
+    },
+    {
+      "key": "writeout:urle.fragment",
+      "name": "urle.fragment",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.fragment"
+      }
+    },
+    {
+      "key": "writeout:urle.host",
+      "name": "urle.host",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.host"
+      }
+    },
+    {
+      "key": "writeout:urle.options",
+      "name": "urle.options",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.options"
+      }
+    },
+    {
+      "key": "writeout:urle.password",
+      "name": "urle.password",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.password"
+      }
+    },
+    {
+      "key": "writeout:urle.path",
+      "name": "urle.path",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.path"
+      }
+    },
+    {
+      "key": "writeout:urle.port",
+      "name": "urle.port",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.port"
+      }
+    },
+    {
+      "key": "writeout:urle.query",
+      "name": "urle.query",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.query"
+      }
+    },
+    {
+      "key": "writeout:urle.scheme",
+      "name": "urle.scheme",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.scheme"
+      }
+    },
+    {
+      "key": "writeout:urle.user",
+      "name": "urle.user",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.user"
+      }
+    },
+    {
+      "key": "writeout:urle.zoneid",
+      "name": "urle.zoneid",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "name": "urle.zoneid"
+      }
+    },
+    {
+      "key": "writeout:urlnum",
+      "name": "urlnum",
+      "introducedIn": "7.75.0",
+      "attributes": {
+        "name": "urlnum"
+      }
+    },
+    {
+      "key": "writeout:xfer_id",
+      "name": "xfer_id",
+      "introducedIn": "8.2.0",
+      "attributes": {
+        "name": "xfer_id"
+      }
+    }
+  ]
+}

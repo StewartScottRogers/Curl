@@ -1,0 +1,12 @@
+[
+  {
+    "stamp": "2026-10-08_1200",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e00",
+    "platform": "linux",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.21.0",
+    "areas": { "options": { "x": 1, "y": 5 }, "environment": { "x": 7, "y": 9 } },
+    "overall": { "x": 8, "y": 14 },
+    "newest": { "x": 8, "y": 14 }
+  }
+]

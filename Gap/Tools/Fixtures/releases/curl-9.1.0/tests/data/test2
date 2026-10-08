@@ -1,0 +1,16 @@
+<testcase>
+<info>
+<keywords>
+HTTP
+globbing
+</keywords>
+</info>
+<client>
+<features>
+http
+</features>
+<name>
+changed between releases, now different
+</name>
+</client>
+</testcase>

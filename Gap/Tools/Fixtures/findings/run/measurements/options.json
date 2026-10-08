@@ -1,0 +1,21 @@
+{ "area": "options", "targetVersion": "9.9.9", "candidateCommit": "0000000000000000000000000000000000000000", "platform": "windows", "reference": "curl 9.9.9 (fixture)", "measuredAt": "2026-10-09T14:30:00Z", "items": [
+    { "key": "options:--ech", "state": "gap", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--ech", "introducedIn": null }
+,
+    { "key": "options:--ech:argument", "state": "gap", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--ech:argument", "introducedIn": null }
+,
+    { "key": "options:--fail", "state": "gap", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--fail", "introducedIn": null }
+,
+    { "key": "options:--fail-early", "state": "gap", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--fail-early", "introducedIn": null }
+,
+    { "key": "options:--http3", "state": "gap", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--http3", "introducedIn": null }
+,
+    { "key": "options:--insecure", "state": "match", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--insecure", "introducedIn": null }
+,
+    { "key": "options:--loose", "state": "gap", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--loose", "introducedIn": null }
+,
+    { "key": "options:--max-time", "state": "gap", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--max-time", "introducedIn": null }
+,
+    { "key": "options:--trace", "state": "excluded", "reason": "platform:linux", "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--trace", "introducedIn": null }
+,
+    { "key": "options:--verbose", "state": "match", "reason": null, "expected": "exit 0", "actual": "exit 2", "evidence": "curl options:--verbose", "introducedIn": null }
+], "counts": { "match": 2, "gap": 7, "unmeasured": 0, "excluded": 1, "x": 2, "y": 9 } }

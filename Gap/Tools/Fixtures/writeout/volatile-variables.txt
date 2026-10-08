@@ -1,0 +1,14 @@
+%time{}
+json
+local_port
+speed_download
+speed_upload
+time_appconnect
+time_connect
+time_namelookup
+time_posttransfer
+time_pretransfer
+time_queue
+time_redirect
+time_starttransfer
+time_total

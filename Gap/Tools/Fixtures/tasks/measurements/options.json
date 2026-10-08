@@ -1,0 +1,13 @@
+{
+  "area": "options",
+  "targetVersion": "8.21.0",
+  "candidateCommit": "0000000000000000000000000000000000000000",
+  "platform": "windows",
+  "reference": "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel",
+  "measuredAt": "2026-10-01T09:00:00Z",
+  "items": [
+    { "key": "options:--ech", "state": "gap", "reason": null, "expected": "known option", "actual": "unknown option", "evidence": "curl --ech true http://localhost/", "introducedIn": "8.8.0" },
+    { "key": "options:--ech:argument", "state": "gap", "reason": null, "expected": "accepts false, true, hard and pn:<name>", "actual": "rejects every argument", "evidence": "curl --ech hard http://localhost/", "introducedIn": "8.8.0" }
+  ],
+  "counts": { "match": 0, "gap": 2, "unmeasured": 0, "excluded": 0, "x": 0, "y": 2 }
+}

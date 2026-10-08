@@ -42,9 +42,10 @@ namespace Curl.Console;
 /// before its exit 23 line unless <c>-s</c> was given.
 /// </para>
 /// <para>
-/// Only asynchronous writes are supported: the file system opens files asynchronously,
-/// and every handler writes with
-/// <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" />.
+/// Only <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" /> is
+/// supported, which every handler writes with: the first write opens the file asynchronously
+/// through the file system. Once it is open each write reaches the file synchronously, as
+/// curl's <c>fwrite</c> does (BL-1675).
 /// </para>
 /// </remarks>
 internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode, bool? clobber = null) : Stream
@@ -145,11 +146,46 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// <inheritdoc />
     /// <exception cref="IOException">The file could not be created.</exception>
     /// <remarks>
-    /// Once the file is open a write returns the file's own <see cref="ValueTask" />, so a
-    /// transfer's per-chunk writes allocate nothing here (BL-1289).
+    /// Once the file is open a write is made synchronously, through
+    /// <see cref="WriteToOpenFile" />, so a transfer's per-chunk writes allocate nothing here
+    /// (BL-1289) and wait on no thread-pool hop (BL-1675).
     /// </remarks>
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
-        file is { } open ? open.WriteAsync(buffer, cancellationToken) : OpenAndWriteAsync(buffer, cancellationToken);
+        file is { } open ? WriteToOpenFile(open, buffer, cancellationToken) : OpenAndWriteAsync(buffer, cancellationToken);
+
+    /// <summary>
+    /// Writes <paramref name="buffer" /> to the open file synchronously, as curl's <c>fwrite</c>
+    /// does, and returns a completed task, or a cancelled one without writing when
+    /// <paramref name="cancellationToken" /> is already cancelled. A failed write comes back as
+    /// a faulted task rather than a throw.
+    /// </summary>
+    /// <remarks>
+    /// The file system opens a synchronous handle, so this write costs one system call. Its
+    /// <see cref="Stream.WriteAsync(ReadOnlyMemory{byte}, CancellationToken)" /> would queue
+    /// each write to the thread pool, which cost a 50 MiB download about a sixth of its wall
+    /// time against curl's (measured, BL-1675, AF-0048).
+    /// </remarks>
+    /// <param name="open">The open file.</param>
+    /// <param name="buffer">The bytes to write.</param>
+    /// <param name="cancellationToken">Cancels the write before it starts.</param>
+    /// <returns>A task that has already completed.</returns>
+    private static ValueTask WriteToOpenFile(Stream open, ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromCanceled(cancellationToken);
+        }
+
+        try
+        {
+            open.Write(buffer.Span);
+            return ValueTask.CompletedTask;
+        }
+        catch (IOException exception)
+        {
+            return ValueTask.FromException(exception);
+        }
+    }
 
     /// <summary>
     /// Opens the file for the first write and writes <paramref name="buffer" /> to it.

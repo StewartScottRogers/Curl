@@ -1,0 +1,243 @@
+{
+  "area": "protocols",
+  "version": "8.22.0",
+  "sources": [
+    "docs/cmdline-opts/_PROTOCOLS.md"
+  ],
+  "items": [
+    {
+      "key": "protocols:dict",
+      "name": "dict",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "dict",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:file",
+      "name": "file",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "file",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:ftp",
+      "name": "ftp",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "ftp",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:ftps",
+      "name": "ftps",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "ftps",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:gopher",
+      "name": "gopher",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "gopher",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:gophers",
+      "name": "gophers",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "gophers",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:http",
+      "name": "http",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "http",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:https",
+      "name": "https",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "https",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:imap",
+      "name": "imap",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "imap",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:imaps",
+      "name": "imaps",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "imaps",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:ldap",
+      "name": "ldap",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "ldap",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:ldaps",
+      "name": "ldaps",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "ldaps",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:mqtt",
+      "name": "mqtt",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "mqtt",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:pop3",
+      "name": "pop3",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "pop3",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:pop3s",
+      "name": "pop3s",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "pop3s",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:rtsp",
+      "name": "rtsp",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "rtsp",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:scp",
+      "name": "scp",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "scp",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:sftp",
+      "name": "sftp",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "sftp",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:smb",
+      "name": "smb",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "smb",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:smbs",
+      "name": "smbs",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "smbs",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:smtp",
+      "name": "smtp",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "smtp",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:smtps",
+      "name": "smtps",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "smtps",
+        "tls": true
+      }
+    },
+    {
+      "key": "protocols:telnet",
+      "name": "telnet",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "telnet",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:tftp",
+      "name": "tftp",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "tftp",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:ws",
+      "name": "ws",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "ws",
+        "tls": false
+      }
+    },
+    {
+      "key": "protocols:wss",
+      "name": "wss",
+      "introducedIn": null,
+      "attributes": {
+        "scheme": "wss",
+        "tls": true
+      }
+    }
+  ]
+}

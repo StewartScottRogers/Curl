@@ -19,6 +19,12 @@ internal sealed class FailingWriteStream : MemoryStream
         base.Write(buffer, offset, count);
     }
 
+    public override void Write(ReadOnlySpan<byte> buffer)
+    {
+        ThrowIfWriteFails();
+        base.Write(buffer);
+    }
+
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         ThrowIfWriteFails();

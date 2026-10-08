@@ -46,6 +46,12 @@ namespace Curl.Core.FileSystem;
 /// <c>open(2)</c> with <c>--create-file-mode</c> does. Windows has no such mode, so there
 /// it is ignored and the option has no effect.
 /// </para>
+/// <para>
+/// Every file opens with a synchronous handle (<see cref="FileOptions.None" />), as curl's
+/// <c>fopen</c> does. On Windows an asynchronous handle makes each of a download's 16 KiB
+/// writes an overlapped write completed through the thread pool, which made a 50 MiB
+/// <c>-o</c> download take 1.8 times curl's wall time (BL-1675, AF-0048).
+/// </para>
 /// </remarks>
 public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTimeSetter
 {
@@ -198,7 +204,7 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// </summary>
     /// <param name="fileMode">How to open or create the file.</param>
     /// <param name="createMode">The mode a newly created file receives, before the umask.</param>
-    /// <returns>Options for an asynchronous <see cref="FileStream" />.</returns>
+    /// <returns>Options for a synchronous <see cref="FileStream" />.</returns>
     [UnsupportedOSPlatform("windows")]
     private static FileStreamOptions WriteOptionsWithCreateMode(FileMode fileMode, UnixFileMode createMode) =>
         new()
@@ -207,7 +213,7 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
             Access = FileAccess.Write,
             Share = FileShare.Read,
             BufferSize = BufferSize,
-            Options = FileOptions.Asynchronous,
+            Options = FileOptions.None,
             UnixCreateMode = createMode,
         };
 
@@ -217,7 +223,7 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// <param name="fileMode">How to open or create the file.</param>
     /// <param name="access">Read or write.</param>
     /// <param name="share">What other processes may do meanwhile.</param>
-    /// <returns>Options for an asynchronous <see cref="FileStream" />.</returns>
+    /// <returns>Options for a synchronous <see cref="FileStream" />.</returns>
     private static FileStreamOptions OptionsFor(FileMode fileMode, FileAccess access, FileShare share) =>
         new()
         {
@@ -225,7 +231,7 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
             Access = access,
             Share = share,
             BufferSize = BufferSize,
-            Options = FileOptions.Asynchronous,
+            Options = FileOptions.None,
         };
 
     /// <summary>

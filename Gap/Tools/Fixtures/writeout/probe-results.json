@@ -1,0 +1,10 @@
+{
+  "reference": "curl 9.9.9 (fixture) libcurl/9.9.9",
+  "answers": {
+    "%{content_type}": { "reference": { "exitCode": 0, "stdout": "", "stderr": "" }, "candidate": { "exitCode": 0, "stdout": "", "stderr": "" } },
+    "%header{content-type}": { "reference": { "exitCode": 0, "stdout": "", "stderr": "" }, "candidate": { "exitCode": 0, "stdout": "", "stderr": "" } },
+    "%{http_code}": { "reference": { "exitCode": 0, "stdout": "000", "stderr": "" }, "candidate": { "exitCode": 0, "stdout": "0", "stderr": "" } },
+    "%{time_total}": { "reference": { "exitCode": 0, "stdout": "0.001234", "stderr": "" }, "candidate": { "exitCode": 0, "stdout": "0.000987", "stderr": "" } },
+    "%{url}": { "reference": { "exitCode": 0, "stdout": "file:///tmp/x.txt", "stderr": "" }, "candidate": { "exitCode": 0, "stdout": "", "stderr": "curl: unknown --write-out variable: 'url'" } }
+  }
+}
