@@ -31,3 +31,4 @@ A `tftp://` download that receives a DATA packet longer than the agreed block si
 ## Log
 
 - 2026-10-07: Created by BL-1520.
+- 2026-10-07: Backlog -> Doing.
