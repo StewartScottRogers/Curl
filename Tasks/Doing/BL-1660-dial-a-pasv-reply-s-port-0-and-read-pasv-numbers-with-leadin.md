@@ -34,3 +34,4 @@ A `227` reply naming port 0 (`(127,0,0,1,0,0)`) or a number written with more th
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
