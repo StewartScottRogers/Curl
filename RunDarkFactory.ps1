@@ -51,7 +51,9 @@
     because claude checks the cap between turns, so a run can end one turn's cost above
     it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A turn that waits
     on subagents spends all of theirs before the next check, so the prompt allows one
-    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap). A task run that
+    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap). What the
+    task's own runs of the last 24 hours cost comes off its next run's cap, down to $1, so a
+    requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed and the task
     goes to Blocked for Stewart, since it is too big for one run and wants splitting.
     -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
@@ -1891,12 +1893,33 @@ function Get-RunBudgetUsd {
     # the recent task runs' costs, so a run that ends one turn above it still stays under
     # three times the median, never above -TaskBudgetUsd and never below $2. Fewer than 10
     # recent costs leaves -TaskBudgetUsd as it is; -TaskBudgetUsd 0 means no cap.
-    param([double]$Ceiling, [double[]]$RecentCosts)
+    # -SpentUsd is what the task's earlier runs of the last day already cost (AF-0095): it
+    # comes off the cap, down to $1, so a task requeued and run again stays near one cap
+    # in all rather than two.
+    param([double]$Ceiling, [double[]]$RecentCosts, [double]$SpentUsd = 0)
     if ($Ceiling -le 0) { return 0.0 }
     $costs = @($RecentCosts | Where-Object { $_ -gt 0 })
-    if ($costs.Count -lt 10) { return $Ceiling }
-    $cap = [math]::Round(2.7 * (Get-MedianCost $costs), 2)
-    return [math]::Min($Ceiling, [math]::Max(2.0, $cap))
+    $cap = if ($costs.Count -lt 10) { $Ceiling } else { [math]::Min($Ceiling, [math]::Max(2.0, [math]::Round(2.7 * (Get-MedianCost $costs), 2))) }
+    if ($SpentUsd -le 0) { return $cap }
+    return [math]::Max(1.0, [math]::Round($cap - $SpentUsd, 2))
+}
+
+function Get-TaskSpentUsd {
+    # What a task's earlier task and resumed runs in a log folder cost, in US dollars,
+    # counting only logs written in the last -Hours (AF-0095): a requeued task's next run
+    # gets the rest of one cap, while a task parked days ago starts afresh.
+    param([string]$Dir, [string]$Id, [double]$Hours = 24)
+    if (-not (Test-Path $Dir)) { return 0.0 }
+    $since = (Get-Date).AddHours(-$Hours)
+    $pattern = '^' + [regex]::Escape($Id) + '-\d{8}-\d{6}(-L\d+)?(-resumed)?\.jsonl$'
+    $spent = 0.0
+    foreach ($log in @(Get-ChildItem $Dir -Filter "$Id-*.jsonl" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern -and $_.LastWriteTime -ge $since })) {
+        $line = Get-Content $log.FullName -Tail 5 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"total_cost_usd"' } | Select-Object -Last 1
+        if (-not $line) { continue }
+        $evt = try { $line | ConvertFrom-Json } catch { $null }
+        if ($evt -and $evt.type -eq 'result') { $spent += [double]$evt.total_cost_usd }
+    }
+    return $spent
 }
 
 function Get-RecentRunCosts {
@@ -2094,6 +2117,18 @@ if ($TestTaskBudget) {
     Set-Content (Join-Path $dir 'BL-3-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
     Set-Content (Join-Path $dir 'BL-4-20261003-100000-L4.jsonl') '{"type":"assistant"}'
     $cases += ,@('costs read from task and resumed runs only', '1.25,2.5', ((@(Get-RecentRunCosts $dir) | Sort-Object) -join ','))
+    # A requeued task's next run gets the rest of one cap (AF-0095).
+    Set-Content (Join-Path $dir 'BL-2-20261003-110000-L5.jsonl') '{"type":"factory","model":"sonnet"}', '{"type":"result","total_cost_usd":1}'
+    Set-Content (Join-Path $dir 'BL-2-20261001-100000-L1.jsonl') '{"type":"result","total_cost_usd":7}'
+    (Get-Item (Join-Path $dir 'BL-2-20261001-100000-L1.jsonl')).LastWriteTime = (Get-Date).AddDays(-3)
+    Set-Content (Join-Path $dir 'BL-22-20261003-100000-L1.jsonl') '{"type":"result","total_cost_usd":8}'
+    Set-Content (Join-Path $dir 'BL-2-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
+    $cases += ,@('a task spent its last day of task and resumed runs only', '3.5', "$(Get-TaskSpentUsd $dir 'BL-2')")
+    $cases += ,@('a task with no runs spent nothing', '0', "$(Get-TaskSpentUsd $dir 'BL-9')")
+    $cases += ,@('earlier runs come off the cap', '2.01', "$(Get-RunBudgetUsd 6 $twelve 1.5)")
+    $cases += ,@('a spent cap still leaves 1 dollar', '1', "$(Get-RunBudgetUsd 6 $twelve 5.73)")
+    $cases += ,@('earlier runs come off -TaskBudgetUsd too', '4', "$(Get-RunBudgetUsd 6 ([double[]](1.0, 1.0, 1.0)) 2)")
+    $cases += ,@('-TaskBudgetUsd 0 stays no cap after spending', '0', "$(Get-RunBudgetUsd 0 $twelve 2)")
     Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {
@@ -3510,8 +3545,9 @@ function Invoke-TaskRun {
     # headless run that then ends its reply to wait for it exits with the task still in
     # Doing (BL-855). It inherits CURL_DARK_FACTORY_LANE.
     # The cost cap (AF-0004, AF-0033): the run stops once it has cost 2.7 times the median
-    # recent run, at most -TaskBudgetUsd.
-    $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir)
+    # recent run, at most -TaskBudgetUsd, less what the task's runs of the last day cost
+    # (AF-0095). Read before this run's log exists, so it never counts itself.
+    $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir) (Get-TaskSpentUsd $LogDir $Id)
     $budget = if ($script:RunBudgetUsd -gt 0) { ' --max-budget-usd ' + $script:RunBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
     # The task's model (BL-1705); the resolver's, overtime and resumed runs keep it. The
     # log's first line names it, so cost per model can be read back (Get-ModelCostSummary).
@@ -4889,7 +4925,7 @@ while ($true) {
     if ($state -eq 'Doing') {
         $why = if ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
             elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
-            elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
+            elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
         Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
         git -C $Root add -A Tasks 2>&1 | Out-Null

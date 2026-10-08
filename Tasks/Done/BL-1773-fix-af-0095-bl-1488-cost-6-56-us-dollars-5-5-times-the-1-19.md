@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1773 — Fix AF-0095: BL-1488 cost 6.56 US dollars, 5.5 times the 1.19 median; lane 7's five Sonnet sub-agents used up the session budget
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The parallel Sonnet subagents behind BL-1488's $5.73 run were already fixed by BL-1679 (AF-0052, commit 630d38761), which landed after that run. The remaining gap: the cap is per run, the auditor measures per task, so a requeued task could cost two caps.
+- Fix (ADR-0437): `Get-TaskSpentUsd` sums the task's own task and resumed runs of the last 24 hours, and `Get-RunBudgetUsd -SpentUsd` takes that off the next run's cap, down to $1. 24 hours so a task parked days ago starts afresh; $1 so a requeued run can still finish or hand back. `-TestTaskBudget` passes 17/17 with six new cases.
+- The reproduction's `-Since 2026-10-07` window will always show BL-1488's historical $6.56, since logs do not change; a lane cannot run `Audit/Tools/Measure-FactoryProcess.ps1` (audit path guard). The re-audit should measure runs after this change.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. A task's runs of the last 24 hours now come off its next run's cost cap (ADR-0437); build clean, fast tests green
