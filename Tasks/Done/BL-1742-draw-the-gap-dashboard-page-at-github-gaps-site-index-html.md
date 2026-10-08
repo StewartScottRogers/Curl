@@ -8,7 +8,7 @@ depends-on: [BL-1733]
 touches: [.github/gaps]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1742 — Draw the gap dashboard page at .github/gaps/site/index.html
 
@@ -62,15 +62,34 @@ at a fixture.
 
 ## Acceptance criteria
 
-- [ ] `.github/gaps/site/index.html` exists as one file with no `<script src`, `<link rel="stylesheet"` or `@import` and no external URL other than links to github.com. `.github/gaps/fixtures/data.json` is committed.
-- [ ] Served with `dotnet run --file .github/gource/serve.cs -- .github/gaps` and opened at `http://localhost:8000/site/?data=../fixtures/data.json`, the page shows the banner, headline, areas table, trend chart, filterable open gaps, regressions and recently closed from the fixture. Filtering by one area hides the other areas' gaps. Note in this task's Notes which browser was used.
-- [ ] Opened with a data file whose `latest` is `null`, it shows "No gap analysis has run yet".
-- [ ] At a 375-pixel-wide viewport, nothing scrolls sideways. With the system theme switched to dark, text and bars keep contrast. Both are checked and noted.
-- [ ] The header comment documents the page, its data source and `?data=`.
+- [x] `.github/gaps/site/index.html` exists as one file with no `<script src`, `<link rel="stylesheet"` or `@import` and no external URL other than links to github.com. `.github/gaps/fixtures/data.json` is committed.
+- [x] Served with `dotnet run --file .github/gource/serve.cs -- .github/gaps` and opened at `http://localhost:8000/site/?data=../fixtures/data.json`, the page shows the banner, headline, areas table, trend chart, filterable open gaps, regressions and recently closed from the fixture. Filtering by one area hides the other areas' gaps. Note in this task's Notes which browser was used.
+- [x] Opened with a data file whose `latest` is `null`, it shows "No gap analysis has run yet".
+- [x] At a 375-pixel-wide viewport, nothing scrolls sideways. With the system theme switched to dark, text and bars keep contrast. Both are checked and noted.
+- [x] The header comment documents the page, its data source and `?data=`.
 
 ## Notes
+
+- The page reads `./data.json` by default; `?data=` is resolved against the page and refused
+  (with a message) when it is not on the page's own origin. Unlike the board's `?contents=`
+  it is not limited to localhost: it sends no token, so same-origin is enough.
+- Areas rows show unmeasured and excluded counts when an area object carries them
+  (`unmeasured`, `excluded`); `history.json` areas today hold only `x` and `y`, so the
+  fixture shows `—`. The bar sits under the percentage in the same cell so the table fits
+  at phone width.
+- `.github/gaps/fixtures/empty.json` (`"latest": null`) is committed beside `data.json` for
+  the empty state.
+- Checked in Microsoft Edge (headless, Chromium) against `serve.cs` on port 8743 with a
+  throwaway harness page that framed the dashboard at 375 px: all six fixture gaps listed;
+  Area = options left GF-0001, GF-0004, GF-0006 only; page scrollWidth 360 = clientWidth
+  360 and the areas table's 328 = 328, so nothing scrolls sideways; `empty.json` shows
+  "No gap analysis has run yet" with the four tabs. Banner, headline (95.0%, 306 of 322;
+  newest 93.3%, 304 of 326), areas with +0.4 change, trend SVG (three series, six points
+  with stamp and value), regressions and recently closed all drawn. A dark-theme
+  screenshot (`preferredColorScheme` dark) kept text, bars and series readable.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Gap dashboard page draws data.json: banner, headline, areas, SVG trend, filterable open gaps, regressions, closed, empty state, ?data= override

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<!--
+  Curl gap dashboard: the gap analysis office's measurement of Curl against upstream curl
+  (ADR-0433 decision 8), drawn in the viewer's browser from the data.json beside this page.
+  One self-contained file: no build step, no framework, no external script, stylesheet or
+  font. The data shape is the "Dashboard data" section of Gap/Instructions/Gap-Format.md,
+  written by Gap/Tools/Export-GapDashboardData.ps1.
+
+  It shows the release banner (when a newer curl than the target is out), the headline
+  equivalence against the targeted and the newest curl, one row per area with its change
+  since the previous run, an inline SVG trend of the overall and per-area scores over the
+  run history, the open gaps with area, severity, scope and introduced-in filters, the
+  regressions and the recently closed gaps. With "latest": null it says "No gap analysis
+  has run yet".
+
+  Query overrides (all optional):
+    ?data=url   read this data file instead of ./data.json, e.g. ?data=../fixtures/data.json;
+                honoured only when the url is on the page's own origin, as the board page
+                does for ?contents=
+
+  Local preview: dotnet run --file .github/gource/serve.cs -- .github/gaps 8000
+  then open http://localhost:8000/site/?data=../fixtures/data.json
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curl gap dashboard</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; --card: #8881; --warn: #c60; --bad: #c33; --good: #2a8; }
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 12px 16px; }
+  header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 15px; margin: 16px 0 6px; }
+  .muted { opacity: .7; }
+  a { color: inherit; }
+  nav.tabs { display: flex; gap: 4px; margin-top: 10px; border-bottom: 1px solid var(--line); }
+  nav.tabs a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: inherit; text-decoration: none; margin-bottom: -1px; }
+  nav.tabs a[aria-selected="true"] { border-color: var(--line); background: Canvas; font-weight: 600; }
+  [hidden] { display: none !important; }
+  #messages p { margin: 6px 0; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--bad); }
+  .banner { margin-top: 12px; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--warn); }
+  .headline { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .score { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--card); }
+  .score .pct { font-size: 28px; font-weight: 600; }
+  .run { margin-top: 6px; overflow-wrap: anywhere; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.num, th.num { text-align: right; }
+  .bar { width: 120px; height: 8px; margin: 2px 0 0 auto; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--good); }
+  .up { color: var(--good); }
+  .down { color: var(--bad); }
+  #trend svg { width: 100%; height: auto; display: block; }
+  #trend .axis { stroke: var(--line); }
+  #trend text { fill: currentColor; font-size: 11px; }
+  #trend circle { cursor: pointer; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  #point { min-height: 1.4em; font-size: 12px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 8px; }
+  .filters label { display: flex; gap: 4px; align-items: center; }
+  .gap { padding: 6px 8px; margin-bottom: 6px; border-radius: 4px; background: var(--card); }
+  .gap .id { font-weight: 600; margin-right: 6px; }
+  .gap .facts { display: block; font-size: 12px; }
+  .gap details { margin-top: 4px; }
+  .gap summary { cursor: pointer; }
+  .gap pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, monospace; margin: 4px 0 0; }
+  .sev-Critical, .sev-High { color: var(--bad); font-weight: 600; }
+  .sev-Medium { color: var(--warn); font-weight: 600; }
+  .lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .lists ul { margin: 0; padding-left: 18px; }
+  .lists li { overflow-wrap: anywhere; }
+  footer { margin-top: 16px; font-size: 12px; }
+  @media (max-width: 700px) {
+    .headline, .lists { grid-template-columns: minmax(0, 1fr); }
+    table { font-size: 12px; }
+    th { white-space: normal; }
+    th, td { padding: 4px 3px; }
+    .bar { width: 40px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Curl gap dashboard</h1>
+  <span id="source" class="muted"></span>
+  <span id="generated" class="muted">Loading…</span>
+</header>
+<nav class="tabs">
+  <a href="../">Gource</a>
+  <a href="../board/">Board</a>
+  <a href="../coverage/">Coverage</a>
+  <a href="./" aria-selected="true">Gaps</a>
+</nav>
+<div id="messages"></div>
+<main id="dashboard"></main>
+<footer class="muted">Measured by the gap analysis office against upstream curl (ADR-0433).</footer>
+<script>
+'use strict';
+
+const params = new URLSearchParams(location.search);
+const palette = ['#4a7fd4', '#d4874a', '#2a8', '#b05cc4', '#c33', '#888', '#c6a400', '#3aa6b9'];
+
+// ?data= is honoured only on the page's own origin, so a crafted link cannot make the page
+// read and render someone else's file.
+function dataUrl() {
+  const value = params.get('data');
+  if (!value) return new URL('data.json', location.href).href;
+  const url = new URL(value, location.href);
+  if (url.origin !== location.origin) throw new Error(`?data= must be on ${location.origin}; ignored ${url.href}`);
+  return url.href;
+}
+
+function element(tag, attributes, ...children) {
+  const node = document.createElement(tag);
+  for (const [name, value] of Object.entries(attributes || {})) {
+    if (value === null || value === undefined || value === false) continue;
+    if (name === 'text') node.textContent = value; else node.setAttribute(name, value);
+  }
+  for (const child of children) if (child !== null && child !== undefined) node.append(child);
+  return node;
+}
+
+function svg(tag, attributes) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [name, value] of Object.entries(attributes || {})) node.setAttribute(name, value);
+  return node;
+}
+
+function percent(score) {
+  return score && score.y > 0 ? 100 * score.x / score.y : null;
+}
+
+function percentText(score) {
+  const value = percent(score);
+  return value === null ? '—' : `${value.toFixed(1)}%`;
+}
+
+function changeText(current, previous) {
+  const now = percent(current), before = percent(previous);
+  if (now === null || before === null) return element('span', { class: 'muted', text: '—' });
+  const delta = now - before;
+  if (Math.abs(delta) < 0.05) return element('span', { class: 'muted', text: '±0.0' });
+  return element('span', { class: delta > 0 ? 'up' : 'down', text: `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}` });
+}
+
+function renderBanner(data) {
+  if (!data.release) return null;
+  return element('p', { class: 'banner', text: `curl ${data.release.version} released: ${data.release.newGaps} new gaps` });
+}
+
+function scoreCard(label, version, score) {
+  return element('div', { class: 'score' },
+    element('div', { class: 'muted', text: `${label}, curl ${version}` }),
+    element('div', { class: 'pct', text: percentText(score) }),
+    element('div', { text: score ? `${score.x} of ${score.y}` : 'not measured' }));
+}
+
+function renderHeadline(data) {
+  const latest = data.latest;
+  const run = element('p', { class: 'run muted' },
+    `Run ${latest.stamp} · commit `,
+    element('a', { href: `https://github.com/StewartScottRogers/Curl/commit/${latest.commit}`, text: latest.commit.slice(0, 9) }),
+    ` · ${latest.platform}` + (latest.reference ? ` · ${latest.reference}` : ''));
+  return element('section', {},
+    element('div', { class: 'headline' },
+      scoreCard('Targeted', latest.targetVersion || data.target, latest.overall),
+      scoreCard('Newest', latest.newestVersion || data.newest, latest.newest)),
+    run);
+}
+
+function renderAreas(data) {
+  const latest = data.latest;
+  const previous = data.history.length > 1 ? data.history[data.history.length - 2] : null;
+  // Soft hyphens let the long headings break at phone width.
+  const head = element('tr', {}, ...['Area', 'X', 'Y', '%', 'Unmea­sured', 'Ex­cluded', 'Change']
+    .map((name, i) => element('th', { class: i === 0 ? null : 'num', text: name })));
+  const rows = Object.keys(latest.areas).sort().map(area => {
+    const score = latest.areas[area];
+    const value = percent(score) || 0;
+    const bar = element('div', { class: 'bar', role: 'img', 'aria-label': percentText(score) },
+      element('span', { style: `width: ${value.toFixed(1)}%` }));
+    return element('tr', {},
+      element('td', { text: area }),
+      element('td', { class: 'num', text: String(score.x) }),
+      element('td', { class: 'num', text: String(score.y) }),
+      element('td', { class: 'num' }, percentText(score), bar),
+      element('td', { class: 'num', text: score.unmeasured === undefined ? '—' : String(score.unmeasured) }),
+      element('td', { class: 'num', text: score.excluded === undefined ? '—' : String(score.excluded) }),
+      element('td', { class: 'num' }, changeText(score, previous && previous.areas[area])));
+  });
+  return element('section', {}, element('h2', { text: 'Areas' }),
+    element('div', { class: 'table-wrap' }, element('table', {}, element('thead', {}, head), element('tbody', {}, ...rows))));
+}
+
+function renderTrend(data) {
+  const history = data.history;
+  const areas = [...new Set(history.flatMap(run => Object.keys(run.areas || {})))].sort();
+  const series = [{ name: 'overall', pick: run => run.overall }]
+    .concat(areas.map(area => ({ name: area, pick: run => run.areas && run.areas[area] })));
+  const values = history.flatMap(run => series.map(s => percent(s.pick(run)))).filter(v => v !== null);
+  const width = 640, height = 220, left = 40, right = 10, top = 10, bottom = 24;
+  const low = Math.max(0, Math.floor(Math.min(...values, 100) / 5) * 5 - 5);
+  const high = 100;
+  const x = i => left + (history.length > 1 ? i * (width - left - right) / (history.length - 1) : (width - left - right) / 2);
+  const y = v => top + (high - v) * (height - top - bottom) / (high - low || 1);
+  const chart = svg('svg', { viewBox: `0 0 ${width} ${height}`, role: 'img', 'aria-label': 'Score over runs' });
+  for (const v of [low, (low + high) / 2, high]) {
+    chart.append(svg('line', { class: 'axis', x1: left, x2: width - right, y1: y(v), y2: y(v) }));
+    const label = svg('text', { x: left - 4, y: y(v) + 4, 'text-anchor': 'end' });
+    label.textContent = `${v}%`;
+    chart.append(label);
+  }
+  const point = element('p', { id: 'point', class: 'muted', text: 'Hover or tap a point for its run.' });
+  const legend = element('div', { class: 'legend' });
+  series.forEach((s, index) => {
+    const colour = palette[index % palette.length];
+    legend.append(element('span', {}, element('i', { style: `background: ${colour}` }), s.name));
+    const points = history.map((run, i) => ({ run, i, value: percent(s.pick(run)) })).filter(p => p.value !== null);
+    if (points.length > 1) {
+      chart.append(svg('polyline', { fill: 'none', stroke: colour, 'stroke-width': index === 0 ? 3 : 1.5,
+        points: points.map(p => `${x(p.i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ') }));
+    }
+    for (const p of points) {
+      const dot = svg('circle', { cx: x(p.i).toFixed(1), cy: y(p.value).toFixed(1), r: 5, fill: colour, tabindex: 0 });
+      const text = `${s.name}: ${p.value.toFixed(1)}% at ${p.run.stamp}`;
+      const title = svg('title');
+      title.textContent = text;
+      dot.append(title);
+      const show = () => { point.textContent = text; };
+      dot.addEventListener('mouseenter', show);
+      dot.addEventListener('click', show);
+      dot.addEventListener('focus', show);
+      chart.append(dot);
+    }
+  });
+  if (history.length > 0) {
+    for (const [i, anchor] of [[0, 'start'], [history.length - 1, 'end']]) {
+      const label = svg('text', { x: x(i), y: height - 6, 'text-anchor': history.length > 1 ? anchor : 'middle' });
+      label.textContent = history[i].stamp;
+      chart.append(label);
+    }
+  }
+  return element('section', { id: 'trend' }, element('h2', { text: 'Trend' }), legend, chart, point);
+}
+
+function gapEntry(gap) {
+  const facts = [gap.area, gap.severity, `scope ${gap.scope}`,
+    gap.introducedIn ? `since ${gap.introducedIn}` : 'introduced in unknown',
+    `${gap.items} item${gap.items === 1 ? '' : 's'}`,
+    gap.tasks.length ? gap.tasks.join(', ') : 'no task'];
+  return element('div', { class: 'gap' },
+    element('a', { class: 'id', href: gap.url, text: gap.id }),
+    element('span', { text: gap.title }),
+    element('span', { class: 'facts' },
+      element('span', { class: `sev-${gap.severity}`, text: gap.severity }),
+      ` · ${facts.filter((_, i) => i !== 1).join(' · ')}`),
+    element('details', {}, element('summary', { text: 'Suggestion' }), element('pre', { text: gap.suggestion })));
+}
+
+function selectFilter(name, label, values) {
+  const select = element('select', { name },
+    element('option', { value: '', text: 'all' }),
+    ...values.map(value => element('option', { value, text: value })));
+  return element('label', {}, label, select);
+}
+
+function renderOpen(data) {
+  const open = data.open;
+  const distinct = pick => [...new Set(open.map(pick))].sort();
+  const introduced = gap => gap.introducedIn || 'unknown';
+  const filters = element('form', { class: 'filters' },
+    selectFilter('area', 'Area', distinct(g => g.area)),
+    selectFilter('severity', 'Severity', ['Critical', 'High', 'Medium', 'Low'].filter(s => open.some(g => g.severity === s))),
+    selectFilter('scope', 'Scope', distinct(g => g.scope)),
+    selectFilter('introducedIn', 'Introduced in', distinct(introduced)));
+  const list = element('div', {});
+  const count = element('span', { class: 'muted' });
+  const draw = () => {
+    const chosen = Object.fromEntries(new FormData(filters));
+    const shown = open.filter(g => (!chosen.area || g.area === chosen.area)
+      && (!chosen.severity || g.severity === chosen.severity)
+      && (!chosen.scope || g.scope === chosen.scope)
+      && (!chosen.introducedIn || introduced(g) === chosen.introducedIn));
+    list.replaceChildren(...(shown.length ? shown.map(gapEntry) : [element('p', { class: 'muted', text: 'No open gap matches.' })]));
+    count.textContent = ` ${shown.length} of ${open.length}`;
+  };
+  filters.addEventListener('change', draw);
+  draw();
+  return element('section', { id: 'open' }, element('h2', {}, 'Open gaps', count), filters, list);
+}
+
+function shortList(title, gaps, empty) {
+  const items = gaps.map(g => element('li', {}, element('a', { href: g.url, text: g.id }), ` ${g.title} (${g.area}, ${g.severity})`));
+  return element('section', {}, element('h2', { text: title }),
+    items.length ? element('ul', {}, ...items) : element('p', { class: 'muted', text: empty }));
+}
+
+function render(data) {
+  document.getElementById('generated').textContent = data.generated ? `Generated ${data.generated}` : '';
+  const main = document.getElementById('dashboard');
+  if (!data.latest) {
+    main.replaceChildren(element('p', { class: 'banner', text: 'No gap analysis has run yet' }));
+    return;
+  }
+  main.replaceChildren(...[
+    renderBanner(data),
+    renderHeadline(data),
+    renderAreas(data),
+    renderTrend(data),
+    renderOpen(data),
+    element('div', { class: 'lists' },
+      shortList('Regressions', data.regressions || [], 'No regressions.'),
+      shortList('Recently closed', data.closed || [], 'Nothing closed in the last 5 runs.')),
+  ].filter(Boolean));
+}
+
+async function load() {
+  try {
+    const url = dataUrl();
+    document.getElementById('source').textContent = new URL(url).pathname;
+    const response = await fetch(url, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    const data = await response.json();
+    data.history = data.history || [];
+    data.open = data.open || [];
+    render(data);
+  } catch (error) {
+    document.getElementById('generated').textContent = '';
+    document.getElementById('messages').replaceChildren(element('p', { text: String(error.message || error) }));
+  }
+}
+
+load();
+</script>
+</body>
+</html>
