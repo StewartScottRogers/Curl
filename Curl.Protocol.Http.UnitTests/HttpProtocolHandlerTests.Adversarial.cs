@@ -52,6 +52,12 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_FourDigitStatusCode_FailsWithInvalidStatusLine()
+    {
+        await AssertAdversarialResponseAsync("HTTP/1.1 1000 X\r\nContent-Length: 2\r\n\r\nok", CurlExitCode.WeirdServerReply, "Invalid status line", "");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_GarbageStatusLine_FailsAsHttp09NotAllowed()
     {
         await AssertAdversarialResponseAsync("GARBAGE\r\n\r\n", CurlExitCode.UnsupportedProtocol, "Received HTTP/0.9 when not allowed", "");

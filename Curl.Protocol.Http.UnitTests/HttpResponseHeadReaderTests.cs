@@ -351,7 +351,6 @@ public sealed class HttpResponseHeadReaderTests
     [DataRow("HTTP/1.1 100 Continue\r\n\r\n", DisplayName = "Only 100 Continue")]
     [DataRow("HTTP/1.1 101 Switching\r\nContent-Length: 0\r\n\r\n", DisplayName = "101 with no upgrade asked for")]
     [DataRow("HTTP/1.1 199 X\r\n\r\n", DisplayName = "199")]
-    [DataRow("HTTP/1.1 1000 X\r\n\r\n", DisplayName = "Four digits read as 100")]
     [DataRow("HTTP/1.1 100 Continue\r\nX-A: 1\r\n", DisplayName = "Inside a 1xx head")]
     [DataRow("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 20", DisplayName = "Part of the status line after a 1xx")]
     public async Task ReadAsync_PeerClosingBeforeAFinalStatusLine_ReturnsGotNothing(string response)
