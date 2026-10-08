@@ -158,6 +158,9 @@ public sealed class Pop3ProtocolHandlerAdversarialTests
     [DataRow("+OK <nohost>", UserAndPass, DisplayName = "GREETING=+OK <nohost>: no @")]
     [DataRow("+OK <a@b", UserAndPass, DisplayName = "GREETING=+OK <a@b: never closed")]
     [DataRow("+OK a@b>", UserAndPass, DisplayName = "GREETING=+OK a@b>: never opened")]
+    [DataRow("+OK hi <a@b> trailing", "APOP u e448b4da727938a4e29f25d416b01191\r\n", DisplayName = "GREETING=+OK hi <a@b> trailing: text after the timestamp")]
+    [DataRow("+OK <a@b> <c@d>", "APOP u e448b4da727938a4e29f25d416b01191\r\n", DisplayName = "GREETING=+OK <a@b> <c@d>: a second timestamp")]
+    [DataRow("+OK <a@b>  ", "APOP u e448b4da727938a4e29f25d416b01191\r\n", DisplayName = "GREETING=+OK <a@b> with trailing spaces")]
     public async Task ExecuteAsync_MalformedApopTimestamp_LogsInAsCurlDoes(string greeting, string login)
     {
         // Measured with CAPA=+OK USER and -u u:p; each digest is the one curl sent.

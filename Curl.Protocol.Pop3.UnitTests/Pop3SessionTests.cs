@@ -41,8 +41,9 @@ public sealed class Pop3SessionTests
 
     [TestMethod]
     [DataRow("+OK POP3 ready <1896.697170952@localhost>", "<1896.697170952@localhost>", DisplayName = "the recorder's greeting")]
-    [DataRow("+OK a <b> c <d@e>", "<b> c <d@e>", DisplayName = "from the first <")]
-    [DataRow("+OK ready <1896.697170952@localhost> now", null, DisplayName = "not at the end")]
+    [DataRow("+OK a <b> c <d@e>", null, DisplayName = "only the first <...>, which has no @")]
+    [DataRow("+OK a <b@c> d <e@f>", "<b@c>", DisplayName = "from the first < to the first >")]
+    [DataRow("+OK ready <1896.697170952@localhost> now", "<1896.697170952@localhost>", DisplayName = "text after it")]
     [DataRow("+OK ready <1896.697170952>", null, DisplayName = "no @")]
     [DataRow("+OK ready 1896@localhost>", null, DisplayName = "no <")]
     [DataRow("+OK ready", null, DisplayName = "none")]

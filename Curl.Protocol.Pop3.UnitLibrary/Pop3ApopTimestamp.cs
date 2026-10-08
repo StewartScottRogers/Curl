@@ -2,11 +2,13 @@ namespace Curl.Protocol.Pop3;
 
 /// <summary>
 /// Finds the APOP timestamp (RFC 1939 section 7) in a POP3 greeting, the way curl 8.21.0's
-/// <c>pop3_state_servergreet_resp</c> does: the greeting must end with <c>&gt;</c>, the
-/// timestamp runs from its first <c>&lt;</c> to that end, and it must contain <c>@</c>.
+/// <c>pop3_state_servergreet_resp</c> does: the timestamp runs from the greeting's first
+/// <c>&lt;</c> to the first <c>&gt;</c> after it, and it must contain <c>@</c>. Text after
+/// the <c>&gt;</c> is ignored.
 /// </summary>
 /// <remarks>
-/// Kept for <c>APOP</c> (BL-548), which measures it against real curl.
+/// Kept for <c>APOP</c> (BL-548), which measures it against real curl; BL-1664 measured the
+/// greetings with text after the timestamp.
 /// </remarks>
 internal static class Pop3ApopTimestamp
 {
@@ -18,12 +20,13 @@ internal static class Pop3ApopTimestamp
     public static string? Read(string greeting)
     {
         int start = greeting.IndexOf('<', StringComparison.Ordinal);
-        if (!greeting.EndsWith('>') || start < 0)
+        int end = start < 0 ? -1 : greeting.IndexOf('>', start);
+        if (end < 0)
         {
             return null;
         }
 
-        string timestamp = greeting[start..];
+        string timestamp = greeting[start..(end + 1)];
         return timestamp.Contains('@', StringComparison.Ordinal) ? timestamp : null;
     }
 }
