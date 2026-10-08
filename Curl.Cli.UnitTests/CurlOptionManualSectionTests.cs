@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -15,6 +16,10 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class CurlOptionManualSectionTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("-v", "help-option-v.txt")]
     [DataRow("--verbose", "help-option-v.txt")]
@@ -25,8 +30,12 @@ public sealed class CurlOptionManualSectionTests
     [DataRow("--no-keepalive", "help-option-keepalive.txt")]
     public void TryGetLines_KnownOption_IsTheMeasuredSection(string subject, string referenceFile)
     {
-        bool found = CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines);
+        Diagnostics.Arrange("reference file", referenceFile);
+        bool found = TryGetLines(subject, out IReadOnlyList<string> lines);
 
+        string[] expected = ReferenceLines(referenceFile);
+        Diagnostics.Assert("found", true, found);
+        Diagnostics.Assert("lines", CommandLineParseDiagnostics.QuoteEach(expected), CommandLineParseDiagnostics.QuoteEach(lines));
         Assert.IsTrue(found);
         CollectionAssert.AreEqual(ReferenceLines(referenceFile), lines.ToArray());
     }
@@ -34,8 +43,10 @@ public sealed class CurlOptionManualSectionTests
     [TestMethod]
     public void TryGetLines_Verbose_StartsWithItsHeadingAndStopsBeforeTheNextOption()
     {
-        CurlOptionManualSection.TryGetLines("-v", out IReadOnlyList<string> lines);
+        TryGetLines("-v", out IReadOnlyList<string> lines);
 
+        Diagnostics.Assert("first line", "    -v, --verbose", lines[0]);
+        Diagnostics.Assert("has a -V heading", false, lines.Any(line => line.StartsWith("    -V", StringComparison.Ordinal)));
         Assert.AreEqual("    -v, --verbose", lines[0]);
         Assert.IsFalse(lines.Any(line => line.StartsWith("    -V", StringComparison.Ordinal)));
     }
@@ -54,8 +65,10 @@ public sealed class CurlOptionManualSectionTests
     [DataRow("- ")]
     public void TryGetLines_NoSuchOption_IsFalseWithNoLines(string subject)
     {
-        bool found = CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines);
+        bool found = TryGetLines(subject, out IReadOnlyList<string> lines);
 
+        Diagnostics.Assert("found", false, found);
+        Diagnostics.Assert("line count", 0, lines.Count);
         Assert.IsFalse(found);
         Assert.IsEmpty(lines);
     }
@@ -65,8 +78,10 @@ public sealed class CurlOptionManualSectionTests
     [DataRow("--include")]
     public void TryGetLines_OptionTheManualHasNoHeadingFor_IsTrueWithNoLines(string subject)
     {
-        bool found = CurlOptionManualSection.TryGetLines(subject, out IReadOnlyList<string> lines);
+        bool found = TryGetLines(subject, out IReadOnlyList<string> lines);
 
+        Diagnostics.Assert("found", true, found);
+        Diagnostics.Assert("line count", 0, lines.Count);
         Assert.IsTrue(found);
         Assert.IsEmpty(lines);
     }
@@ -74,8 +89,11 @@ public sealed class CurlOptionManualSectionTests
     [TestMethod]
     public void IncorrectOptionNameMessage_IsCurls()
     {
+        Diagnostics.Arrange("message", nameof(CurlOptionManualSection.IncorrectOptionNameMessage));
         string message = CurlOptionManualSection.IncorrectOptionNameMessage;
+        Diagnostics.Act("message", message);
 
+        Diagnostics.Assert("message", "Incorrect option name to show help for, see curl -h", message);
         Assert.AreEqual("Incorrect option name to show help for, see curl -h", message);
     }
 
@@ -83,6 +101,7 @@ public sealed class CurlOptionManualSectionTests
     public void TryGetLines_EveryMeasuredSubject_GivesTheMeasuredBytes()
     {
         string[] measurements = ReferenceLines("help-option-measurements.txt");
+        Diagnostics.Arrange("measured subjects", measurements.Length);
         List<string> mismatches = [];
         foreach (string measurement in measurements)
         {
@@ -96,6 +115,9 @@ public sealed class CurlOptionManualSectionTests
             }
         }
 
+        Diagnostics.Act("mismatches", CommandLineParseDiagnostics.QuoteEach(mismatches));
+        Diagnostics.Assert("measured subjects", 634, measurements.Length);
+        Diagnostics.Assert("mismatch count", 0, mismatches.Count);
         Assert.HasCount(634, measurements);
         Assert.IsEmpty(mismatches, string.Join("\n", mismatches));
     }
@@ -106,5 +128,15 @@ public sealed class CurlOptionManualSectionTests
         using StreamReader reader = new(stream);
         string text = reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
         return text.Split('\n')[..^1];
+    }
+
+    /// <summary>Calls <see cref="CurlOptionManualSection.TryGetLines"/>, writing the subject, whether it was found and the lines as diagnostics.</summary>
+    private bool TryGetLines(string subject, out IReadOnlyList<string> lines)
+    {
+        Diagnostics.Arrange("subject", "\"" + subject + "\"");
+        bool found = CurlOptionManualSection.TryGetLines(subject, out lines);
+        Diagnostics.Act("found", found);
+        Diagnostics.Act("lines", CommandLineParseDiagnostics.QuoteEach(lines));
+        return found;
     }
 }

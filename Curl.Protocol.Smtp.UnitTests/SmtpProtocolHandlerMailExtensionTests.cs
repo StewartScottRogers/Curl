@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -20,6 +21,11 @@ namespace Curl.Protocol.Smtp;
 public sealed class SmtpProtocolHandlerMailExtensionTests
 {
     private const string Url = "smtp://127.0.0.1:18025/h";
+
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private const string Greeting = "220 localhost ESMTP\r\n";
 
@@ -62,7 +68,9 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
             new MailRequestOptions { From = "a@b", Recipients = ["c@d"], Auth = auth },
             authenticate: true);
 
+        Diagnostics.Diff("sent", Ehlo + AuthPlain + mailFrom + "\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + AuthPlain + mailFrom + "\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
     }
 
@@ -73,6 +81,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
         SmtpRun run = await RunAsync(
             Greeting + EhloReply + OneRecipientAccepted, new MailRequestOptions { From = "a@b", Recipients = ["c@d"], Auth = "x@y" });
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -85,6 +94,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
             new MailRequestOptions { From = "a@b", Recipients = ["c@d"], Auth = "x@y" },
             authenticate: true);
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -99,6 +109,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
     {
         SmtpRun run = await RunAsync(Greeting + ehloReply + OneRecipientAccepted, Mail());
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b>" + sizeParameter + "\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b>" + sizeParameter + "\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -109,6 +120,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
         SmtpRun run = await RunAsync(
             Greeting + EhloReply + OneRecipientAccepted, Mail(), upload: new NonSeekableStream(Encoding.Latin1.GetBytes(Message)));
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -118,6 +130,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
         // -T empty.txt with SIZE advertised: MAIL FROM:<a@b>, then the end-of-data mark alone.
         SmtpRun run = await RunAsync(Greeting + EhloReply + OneRecipientAccepted, Mail(), upload: new MemoryStream());
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\nDATA\r\n.\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\nDATA\r\n.\r\nQUIT\r\n", run.Sent);
     }
 
@@ -128,6 +141,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
 
         SmtpRun run = await RunAsync(Greeting + EhloReply + OneRecipientAccepted, Mail(), upload: upload);
 
+        Diagnostics.Diff("sent starts with", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\n", run.Sent);
         StringAssert.StartsWith(run.Sent, Ehlo + "MAIL FROM:<a@b> SIZE=21\r\n");
     }
 
@@ -138,6 +152,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
         SmtpRun run = await RunAsync(
             Greeting + "502 no\r\n250 localhost\r\n" + OneRecipientAccepted, new MailRequestOptions { From = "aü@b", Recipients = ["c@d"] });
 
+        Diagnostics.Diff("sent", Ehlo + "HELO h\r\nMAIL FROM:<aü@b>\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "HELO h\r\nMAIL FROM:<aü@b>\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -151,6 +166,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + OneRecipientAccepted, new MailRequestOptions { From = from, Recipients = [recipient] });
 
+        Diagnostics.Diff("sent", Ehlo + envelope + "\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + envelope + "\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -162,6 +178,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
             Greeting + "250-localhost\r\n250 SIZE 100\r\n" + OneRecipientAccepted,
             new MailRequestOptions { From = "aü@b", Recipients = ["cü@dü.de"] });
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<aü@b> SIZE=21\r\nRCPT TO:<cü@xn--d-eha.de>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<aü@b> SIZE=21\r\nRCPT TO:<cü@xn--d-eha.de>\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -172,6 +189,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
         SmtpRun run = await RunAsync(
             Greeting + "250-AUTH PLAIN\r\n250 smtputf8\r\n" + OneRecipientAccepted, new MailRequestOptions { From = "aü@b", Recipients = ["c@d"] });
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<aü@b> SMTPUTF8\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<aü@b> SMTPUTF8\r\nRCPT TO:<c@d>\r\n" + DataAndQuit, run.Sent);
     }
 
@@ -185,8 +203,11 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
             Greeting + EhloReply + Ok + firstReply + secondReply + StartData + Ok + Bye,
             new MailRequestOptions { From = "a@b", Recipients = ["c@d", "e@f"], RecipientAllowFails = true });
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\n" + DataAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\n" + DataAndQuit, run.Sent);
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.AssertValues("response code", 250, run.Result.Report?.ResponseCode);
         Assert.AreEqual(250, run.Result.Report!.ResponseCode);
     }
 
@@ -198,10 +219,15 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
             Greeting + EhloReply + Ok + "550 no\r\n551 no\r\n" + Bye,
             new MailRequestOptions { From = "a@b", Recipients = ["c@d", "e@f"], RecipientAllowFails = true });
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\nQUIT\r\n", run.Sent);
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "RCPT failed: 551 (last error)", run.Result.ErrorMessage);
         Assert.AreEqual("RCPT failed: 551 (last error)", run.Result.ErrorMessage);
+        Diagnostics.AssertValues("response code", 551, run.Result.Report?.ResponseCode);
         Assert.AreEqual(551, run.Result.Report!.ResponseCode);
+        Diagnostics.AssertValues("bytes transferred", 0, run.Result.BytesTransferred);
         Assert.AreEqual(0, run.Result.BytesTransferred);
     }
 
@@ -212,7 +238,9 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
         SmtpRun run = await RunAsync(
             Greeting + EhloReply + Ok + "550 no\r\n" + Bye, new MailRequestOptions { From = "a@b", Recipients = ["c@d", "e@f"] });
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nQUIT\r\n", run.Sent);
+        Diagnostics.AssertValues("error message", "RCPT failed: 550", run.Result.ErrorMessage);
         Assert.AreEqual("RCPT failed: 550", run.Result.ErrorMessage);
     }
 
@@ -224,13 +252,15 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
             Greeting + EhloReply + Ok + "550 no\r\n" + Ok + "554 no\r\n" + Bye,
             new MailRequestOptions { From = "a@b", Recipients = ["c@d", "e@f"], RecipientAllowFails = true });
 
+        Diagnostics.Diff("sent", Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\nDATA\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "MAIL FROM:<a@b> SIZE=21\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\nDATA\r\nQUIT\r\n", run.Sent);
+        Diagnostics.AssertValues("error message", "DATA failed: 554", run.Result.ErrorMessage);
         Assert.AreEqual("DATA failed: 554", run.Result.ErrorMessage);
     }
 
     private static MailRequestOptions Mail() => new() { From = "a@b", Recipients = ["c@d"] };
 
-    private static Task<SmtpRun> RunAsync(string replies, MailRequestOptions mail, bool authenticate = false, Stream? upload = null)
+    private Task<SmtpRun> RunAsync(string replies, MailRequestOptions mail, bool authenticate = false, Stream? upload = null)
     {
         var context = new TransferContext
         {
@@ -241,6 +271,8 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
             Credentials = authenticate ? new NetworkCredential("u", "p") : null,
         };
         FakeSaslAuthenticator? sasl = authenticate ? new FakeSaslAuthenticator("PLAIN", "\0u\0p"u8.ToArray()) : null;
-        return SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), sasl);
+        Diagnostics.Arrange("message body sent", SmtpDiagnostics.Show(Message));
+        Diagnostics.Arrange("authenticate", authenticate);
+        return SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), sasl);
     }
 }

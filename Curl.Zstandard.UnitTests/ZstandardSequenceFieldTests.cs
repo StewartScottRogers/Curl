@@ -1,4 +1,5 @@
 using System.Numerics;
+using Curl.Testing;
 
 namespace Curl.Zstandard;
 
@@ -9,6 +10,8 @@ namespace Curl.Zstandard;
 [TestClass]
 public sealed class ZstandardSequenceFieldTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     /// <summary>RFC 8878 Appendix A.1, states 0 to 63: (Symbol, Number_Of_Bits, Base).</summary>
     private static readonly (int Symbol, int NumberOfBits, int Base)[] LiteralsLengthCodeTable =
     [
@@ -62,8 +65,20 @@ public sealed class ZstandardSequenceFieldTests
             _ => ZstandardSequenceField.Offset,
         };
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("field", name);
+        diagnostics.Arrange("states expected", expected.Length);
+
         var table = field.PredefinedTable;
 
+        diagnostics.Act("max symbol", field.MaxSymbol);
+        diagnostics.Act("max accuracy log", field.MaxAccuracyLog);
+        diagnostics.Act("accuracy log", table.AccuracyLog);
+        diagnostics.Assert("max symbol, max accuracy log, accuracy log", $"{maxSymbol}, {maxAccuracyLog}, {accuracyLog}", $"{field.MaxSymbol}, {field.MaxAccuracyLog}, {table.AccuracyLog}");
+        diagnostics.Diff(
+            "states as (symbol, bits, baseline)",
+            string.Join("\n", expected.Select((row, state) => $"{state}: {row}")),
+            string.Join("\n", Enumerable.Range(0, Math.Min(expected.Length, 1 << table.AccuracyLog)).Select(state => $"{state}: {(table.Symbol(state), NumberOfBits(table, state), Baseline(table, state))}")));
         Assert.AreEqual(maxSymbol, field.MaxSymbol, name);
         Assert.AreEqual(maxAccuracyLog, field.MaxAccuracyLog, name);
         Assert.AreEqual(accuracyLog, table.AccuracyLog, name);

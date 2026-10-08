@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -9,6 +10,10 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpNtlmInfoLinesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(401, false, HttpAuthSchemes.Ntlm, "WWW-Authenticate", "NTLM", true, DisplayName = "Bare NTLM")]
     [DataRow(401, false, HttpAuthSchemes.Any, "www-authenticate", "ntlm TlRMTVNTUAAC", true, DisplayName = "Any case, with a message")]
@@ -24,7 +29,12 @@ public sealed class HttpNtlmInfoLinesTests
     {
         HttpStatusLine statusLine = HttpStatusLine.Parse($"HTTP/1.1 {statusCode} X");
         HttpAuthRequest request = new("GET", CurlUrl.Parse("http://127.0.0.1/"), "/", null, null, allowed, isProxy);
+        Diagnostics.Arrange("status, proxy, allowed, header", $"{statusCode}, {isProxy}, {allowed}, {name}: {value}");
 
-        Assert.AreEqual(expected, HttpNtlmInfoLines.IsNtlmChallenge(request, statusLine, new HttpResponseHeader(name, value)));
+        bool isChallenge = HttpNtlmInfoLines.IsNtlmChallenge(request, statusLine, new HttpResponseHeader(name, value));
+
+        Diagnostics.Act("is NTLM challenge", isChallenge);
+        Diagnostics.Assert("is NTLM challenge", expected, isChallenge);
+        Assert.AreEqual(expected, isChallenge);
     }
 }

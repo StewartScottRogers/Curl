@@ -1,6 +1,7 @@
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -14,36 +15,64 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionSshTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("-v", "--trace-config", "ssh")]
     [DataRow("-v", "--trace-config", "protocol")]
     [DataRow("-v", "--trace-config", "all")]
     [DataRow("-v", "--trace-config", "tls,SSH")]
     [DataRow("-vv")]
-    public void TracesSsh_WithTheSshComponent_IsTrue(params string[] arguments) =>
-        Assert.IsTrue(CurlComposition.TracesSsh(Parse(arguments)));
+    public void TracesSsh_WithTheSshComponent_IsTrue(params string[] arguments)
+    {
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
+
+        bool tracesSsh = CurlComposition.TracesSsh(Parse(arguments));
+
+        Diagnostics.Act("traces ssh", tracesSsh);
+        Diagnostics.Assert("traces ssh", true, tracesSsh);
+        Assert.IsTrue(tracesSsh);
+    }
 
     [TestMethod]
     [DataRow("-v")]
     [DataRow("-v", "--trace-config", "ftp")]
     [DataRow("-v", "--trace-config", "ssh,-ssh")]
     [DataRow("-v", "--trace-config", "network")]
-    public void TracesSsh_WithoutTheSshComponent_IsFalse(params string[] arguments) =>
-        Assert.IsFalse(CurlComposition.TracesSsh(Parse(arguments)));
+    public void TracesSsh_WithoutTheSshComponent_IsFalse(params string[] arguments)
+    {
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
+
+        bool tracesSsh = CurlComposition.TracesSsh(Parse(arguments));
+
+        Diagnostics.Act("traces ssh", tracesSsh);
+        Diagnostics.Assert("traces ssh", false, tracesSsh);
+        Assert.IsFalse(tracesSsh);
+    }
 
     [TestMethod]
     public void CreateTransports_UnderTraceConfigSsh_TracesSsh()
     {
+        Diagnostics.Arrange("arguments", "-v --trace-config ssh");
+
         CurlTransports transports = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "ssh"), TimeProvider.System);
 
+        Diagnostics.Act("transports traces ssh", transports.TracesSsh);
+        Diagnostics.Assert("transports traces ssh", true, transports.TracesSsh);
         Assert.IsTrue(transports.TracesSsh);
     }
 
     [TestMethod]
     public void CreateTransports_WithoutTheSshComponent_DoesNotTraceSsh()
     {
+        Diagnostics.Arrange("arguments", "-v");
+
         CurlTransports transports = CurlComposition.CreateTransports(Parse("-v"), TimeProvider.System);
 
+        Diagnostics.Act("transports traces ssh", transports.TracesSsh);
+        Diagnostics.Assert("transports traces ssh", false, transports.TracesSsh);
         Assert.IsFalse(transports.TracesSsh);
     }
 
@@ -52,6 +81,8 @@ public sealed class CurlCompositionSshTraceTests
     [DataRow(false)]
     public void CreateProtocolHandlers_HandsTheChoiceToTheSshHandler(bool tracesSsh)
     {
+        Diagnostics.Arrange("traces ssh requested", tracesSsh);
+
         SshProtocolHandler ssh = CurlComposition
             .CreateProtocolHandlers(new ScriptedConnector([]), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver(), tracesSsh: tracesSsh)
             .OfType<EndPointReportingProtocolHandler>()
@@ -59,6 +90,8 @@ public sealed class CurlCompositionSshTraceTests
             .OfType<SshProtocolHandler>()
             .Single();
 
+        Diagnostics.Act("handler traces state machine", ssh.TracesStateMachine);
+        Diagnostics.Assert("handler traces state machine", tracesSsh, ssh.TracesStateMachine);
         Assert.AreEqual(tracesSsh, ssh.TracesStateMachine);
     }
 

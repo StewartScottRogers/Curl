@@ -27,10 +27,18 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, ChallengeHead + "nope", OkHead + "ok");
             ScriptedAuthenticator authenticator = new(null, DigestValue);
             HttpRequestOptions options = new() { Headers = ["Authorization: x"] };
+            Diagnostics.Arrange("url, chunk size, headers", $"{AuthUrl}, {chunkSize}, Authorization: x");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(AuthContext(new MemoryStream(), options: options));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff(
+                "connection written",
+                AuthorizationHeaderRequest
+                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+                connection.Written);
             Assert.AreEqual(
                 AuthorizationHeaderRequest
                 + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: " + DigestValue + "\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
@@ -57,10 +65,18 @@ public sealed partial class HttpProtocolHandlerTests
                 Credentials = new NetworkCredential("u", "p"),
                 Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Ntlm, Headers = ["Authorization: x"] },
             };
+            Diagnostics.Arrange("url, chunk size, headers", $"{AuthUrl}, {chunkSize}, Authorization: x");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff(
+                "connection written",
+                "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n"
+                + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T3\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+                connection.Written);
             Assert.AreEqual(
                 "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T1\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n"
                 + "GET /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nAuthorization: NTLM T3\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
@@ -81,10 +97,14 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, OkHead + "ok");
             ScriptedAuthenticator authenticator = new("Basic dTpw", null);
             HttpRequestOptions options = new() { Headers = ["Authorization: x"] };
+            Diagnostics.Arrange("url, chunk size, headers", $"{AuthUrl}, {chunkSize}, Authorization: x");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(AuthContext(new MemoryStream(), options: options));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", AuthorizationHeaderRequest, connection.Written);
             Assert.AreEqual(AuthorizationHeaderRequest, connection.Written, $"Chunk size {chunkSize}");
         }
     }

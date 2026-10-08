@@ -3,6 +3,7 @@ using System.Text;
 using Curl.Cryptography;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.Transport;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Keys;
 
@@ -18,17 +19,26 @@ public sealed class DsaSshPrivateKeyTests
 
     private static readonly byte[] Data = Encoding.ASCII.GetBytes("session identifier and request");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Sign_SshDss_PinsTheSignatureBlob()
     {
         DsaSshPrivateKey key = DsaSshPrivateKey.Create(TestDsaKey.Prime, TestDsaKey.Subprime, TestDsaKey.Generator, TestDsaKey.PublicKey, TestDsaKey.PrivateKey);
+        Diagnostics.Arrange("key", "RFC 6979 section 3.2 DSA key, y given");
+        Diagnostics.Bytes("data", Data);
 
         byte[] blob = key.Sign("ssh-dss", Data);
 
+        Diagnostics.ActBytes("signature blob", blob);
+        Diagnostics.AssertBytes("signature blob", Convert.FromHexString(SshDssBlob), blob);
         Assert.AreEqual(SshDssBlob, Convert.ToHexString(blob));
         SshWireReader reader = new(blob);
         Assert.AreEqual("ssh-dss", reader.ReadName());
         byte[] signature = reader.ReadString().ToArray();
+        Diagnostics.Assert("r || s length", 40, signature.Length);
         Assert.HasCount(40, signature);
         Assert.IsTrue(DsaSignature.VerifyHash(TestDsaKey.Prime, TestDsaKey.Subprime, TestDsaKey.Generator, TestDsaKey.PublicKey, SHA1.HashData(Data), signature));
     }
@@ -36,8 +46,13 @@ public sealed class DsaSshPrivateKeyTests
     [TestMethod]
     public void Create_WithoutY_ComputesItAsGToTheXModP()
     {
+        Diagnostics.Arrange("key", "RFC 6979 section 3.2 DSA key, y left out");
+
         DsaSshPrivateKey key = DsaSshPrivateKey.Create(TestDsaKey.Prime, TestDsaKey.Subprime, TestDsaKey.Generator, null, TestDsaKey.PrivateKey);
 
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key type", "ssh-dss", key.KeyType);
+        Diagnostics.AssertBytes("public key blob", TestDsaKey.PublicKeyBlob, key.PublicKeyBlob);
         Assert.AreEqual("ssh-dss", key.KeyType);
         CollectionAssert.AreEqual(TestDsaKey.PublicKeyBlob, key.PublicKeyBlob);
     }
@@ -45,6 +60,10 @@ public sealed class DsaSshPrivateKeyTests
     [TestMethod]
     public void Create_XOutsideTheSubgroup_Throws()
     {
-        Assert.ThrowsExactly<ArgumentException>(() => DsaSshPrivateKey.Create(TestDsaKey.Prime, TestDsaKey.Subprime, TestDsaKey.Generator, null, TestDsaKey.Subprime));
+        Diagnostics.Arrange("x", "q, outside the subgroup");
+
+        var failure = Assert.ThrowsExactly<ArgumentException>(() => DsaSshPrivateKey.Create(TestDsaKey.Prime, TestDsaKey.Subprime, TestDsaKey.Generator, null, TestDsaKey.Subprime));
+
+        Diagnostics.ActAndAssertThrown(nameof(ArgumentException), failure);
     }
 }

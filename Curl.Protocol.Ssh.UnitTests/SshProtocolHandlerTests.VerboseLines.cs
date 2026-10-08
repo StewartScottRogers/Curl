@@ -35,6 +35,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunRecordingLinesAsync(server, "sftp://files.example/f");
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: no knownhosts file configured | {PasswordLogin} | <= hello world | * Connection #0 to host files.example:22 left intact",
             lines);
@@ -54,6 +55,7 @@ public sealed partial class SshProtocolHandlerTests
             new Dictionary<string, string> { ["id_test"] = TestUserKeys.RsaPkcs1 },
             credentials: new NetworkCredential(User, string.Empty));
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: no knownhosts file configured | * SSH: host offers authentication via: publickey,password | "
             + "* SSH: trying private key file 'id_test' | * SSH: authenticated via publickey | * SSH: authentication complete | "
@@ -73,6 +75,7 @@ public sealed partial class SshProtocolHandlerTests
             new SshOptions { KnownHostsPath = "known_hosts" },
             new Dictionary<string, string> { ["known_hosts"] = $"{Host} ssh-rsa {otherKey}\n" });
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: found host 'files.example' in 'known_hosts' | * SSH: set 'rsa-sha2-256,rsa-sha2-512,ssh-rsa' as hostkey type | "
             + $"* SSH: host check 1, key: {otherKey} | * SSH: knownhost check failed | * closing connection #0",
@@ -90,6 +93,7 @@ public sealed partial class SshProtocolHandlerTests
             new SshOptions { KnownHostsPath = "known_hosts" },
             new Dictionary<string, string> { ["known_hosts"] = server.KnownHostsLine(Host) });
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             $"* SSH: host check 0, key: {Convert.ToBase64String(server.HostKeyBlob)} | * SSH: knownhost entry matches host key | * SSH: host offers");
@@ -100,6 +104,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(ServerWithAFile(), "sftp://files.example/f", new SshOptions { KnownHostsPath = "known_hosts" });
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: failed to read known hosts from known_hosts | * SSH: did not find host 'files.example' in 'known_hosts' | "
             + "* SSH: host check 2, key: <none> | * SSH: knownhost check failed | * closing connection #0",
@@ -115,6 +120,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunRecordingLinesAsync(server, "sftp://files.example/f", new SshOptions { HostPublicKeySha256 = server.HostKeySha256, HostPublicKeyMd5 = md5 });
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.StartsWith(
             lines,
             $"{Start} | * SSH: SHA256 public key '{server.HostKeySha256}' | * SSH: SHA256 fingerprint '{sha256}' | * SSH: SHA256 checksum match | "
@@ -129,6 +135,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunRecordingLinesAsync(server, "sftp://files.example/f", new SshOptions { HostPublicKeyMd5 = "00" });
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: MD5 public key '00' | * SSH: MD5 fingerprint '{md5}' | "
             + $"* Denied establishing ssh session: mismatch MD5 fingerprint. Remote {md5} is not equal to 00 | * closing connection #0",
@@ -140,6 +147,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(ServerWithAFile(), "sftp://files.example/f", credentials: new NetworkCredential(User, "wrong"));
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(
             lines,
             NoKeyDenied + " | * SSH: trying publickey authentication via agent | "
@@ -156,6 +164,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunRecordingLinesAsync(server, "sftp://files.example/f", credentials: new NetworkCredential(User, "wrong"), agent: agent);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(
             lines,
             NoKeyDenied + " | * SSH: trying publickey authentication via agent | "
@@ -169,6 +178,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(ServerWithAFile(), "sftp://files.example/missing.txt");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(
             lines,
             "* SSH: authentication complete | * Could not open remote file for reading: No such file or directory | "
@@ -180,6 +190,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password) { RefusesSessionChannels = true }, "sftp://files.example/f");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(lines, "* SSH: authentication complete | * Failure initializing sftp session: Unable to startup channel | * closing connection #0");
     }
 
@@ -188,6 +199,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password) { RefusesSessionChannels = true }, "scp://files.example/f");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(lines, "* SSH: connection established | * Channel open failure (connect failed) | * Connection #0 to host files.example:22 left intact");
     }
 
@@ -196,6 +208,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password) { HangsUpOnChannelOpen = true }, "scp://files.example/f");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(lines, "* SSH: connection established | * Unexpected error | * Connection #0 to host files.example:22 left intact");
     }
 
@@ -205,10 +218,13 @@ public sealed partial class SshProtocolHandlerTests
         InMemorySshServer server = ServerWithAFile();
         TranscriptTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse("sftp://files.example/f"), Output = new MemoryStream(), Events = events };
+        ArrangeTransfer(context);
 
-        await Handler(server, preferences: SshAlgorithmPreferences.Full).ExecuteAsync(context);
+        TransferResult result = await Handler(server, preferences: SshAlgorithmPreferences.Full).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+        AssertTextDiagnostic("first transcript line", "* SSH: user ''", events.Transcript[0]);
         Assert.AreEqual("* SSH: user ''", events.Transcript[0]);
     }
 
@@ -218,10 +234,13 @@ public sealed partial class SshProtocolHandlerTests
     public void ReportReturnedFailure_WritesTheMessagesCurlsFailfWrites(CurlExitCode exitCode, string message, string expected)
     {
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("failure", $"{exitCode}: {message}");
 
         SshProtocolHandler.ReportReturnedFailure(events, TransferResult.Failure(exitCode, message, 5));
         SshProtocolHandler.ReportReturnedFailure(events, TransferResult.Success(5));
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        AssertTextDiagnostic("transcript", expected, string.Join(" | ", events.Transcript));
         Assert.AreEqual(expected, string.Join(" | ", events.Transcript));
     }
 
@@ -230,6 +249,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password), "sftp://files.example/up.txt", upload: Hello);
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: no knownhosts file configured | {PasswordLogin} | => hello world | * upload completely sent off: 11 bytes | "
             + "* Connection #0 to host files.example:22 left intact",
@@ -241,6 +261,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password), "scp://files.example/up.txt", upload: Hello);
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: no knownhosts file configured | {PasswordLogin} | * SSH: connection established | => hello world | "
             + "* upload completely sent off: 11 bytes | * Connection #0 to host files.example:22 left intact",
@@ -254,6 +275,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunRecordingLinesAsync(new InMemorySshServer(User, Password), $"{scheme}://files.example/up.txt", upload: []);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(lines, $"{lastSessionLine} | * Request completely sent off | * Connection #0 to host files.example:22 left intact");
     }
 
@@ -272,10 +294,13 @@ public sealed partial class SshProtocolHandlerTests
             Upload = new MemoryStream(new byte[70000]),
             Events = events,
         };
+        ArrangeTransfer(context);
 
-        await Handler(server).ExecuteAsync(context);
+        TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+        Diagnostics.Assert("block sizes", expectedSizes, string.Join(' ', events.Transcript.Where(line => line.StartsWith("=> ", StringComparison.Ordinal)).Select(line => line.Length - 3)));
         Assert.AreEqual(expectedSizes, string.Join(' ', events.Transcript.Where(line => line.StartsWith("=> ", StringComparison.Ordinal)).Select(line => line.Length - 3)));
         Assert.AreEqual(70000, server.Files["/up.bin"].Length);
     }
@@ -288,6 +313,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunRecordingLinesAsync(server, "scp://files.example/f");
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | * SSH: no knownhosts file configured | * SSH: host offers authentication via: publickey,keyboard-interactive | "
             + $"* SSH: trying private key file '' | {NoKeyDenied} | * SSH: trying publickey authentication via agent | "
@@ -304,6 +330,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunRecordingLinesAsync(server, "scp://files.example/f");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(lines, "* SSH: connection established | <= hello world | <=  | * end of response with 5 bytes missing | * closing connection #0");
     }
 
@@ -315,6 +342,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunRecordingLinesAsync(server, "scp://files.example/f");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.EndsWith(lines, "a | * closing connection #0");
         Assert.DoesNotContain("Error in the SSH layer", lines);
     }
@@ -326,14 +354,22 @@ public sealed partial class SshProtocolHandlerTests
     [DataRow(CurlExitCode.RemoteFileNotFound, "Could not open remote file for reading: No such file or directory", false, false, DisplayName = "another failure")]
     public void FailedWhileTransferring_TellsTheFailuresAfterWhichCurlClosesTheConnection(CurlExitCode exitCode, string message, bool listsDirectory, bool expected)
     {
+        Diagnostics.Arrange("failure", $"{exitCode}: {message}");
+        Diagnostics.Arrange("lists directory", listsDirectory);
+
         bool closes = SshProtocolHandler.FailedWhileTransferring(TransferResult.Failure(exitCode, message, 0), listsDirectory);
 
+        Diagnostics.Act("closes", closes);
+        Diagnostics.Assert("closes", expected, closes);
         Assert.AreEqual(expected, closes);
     }
 
     [TestMethod]
     public void FailedWhileTransferring_Success_LeavesTheConnection()
     {
+        Diagnostics.Arrange("result", TransferResult.Success(5));
+        Diagnostics.Act("closes", SshProtocolHandler.FailedWhileTransferring(TransferResult.Success(5), listsDirectory: false));
+        Diagnostics.Assert("closes", false, SshProtocolHandler.FailedWhileTransferring(TransferResult.Success(5), listsDirectory: false));
         Assert.IsFalse(SshProtocolHandler.FailedWhileTransferring(TransferResult.Success(5), listsDirectory: false));
     }
 
@@ -344,7 +380,7 @@ public sealed partial class SshProtocolHandlerTests
         return server;
     }
 
-    private static async Task<string> RunRecordingLinesAsync(
+    private async Task<string> RunRecordingLinesAsync(
         InMemorySshServer server,
         string url,
         SshOptions? options = null,
@@ -363,9 +399,12 @@ public sealed partial class SshProtocolHandlerTests
             Ssh = options,
             Events = events,
         };
+        ArrangeTransfer(context);
 
-        await Handler(server, files, agent: agent).ExecuteAsync(context);
+        TransferResult result = await Handler(server, files, agent: agent).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
+
+        ActTransfer(result, context, server);
         return string.Join(" | ", events.Transcript);
     }
 }

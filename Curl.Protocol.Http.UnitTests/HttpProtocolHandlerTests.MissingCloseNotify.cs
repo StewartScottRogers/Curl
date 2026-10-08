@@ -27,12 +27,18 @@ public sealed partial class HttpProtocolHandlerTests
     {
         var output = new MemoryStream();
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(response), 65536, failureAfterResponse: new MissingCloseNotifyException(message));
+        Diagnostics.Arrange("scripted response", OneLine(response));
+        Diagnostics.Arrange("failure after response", message);
 
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(Context("http://127.0.0.1:48191/", output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error message", message, result.ErrorMessage);
         Assert.AreEqual(message, result.ErrorMessage);
+        Diagnostics.Assert("output", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 
@@ -40,11 +46,16 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_ConnectionEndsWithoutCloseNotifyBeforeTheHead_FailsWithExit56AndTheBuildsText()
     {
         var connection = new ScriptedConnection([], 65536, failureAfterResponse: new MissingCloseNotifyException(SchannelMissingCloseNotify));
+        Diagnostics.Arrange("scripted response", "(empty)");
+        Diagnostics.Arrange("failure after response", SchannelMissingCloseNotify);
 
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(Context("http://127.0.0.1:48191/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error message", SchannelMissingCloseNotify, result.ErrorMessage);
         Assert.AreEqual(SchannelMissingCloseNotify, result.ErrorMessage);
     }
 }

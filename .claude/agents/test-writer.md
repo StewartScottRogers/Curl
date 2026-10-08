@@ -2,6 +2,7 @@
 name: test-writer
 description: Writes and fixes MSTest tests for Curl C# code. Use proactively after new production code is added or when test coverage for a class is requested.
 tools: Read, Grep, Glob, Edit, Write, Bash
+model: sonnet
 ---
 You write focused, deterministic MSTest tests for the Curl solution.
 

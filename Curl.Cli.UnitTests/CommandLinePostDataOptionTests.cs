@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -30,6 +31,10 @@ public sealed class CommandLinePostDataOptionTests
 
     private static readonly byte[] FileWithLineBreaks = "a b\r\nc\n"u8.ToArray();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("a b&c=d", "a b&c=d")]
     [DataRow("=a b&c=d", "a+b%26c%3Dd")]
@@ -47,6 +52,7 @@ public sealed class CommandLinePostDataOptionTests
         CommandLineParseResult result = Parse(["--data-urlencode", value, Url], new RecordingDataFileReader());
 
         Assert.IsTrue(result.IsAccepted);
+        AssertBodyDiagnostic(expectedBody, result);
         Assert.AreEqual(expectedBody, BodyText(result));
     }
 
@@ -57,6 +63,7 @@ public sealed class CommandLinePostDataOptionTests
 
         CommandLineParseResult result = Parse(["--data-urlencode", "@f.txt", Url], reader);
 
+        AssertBodyDiagnostic("a+b%0D%0Ac%0A", result);
         Assert.AreEqual("a+b%0D%0Ac%0A", BodyText(result));
         CollectionAssert.AreEqual(new[] { "f.txt" }, reader.Reads);
     }
@@ -68,6 +75,7 @@ public sealed class CommandLinePostDataOptionTests
 
         CommandLineParseResult result = Parse(["--data-urlencode", "n@f.txt", Url], reader);
 
+        AssertBodyDiagnostic("n=a+b%0D%0Ac%0A", result);
         Assert.AreEqual("n=a+b%0D%0Ac%0A", BodyText(result));
     }
 
@@ -78,6 +86,7 @@ public sealed class CommandLinePostDataOptionTests
 
         CommandLineParseResult result = Parse(["--data-urlencode", "n@-", Url], reader);
 
+        AssertBodyDiagnostic("n=q+r", result);
         Assert.AreEqual("n=q+r", BodyText(result));
         CollectionAssert.AreEqual(new[] { "-" }, reader.Reads);
     }
@@ -90,6 +99,7 @@ public sealed class CommandLinePostDataOptionTests
         CommandLineParseResult result = Parse(
             ["--data-urlencode", "x", "--data-urlencode", "n@empty.txt", "--data-urlencode", "y", Url], reader);
 
+        AssertBodyDiagnostic("x&&y", result);
         Assert.AreEqual("x&&y", BodyText(result));
     }
 
@@ -98,6 +108,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse(["--data-urlencode", "é", Url], new RecordingDataFileReader());
 
+        AssertBodyDiagnostic("%C3%A9", result);
         Assert.AreEqual("%C3%A9", BodyText(result));
     }
 
@@ -106,6 +117,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse(["--data-urlencode", "n=x+y", "--data-urlencode", "~", Url], new RecordingDataFileReader());
 
+        AssertBodyDiagnostic("n=x%2By&~", result);
         Assert.AreEqual("n=x%2By&~", BodyText(result));
     }
 
@@ -114,6 +126,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse(["--data-urlencode", "=", "-d", "x", "--data-urlencode", "a", Url], new RecordingDataFileReader());
 
+        AssertBodyDiagnostic("x&a", result);
         Assert.AreEqual("x&a", BodyText(result));
     }
 
@@ -125,6 +138,7 @@ public sealed class CommandLinePostDataOptionTests
         CommandLineParseResult result = Parse(["--data-binary", "@f.txt", "--data-binary", "x", Url], reader);
 
         Assert.IsTrue(result.IsAccepted);
+        AssertBodyDiagnostic("a b\r\nc\n&x", result);
         Assert.AreEqual("a b\r\nc\n&x", BodyText(result));
         Assert.IsFalse(result.Options!.SendsJson);
     }
@@ -136,6 +150,7 @@ public sealed class CommandLinePostDataOptionTests
 
         CommandLineParseResult result = Parse(["--data-binary", "@-", Url], reader);
 
+        AssertBodyDiagnostic("a b\r\nc\n", result);
         Assert.AreEqual("a b\r\nc\n", BodyText(result));
     }
 
@@ -147,6 +162,7 @@ public sealed class CommandLinePostDataOptionTests
         CommandLineParseResult result = Parse(["--data-raw", "@f.txt", "--data-raw", "", "--data-raw", "y", Url], reader);
 
         Assert.IsTrue(result.IsAccepted);
+        AssertBodyDiagnostic("@f.txt&&y", result);
         Assert.AreEqual("@f.txt&&y", BodyText(result));
         Assert.IsEmpty(reader.Reads);
     }
@@ -158,6 +174,7 @@ public sealed class CommandLinePostDataOptionTests
 
         CommandLineParseResult result = Parse(["--data-ascii", "@f.txt", Url], reader);
 
+        AssertBodyDiagnostic("a bc", result);
         Assert.AreEqual("a bc", BodyText(result));
     }
 
@@ -167,6 +184,7 @@ public sealed class CommandLinePostDataOptionTests
         CommandLineParseResult result = Parse(["--json", "{\"a\":1}", "--json", "{\"b\":2}", Url], new RecordingDataFileReader());
 
         Assert.IsTrue(result.IsAccepted);
+        AssertBodyDiagnostic("{\"a\":1}{\"b\":2}", result);
         Assert.AreEqual("{\"a\":1}{\"b\":2}", BodyText(result));
         Assert.IsTrue(result.Options!.SendsJson);
     }
@@ -178,6 +196,7 @@ public sealed class CommandLinePostDataOptionTests
 
         CommandLineParseResult result = Parse(["--json", "@j.json", "--json", "", Url], reader);
 
+        AssertBodyDiagnostic("{\"a\":1}\r\n", result);
         Assert.AreEqual("{\"a\":1}\r\n", BodyText(result));
     }
 
@@ -186,6 +205,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse(["-d", "x", "--json", "y", Url], new RecordingDataFileReader());
 
+        AssertBodyDiagnostic("xy", result);
         Assert.AreEqual("xy", BodyText(result));
         Assert.IsTrue(result.Options!.SendsJson);
     }
@@ -195,6 +215,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse(["--json", "y", "-d", "x", Url], new RecordingDataFileReader());
 
+        AssertBodyDiagnostic("y&x", result);
         Assert.AreEqual("y&x", BodyText(result));
         Assert.IsTrue(result.Options!.SendsJson);
     }
@@ -204,6 +225,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse(["-d", "x", Url], new RecordingDataFileReader());
 
+        Diagnostics.Assert("sends json", false, result.Options?.SendsJson);
         Assert.IsFalse(result.Options!.SendsJson);
     }
 
@@ -217,6 +239,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse([option, value, Url], new RecordingDataFileReader());
 
+        AssertRefusalDiagnostic(CurlExitCode.ReadError, "curl: Failed to open missing", result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -234,6 +257,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse(["-s", "--data-urlencode", "n@missing", Url], new RecordingDataFileReader());
 
+        AssertRefusalDiagnostic(CurlExitCode.ReadError, "curl: option --data-urlencode: error encountered when reading a file", result);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "curl: option --data-urlencode: error encountered when reading a file", CommandLineRefusal.TryHelpLine },
@@ -251,6 +275,7 @@ public sealed class CommandLinePostDataOptionTests
     {
         CommandLineParseResult result = Parse([Url, option], new RecordingDataFileReader());
 
+        AssertRefusalDiagnostic(CurlExitCode.FailedInit, $"curl: option {option}: requires parameter", result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
@@ -261,8 +286,36 @@ public sealed class CommandLinePostDataOptionTests
     private static string BodyText(CommandLineParseResult result) =>
         Encoding.UTF8.GetString(result.Options!.PostData!.Value.Span);
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, RecordingDataFileReader reader)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        foreach ((string path, byte[] contents) in reader.Files.OrderBy(file => file.Key, StringComparer.Ordinal))
+        {
+            Diagnostics.Bytes($"file {path}", contents);
+        }
+
+        Diagnostics.Bytes("standard input", reader.StandardInput);
+
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+
+        Diagnostics.ActParse(result);
+        Diagnostics.Act("reads", CommandLineParseDiagnostics.QuoteEach(reader.Reads));
+        if (result.Options?.PostData is { } postData)
+        {
+            Diagnostics.Bytes("body", postData.Span);
+        }
+
+        return result;
+    }
+
+    private void AssertBodyDiagnostic(string expectedBody, CommandLineParseResult result) =>
+        Diagnostics.Diff("body", expectedBody, result.Options?.PostData is { } postData ? Encoding.UTF8.GetString(postData.Span) : "<no body>");
+
+    private void AssertRefusalDiagnostic(CurlExitCode expectedExitCode, string expectedFirstLine, CommandLineParseResult result)
+    {
+        Diagnostics.Assert("exit code", expectedExitCode, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
+        Diagnostics.Assert("first stderr line", expectedFirstLine, CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines[0]);
+    }
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
@@ -7,6 +9,10 @@ namespace Curl.Protocol.Ssh.Authentication;
 [TestClass]
 public sealed class PageantAgentStreamTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Write_FrameInPieces_ExchangesItOnceWhole()
     {
@@ -16,6 +22,7 @@ public sealed class PageantAgentStreamTests
             frames.Add(frame);
             return [0, 0, 0, 1, 5];
         });
+        Diagnostics.Arrange("writes", "00 00, then 00 02 0b, then 0c; the agent answers 00 00 00 01 05");
 
         stream.Write([0, 0], 0, 2);
         stream.Write([0, 2, 11], 0, 3);
@@ -24,6 +31,17 @@ public sealed class PageantAgentStreamTests
         byte[] answer = new byte[8];
         int read = stream.Read(answer, 0, answer.Length);
 
+        Diagnostics.Act("frames exchanged before the last piece", before);
+        Diagnostics.Act("frames exchanged", frames.Count);
+        Diagnostics.Act("bytes read", read);
+        Diagnostics.Assert("frames exchanged before the last piece", 0, before);
+        Diagnostics.Assert("frames exchanged", 1, frames.Count);
+        if (frames.Count > 0)
+        {
+            Diagnostics.Diff("frame", new byte[] { 0, 0, 0, 2, 11, 12 }, frames[0]);
+        }
+
+        Diagnostics.Assert("bytes read", 5, read);
         Assert.AreEqual(0, before);
         Assert.HasCount(1, frames);
         CollectionAssert.AreEqual(new byte[] { 0, 0, 0, 2, 11, 12 }, frames[0]);
@@ -34,9 +52,12 @@ public sealed class PageantAgentStreamTests
     public void Read_NothingExchanged_ReadsNothing()
     {
         using PageantAgentStream stream = new(_ => []);
+        Diagnostics.Arrange("writes", "none");
 
         int read = stream.Read(new byte[4], 0, 4);
 
+        Diagnostics.Act("bytes read", read);
+        Diagnostics.Assert("bytes read", 0, read);
         Assert.AreEqual(0, read);
     }
 
@@ -44,9 +65,13 @@ public sealed class PageantAgentStreamTests
     public void Members_OfAStreamThatOnlyReadsAndWrites_AnswerAsSuch()
     {
         using PageantAgentStream stream = new(_ => []);
+        Diagnostics.Arrange("stream", "a Pageant stream whose agent answers nothing");
 
         stream.Flush();
 
+        string abilities = $"read {stream.CanRead}, write {stream.CanWrite}, seek {stream.CanSeek}";
+        Diagnostics.Act("abilities", abilities);
+        Diagnostics.Assert("abilities", "read True, write True, seek False", abilities);
         Assert.IsTrue(stream.CanRead);
         Assert.IsTrue(stream.CanWrite);
         Assert.IsFalse(stream.CanSeek);

@@ -2,6 +2,7 @@ using System.Net;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 using CountingTransferEvents = Curl.Networking.HandshakeCapturingTransferEventsTests.CountingTransferEvents;
 
@@ -14,6 +15,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class TcpIoTraceConnectionTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task WriteAsync_AfterTheInnerWrite_WritesTheSendLine()
     {
@@ -21,7 +26,14 @@ public sealed class TcpIoTraceConnectionTests
         var events = new CountingTransferEvents();
         var connection = new TcpIoTraceConnection(inner, events, TcpIoTraceConnection.HttpLines);
 
+        Diagnostics.Arrange("write length", 79);
+
         await connection.WriteAsync(new byte[79], CancellationToken.None);
+
+        Diagnostics.Act("inner bytes written", inner.Written.Count);
+        Diagnostics.Act("trace calls", string.Join(" | ", events.Calls));
+        Diagnostics.Assert("inner bytes written", 79, inner.Written.Count);
+        Diagnostics.Assert("trace calls", "[TCP] send(len=79) -> 0, 79", string.Join(" | ", events.Calls));
 
         Assert.HasCount(79, inner.Written);
         CollectionAssert.AreEqual(new[] { "[TCP] send(len=79) -> 0, 79" }, events.Calls);
@@ -33,7 +45,14 @@ public sealed class TcpIoTraceConnectionTests
         var events = new CountingTransferEvents();
         var connection = new TcpIoTraceConnection(new ScriptedConnection(new byte[40]), events, TcpIoTraceConnection.HttpLines);
 
+        Diagnostics.Arrange("buffer length, bytes available", "16384, 40");
+
         var read = await connection.ReadAsync(new byte[16384], CancellationToken.None);
+
+        Diagnostics.Act("bytes read", read);
+        Diagnostics.Act("trace calls", string.Join(" | ", events.Calls));
+        Diagnostics.Assert("bytes read", 40, read);
+        Diagnostics.Assert("trace calls", "[TCP] recv(len=102400) -> 0, 40", string.Join(" | ", events.Calls));
 
         Assert.AreEqual(40, read);
         CollectionAssert.AreEqual(new[] { "[TCP] recv(len=102400) -> 0, 40" }, events.Calls);
@@ -47,10 +66,22 @@ public sealed class TcpIoTraceConnectionTests
         var inner = new PendingReadConnection();
         var connection = new TcpIoTraceConnection(inner, events, TcpIoTraceConnection.HttpLines);
 
+        Diagnostics.Arrange("buffer length, bytes answered later", "16384, 40");
+
         var reading = connection.ReadAsync(new byte[16384], CancellationToken.None);
+        Diagnostics.Act("trace calls before the answer", string.Join(" | ", events.Calls));
         CollectionAssert.AreEqual(new[] { "[TCP] recv(len=102400) -> 81, 0" }, events.Calls);
         inner.Answer(40);
-        var read = await reading;
+        int read;
+        using (Diagnostics.Phase("read"))
+        {
+            read = await reading;
+        }
+
+        Diagnostics.Act("bytes read", read);
+        Diagnostics.Act("trace calls", string.Join(" | ", events.Calls));
+        Diagnostics.Assert("bytes read", 40, read);
+        Diagnostics.Assert("trace calls", "[TCP] recv(len=102400) -> 81, 0 | [TCP] recv(len=102400) -> 0, 40", string.Join(" | ", events.Calls));
 
         Assert.AreEqual(40, read);
         CollectionAssert.AreEqual(new[] { "[TCP] recv(len=102400) -> 81, 0", "[TCP] recv(len=102400) -> 0, 40" }, events.Calls);
@@ -64,11 +95,18 @@ public sealed class TcpIoTraceConnectionTests
         var inner = new PendingReadConnection();
         var connection = new TcpIoTraceConnection(inner, events, new TcpIoTraceLines("TCP", 900, WritesWouldBlockReads: false));
 
+        Diagnostics.Arrange("fixed receive length, read buffer, bytes answered, bytes written", "900, 4096, 20, 16");
+
         var reading = connection.ReadAsync(new byte[4096], CancellationToken.None);
+        Diagnostics.Act("trace calls before the answer", events.Calls.Count);
+        Diagnostics.Assert("trace calls before the answer", 0, events.Calls.Count);
         Assert.IsEmpty(events.Calls);
         inner.Answer(20);
         await reading;
         await connection.WriteAsync(new byte[16], CancellationToken.None);
+
+        Diagnostics.Act("trace calls", string.Join(" | ", events.Calls));
+        Diagnostics.Assert("trace calls", "[TCP] recv(len=900) -> 0, 20 | [TCP] send(len=16) -> 0, 16", string.Join(" | ", events.Calls));
 
         CollectionAssert.AreEqual(new[] { "[TCP] recv(len=900) -> 0, 20", "[TCP] send(len=16) -> 0, 16" }, events.Calls);
     }
@@ -81,9 +119,14 @@ public sealed class TcpIoTraceConnectionTests
         var inner = new PendingReadConnection();
         var connection = new TcpIoTraceConnection(inner, events, new TcpIoTraceLines("TCP-1", ReceiveLength: null, WritesWouldBlockReads: true));
 
+        Diagnostics.Arrange("filter name, read buffer, bytes answered", "TCP-1, 5, 5");
+
         var reading = connection.ReadAsync(new byte[5], CancellationToken.None);
         inner.Answer(5);
         await reading;
+
+        Diagnostics.Act("trace calls", string.Join(" | ", events.Calls));
+        Diagnostics.Assert("trace calls", "[TCP-1] recv(len=5) -> 81, 0 | [TCP-1] recv(len=5) -> 0, 5", string.Join(" | ", events.Calls));
 
         CollectionAssert.AreEqual(new[] { "[TCP-1] recv(len=5) -> 81, 0", "[TCP-1] recv(len=5) -> 0, 5" }, events.Calls);
     }
@@ -94,12 +137,17 @@ public sealed class TcpIoTraceConnectionTests
         var inner = new PendingReadConnection();
         var connection = new TcpIoTraceConnection(inner, new CountingTransferEvents(), TcpIoTraceConnection.HttpLines);
         var session = new RecordingConnectionSession(new ScriptedConnection([]));
+        Diagnostics.Arrange("calls made", "flush, mark reusable, hold session, clear TLS with close notify, dispose");
 
         await connection.FlushAsync(CancellationToken.None);
         connection.MarkReusable();
         var held = connection.TryHoldSession(session);
         var cleared = await connection.ClearTlsAsync(sendCloseNotifyFirst: true, CancellationToken.None);
         await connection.DisposeAsync();
+
+        Diagnostics.Act("inner calls", string.Join(", ", inner.Calls));
+        Diagnostics.Act("is secure, held, cleared is the inner", $"{connection.IsSecure}, {held}, {ReferenceEquals(inner, cleared)}");
+        Diagnostics.Assert("inner calls", "flush, reusable, hold, clear True, dispose", string.Join(", ", inner.Calls));
 
         Assert.IsTrue(connection.IsSecure);
         Assert.AreEqual(PendingReadConnection.Remote, connection.RemoteEndPoint);

@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Protocol.Http;
@@ -13,6 +14,10 @@ namespace Curl.Protocol.Http;
 public sealed partial class HttpRequestHeadFormatterTests
 {
     private const string Url = "http://127.0.0.1:18091/";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private const string DefaultHeaders = "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
 
@@ -196,8 +201,11 @@ public sealed partial class HttpRequestHeadFormatterTests
     {
         byte[] expected = [.. Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\n" + DefaultHeaders + "X-A: "), 0xE9, .. "\r\nX-B: A\r\n\r\n"u8];
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), new HttpRequestOptions { Headers = ["X-A: \u00E9", "X-B: \u0100"] });
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(Url), Arranged(new HttpRequestOptions { Headers = ["X-A: \u00E9", "X-B: \u0100"] }));
 
+        Diagnostics.Act("head length", head.Length);
+        Diagnostics.Bytes("request head", head);
+        Diagnostics.Diff("request head", expected, head);
         CollectionAssert.AreEqual(expected, head);
     }
 
@@ -220,8 +228,11 @@ public sealed partial class HttpRequestHeadFormatterTests
             CommandLineTextEncoding = CodePagesEncodingProvider.Instance.GetEncoding(1252)!,
         };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), options);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(Url), Arranged(options));
 
+        Diagnostics.Act("head length", head.Length);
+        Diagnostics.Bytes("request head", head);
+        Diagnostics.Diff("request head", expected, head);
         CollectionAssert.AreEqual(expected, head);
     }
 
@@ -242,20 +253,27 @@ public sealed partial class HttpRequestHeadFormatterTests
             CommandLineTextEncoding = Encoding.UTF8,
         };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/"), options, forwardProxy: true);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.com/"), Arranged(options), forwardProxy: true);
 
         Assert.AreEqual(
-            "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Ã©\r\nAccept: */*\r\n"
-            + "Referer: â\u0082¬\r\nProxy-Connection: Keep-Alive\r\nX-A: Ã©\r\nX-P: Ã©\r\n\r\n",
+            ExpectedHead(
+                "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Ã©\r\nAccept: */*\r\n"
+                + "Referer: â\u0082¬\r\nProxy-Connection: Keep-Alive\r\nX-A: Ã©\r\nX-P: Ã©\r\n\r\n",
+                head),
             Encoding.Latin1.GetString(head));
     }
 
     [TestMethod]
     public void Format_DefaultOptions_MatchesNullOptions()
     {
-        CollectionAssert.AreEqual(
-            HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), null),
-            HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), new HttpRequestOptions()));
+        byte[] fromNull = HttpRequestHeadFormatter.Format(ArrangedUrl(Url), Arranged(null));
+        byte[] fromDefault = HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), Arranged(new HttpRequestOptions()));
+
+        Diagnostics.Act("head length", fromNull.Length);
+        Diagnostics.Bytes("head from null options", fromNull);
+        Diagnostics.Bytes("head from default options", fromDefault);
+        Diagnostics.Diff("request head", fromNull, fromDefault);
+        CollectionAssert.AreEqual(fromNull, fromDefault);
     }
 
     [TestMethod]
@@ -351,10 +369,10 @@ public sealed partial class HttpRequestHeadFormatterTests
     {
         HttpRequestOptions options = new() { CustomMethod = customMethod };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://127.0.0.1:18276/a?b"), options, noBody: true);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://127.0.0.1:18276/a?b"), Arranged(options), noBody: true);
 
         Assert.AreEqual(
-            method + " /a?b HTTP/1.1\r\nHost: 127.0.0.1:18276\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            ExpectedHead(method + " /a?b HTTP/1.1\r\nHost: 127.0.0.1:18276\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n", head),
             Encoding.Latin1.GetString(head));
     }
 
@@ -371,9 +389,9 @@ public sealed partial class HttpRequestHeadFormatterTests
     {
         HttpRequestOptions options = new() { Headers = header is null ? [] : [header] };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://127.0.0.1:18181/a"), options, authorization: "Basic dTpw");
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://127.0.0.1:18181/a"), Arranged(options), authorization: "Basic dTpw");
 
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
     }
 
     /// <summary>
@@ -394,11 +412,11 @@ public sealed partial class HttpRequestHeadFormatterTests
     {
         HttpRequestOptions options = new() { Headers = ["Authorization: x"] };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://127.0.0.1:18181/a"), options, authorization: authorization);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://127.0.0.1:18181/a"), Arranged(options), authorization: authorization);
 
         string ownLine = sent ? $"Authorization: {authorization}\r\n" : string.Empty;
         Assert.AreEqual(
-            $"GET /a HTTP/1.1\r\nHost: 127.0.0.1:18181\r\n{ownLine}User-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n",
+            ExpectedHead($"GET /a HTTP/1.1\r\nHost: 127.0.0.1:18181\r\n{ownLine}User-Agent: curl/8.21.0\r\nAccept: */*\r\nAuthorization: x\r\n\r\n", head),
             Encoding.Latin1.GetString(head));
     }
 
@@ -440,17 +458,17 @@ public sealed partial class HttpRequestHeadFormatterTests
             Body = body is null ? null : new BytesBody(Encoding.Latin1.GetBytes(body), "application/x-www-form-urlencoded"),
         };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://127.0.0.1:18082/"), options, authorization: full ? "Basic dTpw" : null, cookie: "j=k");
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://127.0.0.1:18082/"), Arranged(options), authorization: full ? "Basic dTpw" : null, cookie: "j=k");
 
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
     }
 
     [TestMethod]
     public void Format_EmptyCookie_SendsNoCookieHeader()
     {
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), null, cookie: string.Empty);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(Url), Arranged(null), cookie: string.Empty);
 
-        Assert.AreEqual("GET / HTTP/1.1\r\n" + DefaultHeaders + "\r\n", Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead("GET / HTTP/1.1\r\n" + DefaultHeaders + "\r\n", head), Encoding.Latin1.GetString(head));
     }
 
     /// <summary>
@@ -489,9 +507,9 @@ public sealed partial class HttpRequestHeadFormatterTests
     {
         HttpRequestOptions options = new() { Headers = headers };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(url), options, forwardProxy: true, proxyAuthorization: proxyAuthorization);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(url), Arranged(options), forwardProxy: true, proxyAuthorization: proxyAuthorization);
 
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
     }
 
     /// <summary>
@@ -534,9 +552,9 @@ public sealed partial class HttpRequestHeadFormatterTests
     {
         HttpRequestOptions options = new() { Headers = headers, ProxyHeaders = proxyHeaders };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/"), options, forwardProxy: true);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.com/"), Arranged(options), forwardProxy: true);
 
-        Assert.AreEqual("GET http://example.com/ HTTP/1.1\r\n" + expectedHeaders + "\r\n", Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead("GET http://example.com/ HTTP/1.1\r\n" + expectedHeaders + "\r\n", head), Encoding.Latin1.GetString(head));
     }
 
     /// <summary>
@@ -556,9 +574,9 @@ public sealed partial class HttpRequestHeadFormatterTests
             Body = new BytesBody("xy"u8.ToArray(), "application/x-www-form-urlencoded"),
         };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/"), options, forwardProxy: true);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.com/"), Arranged(options), forwardProxy: true);
 
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
     }
 
     /// <summary>
@@ -587,9 +605,9 @@ public sealed partial class HttpRequestHeadFormatterTests
             + "Accept-Encoding: deflate, gzip, br, zstd\r\nReferer: r\r\nProxy-Connection: Keep-Alive\r\nCookie: a=b\r\n\r\n";
         HttpRequestOptions options = new() { Headers = ["Host: other"], Referer = "r", Compressed = true };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/h"), options, cookie: "a=b", forwardProxy: true);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.com/h"), Arranged(options), cookie: "a=b", forwardProxy: true);
 
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(head));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
     }
 
     [TestMethod]
@@ -641,24 +659,50 @@ public sealed partial class HttpRequestHeadFormatterTests
     {
         HttpRequestOptions options = new() { CustomMethod = "OPTIONS", RequestTarget = "*" };
 
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://example.com/a"), options, forwardProxy: true);
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl("http://example.com/a"), Arranged(options), forwardProxy: true);
 
         Assert.AreEqual(
-            "OPTIONS * HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+            ExpectedHead("OPTIONS * HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nProxy-Connection: Keep-Alive\r\n\r\n", head),
             Encoding.Latin1.GetString(head));
     }
 
     [TestMethod]
     public void Format_RequestTargetAboveAscii_SendsItsUtf8Bytes()
     {
-        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse(Url), new HttpRequestOptions { RequestTarget = "/ä" });
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(Url), Arranged(new HttpRequestOptions { RequestTarget = "/ä" }));
 
         byte[] expected = [.. "GET /"u8, 0xC3, 0xA4, .. " HTTP/1.1\r\n"u8];
+        Diagnostics.Act("head length", head.Length);
+        Diagnostics.Bytes("request line", head[..expected.Length]);
+        Diagnostics.Diff("request line", expected, head[..expected.Length]);
         CollectionAssert.AreEqual(expected, head[..expected.Length]);
     }
 
-    private static void AssertHead(string expected, CurlUrl url, HttpRequestOptions? options)
+    private void AssertHead(string expected, CurlUrl url, HttpRequestOptions? options)
     {
-        Assert.AreEqual(expected, Encoding.Latin1.GetString(HttpRequestHeadFormatter.Format(url, options)));
+        Diagnostics.Arrange("URL", url.OriginalString);
+        byte[] head = HttpRequestHeadFormatter.Format(url, Arranged(options));
+        Assert.AreEqual(ExpectedHead(expected, head), Encoding.Latin1.GetString(head));
+    }
+
+    private CurlUrl ArrangedUrl(string url)
+    {
+        Diagnostics.Arrange("URL", url);
+        return CurlUrl.Parse(url);
+    }
+
+    private HttpRequestOptions? Arranged(HttpRequestOptions? options)
+    {
+        Diagnostics.Arrange("options", HttpRequestOptionsDescription.Of(options));
+        return options;
+    }
+
+    private string ExpectedHead(string expected, byte[] head)
+    {
+        string actual = Encoding.Latin1.GetString(head);
+        Diagnostics.Act("request line", actual[..Math.Max(0, actual.IndexOf("\r\n", StringComparison.Ordinal))]);
+        Diagnostics.Bytes("request head", head);
+        Diagnostics.Diff("request head", expected, actual);
+        return expected;
     }
 }

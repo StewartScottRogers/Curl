@@ -2,6 +2,7 @@ using System.Text;
 
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -17,6 +18,10 @@ public sealed class CookieEngineTests
 
     private static readonly DateTimeOffset Now = new(2026, 9, 27, 0, 0, 0, TimeSpan.Zero);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("Cookie: c=d", DisplayName = "Cookie: c=d")]
     [DataRow("cookie: c=d", DisplayName = "cookie: c=d")]
@@ -24,8 +29,12 @@ public sealed class CookieEngineTests
     [DataRow("COOKIE;", DisplayName = "COOKIE;")]
     public void HandlerStore_CookieStringWithHeaderNamingCookie_SendsNoCookieHeader(string header)
     {
+        Diagnostics.Arrange("command line", $"-b a=b -H \"{header}\" {Url}");
         CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-b", "a=b", "-H", header, Url))!;
+        string? cookieHeader = cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("cookie header", cookieHeader ?? "<null>");
 
+        Diagnostics.Assert("cookie header", "<null>", cookieHeader ?? "<null>");
         Assert.IsNull(cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance));
     }
 
@@ -35,8 +44,12 @@ public sealed class CookieEngineTests
     [DataRow(new[] { "-H", "X-Cookie: c=d" }, DisplayName = "-H X-Cookie:")]
     public void HandlerStore_CookieStringWithoutHeaderNamingCookie_SendsTheString(string[] headerArguments)
     {
+        Diagnostics.Arrange("command line", $"-b a=b {string.Join(" ", headerArguments)} {Url}");
         CookieEngine cookies = CookieEngine.FromCommandLine(Parse(["-b", "a=b", .. headerArguments, Url]))!;
+        string? cookieHeader = cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("cookie header", cookieHeader ?? "<null>");
 
+        Diagnostics.Assert("cookie header", "a=b", cookieHeader ?? "<null>");
         Assert.AreEqual("a=b", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance));
     }
 
@@ -46,11 +59,16 @@ public sealed class CookieEngineTests
         InMemoryFileSystem fileSystem = new();
         fileSystem.ExistingContent["jar.txt"] =
             Encoding.Latin1.GetBytes("# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n");
+        Diagnostics.Arrange("command line", $"-b jar.txt -b a=b -H \"Cookie: c=d\" {Url}");
+        Diagnostics.Bytes("jar.txt", fileSystem.ExistingContent["jar.txt"]);
         CookieEngine cookies = CookieEngine.FromCommandLine(
             Parse("-b", "jar.txt", "-b", "a=b", "-H", "Cookie: c=d", Url))!;
 
         await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
+        string? cookieHeader = cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("cookie header", cookieHeader ?? "<null>");
 
+        Diagnostics.Assert("cookie header", "sess=s1", cookieHeader ?? "<null>");
         Assert.AreEqual("sess=s1", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance));
     }
 

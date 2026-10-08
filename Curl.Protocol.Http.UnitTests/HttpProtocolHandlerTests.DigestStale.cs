@@ -34,14 +34,20 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection second = new(chunkSize, StaleChallenge("b", stale: true, close: true));
             TurnTakingConnection third = new(chunkSize, StaleOk);
             MemoryStream output = new();
+            Diagnostics.Arrange("url, chunk size", $"{StaleUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "401 nonce a, 401 nonce b stale, 200 ok");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(first, second, third), StaleAuthenticator("370cf856b91684edfd74ca6d21b5bebb", "fa452aa0c29c5f74b6287443cc695e23"))
                 .ExecuteAsync(StaleContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("first written", StaleRequest(null), first.Written);
             Assert.AreEqual(StaleRequest(null), first.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(StaleRequest(MeasuredDigest("a", "370cf856b91684edfd74ca6d21b5bebb", "8e5f4ff511caf60a1c5d62bf94390e19")), second.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(StaleRequest(MeasuredDigest("b", "fa452aa0c29c5f74b6287443cc695e23", "2c3e85ee0f1f96fd9dc24992aac4b9cc")), third.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
     }
@@ -57,10 +63,14 @@ public sealed partial class HttpProtocolHandlerTests
         {
             TurnTakingConnection connection = new(chunkSize, StaleChallenge("a", stale: false, close: false), StaleChallenge("b", stale: true, close: false), "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
             MemoryStream output = new();
+            Diagnostics.Arrange("url, chunk size", $"{StaleUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "401 nonce a, 401 nonce b stale, 200 ok on one connection");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), StaleAuthenticator("7c8d53b70ecd1db6c969ae2cad2a18d6", "69f374a2527dd5c0db29fba426e68bb3"))
                 .ExecuteAsync(StaleContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(
                 StaleRequest(null)
@@ -68,6 +78,8 @@ public sealed partial class HttpProtocolHandlerTests
                     + StaleRequest(MeasuredDigest("b", "69f374a2527dd5c0db29fba426e68bb3", "beae51319e57b3584ac6ec337011a4ef")),
                 connection.Written,
                 $"Chunk size {chunkSize}");
+            Diagnostics.Act("written", OneLine(connection.Written));
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
     }
@@ -83,14 +95,21 @@ public sealed partial class HttpProtocolHandlerTests
         List<TurnTakingConnection> connections = [.. nonces.Select((nonce, index) => new TurnTakingConnection(65536, StaleChallenge(nonce, stale: index > 0, close: true)))];
         connections.Add(new TurnTakingConnection(65536, StaleOk));
         MemoryStream output = new();
+        Diagnostics.Arrange("url, challenge count", $"{StaleUrl}, {nonces.Length}");
+        Diagnostics.Arrange("scripted responses", "10 stale-chained 401s, then 200 ok");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For([.. connections]), StaleAuthenticator([.. nonces.Select(nonce => nonce + "0")]))
             .ExecuteAsync(StaleContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual("ok", Latin1(output.ToArray()));
         for (int index = 0; index < nonces.Length; index++)
         {
+            Diagnostics.Act($"request {index + 2}", OneLine(connections[index + 1].Written));
+            Diagnostics.Assert($"request {index + 2} nonce", nonces[index], connections[index + 1].Written.Contains(nonces[index], StringComparison.Ordinal) ? nonces[index] : "(missing)");
             StringAssert.Contains(connections[index + 1].Written, $"nonce=\"{nonces[index]}\", uri=\"/\", cnonce=\"{nonces[index]}0\", nc=00000001,", $"Request {index + 2}");
         }
     }
@@ -107,13 +126,19 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection third = new(65536, StaleOk);
         QueueConnector connector = QueueConnector.For(first, second, third);
         MemoryStream output = new();
+        Diagnostics.Arrange("url, scripted responses", $"{StaleUrl}, 401 nonce a, 401 nonce b without stale, 200 ok");
 
         TransferResult result = await new HttpProtocolHandler(connector, StaleAuthenticator("370cf856b91684edfd74ca6d21b5bebb", "x"))
             .ExecuteAsync(StaleContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connect count", 2, connector.Targets.Count);
         Assert.HasCount(2, connector.Targets);
+        Diagnostics.Assert("third written", string.Empty, third.Written);
         Assert.AreEqual(string.Empty, third.Written);
+        Diagnostics.Assert("output length", 0L, output.Length);
         Assert.AreEqual(0L, output.Length);
     }
 
@@ -129,11 +154,17 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = QueueConnector.For(first, second);
         MemoryStream output = new();
         TransferContext context = StaleContext(output, HttpAuthSchemes.Basic);
+        Diagnostics.Arrange("url, scripted responses", $"{StaleUrl}, 401 stale Digest challenge, 200 ok");
+        Diagnostics.Arrange("auth schemes", HttpAuthSchemes.Basic);
 
         TransferResult result = await new HttpProtocolHandler(connector, StaleAuthenticator("x")).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connect count", 1, connector.Targets.Count);
         Assert.HasCount(1, connector.Targets);
+        Diagnostics.Assert("authorization header", "Authorization: Basic dTpw", first.Written.Contains("Authorization: Basic dTpw", StringComparison.Ordinal) ? "Authorization: Basic dTpw" : "(missing)");
         StringAssert.Contains(first.Written, "Authorization: Basic dTpw\r\n");
     }
 

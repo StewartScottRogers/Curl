@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -16,11 +17,20 @@ public sealed class CommandLineTraceOptionTests
 
     private const string VerboseOverridesTrace = "Warning: -v, --verbose overrides an earlier trace option";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoTraceOption_TracesNothing()
     {
         CommandLineOptions options = Accept(Url);
 
+        Diagnostics.Assert("trace", TraceKind.None, options.Trace);
+        Diagnostics.Assert("trace file", null, options.TraceFile);
+        Diagnostics.Assert("verbosity", 0, options.Verbosity);
+        Diagnostics.Assert("trace time", false, options.TraceTime);
+        Diagnostics.Assert("stderr file", null, options.StandardErrorFile);
         Assert.AreEqual(TraceKind.None, options.Trace);
         Assert.IsNull(options.TraceFile);
         Assert.AreEqual(0, options.Verbosity);
@@ -48,6 +58,9 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineOptions options = Accept(arguments);
 
+        Diagnostics.Assert("trace", TraceKind.Verbose, options.Trace);
+        Diagnostics.Assert("trace file", null, options.TraceFile);
+        Diagnostics.Assert("verbosity", expectedVerbosity, options.Verbosity);
         Assert.AreEqual(TraceKind.Verbose, options.Trace);
         Assert.IsNull(options.TraceFile);
         Assert.AreEqual(expectedVerbosity, options.Verbosity);
@@ -62,7 +75,10 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--trace-time -v --no-verbose")]
     public void Parse_TraceTimeResetOrNeverSet_ShowsNoTimes(string arguments)
     {
-        Assert.IsFalse(Accept(arguments).TraceTime);
+        CommandLineOptions options = Accept(arguments);
+
+        Diagnostics.Assert("trace time", false, options.TraceTime);
+        Assert.IsFalse(options.TraceTime);
     }
 
     [TestMethod]
@@ -75,7 +91,10 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--trace t1 --trace-time")]
     public void Parse_TraceTimeOrSecondV_ShowsTimes(string arguments)
     {
-        Assert.IsTrue(Accept(arguments).TraceTime);
+        CommandLineOptions options = Accept(arguments);
+
+        Diagnostics.Assert("trace time", true, options.TraceTime);
+        Assert.IsTrue(options.TraceTime);
     }
 
     // Measured 2026-09-29 (BL-648 Notes): --trace-ids -v prints no IDs, --trace-ids -sv and -vv do,
@@ -89,7 +108,10 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--trace-ids -v --no-verbose")]
     public void Parse_TraceIdsResetOrNeverSet_ShowsNoIds(string arguments)
     {
-        Assert.IsFalse(Accept(arguments).TraceIds);
+        CommandLineOptions options = Accept(arguments);
+
+        Diagnostics.Assert("trace IDs", false, options.TraceIds);
+        Assert.IsFalse(options.TraceIds);
     }
 
     [TestMethod]
@@ -102,7 +124,10 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--trace-ascii - --trace-ids")]
     public void Parse_TraceIdsOrSecondV_ShowsIds(string arguments)
     {
-        Assert.IsTrue(Accept(arguments).TraceIds);
+        CommandLineOptions options = Accept(arguments);
+
+        Diagnostics.Assert("trace IDs", true, options.TraceIds);
+        Assert.IsTrue(options.TraceIds);
     }
 
     [TestMethod]
@@ -110,6 +135,9 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse("--trace-ids " + Url + " --next");
 
+        Diagnostics.Act("group count", result.Groups.Count);
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("second group trace IDs", true, result.Groups.Count > 1 ? result.Groups[1].TraceIds : null);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Groups[1].TraceIds);
     }
@@ -122,6 +150,9 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace time", false, Recorded(result)?.TraceTime);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.TraceTime);
         Assert.IsEmpty(result.WarningLines);
@@ -138,6 +169,11 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace", TraceKind.None, Recorded(result)?.Trace);
+        Diagnostics.Assert("trace file", null, Recorded(result)?.TraceFile);
+        Diagnostics.Assert("verbosity", 0, Recorded(result)?.Verbosity);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TraceKind.None, result.Options.Trace);
         Assert.IsNull(result.Options.TraceFile);
@@ -159,6 +195,10 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace", expectedTrace, Recorded(result)?.Trace);
+        Diagnostics.Assert("trace file", expectedFile, Recorded(result)?.TraceFile);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedTrace, result.Options.Trace);
         Assert.AreEqual(expectedFile, result.Options.TraceFile);
@@ -175,6 +215,10 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace", expectedTrace, Recorded(result)?.Trace);
+        Diagnostics.Assert("trace file", expectedFile, Recorded(result)?.TraceFile);
+        AssertWarningLines([$"Warning: {longName} overrides an earlier trace/verbose option"], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedTrace, result.Options.Trace);
         Assert.AreEqual(expectedFile, result.Options.TraceFile);
@@ -188,6 +232,15 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse("-v --trace-ascii t6 --trace t7");
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace", TraceKind.HexDump, Recorded(result)?.Trace);
+        Diagnostics.Assert("trace file", "t7", Recorded(result)?.TraceFile);
+        AssertWarningLines(
+            [
+                "Warning: --trace-ascii overrides an earlier trace/verbose option",
+                "Warning: --trace overrides an earlier trace/verbose option",
+            ],
+            result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TraceKind.HexDump, result.Options.Trace);
         Assert.AreEqual("t7", result.Options.TraceFile);
@@ -210,6 +263,11 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace", TraceKind.Verbose, Recorded(result)?.Trace);
+        Diagnostics.Assert("trace file", null, Recorded(result)?.TraceFile);
+        Diagnostics.Assert("verbosity", expectedVerbosity, Recorded(result)?.Verbosity);
+        AssertWarningLines([VerboseOverridesTrace], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TraceKind.Verbose, result.Options.Trace);
         Assert.IsNull(result.Options.TraceFile);
@@ -222,6 +280,9 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse("--trace t1 --no-verbose -v");
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace", TraceKind.Verbose, Recorded(result)?.Trace);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(TraceKind.Verbose, result.Options.Trace);
         Assert.IsEmpty(result.WarningLines);
@@ -234,6 +295,9 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace", expectedTrace, Recorded(result)?.Trace);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedTrace, result.Options.Trace);
         Assert.IsEmpty(result.WarningLines);
@@ -244,6 +308,14 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse("-v --trace -x");
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("trace file", "-x", Recorded(result)?.TraceFile);
+        AssertWarningLines(
+            [
+                "Warning: The filename argument '-x' looks like a flag.",
+                "Warning: --trace overrides an earlier trace/verbose option",
+            ],
+            result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("-x", result.Options.TraceFile);
         CollectionAssert.AreEqual(
@@ -261,8 +333,10 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--stderr")]
     public void Parse_FileNameThatLooksLikeFlag_WarnsAndTakesIt(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, "-x", Url]);
+        CommandLineParseResult result = Parse([spelledOption, "-x", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        AssertWarningLines(["Warning: The filename argument '-x' looks like a flag."], result);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "Warning: The filename argument '-x' looks like a flag." }, result.WarningLines.ToArray());
     }
@@ -272,7 +346,7 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--trace-ascii")]
     public void Parse_EmptyTraceFile_IsRefusedAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, string.Empty, Url]);
+        CommandLineParseResult result = Parse([spelledOption, string.Empty, Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: blank argument where content is expected");
     }
@@ -283,7 +357,7 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--stderr")]
     public void Parse_FileOptionAsLastArgument_IsRefusedAsRequiringParameter(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, spelledOption]);
+        CommandLineParseResult result = Parse([Url, spelledOption]);
 
         AssertRefused(result, $"curl: option {spelledOption}: requires parameter");
     }
@@ -294,7 +368,7 @@ public sealed class CommandLineTraceOptionTests
     [DataRow("--no-stderr")]
     public void Parse_NoSpellingOfFileOption_IsRefusedAsNotReversible(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
         AssertRefused(result, $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix");
     }
@@ -308,6 +382,9 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("stderr file", expectedFile, Recorded(result)?.StandardErrorFile);
+        AssertWarningLines([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedFile, result.Options.StandardErrorFile);
         Assert.IsEmpty(result.WarningLines);
@@ -316,8 +393,10 @@ public sealed class CommandLineTraceOptionTests
     [TestMethod]
     public void Parse_EmptyStderr_IsKeptNotRefused()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--stderr", string.Empty, Url]);
+        CommandLineParseResult result = Parse(["--stderr", string.Empty, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("stderr file", string.Empty, Recorded(result)?.StandardErrorFile);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(string.Empty, result.Options.StandardErrorFile);
     }
@@ -325,8 +404,9 @@ public sealed class CommandLineTraceOptionTests
     [TestMethod]
     public void Parse_NoStderr_HasNoStandardErrorRedirects()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("stderr redirect count", 0, result.StandardErrorRedirects.Count);
         Assert.IsEmpty(result.StandardErrorRedirects);
     }
 
@@ -335,6 +415,15 @@ public sealed class CommandLineTraceOptionTests
     {
         CommandLineParseResult result = Parse("-H nocolon --stderr a -H x --stderr b -s --stderr c");
 
+        StandardErrorRedirect[] expected =
+        [
+            new StandardErrorRedirect("a", 1, false),
+            new StandardErrorRedirect("b", 2, false),
+            new StandardErrorRedirect("c", 2, true),
+        ];
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("stderr redirects", string.Join(", ", expected.Select(redirect => redirect.ToString())), string.Join(", ", result.StandardErrorRedirects.Select(redirect => redirect.ToString())));
+        Diagnostics.Assert("options share the redirects", true, ReferenceEquals(Recorded(result)?.StandardErrorRedirects, result.StandardErrorRedirects));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
@@ -350,25 +439,57 @@ public sealed class CommandLineTraceOptionTests
     [TestMethod]
     public void Parse_RefusalAfterStderr_KeepsTheRedirect()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--stderr", "se", "--bogus", Url]);
+        CommandLineParseResult result = Parse(["--stderr", "se", "--bogus", Url]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("stderr redirects", new StandardErrorRedirect("se", 0, false).ToString(), string.Join(", ", result.StandardErrorRedirects.Select(redirect => redirect.ToString())));
         Assert.IsFalse(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { new StandardErrorRedirect("se", 0, false) }, result.StandardErrorRedirects.ToArray());
     }
 
-    private static CommandLineParseResult Parse(string arguments) =>
-        CommandLineParser.Parse([.. arguments.Split(' '), Url]);
+    /// <summary>
+    /// Returns the parsed options, or null for a refusal, for diagnostic lines written before the test asserts
+    /// acceptance, without making the compiler treat <see cref="CommandLineParseResult.Options"/> as possibly null.
+    /// </summary>
+    private static CommandLineOptions? Recorded(CommandLineParseResult result) => result.Options;
 
-    private static CommandLineOptions Accept(string arguments)
+    private CommandLineParseResult Parse(string arguments) =>
+        Parse([.. arguments.Split(' '), Url]);
+
+    /// <summary>Parses <paramref name="arguments"/>, writing them, the outcome and the trace option values as diagnostics.</summary>
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
     {
-        CommandLineParseResult result = arguments == Url ? CommandLineParser.Parse([Url]) : Parse(arguments);
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            Diagnostics.Act("trace", result.Options.Trace);
+            Diagnostics.Act("trace file", result.Options.TraceFile);
+            Diagnostics.Act("verbosity", result.Options.Verbosity);
+            Diagnostics.Act("trace time", result.Options.TraceTime);
+            Diagnostics.Act("trace IDs", result.Options.TraceIds);
+            Diagnostics.Act("stderr file", result.Options.StandardErrorFile);
+        }
 
+        return result;
+    }
+
+    private CommandLineOptions Accept(string arguments)
+    {
+        CommandLineParseResult result = arguments == Url ? Parse([Url]) : Parse(arguments);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
     }
 
-    private static void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
+    private void AssertWarningLines(IEnumerable<string> expected, CommandLineParseResult result) =>
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expected), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+
+    private void AssertRefused(CommandLineParseResult result, string expectedFirstLine)
     {
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, [expectedFirstLine, CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(

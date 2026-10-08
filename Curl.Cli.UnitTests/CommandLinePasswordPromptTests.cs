@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -13,6 +14,10 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class CommandLinePasswordPromptTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_UserWithoutColon_RecordsThePromptedPassword()
     {
@@ -20,6 +25,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", "bob", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt, "Enter host password for user 'bob':");
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("bob", result.Options.Credentials!.UserName);
         Assert.AreEqual("secret", result.Options.Credentials.Password);
@@ -33,6 +39,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["--user", "", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt, "Enter host password for user '':");
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(string.Empty, result.Options.Credentials!.UserName);
         Assert.AreEqual("secret", result.Options.Credentials.Password);
@@ -50,6 +57,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", value, "http://example.com/"], prompt);
 
+        AssertPrompts(prompt);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedUser, result.Options.Credentials!.UserName);
         Assert.AreEqual(expectedPassword, result.Options.Credentials.Password);
@@ -63,6 +71,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", "bob;opt", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt, "Enter host password for user 'bob':");
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("bob;opt", result.Options.Credentials!.UserName);
         Assert.AreEqual("secret", result.Options.Credentials.Password);
@@ -76,6 +85,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", "bob", "-u", "alice", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt, "Enter host password for user 'alice':");
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("alice", result.Options.Credentials!.UserName);
         CollectionAssert.AreEqual(new[] { "Enter host password for user 'alice':" }, prompt.Prompts);
@@ -88,6 +98,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", "bob", "-u", "alice:pw", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("pw", result.Options.Credentials!.Password);
         Assert.IsEmpty(prompt.Prompts);
@@ -100,6 +111,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", "bob"], prompt);
 
+        AssertPrompts(prompt, "Enter host password for user 'bob':");
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { "Enter host password for user 'bob':" }, prompt.Prompts);
@@ -112,6 +124,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", "bob", "--bogus"], prompt);
 
+        AssertPrompts(prompt);
         Assert.IsFalse(result.IsAccepted);
         Assert.IsEmpty(prompt.Prompts);
     }
@@ -123,6 +136,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-s", "-d", "x", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.Credentials);
         Assert.IsEmpty(prompt.Prompts);
@@ -135,6 +149,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse([], prompt);
 
+        AssertPrompts(prompt);
         Assert.IsFalse(result.IsAccepted);
         Assert.IsEmpty(prompt.Prompts);
     }
@@ -146,6 +161,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-u", "bob", "--oauth2-bearer", "tok", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("bob", result.Options.Credentials!.UserName);
         Assert.AreEqual(string.Empty, result.Options.Credentials.Password);
@@ -163,6 +179,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse([spelledOption, user, "http://example.com/"], prompt);
 
+        AssertPrompts(prompt, $"Enter proxy password for user '{shownUser}':");
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(user, result.Options.ProxyCredentials!.UserName);
         Assert.AreEqual("secret", result.Options.ProxyCredentials.Password);
@@ -179,6 +196,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-U", value, "http://example.com/"], prompt);
 
+        AssertPrompts(prompt);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(expectedUser, result.Options.ProxyCredentials!.UserName);
         Assert.AreEqual(expectedPassword, result.Options.ProxyCredentials.Password);
@@ -192,6 +210,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-U", "p", "-u", "h", "http://example.com/"], prompt);
 
+        AssertPrompts(prompt, "Enter host password for user 'h':", "Enter proxy password for user 'p':");
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("secret", result.Options.Credentials!.Password);
         Assert.AreEqual("secret", result.Options.ProxyCredentials!.Password);
@@ -207,6 +226,7 @@ public sealed class CommandLinePasswordPromptTests
 
         CommandLineParseResult result = Parse(["-U", "p"], prompt);
 
+        AssertPrompts(prompt, "Enter proxy password for user 'p':");
         Assert.IsFalse(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "Enter proxy password for user 'p':" }, prompt.Prompts);
     }
@@ -214,15 +234,33 @@ public sealed class CommandLinePasswordPromptTests
     [TestMethod]
     public void Parse_NullPasswordPrompt_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(
+        Diagnostics.ArrangeArguments(["http://example.com/"]);
+        Diagnostics.Arrange("password prompt", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CommandLineParser.Parse(["http://example.com/"], _ => true, null!, new RecordingDataFileReader()));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IPasswordPrompt prompt) =>
-        CommandLineParser.Parse(arguments, _ => true, prompt, new RecordingDataFileReader());
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, RecordingPasswordPrompt prompt)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("prompt answer", prompt.Answer);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, prompt, new RecordingDataFileReader());
+        Diagnostics.ActParse(result);
+        Diagnostics.Act("prompts", CommandLineParseDiagnostics.QuoteEach(prompt.Prompts));
+        return result;
+    }
+
+    private void AssertPrompts(RecordingPasswordPrompt prompt, params string[] expected) =>
+        Diagnostics.Assert("prompts", CommandLineParseDiagnostics.QuoteEach(expected), CommandLineParseDiagnostics.QuoteEach(prompt.Prompts));
 
     private sealed class RecordingPasswordPrompt(string answer) : IPasswordPrompt
     {
+        public string Answer => answer;
+
         public List<string> Prompts { get; } = [];
 
         public string ReadPassword(string prompt)

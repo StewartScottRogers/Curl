@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Ssh.Authentication;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Curl.Protocol.Ssh.Authentication;
 [TestClass]
 public sealed class OpenSshSignatureTypeBugTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("SSH-2.0-OpenSSH_7.7", DisplayName = "7.7")]
     [DataRow("SSH-2.0-OpenSSH_7.0p1 Debian", DisplayName = "7.0")]
@@ -17,7 +21,7 @@ public sealed class OpenSshSignatureTypeBugTests
     [DataRow("SSH-2.0-Foo OpenSSH_5.3", DisplayName = "OpenSSH_ anywhere in the banner")]
     [DataRow("SSH-2.0-OpenSSH_6.", DisplayName = "a major below 7 needs only the dot")]
     public void AffectsServer_OpenSshBefore78_IsTrue(string identification) =>
-        Assert.IsTrue(OpenSshSignatureTypeBug.AffectsServer(identification));
+        Assert.IsTrue(AffectsServer(identification, expected: true));
 
     [TestMethod]
     [DataRow(null, DisplayName = "no banner")]
@@ -35,5 +39,16 @@ public sealed class OpenSshSignatureTypeBugTests
     [DataRow("SSH-2.0-OpenSSH_", DisplayName = "nothing after the prefix")]
     [DataRow("SSH-2.0-OpenSSH_99999999999999999999.1", DisplayName = "a major that overflows")]
     public void AffectsServer_AnythingElse_IsFalse(string? identification) =>
-        Assert.IsFalse(OpenSshSignatureTypeBug.AffectsServer(identification));
+        Assert.IsFalse(AffectsServer(identification, expected: false));
+
+    // Reads the banner, writing it, the answer and what the test expects.
+    private bool AffectsServer(string? identification, bool expected)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("server identification", identification is null ? "(none)" : SshAuthenticationDiagnostics.Text(identification));
+        bool affected = OpenSshSignatureTypeBug.AffectsServer(identification);
+        diagnostics.Act("affects server", affected);
+        diagnostics.Assert("affects server", expected, affected);
+        return affected;
+    }
 }

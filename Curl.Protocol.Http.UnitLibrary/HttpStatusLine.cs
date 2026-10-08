@@ -53,7 +53,8 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
     /// <exception cref="HttpTransferException">
     /// The line does not begin <c>HTTP/</c> (exit 1, <c>Received HTTP/0.9 when not
     /// allowed</c>), names an unsupported version (exit 1), or carries a status code below
-    /// 100 (exit 1, <c>Unsupported response code in HTTP response</c>).
+    /// 100 (exit 1, <c>Unsupported response code in HTTP response</c>), or carries a status
+    /// code of four or more digits (exit 8, <c>Invalid status line</c>).
     /// </exception>
     internal static HttpStatusLine Parse(string line)
     {
@@ -139,6 +140,12 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
         if (statusCode < 100)
         {
             throw Unsupported(HttpTransferMessages.UnsupportedResponseCode);
+        }
+
+        // Checked after the code below 100, as curl's test 1432 (a 100-digit code starting 012) exits 1.
+        if (line.Length > ReasonOffset && char.IsAsciiDigit(line[ReasonOffset]))
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
         }
 
         Version version = line[7] == '0' ? HttpVersion.Version10 : HttpVersion.Version11;

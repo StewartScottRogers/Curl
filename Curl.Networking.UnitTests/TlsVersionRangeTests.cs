@@ -1,4 +1,5 @@
 using System.Security.Authentication;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -18,6 +19,10 @@ public sealed class TlsVersionRangeTests
     private const SslProtocols Tls12 = SslProtocols.Tls12;
 
     private const SslProtocols Tls13 = SslProtocols.Tls13;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow(TlsVersion.SystemDefault, TlsVersion.SystemDefault, SslProtocols.None)]
@@ -40,7 +45,12 @@ public sealed class TlsVersionRangeTests
     [DataRow(TlsVersion.Tls13, TlsVersion.Tls13, Tls13)]
     public void ToSslProtocols_MinimumAndCeiling_OffersEveryVersionBetweenThem(TlsVersion minimum, TlsVersion maximum, SslProtocols expected)
     {
+        Diagnostics.Arrange("minimum, maximum", $"{minimum}, {maximum}");
+
         var offered = TlsVersionRange.ToSslProtocols(minimum, maximum);
+
+        Diagnostics.Act("offered", (int)offered);
+        Diagnostics.Assert("offered", (int)expected, (int)offered);
 
         Assert.AreEqual(expected, offered);
     }
@@ -51,7 +61,12 @@ public sealed class TlsVersionRangeTests
     [DataRow(TlsVersion.Tls11, TlsVersion.Tls10)]
     public void ToSslProtocols_MinimumAboveTheCeiling_ThrowsArgumentException(TlsVersion minimum, TlsVersion maximum)
     {
+        Diagnostics.Arrange("minimum, maximum", $"{minimum}, {maximum}");
+
         var exception = Assert.ThrowsExactly<ArgumentException>(() => TlsVersionRange.ToSslProtocols(minimum, maximum));
+
+        Diagnostics.Act("parameter name", exception.ParamName);
+        Diagnostics.Assert("parameter name", "minimum", exception.ParamName);
 
         Assert.AreEqual("minimum", exception.ParamName);
     }

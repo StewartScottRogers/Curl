@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -36,18 +37,24 @@ public sealed class CurlCommandRunnerImapTransferEventTests
 
     private readonly InMemoryFileSystem files = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_VerboseUidFetchWithAuthPlain_WritesTheMeasuredLines()
     {
         int exitCode = await RunAsync(["-sv"], "INBOX;UID=1", 18143, 59446, [Greeting, CapabilityReply, .. AuthPlain("A002"), Select("A003"), Fetch("A004"), Logout("A005")]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            Opened(18143, 59446, Greeting)
+        string expectedStandardError = Opened(18143, 59446, Greeting)
             + Headers("< ", CapabilityReply)
             + AuthPlainLines("A002")
-            + SelectAndFetchLines("A003", "A004", 18143),
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + SelectAndFetchLines("A003", "A004", 18143);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", Lf(Message), Lf(StandardOutputText));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expectedStandardError, Encoding.ASCII.GetString(standardError.ToArray()));
         Assert.AreEqual(Message, Encoding.ASCII.GetString(standardOutput.ToArray()));
     }
 
@@ -65,6 +72,10 @@ public sealed class CurlCommandRunnerImapTransferEventTests
 
         int tracedExitCode = await RunAsync(["-sv", "--trace-config", component], "INBOX;UID=1", 18148, 59454, replies);
 
+        Diagnostics.Assert("verbose exit code", 0, verboseExitCode);
+        Diagnostics.Assert("traced exit code", 0, tracedExitCode);
+        Diagnostics.Diff("traced stderr against verbose stderr", Lf(verboseLines), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", Lf(Message), Lf(StandardOutputText));
         Assert.AreEqual(0, verboseExitCode);
         Assert.AreEqual(0, tracedExitCode);
         Assert.AreEqual(verboseLines, Encoding.ASCII.GetString(standardError.ToArray()));
@@ -80,14 +91,15 @@ public sealed class CurlCommandRunnerImapTransferEventTests
         int exitCode = await RunAsync(
             ["-sv"], "INBOX;UID=1", 18144, 59449, [greeting, capabilityReply, "A002 OK LOGIN completed\r\n", Select("A003"), Fetch("A004"), Logout("A005")]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            Opened(18144, 59449, greeting)
+        string expectedStandardError = Opened(18144, 59449, greeting)
             + Headers("< ", capabilityReply)
             + "> A002 LOGIN user secret" + HeaderEnd
             + "< A002 OK LOGIN completed" + HeaderEnd
-            + SelectAndFetchLines("A003", "A004", 18144),
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + SelectAndFetchLines("A003", "A004", 18144);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expectedStandardError, Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
     [TestMethod]
@@ -99,13 +111,15 @@ public sealed class CurlCommandRunnerImapTransferEventTests
 
         int exitCode = await RunAsync(["-sv"], "INBOX", 18244, 59084, [greeting, capabilityReply]);
 
-        Assert.AreEqual(67, exitCode);
-        Assert.AreEqual(
-            Opened(18244, 59084, greeting)
+        string expectedStandardError = Opened(18244, 59084, greeting)
             + Headers("< ", capabilityReply)
             + "* SASL: no auth mechanism was offered or recognized" + InfoEnd
-            + "* closing connection #0" + InfoEnd,
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + "* closing connection #0" + InfoEnd;
+        Diagnostics.Assert("exit code", 67, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
+        Assert.AreEqual(67, exitCode);
+        Assert.AreEqual(expectedStandardError, Encoding.ASCII.GetString(standardError.ToArray()));
         Assert.AreEqual(0, standardOutput.Length);
     }
 
@@ -113,6 +127,7 @@ public sealed class CurlCommandRunnerImapTransferEventTests
     public async Task RunAsync_VerboseAppend_WritesTheLiteralSentAndTheLineEndAfterIt()
     {
         files.ExistingContent["mail.txt"] = Encoding.ASCII.GetBytes(Upload);
+        Diagnostics.Arrange("existing mail.txt", Lf(Upload));
 
         int exitCode = await RunAsync(
             ["-sv", "-T", "mail.txt"],
@@ -121,9 +136,7 @@ public sealed class CurlCommandRunnerImapTransferEventTests
             59450,
             [Greeting, CapabilityReply, .. AuthPlain("A002"), "+ Ready for literal data\r\n", "A003 OK APPEND completed\r\n", Logout("A004")]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            Opened(18145, 59450, Greeting)
+        string expectedStandardError = Opened(18145, 59450, Greeting)
             + Headers("< ", CapabilityReply)
             + AuthPlainLines("A002")
             + "> A003 APPEND Sent (\\Seen) {37}" + HeaderEnd
@@ -132,8 +145,11 @@ public sealed class CurlCommandRunnerImapTransferEventTests
             + "* upload completely sent off: 37 bytes" + InfoEnd
             + "> " + HeaderEnd
             + "< A003 OK APPEND completed" + HeaderEnd
-            + "* Connection #0 to host 127.0.0.1:18145 left intact" + InfoEnd,
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + "* Connection #0 to host 127.0.0.1:18145 left intact" + InfoEnd;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expectedStandardError, Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
     [TestMethod]
@@ -166,9 +182,7 @@ public sealed class CurlCommandRunnerImapTransferEventTests
             59452,
             [Greeting, CapabilityReply, "A002 OK Begin TLS negotiation now\r\n", secureCapabilityReply, .. AuthPlain("A004"), Select("A005"), Fetch("A006"), Logout("A007")]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            Opened(18146, 59452, Greeting)
+        string expectedStandardError = Opened(18146, 59452, Greeting)
             + Headers("< ", CapabilityReply)
             + "> A002 STARTTLS" + HeaderEnd
             + "< A002 OK Begin TLS negotiation now" + HeaderEnd
@@ -177,8 +191,12 @@ public sealed class CurlCommandRunnerImapTransferEventTests
             + "> A003 CAPABILITY" + HeaderEnd
             + Headers("< ", secureCapabilityReply)
             + AuthPlainLines("A004")
-            + SelectAndFetchLines("A005", "A006", 18146),
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + SelectAndFetchLines("A005", "A006", 18146);
+        Diagnostics.Arrange("TLS backend lines", Lf(tlsBackendLines));
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expectedStandardError, Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
     [TestMethod]
@@ -187,8 +205,7 @@ public sealed class CurlCommandRunnerImapTransferEventTests
         int exitCode = await RunAsync(
             ["--trace-ascii", "-"], "INBOX;UID=1", 18147, 59453, [Greeting, CapabilityReply, .. AuthPlain("A002"), Select("A003"), Fetch("A004"), Logout("A005")]);
 
-        Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        const string expectedStandardOutput =
             "*   Trying 127.0.0.1:18147...\n"
             + "* Established connection to 127.0.0.1 (127.0.0.1 port 18147) from 127.0.0.1 port 59453 \n"
             + "<= Recv header, 66 bytes (0x42)\n0000: * OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN] ready\n"
@@ -219,9 +236,18 @@ public sealed class CurlCommandRunnerImapTransferEventTests
             + "* Written 100 bytes, 0 bytes are left for transfer\n"
             + "<= Recv header, 3 bytes (0x3)\n0000: )\n"
             + "<= Recv header, 25 bytes (0x19)\n0000: A004 OK FETCH completed\n"
-            + "* Connection #0 to host 127.0.0.1:18147 left intact\n",
-            Encoding.ASCII.GetString(standardOutput.ToArray()));
+            + "* Connection #0 to host 127.0.0.1:18147 left intact\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", Lf(expectedStandardOutput), Lf(StandardOutputText));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expectedStandardOutput, Encoding.ASCII.GetString(standardOutput.ToArray()));
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
+
+    private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());
 
     private static string[] AuthPlain(string tag) => ["+ \r\n", tag + " OK Authenticated\r\n"];
 
@@ -262,21 +288,33 @@ public sealed class CurlCommandRunnerImapTransferEventTests
         + $"< {fetchTag} OK FETCH completed" + HeaderEnd
         + $"* Connection #0 to host 127.0.0.1:{port} left intact" + InfoEnd;
 
-    private Task<int> RunAsync(IReadOnlyList<string> options, string path, int port, int localPort, IReadOnlyList<string> replies)
+    private async Task<int> RunAsync(IReadOnlyList<string> options, string path, int port, int localPort, IReadOnlyList<string> replies)
     {
+        string[] arguments = [.. options, "-u", "user:secret", $"imap://127.0.0.1:{port}/{path}"];
+        Diagnostics.Arrange("command line", string.Join(' ', arguments));
+        Diagnostics.Arrange("scripted replies", string.Join(" | ", replies.Select(Lf)));
         var connector = new ReportingConnector(new ScriptedConnector([.. replies.Select(Encoding.ASCII.GetBytes)]), localPort);
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver()))),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync([.. options, "-u", "user:secret", $"imap://127.0.0.1:{port}/{path}"]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+                            connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver()))),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        return exitCode;
     }
 
     /// <summary>

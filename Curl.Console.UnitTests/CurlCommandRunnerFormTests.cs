@@ -4,6 +4,7 @@ using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -66,11 +67,18 @@ public sealed class CurlCommandRunnerFormTests
     public CurlCommandRunnerFormTests() =>
         files.ExistingContent["srv.py"] = Encoding.ASCII.GetBytes("print(1)\n");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_FormTextAndFileUpload_SendsTheMeasuredMultipartRequest()
     {
         int exitCode = await RunAsync("-sS", "-u", "u:p", "-F", "a=b", "-F", "f=@srv.py", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request", MeasuredRequest, Encoding.Latin1.GetString(server.Written));
+        Diagnostics.Assert("stdout", "hello", Encoding.Latin1.GetString(standardOutput.ToArray()));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(MeasuredRequest, Encoding.Latin1.GetString(server.Written));
         Assert.AreEqual("hello", Encoding.Latin1.GetString(standardOutput.ToArray()));
@@ -89,6 +97,8 @@ public sealed class CurlCommandRunnerFormTests
 
         int exitCode = await RunAsync(arguments);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("request has the escaped part name", true, Encoding.Latin1.GetString(server.Written).Contains($"Content-Disposition: form-data; {sentName}\r\n", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.Contains($"Content-Disposition: form-data; {sentName}\r\n", Encoding.Latin1.GetString(server.Written));
     }
@@ -98,6 +108,9 @@ public sealed class CurlCommandRunnerFormTests
     {
         int exitCode = await RunAsync("-sS", "-u", "u:p", "-F", "a=b", "-F", "f=@srv.py", "-o", "out.txt", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request", MeasuredRequest, Encoding.Latin1.GetString(server.Written));
+        Diagnostics.Assert("out.txt", "hello", Encoding.Latin1.GetString(files.Written["out.txt"].ToArray()));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(MeasuredRequest, Encoding.Latin1.GetString(server.Written));
         Assert.AreEqual("hello", Encoding.Latin1.GetString(files.Written["out.txt"].ToArray()));
@@ -107,9 +120,16 @@ public sealed class CurlCommandRunnerFormTests
     public async Task RunAsync_FormFileThatCannotBeOpened_Exits26WithoutConnecting()
     {
         files.UnreadablePaths.Add("nope.txt");
+        Diagnostics.Arrange("unreadable path", "nope.txt");
 
         int exitCode = await RunAsync("-F", "a=b", "-F", "f=@nope.txt", Url);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Assert(
+            "stderr",
+            $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}\n",
+            Lf(Encoding.UTF8.GetString(standardError.ToArray())));
+        Diagnostics.Assert("requests sent", 0, server.Targets.Count);
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(
             $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}{Environment.NewLine}",
@@ -121,19 +141,27 @@ public sealed class CurlCommandRunnerFormTests
     public async Task RunAsync_FormFile_ClosesTheFileAfterTheTransfer()
     {
         TrackingFileSystem tracking = new();
+        Diagnostics.Arrange("command line", "curl -sS -F \"f=<x\" " + Url);
 
-        await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                formBodyBuilder: new MultipartFormBodyBuilder(tracking, Encoding.UTF8, () => Boundary))
-            .RunAsync(["-sS", "-F", "f=<x", Url]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher(
+                        CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    formBodyBuilder: new MultipartFormBodyBuilder(tracking, Encoding.UTF8, () => Boundary))
+                .RunAsync(["-sS", "-F", "f=<x", Url]);
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("files opened", tracking.Opened.Count);
+        Diagnostics.Assert("opened stream still readable", false, tracking.Opened.Single().CanRead);
         Assert.IsFalse(tracking.Opened.Single().CanRead);
     }
 
@@ -155,18 +183,33 @@ public sealed class CurlCommandRunnerFormTests
             Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello"),
         ]);
 
-        int exitCode = await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(redirectingServer, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => RedirectBoundary))
-            .RunAsync(["-sS", "-L", "-F", "a=b", "-F", "f=@file.txt", "http://127.0.0.1:18298/first"]);
+        Diagnostics.Arrange("redirect status", status);
+        Diagnostics.Arrange("command line", "curl -sS -L -F a=b -F f=@file.txt http://127.0.0.1:18298/first");
 
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher(
+                        CurlComposition.CreateProtocolHandlers(redirectingServer, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => RedirectBoundary))
+                .RunAsync(["-sS", "-L", "-F", "a=b", "-F", "f=@file.txt", "http://127.0.0.1:18298/first"]);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("requests", redirectingServer.Written);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff(
+            "requests",
+            MeasuredRedirectRequest("/first") + MeasuredRedirectRequest("/next"),
+            Encoding.Latin1.GetString(redirectingServer.Written));
+        Diagnostics.Assert("stdout", "hello", Encoding.Latin1.GetString(standardOutput.ToArray()));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             MeasuredRedirectRequest("/first") + MeasuredRedirectRequest("/next"),
@@ -183,6 +226,9 @@ public sealed class CurlCommandRunnerFormTests
     {
         int exitCode = await RunAsync("-sS", "-F", "t=hi;encoder=base64", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("request declares its length", true, Encoding.Latin1.GetString(server.Written).Contains("Content-Length: 187\r\n", StringComparison.Ordinal));
+        Diagnostics.Assert("request has base64 part", true, Encoding.Latin1.GetString(server.Written).Contains("Content-Transfer-Encoding: base64\r\n\r\naGk=\r\n", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             "POST / HTTP/1.1\r\n"
@@ -207,6 +253,12 @@ public sealed class CurlCommandRunnerFormTests
     {
         int exitCode = await RunAsync("-sS", "-F", "t=hi;encoder=bogus", Url);
 
+        Diagnostics.Assert("exit code", 43, exitCode);
+        Diagnostics.Assert(
+            "stderr",
+            "curl: (43) A libcurl function was given a bad argument\n",
+            Lf(Encoding.UTF8.GetString(standardError.ToArray())));
+        Diagnostics.Assert("requests sent", 0, server.Targets.Count);
         Assert.AreEqual(43, exitCode);
         Assert.AreEqual(
             $"curl: (43) A libcurl function was given a bad argument{Environment.NewLine}",
@@ -224,9 +276,26 @@ public sealed class CurlCommandRunnerFormTests
     {
         int exitCode = await RunWithStandardInputAsync(server, "-sS", "-F", "a=@-", Url);
 
-        Assert.AreEqual(0, exitCode);
         string written = Encoding.Latin1.GetString(server.Written);
         string boundary = SentBoundary(written);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("boundary length", 46, boundary.Length);
+        Diagnostics.Diff(
+            "request",
+            "POST / HTTP/1.1\r\n"
+            + "Host: 127.0.0.1:18233\r\n"
+            + "User-Agent: curl/8.21.0\r\n"
+            + "Accept: */*\r\n"
+            + "Content-Length: 173\r\n"
+            + "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n"
+            + "\r\n"
+            + "--" + boundary + "\r\n"
+            + "Content-Disposition: form-data; name=\"a\"; filename=\"-\"\r\n"
+            + "\r\n"
+            + "hello\nworld\r\n"
+            + "--" + boundary + "--\r\n",
+            written);
+        Assert.AreEqual(0, exitCode);
         Assert.AreEqual(46, boundary.Length);
         Assert.AreEqual(
             "POST / HTTP/1.1\r\n"
@@ -261,9 +330,19 @@ public sealed class CurlCommandRunnerFormTests
 
         int exitCode = await RunWithStandardInputAsync(twoResponses, "-sS", "-F", "a=<-", Url, Url);
 
-        Assert.AreEqual(0, exitCode);
         string written = Encoding.Latin1.GetString(twoResponses.Written);
         int secondRequest = written.IndexOf("POST", 1, StringComparison.Ordinal);
+        string secondText = written[secondRequest..];
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff(
+            "first request tail",
+            "Content-Length: 159\r\n" + FormBody(SentBoundary(written), "hello\nworld"),
+            written[written.IndexOf("Content-Length", StringComparison.Ordinal)..secondRequest]);
+        Diagnostics.Diff(
+            "second request tail",
+            "Content-Length: 148\r\n" + FormBody(SentBoundary(secondText), string.Empty),
+            secondText[secondText.IndexOf("Content-Length", StringComparison.Ordinal)..]);
+        Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             "Content-Length: 159\r\n" + FormBody(SentBoundary(written), "hello\nworld"),
             written[written.IndexOf("Content-Length", StringComparison.Ordinal)..secondRequest]);
@@ -283,17 +362,33 @@ public sealed class CurlCommandRunnerFormTests
     private static string SentBoundary(string written) =>
         written.Split("boundary=")[1].Split("\r\n")[0];
 
-    private Task<int> RunWithStandardInputAsync(ScriptedConnector connector, params string[] arguments) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(Encoding.ASCII.GetBytes("hello\nworld")),
-                runsOnWindows: false)
-            .RunAsync(arguments);
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunWithStandardInputAsync(ScriptedConnector connector, params string[] arguments)
+    {
+        Diagnostics.Arrange("command line", "curl " + string.Join(" ", arguments));
+        Diagnostics.Arrange("standard input", "hello\nworld");
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher(
+                        CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(Encoding.ASCII.GetBytes("hello\nworld")),
+                    runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("requests", connector.Written);
+
+        return exitCode;
+    }
 
     private static string MeasuredRedirectRequest(string path) =>
         $"POST {path} HTTP/1.1\r\n"
@@ -305,18 +400,31 @@ public sealed class CurlCommandRunnerFormTests
         + "\r\n"
         + MeasuredRedirectBody;
 
-    private Task<int> RunAsync(params string[] arguments) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => Boundary))
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(params string[] arguments)
+    {
+        Diagnostics.Arrange("command line", "curl " + string.Join(" ", arguments));
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher(
+                        CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => Boundary))
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("request", server.Written);
+
+        return exitCode;
+    }
 
     /// <summary>Opens every path as <c>xy</c> and keeps each stream it opened.</summary>
     private sealed class TrackingFileSystem : IFileSystem

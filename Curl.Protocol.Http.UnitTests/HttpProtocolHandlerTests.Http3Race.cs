@@ -26,11 +26,15 @@ public sealed partial class HttpProtocolHandlerTests
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         RacingConnector connector = new();
 
+        Diagnostics.Arrange("url, happy eyeballs timeout ms", $"{RaceUrl}, {timeout.TotalMilliseconds}");
+        Diagnostics.Arrange("scripted connects", "quic pending, tcp 200 ok");
         Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time, options: options)).AsTask();
         await connector.QuicStarted;
         await time.TimerCreatedAsync(timeout);
         time.Advance(timeout - TimeSpan.FromMilliseconds(1));
 
+        Diagnostics.Act("tcp started one ms before timeout", connector.TcpStarted.IsCompleted);
+        Diagnostics.Assert("tcp started early", false, connector.TcpStarted.IsCompleted);
         Assert.IsFalse(connector.TcpStarted.IsCompleted);
 
         time.Advance(TimeSpan.FromMilliseconds(1));
@@ -38,6 +42,9 @@ public sealed partial class HttpProtocolHandlerTests
         connector.TcpResult.SetResult(ConnectResult.Connected(Connection("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", 65536)));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("tcp connects", 1, connector.TcpConnects);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(1, connector.TcpConnects);
     }
@@ -48,11 +55,17 @@ public sealed partial class HttpProtocolHandlerTests
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         RacingConnector connector = new();
 
+        Diagnostics.Arrange("url", RaceUrl);
+        Diagnostics.Arrange("scripted connects", "quic connects before timeout, h3 200");
         Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time)).AsTask();
         await connector.QuicStarted;
         connector.QuicResult.SetResult(MultiplexedConnectResult.Connected(Http3OkConnection(), null));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("http version", new Version(3, 0), result.Report!.HttpVersion);
+        Diagnostics.Assert("tcp connects", 0, connector.TcpConnects);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(new Version(3, 0), result.Report!.HttpVersion);
         Assert.AreEqual(0, connector.TcpConnects);
@@ -65,6 +78,8 @@ public sealed partial class HttpProtocolHandlerTests
         RacingConnector connector = new();
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url", RaceUrl);
+        Diagnostics.Arrange("scripted connects", "quic fails RecvError, tcp 200 ok");
         Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time, output)).AsTask();
         await connector.QuicStarted;
         connector.QuicResult.SetResult(MultiplexedConnectResult.Failed(CurlExitCode.RecvError, "QUIC: recvfrom() unexpectedly returned -1"));
@@ -72,6 +87,10 @@ public sealed partial class HttpProtocolHandlerTests
         connector.TcpResult.SetResult(ConnectResult.Connected(Connection("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", 65536)));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("clock", DateTimeOffset.UnixEpoch, time.GetUtcNow());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual(DateTimeOffset.UnixEpoch, time.GetUtcNow());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("ok", Latin1(output.ToArray()));
@@ -87,11 +106,18 @@ public sealed partial class HttpProtocolHandlerTests
         RacingConnector connector = new();
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url, late quic outcome", $"{RaceUrl}, {quicLater}");
+        Diagnostics.Arrange("scripted connects", "quic pending, tcp 200 tcp after timeout");
         Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time, output)).AsTask();
         await StartTcpAfterTheTimeoutAsync(connector, time);
         connector.TcpResult.SetResult(ConnectResult.Connected(Connection("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\ntcp", 65536)));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("http version", new Version(1, 1), result.Report!.HttpVersion);
+        Diagnostics.Diff("output", "tcp", Latin1(output.ToArray()));
+        Diagnostics.Assert("quic cancelled", true, connector.QuicToken.IsCancellationRequested);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(new Version(1, 1), result.Report!.HttpVersion);
         Assert.AreEqual("tcp", Latin1(output.ToArray()));
@@ -114,11 +140,17 @@ public sealed partial class HttpProtocolHandlerTests
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         RacingConnector connector = new();
 
+        Diagnostics.Arrange("url, late tcp outcome", $"{RaceUrl}, {tcpLater}");
+        Diagnostics.Arrange("scripted connects", "tcp pending after timeout, quic connects, h3 200");
         Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time)).AsTask();
         await StartTcpAfterTheTimeoutAsync(connector, time);
         connector.QuicResult.SetResult(MultiplexedConnectResult.Connected(Http3OkConnection(), null));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("http version", new Version(3, 0), result.Report!.HttpVersion);
+        Diagnostics.Assert("tcp cancelled", true, connector.TcpToken.IsCancellationRequested);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(new Version(3, 0), result.Report!.HttpVersion);
         Assert.IsTrue(connector.TcpToken.IsCancellationRequested);
@@ -139,11 +171,16 @@ public sealed partial class HttpProtocolHandlerTests
 
         connector.TcpResult.SetResult(ConnectResult.Refused("Failed to connect to 127.0.0.1 port 18731 after 0 ms: Could not connect to server"));
 
+        Diagnostics.Arrange("url", RaceUrl);
+        Diagnostics.Arrange("scripted connects", "tcp refused at once, quic connects after timeout, h3 200");
         Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time)).AsTask();
         await StartTcpAfterTheTimeoutAsync(connector, time);
         connector.QuicResult.SetResult(MultiplexedConnectResult.Connected(Http3OkConnection(), null));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("http version", new Version(3, 0), result.Report!.HttpVersion);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(new Version(3, 0), result.Report!.HttpVersion);
     }
@@ -164,12 +201,18 @@ public sealed partial class HttpProtocolHandlerTests
             connector.TcpResult.SetResult(tcpFailure);
         }
 
+        Diagnostics.Arrange("url, tcp fails first", $"{RaceUrl}, {tcpFailsFirst}");
+        Diagnostics.Arrange("scripted connects", "quic fails RecvError, tcp refused connection #4");
         Task<TransferResult> transfer = RaceHandler(connector).ExecuteAsync(RaceContext(time, events: events)).AsTask();
         await StartTcpAfterTheTimeoutAsync(connector, time);
         connector.QuicResult.SetResult(quicFailure);
         connector.TcpResult.TrySetResult(tcpFailure);
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error message", "QUIC: recvfrom() unexpectedly returned -1", result.ErrorMessage);
+        Diagnostics.Assert("info has closing connection #4", true, events.Info.Contains("closing connection #4"));
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("QUIC: recvfrom() unexpectedly returned -1", result.ErrorMessage);
         CollectionAssert.Contains(events.Info, "closing connection #4");
@@ -181,6 +224,8 @@ public sealed partial class HttpProtocolHandlerTests
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         RacingConnector connector = new();
 
+        Diagnostics.Arrange("url, version", $"{RaceUrl}, http3-only");
+        Diagnostics.Arrange("scripted connects", "quic pending 5 s then SendError");
         Task<TransferResult> transfer = RaceHandler(connector)
             .ExecuteAsync(Http3Context(RaceUrl, new MemoryStream(), time: time, connectTimeout: RaceConnectTimeout)).AsTask();
         await connector.QuicStarted;
@@ -193,6 +238,10 @@ public sealed partial class HttpProtocolHandlerTests
         connector.QuicResult.SetResult(MultiplexedConnectResult.Failed(CurlExitCode.SendError, "ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT"));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("tcp connects", 0, connector.TcpConnects);
+        Diagnostics.Assert("tcp started", false, connector.TcpStarted.IsCompleted);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(0, connector.TcpConnects);
         Assert.IsFalse(connector.TcpStarted.IsCompleted);

@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -15,6 +16,10 @@ namespace Curl.Protocol.Http;
 public sealed class HttpResponseHeadReaderTests
 {
     private static readonly int[] ChunkSizes = [1, 7, 65536];
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     public async Task ReadAsync_Http11StatusLineAndHeaders_Parse()
@@ -37,6 +42,7 @@ public sealed class HttpResponseHeadReaderTests
     {
         foreach (string body in await ReadBodiesEveryWayAsync(response))
         {
+            Diagnostics.Assert("body", "hi", body);
             Assert.AreEqual("hi", body);
         }
     }
@@ -61,6 +67,7 @@ public sealed class HttpResponseHeadReaderTests
     {
         foreach (HttpResponseHead head in await ReadEveryWayAsync(statusLine + "\r\n"))
         {
+            Diagnostics.Assert("reason phrase", reasonPhrase, head.StatusLine.ReasonPhrase);
             Assert.AreEqual(reasonPhrase, head.StatusLine.ReasonPhrase);
         }
     }
@@ -72,6 +79,7 @@ public sealed class HttpResponseHeadReaderTests
     {
         foreach (HttpResponseHead head in await ReadEveryWayAsync(statusLines + "\r\n"))
         {
+            Diagnostics.Assert("status code", statusCode, head.StatusLine.StatusCode);
             Assert.AreEqual(statusCode, head.StatusLine.StatusCode);
         }
     }
@@ -109,6 +117,7 @@ public sealed class HttpResponseHeadReaderTests
 
         foreach (HttpResponseHead head in await ReadEveryWayAsync(Response))
         {
+            Diagnostics.Assert("status code", 201, head.StatusLine.StatusCode);
             Assert.AreEqual(201, head.StatusLine.StatusCode);
             Assert.IsEmpty(head.Headers);
             Assert.AreEqual(Response, Latin1(head.HeadBytes));
@@ -186,6 +195,8 @@ public sealed class HttpResponseHeadReaderTests
         // Measured: curl 8.21.0 exits 0 with %{http_code} 200 and this %{size_header}.
         foreach (HttpResponseHead head in await ReadEveryWayAsync(response))
         {
+            Diagnostics.Assert("status code", 200, head.StatusLine.StatusCode);
+            Diagnostics.Assert("head size", headSize, head.HeadBytes.Length);
             Assert.AreEqual(200, head.StatusLine.StatusCode);
             Assert.AreEqual(headSize, head.HeadBytes.Length);
             Assert.AreEqual(0, head.BodyPrefix.Length);
@@ -219,6 +230,8 @@ public sealed class HttpResponseHeadReaderTests
     {
         foreach (int chunkSize in ChunkSizes)
         {
+            Diagnostics.Arrange("scripted response", Describe(response));
+            Diagnostics.Arrange("chunk size", chunkSize);
             ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), chunkSize);
             HttpResponseHeadReader reader = new(connection) { AcceptsHttp09 = true };
             HttpResponseHead head = await reader.ReadAsync(CancellationToken.None);
@@ -230,6 +243,7 @@ public sealed class HttpResponseHeadReaderTests
                 restLength += read;
             }
 
+            Diagnostics.Act($"head and rest with chunk size {chunkSize}", $"version {head.StatusLine.Version}, body prefix {head.BodyPrefix.Length}, rest {restLength}, ended at empty line {reader.EndedAtEmptyLine}");
             AssertStatus(head, new Version(0, 9), 0, string.Empty);
             Assert.IsEmpty(head.Headers);
             Assert.AreEqual(0, head.HeadBytes.Length);
@@ -241,9 +255,11 @@ public sealed class HttpResponseHeadReaderTests
     [TestMethod]
     public async Task ReadAsync_StatusLineWithHttp09Accepted_ParsesTheStatusLine()
     {
+        Diagnostics.Arrange("scripted response", "HTTP/1.1 200 OK\\r\\n\\r\\nhi, 1-byte reads, HTTP/0.9 accepted");
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\nhi"), 1);
 
         HttpResponseHead head = await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true }.ReadAsync(CancellationToken.None);
+        Diagnostics.Act("head", $"version {head.StatusLine.Version}, status {head.StatusLine.StatusCode}, reason '{head.StatusLine.ReasonPhrase}'");
 
         AssertStatus(head, HttpVersion.Version11, 200, "OK");
     }
@@ -251,9 +267,11 @@ public sealed class HttpResponseHeadReaderTests
     [TestMethod]
     public async Task ReadAsync_Http2StreamWithHttp09Accepted_ParsesTheHttp2StatusLine()
     {
+        Diagnostics.Arrange("scripted response", "HTTP/2 200 \\r\\n\\r\\n, one read, HTTP/0.9 accepted, HTTP/2 or HTTP/3 stream");
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/2 200 \r\n\r\n"), 65536);
 
         HttpResponseHead head = await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true, IsHttp2OrHttp3 = true }.ReadAsync(CancellationToken.None);
+        Diagnostics.Act("head", $"version {head.StatusLine.Version}, status {head.StatusLine.StatusCode}, reason '{head.StatusLine.ReasonPhrase}'");
 
         AssertStatus(head, HttpVersion.Version20, 200, string.Empty);
     }
@@ -261,11 +279,14 @@ public sealed class HttpResponseHeadReaderTests
     [TestMethod]
     public async Task ReadAsync_NoBytesWithHttp09Accepted_IsAnEmptyReply()
     {
+        Diagnostics.Arrange("scripted response", "no bytes, HTTP/0.9 accepted");
         ScriptedConnection connection = new([], 65536);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
             async () => await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true }.ReadAsync(CancellationToken.None));
 
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name}, exit code {thrown.ExitCode}, message '{thrown.Message}'");
+        Diagnostics.Assert("exit code", CurlExitCode.GotNothing, thrown.ExitCode);
         Assert.AreEqual(CurlExitCode.GotNothing, thrown.ExitCode);
     }
 
@@ -330,7 +351,6 @@ public sealed class HttpResponseHeadReaderTests
     [DataRow("HTTP/1.1 100 Continue\r\n\r\n", DisplayName = "Only 100 Continue")]
     [DataRow("HTTP/1.1 101 Switching\r\nContent-Length: 0\r\n\r\n", DisplayName = "101 with no upgrade asked for")]
     [DataRow("HTTP/1.1 199 X\r\n\r\n", DisplayName = "199")]
-    [DataRow("HTTP/1.1 1000 X\r\n\r\n", DisplayName = "Four digits read as 100")]
     [DataRow("HTTP/1.1 100 Continue\r\nX-A: 1\r\n", DisplayName = "Inside a 1xx head")]
     [DataRow("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 20", DisplayName = "Part of the status line after a 1xx")]
     public async Task ReadAsync_PeerClosingBeforeAFinalStatusLine_ReturnsGotNothing(string response)
@@ -382,6 +402,7 @@ public sealed class HttpResponseHeadReaderTests
     {
         foreach (HttpResponseHead head in await ReadEveryWayAsync(Response(HeaderLine('a', 102399))))
         {
+            Diagnostics.Assert("head size", 17 + 102399 + 2, head.HeadBytes.Length);
             Assert.AreEqual(17 + 102399 + 2, head.HeadBytes.Length);
         }
     }
@@ -401,6 +422,7 @@ public sealed class HttpResponseHeadReaderTests
         // exit 0 and %{size_header} 102418.
         foreach (HttpResponseHead head in await ReadEveryWayAsync(Response(FoldedHeader("bb"))))
         {
+            Diagnostics.Assert("head size", 102418, head.HeadBytes.Length);
             Assert.AreEqual(102418, head.HeadBytes.Length);
         }
     }
@@ -428,6 +450,7 @@ public sealed class HttpResponseHeadReaderTests
         // Measured: 17 + 3 x 102007 + 1160 + 2 = 307200 bytes; exit 0, %{size_header} 307200.
         foreach (HttpResponseHead head in await ReadEveryWayAsync(Response(ThreeBigHeaders() + HeaderLine('b', 1160))))
         {
+            Diagnostics.Assert("head size", 307200, head.HeadBytes.Length);
             Assert.AreEqual(307200, head.HeadBytes.Length);
         }
     }
@@ -465,23 +488,38 @@ public sealed class HttpResponseHeadReaderTests
 
     private static string Response(string headerLines) => "HTTP/1.1 200 OK\r\n" + headerLines + "\r\n";
 
-    private static async Task<List<HttpResponseHead>> ReadEveryWayAsync(string response)
+    private static string Describe(string text)
     {
+        const int Shown = 200;
+        string head = text.Length > Shown ? text[..Shown] : text;
+        return $"{text.Length} chars: {head.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}";
+    }
+
+    private async Task<List<HttpResponseHead>> ReadEveryWayAsync(string response)
+    {
+        Diagnostics.Arrange("scripted response", Describe(response));
         List<HttpResponseHead> heads = [];
         foreach (int chunkSize in ChunkSizes)
         {
+            Diagnostics.Arrange("chunk size", chunkSize);
             ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), chunkSize);
-            heads.Add(await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None));
+            HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
+            Diagnostics.Act(
+                $"head read with chunk size {chunkSize}",
+                $"version {head.StatusLine.Version}, status {head.StatusLine.StatusCode}, reason '{head.StatusLine.ReasonPhrase}', {head.Headers.Count} headers, head bytes {head.HeadBytes.Length}, body prefix {head.BodyPrefix.Length}");
+            heads.Add(head);
         }
 
         return heads;
     }
 
-    private static async Task<List<string>> ReadBodiesEveryWayAsync(string response)
+    private async Task<List<string>> ReadBodiesEveryWayAsync(string response)
     {
+        Diagnostics.Arrange("scripted response", Describe(response));
         List<string> bodies = [];
         foreach (int chunkSize in ChunkSizes)
         {
+            Diagnostics.Arrange("chunk size", chunkSize);
             ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), chunkSize);
             HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
             List<byte> body = [.. head.BodyPrefix.Span];
@@ -492,41 +530,54 @@ public sealed class HttpResponseHeadReaderTests
                 body.AddRange(buffer.AsSpan(0, read));
             }
 
-            bodies.Add(Encoding.Latin1.GetString([.. body]));
+            string bodyText = Encoding.Latin1.GetString([.. body]);
+            Diagnostics.Act($"body left after the head with chunk size {chunkSize}", bodyText);
+            bodies.Add(bodyText);
         }
 
         return bodies;
     }
 
-    private static async Task AssertFailsEveryWayAsync(
+    private async Task AssertFailsEveryWayAsync(
         string response,
         CurlExitCode exitCode,
         string message,
         Exception? failureAfterResponse = null)
     {
+        Diagnostics.Arrange("scripted response", Describe(response));
+        Diagnostics.Arrange("failure after response", failureAfterResponse?.GetType().Name ?? "none");
         foreach (int chunkSize in ChunkSizes)
         {
+            Diagnostics.Arrange("chunk size", chunkSize);
             ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), chunkSize, failureAfterResponse: failureAfterResponse);
             HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
                 async () => await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None));
 
+            Diagnostics.Act($"thrown with chunk size {chunkSize}", $"{thrown.GetType().Name}, exit code {thrown.ExitCode}, message '{thrown.Message}'");
+            Diagnostics.Assert($"exit code with chunk size {chunkSize}", exitCode, thrown.ExitCode);
+            Diagnostics.Assert($"message with chunk size {chunkSize}", message, thrown.Message);
             Assert.AreEqual(exitCode, thrown.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, thrown.Message, $"Chunk size {chunkSize}");
         }
     }
 
-    private static void AssertStatus(HttpResponseHead head, Version version, int statusCode, string reasonPhrase)
+    private void AssertStatus(HttpResponseHead head, Version version, int statusCode, string reasonPhrase)
     {
+        Diagnostics.Assert("version", version, head.StatusLine.Version);
+        Diagnostics.Assert("status code", statusCode, head.StatusLine.StatusCode);
+        Diagnostics.Assert("reason phrase", reasonPhrase, head.StatusLine.ReasonPhrase);
         Assert.AreEqual(version, head.StatusLine.Version);
         Assert.AreEqual(statusCode, head.StatusLine.StatusCode);
         Assert.AreEqual(reasonPhrase, head.StatusLine.ReasonPhrase);
     }
 
-    private static void AssertHeaders(HttpResponseHead head, params string[] namesAndValues)
+    private void AssertHeaders(HttpResponseHead head, params string[] namesAndValues)
     {
+        string[] actual = head.Headers.SelectMany(header => new[] { header.Name, header.Value }).ToArray();
+        Diagnostics.Assert("header names and values", string.Join("|", namesAndValues), string.Join("|", actual));
         CollectionAssert.AreEqual(
             namesAndValues,
-            head.Headers.SelectMany(header => new[] { header.Name, header.Value }).ToArray());
+            actual);
     }
 
     private static string Latin1(ReadOnlyMemory<byte> bytes) => Encoding.Latin1.GetString(bytes.Span);

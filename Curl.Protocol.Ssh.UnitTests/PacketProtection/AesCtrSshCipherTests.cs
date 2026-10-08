@@ -1,3 +1,6 @@
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
+
 namespace Curl.Protocol.Ssh.PacketProtection;
 
 [TestClass]
@@ -8,6 +11,10 @@ public sealed class AesCtrSshCipherTests
     private const string Plaintext =
         "6BC1BEE22E409F96E93D7E117393172AAE2D8A571E03AC9C9EB76FAC45AF8E5130C81C46A35CE411E5FBC1191A0A52EFF69F2445DF4F9B17AD2B417BE66C3710";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("2B7E151628AED2A6ABF7158809CF4F3C", "874D6191B620E3261BEF6864990DB6CE9806F66B7970FDFF8617187BB9FFFDFF5AE4DF3EDBD5D35E5B4F09020DB03EAB1E031DDA2FBE03D1792170A0F3009CEE", DisplayName = "SP 800-38A F.5.1, aes128-ctr")]
     [DataRow("8E73B0F7DA0E6452C810F32B809079E562F8EAD2522C6B7B", "1ABC932417521CA24F2B0459FE7E6E0B090339EC0AA6FAEFD5CCC2C6F4CE8E941E36B26BD1EBC670D1BD1D665620ABF74F78A7F6D29809585A97DAEC58C6B050", DisplayName = "SP 800-38A F.5.3, aes192-ctr")]
@@ -17,10 +24,16 @@ public sealed class AesCtrSshCipherTests
         using AesCtrSshCipher cipher = new(Convert.FromHexString(key), Convert.FromHexString(InitialCounter));
         byte[] plaintext = Convert.FromHexString(Plaintext);
         byte[] output = new byte[plaintext.Length];
+        Diagnostics.Arrange("key", key);
+        Diagnostics.Arrange("initial counter", InitialCounter);
+        Diagnostics.Bytes("plaintext", plaintext);
 
         cipher.Encrypt(plaintext.AsSpan(0, 16), output.AsSpan(0, 16));
         cipher.Encrypt(plaintext.AsSpan(16), output.AsSpan(16));
 
+        Diagnostics.ActBytes("ciphertext, one block then the rest", output);
+        Diagnostics.AssertHex("ciphertext", ciphertext, output);
+        Diagnostics.Assert("block size", 16, cipher.BlockSize);
         Assert.AreEqual(ciphertext, Convert.ToHexString(output));
         Assert.AreEqual(16, cipher.BlockSize);
     }
@@ -33,10 +46,16 @@ public sealed class AesCtrSshCipherTests
         using AesCtrSshCipher encryptor = new(key, counter);
         using AesCtrSshCipher decryptor = new(key, counter);
         byte[] bytes = Convert.FromHexString(Plaintext);
+        Diagnostics.Arrange("key", Convert.ToHexString(key));
+        Diagnostics.Arrange("initial counter", InitialCounter);
+        Diagnostics.Bytes("plaintext", bytes);
 
         encryptor.Encrypt(bytes, bytes);
+        Diagnostics.Bytes("encrypted in place", bytes);
         decryptor.Decrypt(bytes, bytes);
 
+        Diagnostics.ActBytes("decrypted in place", bytes);
+        Diagnostics.AssertHex("decrypted", Plaintext, bytes);
         Assert.AreEqual(Plaintext, Convert.ToHexString(bytes));
     }
 }

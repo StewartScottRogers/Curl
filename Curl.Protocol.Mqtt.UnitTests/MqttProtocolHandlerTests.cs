@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Mqtt.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Mqtt;
 
@@ -33,34 +34,55 @@ public sealed class MqttProtocolHandlerTests
 
     private static readonly byte[] Disconnect = Bytes("E0 00");
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void SupportedSchemes_IsExactlyMqttAndMqtts()
     {
         MqttProtocolHandler handler = new(FakeConnector.For(new ScriptedConnection()));
+        Diagnostics.Arrange("connector", "scripted connection with no reads");
 
+        Diagnostics.Act("supported schemes", string.Join(",", handler.SupportedSchemes));
+        Diagnostics.Assert("supported schemes", "mqtt,mqtts", string.Join(",", handler.SupportedSchemes));
         CollectionAssert.AreEqual(new[] { "mqtt", "mqtts" }, handler.SupportedSchemes.ToArray());
     }
 
     [TestMethod]
     public void Constructor_NullConnector_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new MqttProtocolHandler(null!));
+        Diagnostics.Arrange("connector", "null");
+
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new MqttProtocolHandler(null!));
+
+        Diagnostics.Act("thrown parameter", thrown.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public void Constructor_NullClientIdentifierSuffixSource_Throws()
     {
         IConnector connector = FakeConnector.For(new ScriptedConnection());
+        Diagnostics.Arrange("client identifier suffix source", "null");
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => new MqttProtocolHandler(connector, null!));
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new MqttProtocolHandler(connector, null!));
+
+        Diagnostics.Act("thrown parameter", thrown.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws()
     {
         MqttProtocolHandler handler = new(FakeConnector.For(new ScriptedConnection()));
+        Diagnostics.Arrange("context", "null");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        ArgumentNullException thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+
+        Diagnostics.Act("thrown parameter", thrown.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -70,6 +92,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(connector, "mqtt://h/t", new RecordingStream());
 
+        AssertTargets(connector, new ConnectTarget("h", 1883, false));
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 1883, false) }, connector.Targets);
     }
 
@@ -84,6 +107,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(connector, "mqtts://h/t", new RecordingStream());
 
+        AssertTargets(connector, new ConnectTarget("h", 8883, true));
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 8883, true) }, connector.Targets);
     }
 
@@ -101,6 +125,7 @@ public sealed class MqttProtocolHandlerTests
             connector,
             new TransferContext { Url = CurlUrl.Parse("mqtt://example.com/t"), Output = new RecordingStream(), Proxy = proxy });
 
+        AssertTargets(connector, new ConnectTarget("example.com", 1883, false) { Proxy = proxy });
         CollectionAssert.AreEqual(new[] { new ConnectTarget("example.com", 1883, false) { Proxy = proxy } }, connector.Targets);
     }
 
@@ -114,6 +139,7 @@ public sealed class MqttProtocolHandlerTests
             connector,
             new TransferContext { Url = CurlUrl.Parse("mqtt://example.com/t"), Output = new RecordingStream(), Events = events });
 
+        Diagnostics.Assert("target events are the context's", true, connector.Targets.Select(target => ReferenceEquals(events, target.Events)).FirstOrDefault());
         Assert.AreSame(events, connector.Targets.Single().Events);
     }
 
@@ -124,6 +150,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(connector, "mqtt://h/t", new RecordingStream());
 
+        AssertTargets(connector, new ConnectTarget("h", 1883, false));
         Assert.IsNull(connector.Targets.Single().Proxy);
     }
 
@@ -134,6 +161,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(connector, "mqtt://h:18830/t", new RecordingStream());
 
+        AssertTargets(connector, new ConnectTarget("h", 18830, false));
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 18830, false) }, connector.Targets);
     }
 
@@ -144,6 +172,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(connector, "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.CouldntConnect, 0, "Could not connect to server"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.CouldntConnect, 0, "Could not connect to server"), result);
         Assert.IsFalse(result.IsConnectionRefused);
     }
@@ -155,6 +184,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(connector, "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.Assert("exit code and refused", "CouldntConnect True", $"{result.ExitCode} {result.IsConnectionRefused}");
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsTrue(result.IsConnectionRefused);
     }
@@ -177,6 +207,7 @@ public sealed class MqttProtocolHandlerTests
             Concat(MeasuredConnect, Bytes("82 0A 00 01 00 05", "a/b/c", "00")),
             connection.Written);
         CollectionAssert.AreEqual(Bytes("00 05", "a/b/c", string.Empty, "HELLO"), output.ToArray());
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result);
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -185,12 +216,17 @@ public sealed class MqttProtocolHandlerTests
     public async Task ExecuteAsync_DefaultClientIdentifier_IsCurlAndEightRandomLettersOrDigits()
     {
         ScriptedConnection connection = new();
+        Diagnostics.Arrange("url", "mqtt://h/t, default client identifier suffix source");
 
-        await new MqttProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(Context("mqtt://h/t", new RecordingStream()));
+        TransferResult result = await new MqttProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(Context("mqtt://h/t", new RecordingStream()));
 
         byte[] written = connection.Written;
+        Diagnostics.ActResult(result);
+        Diagnostics.ActPackets("sent", written);
+        Diagnostics.Diff("CONNECT before the identifier", MeasuredConnect[..14], written[..Math.Min(14, written.Length)]);
         CollectionAssert.AreEqual(MeasuredConnect[..14], written[..14]);
         string identifier = Encoding.ASCII.GetString(written, 14, written.Length - 14);
+        Diagnostics.Assert("client identifier", "curl and 8 letters or digits", identifier);
         StringAssert.Matches(identifier, new System.Text.RegularExpressions.Regex("^curl[A-Za-z0-9]{8}$"));
     }
 
@@ -208,6 +244,7 @@ public sealed class MqttProtocolHandlerTests
         Assert.HasCount(2, output.Writes);
         CollectionAssert.AreEqual(Bytes("00 01", "t", string.Empty, "one"), output.Writes[0]);
         CollectionAssert.AreEqual(Bytes("00 01", "t", string.Empty, "two"), output.Writes[1]);
+        Diagnostics.AssertResult(TransferResult.Success(12), result);
         Assert.AreEqual(TransferResult.Success(12), result);
     }
 
@@ -220,6 +257,8 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
+        Diagnostics.Assert("output writes", 1, output.Writes.Count);
+        Diagnostics.DiffOutput(publish[2..], output.ToArray());
         Assert.HasCount(1, output.Writes);
         CollectionAssert.AreEqual(publish[2..], output.Writes[0]);
     }
@@ -230,6 +269,8 @@ public sealed class MqttProtocolHandlerTests
         GatedConnection connection = new();
         RecordingStream output = new();
         connection.Send(Bytes("20 02"));
+        Diagnostics.Arrange("url", "mqtt://h/t");
+        Diagnostics.ArrangeSent(Bytes("20 02"));
         Task<TransferResult> transfer = new MqttProtocolHandler(FakeConnector.For(connection), () => FixedSuffix)
             .ExecuteAsync(Context("mqtt://h/t", output)).AsTask();
 
@@ -238,8 +279,14 @@ public sealed class MqttProtocolHandlerTests
         connection.Send(Suback);
         connection.Send(Publish("t", "HELLO"));
         connection.Send(Disconnect);
+        Diagnostics.Arrange("after 50 ms the peer sends", "the CONNACK's last 2 bytes, SUBACK, PUBLISH, DISCONNECT");
         TransferResult result = await transfer;
+        Diagnostics.ActResult(result);
+        Diagnostics.ActPackets("sent", connection.Written);
+        Diagnostics.ActOutput(output);
+        Diagnostics.DiffSent(Concat(MeasuredConnect, Bytes("82 06 00 01 00 01 74 00")), connection.Written);
 
+        Diagnostics.AssertResult(TransferResult.Success(8), result);
         Assert.AreEqual(TransferResult.Success(8), result);
         CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("82 06 00 01 00 01 74 00")), connection.Written);
         CollectionAssert.AreEqual(Publish("t", "HELLO")[2..], output.ToArray());
@@ -264,6 +311,7 @@ public sealed class MqttProtocolHandlerTests
             Concat(MeasuredConnect, Bytes("82 CD 01 00 01 00 C8", topic, "00")),
             connection.Written);
         CollectionAssert.AreEqual(publishBody, output.ToArray());
+        Diagnostics.AssertResult(TransferResult.Success(502), result);
         Assert.AreEqual(TransferResult.Success(502), result);
     }
 
@@ -274,6 +322,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 0005"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 0005"), result);
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
     }
@@ -285,6 +334,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 0100"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 0100"), result);
     }
 
@@ -295,6 +345,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.UrlMalformat, 0, "No MQTT topic found. Forgot to URL encode it?"), result);
         Assert.AreEqual(
             new TransferResult(CurlExitCode.UrlMalformat, 0, "No MQTT topic found. Forgot to URL encode it?"),
             result);
@@ -308,6 +359,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(FakeConnector.For(connection), "mqtt://h/a%2Fb", new RecordingStream());
 
+        Diagnostics.DiffSent(Concat(MeasuredConnect, Bytes("82 08 00 01 00 03", "a/b", "00")), connection.Written);
         CollectionAssert.AreEqual(
             Concat(MeasuredConnect, Bytes("82 08 00 01 00 03", "a/b", "00")),
             connection.Written);
@@ -320,6 +372,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(FakeConnector.For(connection), "mqtt://h/%FF", new RecordingStream());
 
+        Diagnostics.DiffSent(Concat(MeasuredConnect, Bytes("82 06 00 01 00 01 FF 00")), connection.Written);
         CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("82 06 00 01 00 01 FF 00")), connection.Written);
     }
 
@@ -330,6 +383,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(FakeConnector.For(connection), "mqtt://h/%zz", new RecordingStream());
 
+        Diagnostics.DiffSent(Concat(MeasuredConnect, Bytes("82 08 00 01 00 03", "%zz", "00")), connection.Written);
         CollectionAssert.AreEqual(
             Concat(MeasuredConnect, Bytes("82 08 00 01 00 03", "%zz", "00")),
             connection.Written);
@@ -342,6 +396,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ConnectionDisconnected), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ConnectionDisconnected), result);
     }
 
@@ -352,6 +407,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
     }
 
@@ -362,6 +418,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
     }
 
@@ -372,6 +429,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
     }
 
@@ -382,6 +440,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, "CONNACK expected Remaining Length 2, got 3"), result);
         Assert.AreEqual(
             new TransferResult(CurlExitCode.WeirdServerReply, 0, "CONNACK expected Remaining Length 2, got 3"),
             result);
@@ -394,6 +453,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
     }
@@ -411,6 +471,7 @@ public sealed class MqttProtocolHandlerTests
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(Bytes("00 01", "t", string.Empty, "HELLO"), output.ToArray());
+        Diagnostics.AssertResult(TransferResult.Success(8), result);
         Assert.AreEqual(TransferResult.Success(8), result);
     }
 
@@ -434,6 +495,7 @@ public sealed class MqttProtocolHandlerTests
             Concat(MeasuredConnect, Bytes("82 0A 00 01 00 05", "a/b/c", "00")),
             connection.Written);
         Assert.IsEmpty(output.ToArray());
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
@@ -452,6 +514,7 @@ public sealed class MqttProtocolHandlerTests
 
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
         Assert.IsEmpty(output.ToArray());
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
     }
 
@@ -470,6 +533,7 @@ public sealed class MqttProtocolHandlerTests
 
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
         CollectionAssert.AreEqual(Bytes("00 05", "a/b/c", string.Empty, "HELLO"), output.ToArray());
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result);
     }
 
@@ -485,6 +549,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
+        Diagnostics.DiffOutput(Bytes("00 05", "abcde", "00 07", "HELLO"), output.ToArray());
         CollectionAssert.AreEqual(Bytes("00 05", "abcde", "00 07", "HELLO"), output.ToArray());
     }
 
@@ -495,6 +560,9 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(
+            new TransferResult(CurlExitCode.WeirdServerReply, 0, "Broker sent malformed DISCONNECT (remaining_length=1, header byte=0xe0)"),
+            result);
         Assert.AreEqual(
             new TransferResult(
                 CurlExitCode.WeirdServerReply,
@@ -510,6 +578,9 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(
+            new TransferResult(CurlExitCode.WeirdServerReply, 0, "Broker sent malformed PINGRESP (remaining_length=0, header byte=0xd1)"),
+            result);
         Assert.AreEqual(
             new TransferResult(
                 CurlExitCode.WeirdServerReply,
@@ -525,6 +596,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, "SUBACK expected Remaining Length 3, got 2"), result);
         Assert.AreEqual(
             new TransferResult(CurlExitCode.WeirdServerReply, 0, "SUBACK expected Remaining Length 3, got 2"),
             result);
@@ -544,6 +616,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
     }
 
@@ -554,6 +627,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
     }
 
@@ -564,6 +638,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
     }
 
@@ -576,6 +651,7 @@ public sealed class MqttProtocolHandlerTests
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(Bytes("00 01", "tone", "00 01"), output.ToArray());
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.PartialFile, 8, "Transferred a partial file"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.PartialFile, 8, "Transferred a partial file"), result);
     }
 
@@ -588,6 +664,7 @@ public sealed class MqttProtocolHandlerTests
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
         Assert.IsEmpty(output.Writes);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.PartialFile, 0, "Transferred a partial file"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.PartialFile, 0, "Transferred a partial file"), result);
     }
 
@@ -601,6 +678,7 @@ public sealed class MqttProtocolHandlerTests
             "mqtt://h/" + new string('\u20AC', 21846),
             new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.UrlMalformat, 0, "Too long MQTT topic"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.UrlMalformat, 0, "Too long MQTT topic"), result);
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
     }
@@ -612,6 +690,7 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(FakeConnector.For(connection), "mqtt://h/" + new string('\u20AC', 21845), new RecordingStream());
 
+        Diagnostics.Diff("SUBSCRIBE's first 8 bytes", Bytes("82 84 80 04 00 01 FF FF"), connection.Written.AsSpan(MeasuredConnect.Length).Slice(0, Math.Min(8, connection.Written.Length - MeasuredConnect.Length)));
         CollectionAssert.AreEqual(Bytes("82 84 80 04 00 01 FF FF"), connection.Written[MeasuredConnect.Length..][..8]);
     }
 
@@ -623,6 +702,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WriteError, 0, "Failure writing output to destination, passed 6 returned 0"), result);
         Assert.AreEqual(
             new TransferResult(CurlExitCode.WriteError, 0, "Failure writing output to destination, passed 6 returned 0"),
             result);
@@ -655,6 +735,9 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
+        Diagnostics.Assert("exit code", CurlExitCode.WriteError, result.ExitCode);
+        Diagnostics.Assert("error message", expectedMessage, result.ErrorMessage);
+        Diagnostics.Assert("bytes transferred", output.Writes.Sum(write => (long)write.Length), result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual(expectedMessage, result.ErrorMessage);
         Assert.AreEqual(output.Writes.Sum(write => (long)write.Length), result.BytesTransferred);
@@ -669,6 +752,8 @@ public sealed class MqttProtocolHandlerTests
 
         await RunAsync(FakeConnector.For(connection), "mqtt://h/t", output);
 
+        Diagnostics.Assert("write lengths", "4096, 907", string.Join(", ", output.Writes.Select(write => write.Length)));
+        Diagnostics.DiffOutput(publish[3..], output.ToArray());
         CollectionAssert.AreEqual(new[] { 4096, 907 }, output.Writes.Select(write => write.Length).ToArray());
         CollectionAssert.AreEqual(publish[3..], output.ToArray());
     }
@@ -680,6 +765,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -691,6 +777,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), "mqtt://h/t", new RecordingStream());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), result);
         Assert.AreEqual(
             new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"),
             result);
@@ -708,7 +795,14 @@ public sealed class MqttProtocolHandlerTests
             CancellationToken = new CancellationToken(canceled: true),
         };
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await handler.ExecuteAsync(context));
+        Diagnostics.Arrange("url", "mqtt://h/t, cancellation token already cancelled");
+        Diagnostics.ArrangeReads(connection.Reads);
+
+        OperationCanceledException thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await handler.ExecuteAsync(context));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Act("connection disposed", connection.IsDisposed);
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.IsTrue(connection.IsDisposed);
     }
 
@@ -735,6 +829,7 @@ public sealed class MqttProtocolHandlerTests
             Concat(MeasuredConnect, Bytes("30 12 00 0E", "bedroom/dimmer", string.Empty, "75"), Disconnect),
             connection.Written);
         Assert.IsEmpty(output.Writes);
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -756,6 +851,7 @@ public sealed class MqttProtocolHandlerTests
                 Bytes("30 04 00 01", "t", string.Empty, "x"),
                 Disconnect),
             connection.Written);
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
@@ -770,6 +866,10 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential("bob", "se:cret"));
 
+        Diagnostics.Diff(
+            "CONNECT",
+            Bytes("10 26 00 04", "MQTT", "04 C2 00 3C 00 0C", "curlPBadK4E3", "00 03", "bob", "00 07", "se:cret"),
+            connection.Written.AsSpan(0, Math.Min(40, connection.Written.Length)));
         CollectionAssert.AreEqual(
             Bytes("10 26 00 04", "MQTT", "04 C2 00 3C 00 0C", "curlPBadK4E3", "00 03", "bob", "00 07", "se:cret"),
             connection.Written[..40]);
@@ -782,6 +882,10 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential("bob", string.Empty));
 
+        Diagnostics.Diff(
+            "CONNECT",
+            Bytes("10 1D 00 04", "MQTT", "04 82 00 3C 00 0C", "curlPBadK4E3", "00 03", "bob"),
+            connection.Written.AsSpan(0, Math.Min(31, connection.Written.Length)));
         CollectionAssert.AreEqual(
             Bytes("10 1D 00 04", "MQTT", "04 82 00 3C 00 0C", "curlPBadK4E3", "00 03", "bob"),
             connection.Written[..31]);
@@ -794,6 +898,10 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential(string.Empty, "pw"));
 
+        Diagnostics.Diff(
+            "CONNECT",
+            Bytes("10 1C 00 04", "MQTT", "04 42 00 3C 00 0C", "curlPBadK4E3", "00 02", "pw"),
+            connection.Written.AsSpan(0, Math.Min(30, connection.Written.Length)));
         CollectionAssert.AreEqual(
             Bytes("10 1C 00 04", "MQTT", "04 42 00 3C 00 0C", "curlPBadK4E3", "00 02", "pw"),
             connection.Written[..30]);
@@ -806,6 +914,7 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential(string.Empty, string.Empty));
 
+        Diagnostics.Diff("CONNECT", MeasuredConnect, connection.Written.AsSpan(0, Math.Min(MeasuredConnect.Length, connection.Written.Length)));
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written[..MeasuredConnect.Length]);
     }
 
@@ -816,6 +925,10 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential("é", string.Empty));
 
+        Diagnostics.Diff(
+            "CONNECT",
+            Bytes("10 1C 00 04", "MQTT", "04 82 00 3C 00 0C", "curlPBadK4E3", "00 02 C3 A9"),
+            connection.Written.AsSpan(0, Math.Min(30, connection.Written.Length)));
         CollectionAssert.AreEqual(
             Bytes("10 1C 00 04", "MQTT", "04 82 00 3C 00 0C", "curlPBadK4E3", "00 02 C3 A9"),
             connection.Written[..30]);
@@ -835,6 +948,11 @@ public sealed class MqttProtocolHandlerTests
                 Credentials = new NetworkCredential("al", "pw"),
             });
 
+        Diagnostics.DiffSent(
+            Concat(
+                Bytes("10 20 00 04", "MQTT", "04 C2 00 3C 00 0C", "curlPBadK4E3", "00 02", "al", "00 02", "pw"),
+                Bytes("82 06 00 01 00 01", "t", "00")),
+            connection.Written);
         CollectionAssert.AreEqual(
             Concat(
                 Bytes("10 20 00 04", "MQTT", "04 C2 00 3C 00 0C", "curlPBadK4E3", "00 02", "al", "00 02", "pw"),
@@ -853,6 +971,7 @@ public sealed class MqttProtocolHandlerTests
             "x",
             new NetworkCredential(new string('u', 65536), string.Empty));
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Username too long: [65536]"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Username too long: [65536]"), result);
         Assert.IsEmpty(connection.Written);
     }
@@ -868,6 +987,7 @@ public sealed class MqttProtocolHandlerTests
             "x",
             new NetworkCredential("bob", new string('p', 65536)));
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Password too long: [65536]"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Password too long: [65536]"), result);
         Assert.IsEmpty(connection.Written);
     }
@@ -880,6 +1000,7 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", "x", new NetworkCredential(longest, longest));
 
+        Diagnostics.Diff("CONNECT header", Bytes("10 9A 80 08"), connection.Written.AsSpan(0, Math.Min(4, connection.Written.Length)));
         CollectionAssert.AreEqual(Bytes("10 9A 80 08"), connection.Written[..4]);
     }
 
@@ -891,6 +1012,7 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", payload);
 
+        Diagnostics.DiffSent(Concat(MeasuredConnect, Bytes("30 CB 01 00 01", "t", string.Empty, payload), Disconnect), connection.Written);
         CollectionAssert.AreEqual(
             Concat(MeasuredConnect, Bytes("30 CB 01 00 01", "t", string.Empty, payload), Disconnect),
             connection.Written);
@@ -903,6 +1025,7 @@ public sealed class MqttProtocolHandlerTests
 
         await PublishAsync(connection, "mqtt://h/t", string.Empty);
 
+        Diagnostics.DiffSent(Concat(MeasuredConnect, Bytes("30 03 00 01", "t"), Disconnect), connection.Written);
         CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("30 03 00 01", "t"), Disconnect), connection.Written);
     }
 
@@ -925,6 +1048,7 @@ public sealed class MqttProtocolHandlerTests
             Concat(MeasuredConnect, Bytes("30 04 00 01", "t", string.Empty, "x"), Disconnect),
             connection.Written);
         Assert.IsEmpty(output.Writes);
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
@@ -935,6 +1059,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await PublishAsync(connection, "mqtt://h/t", "x");
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 0005"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 0005"), result);
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
     }
@@ -946,6 +1071,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await PublishAsync(connection, "mqtt://h/", "x");
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.UrlMalformat, 0, "No MQTT topic found. Forgot to URL encode it?"), result);
         Assert.AreEqual(
             new TransferResult(CurlExitCode.UrlMalformat, 0, "No MQTT topic found. Forgot to URL encode it?"),
             result);
@@ -959,6 +1085,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await PublishAsync(connection, "mqtt://h/t", "x");
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), result);
     }
 
@@ -980,6 +1107,7 @@ public sealed class MqttProtocolHandlerTests
                 PostData = new byte[268435451 - 3],
             });
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.TooLarge, 0, "A value or data field grew larger than allowed"), result);
         Assert.AreEqual(
             new TransferResult(CurlExitCode.TooLarge, 0, "A value or data field grew larger than allowed"),
             result);
@@ -1023,8 +1151,14 @@ public sealed class MqttProtocolHandlerTests
         RecordingProgress progress = new();
         var context = new TransferContext { Url = CurlUrl.Parse("mqtt://h/t"), Output = new RecordingStream(), Progress = progress };
 
-        await new MqttProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReads(connection.Reads);
 
+        TransferResult result = await new MqttProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("progress reports", string.Join("; ", progress.Reports));
+        Diagnostics.Assert("progress reports", "started; downloaded 5 of 5; downloaded 13 of 8", string.Join("; ", progress.Reports));
         CollectionAssert.AreEqual(new[] { "started", "downloaded 5 of 5", "downloaded 13 of 8" }, progress.Reports);
     }
 
@@ -1040,6 +1174,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(FakeConnector.For(connection), MaxFileSizeContext(output, 9));
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.FilesizeExceeded, 0, "Maximum file size exceeded"), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 0, "Maximum file size exceeded"), result);
         Assert.AreEqual(0, output.ToArray().Length);
     }
@@ -1056,6 +1191,7 @@ public sealed class MqttProtocolHandlerTests
         TransferResult result = await RunAsync(FakeConnector.For(connection), MaxFileSizeContext(output, maxFileSize));
 
         CollectionAssert.AreEqual(Bytes("00 03", "t/xhello"), output.ToArray());
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 10, ConnectionDisconnected), result);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 10, ConnectionDisconnected), result);
     }
 
@@ -1068,8 +1204,19 @@ public sealed class MqttProtocolHandlerTests
         TransferResult result = await RunAsync(FakeConnector.For(connection), MaxFileSizeContext(output, 10));
 
         CollectionAssert.AreEqual(Bytes("00 03", "t/xhello", "00 03", "t/xworld"), output.ToArray());
+        Diagnostics.AssertResult(TransferResult.Success(20), result);
         Assert.AreEqual(TransferResult.Success(20), result);
     }
+
+    private static string Describe(ConnectTarget target) =>
+        $"{target.Host}:{target.Port} tls {target.UseTls} proxy {target.Proxy?.ToString() ?? "none"}";
+
+    /// <summary>Writes an ASSERT line comparing the targets connected to with those expected.</summary>
+    private void AssertTargets(FakeConnector connector, params ConnectTarget[] expected) =>
+        Diagnostics.Assert(
+            "connect targets",
+            string.Join("; ", expected.Select(Describe)),
+            string.Join("; ", connector.Targets.Select(Describe)));
 
     private static TransferContext MaxFileSizeContext(Stream output, long? maxFileSize) =>
         new() { Url = CurlUrl.Parse("mqtt://127.0.0.1/t/x"), Output = output, MaxFileSize = maxFileSize };
@@ -1103,13 +1250,35 @@ public sealed class MqttProtocolHandlerTests
                 Credentials = credentials,
             });
 
-    private Task<TransferResult> RunAsync(IConnector connector, TransferContext context) =>
-        new MqttProtocolHandler(connector, () => FixedSuffix)
-            .ExecuteAsync(context)
-            .AsTask();
+    /// <summary>
+    /// Runs the transfer with the fixed identifier suffix, writing its URL, options and
+    /// scripted reads as ARRANGE lines and its result, bytes sent and output as ACT lines.
+    /// </summary>
+    private async Task<TransferResult> RunAsync(IConnector connector, TransferContext context)
+    {
+        ScriptedConnection? scripted = (connector as FakeConnector)?.Connection as ScriptedConnection;
+        Diagnostics.ArrangeContext(context);
+        if (scripted is not null)
+        {
+            Diagnostics.ArrangeReads(scripted.Reads);
+        }
+
+        TransferResult result = await new MqttProtocolHandler(connector, () => FixedSuffix).ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        if (scripted is not null)
+        {
+            Diagnostics.ActPackets("sent", scripted.Written);
+        }
+
+        if (context.Output is RecordingStream output)
+        {
+            Diagnostics.ActOutput(output);
+        }
+
+        return result;
+    }
 
     private Task<TransferResult> RunAsync(IConnector connector, string url, Stream output) =>
-        new MqttProtocolHandler(connector, () => FixedSuffix)
-            .ExecuteAsync(Context(url, output))
-            .AsTask();
+        RunAsync(connector, Context(url, output));
 }

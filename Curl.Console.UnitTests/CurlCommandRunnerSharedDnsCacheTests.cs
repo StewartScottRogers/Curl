@@ -3,6 +3,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -20,6 +21,10 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -27,9 +32,15 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
     {
         DnsCache runDnsCache = new();
 
+        Diagnostics.Arrange("first option group", "http://h/a");
+        Diagnostics.Arrange("second option group", "-k https://h/b");
         CurlTransports first = CurlComposition.CreateTransports(Parse("http://h/a"), TimeProvider.System, runDnsCache: runDnsCache);
         CurlTransports second = CurlComposition.CreateTransports(Parse("-k", "https://h/b"), TimeProvider.System, runDnsCache: runDnsCache);
 
+        Diagnostics.Act("first connector uses the run cache", ReferenceEquals(runDnsCache, first.TcpConnector.DnsCache));
+        Diagnostics.Act("second connector uses the run cache", ReferenceEquals(runDnsCache, second.TcpConnector.DnsCache));
+        Diagnostics.Assert("first connector uses the run cache", true, ReferenceEquals(runDnsCache, first.TcpConnector.DnsCache));
+        Diagnostics.Assert("second connector uses the run cache", true, ReferenceEquals(runDnsCache, second.TcpConnector.DnsCache));
         Assert.AreSame(runDnsCache, first.TcpConnector.DnsCache);
         Assert.AreSame(runDnsCache, second.TcpConnector.DnsCache);
     }
@@ -37,9 +48,12 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
     [TestMethod]
     public void CreateTransports_WithoutARunDnsCache_GivesEachTcpConnectorACacheOfItsOwn()
     {
+        Diagnostics.Arrange("option groups", "http://h/a and http://h/b, each without a run cache");
         CurlTransports first = CurlComposition.CreateTransports(Parse("http://h/a"));
         CurlTransports second = CurlComposition.CreateTransports(Parse("http://h/b"));
 
+        Diagnostics.Act("connectors share a cache", ReferenceEquals(first.TcpConnector.DnsCache, second.TcpConnector.DnsCache));
+        Diagnostics.Assert("connectors share a cache", false, ReferenceEquals(first.TcpConnector.DnsCache, second.TcpConnector.DnsCache));
         Assert.AreNotSame(first.TcpConnector.DnsCache, second.TcpConnector.DnsCache);
     }
 
@@ -50,6 +64,9 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
         // * Hostname 127.0.0.1 was found in DNS cache, right before *   Trying 127.0.0.1:18531...
         int exitCode = await RunAsync("http://127.0.0.1:18531/a", "--next", "-s", "-v", "http://127.0.0.1:18531/b");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("found-in-cache then trying", 1, Occurrences("* Hostname 127.0.0.1 was found in DNS cache" + InfoEnd + "*   Trying 127.0.0.1:18531..." + InfoEnd));
+        Diagnostics.Assert("found-in-cache lines", 1, Occurrences("Hostname 127.0.0.1 was found in DNS cache"));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(1, Occurrences("* Hostname 127.0.0.1 was found in DNS cache" + InfoEnd + "*   Trying 127.0.0.1:18531..." + InfoEnd));
         Assert.AreEqual(1, Occurrences("Hostname 127.0.0.1 was found in DNS cache"));
@@ -63,6 +80,17 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
         int exitCode = await RunAsync(
             "--resolve", "foo.example:18531:127.0.0.1", "http://foo.example:18531/a", "--next", "-s", "-v", "http://foo.example:18531/b");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("added lines", 1, Occurrences("* Added foo.example:18531:127.0.0.1 to DNS cache" + InfoEnd));
+        Diagnostics.Assert(
+            "found-in-cache blocks",
+            2,
+            Occurrences(
+                "* Hostname foo.example was found in DNS cache" + InfoEnd
+                + "* Host foo.example:18531 was resolved." + InfoEnd
+                + "* IPv6: (none)" + InfoEnd
+                + "* IPv4: 127.0.0.1" + InfoEnd
+                + "*   Trying 127.0.0.1:18531..." + InfoEnd));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(1, Occurrences("* Added foo.example:18531:127.0.0.1 to DNS cache" + InfoEnd));
         Assert.AreEqual(
@@ -84,6 +112,16 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
         int exitCode = await RunAsync(
             "http://localhost:18531/a", "--next", "-s", "-v", "--resolve", "localhost:18531:127.0.0.1", "http://localhost:18531/b");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "discard blocks",
+            1,
+            Occurrences(
+                "* RESOLVE localhost:18531 - old addresses discarded" + InfoEnd
+                + "* Added localhost:18531:127.0.0.1 to DNS cache" + InfoEnd
+                + "* Hostname localhost was found in DNS cache" + InfoEnd
+                + "* Host localhost:18531 was resolved." + InfoEnd));
+        Diagnostics.Assert("found-in-cache lines", 1, Occurrences("Hostname localhost was found in DNS cache"));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             1,
@@ -119,7 +157,21 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
         DnsCache runDnsCache = new();
         ScriptedTcpDialer dialer = new(new ScriptedConnector([ClosingResponse(), ClosingResponse()]));
         InMemoryFileSystem files = new();
+        Diagnostics.Arrange("arguments", string.Join(' ', ["-s", "-v", .. arguments]));
+        Diagnostics.Arrange("dialer", "one scripted dialer whose connections each answer with a closing 200");
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await RunWithAsync(runDnsCache, dialer, files, arguments);
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", StandardErrorText.Replace("\r\n", "\n", StringComparison.Ordinal));
+        return exitCode;
+    }
+
+    private async Task<int> RunWithAsync(DnsCache runDnsCache, ScriptedTcpDialer dialer, InMemoryFileSystem files, string[] arguments)
+    {
         return await new CurlCommandRunner(
                 options =>
                 {

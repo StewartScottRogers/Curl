@@ -3,6 +3,8 @@ using System.Text;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -21,6 +23,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionLdapTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string BindSuccess = "30 0c 02 01 01 61 07 0a 01 00 04 00 04 00";
 
     private const string EntryOuX = "30 1e 02 01 02 64 19 04 0a 64 63 3d 65 78 61 6d 70 6c 65 30 0b 30 09 04 02 6f 75 31 03 04 01 78";
@@ -52,6 +58,7 @@ public sealed class CurlCompositionLdapTests
         (int exitCode, string standardOutput, string standardError, ScriptedConnector connector) =
             await RunAsync("ldap://127.0.0.1:18389/dc=example", 59226, BindSuccess, EntryOuX, SearchDone);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WinLdapEntry, standardOutput);
         Assert.AreEqual(
@@ -75,6 +82,7 @@ public sealed class CurlCompositionLdapTests
         (int exitCode, string standardOutput, string standardError, ScriptedConnector connector) =
             await RunAsync("ldaps://127.0.0.1:18636/dc=example", 50261, BindSuccess, EntryOuX, SearchDone);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(WinLdapEntry, standardOutput);
         Assert.AreEqual(
@@ -97,6 +105,7 @@ public sealed class CurlCompositionLdapTests
         (int exitCode, string standardOutput, string standardError, _) =
             await RunAsync("ldap://127.0.0.1:18389/dc=example", 54983, InvalidCredentials1, InvalidCredentials2);
 
+        Diagnostics.Assert("exit code", 38, exitCode);
         Assert.AreEqual(38, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
@@ -118,6 +127,7 @@ public sealed class CurlCompositionLdapTests
         (int exitCode, string standardOutput, string standardError, ScriptedConnector connector) =
             await RunAsync("ldap://127.0.0.1:18389/dc=example", 44296, BindSuccess, EntryOuX, SearchDone);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(OpenLdapEntry, standardOutput);
         Assert.AreEqual(
@@ -138,6 +148,7 @@ public sealed class CurlCompositionLdapTests
         (int exitCode, string standardOutput, string standardError, ScriptedConnector connector) =
             await RunAsync("ldaps://127.0.0.1:18636/dc=example", 44300, BindSuccess, EntryOuX, SearchDone);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(OpenLdapEntry, standardOutput);
         StringAssert.Contains(standardError, "* LDAP local: ldaps://127.0.0.1:18636/dc=example" + Environment.NewLine);
@@ -152,6 +163,7 @@ public sealed class CurlCompositionLdapTests
         (int exitCode, string standardOutput, string standardError, _) =
             await RunAsync("ldap://127.0.0.1:18389/dc=example", 44298, InvalidCredentials1);
 
+        Diagnostics.Assert("exit code", 67, exitCode);
         Assert.AreEqual(67, exitCode);
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual(
@@ -166,14 +178,19 @@ public sealed class CurlCompositionLdapTests
     public async Task CreateRunner_Version_ListsLdapAndLdaps()
     {
         using MemoryStream standardOutput = new();
+        Diagnostics.ArrangeCommandLine(["-V"]);
 
         int exitCode = await CurlComposition
             .CreateRunner(standardOutput, new MemoryStream(), new MemoryStream(), new ScriptedConnector([]), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
             .RunAsync(["-V"]);
 
         string protocols = Encoding.ASCII.GetString(standardOutput.ToArray()).Split(Environment.NewLine).Single(line => line.StartsWith("Protocols:", StringComparison.Ordinal));
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("protocols line", protocols);
+        Diagnostics.Assert("protocols line", CurlVersionText.ProtocolsLine, protocols);
         Assert.AreEqual(CurlVersionText.ProtocolsLine, protocols);
         StringAssert.Contains(protocols, " ipns ldap ldaps mqtt ");
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
     }
 
@@ -183,18 +200,23 @@ public sealed class CurlCompositionLdapTests
 
     private static byte[] Bytes(string hex) => [.. hex.Split(' ').Select(pair => Convert.ToByte(pair, 16))];
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError, ScriptedConnector Connector)> RunAsync(
+    private async Task<(int ExitCode, string StandardOutput, string StandardError, ScriptedConnector Connector)> RunAsync(
         string url, int localPort, params string[] replies)
     {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         ScriptedConnector connector = new([.. replies.Select(Bytes)]);
+        Diagnostics.ArrangeCommandLine(["-sv", "-u", "cn=u,dc=x:secret", url]);
+        Diagnostics.Arrange("server replies", string.Join(" | ", replies));
 
         int exitCode = await CurlComposition
             .CreateRunner(standardOutput, standardError, new MemoryStream(), new ReportingConnector(connector, localPort), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
             .RunAsync(["-sv", "-u", "cn=u,dc=x:secret", url]);
 
-        return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()), connector);
+        (int ExitCode, string StandardOutput, string StandardError, ScriptedConnector Connector) result = (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()), connector);
+        Diagnostics.ActRun(result.ExitCode, result.StandardOutput, result.StandardError);
+        Diagnostics.ActWritten(connector);
+        return result;
     }
 
     /// <summary>

@@ -1,11 +1,17 @@
 using System.Security.Cryptography;
 using Curl.Cryptography;
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.PacketProtection;
 
 [TestClass]
 public sealed class CbcSshCipherTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Plaintext =
         "6BC1BEE22E409F96E93D7E117393172AAE2D8A571E03AC9C9EB76FAC45AF8E5130C81C46A35CE411E5FBC1191A0A52EFF69F2445DF4F9B17AD2B417BE66C3710";
 
@@ -22,14 +28,22 @@ public sealed class CbcSshCipherTests
         using CbcSshCipher encryptor = CbcSshCipher.ForAes(Convert.FromHexString(key), SixteenByteIv);
         using CbcSshCipher decryptor = CbcSshCipher.ForAes(Convert.FromHexString(key), SixteenByteIv);
         byte[] bytes = Convert.FromHexString(Plaintext);
+        Diagnostics.Arrange("key", key);
+        Diagnostics.Arrange("iv", Convert.ToHexString(SixteenByteIv));
+        Diagnostics.Bytes("plaintext", bytes);
 
         encryptor.Encrypt(bytes.AsSpan(0, 16), bytes.AsSpan(0, 16));
         encryptor.Encrypt(bytes.AsSpan(16), bytes.AsSpan(16));
+        Diagnostics.ActBytes("encrypted in place, one block then the rest", bytes);
+        Diagnostics.AssertHex("ciphertext", ciphertext, bytes);
         Assert.AreEqual(ciphertext, Convert.ToHexString(bytes));
 
         decryptor.Decrypt(bytes.AsSpan(0, 16), bytes.AsSpan(0, 16));
         decryptor.Decrypt(bytes.AsSpan(16, 32), bytes.AsSpan(16, 32));
         decryptor.Decrypt(bytes.AsSpan(48), bytes.AsSpan(48));
+        Diagnostics.ActBytes("decrypted in place, 16, 32 then 16 bytes", bytes);
+        Diagnostics.AssertHex("decrypted", Plaintext, bytes);
+        Diagnostics.Assert("block size", 16, encryptor.BlockSize);
         Assert.AreEqual(Plaintext, Convert.ToHexString(bytes));
         Assert.AreEqual(16, encryptor.BlockSize);
     }
@@ -46,13 +60,22 @@ public sealed class CbcSshCipherTests
         using CbcSshCipher encryptor = Create(cipher, key);
         using CbcSshCipher decryptor = Create(cipher, key);
         byte[] bytes = [.. plaintext];
+        Diagnostics.Arrange("cipher", cipher);
+        Diagnostics.Arrange("key", Convert.ToHexString(key));
+        Diagnostics.Arrange("iv", Convert.ToHexString(EightByteIv));
+        Diagnostics.Bytes("plaintext", plaintext);
 
         encryptor.Encrypt(bytes.AsSpan(0, 8), bytes.AsSpan(0, 8));
         encryptor.Encrypt(bytes.AsSpan(8), bytes.AsSpan(8));
+        Diagnostics.ActBytes("encrypted in place, one block then the rest", bytes);
+        Diagnostics.AssertBytes("ciphertext against one CBC run", expected, bytes);
         CollectionAssert.AreEqual(expected, bytes);
 
         decryptor.Decrypt(bytes.AsSpan(0, 24), bytes.AsSpan(0, 24));
         decryptor.Decrypt(bytes.AsSpan(24), bytes.AsSpan(24));
+        Diagnostics.ActBytes("decrypted in place, 24 then 40 bytes", bytes);
+        Diagnostics.AssertBytes("decrypted", plaintext, bytes);
+        Diagnostics.Assert("block size", 8, encryptor.BlockSize);
         CollectionAssert.AreEqual(plaintext, bytes);
         Assert.AreEqual(8, encryptor.BlockSize);
     }
@@ -64,12 +87,16 @@ public sealed class CbcSshCipherTests
         using CbcSshCipher encryptor = CbcSshCipher.ForAes(key, SixteenByteIv);
         using CbcSshCipher decryptor = CbcSshCipher.ForAes(key, SixteenByteIv);
         byte[] bytes = Convert.FromHexString(Plaintext);
+        Diagnostics.Arrange("key", Convert.ToHexString(key));
+        Diagnostics.Arrange("calls", "an empty encrypt and an empty decrypt before each real one");
 
         encryptor.Encrypt([], []);
         encryptor.Encrypt(bytes, bytes);
         decryptor.Decrypt([], []);
         decryptor.Decrypt(bytes, bytes);
 
+        Diagnostics.ActBytes("round trip", bytes);
+        Diagnostics.AssertHex("round trip", Plaintext, bytes);
         Assert.AreEqual(Plaintext, Convert.ToHexString(bytes));
     }
 

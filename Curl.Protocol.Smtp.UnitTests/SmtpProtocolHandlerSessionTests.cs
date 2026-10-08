@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -36,11 +37,20 @@ public sealed class SmtpProtocolHandlerSessionTests
 
     private const string HelpAndQuit = "HELP\r\nQUIT\r\n";
 
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_DefaultSession_SendsEhloHelpThenQuit()
     {
         SmtpRun run = await RunAsync(Url, Greeting + EhloReply + HelpReplyAndBye);
 
+        Diagnostics.Diff("sent", Ehlo + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
+        Diagnostics.AssertValues("connect target", "127.0.0.1:18025 tls False", $"{run.Connector.Targets.Single().Host}:{run.Connector.Targets.Single().Port} tls {run.Connector.Targets.Single().UseTls}");
+        Diagnostics.AssertValues("connection disposed", true, run.Connection.IsDisposed);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 18025, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
@@ -52,6 +62,7 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         SmtpRun run = await RunAsync("smtp://127.0.0.1/client.example", Greeting + EhloReply + HelpReplyAndBye);
 
+        Diagnostics.AssertValues("connect port", 25, run.Connector.Targets.Single().Port);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 25, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
@@ -63,10 +74,17 @@ public sealed class SmtpProtocolHandlerSessionTests
         var connector = new QueuedConnector(ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + HelpReplyAndBye))));
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Proxy = proxy, Events = events };
 
+        Diagnostics.ArrangeContext(context, Greeting + EhloReply + HelpReplyAndBye);
+        Diagnostics.Arrange("proxy", "Socks5 proxy:1080");
+
         TransferResult result = await new SmtpProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context);
 
+        Diagnostics.ActEvents(result, events);
+        Diagnostics.AssertValues("proxy reached the connector", true, ReferenceEquals(proxy, connector.Targets.Single().Proxy));
         Assert.AreSame(proxy, connector.Targets.Single().Proxy);
         connector.Targets.Single().Events.ReportInfo("from the connector");
+        Diagnostics.AssertValues("last info line", "from the connector", events.Info.Last());
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, result);
         Assert.AreEqual("from the connector", events.Info.Last());
         Assert.AreEqual(SmtpRun.HelpAnswered, result);
     }
@@ -81,6 +99,10 @@ public sealed class SmtpProtocolHandlerSessionTests
             Greeting + EhloReply + HelpReplyAndBye,
             Required);
 
+        Diagnostics.Diff("sent", Ehlo + HelpAndQuit, run.Sent);
+        Diagnostics.AssertValues("connect target", "127.0.0.1:465 tls True", $"{run.Connector.Targets.Single().Host}:{run.Connector.Targets.Single().Port} tls {run.Connector.Targets.Single().UseTls}");
+        Diagnostics.AssertValues("handshake count", 0, run.Tls.Handshakes.Count);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 465, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
@@ -93,6 +115,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // GREETING=554 go away: exit 8, "Got unexpected smtp-server response: 554", no QUIT.
         SmtpRun run = await RunAsync(Url, "554 go away\r\n");
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Got unexpected smtp-server response: 554"), run.Result);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WeirdServerReply, "Got unexpected smtp-server response: 554"),
@@ -107,8 +131,13 @@ public sealed class SmtpProtocolHandlerSessionTests
         byte[] replies = Encoding.Latin1.GetBytes("220-first\r\n220-second\r\n220 last\r\n" + EhloReply + HelpReplyAndBye);
         byte[][] reads = [.. replies.Chunk(3)];
 
+        Diagnostics.Arrange("read chunk size", 3);
+        Diagnostics.Arrange("read count", reads.Length);
+
         SmtpRun run = await RunAsync(Url, new ScriptedConnection(reads));
 
+        Diagnostics.Diff("sent", Ehlo + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -121,6 +150,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // CR (GREETING=220) is a complete reply; an LF alone ends a line.
         SmtpRun run = await RunAsync(Url, "junk\r\n22\r\n250xjunk\r\n220\n220\r\n250-localhost\n250 SMTPUTF8\n" + HelpReplyAndBye);
 
+        Diagnostics.Diff("sent", Ehlo + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -131,6 +162,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // EHLO=502 no: HELO client.example, then the upload; EHLO=421 closing does the same.
         SmtpRun run = await RunAsync(Url, Greeting + "502 no\r\n250 localhost\r\n" + HelpReplyAndBye);
 
+        Diagnostics.Diff("sent", Ehlo + "HELO client.example\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + "HELO client.example\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -141,6 +174,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // EHLO=502 no, HELO=501 no: exit 9, "Remote access denied: 501", no QUIT.
         SmtpRun run = await RunAsync(Url, Greeting + "502 no\r\n501 no\r\n");
 
+        Diagnostics.Diff("sent", Ehlo + "HELO client.example\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 501"), run.Result);
         Assert.AreEqual(Ehlo + "HELO client.example\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 501"), run.Result);
     }
@@ -151,6 +186,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // --ssl-reqd, EHLO=502 no: exit 9, "Remote access denied: 502", no HELO, no QUIT.
         SmtpRun run = await RunAsync(Url, Greeting + "502 no\r\n", Required);
 
+        Diagnostics.Diff("sent", Ehlo, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 502"), run.Result);
         Assert.AreEqual(Ehlo, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 502"), run.Result);
     }
@@ -160,6 +197,8 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         SmtpRun run = await RunAsync(Url, Greeting + "502 no\r\n250 localhost\r\n" + HelpReplyAndBye, Try);
 
+        Diagnostics.Diff("sent", Ehlo + "HELO client.example\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + "HELO client.example\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -170,6 +209,9 @@ public sealed class SmtpProtocolHandlerSessionTests
         // --ssl, STARTTLS=454 not now: no second EHLO, the upload in plaintext, exit 0.
         SmtpRun run = await RunAsync(Url, Greeting + EhloReply + "454 not now\r\n" + HelpReplyAndBye, Try);
 
+        Diagnostics.Diff("sent", Ehlo + "STARTTLS\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertValues("handshake count", 0, run.Tls.Handshakes.Count);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + "STARTTLS\r\n" + HelpAndQuit, run.Sent);
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
@@ -181,6 +223,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // --ssl-reqd, STARTTLS=454 not now: exit 64, "STARTTLS denied, code 454", no QUIT.
         SmtpRun run = await RunAsync(Url, Greeting + EhloReply + "454 not now\r\n", Required);
 
+        Diagnostics.Diff("sent", Ehlo + "STARTTLS\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS denied, code 454"), run.Result);
         Assert.AreEqual(Ehlo + "STARTTLS\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS denied, code 454"), run.Result);
     }
@@ -191,6 +235,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // --ssl-reqd, EHLO=250-localhost\r\n250 SIZE 1000: exit 64, "STARTTLS not supported.".
         SmtpRun run = await RunAsync(Url, Greeting + "250-localhost\r\n250 SIZE 1000\r\n", Required);
 
+        Diagnostics.Diff("sent", Ehlo, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not supported."), run.Result);
         Assert.AreEqual(Ehlo, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not supported."), run.Result);
     }
@@ -200,6 +246,8 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         SmtpRun run = await RunAsync(Url, Greeting + "250-localhost\r\n250-START\r\n250 SIZE 1000\r\n" + HelpReplyAndBye, Try);
 
+        Diagnostics.Diff("sent", Ehlo + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -215,6 +263,11 @@ public sealed class SmtpProtocolHandlerSessionTests
             Required,
             ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Ehlo + "STARTTLS\r\n", run.Sent);
+        Diagnostics.Diff("sent over TLS", Ehlo + HelpAndQuit, Encoding.Latin1.GetString(secured.Sent));
+        Diagnostics.AssertValues("handshake target", "127.0.0.1", run.Tls.Handshakes.Single().TargetHost);
+        Diagnostics.AssertValues("secured disposed", true, secured.IsDisposed);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + "STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Ehlo + HelpAndQuit, Encoding.Latin1.GetString(secured.Sent));
         Assert.AreSame(run.Connection, run.Tls.Handshakes.Single().Plaintext);
@@ -237,6 +290,8 @@ public sealed class SmtpProtocolHandlerSessionTests
             Required,
             ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Ehlo + "STARTTLS\r\n", run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + "STARTTLS\r\n", run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -251,6 +306,8 @@ public sealed class SmtpProtocolHandlerSessionTests
             Required,
             ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent over TLS", Ehlo + "HELO client.example\r\n" + HelpAndQuit, Encoding.Latin1.GetString(secured.Sent));
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + "HELO client.example\r\n" + HelpAndQuit, Encoding.Latin1.GetString(secured.Sent));
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -265,6 +322,8 @@ public sealed class SmtpProtocolHandlerSessionTests
             Required,
             ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "schannel: untrusted"));
 
+        Diagnostics.Diff("sent", Ehlo + "STARTTLS\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.PeerFailedVerification, "schannel: untrusted"), run.Result);
         Assert.AreEqual(Ehlo + "STARTTLS\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PeerFailedVerification, "schannel: untrusted"), run.Result);
     }
@@ -277,6 +336,7 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         SmtpRun run = await RunAsync(Url, replies);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
 
@@ -285,8 +345,11 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { FailReadsWhenExhausted = true };
 
+        Diagnostics.Arrange("fail reads when exhausted", true);
+
         SmtpRun run = await RunAsync(Url, connection);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
 
@@ -295,8 +358,12 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { WritesBeforeFailure = 0 };
 
+        Diagnostics.Arrange("writes before failure", 0);
+
         SmtpRun run = await RunAsync(Url, connection);
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
     }
@@ -308,6 +375,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // field grew larger than allowed".
         SmtpRun run = await RunAsync(Url, "220 " + new string('x', 65530) + "\r\n");
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"), run.Result);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"),
@@ -320,6 +389,8 @@ public sealed class SmtpProtocolHandlerSessionTests
         // GREETING=220 and 65529 x: 65533 characters and CRLF, exit 0.
         SmtpRun run = await RunAsync(Url, "220 " + new string('x', 65529) + "\r\n" + EhloReply + HelpReplyAndBye);
 
+        Diagnostics.Diff("sent", Ehlo + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -332,6 +403,9 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         SmtpRun run = await RunAsync(Url, Greeting + EhloReply + SmtpRun.HelpReply + quitReply);
 
+        Diagnostics.Arrange("QUIT reply", SmtpDiagnostics.Show(quitReply));
+        Diagnostics.Diff("sent", Ehlo + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
@@ -341,6 +415,7 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         SmtpRun run = await RunAsync(Url, Greeting + EhloReply + SmtpRun.HelpReply + "221 " + new string('x', 70000) + "\r\n");
 
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -350,8 +425,15 @@ public sealed class SmtpProtocolHandlerSessionTests
         var connector = new QueuedConnector(ConnectResult.Refused("Failed to connect to 127.0.0.1 port 18025"));
         var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
 
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("connector", "refuses with: Failed to connect to 127.0.0.1 port 18025");
+
         TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null });
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertValues("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.AssertValues("error message", "Failed to connect to 127.0.0.1 port 18025", result.ErrorMessage);
+        Diagnostics.AssertValues("is connection refused", true, result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1 port 18025", result.ErrorMessage);
         Assert.IsTrue(result.IsConnectionRefused);
@@ -361,7 +443,11 @@ public sealed class SmtpProtocolHandlerSessionTests
     public void SupportedSchemes_AreSmtpAndSmtps()
     {
         var handler = new SmtpProtocolHandler(new QueuedConnector(), new QueuedTlsProvider());
+        Diagnostics.Arrange("handler", "no SASL authenticator");
 
+        string schemes = string.Join(", ", handler.SupportedSchemes);
+        Diagnostics.Act("supported schemes", schemes);
+        Diagnostics.AssertValues("supported schemes", "smtp, smtps", schemes);
         CollectionAssert.AreEqual(new[] { "smtp", "smtps" }, handler.SupportedSchemes.ToArray());
     }
 
@@ -370,6 +456,9 @@ public sealed class SmtpProtocolHandlerSessionTests
     {
         var connector = new QueuedConnector();
         var tls = new QueuedTlsProvider();
+        Diagnostics.Arrange("null arguments tried", "connector, tls provider, SASL authenticator, host name provider");
+        Diagnostics.Act("constructing", "each with one null argument");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), nameof(ArgumentNullException));
 
         Assert.ThrowsExactly<ArgumentNullException>(() => new SmtpProtocolHandler(null!, tls));
         Assert.ThrowsExactly<ArgumentNullException>(() => new SmtpProtocolHandler(connector, null!));
@@ -381,6 +470,9 @@ public sealed class SmtpProtocolHandlerSessionTests
     public async Task ExecuteAsync_NullContext_Throws()
     {
         var handler = new SmtpProtocolHandler(new QueuedConnector(), new QueuedTlsProvider());
+        Diagnostics.Arrange("context", "(null)");
+        Diagnostics.Act("executing", "the handler with a null context");
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), nameof(ArgumentNullException));
 
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
     }
@@ -389,16 +481,16 @@ public sealed class SmtpProtocolHandlerSessionTests
 
     private const TransportSecurityLevel Required = TransportSecurityLevel.Required;
 
-    private static Task<SmtpRun> RunAsync(string url, string replies, TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
+    private Task<SmtpRun> RunAsync(string url, string replies, TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
         RunAsync(url, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), sslLevel);
 
-    private static Task<SmtpRun> RunAsync(string url, ScriptedConnection connection, TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
-        SmtpRun.ExecuteAsync(url, connection, sslLevel);
+    private Task<SmtpRun> RunAsync(string url, ScriptedConnection connection, TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
+        SmtpRun.ExecuteAsync(Diagnostics, url, connection, sslLevel);
 
-    private static Task<SmtpRun> RunAsync(
+    private Task<SmtpRun> RunAsync(
         string url,
         ScriptedConnection connection,
         TransportSecurityLevel sslLevel,
         ConnectResult handshake) =>
-        SmtpRun.ExecuteAsync(url, connection, sslLevel, handshake);
+        SmtpRun.ExecuteAsync(Diagnostics, url, connection, sslLevel, handshake);
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -16,6 +17,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerSaslCancelTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/1";
 
     private const string Greeting = "+OK POP3 ready\r\n";
@@ -44,7 +50,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, RecordingTransferEvents events, string sent, _) = await RunAsync(
             Greeting + CramMd5Capa + BadChallenge + Cancelled + "+OK Bye\r\n", CramMd5());
 
+        Diagnostics.AssertValues("sent", CancelSent, sent);
         Assert.AreEqual(CancelSent, sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         CollectionAssert.AreEqual(
             (string[])["< " + BadChallenge, "> *\r\n", "< " + Cancelled, "* " + AuthenticationCancelled],
@@ -59,7 +67,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
             Greeting + "+OK\r\nSASL CRAM-MD5\r\nUSER\r\n.\r\n" + BadChallenge + Cancelled + "+OK User accepted\r\n+OK Logged in\r\n" + Retrieved,
             CramMd5());
 
+        Diagnostics.AssertValues("sent", CancelSent + "USER user\r\nPASS secret\r\n" + RetrieveSent, sent);
         Assert.AreEqual(CancelSent + "USER user\r\nPASS secret\r\n" + RetrieveSent, sent);
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -69,7 +79,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             TimestampGreeting + CramMd5Capa + BadChallenge + Cancelled + "+OK Logged in\r\n" + Retrieved, CramMd5());
 
+        Diagnostics.AssertValues("sent", CancelSent + "APOP user 3f18b52881e44c0cc6067f46e0ced7bc\r\n" + RetrieveSent, sent);
         Assert.AreEqual(CancelSent + "APOP user 3f18b52881e44c0cc6067f46e0ced7bc\r\n" + RetrieveSent, sent);
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -83,11 +95,15 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, RecordingDiagnosticLog log) = await RunAsync(
             Greeting + "+OK\r\nSASL CRAM-MD5 PLAIN\r\n.\r\n" + BadChallenge + Cancelled + "+ \r\n+OK Logged in\r\n" + Retrieved, sasl);
 
+        Diagnostics.AssertValues("sent", CancelSent + "AUTH PLAIN\r\nAHVzZXIAc2VjcmV0\r\n" + RetrieveSent, sent);
         Assert.AreEqual(CancelSent + "AUTH PLAIN\r\nAHVzZXIAc2VjcmV0\r\n" + RetrieveSent, sent);
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual((string[])["CRAM-MD5", "PLAIN"], sasl.Offers[0]);
         CollectionAssert.AreEqual((string[])["PLAIN"], sasl.Offers[1]);
+        Diagnostics.AssertValues("sasl.Challenges count", 0, sasl.Challenges.Count());
         Assert.IsEmpty(sasl.Challenges);
+        Diagnostics.AssertValues("log.MessagesAt(DiagnosticLogLevel.Warning) holds", "SASL mechanism cancelled, choosing another: CRAM-MD5", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Warning)));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Warning), "SASL mechanism cancelled, choosing another: CRAM-MD5");
     }
 
@@ -99,7 +115,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + CramMd5Capa + BadChallenge + response + "+OK Bye\r\n", CramMd5());
 
+        Diagnostics.AssertValues("sent", CancelSent, sent);
         Assert.AreEqual(CancelSent, sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
     }
 
@@ -111,7 +129,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL CRAM-MD5 DIGEST-MD5 SCRAM-SHA-1\r\n.\r\n" + BadChallenge + Cancelled + BadChallenge + Cancelled, sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH DIGEST-MD5\r\n*\r\nAUTH CRAM-MD5\r\n*\r\n", sent);
         Assert.AreEqual("CAPA\r\nAUTH DIGEST-MD5\r\n*\r\nAUTH CRAM-MD5\r\n*\r\n", sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         CollectionAssert.AreEqual((string[])["SCRAM-SHA-1"], sasl.Offers[^1]);
     }
@@ -124,7 +144,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL CRAM-MD5 LOGIN\r\nUSER\r\n.\r\n" + BadChallenge + Cancelled + "-ERR no\r\n", sasl);
 
+        Diagnostics.AssertValues("sent", CancelSent + "AUTH LOGIN\r\n", sent);
         Assert.AreEqual(CancelSent + "AUTH LOGIN\r\n", sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
     }
 
@@ -134,7 +156,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             TimestampGreeting + "+OK\r\nSASL CRAM-MD5\r\nUSER\r\n.\r\n" + BadChallenge + Cancelled, CramMd5(), loginOptions: "AUTH=CRAM-MD5");
 
+        Diagnostics.AssertValues("sent", CancelSent, sent);
         Assert.AreEqual(CancelSent, sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
     }
 
@@ -146,7 +170,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL PLAIN\r\n.\r\n" + BadChallenge + Cancelled, sasl);
 
+        Diagnostics.AssertValues("sent", CancelSent, sent);
         Assert.AreEqual(CancelSent, sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.HasCount(1, sasl.Offers);
     }
@@ -163,8 +189,11 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + CramMd5Capa + challenge + "+OK Logged in\r\n" + Retrieved, sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH CRAM-MD5\r\n" + Convert.ToBase64String(CramMd5Answer) + "\r\n" + RetrieveSent, sent);
         Assert.AreEqual("CAPA\r\nAUTH CRAM-MD5\r\n" + Convert.ToBase64String(CramMd5Answer) + "\r\n" + RetrieveSent, sent);
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.AssertValues("sasl.Challenges.Single().Challenge count", 0, sasl.Challenges.Single().Challenge.Count());
         Assert.IsEmpty(sasl.Challenges.Single().Challenge);
     }
 
@@ -176,8 +205,11 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL DIGEST-MD5\r\n.\r\n+ bm9uY2U9MQ==\r\n" + BadChallenge + "+OK Logged in\r\n" + Retrieved, sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH DIGEST-MD5\r\nYQ==\r\n=\r\n" + RetrieveSent, sent);
         Assert.AreEqual("CAPA\r\nAUTH DIGEST-MD5\r\nYQ==\r\n=\r\n" + RetrieveSent, sent);
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.AssertValues("sasl.Challenges[1].Challenge count", 0, sasl.Challenges[1].Challenge.Count());
         Assert.IsEmpty(sasl.Challenges[1].Challenge);
     }
 
@@ -189,8 +221,11 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL NTLM\r\n.\r\n+ \r\n" + BadChallenge + Cancelled, sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH NTLM\r\nMQ==\r\n*\r\n", sent);
         Assert.AreEqual("CAPA\r\nAUTH NTLM\r\nMQ==\r\n*\r\n", sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
+        Diagnostics.AssertValues("sasl.Challenges count", 0, sasl.Challenges.Count());
         Assert.IsEmpty(sasl.Challenges);
     }
 
@@ -202,7 +237,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL GSSAPI\r\n.\r\n+ \r\n+ YQ==\r\n" + BadChallenge + Cancelled, sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH GSSAPI\r\nMQ==\r\nMg==\r\n*\r\n", sent);
         Assert.AreEqual("CAPA\r\nAUTH GSSAPI\r\nMQ==\r\nMg==\r\n*\r\n", sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), result);
     }
 
@@ -219,8 +256,11 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL " + mechanism + "\r\n.\r\n" + BadChallenge + "+OK Logged in\r\n" + Retrieved, sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH " + mechanism + "\r\nYQ==\r\n" + RetrieveSent, sent);
         Assert.AreEqual("CAPA\r\nAUTH " + mechanism + "\r\nYQ==\r\n" + RetrieveSent, sent);
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.AssertValues("sasl.Challenges.Single().Challenge count", 0, sasl.Challenges.Single().Challenge.Count());
         Assert.IsEmpty(sasl.Challenges.Single().Challenge);
     }
 
@@ -234,7 +274,9 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, RecordingTransferEvents events, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL GSSAPI\r\nUSER\r\n.\r\n+ \r\n+ YQ==\r\n" + Cancelled + "+OK User accepted\r\n+OK Logged in\r\n" + Retrieved, sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH GSSAPI\r\nMQ==\r\n*\r\nUSER user\r\nPASS secret\r\n" + RetrieveSent, sent);
         Assert.AreEqual("CAPA\r\nAUTH GSSAPI\r\nMQ==\r\n*\r\nUSER user\r\nPASS secret\r\n" + RetrieveSent, sent);
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])["< + YQ==\r\n", "* " + Reason, "> *\r\n", "< " + Cancelled],
@@ -249,13 +291,15 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         (TransferResult result, _, string sent, _) = await RunAsync(
             Greeting + "+OK\r\nSASL GSSAPI\r\nUSER\r\n.\r\n+ \r\n+ YQ==\r\n", sasl);
 
+        Diagnostics.AssertValues("sent", "CAPA\r\nAUTH GSSAPI\r\nMQ==\r\n", sent);
         Assert.AreEqual("CAPA\r\nAUTH GSSAPI\r\nMQ==\r\n", sent);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
     }
 
     private static RankedSaslAuthenticator CramMd5() => new(("CRAM-MD5", null, [CramMd5Answer]));
 
-    private static async Task<(TransferResult Result, RecordingTransferEvents Events, string Sent, RecordingDiagnosticLog Log)> RunAsync(
+    private async Task<(TransferResult Result, RecordingTransferEvents Events, string Sent, RecordingDiagnosticLog Log)> RunAsync(
         string replies, RankedSaslAuthenticator sasl, string? loginOptions = null)
     {
         var events = new RecordingTransferEvents();
@@ -274,8 +318,13 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
             Mail = new MailRequestOptions { LoginOptions = loginOptions },
         };
 
+        Diagnostics.ArrangeRun(Url, connection.Script);
+        Diagnostics.Arrange("login options", Pop3Diagnostics.Show(loginOptions));
+
         TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider(), sasl)
             .ExecuteAsync(context);
+        Diagnostics.ActTransfer(result, events, connection.Sent);
+        Diagnostics.Act("diagnostic log", string.Join(" | ", log.Lines.Select(line => $"{line.Level}: {Pop3Diagnostics.Show(line.Message)}")));
 
         return (result, events, Encoding.Latin1.GetString(connection.Sent), log);
     }

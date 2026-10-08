@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -15,13 +17,18 @@ public sealed class CurlVersionTextTests
 
     private const string Features = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL TLS-SRP UnixSockets zstd";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public void Lines_Windows_NamesTheMingwTripleAndSchannel(bool isMacOS)
     {
-        IReadOnlyList<string> lines = CurlVersionText.Lines(isWindows: true, isMacOS);
+        IReadOnlyList<string> lines = Lines(isWindows: true, isMacOS);
 
+        AssertLines(["curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel", ReleaseDate, Protocols, Features], lines);
         CollectionAssert.AreEqual(
             new[] { "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel", ReleaseDate, Protocols, Features },
             lines.ToArray());
@@ -30,8 +37,9 @@ public sealed class CurlVersionTextTests
     [TestMethod]
     public void Lines_Linux_NamesTheGnuTripleAndOpenSsl()
     {
-        IReadOnlyList<string> lines = CurlVersionText.Lines(isWindows: false, isMacOS: false);
+        IReadOnlyList<string> lines = Lines(isWindows: false, isMacOS: false);
 
+        AssertLines(["curl 8.21.0 (x86_64-pc-linux-gnu) libcurl/8.21.0 OpenSSL", ReleaseDate, Protocols, Features], lines);
         CollectionAssert.AreEqual(
             new[] { "curl 8.21.0 (x86_64-pc-linux-gnu) libcurl/8.21.0 OpenSSL", ReleaseDate, Protocols, Features },
             lines.ToArray());
@@ -40,8 +48,9 @@ public sealed class CurlVersionTextTests
     [TestMethod]
     public void Lines_MacOS_NamesTheAppleTripleAndSecureTransport()
     {
-        IReadOnlyList<string> lines = CurlVersionText.Lines(isWindows: false, isMacOS: true);
+        IReadOnlyList<string> lines = Lines(isWindows: false, isMacOS: true);
 
+        AssertLines(["curl 8.21.0 (aarch64-apple-darwin25.0.0) libcurl/8.21.0 SecureTransport", ReleaseDate, Protocols, Features], lines);
         CollectionAssert.AreEqual(
             new[] { "curl 8.21.0 (aarch64-apple-darwin25.0.0) libcurl/8.21.0 SecureTransport", ReleaseDate, Protocols, Features },
             lines.ToArray());
@@ -50,8 +59,15 @@ public sealed class CurlVersionTextTests
     [TestMethod]
     public void Lines_Windows_JoinedWithCrlf_AreTheBytesTheAdrRecords()
     {
-        string text = string.Concat(CurlVersionText.Lines(isWindows: true, isMacOS: false).Select(line => line + "\r\n"));
+        string text = string.Concat(Lines(isWindows: true, isMacOS: false).Select(line => line + "\r\n"));
+        Diagnostics.Bytes("text", System.Text.Encoding.ASCII.GetBytes(text));
 
+        string expected =
+            "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel\r\n"
+            + "Release-Date: 2026-06-24\r\n"
+            + "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss\r\n"
+            + "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL TLS-SRP UnixSockets zstd\r\n";
+        Diagnostics.Diff("text", expected, text);
         Assert.AreEqual(
             "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel\r\n"
             + "Release-Date: 2026-06-24\r\n"
@@ -59,4 +75,17 @@ public sealed class CurlVersionTextTests
             + "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL TLS-SRP UnixSockets zstd\r\n",
             text);
     }
+
+    /// <summary>Returns <see cref="CurlVersionText.Lines"/> for the given platform, writing the platform and the lines as diagnostics.</summary>
+    private IReadOnlyList<string> Lines(bool isWindows, bool isMacOS)
+    {
+        Diagnostics.Arrange("is windows", isWindows);
+        Diagnostics.Arrange("is macOS", isMacOS);
+        IReadOnlyList<string> lines = CurlVersionText.Lines(isWindows, isMacOS);
+        Diagnostics.Act("lines", CommandLineParseDiagnostics.QuoteEach(lines));
+        return lines;
+    }
+
+    private void AssertLines(string[] expected, IReadOnlyList<string> actual) =>
+        Diagnostics.Assert("lines", CommandLineParseDiagnostics.QuoteEach(expected), CommandLineParseDiagnostics.QuoteEach(actual));
 }

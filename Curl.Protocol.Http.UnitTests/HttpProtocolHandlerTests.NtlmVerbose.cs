@@ -26,9 +26,14 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_NtlmBareChallengeAfterType3Verbose_WritesRejectedAndProblemBeforeTheChallengeHeader()
     {
         ScriptedTokenSource tokens = new(NtlmType1Step, NtlmType1Step, NtlmType3Step);
+        Diagnostics.Arrange("scripted responses", "401 NTLM challenge, 401 bare NTLM");
+        Diagnostics.Arrange("context steps", "Type 1, Type 1, Type 3");
 
         List<string> lines = await NtlmVerboseLinesAsync(NegotiateHandler, tokens, CurlExitCode.Ok, KeepAliveNtlmChallenge, KeepAliveBareNtlmChallenge);
 
+        WriteEvents("events", lines);
+        Diagnostics.Assert("last head lines", OneLine("< HTTP/1.1 401 Unauthorized | * NTLM handshake rejected | * NTLM authentication problem, ignoring. | < WWW-Authenticate: NTLM | < Content-Length: 4"), OneLine(string.Join(" | ", LastHeadLines(lines))));
+        Diagnostics.Assert("request heads", 2, lines.Count(line => line.StartsWith("> GET", StringComparison.Ordinal)));
         CollectionAssert.AreEqual(
             new[] { "< HTTP/1.1 401 Unauthorized", "* NTLM handshake rejected", "* NTLM authentication problem, ignoring.", "< WWW-Authenticate: NTLM", "< Content-Length: 4" },
             LastHeadLines(lines));
@@ -39,9 +44,14 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_NtlmBareChallengeTwiceVerbose_WritesInternalErrorAndProblemBeforeTheSecondChallengeHeader()
     {
         ScriptedTokenSource tokens = new(NtlmType1Step, NtlmType1Step);
+        Diagnostics.Arrange("scripted responses", "401 bare NTLM, 401 bare NTLM");
+        Diagnostics.Arrange("context steps", "Type 1, Type 1");
 
         List<string> lines = await NtlmVerboseLinesAsync(NegotiateHandler, tokens, CurlExitCode.Ok, KeepAliveBareNtlmChallenge, KeepAliveBareNtlmChallenge);
 
+        WriteEvents("events", lines);
+        Diagnostics.Assert("last head lines", OneLine("< HTTP/1.1 401 Unauthorized | * NTLM handshake failure (internal error) | * NTLM authentication problem, ignoring. | < WWW-Authenticate: NTLM | < Content-Length: 4"), OneLine(string.Join(" | ", LastHeadLines(lines))));
+        Diagnostics.Assert("request heads", 2, lines.Count(line => line.StartsWith("> GET", StringComparison.Ordinal)));
         CollectionAssert.AreEqual(
             new[] { "< HTTP/1.1 401 Unauthorized", "* NTLM handshake failure (internal error)", "* NTLM authentication problem, ignoring.", "< WWW-Authenticate: NTLM", "< Content-Length: 4" },
             LastHeadLines(lines));
@@ -52,10 +62,15 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_NtlmChallengeNotBase64Verbose_WritesProblemBeforeTheChallengeHeader()
     {
         ScriptedTokenSource tokens = new(NtlmType1Step);
+        Diagnostics.Arrange("scripted responses", "401 NTLM @@@notbase64");
+        Diagnostics.Arrange("context steps", "Type 1");
 
         List<string> lines = await NtlmVerboseLinesAsync(
             NegotiateHandler, tokens, CurlExitCode.Ok, "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: NTLM @@@notbase64\r\nContent-Length: 4\r\n\r\nnope");
 
+        WriteEvents("events", lines);
+        Diagnostics.Assert("last head lines", OneLine("< HTTP/1.1 401 Unauthorized | * NTLM authentication problem, ignoring. | < WWW-Authenticate: NTLM @@@notbase64 | < Content-Length: 4"), OneLine(string.Join(" | ", LastHeadLines(lines))));
+        Diagnostics.Assert("request heads", 1, lines.Count(line => line.StartsWith("> GET", StringComparison.Ordinal)));
         CollectionAssert.AreEqual(
             new[] { "< HTTP/1.1 401 Unauthorized", "* NTLM authentication problem, ignoring.", "< WWW-Authenticate: NTLM @@@notbase64", "< Content-Length: 4" },
             LastHeadLines(lines));
@@ -68,8 +83,13 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedTokenSource tokens = new(NtlmType1Step, NtlmType1Step, new SecurityContextStep(SecurityContextStatus.MalformedToken, []));
 
+        Diagnostics.Arrange("scripted responses", "401 NTLM challenge");
+        Diagnostics.Arrange("context steps", "Type 1, Type 1, MalformedToken");
+
         List<string> lines = await NtlmVerboseLinesAsync(NegotiateHandler, tokens, CurlExitCode.Ok, KeepAliveNtlmChallenge);
 
+        WriteEvents("events", lines);
+        Diagnostics.Assert("last head lines", OneLine("< HTTP/1.1 401 Unauthorized | * NTLM handshake failure (bad type-2 message) | * NTLM authentication problem, ignoring. | < WWW-Authenticate: NTLM BAUG | < Content-Length: 4"), OneLine(string.Join(" | ", LastHeadLines(lines))));
         CollectionAssert.AreEqual(
             new[] { "< HTTP/1.1 401 Unauthorized", "* NTLM handshake failure (bad type-2 message)", "* NTLM authentication problem, ignoring.", "< WWW-Authenticate: NTLM BAUG", "< Content-Length: 4" },
             LastHeadLines(lines));
@@ -86,9 +106,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedTokenSource tokens = new(NtlmType1Step, NtlmType1Step, new SecurityContextStep(SecurityContextStatus.MalformedToken, []));
 
+        Diagnostics.Arrange("scripted responses", "401 NTLM challenge");
+        Diagnostics.Arrange("context steps", "Type 1, Type 1, MalformedToken");
+
         List<string> lines = await NtlmVerboseLinesAsync(SspiNtlmHandler, tokens, CurlExitCode.AuthError, KeepAliveNtlmChallenge);
 
         int issued = lines.IndexOf("* Issue another request to this URL: 'http://127.0.0.1:18183/a'");
+        WriteEvents("events", lines);
+        Diagnostics.Assert("lines around the next request", OneLine("< WWW-Authenticate: NTLM BAUG | < Content-Length: 4 | * Ignoring the response-body | * setting size while ignoring | <  | * Connection #0 to host 127.0.0.1:18183 left intact | * Issue another request to this URL: 'http://127.0.0.1:18183/a' | * Reusing existing http: connection with host 127.0.0.1 | * NTLM handshake failure (type-3 message): Status=0x80090308\n"), OneLine(string.Join(" | ", lines[(issued - 6)..(issued + 3)])));
+        Diagnostics.Assert("request heads", 1, lines.Count(line => line.StartsWith("> GET", StringComparison.Ordinal)));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -112,12 +138,19 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedTokenSource tokens = new(NtlmType1Step, NtlmType1Step, new SecurityContextStep(SecurityContextStatus.MalformedToken, []));
         TurnTakingConnection connection = new(65536, KeepAliveNtlmChallenge);
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "401 NTLM challenge");
+        Diagnostics.Arrange("context steps", "Type 1, Type 1, MalformedToken");
 
         TransferResult result = await SspiNtlmHandler(QueueConnector.For(connection), tokens).ExecuteAsync(NtlmVerboseContext(output, NoTransferEvents.Instance));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.AuthError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.AuthError, result.ExitCode);
+        Diagnostics.Assert("error message", "An authentication function returned an error", result.ErrorMessage);
         Assert.AreEqual("An authentication function returned an error", result.ErrorMessage);
+        Diagnostics.Assert("output length", 0L, output.Length);
         Assert.AreEqual(0L, output.Length);
+        Diagnostics.Diff("request written", OneLine(NtlmRequest("AQID")), OneLine(connection.Written));
         Assert.AreEqual(NtlmRequest("AQID"), connection.Written);
     }
 
@@ -126,6 +159,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, ProxyNtlmChallengeHead, ProxyNtlmRejectedHead);
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("scripted responses", "407 NTLM challenge, 407 bare NTLM");
 
         TransferResult result = await ProxyTokenHandler(QueueConnector.For(connection), NtlmTokens(), HttpAuthSchemes.Ntlm).ExecuteAsync(new TransferContext
         {
@@ -135,7 +169,11 @@ public sealed partial class HttpProtocolHandlerTests
             Events = events,
         });
 
+        WriteResult(result);
+        WriteEvents("events", FirstLinesOf(events));
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("last head lines", OneLine("< HTTP/1.1 407 Proxy Authentication Required | * NTLM handshake rejected | * NTLM authentication problem, ignoring. | < Proxy-Authenticate: NTLM | < Content-Length: 0"), OneLine(string.Join(" | ", LastHeadLines(FirstLinesOf(events)))));
         CollectionAssert.AreEqual(
             new[] { "< HTTP/1.1 407 Proxy Authentication Required", "* NTLM handshake rejected", "* NTLM authentication problem, ignoring.", "< Proxy-Authenticate: NTLM", "< Content-Length: 0" },
             LastHeadLines(FirstLinesOf(events)));

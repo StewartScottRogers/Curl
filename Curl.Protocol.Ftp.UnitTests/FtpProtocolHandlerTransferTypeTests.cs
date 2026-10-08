@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -14,6 +15,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerTransferTypeTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:47633/dir/f.txt";
 
     private const string File = "l1\nl2\r\n";
@@ -38,11 +41,15 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_UseAscii_SendsTypeAAndNoSizeAndCopiesTheBytesUnchanged()
     {
-        // curl -B ftp://127.0.0.1:47633/dir/f.txt
-        FtpRun run = await DownloadAsync(Url, Typed + Transferred + Bye, context => context.UseAscii = true);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -B ftp://127.0.0.1:47633/dir/f.txt
+        FtpRun run = await DownloadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.UseAscii = true);
+
+        diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(File, run.OutputText);
+        diagnostics.Assert("result", TransferResult.Success(7), run.Result);
         Assert.AreEqual(TransferResult.Success(7), run.Result);
     }
 
@@ -51,9 +58,13 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [DataRow(";type=A", DisplayName = "upper-case code")]
     public async Task ExecuteAsync_TypeASuffix_SendsTypeAForTheFileWithoutTheSuffix(string suffix)
     {
-        // curl ftp://127.0.0.1:47633/dir/f.txt;type=a
-        FtpRun run = await DownloadAsync(Url + suffix, Typed + Transferred + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("suffix", suffix);
 
+        // curl ftp://127.0.0.1:47633/dir/f.txt;type=a
+        FtpRun run = await DownloadAsync(diagnostics, Url + suffix, Typed + Transferred + Bye);
+
+        diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(File, run.OutputText);
     }
@@ -64,9 +75,13 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [DataRow(";type=x", DisplayName = "unknown code")]
     public async Task ExecuteAsync_UseAsciiWithAnotherTypeCode_SendsTypeIAndSize(string suffix)
     {
-        // curl -B ftp://127.0.0.1:47633/dir/f.txt;type=i
-        FtpRun run = await DownloadAsync(Url + suffix, Typed + "213 7\r\n" + Transferred + Bye, context => context.UseAscii = true);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("suffix", suffix);
 
+        // curl -B ftp://127.0.0.1:47633/dir/f.txt;type=i
+        FtpRun run = await DownloadAsync(diagnostics, Url + suffix, Typed + "213 7\r\n" + Transferred + Bye, context => context.UseAscii = true);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE I\r\nSIZE f.txt\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE I\r\nSIZE f.txt\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(File, run.OutputText);
     }
@@ -76,9 +91,13 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [DataRow(";type=D", DisplayName = "upper-case code")]
     public async Task ExecuteAsync_TypeDSuffixOnAFile_ListsNamesWithNlst(string suffix)
     {
-        // curl ftp://127.0.0.1:47633/dir/f.txt;type=d
-        FtpRun run = await DownloadAsync(Url + suffix, Typed + Transferred + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("suffix", suffix);
 
+        // curl ftp://127.0.0.1:47633/dir/f.txt;type=d
+        FtpRun run = await DownloadAsync(diagnostics, Url + suffix, Typed + Transferred + Bye);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nNLST\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nNLST\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(File, run.OutputText);
     }
@@ -86,18 +105,24 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_ListOnlyWithTypeASuffix_ListsNamesWithNlst()
     {
-        // curl -l ftp://127.0.0.1:47633/dir/f.txt;type=a
-        FtpRun run = await DownloadAsync(Url + ";type=a", Typed + Transferred + Bye, context => context.ListOnly = true);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -l ftp://127.0.0.1:47633/dir/f.txt;type=a
+        FtpRun run = await DownloadAsync(diagnostics, Url + ";type=a", Typed + Transferred + Bye, context => context.ListOnly = true);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nNLST\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nNLST\r\nQUIT\r\n", run.Sent);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TypeASuffixOnADirectory_ListsWithList()
     {
-        // curl ftp://127.0.0.1:47633/dir/;type=a
-        FtpRun run = await DownloadAsync("ftp://127.0.0.1:47633/dir/;type=a", Typed + Transferred + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl ftp://127.0.0.1:47633/dir/;type=a
+        FtpRun run = await DownloadAsync(diagnostics, "ftp://127.0.0.1:47633/dir/;type=a", Typed + Transferred + Bye);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nLIST\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nLIST\r\nQUIT\r\n", run.Sent);
     }
 
@@ -108,18 +133,28 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [DataRow("f.txt%3Btype=a", "f.txt;type=a", DisplayName = "encoded semicolon")]
     public async Task ExecuteAsync_SuffixThatIsNoTypeCode_StaysInTheFileName(string name, string sentName)
     {
-        // curl ftp://127.0.0.1:47633/dir/f.txt;TYPE=A
-        FtpRun run = await DownloadAsync("ftp://127.0.0.1:47633/dir/" + name, Typed + "213 7\r\n" + Transferred + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("file name", name);
+        diagnostics.Arrange("name expected on the wire", sentName);
 
+        // curl ftp://127.0.0.1:47633/dir/f.txt;TYPE=A
+        FtpRun run = await DownloadAsync(diagnostics, "ftp://127.0.0.1:47633/dir/" + name, Typed + "213 7\r\n" + Transferred + Bye);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE I\r\nSIZE " + sentName + "\r\nRETR " + sentName + "\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE I\r\nSIZE " + sentName + "\r\nRETR " + sentName + "\r\nQUIT\r\n", run.Sent);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TypeCodeInADirectorySegment_StaysInThatDirectory()
     {
-        // curl ftp://127.0.0.1:47633/dir;type=a/f.txt
-        FtpRun run = await DownloadAsync("ftp://127.0.0.1:47633/dir;type=a/f.txt", Typed + "213 7\r\n" + Transferred + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl ftp://127.0.0.1:47633/dir;type=a/f.txt
+        FtpRun run = await DownloadAsync(diagnostics, "ftp://127.0.0.1:47633/dir;type=a/f.txt", Typed + "213 7\r\n" + Transferred + Bye);
+
+        diagnostics.DiffSent(
+            "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir;type=a\r\nEPSV\r\nTYPE I\r\nSIZE f.txt\r\nRETR f.txt\r\nQUIT\r\n",
+            run.Sent);
         Assert.AreEqual(
             "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir;type=a\r\nEPSV\r\nTYPE I\r\nSIZE f.txt\r\nRETR f.txt\r\nQUIT\r\n",
             run.Sent);
@@ -128,9 +163,12 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_UseAsciiWithResume_SendsNoRestAndReadsTheWholeFile()
     {
-        // curl -B -C 3
-        FtpRun run = await DownloadAsync(Url, Typed + Transferred + Bye, context => context.UseAscii = true, resumeFrom: 3);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -B -C 3
+        FtpRun run = await DownloadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.UseAscii = true, resumeFrom: 3);
+
+        diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(File, run.OutputText);
     }
@@ -138,24 +176,32 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_UseAsciiWithBoundedRange_ReadsTheRangesLengthFromTheStartThenSendsAbor()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -B -r 1-3: no REST, three bytes from the start, then ABOR.
         FtpRun run = await DownloadAsync(
+            diagnostics,
             Url,
             Typed + Transferred + "502 Command not implemented\r\n" + Bye,
             context => context.UseAscii = true,
             range: ByteRange.Bounded(1, 3));
 
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual("l1\n", run.OutputText);
+        diagnostics.Assert("result", TransferResult.Success(3), run.Result);
         Assert.AreEqual(TransferResult.Success(3), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_UseAsciiWithOpenRange_ReadsTheWholeFile()
     {
-        // curl -B -r 2-
-        FtpRun run = await DownloadAsync(Url, Typed + Transferred + Bye, context => context.UseAscii = true, range: ByteRange.FromOffset(2));
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -B -r 2-
+        FtpRun run = await DownloadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.UseAscii = true, range: ByteRange.FromOffset(2));
+
+        diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(File, run.OutputText);
     }
@@ -163,13 +209,16 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_UseAsciiHead_SendsTypeAThenSizeAndRest()
     {
-        // curl -B -I
-        FtpRun run = await FtpRun.ExecuteAsync(
-            Url,
-            InDirectory + "213 20260927123456\r\n200 Type set\r\n213 7\r\n350 Restarting\r\n" + Bye,
-            "",
-            c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output, UseAscii = true });
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -B -I
+        string replies = InDirectory + "213 20260927123456\r\n200 Type set\r\n213 7\r\n350 Restarting\r\n" + Bye;
+        diagnostics.ArrangeFtp(Url, replies, "");
+        diagnostics.Arrange("options", "-B -I");
+        FtpRun run = await FtpRun.ExecuteAsync(Url, replies, "", c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output, UseAscii = true });
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent(InDirectorySent + "MDTM f.txt\r\nTYPE A\r\nSIZE f.txt\r\nREST 0\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "MDTM f.txt\r\nTYPE A\r\nSIZE f.txt\r\nREST 0\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(
             "Last-Modified: Sun, 27 Sep 2026 12:34:56 GMT\r\nContent-Length: 7\r\nAccept-ranges: bytes\r\n",
@@ -179,20 +228,27 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_UseAsciiUpload_SendsTypeAAndTheBytesUnchanged()
     {
-        // curl -T up.txt -B
-        FtpRun run = await UploadAsync(Url, Typed + Transferred + Bye, context => context.UseAscii = true);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -T up.txt -B
+        FtpRun run = await UploadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.UseAscii = true);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Upload, Encoding.Latin1.GetString(run.Data.Sent));
+        diagnostics.Assert("result", TransferResult.Success(7), run.Result);
         Assert.AreEqual(TransferResult.Success(7), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_UploadToATypeASuffix_SendsTypeAAndStoresWithoutTheSuffix()
     {
-        // curl -T up.txt ftp://127.0.0.1:47633/dir/f.txt;type=a
-        FtpRun run = await UploadAsync(Url + ";type=a", Typed + Transferred + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -T up.txt ftp://127.0.0.1:47633/dir/f.txt;type=a
+        FtpRun run = await UploadAsync(diagnostics, Url + ";type=a", Typed + Transferred + Bye);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Upload, Encoding.Latin1.GetString(run.Data.Sent));
     }
@@ -200,19 +256,26 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_Append_UploadsWithAppeAndTheBytesUnchanged()
     {
-        // curl -T up.txt -a
-        FtpRun run = await UploadAsync(Url, Typed + Transferred + Bye, context => context.Append = true);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -T up.txt -a
+        FtpRun run = await UploadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.Append = true);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE I\r\nAPPE f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE I\r\nAPPE f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Upload, Encoding.Latin1.GetString(run.Data.Sent));
+        diagnostics.Assert("result", TransferResult.Success(7), run.Result);
         Assert.AreEqual(TransferResult.Success(7), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_AppendResumingAtTheRemoteSize_SendsSizeThenQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -T up.txt -a -C -: the server already holds all seven bytes.
         FtpRun run = await UploadAsync(
+            diagnostics,
             Url,
             Typed + "213 7\r\n" + Bye,
             context =>
@@ -221,18 +284,23 @@ public sealed class FtpProtocolHandlerTransferTypeTests
                 context.ResumeUploadFromUnknownOffset = true;
             });
 
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE I\r\nSIZE f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE I\r\nSIZE f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(0, run.Data.Sent.Length);
+        diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ConvertLineEndings_SendsAndCountsTheConvertedBytes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -T up.txt --crlf: a\nb\r\nc\n is sent as the nine bytes a\r\nb\r\nc\r\n.
         var events = new RecordingTransferEvents();
         var progress = new RecordingProgress();
         FtpRun run = await UploadAsync(
+            diagnostics,
             Url,
             Typed + Transferred + Bye,
             context =>
@@ -242,8 +310,10 @@ public sealed class FtpProtocolHandlerTransferTypeTests
                 context.Progress = progress;
             });
 
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE I\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE I\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual("a\r\nb\r\nc\r\n", Encoding.Latin1.GetString(run.Data.Sent));
+        diagnostics.Assert("result", TransferResult.Success(9), run.Result);
         Assert.AreEqual(TransferResult.Success(9), run.Result);
         Assert.Contains("* upload completely sent off: 9 bytes", events.Transcript);
         Assert.AreEqual(9L, progress.Uploaded[^1].Item1);
@@ -252,24 +322,41 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     [TestMethod]
     public async Task ExecuteAsync_ConvertLineEndingsOverSeveralReads_KeepsACarriageReturnEndingOneReadPairedWithTheNext()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // 16383 bytes, then \r\n: the carriage return ends the first 16384-byte read and the
         // line feed starts the next, so nothing is inserted between them.
         string content = new string('x', 16383) + "\r\n" + "y\n";
-        FtpRun run = await UploadAsync(Url, Typed + Transferred + Bye, context => context.ConvertLineEndings = true, content);
+        FtpRun run = await UploadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.ConvertLineEndings = true, content);
 
-        Assert.AreEqual(new string('x', 16383) + "\r\ny\r\n", Encoding.Latin1.GetString(run.Data.Sent));
+        diagnostics.Diff("uploaded bytes", new string('x', 16383) + "\r\ny\r\n", Encoding.Latin1.GetString(run.Data.Sent));
+        Assert.AreEqual(new string('x', 16383) + "\r\ny\r\n",Encoding.Latin1.GetString(run.Data.Sent));
     }
 
-    private static Task<FtpRun> DownloadAsync(
+    private static async Task<FtpRun> DownloadAsync(
+        TestDiagnostics diagnostics,
         string url,
         string replies,
         Action<MutableFtpContext>? adjust = null,
         long? resumeFrom = null,
-        ByteRange? range = null) =>
-        FtpRun.ExecuteAsync(url, replies, File, c => MutableFtpContext.Build(c, null, adjust, resumeFrom, range));
+        ByteRange? range = null)
+    {
+        diagnostics.ArrangeFtp(url, replies, File);
+        diagnostics.Arrange("resume from", resumeFrom);
+        diagnostics.Arrange("range", range);
+        FtpRun run = await FtpRun.ExecuteAsync(url, replies, File, c => MutableFtpContext.Build(c, null, adjust, resumeFrom, range));
+        diagnostics.ActRun(run);
+        return run;
+    }
 
-    private static Task<FtpRun> UploadAsync(string url, string replies, Action<MutableFtpContext>? adjust = null, string content = Upload) =>
-        FtpRun.ExecuteAsync(url, replies, "", c => MutableFtpContext.Build(c, new MemoryStream(Encoding.Latin1.GetBytes(content)), adjust, null, null));
+    private static async Task<FtpRun> UploadAsync(TestDiagnostics diagnostics, string url, string replies, Action<MutableFtpContext>? adjust = null, string content = Upload)
+    {
+        diagnostics.ArrangeFtp(url, replies);
+        diagnostics.Arrange("upload bytes", content.Length);
+        FtpRun run = await FtpRun.ExecuteAsync(url, replies, "", c => MutableFtpContext.Build(c, new MemoryStream(Encoding.Latin1.GetBytes(content)), adjust, null, null));
+        diagnostics.ActRun(run);
+        return run;
+    }
 
     /// <summary>The options these tests set, gathered before the context is built.</summary>
     private sealed class MutableFtpContext

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -25,9 +26,20 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
     private readonly MemoryStream output = new();
 
     // `curl -v -k -o /dev/null https://host.docker.internal:28405/`, up to the handshake.
+    public TestContext TestContext { get; set; } = null!;
+
+    private static void WriteTextDiagnostics(TestDiagnostics diagnostics, string label, string expected, string actual)
+    {
+        diagnostics.Act(label, actual);
+        diagnostics.Diff(label, expected, actual);
+        diagnostics.Assert(label, expected, actual);
+    }
+
     [TestMethod]
     public void Tls13HandshakeWithoutVerification_RendersRecordsAndTrustAsCurlsOpenSslBuild()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "Tls13HandshakeWithoutVerification_RendersRecordsAndTrustAsCurlsOpenSslBuild");
         var writer = OpenSslWriter();
 
         writer.ReportInfo("ALPN: curl offers h2,http/1.1");
@@ -50,8 +62,7 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
         writer.ReportTlsMessage(Message(Tls13, TlsContentType.InnerContentType, sent: true, 1, 22));
         writer.ReportTlsMessage(Message(Tls13, TlsContentType.Handshake, sent: true, 52, 20));
 
-        Assert.AreEqual(
-            "* ALPN: curl offers h2,http/1.1\n" +
+        string expectedText = "* ALPN: curl offers h2,http/1.1\n" +
             "} [5 bytes data]\n" +
             "* TLSv1.3 (OUT), TLS handshake, Client hello (1):\n" +
             "} [1566 bytes data]\n" +
@@ -72,14 +83,19 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
             "* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):\n" +
             "} [1 bytes data]\n" +
             "* TLSv1.3 (OUT), TLS handshake, Finished (20):\n" +
-            "} [52 bytes data]\n",
-            Written());
+            "} [52 bytes data]\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     // The same exchange after the request: the session tickets and the server's close notify.
     [TestMethod]
     public void Tls13SessionTicketsAndCloseNotify_RenderAsCurlsOpenSslBuild()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "Tls13SessionTicketsAndCloseNotify_RenderAsCurlsOpenSslBuild");
         var writer = OpenSslWriter();
 
         writer.ReportTlsMessage(Message(Tls13, TlsContentType.RecordHeader, sent: false, 5));
@@ -88,22 +104,26 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
         writer.ReportInfo("HTTP 1.0, assume close after body");
         writer.ReportTlsMessage(Message(Tls13, TlsContentType.Alert, sent: false, 2, 1, 0));
 
-        Assert.AreEqual(
-            "{ [5 bytes data]\n" +
+        string expectedText = "{ [5 bytes data]\n" +
             "* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):\n" +
             "{ [249 bytes data]\n" +
             "* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):\n" +
             "{ [249 bytes data]\n" +
             "* HTTP 1.0, assume close after body\n" +
             "* TLSv1.3 (IN), TLS alert, close notify (256):\n" +
-            "{ [2 bytes data]\n",
-            Written());
+            "{ [2 bytes data]\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     // `curl -v -k --tls-max 1.2 -o /dev/null https://host.docker.internal:28405/`.
     [TestMethod]
     public void Tls12Handshake_RendersRecordsAsCurlsOpenSslBuild()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "Tls12Handshake_RendersRecordsAsCurlsOpenSslBuild");
         var writer = OpenSslWriter();
 
         writer.ReportTlsMessage(Message(Tls12, TlsContentType.Handshake, sent: true, 229, 1));
@@ -116,8 +136,7 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
         writer.ReportTlsMessage(Message(Tls12, TlsContentType.Handshake, sent: true, 16, 20));
         writer.ReportTlsMessage(Message(Tls12, TlsContentType.Handshake, sent: false, 16, 20));
 
-        Assert.AreEqual(
-            "* TLSv1.2 (OUT), TLS handshake, Client hello (1):\n" +
+        string expectedText = "* TLSv1.2 (OUT), TLS handshake, Client hello (1):\n" +
             "} [229 bytes data]\n" +
             "* TLSv1.2 (IN), TLS handshake, Server hello (2):\n" +
             "{ [108 bytes data]\n" +
@@ -134,17 +153,26 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
             "* TLSv1.2 (OUT), TLS handshake, Finished (20):\n" +
             "} [16 bytes data]\n" +
             "* TLSv1.2 (IN), TLS handshake, Finished (20):\n" +
-            "{ [16 bytes data]\n",
-            Written());
+            "{ [16 bytes data]\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     [TestMethod]
     public void TlsMessage_DataLinesHidden_WritesOnlyTheLine()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsMessage_DataLinesHidden_WritesOnlyTheLine");
         new VerboseTransferEventWriter(output, writesDataLines: false, TlsBackend.OpenSsl)
             .ReportTlsMessage(Message(Tls13, TlsContentType.Handshake, sent: true, 1566, 1));
 
-        Assert.AreEqual("* TLSv1.3 (OUT), TLS handshake, Client hello (1):\n", Written());
+        string expectedText = "* TLSv1.3 (OUT), TLS handshake, Client hello (1):\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     // `--cacert /w/cert.pem --connect-to localhost:28405:host.docker.internal:28405
@@ -155,6 +183,11 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
     [DataRow("/cacert.pem", null, "*   CAfile: /cacert.pem\n")]
     public void TlsTrust_TrustAnchors_RenderAsCurlsOpenSslBuild(string caFile, string? caDirectory, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsTrust_TrustAnchors_RenderAsCurlsOpenSslBuild");
+        diagnostics.Arrange("caFile", caFile);
+        diagnostics.Arrange("caDirectory", caDirectory);
+        diagnostics.Arrange("expected", expected);
         OpenSslWriter().ReportTlsTrust(new TlsTrustEvent
         {
             VerifiesPeer = true,
@@ -162,7 +195,11 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
             CaCertificateDirectory = caDirectory,
         });
 
-        Assert.AreEqual("* SSL Trust Anchors:\n" + expected, Written());
+        string expectedText = "* SSL Trust Anchors:\n" + expected;
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     // `--cacert` with https://localhost:28405/ and https://127.0.0.1:28405/: the host-name line
@@ -172,29 +209,41 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
     [DataRow("127.0.0.1", "*   subjectAltName: \"127.0.0.1\" matches cert's IP address!\n")]
     public void TlsHandshake_HostNameMatches_WritesTheMatchBeforeTheVerifyResult(string hostName, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsHandshake_HostNameMatches_WritesTheMatchBeforeTheVerifyResult");
+        diagnostics.Arrange("hostName", hostName);
+        diagnostics.Arrange("expected", expected);
         using var certificate = MeasuredCertificate();
 
         OpenSslWriter().ReportTlsHandshake(Handshake(certificate) with { VerifiedHostName = hostName, CertificateVerifyResult = 0 });
 
-        StringAssert.EndsWith(
-            Written(),
-            "*   Certificate level 0: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption\n" +
+        string actualText = Written();
+        string expectedPart = "*   Certificate level 0: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption\n" +
             expected +
             "* OpenSSL verify result: 0\n" +
-            "* SSL certificate verified via OpenSSL.\n");
+            "* SSL certificate verified via OpenSSL.\n";
+        diagnostics.Act("output", actualText);
+        diagnostics.Assert("output EndsWith expected part", true, actualText.EndsWith(expectedPart, StringComparison.Ordinal));
+
+        StringAssert.EndsWith(actualText, expectedPart);
     }
 
     // `--cacert` with https://wrong.test:28405/: curl stops before the verify result.
     [TestMethod]
     public void TlsHandshake_HostNameDoesNotMatch_WritesTheMismatchAndNoVerifyResult()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsHandshake_HostNameDoesNotMatch_WritesTheMismatchAndNoVerifyResult");
         using var certificate = MeasuredCertificate();
 
         OpenSslWriter().ReportTlsHandshake(Handshake(certificate) with { VerifiedHostName = "wrong.test", CertificateVerifyResult = 0 });
 
-        StringAssert.EndsWith(
-            Written(),
-            "signed using sha256WithRSAEncryption\n*  subjectAltName does not match hostname wrong.test\n");
+        string actualText = Written();
+        string expectedPart = "signed using sha256WithRSAEncryption\n*  subjectAltName does not match hostname wrong.test\n";
+        diagnostics.Act("output", actualText);
+        diagnostics.Assert("output EndsWith expected part", true, actualText.EndsWith(expectedPart, StringComparison.Ordinal));
+
+        StringAssert.EndsWith(actualText, expectedPart);
     }
 
     // A certificate with no subjectAltName, CN=localhost, as https://localhost:28406/ and
@@ -204,48 +253,75 @@ public sealed class VerboseTransferEventWriterOpenSslTlsTests
     [DataRow("other", "")]
     public void TlsHandshake_CertificateWithoutAlternativeNames_ChecksTheCommonName(string hostName, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsHandshake_CertificateWithoutAlternativeNames_ChecksTheCommonName");
+        diagnostics.Arrange("hostName", hostName);
+        diagnostics.Arrange("expected", expected);
         using var certificate = SelfSigned("CN=localhost", alternativeNames: null);
 
         OpenSslWriter().ReportTlsHandshake(Handshake(certificate) with { VerifiedHostName = hostName, CertificateVerifyResult = 0 });
 
-        StringAssert.EndsWith(Written(), "*   issuer: CN=localhost\n" + SelfSignedLevelLine + expected);
+        string actualText = Written();
+        string expectedPart = "*   issuer: CN=localhost\n" + SelfSignedLevelLine + expected;
+        diagnostics.Act("output", actualText);
+        diagnostics.Assert("output EndsWith expected part", true, actualText.EndsWith(expectedPart, StringComparison.Ordinal));
+
+        StringAssert.EndsWith(actualText, expectedPart);
     }
 
     // subjectAltName other.test and *.example.test, as https://A.Example.test:28407/.
     [TestMethod]
     public void TlsHandshake_WildcardAlternativeName_WritesTheNameAsGivenAndThePattern()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsHandshake_WildcardAlternativeName_WritesTheNameAsGivenAndThePattern");
         using var certificate = SelfSigned("CN=wild", ["other.test", "*.example.test"]);
 
         OpenSslWriter().ReportTlsHandshake(Handshake(certificate) with { VerifiedHostName = "A.Example.test", CertificateVerifyResult = 0 });
 
-        StringAssert.Contains(Written(), "*   issuer: CN=wild\n" + SelfSignedLevelLine + "*   subjectAltName: \"A.Example.test\" matches cert's \"*.example.test\"\n* OpenSSL verify result: 0\n");
+        string actualText = Written();
+        string expectedPart = "*   issuer: CN=wild\n" + SelfSignedLevelLine + "*   subjectAltName: \"A.Example.test\" matches cert's \"*.example.test\"\n* OpenSSL verify result: 0\n";
+        diagnostics.Act("output", actualText);
+        diagnostics.Assert("output Contains expected part", true, actualText.Contains(expectedPart, StringComparison.Ordinal));
+
+        StringAssert.Contains(actualText, expectedPart);
     }
 
     // `-sv --proxy-insecure -x https://host.docker.internal:28405 http://example.test/`.
     [TestMethod]
     public void TlsHandshake_Proxy_SaysProxyCertificate()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsHandshake_Proxy_SaysProxyCertificate");
         using var certificate = MeasuredCertificate();
 
         OpenSslWriter().ReportTlsHandshake(Handshake(certificate) with { IsProxy = true, CertificateVerifyResult = 18 });
 
-        StringAssert.Contains(Written(), "* ALPN: server accepted http/1.1\n* Proxy certificate:\n*   subject: CN=localhost\n");
+        string actualText = Written();
+        string expectedPart = "* ALPN: server accepted http/1.1\n* Proxy certificate:\n*   subject: CN=localhost\n";
+        diagnostics.Act("output", actualText);
+        diagnostics.Assert("output Contains expected part", true, actualText.Contains(expectedPart, StringComparison.Ordinal));
+
+        StringAssert.Contains(actualText, expectedPart);
     }
 
     [TestMethod]
     public void TlsEvents_Schannel_WriteOnlyTheSchannelTrustLines()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsEvents_Schannel_WriteOnlyTheSchannelTrustLines");
         var writer = new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.Schannel);
 
         writer.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = false, TargetsIpAddress = true });
         writer.ReportTlsMessage(Message(Tls13, TlsContentType.Handshake, sent: true, 1566, 1));
         writer.ReportTlsData(new byte[5], sent: false);
 
-        Assert.AreEqual(
-            "* schannel: disabled automatic use of client certificate\n" +
-            "* schannel: using IP address, SNI is not supported by OS.\n",
-            Written());
+        string expectedText = "* schannel: disabled automatic use of client certificate\n" +
+            "* schannel: using IP address, SNI is not supported by OS.\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     private static TlsMessageEvent Message(int version, TlsContentType contentType, bool sent, int length, params byte[] start)

@@ -37,8 +37,15 @@
     With -Library, the tests that run are only the *.UnitTests projects whose project
     references reach a named library, directly or through other projects - the only
     tests that can execute its code - one dotnet test per project into the same
-    results directory (BL-1318). Without it, or when no test project reaches the names,
+    results directory (BL-1318). With -IncludeIntegration as well, the
+    *.IntegrationTests projects that reach a named library run too; without it they
+    are left out, since the Integration filter would skip every test they hold
+    (ADR-0421, BL-1605). Without -Library, or when no test project reaches the names,
     the whole solution runs.
+
+    Test assemblies of both kinds, *.UnitTests and *.IntegrationTests, are never
+    reported as production code, and no file under either kind of project is listed
+    among the coverage exclusions in production code.
 
 .PARAMETER SkipTestRun
     Reuse the Cobertura files already in ResultsDirectory instead of running tests.
@@ -61,8 +68,10 @@
     An explicit value is used exactly as given.
 
 .PARAMETER IncludeIntegration
-    Run the integration tests too. Off by default, matching the fast test command in
-    CLAUDE.md.
+    Run the integration tests too: drop the TestCategory!=Integration filter and, with
+    -Library, also run the *.IntegrationTests projects that reach the named libraries.
+    Off by default, matching the fast test command in CLAUDE.md, which is the one
+    coverage is measured from (ADR-0421).
 
 .PARAMETER ReportPath
     Also write the Markdown report to this file.
@@ -122,9 +131,12 @@ if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
 }
 
 function Get-TestProjectsReaching {
-    # The *.UnitTests project files whose ProjectReference graph reaches a project whose
-    # name matches one of -Library (wildcards allowed; Curl.Console is the console project).
-    param([string] $Root, [string[]] $Library)
+    # The test project files whose ProjectReference graph reaches a project whose name
+    # matches one of -Library (wildcards allowed; Curl.Console is the console project).
+    # Test projects are the *.UnitTests ones and, with -IncludeIntegration, the
+    # *.IntegrationTests ones too; without it those are left out, because every test in
+    # them carries the Integration category the filter skips (ADR-0421, BL-1605).
+    param([string] $Root, [string[]] $Library, [switch] $IncludeIntegration)
     $projects = @{}
     foreach ($file in Get-ChildItem -Path $Root -Filter '*.csproj' -Recurse -Depth 1 -File) {
         $projects[$file.BaseName] = $file.FullName
@@ -137,7 +149,10 @@ function Get-TestProjectsReaching {
         })
     }
     $reaching = New-Object System.Collections.Generic.List[string]
-    foreach ($test in @($projects.Keys | Where-Object { $_ -like '*.UnitTests' } | Sort-Object)) {
+    $testProjects = @($projects.Keys | Where-Object {
+        ($_ -like '*.UnitTests') -or ($IncludeIntegration -and $_ -like '*.IntegrationTests')
+    } | Sort-Object)
+    foreach ($test in $testProjects) {
         $seen = New-Object System.Collections.Generic.HashSet[string]
         $queue = New-Object System.Collections.Generic.Queue[string]
         $queue.Enqueue($test)
@@ -166,7 +181,7 @@ if (-not $SkipTestRun) {
     # project reaches the names given, the whole solution runs as before.
     $testTargets = @(Join-Path $repositoryRoot 'Curl.slnx')
     if ($Library) {
-        $covering = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $Library)
+        $covering = @(Get-TestProjectsReaching -Root $repositoryRoot -Library $Library -IncludeIntegration:$IncludeIntegration)
         if ($covering.Count) { $testTargets = $covering }
     }
 
@@ -220,10 +235,12 @@ if ($coverageFiles.Count -eq 0) {
 
 # --- 2. Merge every report into one table of production methods -------------------
 
+# Production code is *.UnitLibrary and Curl.Console only. Test assemblies of both kinds,
+# *.UnitTests and *.IntegrationTests, are never production code (ADR-0421).
 function Test-IsProductionAssembly {
     param([string] $Name)
 
-    if ($Name -like '*.UnitTests') { return $false }
+    if ($Name -like '*.UnitTests' -or $Name -like '*.IntegrationTests') { return $false }
     return ($Name -like '*.UnitLibrary') -or ($Name -eq 'Curl.Console')
 }
 
@@ -463,9 +480,11 @@ foreach ($assembly in $assemblies) {
 
 # An excluded member is not in the coverage report at all, so exclusions are invisible
 # unless they are listed on purpose. An [ExcludeFromCodeCoverage] with no justifying
-# comment above it is a finding in its own right.
+# comment above it is a finding in its own right. Files in test projects of both kinds,
+# *.UnitTests and *.IntegrationTests, are not production code and are skipped. Both
+# separator classes match / as well as \, so the scan is right off Windows too.
 $excludeHits = @(Get-ChildItem -Path $repositoryRoot -Filter '*.cs' -Recurse |
-    Where-Object { $_.FullName -notmatch '\\(bin|obj|data)\\' -and $_.FullName -notmatch '\.UnitTests\\' } |
+    Where-Object { $_.FullName -notmatch '[\\/](bin|obj|data)[\\/]' -and $_.FullName -notmatch '\.(UnitTests|IntegrationTests)[\\/]' } |
     Select-String -Pattern 'ExcludeFromCodeCoverage' -SimpleMatch)
 
 $report.Add('## Coverage exclusions in production code')

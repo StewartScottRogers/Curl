@@ -31,6 +31,9 @@ namespace Curl.Protocol.Ldap;
 /// <param name="writer">Writes constructed elements with the dialect's length form.</param>
 internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter writer)
 {
+    /// <summary>The most <c>&amp;</c>, <c>|</c> and <c>!</c> sets one filter nests, so a deep filter cannot overflow the stack (ADR-0425).</summary>
+    internal const int MaximumSetDepth = 256;
+
     private static readonly Asn1Tag AndTag = new(TagClass.ContextSpecific, 0, isConstructed: true);
 
     private static readonly Asn1Tag OrTag = new(TagClass.ContextSpecific, 1, isConstructed: true);
@@ -64,6 +67,9 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
     private int position;
 
+    /// <summary>How many sets enclose the position.</summary>
+    private int setDepth;
+
     /// <summary>Gets the fewest items <c>&amp;</c> and <c>|</c> take: one for WinLDAP, none for <c>libldap</c>.</summary>
     private int EmptySetMinimum => isWinLdap ? 1 : 0;
 
@@ -77,11 +83,12 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
 
     /// <summary>Encodes <paramref name="filter" />.</summary>
     /// <param name="filter">The filter's string form, as a byte string.</param>
-    /// <returns>The encoded Filter elements - more than one only for WinLDAP's run of top-level items - or <see langword="null" /> when the build refuses the filter.</returns>
+    /// <returns>The encoded Filter elements - more than one only for WinLDAP's run of top-level items - or <see langword="null" /> when the build refuses the filter or it nests more than <see cref="MaximumSetDepth" /> sets.</returns>
     public byte[]? Encode(string filter)
     {
         text = filter;
         position = 0;
+        setDepth = 0;
         return filter.StartsWith('(') ? ParseTopLevel() : EncodeItem(filter);
     }
 
@@ -166,11 +173,15 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     /// <summary>Parses what follows a <c>(</c>: a set by its operator, or a simple item.</summary>
     private byte[]? ParseAfterParenthesis() => text[position] switch
     {
-        '&' => ParseSet(AndTag, EmptySetMinimum, int.MaxValue),
-        '|' => ParseSet(OrTag, EmptySetMinimum, int.MaxValue),
-        '!' => ParseSet(NotTag, 1, NotMaximum),
+        '&' => ParseNestedSet(AndTag, EmptySetMinimum, int.MaxValue),
+        '|' => ParseNestedSet(OrTag, EmptySetMinimum, int.MaxValue),
+        '!' => ParseNestedSet(NotTag, 1, NotMaximum),
         _ => ParseSimple(),
     };
+
+    /// <summary>Parses a set one level deeper, refusing it past <see cref="MaximumSetDepth" /> (ADR-0425).</summary>
+    private byte[]? ParseNestedSet(Asn1Tag tag, int minimum, int maximum) =>
+        ++setDepth > MaximumSetDepth ? null : ParseSet(tag, minimum, maximum);
 
     /// <summary>Parses the items of <c>&amp;</c>, <c>|</c> or <c>!</c> up to its <c>)</c>.</summary>
     private byte[]? ParseSet(Asn1Tag tag, int minimum, int maximum)
@@ -194,6 +205,7 @@ internal sealed class LdapFilterEncoder(LdapDialect dialect, LdapBerWriter write
     private byte[] CloseSet(Asn1Tag tag, List<byte[]> items)
     {
         position++;
+        setDepth--;
         return writer.Constructed(tag, [.. items]);
     }
 

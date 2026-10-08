@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -30,6 +31,10 @@ public sealed class CurlCommandRunnerTransferWarningTests
     private readonly MemoryStream standardError = new();
     private readonly InMemoryFileSystem fileSystem = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private static string ExpectedWarnings => CaPathWarnings.Replace("\r\n", Environment.NewLine, StringComparison.Ordinal);
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
@@ -40,10 +45,17 @@ public sealed class CurlCommandRunnerTransferWarningTests
         RecordingProtocolHandler http = RecordingProtocolHandler.Failing(
             "http", CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1 port 1");
 
+        Diagnostics.Arrange("handler behaviour", "http fails with exit 7, Failed to connect to 127.0.0.1 port 1");
+
         int exitCode = await RunAsync(["--capath", ".", "http://127.0.0.1:1/", "http://127.0.0.1:1/"], http);
 
+        Diagnostics.Assert("exit code", 7, exitCode);
         Assert.AreEqual(7, exitCode);
         string errorLine = "curl: (7) Failed to connect to 127.0.0.1 port 1" + Environment.NewLine;
+        Diagnostics.Diff(
+            "stderr",
+            Normalized(ExpectedWarnings + errorLine + ExpectedWarnings + errorLine),
+            Normalized(StandardErrorText));
         Assert.AreEqual(ExpectedWarnings + errorLine + ExpectedWarnings + errorLine, StandardErrorText);
     }
 
@@ -53,7 +65,13 @@ public sealed class CurlCommandRunnerTransferWarningTests
         int exitCode = await RunAsync(
             ["--capath", ".", "file:///Windows/win.ini"], 79, RecordingProtocolHandler.WritingPath("file"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: ignoring setting the CA path for the proxy, not supported by libcurl \n"
+            + "Warning: with Schannel\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "Warning: ignoring setting the CA path for the proxy, not supported by libcurl " + Environment.NewLine
             + "Warning: with Schannel" + Environment.NewLine,
@@ -66,7 +84,9 @@ public sealed class CurlCommandRunnerTransferWarningTests
         int exitCode = await RunAsync(
             ["--capath", ".", "file:///Windows/win.ini"], 200, RecordingProtocolHandler.WritingPath("file"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stderr", CaPathWarningLine + "\n", Normalized(StandardErrorText));
         Assert.AreEqual(CaPathWarningLine + Environment.NewLine, StandardErrorText);
     }
 
@@ -75,15 +95,20 @@ public sealed class CurlCommandRunnerTransferWarningTests
     {
         RecordingProtocolHandler file = new("file", _ =>
         {
+            Diagnostics.Diff("stderr when the handler runs", Normalized(ExpectedWarnings), Normalized(StandardErrorText));
             Assert.AreEqual(ExpectedWarnings, StandardErrorText);
 
             return ValueTask.FromResult(TransferResult.Success(0));
         });
+        Diagnostics.Arrange("handler behaviour", "file checks stderr already holds the warnings, then succeeds with 0 bytes");
 
         int exitCode = await RunAsync(["--capath", ".", "file:///Windows/win.ini"], file);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("handler call count", 1, file.Contexts.Count);
         Assert.HasCount(1, file.Contexts);
+        Diagnostics.Diff("stderr", Normalized(ExpectedWarnings), Normalized(StandardErrorText));
         Assert.AreEqual(ExpectedWarnings, StandardErrorText);
     }
 
@@ -92,7 +117,12 @@ public sealed class CurlCommandRunnerTransferWarningTests
     {
         int exitCode = await RunAsync(["--capath", ".", "dict://exa mple.com/d:x"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            Normalized(ExpectedWarnings) + "curl: (3) URL rejected: Malformed input to a URL function\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             ExpectedWarnings + "curl: (3) URL rejected: Malformed input to a URL function" + Environment.NewLine,
             StandardErrorText);
@@ -104,9 +134,14 @@ public sealed class CurlCommandRunnerTransferWarningTests
         fileSystem.UnwritablePaths.Add("out.txt");
 
         RecordingProtocolHandler empty = new("file", _ => ValueTask.FromResult(TransferResult.Success(0)));
+        Diagnostics.Arrange("handler behaviour", "file succeeds with 0 bytes");
 
         await RunAsync(["--capath", ".", "-o", "out.txt", "file:///empty"], empty);
 
+        Diagnostics.Assert(
+            "stderr starts with the warnings then the open warning",
+            true,
+            StandardErrorText.StartsWith(ExpectedWarnings + "Warning: Failed to open the file out.txt", StringComparison.Ordinal));
         StringAssert.StartsWith(StandardErrorText, ExpectedWarnings + "Warning: Failed to open the file out.txt");
     }
 
@@ -119,7 +154,12 @@ public sealed class CurlCommandRunnerTransferWarningTests
             ["--capath", ".", "-D", "hd.txt", "file:///Windows/win.ini"],
             RecordingProtocolHandler.WritingPath("file"));
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: Failed to open hd.txt\n" + "curl: (23) " + CurlCommandRunner.WriteReceivedDataFailedMessage + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: Failed to open hd.txt" + Environment.NewLine
             + "curl: (23) " + CurlCommandRunner.WriteReceivedDataFailedMessage + Environment.NewLine,
@@ -136,19 +176,26 @@ public sealed class CurlCommandRunnerTransferWarningTests
             "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel",
         ];
         string warnings = lines[0] + Environment.NewLine + lines[1] + Environment.NewLine;
+        IProtocolHandler[] handlers = [RecordingProtocolHandler.WritingPath("file")];
+        Diagnostics.Arrange("terminal columns", 79);
 
-        int exitCode = await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("file")]), lines),
+        int exitCode = await RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(handlers), lines),
                 fileSystem,
                 fileSystem,
                 standardOutput,
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: false,
-                79)
-            .RunAsync(["-o", "a", "-o", "b", "file:///Windows/win.ini", "file:///Windows/win.ini"]);
+                79),
+            ["-o", "a", "-o", "b", "file:///Windows/win.ini", "file:///Windows/win.ini"],
+            lines,
+            handlers);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stderr", Normalized(warnings + warnings), Normalized(StandardErrorText));
         Assert.AreEqual(warnings + warnings, StandardErrorText);
     }
 
@@ -161,18 +208,29 @@ public sealed class CurlCommandRunnerTransferWarningTests
         // names the output file before it sets the transfer's options.
         string[] lines = ["Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel"];
 
-        int exitCode = await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([RecordingProtocolHandler.WritingPath("http")]), lines),
+        IProtocolHandler[] handlers = [RecordingProtocolHandler.WritingPath("http")];
+        Diagnostics.Arrange("terminal columns", 79);
+
+        int exitCode = await RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(handlers), lines),
                 fileSystem,
                 fileSystem,
                 standardOutput,
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: false,
-                79)
-            .RunAsync([remoteName, "http://127.0.0.1:1/"]);
+                79),
+            [remoteName, "http://127.0.0.1:1/"],
+            lines,
+            handlers);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: No remote filename, uses \"curl_response\"\n" + lines[0] + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "Warning: No remote filename, uses \"curl_response\"" + Environment.NewLine + lines[0] + Environment.NewLine,
             StandardErrorText);
@@ -183,7 +241,12 @@ public sealed class CurlCommandRunnerTransferWarningTests
     {
         int exitCode = await RunAsync(["-O", "http://exa mple.com/"], RecordingProtocolHandler.WritingPath("http"));
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        Diagnostics.Assert(
+            "stderr contains No remote filename",
+            false,
+            StandardErrorText.Contains("No remote filename", StringComparison.Ordinal));
         Assert.IsFalse(StandardErrorText.Contains("No remote filename", StringComparison.Ordinal), StandardErrorText);
     }
 
@@ -195,15 +258,23 @@ public sealed class CurlCommandRunnerTransferWarningTests
         int exitCode = await RunAsync(
             ["--capath", ".", "file:///Windows/win.ini", silent], RecordingProtocolHandler.WritingPath("file"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Normalized(StandardErrorText));
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
+
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
         RunAsync(arguments, TerminalColumns.Default, handlers);
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, int terminalColumns, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, int terminalColumns, params IProtocolHandler[] handlers)
+    {
+        Diagnostics.Arrange("terminal columns", terminalColumns);
+
+        return await RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher(handlers), CaPathWarningLines),
                 fileSystem,
                 fileSystem,
@@ -211,6 +282,34 @@ public sealed class CurlCommandRunnerTransferWarningTests
                 standardError,
                 new MemoryStream(),
                 runsOnWindows: false,
-                terminalColumns)
-            .RunAsync(arguments);
+                terminalColumns),
+            arguments,
+            CaPathWarningLines,
+            handlers);
+    }
+
+    private async Task<int> RunWithDiagnosticsAsync(
+        CurlCommandRunner runner,
+        IReadOnlyList<string> arguments,
+        string[] warningLines,
+        IProtocolHandler[] handlers)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("warning lines before each transfer", string.Join(" | ", warningLines));
+        Diagnostics.Arrange(
+            "handler schemes",
+            string.Join(", ", handlers.Select(handler => string.Join('/', handler.SupportedSchemes))));
+        Diagnostics.Arrange("unwritable paths", string.Join(", ", fileSystem.UnwritablePaths));
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await runner.RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Act("stderr", Normalized(StandardErrorText));
+        return exitCode;
+    }
 }

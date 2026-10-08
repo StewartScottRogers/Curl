@@ -51,10 +51,11 @@ public sealed partial class SshUserAuthenticationTests
             PublicKeyOk("ssh-ed25519", Ed25519Blob),
             Success);
 
-        await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
+        await AuthenticateInPhaseAsync(peer);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         Assert.HasCount(3, written);
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[1]);
         AssertSigned(peer, written[2], "ssh-ed25519", Ed25519Blob);
     }
@@ -68,6 +69,7 @@ public sealed partial class SshUserAuthenticationTests
 
         byte[] signedRequest = (await AuthenticationMessagesAsync(peer))[2];
         byte[] signatureBlob = new SshWireReader(signedRequest.AsMemory(PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: true).Length)).ReadString().ToArray();
+        Diagnostics.Diff("signature blob", PinnedEd25519SignatureBlob, Convert.ToHexString(signatureBlob));
         Assert.AreEqual(PinnedEd25519SignatureBlob, Convert.ToHexString(signatureBlob));
     }
 
@@ -79,10 +81,12 @@ public sealed partial class SshUserAuthenticationTests
         KeyedPeer peer = await ConnectAsync(Keys(TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"], passphrase: passphrase), Failure("publickey,password"), Failure("publickey,password"));
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
-            async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+            async () => await AuthenticateInPhaseAsync(peer));
 
         AssertAuthenticationFailure(failure);
         AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: Reason unknown (-1)", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: Reason unknown (-1)"));
         CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Reason unknown (-1)");
     }
 
@@ -94,8 +98,10 @@ public sealed partial class SshUserAuthenticationTests
         KeyedPeer peer = await ConnectWithBackendAsync(
             "WinCNG", Keys(TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"], passphrase: passphrase), Failure("publickey,password"), Failure("publickey,password"));
 
-        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await AuthenticateInPhaseAsync(peer));
 
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: Reason unknown (-1)", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: Reason unknown (-1)"));
         CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Reason unknown (-1)");
     }
 
@@ -108,10 +114,12 @@ public sealed partial class SshUserAuthenticationTests
             "OpenSSL", Keys(TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"], passphrase: passphrase), Failure("publickey,password"), Failure("publickey,password"));
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
-            async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
+            async () => await AuthenticateInPhaseAsync(peer));
 
         AssertAuthenticationFailure(failure);
         AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format"));
         CollectionAssert.Contains(
             peer.Events.Transcript,
             "* SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format");
@@ -127,6 +135,8 @@ public sealed partial class SshUserAuthenticationTests
 
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format"));
         CollectionAssert.Contains(
             peer.Events.Transcript,
             "* SSH: publickey authentication denied: Unable to extract public key from private key file: Wrong passphrase or invalid/unrecognized private key file format");
@@ -139,6 +149,8 @@ public sealed partial class SshUserAuthenticationTests
 
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: Unable to extract public key from private key file: Unable to open private key file", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: Unable to extract public key from private key file: Unable to open private key file"));
         CollectionAssert.Contains(
             peer.Events.Transcript,
             "* SSH: publickey authentication denied: Unable to extract public key from private key file: Unable to open private key file");
@@ -156,6 +168,8 @@ public sealed partial class SshUserAuthenticationTests
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
         AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: Unable to open public key file", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: Unable to open public key file"));
         CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Unable to open public key file");
     }
 
@@ -169,6 +183,8 @@ public sealed partial class SshUserAuthenticationTests
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
         AssertMethods(await AuthenticationMessagesAsync(peer), "none", "password");
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: Invalid public key data", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: Invalid public key data"));
         CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: Invalid public key data");
     }
 
@@ -182,6 +198,8 @@ public sealed partial class SshUserAuthenticationTests
 
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: publickey authentication denied: No signing signature matched", true, peer.Events.Transcript.Contains("* SSH: publickey authentication denied: No signing signature matched"));
         CollectionAssert.Contains(peer.Events.Transcript, "* SSH: publickey authentication denied: No signing signature matched");
     }
 
@@ -200,6 +218,7 @@ public sealed partial class SshUserAuthenticationTests
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         Assert.HasCount(3, written);
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", algorithm, RsaBlob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", algorithm, RsaBlob, signed: false), written[1]);
         AssertSigned(peer, written[2], algorithm, RsaBlob);
     }
@@ -227,6 +246,7 @@ public sealed partial class SshUserAuthenticationTests
         AssertAuthenticationFailure(failure);
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         AssertMethods(written, "none", "publickey", "password");
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", "rsa-sha2-512", RsaBlob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-512", RsaBlob, signed: false), written[1]);
     }
 
@@ -323,6 +343,7 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[1]);
         AssertSigned(peer, written[2], "ssh-rsa", RsaBlob);
     }
@@ -345,6 +366,7 @@ public sealed partial class SshUserAuthenticationTests
         AssertAuthenticationFailure(failure);
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         AssertMethods(written, "none", "publickey", "password");
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", "ecdsa-sha2-nistp256", EcdsaBlob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ecdsa-sha2-nistp256", EcdsaBlob, signed: false), written[1], "an ECDSA key is not narrowed by server-sig-algs");
     }
 
@@ -391,6 +413,7 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", publicKey.KeyType, publicKey.Blob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", publicKey.KeyType, publicKey.Blob, signed: false), written[1]);
         AssertSigned(peer, written[2], publicKey.KeyType, publicKey.Blob);
     }
@@ -417,7 +440,9 @@ public sealed partial class SshUserAuthenticationTests
 
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
-        CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), (await AuthenticationMessagesAsync(peer))[1]);
+        List<byte[]> clientMessages = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), clientMessages[1]);
+        CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), clientMessages[1]);
     }
 
     [TestMethod]
@@ -428,7 +453,9 @@ public sealed partial class SshUserAuthenticationTests
 
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
-        CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), (await AuthenticationMessagesAsync(peer))[1]);
+        List<byte[]> clientMessages = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), clientMessages[1]);
+        CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), clientMessages[1]);
     }
 
     [TestMethod]
@@ -444,7 +471,9 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.RequestServiceAsync(CancellationToken.None);
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
-        CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), (await AuthenticationMessagesAsync(peer))[2]);
+        List<byte[]> clientMessages = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), clientMessages[2]);
+        CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), clientMessages[2]);
     }
 
     private static SshUserKeySource Keys(string? privateKeyText, string? publicKeyText = null, string? passphrase = null)
@@ -474,17 +503,22 @@ public sealed partial class SshUserAuthenticationTests
 
     // After a key exchange with the scripted server the client's messages are sealed, so the
     // transcript opens them with the client-to-server keys.
-    private static Task<KeyedPeer> ConnectAsync(SshUserKeySource keys, params byte[][] payloads) => ConnectWithAgentAsync(null, keys, payloads);
+    private Task<KeyedPeer> ConnectAsync(SshUserKeySource keys, params byte[][] payloads) => ConnectWithAgentAsync(null, keys, payloads);
 
-    private static Task<KeyedPeer> ConnectWithAgentAsync(ISshAgentConnector? agent, SshUserKeySource? keys, params byte[][] payloads) =>
+    private Task<KeyedPeer> ConnectWithAgentAsync(ISshAgentConnector? agent, SshUserKeySource? keys, params byte[][] payloads) =>
         ConnectWithPresetAsync(SshAlgorithmPreferences.Full, agent, keys, payloads);
 
     // Full's lists with a reference build's backend keep the scripted key exchange and name the backend.
-    private static Task<KeyedPeer> ConnectWithBackendAsync(string backend, SshUserKeySource keys, params byte[][] payloads) =>
+    private Task<KeyedPeer> ConnectWithBackendAsync(string backend, SshUserKeySource keys, params byte[][] payloads) =>
         ConnectWithPresetAsync(SshAlgorithmPreferences.Full with { CryptographyBackend = backend }, null, keys, payloads);
 
-    private static async Task<KeyedPeer> ConnectWithPresetAsync(SshAlgorithmPreferences preferences, ISshAgentConnector? agent, SshUserKeySource? keys, byte[][] payloads, string serverIdentification = TestKeyExchangeServer.ServerIdentification)
+    private async Task<KeyedPeer> ConnectWithPresetAsync(SshAlgorithmPreferences preferences, ISshAgentConnector? agent, SshUserKeySource? keys, byte[][] payloads, string serverIdentification = TestKeyExchangeServer.ServerIdentification)
     {
+        Diagnostics.Arrange("cryptography backend", preferences.CryptographyBackend ?? "(none: Full)");
+        Diagnostics.Arrange("agent", agent is null ? "(none)" : agent.GetType().Name);
+        Diagnostics.Arrange("key files", keys is null ? "(none)" : "--key " + KeyPath);
+        Diagnostics.Arrange("server identification", serverIdentification);
+        Diagnostics.ArrangeMessages("server messages after NEWKEYS", payloads);
         TestHostKey hostKey = TestHostKey.Ecdsa("nistp256", TestHostKey.FixedNistP256);
         SshKexInit serverKexInit = ServerKexInit("ecdh-sha2-nistp256", hostKey.Algorithm);
         TestEphemeralKeys ephemeralKeys = new();
@@ -500,36 +534,60 @@ public sealed partial class SshUserAuthenticationTests
 
         ScriptedConnection connection = new(script.Bytes);
         SshTransport transport = new(connection, preferences, EverythingImplemented, new RepeatingRandomSource(0x33), ephemeralKeys);
-        await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
+        using (Diagnostics.Phase("key exchange"))
+        {
+            await transport.ExchangeKeysAsync(await transport.NegotiateAlgorithmsAsync(CancellationToken.None), CancellationToken.None);
+        }
+
         TranscriptTransferEvents events = new();
         return new KeyedPeer(new SshUserAuthentication(transport, Encoding.UTF8, keys, events, agent), connection, exchange.ExchangeHash, SshPacketProtections.ForClientToServer(ctr, exchange.Keys(exchange.ExchangeHash)), events);
     }
 
-    // The client's messages after its KEXINIT, key-exchange message and NEWKEYS.
-    private static async Task<List<byte[]>> AuthenticationMessagesAsync(KeyedPeer peer) =>
-        [.. (await SshClientTranscript.PayloadsAsync(peer.Connection.Written, false, peer.ClientProtection)).Skip(3)];
-
-    private static void AssertMethods(List<byte[]> written, params string[] methods)
+    // Times the authentication as a PHASE line: an encrypted key's bcrypt_pbkdf is its slow part (BL-1558).
+    private async Task AuthenticateInPhaseAsync(KeyedPeer peer)
     {
+        using (Diagnostics.Phase("authentication"))
+        {
+            await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
+        }
+    }
+
+    // The client's messages after its KEXINIT, key-exchange message and NEWKEYS.
+    private async Task<List<byte[]>> AuthenticationMessagesAsync(KeyedPeer peer)
+    {
+        List<byte[]> written = [.. (await SshClientTranscript.PayloadsAsync(peer.Connection.Written, false, peer.ClientProtection)).Skip(3)];
+        Diagnostics.ActMessages("client messages", written);
+        return written;
+    }
+
+    private void AssertMethods(List<byte[]> written, params string[] methods)
+    {
+        Diagnostics.Assert("client message count", methods.Length, written.Count);
         Assert.HasCount(methods.Length, written);
         for (int index = 0; index < methods.Length; index++)
         {
             SshWireReader reader = new(written[index].AsMemory(1));
             reader.ReadString();
             reader.ReadString();
-            Assert.AreEqual(methods[index], reader.ReadName(), $"client message {index}");
+            string method = reader.ReadName();
+            Diagnostics.Assert($"client message {index} method", methods[index], method);
+            Assert.AreEqual(methods[index], method, $"client message {index}");
         }
     }
 
     // RFC 4252 section 7: the request with the flag set, then a signature blob naming the
     // algorithm, over the session identifier as a string and the request up to the blob.
-    private static void AssertSigned(KeyedPeer peer, byte[] message, string algorithm, byte[] publicKeyBlob)
+    private void AssertSigned(KeyedPeer peer, byte[] message, string algorithm, byte[] publicKeyBlob)
     {
         byte[] signedPart = PublicKeyRequest("tester", algorithm, publicKeyBlob, signed: true);
+        Diagnostics.Diff("signed request", signedPart, message.AsSpan(0, Math.Min(signedPart.Length, message.Length)));
         CollectionAssert.AreEqual(signedPart, message[..signedPart.Length]);
         SshWireReader signatureBlob = new(new SshWireReader(message.AsMemory(signedPart.Length)).ReadString());
-        Assert.AreEqual(algorithm, signatureBlob.ReadName());
+        string signatureAlgorithm = signatureBlob.ReadName();
+        Diagnostics.Assert("signature algorithm", algorithm, signatureAlgorithm);
+        Assert.AreEqual(algorithm, signatureAlgorithm);
         byte[] signature = signatureBlob.ReadString().ToArray();
+        Diagnostics.Bytes("signature", signature);
         Assert.IsTrue(Verify(publicKeyBlob, algorithm, Join(String(peer.SessionIdentifier), signedPart), signature), "the signature verifies against the public key");
     }
 

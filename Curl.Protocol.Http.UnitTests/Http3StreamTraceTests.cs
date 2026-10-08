@@ -1,4 +1,5 @@
 using Curl.Protocol.Http.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -10,12 +11,21 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class Http3StreamTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void TransferDone_WithAnotherStreamInUse_WritesNoNoActiveStreamsLine()
     {
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("transfer done", "stream 4 on connection 2, MAX_CONCURRENT 97, 1 stream in use");
+
         new Http3StreamTrace(events).TransferDone(4, 2, 97, 1);
+
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line count", 2, events.Info.Count);
 
         CollectionAssert.AreEqual(
             new[] { "[HTTP/3] [4] easy handle is done", "[HTTP/3] query conn[2]: MAX_CONCURRENT -> 97 (1 in use)" },

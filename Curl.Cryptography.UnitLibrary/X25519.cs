@@ -19,10 +19,10 @@ public static class X25519
     public const int KeySize = 32;
 
     /// <summary>(A - 2) / 4 for Curve25519's A = 486662, the ladder's a24 (RFC 7748 section 5).</summary>
-    private const ushort A24Low = 0xDB41;
+    private const uint A24 = 121665;
 
-    /// <summary>The high 16-bit limb of a24 = 121665 = 0x1DB41.</summary>
-    private const ushort A24High = 1;
+    /// <summary>The field elements one ladder step works in: A, AA, B, BB, E, C, D, DA and CB.</summary>
+    private const int LadderScratchElements = 9;
 
     /// <summary>
     /// Fills <paramref name="privateKey" /> with <see cref="KeySize" /> bytes from
@@ -85,7 +85,7 @@ public static class X25519
     private static void ScalarMultiply(ReadOnlySpan<byte> scalar, ReadOnlySpan<byte> uCoordinate, Span<byte> result)
     {
         Span<byte> clamped = stackalloc byte[KeySize];
-        Span<long> ladder = stackalloc long[5 * Field25519.LimbCount];
+        Span<long> ladder = stackalloc long[(5 + LadderScratchElements) * Field25519.LimbCount];
         Span<long> x1 = ladder[..Field25519.LimbCount];
         Span<long> x2 = ladder.Slice(Field25519.LimbCount, Field25519.LimbCount);
         Span<long> z2 = ladder.Slice(2 * Field25519.LimbCount, Field25519.LimbCount);
@@ -102,7 +102,7 @@ public static class X25519
             Field25519.SetSmall(z2, 0);
             x1.CopyTo(x3);
             Field25519.SetSmall(z3, 1);
-            RunLadder(clamped, x1, x2, z2, x3, z3);
+            RunLadder(clamped, x1, x2, z2, x3, z3, ladder[(5 * Field25519.LimbCount)..]);
             Field25519.Invert(z2, z2);
             Field25519.Multiply(x2, x2, z2);
             Field25519.Encode(result, x2);
@@ -124,7 +124,8 @@ public static class X25519
         Span<long> x2,
         Span<long> z2,
         Span<long> x3,
-        Span<long> z3)
+        Span<long> z3,
+        Span<long> scratch)
     {
         uint swap = 0;
         for (int bit = 254; bit >= 0; bit--)
@@ -134,7 +135,7 @@ public static class X25519
             Field25519.ConditionalSwap(x2, x3, swap);
             Field25519.ConditionalSwap(z2, z3, swap);
             swap = scalarBit;
-            LadderStep(x1, x2, z2, x3, z3);
+            LadderStep(x1, x2, z2, x3, z3, scratch);
         }
 
         Field25519.ConditionalSwap(x2, x3, swap);
@@ -147,9 +148,9 @@ public static class X25519
         Span<long> x2,
         Span<long> z2,
         Span<long> x3,
-        Span<long> z3)
+        Span<long> z3,
+        Span<long> scratch)
     {
-        Span<long> scratch = stackalloc long[9 * Field25519.LimbCount];
         Span<long> a = scratch[..Field25519.LimbCount];
         Span<long> aa = scratch.Slice(Field25519.LimbCount, Field25519.LimbCount);
         Span<long> b = scratch.Slice(2 * Field25519.LimbCount, Field25519.LimbCount);
@@ -159,32 +160,23 @@ public static class X25519
         Span<long> d = scratch.Slice(6 * Field25519.LimbCount, Field25519.LimbCount);
         Span<long> da = scratch.Slice(7 * Field25519.LimbCount, Field25519.LimbCount);
         Span<long> cb = scratch.Slice(8 * Field25519.LimbCount, Field25519.LimbCount);
-        try
-        {
-            Field25519.Add(a, x2, z2);
-            Field25519.Square(aa, a);
-            Field25519.Subtract(b, x2, z2);
-            Field25519.Square(bb, b);
-            Field25519.Subtract(e, aa, bb);
-            Field25519.Add(c, x3, z3);
-            Field25519.Subtract(d, x3, z3);
-            Field25519.Multiply(da, d, a);
-            Field25519.Multiply(cb, c, b);
-            Field25519.Add(x3, da, cb);
-            Field25519.Square(x3, x3);
-            Field25519.Subtract(z3, da, cb);
-            Field25519.Square(z3, z3);
-            Field25519.Multiply(z3, z3, x1);
-            Field25519.Multiply(x2, aa, bb);
-            Field25519.SetSmall(a, A24Low);
-            a[1] = A24High;
-            Field25519.Multiply(z2, e, a);
-            Field25519.Add(z2, z2, aa);
-            Field25519.Multiply(z2, z2, e);
-        }
-        finally
-        {
-            Field25519.Clear(scratch);
-        }
+        Field25519.Add(a, x2, z2);
+        Field25519.Square(aa, a);
+        Field25519.Subtract(b, x2, z2);
+        Field25519.Square(bb, b);
+        Field25519.Subtract(e, aa, bb);
+        Field25519.Add(c, x3, z3);
+        Field25519.Subtract(d, x3, z3);
+        Field25519.Multiply(da, d, a);
+        Field25519.Multiply(cb, c, b);
+        Field25519.Add(x3, da, cb);
+        Field25519.Square(x3, x3);
+        Field25519.Subtract(z3, da, cb);
+        Field25519.Square(z3, z3);
+        Field25519.Multiply(z3, z3, x1);
+        Field25519.Multiply(x2, aa, bb);
+        Field25519.MultiplySmall(z2, e, A24);
+        Field25519.Add(z2, z2, aa);
+        Field25519.Multiply(z2, z2, e);
     }
 }

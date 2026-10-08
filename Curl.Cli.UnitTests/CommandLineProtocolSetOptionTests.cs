@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -20,12 +21,19 @@ public sealed class CommandLineProtocolSetOptionTests
         "wss",
     ];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoProtocolOptions_LeavesThemNotGiven()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("allowed protocols given", false, result.Options.AllowedProtocols is not null);
+        Diagnostics.Assert("allowed redirect protocols given", false, result.Options.AllowedRedirectProtocols is not null);
+        Diagnostics.Assert("default protocol", "null", result.Options.DefaultProtocol ?? "null");
         Assert.IsNull(result.Options.AllowedProtocols);
         Assert.IsNull(result.Options.AllowedRedirectProtocols);
         Assert.IsNull(result.Options.DefaultProtocol);
@@ -47,7 +55,7 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("=ftp,,+ws,", new[] { "ftp", "ws" }, DisplayName = "empty items between others are skipped")]
     public void Parse_ProtoInEachSyntaxForm_AllowsTheSchemesLeftToRight(string value, string[]? expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto", value, Url]);
+        CommandLineParseResult result = Parse(["--proto", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
@@ -57,7 +65,7 @@ public sealed class CommandLineProtocolSetOptionTests
     [TestMethod]
     public void Parse_ProtoRedir_AllowsTheSchemesAsProtoDoes()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto-redir", "-all,+https", Url]);
+        CommandLineParseResult result = Parse(["--proto-redir", "-all,+https", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         AssertSchemes(["https"], result.Options.AllowedRedirectProtocols);
@@ -69,9 +77,13 @@ public sealed class CommandLineProtocolSetOptionTests
     {
         // Linux curl 8.18.0 (OpenSSL), measured 2026-10-01 (BL-1099 Notes): curl -sS --proto -ftp
         // smb://127.0.0.1:1/s/f -> exit 7, a connect failure, so smb stays allowed.
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto", "-ftp", Url]);
+        CommandLineParseResult result = Parse(["--proto", "-ftp", Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        IReadOnlySet<string>? allowed = CommandLineParseDiagnostics.Peek(result.Options.AllowedProtocols);
+        Diagnostics.Assert("smb allowed", true, allowed?.Contains("smb"));
+        Diagnostics.Assert("smbs allowed", true, allowed?.Contains("smbs"));
+        Diagnostics.Assert("ftp allowed", false, allowed?.Contains("ftp"));
         Assert.IsTrue(result.Options.AllowedProtocols!.Contains("smb"));
         Assert.IsTrue(result.Options.AllowedProtocols.Contains("smbs"));
         Assert.IsFalse(result.Options.AllowedProtocols.Contains("ftp"));
@@ -85,8 +97,9 @@ public sealed class CommandLineProtocolSetOptionTests
     {
         // Linux curl 8.18.0 (OpenSSL), measured 2026-10-01 (BL-1099 Notes): --proto smb,bogus warns
         // only about 'bogus'.
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto", value, Url]);
+        CommandLineParseResult result = Parse(["--proto", value, Url]);
 
+        AssertWarnings([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -94,7 +107,7 @@ public sealed class CommandLineProtocolSetOptionTests
     [TestMethod]
     public void Parse_ProtoGivenTwice_StartsAgainFromEverySchemeEachTime()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto", "-http", "--proto", "+ftp", Url]);
+        CommandLineParseResult result = Parse(["--proto", "-http", "--proto", "+ftp", Url]);
 
         Assert.IsTrue(result.IsAccepted);
         AssertSchemes(EveryKnownScheme, result.Options.AllowedProtocols);
@@ -113,8 +126,9 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", new[] { "Warning: unrecognized protocol 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'" }, DisplayName = "cut after the modifier")]
     public void Parse_ProtoNamingUnknownSchemes_WarnsAndKeepsEveryScheme(string value, string[] expectedWarnings)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto", value, Url]);
+        CommandLineParseResult result = Parse(["--proto", value, Url]);
 
+        AssertWarnings(expectedWarnings, result);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(expectedWarnings, result.WarningLines.ToArray());
         AssertSchemes(EveryKnownScheme, result.Options.AllowedProtocols);
@@ -125,8 +139,9 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("=,http", DisplayName = "= alone empties, then http")]
     public void Parse_ProtoSettingUnknownThenKnown_WarnsAndAllowsOnlyTheKnown(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto", value, Url]);
+        CommandLineParseResult result = Parse(["--proto", value, Url]);
 
+        Diagnostics.Assert("warning count", 1, result.WarningLines.Count);
         Assert.IsTrue(result.IsAccepted);
         Assert.HasCount(1, result.WarningLines);
         AssertSchemes(["http"], result.Options.AllowedProtocols);
@@ -135,8 +150,9 @@ public sealed class CommandLineProtocolSetOptionTests
     [TestMethod]
     public void Parse_ProtoNamingUnknownAfterSilent_DropsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--proto", "http,bogus", Url]);
+        CommandLineParseResult result = Parse(["-s", "--proto", "http,bogus", Url]);
 
+        AssertWarnings([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -149,8 +165,10 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("--proto-redir", "=bogus", new[] { "Warning: unrecognized protocol 'bogus'" }, DisplayName = "proto-redir =unknown")]
     public void Parse_ProtoLeavingNoScheme_RefusesAsBadlyUsedAfterItsWarnings(string option, string value, string[] expectedWarnings)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, value, Url]);
+        CommandLineParseResult result = Parse([option, value, Url]);
 
+        AssertRefusal(CurlExitCode.FailedInit, [$"curl: option {option}: is badly used here", CommandLineRefusal.TryHelpLine], result);
+        AssertWarnings(expectedWarnings, result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -162,8 +180,12 @@ public sealed class CommandLineProtocolSetOptionTests
     [TestMethod]
     public void Parse_ProtoLeavingNoSchemeAfterAnAcceptedOne_StillRefuses()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto", "http", "--proto", "-all", Url]);
+        CommandLineParseResult result = Parse(["--proto", "http", "--proto", "-all", Url]);
 
+        Diagnostics.Assert(
+            "first stderr line",
+            "curl: option --proto: is badly used here",
+            CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines.FirstOrDefault());
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual("curl: option --proto: is badly used here", result.Refusal.StandardErrorLines[0]);
     }
@@ -175,9 +197,10 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("SMBS", "smbs")]
     public void Parse_ProtoDefaultNamingKnownScheme_RecordsItLowercase(string value, string expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto-default", value, Url]);
+        CommandLineParseResult result = Parse(["--proto-default", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("default protocol", expected, result.Options.DefaultProtocol);
         Assert.AreEqual(expected, result.Options.DefaultProtocol);
     }
 
@@ -187,8 +210,12 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("ipfs")]
     public void Parse_ProtoDefaultNamingUnknownScheme_RefusesAsUnsupportedWithExitOne(string value)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--proto-default", value, Url]);
+        CommandLineParseResult result = Parse(["-s", "--proto-default", value, Url]);
 
+        AssertRefusal(
+            CurlExitCode.UnsupportedProtocol,
+            ["curl: option --proto-default: a specified protocol is unsupported by libcurl", CommandLineRefusal.TryHelpLine],
+            result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -199,8 +226,12 @@ public sealed class CommandLineProtocolSetOptionTests
     [TestMethod]
     public void Parse_ProtoDefaultEmpty_RefusesAsBlank()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--proto-default", "", Url]);
+        CommandLineParseResult result = Parse(["--proto-default", "", Url]);
 
+        AssertRefusal(
+            CurlExitCode.FailedInit,
+            ["curl: option --proto-default: blank argument where content is expected", CommandLineRefusal.TryHelpLine],
+            result);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -211,11 +242,44 @@ public sealed class CommandLineProtocolSetOptionTests
     [TestMethod]
     public void UnsupportedProtocol_NullSpelledOption_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.UnsupportedProtocol(null!));
+        Diagnostics.Arrange("spelled option", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.UnsupportedProtocol(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
-    private static void AssertSchemes(string[] expected, IReadOnlySet<string>? actual)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
     {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertWarnings(string[] expected, CommandLineParseResult result) =>
+        Diagnostics.Assert(
+            "warnings",
+            CommandLineParseDiagnostics.QuoteEach(expected),
+            CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+
+    private void AssertRefusal(CurlExitCode expectedExitCode, string[] expectedLines, CommandLineParseResult result)
+    {
+        CommandLineRefusal? refusal = CommandLineParseDiagnostics.Peek(result.Refusal);
+        Diagnostics.Assert("exit code", expectedExitCode, refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach(expectedLines),
+            CommandLineParseDiagnostics.QuoteEach(refusal?.StandardErrorLines ?? []));
+    }
+
+    private void AssertSchemes(string[] expected, IReadOnlySet<string>? actual)
+    {
+        Diagnostics.Assert(
+            "schemes (sorted)",
+            CommandLineParseDiagnostics.QuoteEach(expected.Order(StringComparer.Ordinal)),
+            actual is null ? "null" : CommandLineParseDiagnostics.QuoteEach(actual.Order(StringComparer.Ordinal)));
         Assert.IsNotNull(actual);
         CollectionAssert.AreEquivalent(expected, actual.ToArray());
     }

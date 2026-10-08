@@ -1,0 +1,48 @@
+---
+id: BL-1486
+title: Make every test in Curl.Protocol.Tftp.UnitTests write descriptive diagnostic output
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: [BL-1457]
+touches: [Curl.Protocol.Tftp.UnitTests]
+requirement: none
+created: 2026-10-04
+completed: 2026-10-07
+---
+# BL-1486 — Make every test in Curl.Protocol.Tftp.UnitTests write descriptive diagnostic output
+
+## Goal
+
+Every test in `Curl.Protocol.Tftp.UnitTests` writes, through BL-1457's shared `TestDiagnostics` helper, the Arrange inputs that matter, its Act result and its assertion context (expected against actual, first differing byte or character), plus `PHASE` timings where it has distinct phases, so an AI reading a failed or slow test's log can debug it or understand its time without re-running it; no test's logic or assertions change.
+
+## Context
+
+- Stewart's request, plan approved 2026-10-04: every unit test writes enough descriptive console output that an AI reading a failed or slow test's log can debug it without re-running it; slow budget 3 seconds per test. One task per test project; this one is `Curl.Protocol.Tftp.UnitTests`, which tests `Curl.Protocol.Tftp.UnitLibrary`.
+- BL-1457 links the root `TestDiagnostics.cs` into every test project and writes each test's `START`, `END ... (arrange <a>, act <b>, assert <c>)` and `SLOW:` lines itself. The line format (`ARRANGE`, `ACT`, `ASSERT`, `BYTES`, `DIFF`, `PHASE`) and how a test calls the helper are in `Documentation/Wiki/Test-Diagnostics.md` and BL-1457's ADR; follow them and add no prefix of your own.
+- Size, counted 2026-10-04 by matching `[TestMethod]`, `[TestMethod(` and `[DataTestMethod]` in the project's `.cs` files: 156 test methods in 12 files, with 99 `[DataRow(` lines. Solution-wide, 21 test files reference `TestContext` (mostly for its `CancellationToken`) and only 3, all in `Curl.Console.UnitTests`, write any output today.
+- What matters here: the URL and options (block size, timeout), each datagram sent and received through the fake channels (`Fakes/AcknowledgingDatagramChannel.cs`, `FallsSilentDatagramChannel.cs`) as `BYTES` with its decoded opcode and block number, `ManualTimeProvider` advances as `ARRANGE` lines, the bytes written and the `CurlExitCode` with its error text.
+- Output only. No test method, data row, assertion or arrange step is removed, weakened or changed in what it tests. A shared fake or helper in this project may write the lines for the tests that use it, as long as each test's `END` line counts them.
+- Keep the log readable: large payloads go through `BYTES` (which caps itself), never a loop printing thousands of lines. Nothing printed may make a test depend on the operating system.
+
+## Acceptance criteria
+
+- [x] `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Tftp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Tftp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Tftp.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Tftp.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+
+## Notes
+
+- Sized for one run: 156 test methods in 12 files.
+- Added `TftpTestDiagnostics.cs`: it decodes a TFTP datagram (RRQ/WRQ file name, DATA/ACK block number, ERROR code and text, OACK options) into the label of a BYTES line, and writes a channel's sent datagrams, scripted datagrams and a `TransferResult` (exit code, error text, bytes). Shared private helpers (`Run`, `Channel`, `Context`) in each test class write the URL, options, clock advances and datagrams, so every test passes through them; each real assertion has a `Diagnostics.Assert` or `Diff` before it.
+- Counts (`Select-String -AllMatches`, excluding obj and bin): before `Assert.` 519, `[TestMethod` 161, `[DataRow(` 105; after 519, 161, 105. No test method, data row or assertion changed, so the run's total is unchanged by construction: 240 tests, all passed (no separate pre-change run was recorded; the method and data-row counts that make up the total are identical).
+- Detailed run: 240 `END` lines for 240 tests, none with `arrange 0`, `act 0` or `assert 0`.
+- SLOW: none. The slowest test took 473 ms, under the 3000 ms budget; no follow-up task filed.
+
+## Log
+
+- 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Protocol.Tftp.UnitTests test writes ARRANGE, ACT and ASSERT/DIFF lines with TFTP datagrams decoded as BYTES; 240 tests pass

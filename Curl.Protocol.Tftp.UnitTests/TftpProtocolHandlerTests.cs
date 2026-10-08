@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Tftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Tftp;
 
@@ -26,26 +27,44 @@ public sealed class TftpProtocolHandlerTests
     /// <summary>The server's transfer identifier: the new port it answers from.</summary>
     private static readonly IPEndPoint TransferEndPoint = new(IPAddress.Loopback, 50123);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void SupportedSchemes_IsExactlyTftp()
     {
         var handler = new TftpProtocolHandler(Connector(Channel()));
+        Diagnostics.Arrange("handler", "a TFTP handler over a channel with nothing scripted");
 
-        CollectionAssert.AreEqual(new[] { "tftp" }, handler.SupportedSchemes.ToArray());
+        var schemes = handler.SupportedSchemes.ToArray();
+
+        Diagnostics.Act("supported schemes", string.Join(",", schemes));
+        Diagnostics.Assert("supported schemes", "tftp", string.Join(",", schemes));
+        CollectionAssert.AreEqual(new[] { "tftp" }, schemes);
     }
 
     [TestMethod]
     public void Constructor_NullConnector_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new TftpProtocolHandler(null!));
+        Diagnostics.Arrange("connector", "null");
+
+        var thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new TftpProtocolHandler(null!));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("thrown type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws()
     {
         var handler = new TftpProtocolHandler(Connector(Channel()));
+        Diagnostics.Arrange("context", "null");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        var thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("thrown type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -54,20 +73,26 @@ public sealed class TftpProtocolHandlerTests
         var channel = Channel(Data(1, "hello"));
         var connector = Connector(channel);
 
-        await new TftpProtocolHandler(connector).ExecuteAsync(Context("tftp://h/file.txt"));
+        await RunAsync(connector, Context("tftp://h/file.txt"), channel);
 
+        Diagnostics.Act("opens", string.Join(";", connector.Opens));
+        Diagnostics.Assert("opens", "(h, 69)", string.Join(";", connector.Opens));
         CollectionAssert.AreEqual(new[] { ("h", 69) }, connector.Opens);
+        Diagnostics.Diff("read request", ExpectedFileTxtReadRequest, channel.Sent[0].Datagram);
         CollectionAssert.AreEqual(ExpectedFileTxtReadRequest, channel.Sent[0].Datagram);
+        Diagnostics.Assert("request destination", ServerEndPoint, channel.Sent[0].Destination);
         Assert.AreEqual(ServerEndPoint, channel.Sent[0].Destination);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_UrlNamesPort_OpensThatPort()
     {
-        var connector = Connector(Channel(Data(1, "hello")));
+        var channel = Channel(Data(1, "hello"));
+        var connector = Connector(channel);
 
-        await new TftpProtocolHandler(connector).ExecuteAsync(Context("tftp://h:6969/file.txt"));
+        await RunAsync(connector, Context("tftp://h:6969/file.txt"), channel);
 
+        Diagnostics.Assert("opens", "(h, 6969)", string.Join(";", connector.Opens));
         CollectionAssert.AreEqual(new[] { ("h", 6969) }, connector.Opens);
     }
 
@@ -76,10 +101,12 @@ public sealed class TftpProtocolHandlerTests
     {
         var channel = Channel(Data(1, "hello"));
 
-        await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/dir/my%20file.txt"));
+        await RunAsync(Connector(channel), Context("tftp://h/dir/my%20file.txt"), channel);
 
         var request = channel.Sent[0].Datagram;
-        Assert.AreEqual("dir/my file.txt", Encoding.UTF8.GetString(request, 2, "dir/my file.txt".Length));
+        string actualName = Encoding.UTF8.GetString(request, 2, "dir/my file.txt".Length);
+        Diagnostics.Assert("requested file name", "dir/my file.txt", actualName);
+        Assert.AreEqual("dir/my file.txt", actualName);
     }
 
     [TestMethod]
@@ -88,25 +115,33 @@ public sealed class TftpProtocolHandlerTests
         var channel = Channel(Data(1, "hello"));
         var output = new MemoryStream();
 
-        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt", output));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt", output), channel);
 
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 5, result.BytesTransferred);
         Assert.AreEqual(5, result.BytesTransferred);
         Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()));
         Assert.HasCount(2, channel.Sent);
+        Diagnostics.Diff("acknowledgement", new byte[] { 0, 4, 0, 1 }, channel.Sent[1].Datagram);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[1].Datagram);
+        Diagnostics.Assert("acknowledgement destination", TransferEndPoint, channel.Sent[1].Destination);
         Assert.AreEqual(TransferEndPoint, channel.Sent[1].Destination);
         Assert.AreNotEqual(ServerEndPoint, channel.Sent[1].Destination);
+        Diagnostics.Assert("channel disposed", true, channel.IsDisposed);
         Assert.IsTrue(channel.IsDisposed);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_UrlWithNoPort_OpensPort69()
     {
-        var connector = Connector(Channel(Data(1, "hello")));
+        var channel = Channel(Data(1, "hello"));
+        var connector = Connector(channel);
 
-        await new TftpProtocolHandler(connector).ExecuteAsync(Context("unknown://h/file.txt", new MemoryStream()));
+        await RunAsync(connector, Context("unknown://h/file.txt", new MemoryStream()), channel);
 
+        Diagnostics.Assert("opens", "(h, 69)", string.Join(";", connector.Opens));
         CollectionAssert.AreEqual(new[] { ("h", 69) }, connector.Opens);
     }
 
@@ -119,12 +154,17 @@ public sealed class TftpProtocolHandlerTests
         var channel = Channel(Data(1, first), Data(2, second), Data(3, third));
         var output = new MemoryStream();
 
-        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt", output));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt", output), channel);
 
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 1124, result.BytesTransferred);
         Assert.AreEqual(1124, result.BytesTransferred);
         Assert.AreEqual(first + second + third, Encoding.ASCII.GetString(output.ToArray()));
-        CollectionAssert.AreEqual(new ushort[] { 1, 2, 3 }, AcknowledgedBlocks(channel));
+        var acknowledged = AcknowledgedBlocks(channel);
+        Diagnostics.Assert("acknowledged blocks", "1,2,3", string.Join(",", acknowledged));
+        CollectionAssert.AreEqual(new ushort[] { 1, 2, 3 }, acknowledged);
     }
 
     [TestMethod]
@@ -135,12 +175,16 @@ public sealed class TftpProtocolHandlerTests
             Data(1, Payload(1024, 'a')),
             Data(2, Payload(512, 'b')));
 
-        var result = await new TftpProtocolHandler(Connector(channel))
-            .ExecuteAsync(Context("tftp://h/file.txt", tftpBlockSize: 1024));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt", tftpBlockSize: 1024), channel);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", 1536, result.BytesTransferred);
         Assert.AreEqual(1536, result.BytesTransferred);
-        CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, AcknowledgedBlocks(channel));
+        var acknowledged = AcknowledgedBlocks(channel);
+        Diagnostics.Assert("acknowledged blocks", "0,1,2", string.Join(",", acknowledged));
+        CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, acknowledged);
+        Diagnostics.Assert("second datagram destination", TransferEndPoint, channel.Sent[1].Destination);
         Assert.AreEqual(TransferEndPoint, channel.Sent[1].Destination);
     }
 
@@ -162,17 +206,22 @@ public sealed class TftpProtocolHandlerTests
     [DataRow("\0\0", null, 512, DisplayName = "an empty name and value are ignored")]
     public async Task ExecuteAsync_OptionAcknowledgement_DecidesBlockSize(string options, int? tftpBlockSize, int expectedBlockSize)
     {
+        Diagnostics.Arrange("option acknowledgement", options.Replace('\0', '|'));
+        Diagnostics.Arrange("expected block size", expectedBlockSize);
         var channel = Channel(
             OptionAcknowledgement(options),
             Data(1, Payload(expectedBlockSize, 'a')),
             Data(2, string.Empty));
 
-        var result = await new TftpProtocolHandler(Connector(channel))
-            .ExecuteAsync(Context("tftp://h/file.txt", tftpBlockSize: tftpBlockSize));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt", tftpBlockSize: tftpBlockSize), channel);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes transferred", expectedBlockSize, result.BytesTransferred);
         Assert.AreEqual(expectedBlockSize, result.BytesTransferred);
-        CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, AcknowledgedBlocks(channel));
+        var acknowledged = AcknowledgedBlocks(channel);
+        Diagnostics.Assert("acknowledged blocks", "0,1,2", string.Join(",", acknowledged));
+        CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, acknowledged);
     }
 
     /// <summary>
@@ -196,14 +245,21 @@ public sealed class TftpProtocolHandlerTests
     [DataRow("tsize\05\0blksize\0", "Malformed ACK packet, rejecting", DisplayName = "malformed after a good option")]
     public async Task ExecuteAsync_OptionAcknowledgementCurlRejects_ReturnsExit71AndSendsNothingMore(string options, string expectedMessage)
     {
+        Diagnostics.Arrange("option acknowledgement", options.Replace('\0', '|'));
+        Diagnostics.Arrange("expected message", expectedMessage);
         var channel = Channel(OptionAcknowledgement(options), Data(1, "hello"));
 
-        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt"));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt"), channel);
 
+        Diagnostics.Assert("exit code", CurlExitCode.TftpIllegal, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Diagnostics.Assert("numeric exit code", 71, (int)result.ExitCode);
         Assert.AreEqual(71, (int)result.ExitCode);
+        Diagnostics.Assert("error message", expectedMessage, result.ErrorMessage);
         Assert.AreEqual(expectedMessage, result.ErrorMessage);
+        Diagnostics.Assert("datagrams sent", 1, channel.Sent.Count);
         Assert.HasCount(1, channel.Sent);
+        Diagnostics.Assert("channel disposed", true, channel.IsDisposed);
         Assert.IsTrue(channel.IsDisposed);
     }
 
@@ -212,11 +268,13 @@ public sealed class TftpProtocolHandlerTests
     {
         var channel = Channel(OptionAcknowledgement("blksize\02048\0"));
 
-        var result = await new TftpProtocolHandler(Connector(channel))
-            .ExecuteAsync(Context("tftp://h/file.txt", tftpBlockSize: 1024));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt", tftpBlockSize: 1024), channel);
 
+        Diagnostics.Assert("exit code", CurlExitCode.TftpIllegal, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Diagnostics.Assert("error message", "server requested blksize larger than allocated (2048)", result.ErrorMessage);
         Assert.AreEqual("server requested blksize larger than allocated (2048)", result.ErrorMessage);
+        Diagnostics.Assert("datagrams sent", 1, channel.Sent.Count);
         Assert.HasCount(1, channel.Sent);
     }
 
@@ -236,12 +294,16 @@ public sealed class TftpProtocolHandlerTests
         CurlExitCode expectedExitCode,
         string expectedMessage)
     {
+        Diagnostics.Arrange("TFTP error code", tftpErrorCode);
         var channel = Channel(Error(tftpErrorCode, "server says no"));
 
-        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt"));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt"), channel);
 
+        Diagnostics.Assert("exit code", expectedExitCode, result.ExitCode);
         Assert.AreEqual(expectedExitCode, result.ExitCode);
+        Diagnostics.Assert("error message", expectedMessage, result.ErrorMessage);
         Assert.AreEqual(expectedMessage, result.ErrorMessage);
+        Diagnostics.Assert("channel disposed", true, channel.IsDisposed);
         Assert.IsTrue(channel.IsDisposed);
     }
 
@@ -250,22 +312,28 @@ public sealed class TftpProtocolHandlerTests
     {
         var connector = Connector(Channel());
 
-        var result = await new TftpProtocolHandler(connector).ExecuteAsync(Context("tftp://h/"));
+        var result = await RunAsync(connector, Context("tftp://h/"));
 
+        Diagnostics.Assert("exit code", CurlExitCode.TftpIllegal, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Diagnostics.Assert("error message", "Missing filename", result.ErrorMessage);
         Assert.AreEqual("Missing filename", result.ErrorMessage);
+        Diagnostics.Assert("opens", 0, connector.Opens.Count);
         Assert.IsEmpty(connector.Opens);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_OpenFails_ReturnsConnectorsCodeAndMessageUnchanged()
     {
+        Diagnostics.Arrange("connector result", "Failed(CouldntResolveHost, Could not resolve host: h)");
         var connector = new RecordingDatagramConnector(
             DatagramOpenResult.Failed(CurlExitCode.CouldntResolveHost, "Could not resolve host: h"));
 
-        var result = await new TftpProtocolHandler(connector).ExecuteAsync(Context("tftp://h/file.txt"));
+        var result = await RunAsync(connector, Context("tftp://h/file.txt"));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Diagnostics.Assert("error message", "Could not resolve host: h", result.ErrorMessage);
         Assert.AreEqual("Could not resolve host: h", result.ErrorMessage);
     }
 
@@ -277,18 +345,53 @@ public sealed class TftpProtocolHandlerTests
             Data(1, "hello"));
         var output = new MemoryStream();
 
-        var result = await new TftpProtocolHandler(Connector(channel)).ExecuteAsync(Context("tftp://h/file.txt", output));
+        var result = await RunAsync(Connector(channel), Context("tftp://h/file.txt", output), channel);
 
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()));
-        CollectionAssert.AreEqual(new ushort[] { 1 }, AcknowledgedBlocks(channel));
+        var acknowledged = AcknowledgedBlocks(channel);
+        Diagnostics.Assert("acknowledged blocks", "1", string.Join(",", acknowledged));
+        CollectionAssert.AreEqual(new ushort[] { 1 }, acknowledged);
     }
 
-    private static TransferContext Context(string url, Stream? output = null, int? tftpBlockSize = null) =>
-        new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream(), TftpBlockSize = tftpBlockSize };
+    private async Task<TransferResult> RunAsync(
+        RecordingDatagramConnector connector,
+        TransferContext context,
+        ScriptedDatagramChannel? channel = null)
+    {
+        TransferResult result;
+        using (Diagnostics.Phase("execute"))
+        {
+            result = await new TftpProtocolHandler(connector).ExecuteAsync(context);
+        }
 
-    private static ScriptedDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script) =>
-        new(ServerEndPoint, script);
+        TftpTestDiagnostics.Result(Diagnostics, result);
+        if (channel is not null)
+        {
+            TftpTestDiagnostics.Sent(Diagnostics, channel);
+        }
+
+        return result;
+    }
+
+    private TransferContext Context(string url, Stream? output = null, int? tftpBlockSize = null)
+    {
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("TFTP block size", tftpBlockSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(default)");
+        return new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream(), TftpBlockSize = tftpBlockSize };
+    }
+
+    private ScriptedDatagramChannel Channel(params (byte[] Datagram, EndPoint Source)[] script)
+    {
+        for (int index = 0; index < script.Length; index++)
+        {
+            TftpTestDiagnostics.Scripted(Diagnostics, index, script[index].Datagram, script[index].Source);
+        }
+
+        return new(ServerEndPoint, script);
+    }
 
     private static RecordingDatagramConnector Connector(ScriptedDatagramChannel channel) =>
         new(DatagramOpenResult.Opened(channel));

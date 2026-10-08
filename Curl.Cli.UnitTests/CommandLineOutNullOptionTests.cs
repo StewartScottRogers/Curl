@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -15,13 +17,18 @@ public sealed class CommandLineOutNullOptionTests
 
     private const string OtherUrl = "http://127.0.0.1:1/b";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("--out-null")]
     [DataRow("--no-out-null")]
     public void Parse_OutNull_DiscardsItsUrlsBody(string spelledOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         UrlOutput output = result.Options.UrlOutputs.Single();
         Assert.AreEqual(Url, output.Url);
@@ -34,8 +41,9 @@ public sealed class CommandLineOutNullOptionTests
     [TestMethod]
     public void Parse_NoOutputOption_KeepsTheBody()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.UrlOutputs.Single().DiscardsBody);
     }
@@ -43,8 +51,9 @@ public sealed class CommandLineOutNullOptionTests
     [TestMethod]
     public void Parse_OutNullAfterItsUrl_StillPairsWithIt()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, "--out-null"]);
+        CommandLineParseResult result = Parse([Url, "--out-null"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.UrlOutputs.Single().DiscardsBody);
     }
@@ -52,8 +61,9 @@ public sealed class CommandLineOutNullOptionTests
     [TestMethod]
     public void Parse_OutNullThenOutput_PairsEachWithItsUrlInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--out-null", "-o", "b.txt", Url, OtherUrl]);
+        CommandLineParseResult result = Parse(["--out-null", "-o", "b.txt", Url, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.HasCount(2, result.Options.UrlOutputs);
         Assert.AreEqual(Url, result.Options.UrlOutputs[0].Url);
@@ -68,8 +78,9 @@ public sealed class CommandLineOutNullOptionTests
     [TestMethod]
     public void Parse_OutputThenOutNull_PairsEachWithItsUrlInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-o", "c.txt", "--out-null", Url, OtherUrl]);
+        CommandLineParseResult result = Parse(["-o", "c.txt", "--out-null", Url, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("c.txt", result.Options.UrlOutputs[0].FileName);
         Assert.IsFalse(result.Options.UrlOutputs[0].DiscardsBody);
@@ -80,8 +91,9 @@ public sealed class CommandLineOutNullOptionTests
     [TestMethod]
     public void Parse_OutNullThenRemoteName_PairsEachWithItsUrlInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--out-null", "-O", Url, OtherUrl]);
+        CommandLineParseResult result = Parse(["--out-null", "-O", Url, OtherUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.UrlOutputs[0].DiscardsBody);
         Assert.IsFalse(result.Options.UrlOutputs[0].UsesRemoteName);
@@ -92,8 +104,9 @@ public sealed class CommandLineOutNullOptionTests
     [TestMethod]
     public void Parse_OutNullUnderRemoteNameAll_DoesNotUseTheRemoteName()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--remote-name-all", "--out-null", Url]);
+        CommandLineParseResult result = Parse(["--remote-name-all", "--out-null", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         UrlOutput output = result.Options.UrlOutputs.Single();
         Assert.IsTrue(output.DiscardsBody);
@@ -103,11 +116,32 @@ public sealed class CommandLineOutNullOptionTests
     [TestMethod]
     public void Parse_MoreOutNullsThanUrls_WarnsAfterTheTransfers()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--out-null", Url, "--out-null"]);
+        CommandLineParseResult result = Parse(["--out-null", Url, "--out-null"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.HasCount(2, result.Options.UrlOutputs);
         Assert.IsNull(result.Options.UrlOutputs[1].Url);
         CollectionAssert.AreEqual(new[] { CommandLineWarning.MoreOutputOptionsThanUrls }, result.WarningLinesAfterTransfers.ToArray());
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        foreach (UrlOutput output in CommandLineParseDiagnostics.Peek(result.Options)?.UrlOutputs ?? [])
+        {
+            Diagnostics.Act(
+                "url output",
+                $"url {CommandLineParseDiagnostics.QuoteEach([output.Url])}, file name {CommandLineParseDiagnostics.QuoteEach([output.FileName])}, discards body {output.DiscardsBody}, uses remote name {output.UsesRemoteName}");
+        }
+
+        foreach (string line in result.WarningLinesAfterTransfers)
+        {
+            Diagnostics.Act("warning after transfers", line);
+        }
+
+        return result;
     }
 }

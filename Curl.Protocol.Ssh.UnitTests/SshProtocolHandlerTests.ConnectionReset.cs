@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Sftp;
 
 namespace Curl.Protocol.Ssh;
 
@@ -52,6 +53,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         Outcome outcome = await RunResetAsync("sftp 3 " + ResetFile, $"sftp://{Host}{ResetFile}");
 
+        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
         Assert.AreEqual(TransferResult.Success(0), outcome.Result);
         Assert.IsEmpty(outcome.Output);
     }
@@ -97,23 +99,31 @@ public sealed partial class SshProtocolHandlerTests
             Output = new UnwritableStream(outputFailure),
             Credentials = new NetworkCredential(User, Password),
         };
+        ArrangeTransfer(context);
+        Diagnostics.Arrange("output failure", outputFailure.Message);
 
         IOException thrown = await Assert.ThrowsExactlyAsync<IOException>(async () => await Handler(server).ExecuteAsync(context));
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(null, context, server);
+        Diagnostics.Act("thrown", thrown.Message);
+        Diagnostics.Assert("thrown is the output's exception", true, ReferenceEquals(outputFailure, thrown));
         Assert.AreSame(outputFailure, thrown);
     }
 
     // A 100000-byte file, so a download reset after its first block has written part of it.
-    private static async Task<Outcome> RunResetAsync(string step, string url, int occurrence = 1)
+    private async Task<Outcome> RunResetAsync(string step, string url, int occurrence = 1)
     {
         InMemorySshServer server = new(User, Password) { ResetsAt = step, ResetsAtOccurrence = occurrence };
         server.Files[ResetFile] = [.. Enumerable.Range(0, 100000).Select(index => (byte)index)];
+        Diagnostics.Arrange("reset at", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{step} (occurrence {occurrence})"));
         return await RunAsync(server, url);
     }
 
-    private static void AssertPartialDownload(Outcome outcome)
+    private void AssertPartialDownload(Outcome outcome)
     {
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, outcome.Result.ExitCode);
+        Diagnostics.Assert("bytes transferred", outcome.Output.Length, outcome.Result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ssh, outcome.Result.ExitCode);
         Assert.AreEqual("Error in the SSH layer", outcome.Result.ErrorMessage);
         Assert.IsTrue(outcome.Output.Length is > 0 and < 100000, $"part of the file is written, not {outcome.Output.Length} bytes");

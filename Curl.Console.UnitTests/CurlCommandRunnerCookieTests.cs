@@ -2,6 +2,7 @@ using System.Text;
 
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -46,6 +47,10 @@ public sealed class CurlCommandRunnerCookieTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
 
     [TestInitialize]
@@ -64,6 +69,8 @@ public sealed class CurlCommandRunnerCookieTests
 
         int exitCode = await RunAsync(server, ["-s", .. arguments, Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request bytes", $"GET / HTTP/1.1\r\n{Head}{expectedCookieHeader}\r\n", Latin1(server.Written));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual($"GET / HTTP/1.1\r\n{Head}{expectedCookieHeader}\r\n", Latin1(server.Written));
     }
@@ -82,6 +89,13 @@ public sealed class CurlCommandRunnerCookieTests
 
         int exitCode = await RunAsync(server, ["-s", .. arguments, "http://127.0.0.1:18316/x"], StandardInputCookies);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "request starts with the expected cookie header",
+            true,
+            Latin1(server.Written).StartsWith(
+                $"GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{expectedCookieHeader}\r\n",
+                StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.StartsWith(
             $"GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n{expectedCookieHeader}\r\n",
@@ -102,6 +116,13 @@ public sealed class CurlCommandRunnerCookieTests
             ["-s", "-b", "-", "telnet://127.0.0.1:18316", "http://127.0.0.1:18316/x"],
             StandardInputCookies);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "request starts with standard input then the HTTP request",
+            true,
+            Latin1(server.Written).StartsWith(
+                StandardInputCookies + "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+                StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.StartsWith(
             StandardInputCookies + "GET /x HTTP/1.1\r\nHost: 127.0.0.1:18316\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
@@ -122,6 +143,14 @@ public sealed class CurlCommandRunnerCookieTests
 
         int exitCode = await RunAsync(server, ["-s", "-v", "-b", "cf.txt", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "stderr starts with the refusal lines",
+            true,
+            Latin1(standardError.ToArray()).StartsWith(
+                "* invalid octets in value, cookie dropped\r\n* invalid cookie, dropped\r\n* using HTTP/1.x\r\n",
+                StringComparison.Ordinal));
+        Diagnostics.Diff("request bytes", $"GET / HTTP/1.1\r\n{Head}Cookie: s=v\r\n\r\n", Latin1(server.Written));
         Assert.AreEqual(0, exitCode);
         Assert.StartsWith(
             "* invalid octets in value, cookie dropped\r\n* invalid cookie, dropped\r\n* using HTTP/1.x\r\n",
@@ -148,6 +177,14 @@ public sealed class CurlCommandRunnerCookieTests
 
         int exitCode = await RunAsync(server, ["-s", "-v", "-b", "many.txt", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "stderr has the max-cookies line before the request",
+            true,
+            Latin1(standardError.ToArray()).Contains(
+                "* using HTTP/1.x\r\n* Included max number of cookies (150) in request!\r\n> GET / HTTP/1.1\r\r\n",
+                StringComparison.Ordinal));
+        Diagnostics.Assert("cookies sent", 150, SentCookies(server).Length);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(
             Latin1(standardError.ToArray()),
@@ -171,6 +208,14 @@ public sealed class CurlCommandRunnerCookieTests
 
         int exitCode = await RunAsync(server, ["-s", "-v", "-b", "big.txt", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "stderr has the restricted line before the request",
+            true,
+            Latin1(standardError.ToArray()).Contains(
+                "* using HTTP/1.x\r\n* Restricted outgoing cookies due to header size, 'c' not sent\r\n> GET / HTTP/1.1\r\r\n",
+                StringComparison.Ordinal));
+        Diagnostics.Assert("cookies sent", string.Join("; ", $"aaa={value}", $"bb={value}"), string.Join("; ", SentCookies(server)));
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(
             Latin1(standardError.ToArray()),
@@ -193,6 +238,13 @@ public sealed class CurlCommandRunnerCookieTests
 
         int exitCode = await RunAsync(server, ["-s", "-v", "-b", "sub\\missing.txt", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "stderr starts with the warning",
+            true,
+            Latin1(standardError.ToArray()).StartsWith(
+                "* WARNING: failed to open cookie file \"sub\\missing.txt\"\r\n* using HTTP/1.x\r\n",
+                StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.StartsWith(
             "* WARNING: failed to open cookie file \"sub\\missing.txt\"\r\n* using HTTP/1.x\r\n",
@@ -202,34 +254,43 @@ public sealed class CurlCommandRunnerCookieTests
     [TestMethod]
     public async Task RunAsync_CookieJarFile_WritesTheReceivedCookieInThePlatformsLineEndings()
     {
-        await RunAsync(Serve(SetsCookie), ["-s", "-c", "jar.txt", Url]);
+        int exitCode = await RunAsync(Serve(SetsCookie), ["-s", "-c", "jar.txt", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("jar.txt", Lf(NativeLines(JarHeader + GotLine)), Lf(Latin1(fileSystem.Written["jar.txt"].ToArray())));
         Assert.AreEqual(NativeLines(JarHeader + GotLine), Latin1(fileSystem.Written["jar.txt"].ToArray()));
     }
 
     [TestMethod]
     public async Task RunAsync_CookieFileJunkedAndJar_WritesTheReceivedAndPersistentCookiesNewestFirst()
     {
-        await RunAsync(Serve(SetsCookie), ["-s", "-b", "in.txt", "-j", "-c", "jarj.txt", Url]);
+        int exitCode = await RunAsync(Serve(SetsCookie), ["-s", "-b", "in.txt", "-j", "-c", "jarj.txt", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("jarj.txt", Lf(NativeLines(JarHeader + GotLine + KeepLine)), Lf(Latin1(fileSystem.Written["jarj.txt"].ToArray())));
         Assert.AreEqual(NativeLines(JarHeader + GotLine + KeepLine), Latin1(fileSystem.Written["jarj.txt"].ToArray()));
     }
 
     [TestMethod]
     public async Task RunAsync_CookieJarOnStandardOutputAfterABodyThere_WritesTheJarWithLineFeeds()
     {
-        await RunAsync(Serve(SetsCookie), ["-s", "-b", "in.txt", "-c", "-", Url]);
+        int exitCode = await RunAsync(Serve(SetsCookie), ["-s", "-b", "in.txt", "-c", "-", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", JarHeader + GotLine + KeepLine + SessLine, StandardOutputText);
         Assert.AreEqual(JarHeader + GotLine + KeepLine + SessLine, StandardOutputText);
     }
 
     [TestMethod]
     public async Task RunAsync_CookieJarOnStandardOutputWithTheBodyInAFile_WritesTheJarInTextMode()
     {
-        await RunAsync(
+        int exitCode = await RunAsync(
             Serve("HTTP/1.1 200 OK\r\nSet-Cookie: got=g1\r\nContent-Length: 5\r\n\r\nbody\n"),
             ["-s", "-c", "-", "-o", "out.bin", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", (JarHeader + GotLine).Replace("\n", "\r\n", StringComparison.Ordinal), StandardOutputText);
+        Diagnostics.Diff("out.bin", "body\n", Latin1(fileSystem.Written["out.bin"].ToArray()));
         Assert.AreEqual((JarHeader + GotLine).Replace("\n", "\r\n", StringComparison.Ordinal), StandardOutputText);
         Assert.AreEqual("body\n", Latin1(fileSystem.Written["out.bin"].ToArray()));
     }
@@ -240,9 +301,17 @@ public sealed class CurlCommandRunnerCookieTests
         const string Response = "HTTP/1.1 200 OK\r\nSet-Cookie: got=g1\r\nContent-Length: 5\r\n\r\nbody\n";
         ScriptedConnector server = Serve(Response, Response);
 
-        await RunAsync(server, ["-s", "-c", "-", "-w", "[w]\\n", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+        int exitCode = await RunAsync(server, ["-s", "-c", "-", "-w", "[w]\\n", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
 
         string jar = JarHeader + GotLine;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", $"body\n[w]\n{jar}body\n[w]\n{jar}", StandardOutputText);
+        Diagnostics.Assert(
+            "request bytes start with both requests",
+            true,
+            Latin1(server.Written).StartsWith(
+                $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
+                StringComparison.Ordinal));
         Assert.AreEqual($"body\n[w]\n{jar}body\n[w]\n{jar}", StandardOutputText);
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
@@ -254,8 +323,15 @@ public sealed class CurlCommandRunnerCookieTests
     {
         ScriptedConnector server = Serve(SetsCookie, SetsCookie);
 
-        await RunAsync(server, ["-s", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+        int exitCode = await RunAsync(server, ["-s", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "request bytes start with both requests",
+            true,
+            Latin1(server.Written).StartsWith(
+                $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
+                StringComparison.Ordinal));
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
             Latin1(server.Written));
@@ -266,8 +342,15 @@ public sealed class CurlCommandRunnerCookieTests
     {
         ScriptedConnector server = Serve(SetsCookie, SetsCookie);
 
-        await RunAsync(server, ["-s", "-b", "", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+        int exitCode = await RunAsync(server, ["-s", "-b", "", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "request bytes start with both requests",
+            true,
+            Latin1(server.Written).StartsWith(
+                $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
+                StringComparison.Ordinal));
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
             Latin1(server.Written));
@@ -278,8 +361,15 @@ public sealed class CurlCommandRunnerCookieTests
     {
         ScriptedConnector server = Serve(RedirectSetsCookie, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
 
-        await RunAsync(server, ["-s", "-L", "-b", "", "http://127.0.0.1:18231/1"]);
+        int exitCode = await RunAsync(server, ["-s", "-L", "-b", "", "http://127.0.0.1:18231/1"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "request bytes start with both hops",
+            true,
+            Latin1(server.Written).StartsWith(
+                $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
+                StringComparison.Ordinal));
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: got=g1\r\n\r\n",
             Latin1(server.Written));
@@ -290,8 +380,15 @@ public sealed class CurlCommandRunnerCookieTests
     {
         ScriptedConnector server = Serve(RedirectSetsCookie, "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
 
-        await RunAsync(server, ["-s", "-L", "-b", "a=1", "http://127.0.0.1:18231/1"]);
+        int exitCode = await RunAsync(server, ["-s", "-L", "-b", "a=1", "http://127.0.0.1:18231/1"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "request bytes start with both hops",
+            true,
+            Latin1(server.Written).StartsWith(
+                $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
+                StringComparison.Ordinal));
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\nGET /2 HTTP/1.1\r\n{Head}Cookie: a=1\r\n\r\n",
             Latin1(server.Written));
@@ -302,8 +399,16 @@ public sealed class CurlCommandRunnerCookieTests
     {
         ScriptedConnector server = Serve(SetsCookie, SetsCookie);
 
-        await RunAsync(server, ["-s", "-b", "in.txt", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
+        int exitCode = await RunAsync(server, ["-s", "-b", "in.txt", "-b", "a=1", "http://127.0.0.1:18231/1", "http://127.0.0.1:18231/2"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert(
+            "request bytes start with both requests",
+            true,
+            Latin1(server.Written).StartsWith(
+                $"GET /1 HTTP/1.1\r\n{Head}Cookie: keep=k1; sess=s1; a=1\r\n\r\n"
+                + $"GET /2 HTTP/1.1\r\n{Head}Cookie: keep=k1; sess=s1; got=g1; a=1\r\n\r\n",
+                StringComparison.Ordinal));
         Assert.StartsWith(
             $"GET /1 HTTP/1.1\r\n{Head}Cookie: keep=k1; sess=s1; a=1\r\n\r\n"
             + $"GET /2 HTTP/1.1\r\n{Head}Cookie: keep=k1; sess=s1; got=g1; a=1\r\n\r\n",
@@ -317,6 +422,8 @@ public sealed class CurlCommandRunnerCookieTests
             new RecordingConnector(CurlExitCode.CouldntConnect, "Failed to connect"),
             ["-s", "-c", "jarfail.txt", "http://127.0.0.1:1/"]);
 
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Diagnostics.Diff("jarfail.txt", Lf(NativeLines(JarHeader)), Lf(Latin1(fileSystem.Written["jarfail.txt"].ToArray())));
         Assert.AreEqual(7, exitCode);
         Assert.AreEqual(NativeLines(JarHeader), Latin1(fileSystem.Written["jarfail.txt"].ToArray()));
     }
@@ -326,8 +433,10 @@ public sealed class CurlCommandRunnerCookieTests
     [DataRow("dict://exa mple.com/x", DisplayName = "malformed")]
     public async Task RunAsync_CookieJarAndAUrlThatIsNotHttp_WritesNoJar(string url)
     {
-        await RunAsync(Serve(), ["-s", "-b", "in.txt", "-c", "j4.txt", url]);
+        int exitCode = await RunAsync(Serve(), ["-s", "-b", "in.txt", "-c", "j4.txt", url]);
 
+        Diagnostics.Act("exit code seen by the test", exitCode);
+        Diagnostics.Assert("jar written", false, fileSystem.Written.ContainsKey("j4.txt"));
         Assert.IsFalse(fileSystem.Written.ContainsKey("j4.txt"));
     }
 
@@ -335,37 +444,80 @@ public sealed class CurlCommandRunnerCookieTests
     public async Task RunAsync_CookieJarOnAFailedStandardOutput_WritesNothingAndReportsTheWriteFailure()
     {
         using FailingWriteStream closed = new();
+        string[] arguments = ["-s", "-c", "-", Url];
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("standard output", "a stream whose every write fails");
 
-        int exitCode = await new CurlCommandRunner(
-                options => CreateTransferDispatch(Serve("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nbody\n"), options),
-                fileSystem,
-                fileSystem,
-                closed,
-                new MemoryStream(),
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(["-s", "-c", "-", Url]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    options => CreateTransferDispatch(Serve("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nbody\n"), options),
+                    fileSystem,
+                    fileSystem,
+                    closed,
+                    new MemoryStream(),
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(arguments);
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
     }
 
     /// <summary>A connector whose connections answer <paramref name="responses" /> in turn.</summary>
-    private static ScriptedConnector Serve(params string[] responses) => new(responses.Select(Encoding.Latin1.GetBytes));
+    private ScriptedConnector Serve(params string[] responses)
+    {
+        Diagnostics.Arrange(
+            "scripted responses",
+            responses.Length == 0 ? "<none>" : string.Join(" | ", responses.Select(response => response.Length == 0 ? "<empty>" : response)));
+        return new(responses.Select(Encoding.Latin1.GetBytes));
+    }
 
     /// <summary>
     /// Runs <paramref name="arguments" /> as on Windows over <paramref name="connector" /> and the
     /// in-memory disk, with <paramref name="standardInput" /> (Latin-1) on standard input.
     /// </summary>
-    private Task<int> RunAsync(IConnector connector, string[] arguments, string standardInput = "") =>
-        new CurlCommandRunner(
-                options => CreateTransferDispatch(connector, options),
-                fileSystem,
-                fileSystem,
-                standardOutput,
-                standardError,
-                new MemoryStream(Encoding.Latin1.GetBytes(standardInput)),
-                runsOnWindows: true)
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(IConnector connector, string[] arguments, string standardInput = "")
+    {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("standard input", standardInput.Length == 0 ? "<empty>" : standardInput);
+        foreach (KeyValuePair<string, byte[]> file in fileSystem.ExistingContent)
+        {
+            Diagnostics.Bytes($"input file {file.Key}", file.Value);
+        }
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    options => CreateTransferDispatch(connector, options),
+                    fileSystem,
+                    fileSystem,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(Encoding.Latin1.GetBytes(standardInput)),
+                    runsOnWindows: true)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        if (connector is ScriptedConnector scripted)
+        {
+            Diagnostics.Bytes("request bytes", scripted.Written);
+        }
+
+        foreach (KeyValuePair<string, MemoryStream> file in fileSystem.Written)
+        {
+            Diagnostics.Bytes($"written file {file.Key}, platform newlines as LF", Lf(file.Value.ToArray()));
+        }
+
+        return exitCode;
+    }
 
     /// <summary>The production handler set over <paramref name="connector" />, with the run's cookies.</summary>
     private static TransferDispatch CreateTransferDispatch(IConnector connector, Cli.CommandLineOptions options)
@@ -383,6 +535,12 @@ public sealed class CurlCommandRunnerCookieTests
 
     /// <summary>The jar-file lines as <see cref="Cookies.CookieStore.SaveCookieJarAsync" /> ends them: CR LF on Windows, as measured.</summary>
     private static string NativeLines(string text) => text.Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+
+    /// <summary>The text with each platform newline written as LF, so what a test prints does not depend on the OS.</summary>
+    private static string Lf(string text) => text.Replace(Environment.NewLine, "\n", StringComparison.Ordinal);
+
+    /// <summary>The bytes with each platform newline written as LF, so what a test prints does not depend on the OS.</summary>
+    private static byte[] Lf(byte[] bytes) => Encoding.Latin1.GetBytes(Lf(Encoding.Latin1.GetString(bytes)));
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);
 }

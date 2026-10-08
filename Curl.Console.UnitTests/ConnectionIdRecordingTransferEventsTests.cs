@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -14,6 +15,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class ConnectionIdRecordingTransferEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ReportConnectionOpened_FirstConnection_TakesTheConnIdAndRemembersItUnderThePoolsNumber()
     {
@@ -21,8 +26,13 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         ConcurrentDictionary<long, long> connectionIds = new();
         ITransferEvents events = new ConnectionIdRecordingTransferEvents(NoTransferEvents.Instance, state, connectionIds, () => state.ConnectionId ??= 4);
 
+        Diagnostics.Arrange("connection number, is second connection", "7, False");
+
         events.ReportConnectionOpened(Opened(connectionNumber: 7, isSecondConnection: false));
 
+        Diagnostics.Act("state connection id", state.ConnectionId);
+        Diagnostics.Assert("state connection id", 4L, state.ConnectionId);
+        Diagnostics.Assert("remembered id for pool number 7", 4L, connectionIds[7]);
         Assert.AreEqual(4L, state.ConnectionId);
         Assert.AreEqual(4L, connectionIds[7]);
     }
@@ -34,8 +44,13 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         ConcurrentDictionary<long, long> connectionIds = new();
         ITransferEvents events = new ConnectionIdRecordingTransferEvents(NoTransferEvents.Instance, state, connectionIds, () => state.ConnectionId ??= 4);
 
+        Diagnostics.Arrange("connection number, is second connection", "8, True");
+
         events.ReportConnectionOpened(Opened(connectionNumber: 8, isSecondConnection: true));
 
+        Diagnostics.Act("state connection id", state.ConnectionId);
+        Diagnostics.Assert("state connection id", null, state.ConnectionId);
+        Diagnostics.Assert("remembered ids", 0, connectionIds.Count);
         Assert.IsNull(state.ConnectionId);
         Assert.IsEmpty(connectionIds);
     }
@@ -47,8 +62,12 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         ConcurrentDictionary<long, long> connectionIds = new() { [7] = 2 };
         ITransferEvents events = new ConnectionIdRecordingTransferEvents(NoTransferEvents.Instance, state, connectionIds, () => 9);
 
+        Diagnostics.Arrange("reused pool number, remembered id", "7, 2");
+
         events.ReportConnectionReused(Reused(connectionNumber: 7));
 
+        Diagnostics.Act("state connection id", state.ConnectionId);
+        Diagnostics.Assert("state connection id", 2L, state.ConnectionId);
         Assert.AreEqual(2L, state.ConnectionId);
     }
 
@@ -58,8 +77,12 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         RunningTransferState state = NewState();
         ITransferEvents events = new ConnectionIdRecordingTransferEvents(NoTransferEvents.Instance, state, new ConcurrentDictionary<long, long>(), () => 9);
 
+        Diagnostics.Arrange("reused pool number, remembered id", "3, none");
+
         events.ReportConnectionReused(Reused(connectionNumber: 3));
 
+        Diagnostics.Act("state connection id", state.ConnectionId);
+        Diagnostics.Assert("state connection id", 3L, state.ConnectionId);
         Assert.AreEqual(3L, state.ConnectionId);
     }
 
@@ -68,6 +91,7 @@ public sealed class ConnectionIdRecordingTransferEventsTests
     {
         CallRecordingEvents inner = new();
         ITransferEvents events = new ConnectionIdRecordingTransferEvents(inner, NewState(), new ConcurrentDictionary<long, long>(), () => 0);
+        Diagnostics.Arrange("events to report", 13);
 
         events.ReportInfo("text");
         events.ReportConnectionOpened(Opened(connectionNumber: 0, isSecondConnection: false));
@@ -83,6 +107,8 @@ public sealed class ConnectionIdRecordingTransferEventsTests
         events.ReportDataSent([4]);
         events.ReportDataReceived([5]);
 
+        Diagnostics.Act("inner calls", string.Join(", ", inner.Calls));
+        Diagnostics.Assert("inner call count", 13, inner.Calls.Count);
         CollectionAssert.AreEqual(
             new[]
             {

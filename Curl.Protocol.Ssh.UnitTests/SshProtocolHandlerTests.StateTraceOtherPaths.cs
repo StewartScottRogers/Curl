@@ -28,6 +28,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/up.txt", setup, upload: "up data!");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             SftpUntilTransInit + " | * [SSH] [SSH_SFTP_TRANS_INIT] -> [SSH_SFTP_UPLOAD_INIT] | * [SSH] [SSH_SFTP_UPLOAD_INIT] -> [SSH_STOP] | "
@@ -42,6 +43,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("scp://files.example/up.txt", setup, upload: "up data!");
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             $"{DoPhaseStarts} | * [SSH] [SSH_STOP] -> [SSH_SCP_TRANS_INIT] | * [SSH] [SSH_SCP_TRANS_INIT] -> [SSH_SCP_UPLOAD_INIT] | "
@@ -68,6 +70,7 @@ public sealed partial class SshProtocolHandlerTests
 
         // Each entry's data line comes before its READDIR_BOTTOM, as curl's does; left out here.
         string traced = string.Join(" | ", lines.Split(" | ").Where(line => !line.StartsWith("<= ", StringComparison.Ordinal)));
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             traced,
             SftpUntilTransInit + " | * [SSH] [SSH_SFTP_TRANS_INIT] -> [SSH_SFTP_READDIR_INIT] | * [SSH] [SSH_SFTP_READDIR_INIT] -> [SSH_SFTP_READDIR] | "
@@ -83,6 +86,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup, quotes: ["*mkdir /x", "pwd", "-chmod 644 /f"]);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             "* [SSH] [SSH_STOP] -> [SSH_SFTP_QUOTE_INIT] | * SSH: sending quote commands | * [SSH] [SSH_SFTP_QUOTE_INIT] -> [SSH_SFTP_QUOTE] | "
@@ -108,6 +112,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunTracedAsync("sftp://files.example/f", KeyLogin(), quotes: [quote]);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(lines, $"* [SSH] [SSH_SFTP_QUOTE] -> [{state}] | * [SSH] [{state}] -> [SSH_SFTP_NEXT_QUOTE]");
     }
 
@@ -123,6 +128,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup, quotes: [quote]);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             $"{failedIn} -> [SSH_SFTP_CLOSE] | * [SSH] [SSH_SFTP_CLOSE] statemachine() -> 21, block=0 | * Connection #0 to host files.example:22 left intact");
@@ -136,6 +142,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             "* [SSH] [SSH_AUTH_PKEY] -> [SSH_AUTH_PASS_INIT] | * [SSH] [SSH_AUTH_PASS_INIT] -> [SSH_AUTH_PASS] | "
@@ -149,6 +156,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             "* [SSH] [SSH_AUTH_PASS_INIT] -> [SSH_AUTH_PASS] | * [SSH] [SSH_AUTH_PASS] -> [SSH_AUTH_HOST_INIT] | "
@@ -169,6 +177,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(lines, "* [SSH] [SSH_AUTH_PASS_INIT] -> [SSH_AUTH_HOST_INIT]");
         StringAssert.Contains(lines, "* [SSH] [SSH_AUTH_KEY_INIT] -> [SSH_AUTH_KEY] | " + outcome);
     }
@@ -182,6 +191,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(lines, "* SSH: SHA256 checksum match | * [SSH] [SSH_HOSTKEY] -> [SSH_AUTHLIST]");
     }
 
@@ -195,6 +205,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(lines, "* [SSH] [SSH_HOSTKEY] -> [SSH_SESSION_FREE] | * [SSH] [SSH_SESSION_FREE] statemachine() -> 60, block=0 | * closing connection #0");
     }
 
@@ -210,6 +221,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync(url, setup, upload: upload);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(lines, expected + ", block=0 | * Connection #0 to host files.example:22 left intact");
     }
 
@@ -218,13 +230,16 @@ public sealed partial class SshProtocolHandlerTests
     {
         TranscriptTransferEvents events = new();
         SshStateTrace trace = new(events, enabled: true);
+        Diagnostics.Arrange("trace", "enabled, resting");
 
         trace.Fail(CurlExitCode.PartialFile);
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript lines", 0, events.Transcript.Count);
         Assert.IsEmpty(events.Transcript);
     }
 
-    private static async Task<string> RunTracedAsync(string url, TraceSetup setup, string? upload = null, IReadOnlyList<string>? quotes = null, bool listOnly = false, bool noBody = false)
+    private async Task<string> RunTracedAsync(string url, TraceSetup setup, string? upload = null, IReadOnlyList<string>? quotes = null, bool listOnly = false, bool noBody = false)
     {
         TranscriptTransferEvents events = new();
         TransferContext context = TracedContext(url, setup, events);
@@ -240,8 +255,13 @@ public sealed partial class SshProtocolHandlerTests
             ListOnly = listOnly,
             NoBody = noBody,
         };
-        await HandlerFor(setup, tracesStateMachine: true).ExecuteAsync(context);
+        ArrangeTransfer(context);
+        Diagnostics.Arrange("no body", noBody);
+
+        TransferResult result = await HandlerFor(setup, tracesStateMachine: true).ExecuteAsync(context);
         await setup.Server.WhenSessionsEndAsync();
+
+        ActTransfer(result, context, setup.Server);
         return string.Join(" | ", events.Transcript);
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Tls;
 
 /// <summary>The ClientHello's extension order, its fixed extensions, and the padding rule at each edge of its 256-to-511-byte window.</summary>
@@ -5,6 +7,10 @@ namespace Curl.Tls;
 public sealed class Tls13ClientHelloBuilderTests
 {
     private static readonly byte[] Random = new byte[32];
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow(255, -1)]
@@ -15,9 +21,14 @@ public sealed class Tls13ClientHelloBuilderTests
     [DataRow(512, -1)]
     public void PaddingBringsAHelloOf256To511BytesUpTo512(int unpaddedLength, int expectedPadding)
     {
+        Diagnostics.Arrange("unpadded length", unpaddedLength);
+
         ClientHello hello = HelloOfLength(unpaddedLength, withPadding: true);
 
         TlsExtension? padding = hello.Extensions.FirstOrDefault(extension => extension.Type == TlsExtensionType.Padding);
+        Diagnostics.Act("extensions", Types(hello));
+        Diagnostics.Act("padded length", hello.Encode().Length);
+        Diagnostics.Assert("padding length (-1 for none)", expectedPadding, padding?.Data.Length ?? -1);
         Assert.AreEqual(expectedPadding, padding?.Data.Length ?? -1);
     }
 
@@ -26,9 +37,13 @@ public sealed class Tls13ClientHelloBuilderTests
     {
         TlsExtension quic = new(TlsExtensionType.QuicTransportParameters, [1, 2]);
         Tls13ClientSettings settings = new() { ExtensionOrder = [TlsExtensionType.SupportedVersions], FixedExtensions = [quic] };
+        Diagnostics.Arrange("extension order", "supported_versions");
+        Diagnostics.Arrange("fixed extensions", "quic_transport_parameters (not in the order)");
 
         ClientHello hello = new Tls13ClientHelloBuilder(settings, Random, []).Build([], null);
 
+        Diagnostics.Act("extensions", Types(hello));
+        Diagnostics.Assert("extensions", $"{TlsExtensionType.SupportedVersions}, {TlsExtensionType.QuicTransportParameters}", Types(hello));
         CollectionAssert.AreEqual(new[] { TlsExtensionType.SupportedVersions, TlsExtensionType.QuicTransportParameters }, hello.Extensions.Select(extension => extension.Type).ToArray());
     }
 
@@ -39,11 +54,16 @@ public sealed class Tls13ClientHelloBuilderTests
         {
             ExtensionOrder = [TlsExtensionType.ServerName, TlsExtensionType.ApplicationLayerProtocolNegotiation, TlsExtensionType.Cookie, TlsExtensionType.EarlyData, TlsExtensionType.KeyShare],
         };
+        Diagnostics.Arrange("extension order", string.Join(", ", settings.ExtensionOrder));
 
         ClientHello hello = new Tls13ClientHelloBuilder(settings, Random, []).Build([], null);
 
+        Diagnostics.Act("extensions", Types(hello));
+        Diagnostics.Assert("only extension", TlsExtensionType.KeyShare, hello.Extensions.Single().Type);
         Assert.AreEqual(TlsExtensionType.KeyShare, hello.Extensions.Single().Type);
     }
+
+    private static string Types(ClientHello hello) => string.Join(", ", hello.Extensions.Select(extension => extension.Type));
 
     private static ClientHello HelloOfLength(int length, bool withPadding)
     {

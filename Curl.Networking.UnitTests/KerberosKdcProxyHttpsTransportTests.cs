@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -14,6 +15,8 @@ namespace Curl.Networking;
 [TestClass]
 public sealed partial class KerberosKdcProxyHttpsTransportTests
 {
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task PostAsync_ProxyAnswers200_SendsMitsRequestOverItsOwnTlsAndReturnsTheBody()
     {
@@ -21,8 +24,9 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         connector.BytesToRead.Add(Reply("HTTP/1.1 200 OK\r\nContent-Type: application/kerberos\r\nContent-Length: 2\r\n\r\n", [0xAA, 0xBB]));
         KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
-        byte[] reply = await transport.PostAsync("kdcproxy.example.test", 443, "KdcProxy", new byte[] { 0x30, 0x01, 0x02 }, CancellationToken.None);
+        byte[] reply = await PostAsync(transport, "kdcproxy.example.test", 443, "KdcProxy", new byte[] { 0x30, 0x01, 0x02 }, CancellationToken.None);
 
+        Diagnostics.Diff("body", new byte[] { 0xAA, 0xBB }, reply);
         CollectionAssert.AreEqual(new byte[] { 0xAA, 0xBB }, reply);
         Assert.AreEqual(new ConnectTarget("kdcproxy.example.test", 443, UseTls: false), connector.Targets.Single());
         byte[] expected = Reply(
@@ -36,6 +40,10 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
             "\r\n",
             [0x30, 0x01, 0x02]);
         ScriptedConnection connection = connector.Opened.Single();
+        Diagnostics.Bytes("request", connection.Written.ToArray());
+        Diagnostics.Diff("request", expected, connection.Written.ToArray());
+        Diagnostics.Assert("flush count", 1, connection.FlushCount);
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         CollectionAssert.AreEqual(expected, connection.Written);
         Assert.AreEqual(1, connection.FlushCount);
         Assert.IsTrue(connection.IsDisposed);
@@ -44,8 +52,15 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
     [TestMethod]
     public void BuildRequest_EmptyPathAndIpv6Host_PostsToTheRootWithABracketedHost()
     {
+        Diagnostics.Arrange("host", "2001:db8::1");
+        Diagnostics.Arrange("path", "");
+        Diagnostics.Arrange("body", "0 bytes");
+
         string request = Encoding.ASCII.GetString(KerberosKdcProxyHttpsTransport.BuildRequest("2001:db8::1", "", ReadOnlyMemory<byte>.Empty));
 
+        Diagnostics.Act("request", request.ReplaceLineEndings("\\r\\n"));
+        Diagnostics.Assert("starts with the root and a bracketed host", true, request.StartsWith("POST / HTTP/1.0\r\nHost: [2001:db8::1]\r\n", StringComparison.Ordinal));
+        Diagnostics.Assert("ends with Content-Length 0", true, request.EndsWith("Content-Length: 0\r\n\r\n", StringComparison.Ordinal));
         StringAssert.StartsWith(request, "POST / HTTP/1.0\r\nHost: [2001:db8::1]\r\n");
         StringAssert.EndsWith(request, "Content-Length: 0\r\n\r\n");
     }
@@ -57,8 +72,10 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         connector.BytesToRead.Add(Reply("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n", []));
         KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
-        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("kdcproxy.example.test", 443, "KdcProxy", new byte[] { 0x30 }, CancellationToken.None));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => PostAsync(transport, "kdcproxy.example.test", 443, "KdcProxy", new byte[] { 0x30 }, CancellationToken.None));
 
+        Diagnostics.Diff("message", "The KDC proxy kdcproxy.example.test port 443 answered HTTP/1.1 404 Not Found.", failure.Message);
+        Diagnostics.Assert("connection disposed", true, connector.Opened.Single().IsDisposed);
         Assert.AreEqual("The KDC proxy kdcproxy.example.test port 443 answered HTTP/1.1 404 Not Found.", failure.Message);
         Assert.IsTrue(connector.Opened.Single().IsDisposed);
     }
@@ -72,22 +89,30 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
     public void ReadBody_StatusLine_AcceptsOnlyHttp1With200(string head, bool accepted)
     {
         byte[] reply = Reply(head, [0x01]);
+        Diagnostics.Bytes("reply", reply);
+        Diagnostics.Arrange("accepted", accepted);
 
         if (accepted)
         {
+            byte[] body = ReadBody(reply);
+            Diagnostics.Diff("body", new byte[] { 0x01 }, body);
             CollectionAssert.AreEqual(new byte[] { 0x01 }, KerberosKdcProxyHttpsTransport.ReadBody("proxy", 443, reply));
         }
         else
         {
-            Assert.ThrowsExactly<IOException>(() => KerberosKdcProxyHttpsTransport.ReadBody("proxy", 443, reply));
+            IOException failure = Assert.ThrowsExactly<IOException>(() => ReadBody(reply));
+            Diagnostics.Assert("exception", nameof(IOException), failure.GetType().Name);
         }
     }
 
     [TestMethod]
     public void ReadBody_NoBlankLine_ThrowsIOException()
     {
-        IOException failure = Assert.ThrowsExactly<IOException>(() => KerberosKdcProxyHttpsTransport.ReadBody("proxy", 443, Reply("HTTP/1.1 200 OK\r\n", [])));
+        Diagnostics.Arrange("reply", "HTTP/1.1 200 OK\\r\\n with no blank line");
 
+        IOException failure = Assert.ThrowsExactly<IOException>(() => ReadBody(Reply("HTTP/1.1 200 OK\r\n", [])));
+
+        Diagnostics.Diff("message", "The KDC proxy proxy port 443 sent no complete HTTP reply.", failure.Message);
         Assert.AreEqual("The KDC proxy proxy port 443 sent no complete HTTP reply.", failure.Message);
     }
 
@@ -98,8 +123,9 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         connector.BytesToRead.Add(new byte[KerberosKdcProxyHttpsTransport.MaximumReplyLength + 1]);
         KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
-        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => PostAsync(transport, "proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
 
+        Diagnostics.Diff("message", "The KDC proxy proxy port 443 sent a reply longer than 1048576 bytes.", failure.Message);
         Assert.AreEqual("The KDC proxy proxy port 443 sent a reply longer than 1048576 bytes.", failure.Message);
     }
 
@@ -109,8 +135,9 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         FakeConnector connector = new() { Failure = ConnectResult.Failed(CurlExitCode.SslConnectError, "TLS connect error") };
         KerberosKdcProxyHttpsTransport transport = OverPlaintext(connector, new ManualTimeProvider());
 
-        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => PostAsync(transport, "proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
 
+        Diagnostics.Diff("message", "TLS connect error", failure.Message);
         Assert.AreEqual("TLS connect error", failure.Message);
     }
 
@@ -121,8 +148,10 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         StallingConnection connection = new() { OnStalled = () => time.Advance(10000) };
         KerberosKdcProxyHttpsTransport transport = OverPlaintext(new SingleConnectionConnector(connection), time);
 
-        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
+        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(() => PostAsync(transport, "proxy", 443, "", new byte[] { 0x30 }, CancellationToken.None));
 
+        Diagnostics.Diff("message", "The KDC proxy proxy port 443 did not answer within 10 s.", failure.Message);
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.AreEqual("The KDC proxy proxy port 443 did not answer within 10 s.", failure.Message);
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -134,7 +163,52 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         StallingConnection connection = new() { OnStalled = cancel.Cancel };
         KerberosKdcProxyHttpsTransport transport = OverPlaintext(new SingleConnectionConnector(connection), new ManualTimeProvider());
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => transport.PostAsync("proxy", 443, "", new byte[] { 0x30 }, cancel.Token));
+        var failure = await Assert.ThrowsAsync<OperationCanceledException>(() => PostAsync(transport, "proxy", 443, "", new byte[] { 0x30 }, cancel.Token));
+
+        Diagnostics.Assert("cancelled", true, failure is OperationCanceledException);
+    }
+
+    private async Task<byte[]> PostAsync(KerberosKdcProxyHttpsTransport transport, string host, int port, string path, byte[] body, CancellationToken cancellationToken)
+    {
+        Diagnostics.Arrange("proxy", $"{host} port {port}");
+        Diagnostics.Arrange("path", path);
+        Diagnostics.Bytes("KDC request", body);
+        try
+        {
+            byte[] reply;
+            using (Diagnostics.Phase("post"))
+            {
+                reply = await transport.PostAsync(host, port, path, body, cancellationToken);
+            }
+
+            Diagnostics.Bytes("reply body", reply);
+            Diagnostics.Act("reply body length", reply.Length);
+            return reply;
+        }
+        catch (Exception exception) when (WriteFailure(exception))
+        {
+            throw;
+        }
+    }
+
+    private byte[] ReadBody(byte[] reply)
+    {
+        try
+        {
+            byte[] body = KerberosKdcProxyHttpsTransport.ReadBody("proxy", 443, reply);
+            Diagnostics.Act("body length", body.Length);
+            return body;
+        }
+        catch (Exception exception) when (WriteFailure(exception))
+        {
+            throw;
+        }
+    }
+
+    private bool WriteFailure(Exception exception)
+    {
+        Diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.Message}");
+        return false;
     }
 
     private static byte[] Reply(string head, byte[] body) => [.. Encoding.ASCII.GetBytes(head), .. body];

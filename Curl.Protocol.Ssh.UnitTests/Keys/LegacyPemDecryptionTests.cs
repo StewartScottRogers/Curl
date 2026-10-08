@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Keys;
 
@@ -13,12 +14,22 @@ public sealed class LegacyPemDecryptionTests
 {
     private static readonly byte[] Secret = Encoding.UTF8.GetBytes("secret");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Decrypt_NoDekInfo_ReturnsTheBodyAsItIs()
     {
         PemBlock block = new("RSA PRIVATE KEY", new Dictionary<string, string> { ["Proc-Type"] = "4,ENCRYPTED" }, [1, 2, 3]);
+        Diagnostics.Arrange("headers", "Proc-Type: 4,ENCRYPTED, no DEK-Info");
+        Diagnostics.Bytes("body", block.Body);
 
-        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, LegacyPemDecryption.Decrypt(block, Secret));
+        byte[] decrypted = LegacyPemDecryption.Decrypt(block, Secret);
+
+        Diagnostics.ActBytes("decrypted", decrypted);
+        Diagnostics.AssertBytes("decrypted", [1, 2, 3], decrypted);
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, decrypted);
     }
 
     [TestMethod]
@@ -28,15 +39,21 @@ public sealed class LegacyPemDecryptionTests
     public void Decrypt_UnusableDekInfo_Throws(string dekInfo)
     {
         PemBlock block = new("RSA PRIVATE KEY", new Dictionary<string, string> { ["DEK-Info"] = dekInfo }, new byte[16]);
+        Diagnostics.Arrange("DEK-Info", dekInfo);
 
-        Assert.ThrowsExactly<CryptographicException>(() => LegacyPemDecryption.Decrypt(block, Secret));
+        var failure = Assert.ThrowsExactly<CryptographicException>(() => LegacyPemDecryption.Decrypt(block, Secret));
+
+        Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
     [TestMethod]
     public void Decrypt_IvNotHexadecimal_Throws()
     {
         PemBlock block = new("RSA PRIVATE KEY", new Dictionary<string, string> { ["DEK-Info"] = "AES-128-CBC,XYZ" }, new byte[16]);
+        Diagnostics.Arrange("DEK-Info", block.Headers["DEK-Info"]);
 
-        Assert.ThrowsExactly<FormatException>(() => LegacyPemDecryption.Decrypt(block, Secret));
+        var failure = Assert.ThrowsExactly<FormatException>(() => LegacyPemDecryption.Decrypt(block, Secret));
+
+        Diagnostics.ActAndAssertThrown(nameof(FormatException), failure);
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -13,6 +15,10 @@ public sealed class CommandLineSizeAndOffsetTests
     private const string MaxFileSizeOption = "--max-filesize";
 
     private const string ContinueAtOption = "-C";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow("9", 9L)]
@@ -32,7 +38,8 @@ public sealed class CommandLineSizeAndOffsetTests
     [DataRow("8191P", 9222246136947933184L)]
     public void ParseSize_WholeUnits_MultipliesByTheUnit(string value, long expected)
     {
-        Assert.IsNull(CommandLineNumber.ParseSize(MaxFileSizeOption, value, out long size));
+        Assert.IsNull(ParseSize(value, out long size));
+        Diagnostics.Assert("size", expected, size);
         Assert.AreEqual(expected, size);
     }
 
@@ -67,7 +74,8 @@ public sealed class CommandLineSizeAndOffsetTests
     [DataRow("9007199254740991.999k", 9223372036854775806L)]
     public void ParseSize_Fraction_KeepsTheUnitsDecimalPlacesAndRoundsDown(string value, long expected)
     {
-        Assert.IsNull(CommandLineNumber.ParseSize(MaxFileSizeOption, value, out long size));
+        Assert.IsNull(ParseSize(value, out long size));
+        Diagnostics.Assert("size", expected, size);
         Assert.AreEqual(expected, size);
     }
 
@@ -103,8 +111,10 @@ public sealed class CommandLineSizeAndOffsetTests
     [DataRow("9007199254740992k", "too large number")]
     public void ParseSize_Unreadable_IsRefusedWithCurlsReason(string value, string reason)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseSize(MaxFileSizeOption, value, out long size);
+        CommandLineRefusal? refusal = ParseSize(value, out long size);
 
+        Diagnostics.Assert("stderr", CommandLineParseDiagnostics.QuoteEach([$"curl: option --max-filesize: {reason}", CommandLineRefusal.TryHelpLine]), CommandLineParseDiagnostics.QuoteEach(refusal?.StandardErrorLines ?? []));
+        Diagnostics.Assert("size", 0L, size);
         Assert.IsNotNull(refusal);
         CollectionAssert.AreEqual(
             new[] { $"curl: option --max-filesize: {reason}", CommandLineRefusal.TryHelpLine },
@@ -115,12 +125,18 @@ public sealed class CommandLineSizeAndOffsetTests
     [TestMethod]
     public void ParseSize_NullArguments_Throw()
     {
-        Assert.AreEqual(
-            "spelledOption",
-            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSize(null!, "1", out _)).ParamName);
-        Assert.AreEqual(
-            "value",
-            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSize(MaxFileSizeOption, null!, out _)).ParamName);
+        Diagnostics.Arrange("first call", "ParseSize(null, \"1\")");
+        Diagnostics.Arrange("second call", $"ParseSize(\"{MaxFileSizeOption}\", null)");
+
+        string? nullOptionParameter = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSize(null!, "1", out _)).ParamName;
+        string? nullValueParameter = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseSize(MaxFileSizeOption, null!, out _)).ParamName;
+
+        Diagnostics.Act("first call throws for", nullOptionParameter);
+        Diagnostics.Act("second call throws for", nullValueParameter);
+        Diagnostics.Assert("first call parameter", "spelledOption", nullOptionParameter);
+        Diagnostics.Assert("second call parameter", "value", nullValueParameter);
+        Assert.AreEqual("spelledOption", nullOptionParameter);
+        Assert.AreEqual("value", nullValueParameter);
     }
 
     [TestMethod]
@@ -129,7 +145,8 @@ public sealed class CommandLineSizeAndOffsetTests
     [DataRow("9223372036854775807", long.MaxValue)]
     public void ParseOffset_Digits_ReadsThem(string value, long expected)
     {
-        Assert.IsNull(CommandLineNumber.ParseOffset(ContinueAtOption, value, out long offset));
+        Assert.IsNull(ParseOffset(value, out long offset));
+        Diagnostics.Assert("offset", expected, offset);
         Assert.AreEqual(expected, offset);
     }
 
@@ -141,8 +158,10 @@ public sealed class CommandLineSizeAndOffsetTests
     [DataRow("9223372036854775808")]
     public void ParseOffset_NotDigitsOrTooLarge_IsRefusedAsNotProperNumerical(string value)
     {
-        CommandLineRefusal? refusal = CommandLineNumber.ParseOffset(ContinueAtOption, value, out long offset);
+        CommandLineRefusal? refusal = ParseOffset(value, out long offset);
 
+        Diagnostics.Assert("stderr", CommandLineParseDiagnostics.QuoteEach(["curl: option -C: expected a proper numerical parameter", CommandLineRefusal.TryHelpLine]), CommandLineParseDiagnostics.QuoteEach(refusal?.StandardErrorLines ?? []));
+        Diagnostics.Assert("offset", 0L, offset);
         Assert.IsNotNull(refusal);
         CollectionAssert.AreEqual(
             new[] { "curl: option -C: expected a proper numerical parameter", CommandLineRefusal.TryHelpLine },
@@ -153,25 +172,74 @@ public sealed class CommandLineSizeAndOffsetTests
     [TestMethod]
     public void ParseOffset_NullArguments_Throw()
     {
-        Assert.AreEqual(
-            "spelledOption",
-            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseOffset(null!, "1", out _)).ParamName);
-        Assert.AreEqual(
-            "value",
-            Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseOffset(ContinueAtOption, null!, out _)).ParamName);
+        Diagnostics.Arrange("first call", "ParseOffset(null, \"1\")");
+        Diagnostics.Arrange("second call", $"ParseOffset(\"{ContinueAtOption}\", null)");
+
+        string? nullOptionParameter = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseOffset(null!, "1", out _)).ParamName;
+        string? nullValueParameter = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineNumber.ParseOffset(ContinueAtOption, null!, out _)).ParamName;
+
+        Diagnostics.Act("first call throws for", nullOptionParameter);
+        Diagnostics.Act("second call throws for", nullValueParameter);
+        Diagnostics.Assert("first call parameter", "spelledOption", nullOptionParameter);
+        Diagnostics.Assert("second call parameter", "value", nullValueParameter);
+        Assert.AreEqual("spelledOption", nullOptionParameter);
+        Assert.AreEqual("value", nullValueParameter);
     }
 
     [TestMethod]
     public void BadlyUsedHere_NamesTheOption()
     {
+        Diagnostics.Arrange("spelled option", "--max-filesize=1x");
+
+        CommandLineRefusal refusal = CommandLineRefusal.BadlyUsedHere("--max-filesize=1x");
+
+        Diagnostics.Act("exit code", $"{(int)refusal.ExitCode} ({refusal.ExitCode})");
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach(["curl: option --max-filesize=1x: is badly used here", CommandLineRefusal.TryHelpLine]),
+            CommandLineParseDiagnostics.QuoteEach(refusal.StandardErrorLines));
         CollectionAssert.AreEqual(
             new[] { "curl: option --max-filesize=1x: is badly used here", CommandLineRefusal.TryHelpLine },
-            CommandLineRefusal.BadlyUsedHere("--max-filesize=1x").StandardErrorLines.ToArray());
+            refusal.StandardErrorLines.ToArray());
     }
 
     [TestMethod]
     public void ContinueAtExclusiveWithRange_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtExclusiveWithRange(null!, errorsHidden: false));
+        Diagnostics.Arrange("spelled option", "null");
+        Diagnostics.Arrange("errors hidden", false);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtExclusiveWithRange(null!, errorsHidden: false));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
+
+    private CommandLineRefusal? ParseSize(string value, out long size)
+    {
+        Diagnostics.Arrange("option", MaxFileSizeOption);
+        Diagnostics.Arrange("value", "\"" + value + "\"");
+        CommandLineRefusal? refusal = CommandLineNumber.ParseSize(MaxFileSizeOption, value, out size);
+        ActNumber("size", refusal, size);
+        return refusal;
+    }
+
+    private CommandLineRefusal? ParseOffset(string value, out long offset)
+    {
+        Diagnostics.Arrange("option", ContinueAtOption);
+        Diagnostics.Arrange("value", "\"" + value + "\"");
+        CommandLineRefusal? refusal = CommandLineNumber.ParseOffset(ContinueAtOption, value, out offset);
+        ActNumber("offset", refusal, offset);
+        return refusal;
+    }
+
+    private void ActNumber(string label, CommandLineRefusal? refusal, long number)
+    {
+        Diagnostics.Act(label, number);
+        Diagnostics.Act("refused", refusal is not null);
+        foreach (string line in refusal?.StandardErrorLines ?? [])
+        {
+            Diagnostics.Act("stderr", line);
+        }
     }
 }

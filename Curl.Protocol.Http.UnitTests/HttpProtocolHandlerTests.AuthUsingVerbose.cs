@@ -20,7 +20,9 @@ public sealed partial class HttpProtocolHandlerTests
     {
         List<string> events = await AuthUsingEventsAsync(new HttpRequestOptions(), new NetworkCredential("u", "p"), OkHead + "ok");
 
-        CollectionAssert.AreEqual(new[] { "* using HTTP/1.x", "* Server auth using Basic with user 'u'", AuthUsingRequestLine }, events);
+        string[] expected = ["* using HTTP/1.x", "* Server auth using Basic with user 'u'", AuthUsingRequestLine];
+        WriteExpectedLines("auth using lines", expected, events);
+        CollectionAssert.AreEqual(expected, events);
     }
 
     [TestMethod]
@@ -28,7 +30,9 @@ public sealed partial class HttpProtocolHandlerTests
     {
         List<string> events = await AuthUsingEventsAsync(new HttpRequestOptions { Headers = ["Authorization: x"] }, new NetworkCredential("u", "p"), OkHead + "ok");
 
-        CollectionAssert.AreEqual(new[] { "* using HTTP/1.x", AuthUsingRequestLine }, events);
+        string[] expected = ["* using HTTP/1.x", AuthUsingRequestLine];
+        WriteExpectedLines("auth using lines", expected, events);
+        CollectionAssert.AreEqual(expected, events);
     }
 
     [TestMethod]
@@ -36,7 +40,9 @@ public sealed partial class HttpProtocolHandlerTests
     {
         List<string> events = await AuthUsingEventsAsync(new HttpRequestOptions { BearerToken = "tok", AuthSchemes = HttpAuthSchemes.Bearer }, credential: null, OkHead + "ok");
 
-        CollectionAssert.AreEqual(new[] { "* using HTTP/1.x", "* Server auth using Bearer with user ''", AuthUsingRequestLine }, events);
+        string[] expected = ["* using HTTP/1.x", "* Server auth using Bearer with user ''", AuthUsingRequestLine];
+        WriteExpectedLines("auth using lines", expected, events);
+        CollectionAssert.AreEqual(expected, events);
     }
 
     [TestMethod]
@@ -46,9 +52,9 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> events = await AuthUsingEventsAsync(new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest }, new NetworkCredential("u", "p"), Challenge, OkHead + "ok");
 
-        CollectionAssert.AreEqual(
-            new[] { "* using HTTP/1.x", "* Server auth using Digest with user 'u'", AuthUsingRequestLine, "* Server auth using Digest with user 'u'", AuthUsingRequestLine },
-            events);
+        string[] expected = ["* using HTTP/1.x", "* Server auth using Digest with user 'u'", AuthUsingRequestLine, "* Server auth using Digest with user 'u'", AuthUsingRequestLine];
+        WriteExpectedLines("auth using lines", expected, events);
+        CollectionAssert.AreEqual(expected, events);
     }
 
     [TestMethod]
@@ -61,9 +67,9 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> events = await AuthUsingEventsAsync(new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Ntlm }, new NetworkCredential("u", "p"), tokens, Challenge, OkHead + "ok");
 
-        CollectionAssert.AreEqual(
-            new[] { "* using HTTP/1.x", "* Server auth using NTLM with user 'u'", AuthUsingRequestLine, "* Server auth using NTLM with user 'u'", AuthUsingRequestLine },
-            events);
+        string[] expected = ["* using HTTP/1.x", "* Server auth using NTLM with user 'u'", AuthUsingRequestLine, "* Server auth using NTLM with user 'u'", AuthUsingRequestLine];
+        WriteExpectedLines("auth using lines", expected, events);
+        CollectionAssert.AreEqual(expected, events);
     }
 
     [TestMethod]
@@ -73,15 +79,15 @@ public sealed partial class HttpProtocolHandlerTests
 
         List<string> events = await AuthUsingEventsOfUrlAsync(options, new NetworkCredential("u", "p"), new ScriptedTokenSource(), "http://example.invalid/", ProxyOkHead + "ok");
 
-        CollectionAssert.AreEqual(
-            new[] { "* using HTTP/1.x", "* Proxy auth using Basic with user 'pu'", "* Server auth using Basic with user 'u'", "> GET http://example.invalid/ HTTP/1.1" },
-            events);
+        string[] expected = ["* using HTTP/1.x", "* Proxy auth using Basic with user 'pu'", "* Server auth using Basic with user 'u'", "> GET http://example.invalid/ HTTP/1.1"];
+        WriteExpectedLines("auth using lines", expected, events);
+        CollectionAssert.AreEqual(expected, events);
     }
 
-    private static Task<List<string>> AuthUsingEventsAsync(HttpRequestOptions options, NetworkCredential? credential, params string[] responses) =>
+    private Task<List<string>> AuthUsingEventsAsync(HttpRequestOptions options, NetworkCredential? credential, params string[] responses) =>
         AuthUsingEventsAsync(options, credential, new ScriptedTokenSource(), responses);
 
-    private static Task<List<string>> AuthUsingEventsAsync(HttpRequestOptions options, NetworkCredential? credential, ScriptedTokenSource tokens, params string[] responses) =>
+    private Task<List<string>> AuthUsingEventsAsync(HttpRequestOptions options, NetworkCredential? credential, ScriptedTokenSource tokens, params string[] responses) =>
         AuthUsingEventsOfUrlAsync(options, credential, tokens, AuthUrl, responses);
 
     /// <summary>
@@ -89,14 +95,17 @@ public sealed partial class HttpProtocolHandlerTests
     /// on one connection and gives its <c>using</c> and <c>auth using</c> lines and the first
     /// line of each request head, in order.
     /// </summary>
-    private static async Task<List<string>> AuthUsingEventsOfUrlAsync(HttpRequestOptions options, NetworkCredential? credential, ScriptedTokenSource tokens, string url, params string[] responses)
+    private async Task<List<string>> AuthUsingEventsOfUrlAsync(HttpRequestOptions options, NetworkCredential? credential, ScriptedTokenSource tokens, string url, params string[] responses)
     {
         TurnTakingConnection connection = new(65536, responses);
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse(url), Output = new MemoryStream(), Credentials = credential, Http = options, Events = events };
+        Diagnostics.Arrange("url, user, auth schemes, responses", $"{url}, {credential?.UserName ?? "(none)"}, {options.AuthSchemes}, {responses.Length}");
 
         TransferResult result = await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         return
         [

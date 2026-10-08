@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -24,7 +25,13 @@ public sealed class CurlCommandRunnerSpeedLimitTests
     private readonly SteppingTimeProvider clock = new();
     private readonly TaskCompletionSource stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
+
+    private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());
 
     [TestMethod]
     public async Task RunAsync_StalledBelowSpeedLimitForSpeedTime_Exits28WithCurlsMessage()
@@ -33,10 +40,14 @@ public sealed class CurlCommandRunnerSpeedLimitTests
         await stalled.Task;
 
         clock.Advance(TimeSpan.FromSeconds(2));
+        Diagnostics.Assert("run completed after 2 seconds", false, run.IsCompleted);
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.AreEqual(28, await run);
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 28, exitCode);
+        Assert.AreEqual(28, exitCode);
+        Diagnostics.Diff("stderr", "curl: (28) Operation too slow. Less than 100 bytes/sec transferred the last 2 seconds\n", Lf(StandardErrorText));
         Assert.AreEqual(
             "curl: (28) Operation too slow. Less than 100 bytes/sec transferred the last 2 seconds" + NewLine,
             StandardErrorText);
@@ -50,7 +61,10 @@ public sealed class CurlCommandRunnerSpeedLimitTests
 
         clock.Advance(TimeSpan.FromSeconds(3));
 
-        Assert.AreEqual(28, await run);
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 28, exitCode);
+        Assert.AreEqual(28, exitCode);
+        Diagnostics.Diff("stderr", "curl: (28) Operation too slow. Less than 100 bytes/sec transferred the last 2 seconds\n", Lf(StandardErrorText));
         Assert.AreEqual(
             "curl: (28) Operation too slow. Less than 100 bytes/sec transferred the last 2 seconds" + NewLine,
             StandardErrorText);
@@ -63,10 +77,14 @@ public sealed class CurlCommandRunnerSpeedLimitTests
         await stalled.Task;
 
         clock.Advance(TimeSpan.FromSeconds(30));
+        Diagnostics.Assert("run completed after 30 seconds", false, run.IsCompleted);
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.AreEqual(28, await run);
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 28, exitCode);
+        Assert.AreEqual(28, exitCode);
+        Diagnostics.Diff("stderr", "curl: (28) Operation too slow. Less than 100 bytes/sec transferred the last 30 seconds\n", Lf(StandardErrorText));
         Assert.AreEqual(
             "curl: (28) Operation too slow. Less than 100 bytes/sec transferred the last 30 seconds" + NewLine,
             StandardErrorText);
@@ -80,7 +98,10 @@ public sealed class CurlCommandRunnerSpeedLimitTests
 
         clock.Advance(TimeSpan.FromSeconds(3));
 
-        Assert.AreEqual(28, await run);
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 28, exitCode);
+        Assert.AreEqual(28, exitCode);
+        Diagnostics.Diff("stderr", "curl: (28) Operation too slow. Less than 1 bytes/sec transferred the last 2 seconds\n", Lf(StandardErrorText));
         Assert.AreEqual(
             "curl: (28) Operation too slow. Less than 1 bytes/sec transferred the last 2 seconds" + NewLine,
             StandardErrorText);
@@ -93,10 +114,14 @@ public sealed class CurlCommandRunnerSpeedLimitTests
         await stalled.Task;
 
         clock.Advance(TimeSpan.FromSeconds(2));
+        Diagnostics.Assert("run completed after 2 seconds", false, run.IsCompleted);
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.AreEqual(28, await run);
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 28, exitCode);
+        Assert.AreEqual(28, exitCode);
+        Diagnostics.Diff("stderr", "curl: (28) Operation too slow. Less than 1 bytes/sec transferred the last 2 seconds\n", Lf(StandardErrorText));
         Assert.AreEqual(
             "curl: (28) Operation too slow. Less than 1 bytes/sec transferred the last 2 seconds" + NewLine,
             StandardErrorText);
@@ -111,7 +136,9 @@ public sealed class CurlCommandRunnerSpeedLimitTests
 
         int exitCode = await RunAsync(writing, "-sS", firstOption, firstValue, lastOption, lastValue, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("handler token is CancellationToken.None", true, writing.Contexts[0].CancellationToken == CancellationToken.None);
         Assert.AreEqual(CancellationToken.None, writing.Contexts[0].CancellationToken);
     }
 
@@ -122,8 +149,11 @@ public sealed class CurlCommandRunnerSpeedLimitTests
 
         int exitCode = await RunAsync(writing, "-sS", "-Y", "100", "-y", "2", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "/a", StandardOutputText);
         Assert.AreEqual("/a", Encoding.ASCII.GetString(standardOutput.ToArray()));
+        Diagnostics.Assert("handler token is CancellationToken.None", false, writing.Contexts[0].CancellationToken == CancellationToken.None);
         Assert.AreNotEqual(CancellationToken.None, writing.Contexts[0].CancellationToken);
     }
 
@@ -134,7 +164,9 @@ public sealed class CurlCommandRunnerSpeedLimitTests
 
         int exitCode = await RunAsync(writing, "-sS", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("handler token is CancellationToken.None", true, writing.Contexts[0].CancellationToken == CancellationToken.None);
         Assert.AreEqual(CancellationToken.None, writing.Contexts[0].CancellationToken);
     }
 
@@ -143,7 +175,10 @@ public sealed class CurlCommandRunnerSpeedLimitTests
     {
         RecordingProtocolHandler cancelled = new("http", _ => throw new OperationCanceledException());
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => RunAsync(cancelled, "-sS", "-Y", "100", Url));
+        OperationCanceledException thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => RunAsync(cancelled, "-sS", "-Y", "100", Url));
+
+        Diagnostics.Act("exception", thrown.GetType().Name);
+        Diagnostics.Assert("exception type", nameof(OperationCanceledException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -151,8 +186,13 @@ public sealed class CurlCommandRunnerSpeedLimitTests
     {
         RecordingProtocolHandler cancelled = new("http", _ => throw new OperationCanceledException());
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => RunAsync(cancelled, "-sS", Url));
+        OperationCanceledException thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => RunAsync(cancelled, "-sS", Url));
+
+        Diagnostics.Act("exception", thrown.GetType().Name);
+        Diagnostics.Assert("exception type", nameof(OperationCanceledException), thrown.GetType().Name);
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     /// <summary>A handler that reports it has stalled, then waits until its transfer is cancelled.</summary>
     private RecordingProtocolHandler Stalling() =>
@@ -163,15 +203,28 @@ public sealed class CurlCommandRunnerSpeedLimitTests
             return TransferResult.Success(0);
         });
 
-    private Task<int> RunAsync(IProtocolHandler handler, params string[] arguments) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([handler])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                timeProvider: clock)
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(IProtocolHandler handler, params string[] arguments)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("handler scheme", "http");
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([handler])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    timeProvider: clock)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
+    }
 }

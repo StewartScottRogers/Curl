@@ -17,11 +17,17 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("103", ("link", "</a>")), Http3Head("200", ("content-length", "5")), Http3Data("hel"), Http3Data("lo")), 65536);
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url, tracing", "https://example.com/, http3 streams");
+        Diagnostics.Arrange("scripted response", "h3 103 link, h3 200 content-length 5, data hel, data lo");
         TransferResult result = await new HttpProtocolHandler(QuicConnector(new FakeMultiplexedConnection(stream)), new SilentAuthenticator()) { TracesHttp3Streams = true }
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
 
+        WriteResult(result);
+        WriteEvents("trace events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         int interim = events.Events.IndexOf("< HTTP/3 103 \r\n");
+        Diagnostics.Assert("interim head index at least", true, interim >= 0);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -58,11 +64,17 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedConnection quic = new(stream) { PeerIdleTimeout = TimeSpan.FromMilliseconds(180000), BidirectionalStreamLimit = 100 };
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url, tracing", "https://example.com/, http3 streams");
+        Diagnostics.Arrange("peer idle timeout ms, stream limit", "180000, 100");
         TransferResult result = await new HttpProtocolHandler(QuicConnector(quic), new SilentAuthenticator()) { TracesHttp3Streams = true }
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
 
+        WriteResult(result);
+        WriteEvents("info events", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         int idle = events.Info.IndexOf("[HTTP/3] peer idle timeout is 180000ms, set keep-alive to 90000 ms.");
+        Diagnostics.Assert("idle line index at least", true, idle >= 0);
         Assert.IsGreaterThan(events.Info.IndexOf("using HTTP/3"), idle, string.Join('\n', events.Info));
         StringAssert.StartsWith(events.Info[idle + 1], "[HTTP/3] [0] OPENED stream for ");
         int done = events.Info.IndexOf("[HTTP/3] [0] easy handle is done");
@@ -85,9 +97,15 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200"), Http3Data("x")), 65536);
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url, tracing", "https://example.com/, http3 streams");
+        Diagnostics.Arrange("peer idle timeout, stream limit", "none");
         TransferResult result = await new HttpProtocolHandler(QuicConnector(new FakeMultiplexedConnection(stream)), new SilentAuthenticator()) { TracesHttp3Streams = true }
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
 
+        WriteResult(result);
+        WriteEvents("info events", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("idle or limit line written", false, events.Info.Any(line => line.Contains("peer idle timeout", StringComparison.Ordinal) || line.Contains("MAX_CONCURRENT", StringComparison.Ordinal)));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(events.Info.Any(line => line.Contains("peer idle timeout", StringComparison.Ordinal) || line.Contains("MAX_CONCURRENT", StringComparison.Ordinal)), string.Join('\n', events.Info));
         CollectionAssert.Contains(events.Info, "[HTTP/3] [0] easy handle is done");
@@ -99,9 +117,14 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "5"))), 65536);
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url, tracing, method", "https://example.com/, http3 streams, HEAD");
+        Diagnostics.Arrange("scripted response", "h3 200 content-length 5, no body");
         TransferResult result = await new HttpProtocolHandler(QuicConnector(new FakeMultiplexedConnection(stream)), new SilentAuthenticator()) { TracesHttp3Streams = true }
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events, noBody: true));
 
+        WriteResult(result);
+        WriteEvents("info events", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "[HTTP/3] [0] status: HTTP/3 200 \r\n", "[HTTP/3] [0] header: content-length: 5", "[HTTP/3] [0] end_headers, status=200", "[HTTP/3] [0] CLOSED", "[HTTP/3] [0] quic close(app_error=256) -> 0", "[HTTP/3] [0] easy handle is done" },
@@ -115,11 +138,18 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200"), Http3Data("x")), 65536);
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url, tracing", "https://example.com/, http2 frames only");
+        Diagnostics.Arrange("scripted response", "h3 200, data x");
         TransferResult result = await new HttpProtocolHandler(QuicConnector(new FakeMultiplexedConnection(stream)), new SilentAuthenticator()) { TracesHttp2Frames = true }
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         string[] lines = [.. events.Info.Where(line => line.StartsWith("[HTTP/3]", StringComparison.Ordinal))];
+        WriteEvents("http3 info lines", lines);
+        Diagnostics.Assert("only opened lines", true, lines.All(line => line.StartsWith("[HTTP/3] [0] OPENED", StringComparison.Ordinal) || line.StartsWith("[HTTP/3] [0] [", StringComparison.Ordinal)));
+        Diagnostics.Assert("traces http3 streams by default", false, new HttpProtocolHandler(QueueConnector.For(), new SilentAuthenticator()).TracesHttp3Streams);
         Assert.IsTrue(lines.All(line => line.StartsWith("[HTTP/3] [0] OPENED", StringComparison.Ordinal) || line.StartsWith("[HTTP/3] [0] [", StringComparison.Ordinal)), string.Join('\n', lines));
         Assert.IsFalse(new HttpProtocolHandler(QueueConnector.For(), new SilentAuthenticator()).TracesHttp3Streams);
     }

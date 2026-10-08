@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -31,6 +32,10 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
 
     private readonly RecordingProtocolHandler ftp = RecordingProtocolHandler.WritingPath("ftp");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string[] StandardErrorLines =>
         Encoding.UTF8.GetString(standardError.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
 
@@ -48,6 +53,7 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     {
         await RunAsync([.. options, "-o", "out", Url]);
 
+        Diagnostics.Assert("first stderr line", Note(method), StandardErrorLines[0]);
         Assert.AreEqual(Note(method), StandardErrorLines[0]);
     }
 
@@ -55,9 +61,11 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     public async Task RunAsync_VerbosePutRepeatsTheUploadMethod_WritesThePutNote()
     {
         fileSystem.ExistingContent["up.txt"] = Encoding.ASCII.GetBytes("abc");
+        Diagnostics.Arrange("input file up.txt", "abc");
 
         await RunAsync(["-v", "-X", "PUT", "-T", "up.txt", "-o", "out", Url]);
 
+        Diagnostics.Assert("first stderr line", Note("PUT"), StandardErrorLines[0]);
         Assert.AreEqual(Note("PUT"), StandardErrorLines[0]);
     }
 
@@ -66,6 +74,8 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     {
         await RunAsync(["-v", "-X", "GET", "-o", "out", "ftp://127.0.0.1:1/a"]);
 
+        Diagnostics.Assert("first stderr line", Note("GET"), StandardErrorLines[0]);
+        Diagnostics.Assert("ftp transfers", 1, ftp.Contexts.Count());
         Assert.AreEqual(Note("GET"), StandardErrorLines[0]);
         Assert.HasCount(1, ftp.Contexts);
     }
@@ -82,6 +92,14 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     {
         await RunAsync([.. options, "--no-progress-meter", "-o", "out", Url]);
 
+        Diagnostics.Assert(
+            "stderr has a Note: Unnecessary line",
+            false,
+            StandardErrorLines.Any(line => line.StartsWith("Note: Unnecessary", StringComparison.Ordinal)));
+        Diagnostics.Assert(
+            "stderr has the HEAD warning",
+            false,
+            StandardErrorLines.Any(line => line.StartsWith(HeadWarningFirstLine, StringComparison.Ordinal)));
         Assert.IsFalse(StandardErrorLines.Any(line => line.StartsWith("Note: Unnecessary", StringComparison.Ordinal)));
         Assert.IsFalse(StandardErrorLines.Any(line => line.StartsWith(HeadWarningFirstLine, StringComparison.Ordinal)));
     }
@@ -93,6 +111,10 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     {
         await RunAsync(["--no-progress-meter", "-X", method, "-o", "out", Url]);
 
+        Diagnostics.Assert(
+            "stderr lines",
+            string.Join("|", new[] { HeadWarningFirstLine, HeadWarningSecondLine, string.Empty }),
+            string.Join("|", StandardErrorLines));
         CollectionAssert.AreEqual(new[] { HeadWarningFirstLine, HeadWarningSecondLine, string.Empty }, StandardErrorLines);
     }
 
@@ -103,6 +125,7 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     {
         await RunAsync(["-s", "-X", method, "-o", "out", Url]);
 
+        Diagnostics.Assert("stderr length", 0L, standardError.Length);
         Assert.AreEqual(0, standardError.Length);
     }
 
@@ -113,6 +136,9 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
 
         string[] lines = StandardErrorLines;
         int leftIntact = Array.IndexOf(lines, "* Connection #0 to host 127.0.0.1:1 left intact");
+        Diagnostics.Assert("first stderr line", Note("GET"), lines[0]);
+        Diagnostics.Assert("left intact line is after the first line", true, leftIntact > 0);
+        Diagnostics.Assert("line after the left intact line", Note("GET"), lines[leftIntact + 1]);
         Assert.AreEqual(Note("GET"), lines[0]);
         Assert.IsGreaterThan(0, leftIntact);
         Assert.AreEqual(Note("GET"), lines[leftIntact + 1]);
@@ -123,21 +149,39 @@ public sealed class CurlCommandRunnerCustomRequestNoteTests
     {
         await RunAsync(["--no-progress-meter", "-X", "HEAD", "-o", "one", Url, "-o", "two", "http://127.0.0.1:1/b"]);
 
+        Diagnostics.Assert(
+            "stderr lines",
+            string.Join("|", new[] { HeadWarningFirstLine, HeadWarningSecondLine, HeadWarningFirstLine, HeadWarningSecondLine, string.Empty }),
+            string.Join("|", StandardErrorLines));
+        Diagnostics.Assert("http transfers", 2, http.Contexts.Count());
         CollectionAssert.AreEqual(
             new[] { HeadWarningFirstLine, HeadWarningSecondLine, HeadWarningFirstLine, HeadWarningSecondLine, string.Empty },
             StandardErrorLines);
         Assert.HasCount(2, http.Contexts);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http, ftp]), []),
-                fileSystem,
-                fileSystem,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                TerminalColumns.Default)
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("protocol handlers", "http (reports a left intact line) and ftp (writes its path)");
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http, ftp]), []),
+                    fileSystem,
+                    fileSystem,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    TerminalColumns.Default)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        return exitCode;
+    }
 }

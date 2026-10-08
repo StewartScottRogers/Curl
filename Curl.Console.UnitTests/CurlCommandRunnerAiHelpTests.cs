@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -19,14 +20,30 @@ public sealed class CurlCommandRunnerAiHelpTests
     private readonly InMemoryFileSystem fileSystem = new();
     private readonly RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(new[] { "--ai-help" }, null)]
     [DataRow(new[] { "--ai-help", "tls" }, "tls")]
     [DataRow(new[] { "--ai-help=all", "file:///x" }, "all")]
     public async Task RunAsync_AiHelp_PrintsTheMarkdownAndTransfersNothing(string[] arguments, string? subject)
     {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("subject", subject ?? "<null>");
         int exitCode = await RunAsync(arguments);
+        bool found = CurlAiHelpText.TryGetMarkdown(subject, out string expectedMarkdown);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        Diagnostics.Act("protocol handler contexts", file.Contexts.Count);
 
+        Diagnostics.Assert("markdown found", true, found);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", expectedMarkdown, StandardOutputText());
+        Diagnostics.Assert("stderr length", 0, standardError.Length);
+        Diagnostics.Assert("transfers", 0, file.Contexts.Count);
         Assert.IsTrue(CurlAiHelpText.TryGetMarkdown(subject, out string markdown));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(markdown, StandardOutputText());
@@ -37,11 +54,21 @@ public sealed class CurlCommandRunnerAiHelpTests
     [TestMethod]
     public async Task RunAsync_AiHelpWithAnUnknownCategory_PrintsWhatHelpPrintsForOne()
     {
+        Diagnostics.Arrange("command line", "--ai-help bogus, then --help bogus");
         int exitCode = await RunAsync(["--ai-help", "bogus"]);
         string aiHelpOutput = StandardOutputText();
+        Diagnostics.Act("--ai-help exit code", exitCode);
+        Diagnostics.Bytes("--ai-help stdout", standardOutput.ToArray());
         standardOutput.SetLength(0);
         int helpExitCode = await RunAsync(["--help", "bogus"]);
+        Diagnostics.Act("--help exit code", helpExitCode);
+        Diagnostics.Bytes("--help stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
 
+        Diagnostics.Assert("exit code matches --help", helpExitCode, exitCode);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout matches --help", StandardOutputText(), aiHelpOutput);
+        Diagnostics.Assert("stderr length", 0, standardError.Length);
         Assert.AreEqual(helpExitCode, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(StandardOutputText(), aiHelpOutput);

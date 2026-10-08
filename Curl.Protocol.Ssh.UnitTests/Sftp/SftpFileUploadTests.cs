@@ -1,5 +1,6 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Sftp;
@@ -27,6 +28,10 @@ public sealed class SftpFileUploadTests
     private static readonly byte[] Content = "hello upload\n"u8.ToArray();
 
     private static readonly SftpUploadOptions Plain = new(0, false, false, false, Mode0644);
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     public async Task UploadAsync_NewFile_OpensToCreateAndTruncateWritesAndClosesAsMeasured()
@@ -143,8 +148,11 @@ public sealed class SftpFileUploadTests
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Upload(connection, "/e.txt", Plain with { ResumeFromRemoteSize = true }));
+        Diagnostics.ActFailure(failure);
 
+        Diagnostics.Assert("exit code", CurlExitCode.BadDownloadResume, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.BadDownloadResume, failure.ExitCode);
+        Diagnostics.Diff("message", "Bad file size (-9223372036854775808)", failure.Message);
         Assert.AreEqual("Bad file size (-9223372036854775808)", failure.Message);
         List<byte[]> requests = SftpServerScript.SftpRequests(connection.Written);
         CollectionAssert.AreEqual(SftpServerScript.StatRequest("/e.txt", 1), requests[^1]);
@@ -224,6 +232,7 @@ public sealed class SftpFileUploadTests
 
         Outcome outcome = await UploadAsync(script, "/n.txt", Plain with { CreateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite }, new MemoryStream(Content));
 
+        Diagnostics.Diff("SSH_FXP_OPEN", SftpServerScript.OpenRequest("/n.txt", NewFile, 1, 0x180), Requests(outcome)[2]);
         CollectionAssert.AreEqual(SftpServerScript.OpenRequest("/n.txt", NewFile, 1, 0x180), Requests(outcome)[2]);
     }
 
@@ -234,6 +243,7 @@ public sealed class SftpFileUploadTests
 
         Outcome outcome = await UploadAsync(script, "/n.txt", Plain with { CreateFileMode = 0 }, new MemoryStream(Content));
 
+        Diagnostics.Diff("SSH_FXP_OPEN", SftpServerScript.OpenRequest("/n.txt", NewFile, 1, 0x1A4), Requests(outcome)[2]);
         CollectionAssert.AreEqual(SftpServerScript.OpenRequest("/n.txt", NewFile, 1, 0x1A4), Requests(outcome)[2]);
     }
 
@@ -246,6 +256,7 @@ public sealed class SftpFileUploadTests
 
         Outcome outcome = await UploadAsync(script, urlPath, Plain, new MemoryStream(Content));
 
+        Diagnostics.Diff("SSH_FXP_OPEN", SftpServerScript.OpenRequest(expected, NewFile, 1), Requests(outcome)[2]);
         CollectionAssert.AreEqual(SftpServerScript.OpenRequest(expected, NewFile, 1), Requests(outcome)[2]);
     }
 
@@ -290,8 +301,11 @@ public sealed class SftpFileUploadTests
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Upload(connection, "/d1/d2/n.txt", Plain with { CreateDirectories = true }));
+        Diagnostics.ActFailure(failure);
 
+        Diagnostics.Assert("exit code", exitCode, failure.ExitCode);
         Assert.AreEqual(exitCode, failure.ExitCode);
+        Diagnostics.Diff("message", message, failure.Message);
         Assert.AreEqual(message, failure.Message);
         Assert.HasCount(4, SftpServerScript.SftpRequests(connection.Written), "no second MKDIR, no open");
     }
@@ -305,8 +319,11 @@ public sealed class SftpFileUploadTests
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Upload(new ScriptedConnection(script.Bytes), "/d1/n.txt", Plain with { CreateDirectories = true }));
+        Diagnostics.ActFailure(failure);
 
+        Diagnostics.Assert("exit code", exitCode, failure.ExitCode);
         Assert.AreEqual(exitCode, failure.ExitCode);
+        Diagnostics.Diff("message", message, failure.Message);
         Assert.AreEqual(message, failure.Message);
     }
 
@@ -318,7 +335,9 @@ public sealed class SftpFileUploadTests
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Upload(connection, "/x.txt", Plain with { CreateDirectories = true }));
+        Diagnostics.ActFailure(failure);
 
+        Diagnostics.Diff("message", "Creating the dir/file failed: No such file or directory", failure.Message);
         Assert.AreEqual("Creating the dir/file failed: No such file or directory", failure.Message);
         List<byte[]> requests = SftpServerScript.SftpRequests(connection.Written);
         CollectionAssert.AreEqual(SftpServerScript.OpenRequest("/x.txt", NewFile, 2), requests[^1]);
@@ -338,8 +357,11 @@ public sealed class SftpFileUploadTests
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Upload(connection, "/d/x.txt", Plain with { CreateDirectories = createDirectories }));
+        Diagnostics.ActFailure(failure);
 
+        Diagnostics.Assert("exit code", exitCode, failure.ExitCode);
         Assert.AreEqual(exitCode, failure.ExitCode);
+        Diagnostics.Diff("message", message, failure.Message);
         Assert.AreEqual(message, failure.Message);
         Assert.HasCount(3, SftpServerScript.SftpRequests(connection.Written), "no MKDIR, no close without a handle");
     }
@@ -419,8 +441,11 @@ public sealed class SftpFileUploadTests
 
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Upload(new ScriptedConnection(script.Bytes), "/f", Plain));
+        Diagnostics.ActFailure(failure);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
+        Diagnostics.Diff("message", "Error in the SSH layer", failure.Message);
         Assert.AreEqual("Error in the SSH layer", failure.Message);
     }
 
@@ -435,13 +460,23 @@ public sealed class SftpFileUploadTests
             .Handle(4)
             .Status(5, SftpStatusCode.Ok)
             .Status(6, SftpStatusCode.Ok);
+        Diagnostics.ArrangeScript(script);
         ScriptedConnection connection = new(script.Bytes);
         RequestCountingTransferEvents events = new(connection);
         SftpUploadOptions options = new(0, false, false, true, 0);
+        ArrangeUpload("/a/b/c.txt", options);
 
         TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection), events)
             .UploadAsync("/a/b/c.txt", options, new MemoryStream("x"u8.ToArray()), NoTransferProgress.Instance, CancellationToken.None);
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("transfer event lines", string.Join(" | ", events.Lines));
+        Diagnostics.ActRequests(connection.Written);
 
+        Diagnostics.Assert("success", true, result.IsSuccess);
+        Diagnostics.Diff(
+            "transfer event lines",
+            "3: SFTP: creating directory '/a' | 4: SFTP: creating directory '/a/b' | 7: upload completely sent off: 1 bytes",
+            string.Join(" | ", events.Lines));
         Assert.IsTrue(result.IsSuccess, result.ErrorMessage);
 
         // INIT, REALPATH and the failed OPEN come before the first line; its MKDIR before the second.
@@ -453,28 +488,52 @@ public sealed class SftpFileUploadTests
         CollectionAssert.AreEqual(SftpServerScript.MakeDirectoryRequest("/a/b", 3), requests[4]);
     }
 
-    private static ValueTask<TransferResult> Upload(ScriptedConnection connection, string urlPath, SftpUploadOptions options) =>
-        new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
-            .UploadAsync(urlPath, options, new MemoryStream(Content), new RecordingProgress(), CancellationToken.None);
-
-    private static async Task<Outcome> UploadAsync(SftpServerScript script, string urlPath, SftpUploadOptions options, Stream source)
+    private ValueTask<TransferResult> Upload(ScriptedConnection connection, string urlPath, SftpUploadOptions options)
     {
+        ArrangeUpload(urlPath, options);
+        Diagnostics.Bytes("source", Content);
+        return new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
+            .UploadAsync(urlPath, options, new MemoryStream(Content), new RecordingProgress(), CancellationToken.None);
+    }
+
+    private async Task<Outcome> UploadAsync(SftpServerScript script, string urlPath, SftpUploadOptions options, Stream source)
+    {
+        ArrangeUpload(urlPath, options);
+        Diagnostics.ArrangeScript(script);
         ScriptedConnection connection = new(script.Bytes);
         RecordingProgress progress = new();
-        TransferResult result = await new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
-            .UploadAsync(urlPath, options, source, progress, CancellationToken.None);
+        TransferResult result;
+        using (Diagnostics.Phase("upload"))
+        {
+            result = await new SftpFileUpload(SftpSessionTests.Transport(connection), NoTransferEvents.Instance)
+                .UploadAsync(urlPath, options, source, progress, CancellationToken.None);
+        }
+
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("progress reports", string.Join(", ", progress.Reports));
+        Diagnostics.ActRequests(connection.Written);
         return new Outcome(result, progress.Reports, connection.Written);
     }
 
-    private static void AssertSuccess(Outcome outcome, long uploaded)
+    private void ArrangeUpload(string urlPath, SftpUploadOptions options)
     {
+        Diagnostics.Arrange("URL path", urlPath);
+        Diagnostics.Arrange("upload options", options);
+    }
+
+    private void AssertSuccess(Outcome outcome, long uploaded)
+    {
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, outcome.Result.ExitCode);
+        Diagnostics.Assert("bytes uploaded", uploaded, outcome.Result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.Ok, outcome.Result.ExitCode);
         Assert.AreEqual(uploaded, outcome.Result.BytesTransferred);
         Assert.AreEqual(uploaded, outcome.Result.Report!.UploadSize, "%{size_upload}");
     }
 
-    private static void AssertFailure(Outcome outcome, long uploaded)
+    private void AssertFailure(Outcome outcome, long uploaded)
     {
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, outcome.Result.ExitCode);
+        Diagnostics.Assert("%{size_upload}", uploaded, outcome.Result.Report?.UploadSize);
         Assert.AreEqual(CurlExitCode.Ssh, outcome.Result.ExitCode);
         Assert.AreEqual("Error in the SSH layer", outcome.Result.ErrorMessage);
         Assert.AreEqual(uploaded, outcome.Result.Report!.UploadSize, "%{size_upload}, as measured");
@@ -482,14 +541,16 @@ public sealed class SftpFileUploadTests
 
     private static List<byte[]> Requests(Outcome outcome) => SftpServerScript.SftpRequests(outcome.Written);
 
-    private static void AssertRequests(Outcome outcome, params byte[][] expected) => AssertRequests(outcome, 0, expected);
+    private void AssertRequests(Outcome outcome, params byte[][] expected) => AssertRequests(outcome, 0, expected);
 
-    private static void AssertRequests(Outcome outcome, int skipped, params byte[][] expected)
+    private void AssertRequests(Outcome outcome, int skipped, params byte[][] expected)
     {
         List<byte[]> requests = Requests(outcome);
+        Diagnostics.Assert("request count", skipped + expected.Length, requests.Count);
         Assert.HasCount(skipped + expected.Length, requests);
         for (int index = 0; index < expected.Length; index++)
         {
+            Diagnostics.Diff($"request {skipped + index}", expected[index], requests[skipped + index]);
             CollectionAssert.AreEqual(expected[index], requests[skipped + index], $"request {skipped + index}");
         }
     }

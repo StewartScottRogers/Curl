@@ -554,6 +554,32 @@ public sealed class HstsCacheTests
     }
 
     [TestMethod]
+    public void ApplyHeader_PastMaxEntries_DroppingOneOfARepeatedHost_FindsTheOther()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
+        string name = new('a', HstsFileLineParser.MaxHostLength);
+        diagnostics.Arrange("host", "2048 letters and a trailing dot, applied twice, then the cache filled and one more host applied");
+        cache.ApplyHeader("max-age=60", name + ".");
+        cache.ApplyHeader("max-age=120", name + ".");
+        cache.ReadFile(string.Concat(Enumerable.Range(0, HstsCache.MaxEntries - 2).Select(number => $"h{number} \"unlimited\"\n")));
+
+        cache.ApplyHeader("max-age=60", "new");
+
+        long? expiry = cache.Find(name)?.ExpiresUnixSeconds;
+        long expected = new DateTimeOffset(2026, 9, 29, 6, 2, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        diagnostics.Act("first host length", cache.Entries[0].Host.Length);
+        diagnostics.Assert("first host length", HstsFileLineParser.MaxHostLength, cache.Entries[0].Host.Length);
+        Assert.AreEqual(HstsFileLineParser.MaxHostLength, cache.Entries[0].Host.Length);
+        diagnostics.Act("found expiry", expiry ?? -1);
+        diagnostics.Assert("found expiry", expected, expiry);
+        Assert.AreEqual(expected, expiry);
+        diagnostics.Act("new found", cache.Find("new")?.Host ?? "null");
+        diagnostics.Assert("new found", "new", cache.Find("new")?.Host);
+        Assert.AreEqual("new", cache.Find("new")?.Host);
+    }
+
+    [TestMethod]
     public void Find_SeveralParents_TakesTheLongestAndAnExactMatchOverAll()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -585,6 +611,46 @@ public sealed class HstsCacheTests
     }
 
     [TestMethod]
+    public void Find_PastAnExpiredEntry_RemovesItAndTakesTheLongestParentOrExactMatch()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        FakeTimeProvider clock = new(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        HstsCache cache = new(clock);
+        diagnostics.Arrange("file read", "e1..e4 expiring one second apart, then .c.test, .test");
+        cache.ReadFile(
+            string.Concat(Enumerable.Range(1, 4).Select(second => $"e{second} \"20200101 00:00:0{second}\"\n"))
+            + ".c.test \"unlimited\"\n.test \"unlimited\"\n");
+        diagnostics.Arrange("headers", "b.test with includeSubDomains, then x.b.test without");
+        cache.ApplyHeader("max-age=86400; includeSubDomains", "b.test");
+        cache.ApplyHeader("max-age=86400", "x.b.test");
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        string? deepest = cache.Find("y.x.b.test")?.Host;
+        clock.Advance(TimeSpan.FromSeconds(1));
+        string? exact = cache.Find("X.B.TEST")?.Host;
+        clock.Advance(TimeSpan.FromSeconds(1));
+        string? firstParent = cache.Find("z.c.test")?.Host;
+        clock.Advance(TimeSpan.FromSeconds(1));
+        HstsEntry? noDot = cache.Find("atest");
+
+        diagnostics.Act("y.x.b.test", deepest ?? "null");
+        diagnostics.Assert("y.x.b.test", "b.test", deepest);
+        Assert.AreEqual("b.test", deepest);
+        diagnostics.Act("X.B.TEST", exact ?? "null");
+        diagnostics.Assert("X.B.TEST", "x.b.test", exact);
+        Assert.AreEqual("x.b.test", exact);
+        diagnostics.Act("z.c.test", firstParent ?? "null");
+        diagnostics.Assert("z.c.test", "c.test", firstParent);
+        Assert.AreEqual("c.test", firstParent);
+        diagnostics.Act("atest", noDot?.Host ?? "null");
+        diagnostics.Assert("atest", "null", noDot?.Host ?? "null");
+        Assert.IsNull(noDot);
+        diagnostics.Act("entries left", cache.Entries.Count);
+        diagnostics.Assert("entries left", 4, cache.Entries.Count);
+        Assert.AreEqual(4, cache.Entries.Count);
+    }
+
+    [TestMethod]
     public void Find_EmptyHost_FindsNothing()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -605,10 +671,17 @@ public sealed class HstsCacheTests
         var diagnostics = TestDiagnostics.For(TestContext);
         HstsCache cache = CacheAt(2026, 9, 29, 6, 0, 0);
         diagnostics.Arrange("entries read", HstsCache.MaxEntries);
-        cache.ReadFile(string.Concat(Enumerable.Range(0, HstsCache.MaxEntries).Select(number => $"h{number} \"unlimited\"\n")));
+        using (diagnostics.Phase("read file"))
+        {
+            cache.ReadFile(string.Concat(Enumerable.Range(0, HstsCache.MaxEntries).Select(number => $"h{number} \"unlimited\"\n")));
+        }
+
         diagnostics.Arrange("header", "max-age=60 for new");
 
-        cache.ApplyHeader("max-age=60", "new");
+        using (diagnostics.Phase("apply header"))
+        {
+            cache.ApplyHeader("max-age=60", "new");
+        }
 
         diagnostics.Act("entry count", cache.Entries.Count);
         diagnostics.Act("first host", cache.Entries[0].Host);

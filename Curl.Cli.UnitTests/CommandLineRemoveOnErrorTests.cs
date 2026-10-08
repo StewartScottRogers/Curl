@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -14,11 +15,30 @@ public sealed class CommandLineRemoveOnErrorTests
 
     private const string MutuallyExclusive = "curl: --continue-at is mutually exclusive with --remove-on-error";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            Diagnostics.Act("remove on error", result.Options.RemoveOnError);
+            Diagnostics.Act("resume from", result.Options.ResumeFrom?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null");
+        }
+
+        return result;
+    }
+
     [TestMethod]
     public void Parse_NoSpelling_DoesNotRemoveOnError()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.RemoveOnError);
     }
@@ -28,8 +48,9 @@ public sealed class CommandLineRemoveOnErrorTests
     [DataRow("--no-remove-on-error", false)]
     public void Parse_OneSpelling_SetsRemoveOnError(string spelling, bool removeOnError)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([spelling, Url]);
+        CommandLineParseResult result = Parse([spelling, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(removeOnError, result.Options.RemoveOnError);
     }
@@ -39,8 +60,9 @@ public sealed class CommandLineRemoveOnErrorTests
     [DataRow("--remove-on-error", "--no-remove-on-error", false)]
     public void Parse_TwoSpellings_LastOneWins(string first, string second, bool removeOnError)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([first, second, Url]);
+        CommandLineParseResult result = Parse([first, second, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(removeOnError, result.Options.RemoveOnError);
     }
@@ -57,8 +79,9 @@ public sealed class CommandLineRemoveOnErrorTests
     [DataRow(new[] { "-s", "-S", "-C", "5", "--remove-on-error", Url }, "--remove-on-error")]
     public void Parse_RemoveOnErrorWithContinueAt_IsRefusedWithThreeLines(string[] arguments, string refusedOption)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, [MutuallyExclusive, $"curl: option {refusedOption}: is badly used here", CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -70,8 +93,9 @@ public sealed class CommandLineRemoveOnErrorTests
     [TestMethod]
     public void Parse_RemoveOnErrorWithContinueAtAfterSilent_IsRefusedWithoutTheErrorLine()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "-C", "5", "--remove-on-error", Url]);
+        CommandLineParseResult result = Parse(["-s", "-C", "5", "--remove-on-error", Url]);
 
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, ["curl: option --remove-on-error: is badly used here", CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "curl: option --remove-on-error: is badly used here", CommandLineRefusal.TryHelpLine },
@@ -85,8 +109,9 @@ public sealed class CommandLineRemoveOnErrorTests
     [DataRow(new[] { "--remove-on-error", "--no-remove-on-error", "-C", "5", Url })]
     public void Parse_ContinueAtWithRemoveOnErrorOff_IsAccepted(string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(5L, result.Options.ResumeFrom);
         Assert.IsFalse(result.Options.RemoveOnError);
@@ -96,8 +121,10 @@ public sealed class CommandLineRemoveOnErrorTests
     [TestMethod]
     public void Parse_RangeAndRemoveOnErrorBeforeContinueAt_NamesTheRange()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-r", "0-4", "--remove-on-error", "-C", "5", Url]);
+        CommandLineParseResult result = Parse(["-r", "0-4", "--remove-on-error", "-C", "5", Url]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("first stderr line", "curl: --continue-at is mutually exclusive with --range", CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines[0]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual("curl: --continue-at is mutually exclusive with --range", result.Refusal.StandardErrorLines[0]);
     }
@@ -105,6 +132,12 @@ public sealed class CommandLineRemoveOnErrorTests
     [TestMethod]
     public void ContinueAtExclusiveWithRemoveOnError_Null_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtExclusiveWithRemoveOnError(null!, errorsHidden: false));
+        Diagnostics.Arrange("spelled option", "null");
+        Diagnostics.Arrange("errors hidden", false);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineRefusal.ContinueAtExclusiveWithRemoveOnError(null!, errorsHidden: false));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 }

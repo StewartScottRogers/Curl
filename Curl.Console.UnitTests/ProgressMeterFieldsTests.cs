@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -7,6 +9,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class ProgressMeterFieldsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(0L, "     0")]
     [DataRow(10L, "    10")]
@@ -19,7 +25,13 @@ public sealed class ProgressMeterFieldsTests
     [DataRow(long.MaxValue, " 7.99E")]
     public void Size_Bytes_IsCurlsMax6Out(long bytes, string expected)
     {
-        Assert.AreEqual(expected, ProgressMeterFields.Size(bytes));
+        Diagnostics.Arrange("bytes", bytes);
+
+        string size = ProgressMeterFields.Size(bytes);
+        Diagnostics.Act("size field", $"\"{size}\"");
+
+        Diagnostics.Assert("size field", $"\"{expected}\"", $"\"{size}\"");
+        Assert.AreEqual(expected, size);
     }
 
     [TestMethod]
@@ -40,7 +52,13 @@ public sealed class ProgressMeterFieldsTests
     [DataRow(100000L * 365L * 86400L, ">99999y")]
     public void Time_Seconds_IsCurlsTime2Str(long seconds, string expected)
     {
-        Assert.AreEqual(expected, ProgressMeterFields.Time(seconds));
+        Diagnostics.Arrange("seconds", seconds);
+
+        string time = ProgressMeterFields.Time(seconds);
+        Diagnostics.Act("time field", $"\"{time}\"");
+
+        Diagnostics.Assert("time field", $"\"{expected}\"", $"\"{time}\"");
+        Assert.AreEqual(expected, time);
     }
 
     [TestMethod]
@@ -52,7 +70,14 @@ public sealed class ProgressMeterFieldsTests
     [DataRow(10001L, 10001L, 100L)]
     public void Percent_TotalAndCurrent_IsCurlsPgrsEstPercent(long total, long current, long expected)
     {
-        Assert.AreEqual(expected, ProgressMeterFields.Percent(total, current));
+        Diagnostics.Arrange("total", total);
+        Diagnostics.Arrange("current", current);
+
+        long percent = ProgressMeterFields.Percent(total, current);
+        Diagnostics.Act("percent", percent);
+
+        Diagnostics.Assert("percent", expected, percent);
+        Assert.AreEqual(expected, percent);
     }
 
     [TestMethod]
@@ -62,6 +87,13 @@ public sealed class ProgressMeterFieldsTests
     [DataRow(long.MaxValue / 1000000, 999999L, long.MaxValue)]
     public void Speed_SizeAndMicroseconds_IsCurlsTrspeed(long size, long microseconds, long expected)
     {
-        Assert.AreEqual(expected, ProgressMeterFields.Speed(size, microseconds));
+        Diagnostics.Arrange("size", size);
+        Diagnostics.Arrange("microseconds", microseconds);
+
+        long speed = ProgressMeterFields.Speed(size, microseconds);
+        Diagnostics.Act("speed", speed);
+
+        Diagnostics.Assert("speed", expected, speed);
+        Assert.AreEqual(expected, speed);
     }
 }

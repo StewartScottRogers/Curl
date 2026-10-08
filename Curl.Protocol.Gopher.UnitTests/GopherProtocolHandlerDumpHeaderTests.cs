@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Gopher.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Gopher;
 
@@ -15,6 +16,11 @@ public sealed class GopherProtocolHandlerDumpHeaderTests
     /// <summary>The reply the measured server sent: one info line and the terminator.</summary>
     private const string MeasuredReply = "iHello\tfake\t(NULL)\t0\r\n.\r\n";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_SelectorWithDumpHeaderOutput_WritesSelectorAndCrlfThereBeforeTheReply()
     {
@@ -27,9 +33,15 @@ public sealed class GopherProtocolHandlerDumpHeaderTests
             Output = new WriteRecordingStream("output", writes),
             DumpHeaderOutput = new WriteRecordingStream("dump", writes),
         };
+        Diagnostics.Arrange("url", "gopher://h/1sel");
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines([MeasuredReply]));
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("writes", DiagnosticText.Lines(writes));
 
+        Diagnostics.Assert("result", TransferResult.Success(MeasuredReply.Length), result);
+        Diagnostics.Diff("writes", DiagnosticText.Lines(["dump:sel", "dump:\r\n", "output:" + MeasuredReply]), DiagnosticText.Lines(writes));
         Assert.AreEqual(TransferResult.Success(MeasuredReply.Length), result);
         CollectionAssert.AreEqual(new[] { "dump:sel", "dump:\r\n", "output:" + MeasuredReply }, writes);
     }
@@ -47,9 +59,13 @@ public sealed class GopherProtocolHandlerDumpHeaderTests
             Output = new MemoryStream(),
             DumpHeaderOutput = dump,
         };
+        Diagnostics.Arrange("url", url);
 
-        await new GopherProtocolHandler(FakeConnector.For(new ScriptedConnection())).ExecuteAsync(context);
+        TransferResult result = await new GopherProtocolHandler(FakeConnector.For(new ScriptedConnection())).ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("dump header output", dump.ToArray());
 
+        Diagnostics.Diff("dump header output", "\r\n"u8, dump.ToArray());
         CollectionAssert.AreEqual("\r\n"u8.ToArray(), dump.ToArray());
     }
 
@@ -65,10 +81,15 @@ public sealed class GopherProtocolHandlerDumpHeaderTests
             HeaderOutput = output,
             DumpHeaderOutput = null,
         };
+        Diagnostics.Arrange("url", "gopher://h/1sel");
+        Diagnostics.Arrange("header output", "the same stream as the output (-i), no dump header output");
 
-        await new GopherProtocolHandler(FakeConnector.For(new ScriptedConnection(Encoding.ASCII.GetBytes(MeasuredReply))))
+        TransferResult result = await new GopherProtocolHandler(FakeConnector.For(new ScriptedConnection(Encoding.ASCII.GetBytes(MeasuredReply))))
             .ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("output", output.ToArray());
 
+        Diagnostics.Diff("output", MeasuredReply, Encoding.ASCII.GetString(output.ToArray()));
         Assert.AreEqual(MeasuredReply, Encoding.ASCII.GetString(output.ToArray()));
     }
 
@@ -83,9 +104,16 @@ public sealed class GopherProtocolHandlerDumpHeaderTests
             Output = output,
             DumpHeaderOutput = new WriteRefusingStream(),
         };
+        Diagnostics.Arrange("url", "gopher://h/1sel");
+        Diagnostics.Arrange("dump header output", "every write throws a plain IOException");
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("selector sent", connection.Written);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WriteError, "client returned ERROR on write of 3 bytes"), result);
+        Diagnostics.Diff("selector sent", "sel"u8, connection.Written);
+        Diagnostics.Assert("output length", 0, output.Length);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WriteError, "client returned ERROR on write of 3 bytes"),
             result);
@@ -104,9 +132,15 @@ public sealed class GopherProtocolHandlerDumpHeaderTests
             Output = new MemoryStream(),
             DumpHeaderOutput = dump,
         };
+        Diagnostics.Arrange("url", "gopher://h/1sel");
+        Diagnostics.Arrange("connection", "every write throws a plain IOException");
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("dump header output", dump.ToArray());
 
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("dump header output length", 0, dump.Length);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(0, dump.Length);
     }

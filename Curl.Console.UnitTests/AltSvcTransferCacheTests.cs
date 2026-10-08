@@ -1,5 +1,6 @@
 using Curl.Core.AltSvc;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -10,6 +11,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class AltSvcTransferCacheTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(3, 0, AltSvcAlpn.H3)]
     [DataRow(2, 0, AltSvcAlpn.H2)]
@@ -17,6 +22,10 @@ public sealed class AltSvcTransferCacheTests
     [DataRow(1, 0, AltSvcAlpn.H1)]
     public void SourceAlpnOf_ResponseVersion_GivesCurlsSourceAlpn(int major, int minor, AltSvcAlpn expected)
     {
+        Diagnostics.Arrange("response version", $"{major}.{minor}");
+        AltSvcAlpn actual = AltSvcTransferCache.SourceAlpnOf(new Version(major, minor));
+        Diagnostics.Act("source alpn", actual);
+        Diagnostics.Assert("source alpn", expected, actual);
         Assert.AreEqual(expected, AltSvcTransferCache.SourceAlpnOf(new Version(major, minor)));
     }
 
@@ -35,6 +44,10 @@ public sealed class AltSvcTransferCacheTests
             System.Net.HttpVersion.Version11,
             DateTimeOffset.UnixEpoch);
 
+        Diagnostics.Arrange("alt-svc header", "h2=\":8443\", h2=\"host:\"");
+        Diagnostics.Act("outcome count", outcomes.Count);
+        Diagnostics.Assert("outcome count", 2, outcomes.Count);
+        Diagnostics.Assert("second skip reason", AltSvcSkipReason.UnknownPortNumber, outcomes[1].SkipReason);
         Assert.HasCount(2, outcomes);
         Assert.AreEqual(new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "h.test", 8443), outcomes[0].Added);
         Assert.AreEqual(AltSvcSkipReason.UnknownPortNumber, outcomes[1].SkipReason);

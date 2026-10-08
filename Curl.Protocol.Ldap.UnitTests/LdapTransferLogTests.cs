@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ldap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ldap;
 
@@ -25,14 +26,22 @@ public sealed class LdapTransferLogTests
 
     private static NetworkCredential User => new("cn=u,dc=x", "s3cret");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_BindAndSearch_LogsTheBindTheSearchTheEntriesAndTheEndAtInfo()
     {
         var log = new RecordingDiagnosticLog();
+        Diagnostics.Arrange("url", "ldap://127.0.0.1:18389/dc=example");
+        Diagnostics.Arrange("replies", "bind success, entry, search done");
 
         await Handler(BindSuccess1, Entry2, SearchDone2).ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", User, log));
 
         string[] info = log.MessagesAt(DiagnosticLogLevel.Info);
+        Diagnostics.Act("info lines", string.Join(" | ", info));
+        Diagnostics.Assert("info line count", 4, info.Length);
         Assert.HasCount(4, info);
         Assert.AreEqual("bound with a simple bind as \"cn=u,dc=x\"", info[0]);
         Assert.AreEqual("search base \"dc=example\", scope baseObject, filter (objectClass=*)", info[1]);
@@ -45,10 +54,14 @@ public sealed class LdapTransferLogTests
     public async Task ExecuteAsync_ScopeAndFilter_LogsThemAtInfo()
     {
         var log = new RecordingDiagnosticLog();
+        Diagnostics.Arrange("url", "ldap://127.0.0.1:18389/dc=example?cn?sub?(uid=a)");
+        Diagnostics.Arrange("replies", "bind success, search done");
 
         await Handler(BindSuccess1, SearchDone2).ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example?cn?sub?(uid=a)", null, log));
 
         string[] info = log.MessagesAt(DiagnosticLogLevel.Info);
+        Diagnostics.Act("info lines", string.Join(" | ", info));
+        Diagnostics.Assert("search line", "search base \"dc=example\", scope wholeSubtree, filter (uid=a)", info[1]);
         Assert.AreEqual("bound anonymously", info[0]);
         Assert.AreEqual("search base \"dc=example\", scope wholeSubtree, filter (uid=a)", info[1]);
         Assert.AreEqual("search returned 0 entries", info[2]);
@@ -58,9 +71,14 @@ public sealed class LdapTransferLogTests
     public async Task ExecuteAsync_BindAndSearch_LogsEachMessageIdAndOperationAtVerbose()
     {
         var log = new RecordingDiagnosticLog();
+        Diagnostics.Arrange("url", "ldap://127.0.0.1:18389/dc=example");
+        Diagnostics.Arrange("replies", "bind success, entry, search done");
 
         await Handler(BindSuccess1, Entry2, SearchDone2).ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", User, log));
 
+        string[] verbose = log.MessagesAt(DiagnosticLogLevel.Verbose);
+        Diagnostics.Act("verbose lines", string.Join(" | ", verbose));
+        Diagnostics.Assert("verbose line count", 5, verbose.Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -77,9 +95,14 @@ public sealed class LdapTransferLogTests
     public async Task ExecuteAsync_InvalidCredentials_LogsTheExitCodeAtError()
     {
         var log = new RecordingDiagnosticLog();
+        Diagnostics.Arrange("url", "ldap://127.0.0.1:18389/dc=example");
+        Diagnostics.Arrange("bind reply", BindInvalidCredentials1);
 
         TransferResult result = await Handler(BindInvalidCredentials1).ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", User, log));
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error lines", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Error)));
+        Diagnostics.Assert("exit code", CurlExitCode.LoginDenied, result.ExitCode);
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "transfer failed with LoginDenied (exit 67): Login denied" },
@@ -90,9 +113,13 @@ public sealed class LdapTransferLogTests
     public async Task ExecuteAsync_AtErrorLevel_LogsNoInfoOrVerboseLine()
     {
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Error);
+        Diagnostics.Arrange("log level", DiagnosticLogLevel.Error);
+        Diagnostics.Arrange("url", "ldap://127.0.0.1:18389/dc=example");
 
         await Handler(BindSuccess1, Entry2, SearchDone2).ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", User, log));
 
+        Diagnostics.Act("line count", log.Lines.Count);
+        Diagnostics.Assert("line count", 0, log.Lines.Count);
         Assert.IsEmpty(log.Lines);
     }
 
@@ -100,9 +127,13 @@ public sealed class LdapTransferLogTests
     public async Task ExecuteAsync_AtNone_LogsNothingOnFailure()
     {
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.None);
+        Diagnostics.Arrange("log level", DiagnosticLogLevel.None);
+        Diagnostics.Arrange("bind reply", BindInvalidCredentials1);
 
         await Handler(BindInvalidCredentials1).ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", User, log));
 
+        Diagnostics.Act("line count", log.Lines.Count);
+        Diagnostics.Assert("line count", 0, log.Lines.Count);
         Assert.IsEmpty(log.Lines);
     }
 
@@ -112,8 +143,12 @@ public sealed class LdapTransferLogTests
         var log = new RecordingDiagnosticLog();
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection(Hex.Bytes(BindSuccess1), Hex.Bytes(SearchDone2))));
 
+        Diagnostics.Arrange("url", "ldap://127.0.0.1:18389/dc=example");
+
         await new LdapProtocolHandler(connector, LdapDialect.OpenLdap).ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", User, log));
 
+        Diagnostics.Act("connect targets", connector.Targets.Count);
+        Diagnostics.Assert("target log is the context log", true, ReferenceEquals(log, connector.Targets.Single().DiagnosticLog));
         Assert.AreSame(log, connector.Targets.Single().DiagnosticLog);
     }
 
@@ -121,9 +156,13 @@ public sealed class LdapTransferLogTests
     public async Task ExecuteAsync_SimpleBindPassword_IsNeverLogged()
     {
         var log = new RecordingDiagnosticLog();
+        Diagnostics.Arrange("url", "ldap://cn=u:<password>@127.0.0.1:18389/dc=example");
 
         await Handler(BindSuccess1, Entry2, SearchDone2).ExecuteAsync(Context("ldap://cn=u:s3cret@127.0.0.1:18389/dc=example", User, log));
 
+        bool leaked = log.Lines.Any(line => line.Message.Contains("s3cret", StringComparison.Ordinal));
+        Diagnostics.Act("line count", log.Lines.Count);
+        Diagnostics.Assert("password appears in a line", false, leaked);
         Assert.IsNotEmpty(log.Lines);
         Assert.IsFalse(log.Lines.Any(line => line.Message.Contains("s3cret", StringComparison.Ordinal)));
     }
@@ -135,9 +174,12 @@ public sealed class LdapTransferLogTests
     public void SearchReplyReceived_OtherKinds_DescribesThem(int kind, string expected)
     {
         var log = new RecordingDiagnosticLog();
+        Diagnostics.Arrange("reply kind", (LdapSearchReplyKind)kind);
 
         new LdapTransferLog(log).SearchReplyReceived(LdapSearchReply.Of((LdapSearchReplyKind)kind), 2);
 
+        Diagnostics.Act("verbose lines", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Verbose)));
+        Diagnostics.Assert("verbose text", expected, string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Verbose)));
         CollectionAssert.AreEqual(new[] { expected }, log.MessagesAt(DiagnosticLogLevel.Verbose));
     }
 

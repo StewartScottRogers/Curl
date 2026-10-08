@@ -9,8 +9,9 @@ namespace Curl.Protocol.Smb;
 /// </summary>
 internal static class SmbWriteResponse
 {
-    // sizeof(struct smb_header) + 6: through the count word.
-    private const int MinimumLength = SmbMessageHeader.Length + 6;
+    // Through the count word: one byte past curl's sizeof(struct smb_header) + 6,
+    // which reads the word's high byte from its receive buffer past the reply (BL-1665).
+    private const int MinimumLength = CountOffset + sizeof(ushort);
 
     private const int CountOffset = SmbMessageHeader.Length + 5;
 

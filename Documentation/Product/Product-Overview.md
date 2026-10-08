@@ -1,8 +1,11 @@
 # Product Overview
 
-- **Status:** Rough-out. Scope and architecture are drafted and sourced; the numbers
-  are measured, not estimated. Sections marked `> **TODO**` still need a decision.
-- **Last updated:** 2026-09-25
+- **Status:** In development, in the conformance phase. All 16 protocol libraries have
+  working handlers; HTTP/2, HTTP/3 over QUIC, TLS where `SslStream` falls short,
+  Kerberos, NTLM and Zstandard are hand-built; `curl.exe` publishes as a native AOT
+  binary. 559 of the 2,017 upstream test cases pass (see Success criteria). The numbers
+  are measured, not estimated.
+- **Last updated:** 2026-10-07
 - **Measured against:** curl 8.21.0 (released 2026-06-24) and `curl/curl@master`
 
 ## What is Curl?
@@ -72,6 +75,7 @@ Measured directly from curl 8.21.0 rather than estimated:
 | `--write-out` variables | **76** | `docs/cmdline-opts/write-out.md` |
 | Exit codes | **0–101**, with gaps | `libcurl-errors` (`CURLE_*`) |
 | Upstream test cases | **2,126** | `tests/data` on `master` |
+| Upstream test cases vendored here | **2,017** | `Curl.Conformance.UnitTests/UpstreamTestData` |
 
 ### The 29 schemes, and why they are 16 libraries
 
@@ -102,7 +106,7 @@ Two findings from the research drive that table:
 
 - **TLS is a transport, not a protocol.** `https` is HTTP over TLS, and the same
   holds for `ftps`, `imaps`, `pop3s`, `smtps`, `ldaps`, `wss`, `smbs` and `gophers`.
-  TLS therefore lives once, in `Curl.Networking.UnitLibrary`, and every protocol
+  TLS is therefore chosen once, in `Curl.Networking.UnitLibrary`, and every protocol
   receives an already-secured stream. Implementing it per protocol would be nine
   copies of the hardest code in the system.
 - **`ipfs` and `ipns` are URL rewrites, not a wire protocol.** curl resolves them to
@@ -153,7 +157,8 @@ FtpProtocolHandler(IConnector, TimeProvider)
         │
         ├─ unit test  → a fake IConnector handing back a FakeConnection that
         │               replays recorded bytes, or a Failed result (exit 6, 7).
-        │               No network. No server. No [TestCategory("Integration")].
+        │               No network. No server. No [TestCategory("Integration")]:
+        │               those live only in Curl.<Area>.IntegrationTests projects.
         │
         └─ production → the connector in Curl.Networking.UnitLibrary: DNS, a
                         socket, wrapped by SslStream when the scheme is secure.
@@ -164,27 +169,51 @@ continuations, chunked transfer decoding, MQTT packet framing — becomes an ass
 over a byte array. `TimeProvider` is injected for the same reason, so timeout and
 retry logic is testable without `Thread.Sleep`.
 
-**TLS is the deliberate exception.** `Curl.Networking.UnitLibrary` uses .NET's
-`SslStream` rather than implementing the handshake. Writing new TLS is how projects
-introduce security holes; this one is not going to. Raw sockets sit above and below
-`SslStream`, never inside it.
+**TLS uses `SslStream` where it can and a hand-built client where it cannot.** Over
+TCP, `Curl.Networking.UnitLibrary` hands the handshake to .NET's `SslStream` whenever
+`SslStream` can honour the transfer's options. QUIC always, and TCP options `SslStream`
+cannot express (TLS 1.0/1.1 limits, `--curves`, `--sigalgs`, TLS-SRP, ECH, early data
+and the like), run on the hand-built TLS 1.0-1.3 client in `Curl.Tls.UnitLibrary`
+([ADR-0140](../Planning/Decisions/ADR-0140-the-hand-built-tls-client-runs-quic-always-and-tcp-only-where-sslstream-cannot.md),
+[ADR-0162](../Planning/Decisions/ADR-0162-the-hand-built-tls-client-is-offered-through-itlsprovider-with-the-sslstream-providers-verifier-and-text.md)).
+Both sit behind the same `ITlsProvider` and share one certificate verifier. The
+hand-built client is isolated in its own library, held to the same quality gates, and
+fuzzed and checked for timing leaks by the audit office's security auditor.
 
 ### Layers
 
 | Project | Responsibility |
 | --- | --- |
-| `Curl.Console` | Entry point. `AssemblyName` is `curl`, published native-AOT single-file so it drops onto PATH as `curl.exe`. |
-| `Curl.Cli.UnitLibrary` | The 274-option table, argument parsing, `.curlrc` and `-K`, `--variable`, usage text, exit-code mapping. |
+| `Curl.Console` | Entry point and composition root. `AssemblyName` is `curl`, published as a native AOT binary so it drops onto PATH as `curl.exe`. |
+| `Curl.Cli.UnitLibrary` | The option table, argument parsing, `.curlrc` and `-K`, `--variable`, `--help` and `--ai-help` text, exit-code mapping. |
 | `Curl.Core.UnitLibrary` | Transfer engine: URL parsing, scheme dispatch, redirects, resume, retries, rate limiting, IPFS gateway rewriting. |
-| `Curl.Networking.UnitLibrary` | `IConnection`/`IDnsResolver`/`ITlsProvider` implementations, TLS via `SslStream`, proxy and SOCKS handling, connection reuse. |
-| `Curl.Authentication.UnitLibrary` | Basic, Digest, NTLM, Negotiate, Bearer, AWS SigV4. |
+| `Curl.Networking.UnitLibrary` | `IConnection`/`IDnsResolver`/`ITlsProvider` implementations, TCP and QUIC dialers, the TLS choice (`SslStream` or the hand-built client), proxy and SOCKS handling, connection reuse. |
+| `Curl.Authentication.UnitLibrary` | Basic, Digest, NTLM, Negotiate, Bearer, AWS SigV4; SSPI on Windows, the hand-built Kerberos and NTLM elsewhere. |
 | `Curl.Cookies.UnitLibrary` | Cookie jar, Netscape file format, Public Suffix List. |
-| `Curl.Output.UnitLibrary` | The 76 `--write-out` variables, progress meter, verbose and trace formatting. |
+| `Curl.Output.UnitLibrary` | The `--write-out` variables, progress meter, verbose and trace formatting. |
 | `Curl.Protocol.Abstractions.UnitLibrary` | Contracts. Depends on nothing. |
 | `Curl.Protocol.*.UnitLibrary` | One per protocol family, 16 in total. |
+| `Curl.Conformance.UnitLibrary` | The harness that runs curl's own upstream test cases against Curl in process ([ADR-0013](../Planning/Decisions/ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md)). |
+
+The pieces the base class library lacks on at least one platform are hand-built, each in
+its own library with its own tests and the same quality gates
+([ADR-0118](../Planning/Decisions/ADR-0118-curl-cryptography-hand-builds-every-primitive-the-bcl-lacks-on-a-ci-platform.md)):
+
+| Project | Hand-builds |
+| --- | --- |
+| `Curl.Cryptography.UnitLibrary` | Primitives the BCL lacks on some platform: X25519, X448, Ed25519, ChaCha20-Poly1305, DSA, Brainpool ECDSA, ML-KEM, ML-DSA, MD4, RC4, DES, CAST-128 and more. References nothing. |
+| `Curl.Tls.UnitLibrary` | A TLS 1.0-1.3 client for QUIC and for what `SslStream` cannot do. |
+| `Curl.Quic.UnitLibrary` | A QUIC version 1 client transport (RFC 9000-9002), with CUBIC congestion control. |
+| `Curl.Http2.UnitLibrary` | HPACK and HTTP/2 framing ([ADR-0141](../Planning/Decisions/ADR-0141-http-2-is-hand-built-and-accepted-everywhere-with-h2-offered-by-default-off-windows.md)). |
+| `Curl.Http3.UnitLibrary` | QPACK and HTTP/3 framing over QUIC ([ADR-0144](../Planning/Decisions/ADR-0144-http-3-is-hand-built-over-a-hand-built-quic-and-http3-races-tcp-as-curls-ngtcp2-build-does.md)). |
+| `Curl.Kerberos.UnitLibrary` | A Kerberos V5 client and the GSS-API Kerberos mechanism (SPNEGO wraps it in `Curl.Authentication.UnitLibrary`). |
+| `Curl.Ntlm.UnitLibrary` | NTLM messages and NTLMv1/NTLMv2 responses (MS-NLMP). |
+| `Curl.Zstandard.UnitLibrary` | A Zstandard decoder (RFC 8878) for `--compressed` and TLS certificate compression. |
 
 Dependencies point one way — `Console → Cli → Core → {Protocols} → Abstractions` —
-with `Networking`, `Authentication`, `Cookies` and `Output` injected as services.
+with `Networking`, `Authentication`, `Cookies` and `Output` injected as services, and the
+hand-built libraries below them (`Networking → Tls, Quic, Http2, Kerberos`;
+`Protocol.Http → Http2, Http3, Zstandard`; `Tls, Quic, Kerberos, Ntlm → Cryptography`).
 Nothing points back up.
 
 ## Project layout
@@ -192,37 +221,49 @@ Nothing points back up.
 Flat and linear. Every project is a directory immediately under the repository root
 — no `src/`, no `tests/`, no grouping folders — and `Curl.slnx` lists them as one
 unbroken run with no solution folders around them. Because the names sort that way,
-each `.UnitTests` project sits directly after the `.UnitLibrary` it tests.
+each `.UnitTests` project sits directly after the `.UnitLibrary` it tests, and an
+`.IntegrationTests` project sits directly before it
+([ADR-0421](../Planning/Decisions/ADR-0421-integration-tests-live-only-in-integrationtests-projects.md)).
 
-**24 production projects, 24 test projects, 48 in total.**
+**33 production projects (32 libraries and `Curl.Console`), 33 unit test projects and
+1 integration test project: 67 in total.** Four shared projects hold no code:
+`Documentation`, `Tasks`, `Audit` and `.claude`.
 
 ```
-Curl.Authentication.UnitLibrary/          Curl.Protocol.Gopher.UnitLibrary/
-Curl.Authentication.UnitTests/            Curl.Protocol.Gopher.UnitTests/
-Curl.Cli.UnitLibrary/                     Curl.Protocol.Http.UnitLibrary/
-Curl.Cli.UnitTests/                       Curl.Protocol.Http.UnitTests/
+Curl.Authentication.UnitLibrary/          Curl.Protocol.Ftp.UnitLibrary/
+Curl.Authentication.UnitTests/            Curl.Protocol.Ftp.UnitTests/
+Curl.Cli.UnitLibrary/                     Curl.Protocol.Gopher.UnitLibrary/
+Curl.Cli.UnitTests/                       Curl.Protocol.Gopher.UnitTests/
+Curl.Conformance.UnitLibrary/             Curl.Protocol.Http.UnitLibrary/
+Curl.Conformance.UnitTests/               Curl.Protocol.Http.UnitTests/
 Curl.Console/                             Curl.Protocol.Imap.UnitLibrary/
 Curl.Console.UnitTests/                   Curl.Protocol.Imap.UnitTests/
 Curl.Cookies.UnitLibrary/                 Curl.Protocol.Ldap.UnitLibrary/
 Curl.Cookies.UnitTests/                   Curl.Protocol.Ldap.UnitTests/
 Curl.Core.UnitLibrary/                    Curl.Protocol.Mqtt.UnitLibrary/
 Curl.Core.UnitTests/                      Curl.Protocol.Mqtt.UnitTests/
-Curl.Networking.UnitLibrary/              Curl.Protocol.Pop3.UnitLibrary/
-Curl.Networking.UnitTests/                Curl.Protocol.Pop3.UnitTests/
-Curl.Output.UnitLibrary/                  Curl.Protocol.Rtsp.UnitLibrary/
-Curl.Output.UnitTests/                    Curl.Protocol.Rtsp.UnitTests/
-Curl.Protocol.Abstractions.UnitLibrary/   Curl.Protocol.Smb.UnitLibrary/
-Curl.Protocol.Abstractions.UnitTests/     Curl.Protocol.Smb.UnitTests/
-Curl.Protocol.Dict.UnitLibrary/           Curl.Protocol.Smtp.UnitLibrary/
-Curl.Protocol.Dict.UnitTests/             Curl.Protocol.Smtp.UnitTests/
-Curl.Protocol.File.UnitLibrary/           Curl.Protocol.Ssh.UnitLibrary/
-Curl.Protocol.File.UnitTests/             Curl.Protocol.Ssh.UnitTests/
-Curl.Protocol.Ftp.UnitLibrary/            Curl.Protocol.Telnet.UnitLibrary/
-Curl.Protocol.Ftp.UnitTests/              Curl.Protocol.Telnet.UnitTests/
-                                          Curl.Protocol.Tftp.UnitLibrary/
-                                          Curl.Protocol.Tftp.UnitTests/
-                                          Curl.Protocol.Ws.UnitLibrary/
-                                          Curl.Protocol.Ws.UnitTests/
+Curl.Cryptography.UnitLibrary/            Curl.Protocol.Pop3.UnitLibrary/
+Curl.Cryptography.UnitTests/              Curl.Protocol.Pop3.UnitTests/
+Curl.Http2.UnitLibrary/                   Curl.Protocol.Rtsp.UnitLibrary/
+Curl.Http2.UnitTests/                     Curl.Protocol.Rtsp.UnitTests/
+Curl.Http3.UnitLibrary/                   Curl.Protocol.Smb.UnitLibrary/
+Curl.Http3.UnitTests/                     Curl.Protocol.Smb.UnitTests/
+Curl.Kerberos.UnitLibrary/                Curl.Protocol.Smtp.UnitLibrary/
+Curl.Kerberos.UnitTests/                  Curl.Protocol.Smtp.UnitTests/
+Curl.Networking.IntegrationTests/         Curl.Protocol.Ssh.UnitLibrary/
+Curl.Networking.UnitLibrary/              Curl.Protocol.Ssh.UnitTests/
+Curl.Networking.UnitTests/                Curl.Protocol.Telnet.UnitLibrary/
+Curl.Ntlm.UnitLibrary/                    Curl.Protocol.Telnet.UnitTests/
+Curl.Ntlm.UnitTests/                      Curl.Protocol.Tftp.UnitLibrary/
+Curl.Output.UnitLibrary/                  Curl.Protocol.Tftp.UnitTests/
+Curl.Output.UnitTests/                    Curl.Protocol.Ws.UnitLibrary/
+Curl.Protocol.Abstractions.UnitLibrary/   Curl.Protocol.Ws.UnitTests/
+Curl.Protocol.Abstractions.UnitTests/     Curl.Quic.UnitLibrary/
+Curl.Protocol.Dict.UnitLibrary/           Curl.Quic.UnitTests/
+Curl.Protocol.Dict.UnitTests/             Curl.Tls.UnitLibrary/
+Curl.Protocol.File.UnitLibrary/           Curl.Tls.UnitTests/
+Curl.Protocol.File.UnitTests/             Curl.Zstandard.UnitLibrary/
+                                          Curl.Zstandard.UnitTests/
 ```
 
 `Curl.Console` carries no `.UnitLibrary` suffix because it is an executable, not a
@@ -232,9 +273,11 @@ library. It is the only exception.
 
 Checkable by someone outside the project, in priority order:
 
-1. **Upstream conformance.** curl's own 2,126 test cases are the oracle. A stated
-   pass rate against them, rising per release, is the headline number — far better
-   evidence than any coverage percentage.
+1. **Upstream conformance.** curl's own test cases are the oracle. A stated pass rate
+   against them, rising per release, is the headline number — far better evidence than
+   any coverage percentage. **Today: 559 of the 2,017 vendored cases (28%) pass**, as
+   listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; a listed case that
+   stops passing fails the build.
 2. **Differential testing.** For a corpus of invocations, real `curl` and this
    implementation produce byte-identical stdout, stderr and exit code. A
    disagreement is a bug here until proven otherwise.
@@ -242,7 +285,10 @@ Checkable by someone outside the project, in priority order:
    returned in the same circumstances as upstream.
 4. **Unit tests need no network.** `dotnet test --filter "TestCategory!=Integration"`
    passes with networking disabled. If a protocol needs a live server to test, the
-   seam is in the wrong place.
+   seam is in the wrong place. The few tests that must touch something real - a
+   socket, the disk, the OS, a native API, a system agent - are Integration tests and
+   live only in `Curl.<Area>.IntegrationTests` projects, never in a `*.UnitTests`
+   project (ADR-0421).
 5. **Drops onto PATH.** A published `curl.exe` can replace the system binary and
    existing scripts keep working unchanged.
 
@@ -251,8 +297,18 @@ Checkable by someone outside the project, in priority order:
 - **Runtime:** .NET 10, `net10.0`. Nullable enabled, warnings as errors.
 - **Publish:** native AOT, single file. This rules out reflection-heavy designs and
   is a reason dependency injection is wired explicitly rather than by scanning.
-- **Platform:** Windows is the development platform. Linux and macOS parity is
-  wanted; > **TODO** confirm whether it is a release requirement.
+- **Platform:** Windows, Linux and macOS. CI runs the fast tests on all three, and a
+  red job on any of them blocks a merge to `master`. On each platform Curl matches
+  that platform's usual curl build: the Schannel build on Windows, the OpenSSL build
+  on Linux and macOS
+  ([ADR-0009](../Planning/Decisions/ADR-0009-tls-behaviour-matches-the-platforms-usual-curl-build.md)).
+- **Dependencies:** base class library only. The MSTest meta-package is the one
+  package in the solution. What the BCL lacks is hand-built in its own library rather
+  than added as a package.
+- **Quality gates:** every production library is held to 100% line and branch
+  coverage, cyclomatic complexity of at most 10 per method and a CRAP score of at most
+  30. Complexity breaks the build; coverage and CRAP are measured by
+  `Measure-CodeQuality.ps1`.
 - **Licensing — MIT.** This repository is under the **MIT licence**
   ([ADR-0012](../Planning/Decisions/ADR-0012-relicense-from-gpl-3-0-to-mit.md)),
   relicensed from GPL-3.0. curl is under the **curl licence**, a permissive MIT-style
@@ -267,28 +323,40 @@ Checkable by someone outside the project, in priority order:
 Full scope is the target; it is not one push. Each phase must leave the solution
 building and its tests green.
 
-| Phase | Delivers | Proves |
-| --- | --- | --- |
-| **0** | Solution, documentation, conventions | — (complete) |
-| **1** | `Abstractions`, `Networking`, `Core`, `Cli`, `Output`, `Console`, plus `File` and `Http`, with `Authentication` and `Cookies` ([ADR-0016](../Planning/Decisions/ADR-0016-authentication-and-cookies-move-into-milestone-1.md)) | The architecture end to end. `curl https://…` works and the seam holds. |
-| **2** | `Ftp`, `Ssh` | A second transport shape — control plus data channels — does not distort the design. |
-| **3** | `Smtp`, `Imap`, `Pop3` | Line-oriented protocols share machinery cleanly. |
-| **4** | `Ws`, `Mqtt`, `Tftp`, `Dict`, `Gopher`, `Telnet` | Breadth. |
-| **5** | `Ldap`, `Smb`, `Rtsp` | The awkward remainder. |
-| **6** | Upstream conformance push, HTTP/3, AOT publish | The drop-in claim becomes defensible. |
+| Phase | Delivers | Proves | Status |
+| --- | --- | --- | --- |
+| **0** | Solution, documentation, conventions | — | Complete |
+| **1** | `Abstractions`, `Networking`, `Core`, `Cli`, `Output`, `Console`, plus `File` and `Http`, with `Authentication` and `Cookies` ([ADR-0016](../Planning/Decisions/ADR-0016-authentication-and-cookies-move-into-milestone-1.md)) | The architecture end to end. `curl https://…` works and the seam holds. | Complete |
+| **2** | `Ftp`, `Ssh` | A second transport shape — control plus data channels — does not distort the design. | Complete |
+| **3** | `Smtp`, `Imap`, `Pop3` | Line-oriented protocols share machinery cleanly. | Complete |
+| **4** | `Ws`, `Mqtt`, `Tftp`, `Dict`, `Gopher`, `Telnet` | Breadth. | Complete |
+| **5** | `Ldap`, `Smb`, `Rtsp` | The awkward remainder. | Complete |
+| **6** | Upstream conformance push, HTTP/3, AOT publish | The drop-in claim becomes defensible. | In progress: HTTP/2, HTTP/3 and AOT publish are done; conformance stands at 559 of 2,017 cases |
 
-Projects are created as their phase begins, not all 48 up front. Forty-eight empty
-projects before anything works is a liability, not a head start.
+"Complete" means every library of the phase has a working handler under the quality
+gates, not that every option it touches matches curl yet; the conformance pass rate
+measures that. Projects were created as their phase began, not all up front.
+
+## How it is built
+
+Most of the code is written by the **dark factory**: `RunDarkFactory.cmd` works the
+task board in `Tasks/` unattended, one Claude Code session per task, several lanes at
+once in their own git worktrees, and merges its branch into `master` only when CI is
+green on all three platforms. An independent **audit office** (`Audit/`,
+[ADR-0267](../Planning/Decisions/ADR-0267-an-independent-audit-office-audits-the-dark-factory-from-outside-its-reach.md))
+audits the factory and its code from outside its reach - test quality, security,
+performance, conformance, truthfulness of names and documents, and process - and an
+accepted finding closes only on evidence that its fix holds.
 
 ## Open questions
 
 | # | Question | Blocks |
 | --- | --- | --- |
 | 1 | ~~Is GPL-3.0 intentional, or should this relicense to MIT/Apache-2.0 before release?~~ **Answered:** relicensed to MIT, see [ADR-0012](../Planning/Decisions/ADR-0012-relicense-from-gpl-3-0-to-mit.md). | First public release |
-| 2 | Are Linux and macOS release requirements, or is this Windows-first? | Phase 1 CI design |
+| 2 | ~~Are Linux and macOS release requirements, or is this Windows-first?~~ **Answered:** all three are; CI gates `master` on Windows, Linux and macOS, and each platform matches its usual curl build, see [ADR-0009](../Planning/Decisions/ADR-0009-tls-behaviour-matches-the-platforms-usual-curl-build.md). | Phase 1 CI design |
 | 3 | ~~How is curl's test suite driven from .NET — port the harness, or run upstream's Perl `runtests.pl` against our binary?~~ **Answered:** ported to data-driven MSTest cases run in process, no Perl, see [ADR-0013](../Planning/Decisions/ADR-0013-upstream-test-cases-run-as-data-driven-mstest.md). | Phase 1 conformance work |
 | 4 | Is a managed NuGet API a deliverable, or is the CLI the only product? | Public API surface |
-| 5 | ~~HTTP/2 and HTTP/3: BCL framing, or implemented over the seam like everything else?~~ **Answered:** the BCL has no public framing, so HTTP/2 will be hand-written over `IConnection`; it is not in Milestone 1, and `--http2`, `--http2-prior-knowledge` and `--http3` are refused as the Windows reference build refuses them, see [ADR-0017](../Planning/Decisions/ADR-0017-no-http-2-or-http-3-in-milestone-1.md). | Phases 1 and 6 |
+| 5 | ~~HTTP/2 and HTTP/3: BCL framing, or implemented over the seam like everything else?~~ **Answered:** the BCL has no public framing, so both are hand-built: HTTP/2 in `Curl.Http2.UnitLibrary` ([ADR-0141](../Planning/Decisions/ADR-0141-http-2-is-hand-built-and-accepted-everywhere-with-h2-offered-by-default-off-windows.md)), and HTTP/3 in `Curl.Http3.UnitLibrary` over the hand-built QUIC in `Curl.Quic.UnitLibrary` ([ADR-0144](../Planning/Decisions/ADR-0144-http-3-is-hand-built-over-a-hand-built-quic-and-http3-races-tcp-as-curls-ngtcp2-build-does.md)). They were kept out of Milestone 1 ([ADR-0017](../Planning/Decisions/ADR-0017-no-http-2-or-http-3-in-milestone-1.md)) and added afterwards. | Phases 1 and 6 |
 
 ## Sources
 

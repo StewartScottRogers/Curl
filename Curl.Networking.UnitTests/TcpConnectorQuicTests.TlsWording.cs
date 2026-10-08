@@ -14,10 +14,12 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("insecure", true);
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target(events));
 
         await using var connection = result.Connection!;
+        Diagnostics.Assert("trust event is QUIC", true, ((TlsTrustEvent)events.TlsEvents[0]).IsQuic);
         Assert.IsTrue(((TlsTrustEvent)events.TlsEvents[0]).IsQuic);
         Assert.IsTrue(events.Handshakes.Single().IsQuic);
     }
@@ -58,8 +60,11 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = Connector(opener, new ManualTimeProvider(), options, matchesSchannelBuild);
+        Diagnostics.Arrange("CA certificate file", options.CaCertificateFile);
+        Diagnostics.Arrange("Schannel build", matchesSchannelBuild);
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        // Whether the trust anchors verify is the platform's own outcome, so the message is not written.
+        var result = await ConnectMultiplexedAsync(connector, Target(events), writesErrorMessage: false);
 
         if (result.Connection is { } connection)
         {
@@ -67,6 +72,8 @@ public sealed partial class TcpConnectorQuicTests
         }
 
         var trust = (TlsTrustEvent)events.TlsEvents[0];
+        Diagnostics.Act("trust", $"Windows system stores {trust.UsesWindowsSystemStores}, CA file {trust.CaCertificateFile}, verifies peer {trust.VerifiesPeer}");
+        Diagnostics.Assert("trust event is QUIC", true, trust.IsQuic);
         Assert.IsTrue(trust.IsQuic);
         return trust;
     }

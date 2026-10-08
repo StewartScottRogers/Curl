@@ -1,6 +1,7 @@
 using Curl.Authentication;
 using Curl.Cli;
 using Curl.Networking;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -12,6 +13,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlTransportsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void CurlTransports_WithExpressionNamingEveryProperty_ReplacesEachProperty()
     {
@@ -31,7 +36,13 @@ public sealed class CurlTransportsTests
             UdpDatagramConnector = replacement.UdpDatagramConnector,
             PoolingConnector = replacement.PoolingConnector,
         };
+        Diagnostics.Act("copy insecure", copy.TlsClientOptions.Insecure);
+        Diagnostics.Act("copy tunnel user agent", copy.ProxyTunnelOptions.UserAgent);
+        Diagnostics.Act("copy time provider is the replacement", ReferenceEquals(replacementTimeProvider, copy.TimeProvider));
 
+        Diagnostics.Assert("copy insecure", true, copy.TlsClientOptions.Insecure);
+        Diagnostics.Assert("copy tunnel user agent", "replaced", copy.ProxyTunnelOptions.UserAgent);
+        Diagnostics.Assert("original insecure", false, original.TlsClientOptions.Insecure);
         Assert.AreSame(replacement.DnsResolver, copy.DnsResolver);
         Assert.AreSame(replacementTimeProvider, copy.TimeProvider);
         Assert.AreSame(replacement.TcpDialer, copy.TcpDialer);
@@ -52,7 +63,11 @@ public sealed class CurlTransportsTests
         CurlTransports replacement = CurlComposition.CreateTransports(NoOptions());
 
         CurlTransports copy = original with { DnsResolver = replacement.DnsResolver };
+        Diagnostics.Act("copy dns resolver is the replacement", ReferenceEquals(replacement.DnsResolver, copy.DnsResolver));
+        Diagnostics.Act("copy tcp connector is the original", ReferenceEquals(original.TcpConnector, copy.TcpConnector));
 
+        Diagnostics.Assert("copy dns resolver is the replacement", true, ReferenceEquals(replacement.DnsResolver, copy.DnsResolver));
+        Diagnostics.Assert("copy tcp connector is the original", true, ReferenceEquals(original.TcpConnector, copy.TcpConnector));
         Assert.AreSame(replacement.DnsResolver, copy.DnsResolver);
         Assert.AreSame(original.TimeProvider, copy.TimeProvider);
         Assert.AreSame(original.TcpDialer, copy.TcpDialer);
@@ -68,7 +83,9 @@ public sealed class CurlTransportsTests
     public void CreateTransports_WithUserAgent_TunnelOptionsCarryIt()
     {
         CurlTransports transports = CurlComposition.CreateTransports(Options("-A", "agent/1.0", "gophers://example.com/"));
+        Diagnostics.Act("tunnel user agent", transports.ProxyTunnelOptions.UserAgent);
 
+        Diagnostics.Assert("tunnel user agent", "agent/1.0", transports.ProxyTunnelOptions.UserAgent);
         Assert.AreEqual("agent/1.0", transports.ProxyTunnelOptions.UserAgent);
     }
 
@@ -76,7 +93,9 @@ public sealed class CurlTransportsTests
     public void CreateTransports_WithEmptyUserAgent_TunnelOptionsUserAgentIsNull()
     {
         CurlTransports transports = CurlComposition.CreateTransports(Options("-A", "", "gophers://example.com/"));
+        Diagnostics.Act("tunnel user agent", transports.ProxyTunnelOptions.UserAgent ?? "null");
 
+        Diagnostics.Assert("tunnel user agent", "null", transports.ProxyTunnelOptions.UserAgent ?? "null");
         Assert.IsNull(transports.ProxyTunnelOptions.UserAgent);
     }
 
@@ -84,7 +103,9 @@ public sealed class CurlTransportsTests
     public void CreateTransports_WithoutUserAgent_TunnelOptionsUserAgentIsCurl8210()
     {
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+        Diagnostics.Act("tunnel user agent", transports.ProxyTunnelOptions.UserAgent);
 
+        Diagnostics.Assert("tunnel user agent", "curl/8.21.0", transports.ProxyTunnelOptions.UserAgent);
         Assert.AreEqual("curl/8.21.0", transports.ProxyTunnelOptions.UserAgent);
     }
 
@@ -93,7 +114,9 @@ public sealed class CurlTransportsTests
     {
         CurlTransports transports = CurlComposition.CreateTransports(
             Options("--proxy-header", "X-P: 1", "-H", "X-A: 1", "--proxy-header", "X-Q: 2", "gophers://example.com/"));
+        Diagnostics.Act("tunnel proxy headers", string.Join(" | ", transports.ProxyTunnelOptions.ProxyHeaders));
 
+        Diagnostics.Assert("tunnel proxy headers", "X-P: 1 | X-Q: 2", string.Join(" | ", transports.ProxyTunnelOptions.ProxyHeaders));
         CollectionAssert.AreEqual(new[] { "X-P: 1", "X-Q: 2" }, transports.ProxyTunnelOptions.ProxyHeaders.ToArray());
     }
 
@@ -101,7 +124,10 @@ public sealed class CurlTransportsTests
     public void CreateTransports_TunnelOptionsCredentialEncoding_IsForPlatform()
     {
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+        bool isForPlatform = Equals(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), transports.ProxyTunnelOptions.CredentialEncoding);
+        Diagnostics.Act("credential encoding is the platform's", isForPlatform);
 
+        Diagnostics.Assert("credential encoding is the platform's", true, isForPlatform);
         Assert.AreEqual(CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()), transports.ProxyTunnelOptions.CredentialEncoding);
     }
 
@@ -109,7 +135,9 @@ public sealed class CurlTransportsTests
     public void CreateTransports_WithoutSocketSwitches_DialsWithNoDelayAndKeepAlive()
     {
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
+        Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
+        Diagnostics.Assert("socket options", new TcpSocketOptions(NoDelay: true, KeepAlive: true), transports.TcpDialer.SocketOptions);
         Assert.AreEqual(new TcpSocketOptions(NoDelay: true, KeepAlive: true), transports.TcpDialer.SocketOptions);
     }
 
@@ -119,7 +147,9 @@ public sealed class CurlTransportsTests
     public void CreateTransports_WithANoSocketSwitch_DialsWithThatOptionOff(string argument, bool noDelay, bool keepAlive)
     {
         CurlTransports transports = CurlComposition.CreateTransports(Options(argument, "gophers://example.com/"));
+        Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
+        Diagnostics.Assert("socket options", new TcpSocketOptions(noDelay, keepAlive), transports.TcpDialer.SocketOptions);
         Assert.AreEqual(new TcpSocketOptions(noDelay, keepAlive), transports.TcpDialer.SocketOptions);
     }
 
@@ -128,7 +158,9 @@ public sealed class CurlTransportsTests
     {
         CurlTransports transports = CurlComposition.CreateTransports(
             Options("--keepalive-time", "5", "--keepalive-cnt", "3", "gophers://example.com/"));
+        Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
+        Diagnostics.Assert("socket options", new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3), transports.TcpDialer.SocketOptions);
         Assert.AreEqual(new TcpSocketOptions(KeepAliveSeconds: 5, KeepAliveProbeCount: 3), transports.TcpDialer.SocketOptions);
     }
 
@@ -137,7 +169,9 @@ public sealed class CurlTransportsTests
     {
         CurlTransports transports = CurlComposition.CreateTransports(
             Options("--ip-tos", "CS1", "--vlan-priority", "3", "gophers://example.com/"));
+        Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
+        Diagnostics.Assert("socket options", new TcpSocketOptions(TypeOfService: 0x20, VlanPriority: 3), transports.TcpDialer.SocketOptions);
         Assert.AreEqual(new TcpSocketOptions(TypeOfService: 0x20, VlanPriority: 3), transports.TcpDialer.SocketOptions);
     }
 
@@ -146,14 +180,17 @@ public sealed class CurlTransportsTests
     {
         CurlTransports transports = CurlComposition.CreateTransports(
             Options("--tcp-fastopen", "--mptcp", "gophers://example.com/"));
+        Diagnostics.Act("socket options", transports.TcpDialer.SocketOptions);
 
+        Diagnostics.Assert("socket options", new TcpSocketOptions(FastOpen: true, MultipathTcp: true), transports.TcpDialer.SocketOptions);
         Assert.AreEqual(new TcpSocketOptions(FastOpen: true, MultipathTcp: true), transports.TcpDialer.SocketOptions);
     }
 
-    private static CommandLineOptions NoOptions() => Options("gophers://example.com/");
+    private CommandLineOptions NoOptions() => Options("gophers://example.com/");
 
-    private static CommandLineOptions Options(params string[] arguments)
+    private CommandLineOptions Options(params string[] arguments)
     {
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;

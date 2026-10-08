@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -16,6 +17,11 @@ namespace Curl.Protocol.Imap;
 public sealed class ImapProtocolHandlerFetchTests
 {
     private const string Host = "imap://127.0.0.1:18155/";
+
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private const string Opening = "* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN] ready\r\n"
         + "* CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN\r\nA001 OK CAPABILITY completed\r\n";
@@ -40,6 +46,9 @@ public sealed class ImapProtocolHandlerFetchTests
         // Measured: INBOX;UID=1, stdout the 100 message bytes, exit 0.
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + FetchReply + LogoutReply);
 
+        DiffSent(run, SentThroughFetch + "A004 LOGOUT\r\n");
+        DiffOutput(run, Message);
+        AssertResult(run, TransferResult.Success(100));
         Assert.AreEqual(SentThroughFetch + "A004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Message, run.Output);
         Assert.AreEqual(TransferResult.Success(100), run.Result);
@@ -76,6 +85,9 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + path, Opening + SelectReply + FetchReply + LogoutReply);
 
+        DiffSent(run, $"A001 CAPABILITY\r\nA002 SELECT {mailbox}\r\nA003 {fetch}\r\nA004 LOGOUT\r\n");
+        DiffOutput(run, Message);
+        AssertResult(run, TransferResult.Success(100));
         Assert.AreEqual($"A001 CAPABILITY\r\nA002 SELECT {mailbox}\r\nA003 {fetch}\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Message, run.Output);
         Assert.AreEqual(TransferResult.Success(100), run.Result);
@@ -94,6 +106,9 @@ public sealed class ImapProtocolHandlerFetchTests
             Host + "INBOX;UIDVALIDITY=2;UID=1",
             Opening + untagged + "A002 OK [READ-WRITE] done\r\n* BYE\r\nA003 OK bye\r\n");
 
+        DiffSent(run, SentThroughSelect + "A003 LOGOUT\r\n");
+        DiffOutput(run, string.Empty);
+        AssertResult(run, TransferResult.Failure(CurlExitCode.RemoteFileNotFound, "Mailbox UIDVALIDITY has changed"));
         Assert.AreEqual(SentThroughSelect + "A003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(string.Empty, run.Output);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteFileNotFound, "Mailbox UIDVALIDITY has changed"), run.Result);
@@ -106,6 +121,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UIDVALIDITY=2;UID=1", Opening + selectReply + FetchReply + LogoutReply);
 
+        DiffSent(run, SentThroughFetch + "A004 LOGOUT\r\n");
+        AssertResult(run, TransferResult.Success(100));
         Assert.AreEqual(SentThroughFetch + "A004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(100), run.Result);
     }
@@ -118,6 +135,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + selectReply + "A003 OK bye\r\n");
 
+        DiffSent(run, SentThroughSelect + "A003 LOGOUT\r\n");
+        AssertResult(run, TransferResult.Failure(CurlExitCode.LoginDenied, "Select failed"));
         Assert.AreEqual(SentThroughSelect + "A003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Select failed"), run.Result);
     }
@@ -130,6 +149,9 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + fetchReply + LogoutReply);
 
+        DiffSent(run, SentThroughFetch + "A004 LOGOUT\r\n");
+        DiffOutput(run, string.Empty);
+        AssertResult(run, TransferResult.Failure(CurlExitCode.RemoteFileNotFound, "Remote file not found"));
         Assert.AreEqual(SentThroughFetch + "A004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(string.Empty, run.Output);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteFileNotFound, "Remote file not found"), run.Result);
@@ -146,6 +168,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + fetchLine + "A003 OK done\r\n" + LogoutReply);
 
+        DiffSent(run, SentThroughFetch + "A004 LOGOUT\r\n");
+        AssertResult(run, TransferResult.Failure(CurlExitCode.WeirdServerReply, "Failed to parse FETCH response."));
         Assert.AreEqual(SentThroughFetch + "A004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Failed to parse FETCH response."), run.Result);
     }
@@ -158,6 +182,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + fetchReply + LogoutReply);
 
+        DiffOutput(run, "abc");
+        AssertResult(run, TransferResult.Success(3));
         Assert.AreEqual("abc", run.Output);
         Assert.AreEqual(TransferResult.Success(3), run.Result);
     }
@@ -168,6 +194,9 @@ public sealed class ImapProtocolHandlerFetchTests
         // Measured: UID FETCH=* 1 FETCH (BODY[] {0}\r\n)\r\nOK done: empty stdout, exit 0.
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + "* 1 FETCH (BODY[] {0}\r\n)\r\nA003 OK done\r\n" + LogoutReply);
 
+        DiffSent(run, SentThroughFetch + "A004 LOGOUT\r\n");
+        DiffOutput(run, string.Empty);
+        AssertResult(run, TransferResult.Success(0));
         Assert.AreEqual(SentThroughFetch + "A004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(string.Empty, run.Output);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
@@ -181,6 +210,11 @@ public sealed class ImapProtocolHandlerFetchTests
 
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", new ScriptedConnection([.. replies.Chunk(3000)]));
 
+        Diagnostics.Act("progress reports", run.Progress.Reports.Count);
+        Diagnostics.Act("last progress report", run.Progress.Reports[^1]);
+        Diagnostics.Assert("output length", body.Length, run.Output.Length);
+        Diagnostics.Assert("last progress report", "down 10000/10000", run.Progress.Reports[^1]);
+        AssertResult(run, TransferResult.Success(10000));
         Assert.AreEqual(body, run.Output);
         Assert.AreEqual(TransferResult.Success(10000), run.Result);
         Assert.AreEqual("down 10000/10000", run.Progress.Reports[^1]);
@@ -195,6 +229,9 @@ public sealed class ImapProtocolHandlerFetchTests
         // Measured: stdout "abc", LOGOUT, exit 8 "Weird server reply".
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + "* 1 FETCH (BODY[] {3}\r\nabc)\r\n" + completion + LogoutReply);
 
+        DiffSent(run, SentThroughFetch + "A004 LOGOUT\r\n");
+        DiffOutput(run, "abc");
+        AssertResult(run, TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply", 3));
         Assert.AreEqual(SentThroughFetch + "A004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("abc", run.Output);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply", 3), run.Result);
@@ -207,6 +244,9 @@ public sealed class ImapProtocolHandlerFetchTests
         // line: stdout "A003 abc\r\n", exit 18, no LOGOUT seen.
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + "* 1 FETCH (BODY[] {100}\r\nA003 abc\r\n");
 
+        DiffSent(run, SentThroughFetch);
+        DiffOutput(run, "A003 abc\r\n");
+        AssertResult(run, TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 90 bytes missing", 10));
         Assert.AreEqual(SentThroughFetch, run.Sent);
         Assert.AreEqual("A003 abc\r\n", run.Output);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 90 bytes missing", 10), run.Result);
@@ -217,6 +257,9 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + "* 1 FETCH (BODY[] {3}\r\nabc)\r\n");
 
+        DiffSent(run, SentThroughFetch);
+        DiffOutput(run, "abc");
+        AssertResult(run, TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"));
         Assert.AreEqual(SentThroughFetch, run.Sent);
         Assert.AreEqual("abc", run.Output);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
@@ -230,6 +273,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + replies);
 
+        Diagnostics.Assert("sent contains LOGOUT", false, run.Sent.Contains("LOGOUT", StringComparison.Ordinal));
+        AssertResult(run, TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"));
         Assert.DoesNotContain("LOGOUT", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
@@ -241,6 +286,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + "INBOX;UID=1", Opening + SelectReply + line + FetchReply + LogoutReply);
 
+        DiffSent(run, SentThroughFetch);
+        AssertResult(run, TransferResult.Failure(CurlExitCode.WeirdServerReply, message));
         Assert.AreEqual(SentThroughFetch, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, message), run.Result);
     }
@@ -249,9 +296,14 @@ public sealed class ImapProtocolHandlerFetchTests
     public async Task ExecuteAsync_OutputFailsPartway_FailsWithExit23WithoutLogout()
     {
         var context = Context(Host + "INBOX;UID=1", output: new FailingOutputStream(new OutputWriteFailedException(40, "disk full")));
+        Diagnostics.Arrange("url", Host + "INBOX;UID=1");
+        Diagnostics.Arrange("output", "fails after accepting 40 bytes: disk full");
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Opening + SelectReply + FetchReply + LogoutReply));
 
         FetchRun run = await RunAsync(context, new ScriptedConnection(Latin1(Opening + SelectReply + FetchReply + LogoutReply)));
 
+        DiffSent(run, SentThroughFetch);
+        AssertResult(run, TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, passed 100 returned 40"));
         Assert.AreEqual(SentThroughFetch, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, passed 100 returned 40"),
@@ -262,9 +314,13 @@ public sealed class ImapProtocolHandlerFetchTests
     public async Task ExecuteAsync_OutputFailsWithAPlainIOException_ReportsNoneAccepted()
     {
         var context = Context(Host + "INBOX;UID=1", output: new FailingOutputStream(new IOException("gone")));
+        Diagnostics.Arrange("url", Host + "INBOX;UID=1");
+        Diagnostics.Arrange("output", "throws a plain IOException: gone");
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Opening + SelectReply + FetchReply));
 
         FetchRun run = await RunAsync(context, new ScriptedConnection(Latin1(Opening + SelectReply + FetchReply)));
 
+        AssertResult(run, TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, passed 100 returned 0"));
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WriteError, "Failure writing output to destination, passed 100 returned 0"),
             run.Result);
@@ -287,6 +343,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + path, Opening + "* BYE\r\nA002 OK bye\r\n");
 
+        DiffSent(run, "A001 CAPABILITY\r\nA002 LOGOUT\r\n");
+        AssertResult(run, TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"));
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"), run.Result);
     }
@@ -300,6 +358,8 @@ public sealed class ImapProtocolHandlerFetchTests
     {
         FetchRun run = await RunAsync(Host + path, Opening + "A002 OK done\r\n");
 
+        DiffSent(run, $"A001 CAPABILITY\r\nA002 LIST \"{listed}\" *\r\nA003 LOGOUT\r\n");
+        AssertResult(run, TransferResult.Success(0));
         Assert.AreEqual($"A001 CAPABILITY\r\nA002 LIST \"{listed}\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -308,9 +368,14 @@ public sealed class ImapProtocolHandlerFetchTests
     public async Task ExecuteAsync_CustomCommand_IsSentInsteadOfTheFetch()
     {
         var context = Context(Host + "INBOX;UID=1", mail: new MailRequestOptions { CustomCommand = "EXAMINE INBOX" });
+        Diagnostics.Arrange("url", Host + "INBOX;UID=1");
+        Diagnostics.Arrange("custom command", "EXAMINE INBOX");
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Opening + SelectReply + "A003 OK done\r\n"));
 
         FetchRun run = await RunAsync(context, new ScriptedConnection(Latin1(Opening + SelectReply + "A003 OK done\r\n")));
 
+        DiffSent(run, SentThroughSelect + "A003 EXAMINE INBOX\r\nA004 LOGOUT\r\n");
+        AssertResult(run, TransferResult.Success(0));
         Assert.AreEqual(SentThroughSelect + "A003 EXAMINE INBOX\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -319,9 +384,13 @@ public sealed class ImapProtocolHandlerFetchTests
     public async Task ExecuteAsync_MailOptionsWithoutCustomCommand_Fetches()
     {
         var context = Context(Host + "INBOX;UID=1", mail: new MailRequestOptions());
+        Diagnostics.Arrange("url", Host + "INBOX;UID=1");
+        Diagnostics.Arrange("custom command", "none");
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Opening + SelectReply + FetchReply + LogoutReply));
 
         FetchRun run = await RunAsync(context, new ScriptedConnection(Latin1(Opening + SelectReply + FetchReply + LogoutReply)));
 
+        AssertResult(run, TransferResult.Success(100));
         Assert.AreEqual(TransferResult.Success(100), run.Result);
     }
 
@@ -337,18 +406,36 @@ public sealed class ImapProtocolHandlerFetchTests
             Progress = new RecordingTransferProgress(),
         };
 
-    private static Task<FetchRun> RunAsync(string url, string replies) =>
-        RunAsync(url, new ScriptedConnection(Latin1(replies)));
+    private Task<FetchRun> RunAsync(string url, string replies)
+    {
+        Diagnostics.Arrange("server", DiagnosticText.Escape(replies));
+        return RunAsync(url, new ScriptedConnection(Latin1(replies)));
+    }
 
-    private static Task<FetchRun> RunAsync(string url, ScriptedConnection connection) =>
-        RunAsync(Context(url), connection);
+    private Task<FetchRun> RunAsync(string url, ScriptedConnection connection)
+    {
+        Diagnostics.Arrange("url", url);
+        return RunAsync(Context(url), connection);
+    }
 
-    private static async Task<FetchRun> RunAsync(TransferContext context, ScriptedConnection connection)
+    private async Task<FetchRun> RunAsync(TransferContext context, ScriptedConnection connection)
     {
         ImapRun run = await ImapRun.ExecuteAsync(context, connection);
         string output = context.Output is MemoryStream memory ? Encoding.Latin1.GetString(memory.ToArray()) : string.Empty;
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        Diagnostics.Act("output", DiagnosticText.Escape(output.Length > 200 ? output[..200] + "..." : output));
         return new FetchRun(run.Result, run.Sent, output, (RecordingTransferProgress)context.Progress);
     }
+
+    private void DiffSent(FetchRun run, string expected) =>
+        Diagnostics.Diff("sent", expected, run.Sent);
+
+    private void DiffOutput(FetchRun run, string expected) =>
+        Diagnostics.Diff("output", expected, run.Output);
+
+    private void AssertResult(FetchRun run, TransferResult expected) =>
+        Diagnostics.Assert("result", DiagnosticText.Result(expected), DiagnosticText.Result(run.Result));
 
     /// <summary>What a fetch did: its result, the bytes sent, the output written and the progress reported.</summary>
     private sealed record FetchRun(TransferResult Result, string Sent, string Output, RecordingTransferProgress Progress);

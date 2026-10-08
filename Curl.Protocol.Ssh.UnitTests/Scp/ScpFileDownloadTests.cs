@@ -1,8 +1,11 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Keys;
 using Curl.Protocol.Ssh.Sftp;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Scp;
@@ -17,6 +20,10 @@ namespace Curl.Protocol.Ssh.Scp;
 [TestClass]
 public sealed partial class ScpFileDownloadTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string FailedToReceive = "Failed to recv file";
 
     private const string InvalidResponse = "Invalid response from SCP server";
@@ -30,13 +37,17 @@ public sealed partial class ScpFileDownloadTests
     {
         Outcome outcome = await DownloadAsync(ScpServerScript.Sending(HelloScp), "/home/u/files/hello.txt");
 
+        Diagnostics.AssertResult(TransferResult.Success(11), outcome.Result);
         Assert.AreEqual(TransferResult.Success(11), outcome.Result);
+        Diagnostics.AssertBytes("output", HelloScp, outcome.Output);
         CollectionAssert.AreEqual(HelloScp, outcome.Output);
+        Diagnostics.AssertProgress(new[] { (11L, (long?)11) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (11L, (long?)11) }, outcome.Progress);
         List<byte[]> written = SftpServerScript.SshPayloads(outcome.Written);
         byte[] serverChannel = UInt32(SftpServerScript.ServerChannel);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelOpen], Name("session"), UInt32(0), UInt32(2097152), UInt32(32768)), written[0]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelRequest], serverChannel, Name("exec"), [1], Name("scp -pf '/home/u/files/hello.txt'")), written[1]);
+        Diagnostics.AssertBytes("channel bytes", new byte[] { 0, 0, 0 }, outcome.ChannelBytes);
         CollectionAssert.AreEqual(new byte[] { 0, 0, 0 }, outcome.ChannelBytes, "the wakeup, then one acknowledgement per line and none after the bytes, as measured");
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelEof], serverChannel), written[^2]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelClose], serverChannel), written[^1]);
@@ -47,9 +58,13 @@ public sealed partial class ScpFileDownloadTests
     {
         Outcome outcome = await DownloadAsync(ScpServerScript.Sending([]), "/f/empty.txt");
 
+        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
         Assert.AreEqual(TransferResult.Success(0), outcome.Result);
+        Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
+        Diagnostics.AssertProgress([], outcome.Progress);
         Assert.IsEmpty(outcome.Progress);
+        Diagnostics.AssertBytes("channel bytes", new byte[] { 0, 0, 0 }, outcome.ChannelBytes);
         CollectionAssert.AreEqual(new byte[] { 0, 0, 0 }, outcome.ChannelBytes);
     }
 
@@ -62,6 +77,7 @@ public sealed partial class ScpFileDownloadTests
     {
         Outcome outcome = await DownloadAsync(ScpServerScript.Sending(Hello), urlPath);
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
         CollectionAssert.AreEqual(Encoding.Latin1.GetBytes(command), ExecCommand(outcome));
     }
@@ -80,6 +96,7 @@ public sealed partial class ScpFileDownloadTests
         Outcome outcome = await DownloadAsync(ScpServerScript.Started().Output(output).Ended(), "/f");
 
         AssertFailure(outcome, FailedToReceive);
+        Diagnostics.AssertBytes("channel bytes", new byte[] { 0 }, outcome.ChannelBytes);
         CollectionAssert.AreEqual(new byte[] { 0 }, outcome.ChannelBytes);
     }
 
@@ -102,6 +119,7 @@ public sealed partial class ScpFileDownloadTests
         Outcome outcome = await DownloadAsync(ScpServerScript.Started().Output(ScpServerScript.TimesLine + fileLine).Ended(), "/f");
 
         AssertFailure(outcome, message);
+        Diagnostics.AssertBytes("channel bytes", new byte[] { 0, 0 }, outcome.ChannelBytes);
         CollectionAssert.AreEqual(new byte[] { 0, 0 }, outcome.ChannelBytes);
     }
 
@@ -128,6 +146,7 @@ public sealed partial class ScpFileDownloadTests
         Outcome outcome = await DownloadAsync(ScpServerScript.Started().Output(timesLine).Ended(), "/f");
 
         AssertFailure(outcome, message);
+        Diagnostics.AssertBytes("channel bytes", new byte[] { 0 }, outcome.ChannelBytes);
         CollectionAssert.AreEqual(new byte[] { 0 }, outcome.ChannelBytes);
     }
 
@@ -152,7 +171,9 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
     }
 
@@ -163,6 +184,7 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
     }
 
@@ -173,8 +195,11 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/x/short");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing", 5), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing", 5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
+        Diagnostics.AssertProgress(new[] { (5L, (long?)10) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (5L, (long?)10) }, outcome.Progress);
     }
 
@@ -185,7 +210,9 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/x/negsize");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.PartialFile, "transfer closed with -5 bytes remaining to read", 0), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "transfer closed with -5 bytes remaining to read", 0), outcome.Result);
+        Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
     }
 
@@ -196,8 +223,11 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/x/minus1");
 
+        Diagnostics.AssertResult(TransferResult.Success(10), outcome.Result);
         Assert.AreEqual(TransferResult.Success(10), outcome.Result);
+        Diagnostics.AssertBytes("output", "hello\0tail"u8.ToArray(), outcome.Output);
         CollectionAssert.AreEqual("hello\0tail"u8.ToArray(), outcome.Output);
+        Diagnostics.AssertProgress(new[] { (10L, (long?)null) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (10L, (long?)null) }, outcome.Progress);
     }
 
@@ -208,7 +238,9 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/x/extra");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
     }
 
@@ -224,8 +256,11 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/x/stderr");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
+        Diagnostics.AssertProgress(new[] { (3L, (long?)5), (5L, (long?)5) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (3L, (long?)5), (5L, (long?)5) }, outcome.Progress);
     }
 
@@ -242,7 +277,9 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script.Output([0]).Ended(), "/f/big.bin");
 
+        Diagnostics.AssertResult(TransferResult.Success(Size), outcome.Result);
         Assert.AreEqual(TransferResult.Success(Size), outcome.Result);
+        Diagnostics.AssertBytes("output", content, outcome.Output);
         CollectionAssert.AreEqual(content, outcome.Output);
         Assert.AreEqual((Size, (long?)Size), outcome.Progress[^1]);
         List<byte[]> adjustments = [.. SftpServerScript.SshPayloads(outcome.Written).Where(payload => payload[0] == SshConnectionMessageNumber.ChannelWindowAdjust)];
@@ -256,7 +293,9 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/x/killdata");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 5), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
     }
 
@@ -267,7 +306,9 @@ public sealed partial class ScpFileDownloadTests
 
         SshTransferException failure = await DownloadFailsAsync(script);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
+        Diagnostics.AssertText("message", "Failed reading SCP response", failure.Message);
         Assert.AreEqual("Failed reading SCP response", failure.Message);
     }
 
@@ -283,7 +324,9 @@ public sealed partial class ScpFileDownloadTests
 
         SshTransferException failure = await DownloadFailsAsync(script);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
+        Diagnostics.AssertText("message", message, failure.Message);
         Assert.AreEqual(message, failure.Message);
     }
 
@@ -294,7 +337,9 @@ public sealed partial class ScpFileDownloadTests
 
         SshTransferException failure = await DownloadFailsAsync(script);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
+        Diagnostics.AssertText("message", "Unable to complete request for channel-process-startup", failure.Message);
         Assert.AreEqual("Unable to complete request for channel-process-startup", failure.Message);
     }
 
@@ -307,7 +352,9 @@ public sealed partial class ScpFileDownloadTests
 
         SshTransferException failure = await DownloadFailsAsync(script);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
+        Diagnostics.AssertText("message", message, failure.Message);
         Assert.AreEqual(message, failure.Message);
     }
 
@@ -318,11 +365,15 @@ public sealed partial class ScpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
     }
 
-    private static void AssertFailure(Outcome outcome, string message) =>
+    private void AssertFailure(Outcome outcome, string message)
+    {
+        Diagnostics.AssertText("message", new SshTransferException(CurlExitCode.RemoteFileNotFound, message).Message, outcome.Failure?.Message ?? "(none)");
         Assert.AreEqual(new SshTransferException(CurlExitCode.RemoteFileNotFound, message).Message, outcome.Failure?.Message, "message");
+    }
 
     private static byte[] ExecCommand(Outcome outcome)
     {
@@ -330,12 +381,43 @@ public sealed partial class ScpFileDownloadTests
         return request[(1 + 4 + 4 + 4 + 1 + 4)..];
     }
 
-    private static async Task<SshTransferException> DownloadFailsAsync(ScpServerScript script) =>
-        await Assert.ThrowsExactlyAsync<SshTransferException>(
-            async () => await new ScpFileDownload(SftpSessionTests.Transport(new ScriptedConnection(script.Bytes)))
-                .DownloadAsync("/f", new MemoryStream(), new RecordingProgress(), CancellationToken.None));
+    private async Task<SshTransferException> DownloadFailsAsync(ScpServerScript script)
+    {
+        Diagnostics.ArrangeTransfer("/f", script.Bytes);
+        SshTransferException failure;
+        using (Diagnostics.Phase("download"))
+        {
+            failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
+                async () => await new ScpFileDownload(SftpSessionTests.Transport(new ScriptedConnection(script.Bytes)))
+                    .DownloadAsync("/f", new MemoryStream(), new RecordingProgress(), CancellationToken.None));
+        }
 
-    private static async Task<Outcome> DownloadAsync(ScpServerScript script, string urlPath, long? maxFileSize = null)
+        SshAuthenticationDiagnostics.ActFailure(Diagnostics, failure);
+        return failure;
+    }
+
+    private async Task<Outcome> DownloadAsync(ScpServerScript script, string urlPath, long? maxFileSize = null)
+    {
+        Diagnostics.ArrangeTransfer(urlPath, script.Bytes);
+        Diagnostics.Arrange("max file size", maxFileSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(none)");
+        Outcome outcome;
+        using (Diagnostics.Phase("download"))
+        {
+            outcome = await RunDownloadAsync(script, urlPath, maxFileSize);
+        }
+
+        Diagnostics.ActTransfer(outcome.Result, outcome.Output, outcome.Progress);
+        if (outcome.Failure is not null)
+        {
+            SshAuthenticationDiagnostics.ActFailure(Diagnostics, outcome.Failure);
+        }
+
+        Diagnostics.ActBytes("channel bytes", outcome.ChannelBytes);
+        Diagnostics.ActSshMessages(outcome.Written);
+        return outcome;
+    }
+
+    private static async Task<Outcome> RunDownloadAsync(ScpServerScript script, string urlPath, long? maxFileSize)
     {
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream output = new();

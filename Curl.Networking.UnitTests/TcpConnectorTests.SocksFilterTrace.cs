@@ -20,6 +20,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -v --trace-config socks -x socks5h://127.0.0.1:18601 http://example.test/x (BL-1191 Notes).
         var events = await TraceThroughSocksAsync(ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded]);
 
+        Diagnostics.Assert("SOCKS and Opened lines", 6, SocksAndOpenedLines(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -39,6 +40,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -v --trace-config socks -x socks5h://127.0.0.1:18601 http://127.0.0.1/x (BL-1191 Notes).
         var events = await TraceThroughSocksAsync(ProxyKind.Socks5Hostname, "127.0.0.1", [.. Socks5NoAuthentication, .. Socks5Succeeded]);
 
+        Diagnostics.Assert("remotely resolved line written", true, events.Info.Contains("[SOCKS] SOCKS5 connect to 127.0.0.1:8080 (remotely resolved)"));
         CollectionAssert.Contains(events.Info, "[SOCKS] SOCKS5 connect to 127.0.0.1:8080 (remotely resolved)");
     }
 
@@ -48,6 +50,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -v --trace-config socks -x socks5://127.0.0.1:18601 http://127.0.0.1:80/x (BL-1191 Notes).
         var events = await TraceThroughSocksAsync(ProxyKind.Socks5, "127.0.0.1", [.. Socks5NoAuthentication, .. Socks5Succeeded]);
 
+        Diagnostics.Assert("SOCKS lines", 5, SocksLines(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -68,6 +71,7 @@ public sealed partial class TcpConnectorTests
         var events = await TraceThroughSocksAsync(
             ProxyKind.Socks5, "target.example", [.. Socks5NoAuthentication, .. Socks5Succeeded], resolveEntry: "target.example:8080:[::1]");
 
+        Diagnostics.Assert("locally resolved line written", true, events.Info.Contains("[SOCKS] SOCKS5 connect to [::1]:8080 (locally resolved)"));
         CollectionAssert.Contains(events.Info, "[SOCKS] SOCKS5 connect to [::1]:8080 (locally resolved)");
     }
 
@@ -79,6 +83,7 @@ public sealed partial class TcpConnectorTests
         var events = await TraceThroughSocksAsync(
             ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, 0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0]);
 
+        Diagnostics.Assert("SOCKS lines", 4, SocksLines(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -96,6 +101,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -v --trace-config socks -x socks4://127.0.0.1:18601 http://localhost:80/x (BL-1191 Notes).
         var events = await TraceThroughSocksAsync(ProxyKind.Socks4, "target.example", Socks4Granted, resolveEntry: "target.example:8080:127.0.0.1");
 
+        Diagnostics.Assert("SOCKS lines", 4, SocksLines(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -114,6 +120,7 @@ public sealed partial class TcpConnectorTests
         // answering 00 5b: exit 97 with curl's own [SOCKS] message (BL-1191 Notes).
         var events = await TraceThroughSocksAsync(ProxyKind.Socks4, "127.0.0.1", Socks4Refused);
 
+        Diagnostics.Assert("SOCKS lines", 3, SocksLines(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -130,6 +137,7 @@ public sealed partial class TcpConnectorTests
         // curl -s -v --trace-config socks -x socks4a://127.0.0.1:18601 http://example.test/x (BL-1191 Notes).
         var events = await TraceThroughSocksAsync(ProxyKind.Socks4a, "example.test", Socks4Granted);
 
+        Diagnostics.Assert("SOCKS lines", 3, SocksLines(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -148,6 +156,7 @@ public sealed partial class TcpConnectorTests
         byte[] reply = kind == ProxyKind.Socks4 ? Socks4Granted : [.. Socks5NoAuthentication, .. Socks5Succeeded];
         var events = await TraceThroughSocksAsync(kind, "127.0.0.1", reply, tracesSocks: false);
 
+        Diagnostics.Assert("SOCKS trace lines", 0, events.Info.Count(line => line.Contains("SOCKS]", StringComparison.Ordinal) || line.Contains("SOCKS filter", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.Contains("SOCKS]", StringComparison.Ordinal) || line.Contains("SOCKS filter", StringComparison.Ordinal)));
         CollectionAssert.Contains(events.Info, "Opened SOCKS connection from 127.0.0.1 port 50000 to 127.0.0.1 port 8080 (via 192.0.2.10 port 1080)");
     }
@@ -160,6 +169,7 @@ public sealed partial class TcpConnectorTests
         var events = await TraceThroughSocksAsync(ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], tracesSetup: true);
 
         var added = events.Info.IndexOf("[SETUP] added SOCKS filter to example.test:8080");
+        Diagnostics.Assert("SOCKS connecting line index", added + 1, events.Info.IndexOf("[SOCKS] SOCKS5: connecting to example.test:8080"));
         Assert.IsTrue(added >= 0);
         Assert.AreEqual(added + 1, events.Info.IndexOf("[SOCKS] SOCKS5: connecting to example.test:8080"));
     }
@@ -177,7 +187,9 @@ public sealed partial class TcpConnectorTests
             TracesSocksFilter = true,
         };
 
-        var result = await connector.ConnectAsync(ForwardProxyTarget with { Events = events }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, ForwardProxyTarget with { Events = events });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
@@ -211,6 +223,8 @@ public sealed partial class TcpConnectorTests
 
         var events = await TraceThroughSocksAsync(kind, "127.0.0.1", reply, poolScheme: "http", recording: recording);
 
+        Diagnostics.Assert("last info line", TcpConnector.SocksQueryAlpnLine, events.Info[^1]);
+        Diagnostics.Assert("connections opened at the query", 1, openedAtQuery);
         Assert.AreEqual(TcpConnector.SocksQueryAlpnLine, events.Info[^1]);
         Assert.AreEqual(1, openedAtQuery);
     }
@@ -222,6 +236,7 @@ public sealed partial class TcpConnectorTests
         var events = await TraceThroughSocksAsync(
             ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], poolScheme: "http", tracesTcp: true);
 
+        Diagnostics.Assert("SOCKS query ALPN line written", true, events.Info.Contains(TcpConnector.SocksQueryAlpnLine));
         CollectionAssert.Contains(events.Info, TcpConnector.SocksQueryAlpnLine);
         CollectionAssert.DoesNotContain(events.Info, TcpConnector.QueryAlpnLine);
     }
@@ -234,6 +249,7 @@ public sealed partial class TcpConnectorTests
         var events = await TraceThroughSocksAsync(
             ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], tracesSocks: false, poolScheme: "http", tracesTcp: true);
 
+        Diagnostics.Assert("query ALPN lines", 0, events.Info.Count(line => line.EndsWith("query ALPN", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.EndsWith("query ALPN", StringComparison.Ordinal)));
     }
 
@@ -245,6 +261,7 @@ public sealed partial class TcpConnectorTests
         var events = await TraceThroughSocksAsync(
             ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], poolScheme: poolScheme);
 
+        Diagnostics.Assert("SOCKS query ALPN line written", false, events.Info.Contains(TcpConnector.SocksQueryAlpnLine));
         CollectionAssert.DoesNotContain(events.Info, TcpConnector.SocksQueryAlpnLine);
     }
 
@@ -255,6 +272,7 @@ public sealed partial class TcpConnectorTests
         var events = await TraceThroughSocksAsync(
             ProxyKind.Socks5Hostname, "example.test", [.. Socks5NoAuthentication, .. Socks5Succeeded], poolScheme: "https", useTls: true);
 
+        Diagnostics.Assert("SOCKS query ALPN line written", false, events.Info.Contains(TcpConnector.SocksQueryAlpnLine));
         CollectionAssert.Contains(events.Info, "[SOCKS] SOCKS5 request granted.");
         CollectionAssert.DoesNotContain(events.Info, TcpConnector.SocksQueryAlpnLine);
     }
@@ -275,8 +293,9 @@ public sealed partial class TcpConnectorTests
             TracesSocksFilter = true,
         };
 
-        await connector.ConnectAsync(ForwardProxyTarget with { Events = events, PoolScheme = "http" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, ForwardProxyTarget with { Events = events, PoolScheme = "http" });
 
+        Diagnostics.Assert("last info line", TcpConnector.SocksQueryAlpnLine, events.Info[^1]);
         Assert.AreEqual(TcpConnector.SocksQueryAlpnLine, events.Info[^1]);
     }
 
@@ -288,7 +307,7 @@ public sealed partial class TcpConnectorTests
 
     // Connects to host:8080 through a SOCKS proxy at socks.example:1080 that answers with proxyReply,
     // tracing the SOCKS filter (and the setup filter when asked).
-    private static async Task<RecordingTransferEvents> TraceThroughSocksAsync(
+    private async Task<RecordingTransferEvents> TraceThroughSocksAsync(
         ProxyKind kind,
         string host,
         byte[] proxyReply,
@@ -314,9 +333,10 @@ public sealed partial class TcpConnectorTests
             TracesTcpFilter = tracesTcp,
         };
 
-        await connector.ConnectAsync(
-            new ConnectTarget(host, 8080, useTls) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null), Events = events, PoolScheme = poolScheme },
-            CancellationToken.None);
+        await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget(host, 8080, useTls) { Proxy = new ProxyEndpoint(kind, "socks.example", 1080, null), Events = events, PoolScheme = poolScheme });
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
         return events;
     }
 }

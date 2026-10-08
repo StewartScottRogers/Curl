@@ -50,15 +50,27 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             MemoryStream headerOutput = new();
 
+            Diagnostics.Arrange("url, chunk size", $"http://127.0.0.1:18658/a?b=1, {chunkSize}");
+            Diagnostics.Arrange("response frames", "HEADERS 200 text/plain length 5, DATA hello (end stream)");
+
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(Http2Context("http://127.0.0.1:18658/a?b=1", output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Act("response code, http version", $"{result.Report?.ResponseCode}, {result.Report?.HttpVersion}");
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("head", OneLine("HTTP/2 200 \r\ncontent-type: text/plain\r\ncontent-length: 5\r\n\r\n"), OneLine(Latin1(headerOutput.ToArray())));
             Assert.AreEqual("HTTP/2 200 \r\ncontent-type: text/plain\r\ncontent-length: 5\r\n\r\n", Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("response code", 200, result.Report!.ResponseCode);
             Assert.AreEqual(200, result.Report!.ResponseCode);
+            Diagnostics.Assert("http version", new Version(2, 0), result.Report.HttpVersion);
             Assert.AreEqual(new Version(2, 0), result.Report.HttpVersion);
+            Diagnostics.Assert("connection marked reusable", true, connection.IsMarkedReusable);
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}: curl leaves an HTTP/2 connection intact");
+            Diagnostics.Assert("written ends with closing goaway", true, Convert.ToHexString(connection.Written).EndsWith(ClosingGoAway, StringComparison.Ordinal));
             StringAssert.EndsWith(Convert.ToHexString(connection.Written), ClosingGoAway, $"Chunk size {chunkSize}: a connection that holds no session gets the GOAWAY from the handler");
         }
     }
@@ -78,13 +90,21 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = new(response, 65536, Convert.FromHexString(Http2Preface + headers + data + StreamOneWindowUpdates));
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url, body", "http://127.0.0.1:18659/form, name=value (application/x-www-form-urlencoded)");
+        Diagnostics.Arrange("response frames", "HEADERS 200 length 2, DATA ok (end stream)");
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(Http2Context(
             "http://127.0.0.1:18659/form",
             output,
             options: new HttpRequestOptions { Body = new BytesBody("name=value"u8.ToArray(), "application/x-www-form-urlencoded") }));
 
+        WriteResult(result);
+        Diagnostics.Act("upload size", result.Report?.UploadSize);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("body", "ok", Latin1(output.ToArray()));
         Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Diagnostics.Assert("upload size", 10L, result.Report!.UploadSize);
         Assert.AreEqual(10L, result.Report!.UploadSize);
     }
 
@@ -102,11 +122,16 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateData(1, "ok"u8.ToArray(), isEndStream: true));
         ScriptedConnection connection = new(response, 65536, Convert.FromHexString(Http2Preface + headers + StreamOneWindowUpdates));
 
+        Diagnostics.Arrange("url", "http://127.0.0.1:18660/");
+        Diagnostics.Arrange("custom headers", "X-Custom: One | Accept: text/html | Connection: keep-alive | TE: trailers, gzip | Host: example.com");
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(Http2Context(
             "http://127.0.0.1:18660/",
             new MemoryStream(),
             options: new HttpRequestOptions { Headers = ["X-Custom: One", "Accept: text/html", "Connection: keep-alive", "TE: trailers, gzip", "Host: example.com"] }));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -122,10 +147,19 @@ public sealed partial class HttpProtocolHandlerTests
                 Http2FrameFactory.CreateHeaders(1, server.Encode([new("x-checksum", "abc"), new("x-second", "two")]), isEndStream: true, isEndHeaders: true));
             MemoryStream output = new();
 
+            Diagnostics.Arrange("url, chunk size", $"http://127.0.0.1:18661/, {chunkSize}");
+            Diagnostics.Arrange("response frames", "HEADERS 200 text/plain, DATA hello, HEADERS trailers x-checksum x-second (end stream)");
+
             TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, chunkSize)))
                 .ExecuteAsync(Http2Context("http://127.0.0.1:18661/", output, output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff(
+                "output",
+                OneLine("HTTP/2 200 \r\ncontent-type: text/plain\r\n\r\nhellox-checksum: abc\r\nx-second: two\r\n"),
+                OneLine(Latin1(output.ToArray())));
             Assert.AreEqual(
                 "HTTP/2 200 \r\ncontent-type: text/plain\r\n\r\nhellox-checksum: abc\r\nx-second: two\r\n",
                 Latin1(output.ToArray()),
@@ -144,11 +178,19 @@ public sealed partial class HttpProtocolHandlerTests
         MemoryStream output = new();
         MemoryStream headerOutput = new();
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "HEADERS 200 length 5, DATA hello, HEADERS trailer x-checksum (end stream)");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", output, headerOutput));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
+        Diagnostics.Assert("head output ends with trailer", true, Latin1(headerOutput.ToArray()).EndsWith("\r\n\r\nx-checksum: abc\r\n", StringComparison.Ordinal));
+        Diagnostics.Act("head output", OneLine(Latin1(headerOutput.ToArray())));
         StringAssert.EndsWith(Latin1(headerOutput.ToArray()), "\r\n\r\nx-checksum: abc\r\n");
     }
 
@@ -165,12 +207,20 @@ public sealed partial class HttpProtocolHandlerTests
         MemoryStream output = new();
         MemoryStream headerOutput = new();
 
+        Diagnostics.Arrange("url, error code", $"http://127.0.0.1:18662/, {errorCode}");
+        Diagnostics.Arrange("response frames", "HEADERS 200 length 10, DATA hello, RST_STREAM");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(Http2Context("http://127.0.0.1:18662/", output, headerOutput));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2Stream, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2Stream, result.ExitCode);
+        Diagnostics.Assert("error message", message, result.ErrorMessage);
         Assert.AreEqual(message, result.ErrorMessage);
+        Diagnostics.Diff("head", OneLine("HTTP/2 200 \r\ncontent-length: 10\r\n\r\n"), OneLine(Latin1(headerOutput.ToArray())));
         Assert.AreEqual("HTTP/2 200 \r\ncontent-length: 10\r\n\r\n", Latin1(headerOutput.ToArray()));
+        Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 
@@ -184,11 +234,18 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateGoAway(0, Http2ErrorCode.InternalError, ReadOnlyMemory<byte>.Empty));
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "HEADERS 200, DATA hello, GOAWAY INTERNAL_ERROR");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error message", "Failure when receiving data from the peer", result.ErrorMessage);
         Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
+        Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 
@@ -198,11 +255,18 @@ public sealed partial class HttpProtocolHandlerTests
         byte[] response = Http2Response(Http2FrameFactory.CreateContinuation(1, new byte[] { 0x88 }, isEndHeaders: true));
         ScriptedConnection connection = new(response, 65536);
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "CONTINUATION on stream 1 without a HEADERS");
+
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
+        Diagnostics.Assert("error message", "nghttp2 shuts down connection with error 1: PROTOCOL_ERROR", result.ErrorMessage);
         Assert.AreEqual("nghttp2 shuts down connection with error 1: PROTOCOL_ERROR", result.ErrorMessage);
+        Diagnostics.Assert("frame type fourteen bytes from the end", (byte)Http2FrameType.GoAway, connection.Written[^14]);
         Assert.AreEqual((byte)Http2FrameType.GoAway, connection.Written[^14]);
     }
 
@@ -215,21 +279,34 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateData(1, "hello"u8.ToArray(), isEndStream: false));
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "HEADERS 200, DATA hello, then the peer closes");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
+        Diagnostics.Assert("error message", "Transferred a partial file", result.ErrorMessage);
         Assert.AreEqual("Transferred a partial file", result.ErrorMessage);
+        Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Http2PeerClosesBeforeTheHead_FailsWithExit16()
     {
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "SETTINGS and acknowledgement only, then the peer closes");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(Http2Response(), 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
+        Diagnostics.Assert("error message", "Error in the HTTP2 framing layer", result.ErrorMessage);
         Assert.AreEqual("Error in the HTTP2 framing layer", result.ErrorMessage);
     }
 
@@ -241,9 +318,14 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200")]), isEndStream: false, isEndHeaders: true),
             Http2FrameFactory.CreateData(1, "hello"u8.ToArray(), isEndStream: false));
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", $"HEADERS 200, DATA hello cut two bytes short, total {whole.Length - 2} bytes");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(whole[..^2], 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
     }
 
@@ -257,11 +339,17 @@ public sealed partial class HttpProtocolHandlerTests
         byte[] response = Http2Response(Http2FrameFactory.CreateHeaders(1, server.Encode(fields), isEndStream: true, isEndHeaders: true));
         ScriptedConnection connection = new(response, 65536);
 
+        Diagnostics.Arrange("url, status", $"http://example.com/, {status ?? "(none)"}");
+
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2Stream, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2Stream, result.ExitCode);
+        Diagnostics.Assert("error message", "HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)", result.ErrorMessage);
         Assert.AreEqual("HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)", result.ErrorMessage);
+        Diagnostics.Assert("written ends with reset then goaway", true, Convert.ToHexString(connection.Written).EndsWith("00000403000000000100000001" + ClosingGoAway, StringComparison.Ordinal));
         StringAssert.EndsWith(Convert.ToHexString(connection.Written), "00000403000000000100000001" + ClosingGoAway, "RST_STREAM PROTOCOL_ERROR, then the closing GOAWAY");
     }
 
@@ -270,10 +358,16 @@ public sealed partial class HttpProtocolHandlerTests
     {
         byte[] response = Http2Response(Http2FrameFactory.CreateData(1, "x"u8.ToArray(), isEndStream: true));
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "DATA x on stream 1 before any HEADERS");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2Stream, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2Stream, result.ExitCode);
+        Diagnostics.Assert("error message", "HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)", result.ErrorMessage);
         Assert.AreEqual("HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)", result.ErrorMessage);
     }
 
@@ -282,10 +376,16 @@ public sealed partial class HttpProtocolHandlerTests
     {
         byte[] response = Http2Response(Http2FrameFactory.CreateHeaders(1, new byte[] { 0x80 }, isEndStream: true, isEndHeaders: true));
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "HEADERS with the undecodable block 0x80");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
+        Diagnostics.Assert("error message", "nghttp2 shuts down connection with error 9: COMPRESSION_ERROR", result.ErrorMessage);
         Assert.AreEqual("nghttp2 shuts down connection with error 9: COMPRESSION_ERROR", result.ErrorMessage);
     }
 
@@ -298,11 +398,18 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "204")]), isEndStream: true, isEndHeaders: true));
         MemoryStream headerOutput = new();
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "HEADERS 103 link, HEADERS 204 (end stream)");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536)))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream(), headerOutput));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("head", OneLine("HTTP/2 103 \r\nlink: </a>\r\n\r\nHTTP/2 204 \r\n\r\n"), OneLine(Latin1(headerOutput.ToArray())));
         Assert.AreEqual("HTTP/2 103 \r\nlink: </a>\r\n\r\nHTTP/2 204 \r\n\r\n", Latin1(headerOutput.ToArray()));
+        Diagnostics.Assert("response code", 204, result.Report!.ResponseCode);
         Assert.AreEqual(204, result.Report!.ResponseCode);
     }
 
@@ -315,12 +422,24 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse("https://example.com/"), Output = new MemoryStream(), Events = events };
 
+        Diagnostics.Arrange("url, alpn", "https://example.com/, h2");
+        Diagnostics.Arrange("response frames", "HEADERS 204 (end stream)");
+
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, applicationProtocol: "h2")))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("info", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("written starts with", "PRI * HTTP/2.0", Latin1(connection.Written).Substring(0, 14));
         StringAssert.StartsWith(Latin1(connection.Written), "PRI * HTTP/2.0");
+        Diagnostics.Assert("info contains", "using HTTP/2", events.Info.Contains("using HTTP/2") ? "using HTTP/2" : "(missing)");
         CollectionAssert.Contains(events.Info, "using HTTP/2");
+        Diagnostics.Assert(
+            "request head event",
+            OneLine("> GET / HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n"),
+            OneLine(events.Events.First(line => line.StartsWith("> ", StringComparison.Ordinal))));
         Assert.AreEqual("> GET / HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n", events.Events.First(line => line.StartsWith("> ", StringComparison.Ordinal)));
     }
 
@@ -333,11 +452,31 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse("HTTPS://example.com?x#frag"), Output = new MemoryStream(), Events = events };
 
+        Diagnostics.Arrange("url, alpn", "HTTPS://example.com?x#frag, h2");
+        Diagnostics.Arrange("response frames", "HEADERS 204 (end stream)");
+
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(new ScriptedConnection(response, 65536), null, applicationProtocol: "h2")))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         int opened = events.Events.IndexOf("* [HTTP/2] [1] OPENED stream for https://example.com/?x#frag");
+        Diagnostics.Act("opened event index", opened);
+        WriteExpectedLines(
+            "events from opened",
+            [
+                "* [HTTP/2] [1] OPENED stream for https://example.com/?x#frag",
+                "* [HTTP/2] [1] [:method: GET]",
+                "* [HTTP/2] [1] [:scheme: https]",
+                "* [HTTP/2] [1] [:authority: example.com]",
+                "* [HTTP/2] [1] [:path: /?x]",
+                "* [HTTP/2] [1] [user-agent: curl/8.21.0]",
+                "* [HTTP/2] [1] [accept: */*]",
+                "> GET /?x HTTP/2\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            ],
+            events.Events.Skip(opened).Take(8));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -365,9 +504,16 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), Events = events, Http = new HttpRequestOptions { Version = HttpVersionPreference.Http2PriorKnowledge } };
 
+        Diagnostics.Arrange("url, version", "http://example.com/, Http2PriorKnowledge");
+        Diagnostics.Arrange("shared with another transfer, expected left intact", $"{isShared}, {reportsLeftIntact}");
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("info", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("left intact reported", reportsLeftIntact, events.Info.Contains("Connection #0 to host example.com:80 left intact"));
         Assert.AreEqual(reportsLeftIntact, events.Info.Contains("Connection #0 to host example.com:80 left intact"));
     }
 
@@ -376,9 +522,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedConnection connection = Connection(NoContent, 65536, RootRequest);
 
+        Diagnostics.Arrange("url, alpn", "https://example.com/, http/1.1");
+        Diagnostics.Arrange("expected request", OneLine(RootRequest));
+
         TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, applicationProtocol: "http/1.1")))
             .ExecuteAsync(Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -393,17 +544,27 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "201")]), isEndStream: true, isEndHeaders: true));
         ScriptedConnection connection = new(response, 65536);
 
+        Diagnostics.Arrange("url, body length", "http://example.com/up, 70000");
+        Diagnostics.Arrange("response frames", "WINDOW_UPDATE 0 +10000, WINDOW_UPDATE 1 +10000, HEADERS 201 (end stream)");
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(Http2Context(
             "http://example.com/up",
             new MemoryStream(),
             options: new HttpRequestOptions { Body = new BytesBody(body, "application/octet-stream") }));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("upload size", 70000L, result.Report!.UploadSize);
         Assert.AreEqual(70000L, result.Report!.UploadSize);
         List<Http2Frame> sent = await FramesAfterPreface(connection.Written);
         Http2Frame[] data = [.. sent.Where(frame => frame.Type == Http2FrameType.Data)];
+        Diagnostics.Act("frames sent, data frames", $"{sent.Count}, {data.Length}");
+        Diagnostics.Assert("data payload total", 70000, data.Sum(frame => frame.Payload.Length));
         Assert.AreEqual(70000, data.Sum(frame => frame.Payload.Length));
+        Diagnostics.Assert("last data flags", Http2FrameFlags.EndStream, data[^1].Flags);
         Assert.AreEqual(Http2FrameFlags.EndStream, data[^1].Flags);
+        Diagnostics.Assert("earlier data frames all without flags", true, data[..^1].All(frame => frame.Flags == 0));
         Assert.IsTrue(data[..^1].All(frame => frame.Flags == 0));
     }
 
@@ -417,16 +578,25 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = new(response, 65536);
         MemoryStream headerOutput = new();
 
+        Diagnostics.Arrange("url, body length", "http://example.com/up, 70000");
+        Diagnostics.Arrange("response frames", "HEADERS 413 (end stream)");
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(Http2Context(
             "http://example.com/up",
             new MemoryStream(),
             headerOutput,
             new HttpRequestOptions { Body = new BytesBody(body, "application/octet-stream") }));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("head", OneLine("HTTP/2 413 \r\n\r\n"), OneLine(Latin1(headerOutput.ToArray())));
         Assert.AreEqual("HTTP/2 413 \r\n\r\n", Latin1(headerOutput.ToArray()));
         List<Http2Frame> sent = await FramesAfterPreface(connection.Written);
+        Diagnostics.Act("frames sent", sent.Count);
+        Diagnostics.Assert("data payload total", 65535, sent.Where(frame => frame.Type == Http2FrameType.Data).Sum(frame => frame.Payload.Length));
         Assert.AreEqual(65535, sent.Where(frame => frame.Type == Http2FrameType.Data).Sum(frame => frame.Payload.Length));
+        Diagnostics.Assert("any data frame ends the stream", false, sent.Any(frame => frame.Type == Http2FrameType.Data && frame.Flags == Http2FrameFlags.EndStream));
         Assert.IsFalse(sent.Any(frame => frame.Type == Http2FrameType.Data && frame.Flags == Http2FrameFlags.EndStream));
     }
 
@@ -438,17 +608,29 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection connection = new(response, 65536);
         TransferContext context = Http2Context("http://example.com/up", new MemoryStream(), upload: new UnseekableStream("abc"u8.ToArray()));
 
+        Diagnostics.Arrange("url, upload", "http://example.com/up, abc from an unseekable stream");
+        Diagnostics.Arrange("response frames", "HEADERS 201 (end stream)");
+
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         List<Http2Frame> sent = await FramesAfterPreface(connection.Written);
         Http2Frame headers = sent.Single(frame => frame.Type == Http2FrameType.Headers);
+        Diagnostics.Act("frames sent", sent.Count);
+        Diagnostics.Assert("headers flags", Http2FrameFlags.EndHeaders, headers.Flags);
         Assert.AreEqual(Http2FrameFlags.EndHeaders, headers.Flags, "HEADERS without END_STREAM");
         IReadOnlyList<HeaderField> fields = new HpackDecoder().Decode(headers.Payload.Span);
+        Diagnostics.Act("request header names", string.Join(", ", fields.Select(field => field.Name)));
+        Diagnostics.Assert("any transfer-encoding, expect or content-length field", false, fields.Any(field => field.Name is "transfer-encoding" or "expect" or "content-length"));
         Assert.IsFalse(fields.Any(field => field.Name is "transfer-encoding" or "expect" or "content-length"));
         Http2Frame[] data = [.. sent.Where(frame => frame.Type == Http2FrameType.Data)];
+        Diagnostics.Assert("first data payload", "abc", Latin1(data[0].Payload.ToArray()));
         Assert.AreEqual("abc", Latin1(data[0].Payload.ToArray()));
+        Diagnostics.Assert("second data length", 0, data[1].Payload.Length);
         Assert.AreEqual(0, data[1].Payload.Length);
+        Diagnostics.Assert("second data flags", Http2FrameFlags.EndStream, data[1].Flags);
         Assert.AreEqual(Http2FrameFlags.EndStream, data[1].Flags);
     }
 
@@ -457,9 +639,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TransferContext context = Http2Context("http://example.com/up", new MemoryStream(), upload: new UnseekableStream("abc"u8.ToArray()));
 
+        Diagnostics.Arrange("url, upload", "http://example.com/up, abc from an unseekable stream");
+        Diagnostics.Arrange("failing send", "IOException reset after 3 writes");
+
         TransferResult result = await Handler(QueueConnector.For(new FailingSendConnection(new IOException("reset"), writesBeforeFailure: 3)))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
     }
 
@@ -477,14 +664,24 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedAuthenticator authenticator = new(null, "Basic dTpw");
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url, authorization on retry", "http://example.com/, Basic dTpw");
+        Diagnostics.Arrange("response frames", "SETTINGS header table 0, HEADERS 401 on 1, stray HEADERS on 1, HEADERS 200 on 3, DATA ok");
+
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
             .ExecuteAsync(Http2Context("http://example.com/", output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("body", "ok", Latin1(output.ToArray()));
         Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Diagnostics.Assert("connection count", 1, result.Report!.ConnectionCount);
         Assert.AreEqual(1, result.Report!.ConnectionCount);
         Http2Frame[] headers = [.. (await FramesAfterPreface(connection.Written)).Where(frame => frame.Type == Http2FrameType.Headers)];
+        Diagnostics.Act("headers frames sent", headers.Length);
+        Diagnostics.Assert("retry stream id", 3, headers[1].StreamId);
         Assert.AreEqual(3, headers[1].StreamId);
+        Diagnostics.Assert("retry block first byte", 0x20, headers[1].Payload.Span[0]);
         Assert.AreEqual(0x20, headers[1].Payload.Span[0], "the retry's block opens with the table size update the peer's SETTINGS asked for");
     }
 
@@ -498,11 +695,16 @@ public sealed partial class HttpProtocolHandlerTests
         HpackEncoder second = new();
         byte[] accepted = Http2Response(Http2FrameFactory.CreateHeaders(1, second.Encode([new(":status", "204")]), isEndStream: true, isEndHeaders: true));
         ScriptedAuthenticator authenticator = new(null, "Basic dTpw");
+        Diagnostics.Arrange("url, authorization on retry", "http://example.com/, Basic dTpw");
+        Diagnostics.Arrange("connections", "first: GOAWAY then HEADERS 401; second: HEADERS 204");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new ScriptedConnection(refused, 65536), new ScriptedConnection(accepted, 65536)), authenticator)
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connection count", 2, result.Report!.ConnectionCount);
         Assert.AreEqual(2, result.Report!.ConnectionCount);
     }
 
@@ -515,10 +717,16 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "401"), new("www-authenticate", "Basic realm=\"r\""), new("content-length", "0")]), isEndStream: true, isEndHeaders: true));
         ScriptedAuthenticator authenticator = new(null, "Basic dTpw");
 
+        Diagnostics.Arrange("url, authorization on retry", "http://example.com/, Basic dTpw");
+        Diagnostics.Arrange("response frames", "SETTINGS max concurrent streams 0, HEADERS 401 (end stream)");
+
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new ScriptedConnection(response, 65536)), authenticator)
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
+        Diagnostics.Assert("error message", "Error in the HTTP2 framing layer", result.ErrorMessage);
         Assert.AreEqual("Error in the HTTP2 framing layer", result.ErrorMessage);
     }
 
@@ -542,16 +750,29 @@ public sealed partial class HttpProtocolHandlerTests
             ConnectResult.Connected(connection, null),
             ConnectResult.Connected(connection, null, isReused: true)));
         MemoryStream secondHead = new();
+        Diagnostics.Arrange("urls", "http://127.0.0.1:18817/a, http://127.0.0.1:18817/b");
+        Diagnostics.Arrange("response frames", "HEADERS 200 x-served one on 1, HEADERS 200 x-served one on 3");
 
         TransferResult first = await handler.ExecuteAsync(Http2Context("http://127.0.0.1:18817/a", new MemoryStream()));
         TransferResult second = await handler.ExecuteAsync(Http2Context("http://127.0.0.1:18817/b", new MemoryStream(), secondHead));
         await connection.CloseAsync();
 
+        Diagnostics.Act("first exit code", $"{first.ExitCode} ({(int)first.ExitCode}), error: {first.ErrorMessage ?? "(none)"}");
+        WriteResult(second);
+        Diagnostics.Assert("first exit code", CurlExitCode.Ok, first.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
+        Diagnostics.Assert("second exit code", CurlExitCode.Ok, second.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
+        Diagnostics.Diff("second head", OneLine("HTTP/2 200 \r\nx-served: one\r\n\r\n"), OneLine(Latin1(secondHead.ToArray())));
         Assert.AreEqual("HTTP/2 200 \r\nx-served: one\r\n\r\n", Latin1(secondHead.ToArray()), "the second head decodes against the first's HPACK table");
+        Diagnostics.Assert("returned reusable count", 2, connection.ReturnedReusableCount);
         Assert.AreEqual(2, connection.ReturnedReusableCount);
+        Diagnostics.Assert("second connection count", 0, second.Report!.ConnectionCount);
         Assert.AreEqual(0, second.Report!.ConnectionCount, "the second transfer reused the connection");
+        Diagnostics.Assert(
+            "bytes written",
+            Convert.ToHexString(Convert.FromHexString(Http2Preface + firstRequest + StreamOneWindowUpdates + settingsAcknowledgement + secondRequest + streamThreeWindowUpdates + ClosingGoAway)),
+            Convert.ToHexString(wire.Written));
         CollectionAssert.AreEqual(
             Convert.FromHexString(Http2Preface + firstRequest + StreamOneWindowUpdates + settingsAcknowledgement + secondRequest + streamThreeWindowUpdates + ClosingGoAway),
             wire.Written);
@@ -567,11 +788,18 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedConnection wire = new(response, 65536);
         SessionHoldingConnection connection = new(wire);
 
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("response frames", "GOAWAY last stream 1 NO_ERROR, HEADERS 200 length 0 (end stream)");
+
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("returned reusable count", 0, connection.ReturnedReusableCount);
         Assert.AreEqual(0, connection.ReturnedReusableCount);
+        Diagnostics.Assert("wire disposed", true, wire.IsDisposed);
         Assert.IsTrue(wire.IsDisposed);
     }
 

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using Curl.Testing;
 using static Curl.Zstandard.ZstandardTestFrames;
 
 namespace Curl.Zstandard;
@@ -12,6 +13,8 @@ namespace Curl.Zstandard;
 [TestClass]
 public sealed class ZstandardDecoderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     /// <summary>
     /// "Hello, world" in a single-segment frame with a 1-byte <c>Frame_Content_Size</c>, one
     /// raw block and a <c>Content_Checksum</c>. curl 8.21.0 with libzstd 1.5.7 decodes it
@@ -78,10 +81,16 @@ public sealed class ZstandardDecoderTests
     [DynamicData(nameof(ValidInputs))]
     public void TryDecompress_ValidFrames_WritesTheirContent(string name, byte[] source, byte[] expected, int frameCount)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource(name, source);
         var destination = new byte[expected.Length];
 
         var decoded = ZstandardDecoder.TryDecompress(source, destination, out var bytesWritten);
 
+        diagnostics.Act("decoded", decoded);
+        diagnostics.Act("bytes written", bytesWritten);
+        diagnostics.ActOutput(expected, destination.AsSpan(0, Math.Min(bytesWritten, destination.Length)));
+        diagnostics.Assert("bytes written", expected.Length, bytesWritten);
         Assert.IsTrue(decoded, name);
         Assert.AreEqual(expected.Length, bytesWritten, name);
         CollectionAssert.AreEqual(expected, destination, $"{name} ({frameCount} frames)");
@@ -105,10 +114,19 @@ public sealed class ZstandardDecoderTests
     [DynamicData(nameof(InvalidInputs))]
     public void Decompress_InvalidFrame_IsInvalidDataWithTheNamedError(string name, byte[] source, ZstandardDecodeError expected, int maxWindowLog)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource(name, source);
+        diagnostics.Arrange("max window log", maxWindowLog);
         var decoder = new ZstandardDecoder(maxWindowLog);
 
-        var status = decoder.Decompress(source, new byte[200_000], out _, out _);
+        var status = decoder.Decompress(source, new byte[200_000], out var consumed, out var written);
 
+        diagnostics.Act("status", status);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Act("consumed", consumed);
+        diagnostics.Act("written", written);
+        diagnostics.Assert("status", OperationStatus.InvalidData, status);
+        diagnostics.Assert("error raised", expected, decoder.LastError);
         Assert.AreEqual(OperationStatus.InvalidData, status, name);
         Assert.AreEqual(expected, decoder.LastError, name);
         Assert.IsFalse(ZstandardDecoder.TryDecompress(source, new byte[200_000], out _, maxWindowLog), name);
@@ -117,11 +135,21 @@ public sealed class ZstandardDecoderTests
     [TestMethod]
     public void Decompress_AfterInvalidData_StaysFailedAndConsumesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var decoder = new ZstandardDecoder();
         decoder.Decompress([0, 0, 0, 0], new byte[16], out _, out _);
+        diagnostics.Arrange("first call", "00 00 00 00, an unknown magic");
+        diagnostics.Arrange("error after the first call", decoder.LastError);
+        diagnostics.ArrangeSource("second call: measured Hello, world frame", Convert.FromHexString(MeasuredHelloWorldFrame));
 
         var status = decoder.Decompress(Convert.FromHexString(MeasuredHelloWorldFrame), new byte[16], out var consumed, out var written);
 
+        diagnostics.Act("status", status);
+        diagnostics.Act("consumed", consumed);
+        diagnostics.Act("written", written);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Assert("status", OperationStatus.InvalidData, status);
+        diagnostics.Assert("consumed and written", "0 and 0", $"{consumed} and {written}");
         Assert.AreEqual(OperationStatus.InvalidData, status);
         Assert.AreEqual(0, consumed);
         Assert.AreEqual(0, written);
@@ -138,11 +166,19 @@ public sealed class ZstandardDecoderTests
     [DataRow("5F2A4D00")]
     public void Decompress_BytesThatCannotBeginAMagicAfterAFrame_FailAtOnceWithPrefixUnknown(string trailingHex)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var decoder = new ZstandardDecoder();
+        diagnostics.ArrangeSource("first call: measured ok frame", Convert.FromHexString(MeasuredOkFrame));
+        diagnostics.Arrange("trailing bytes", trailingHex);
         Assert.AreEqual(OperationStatus.Done, decoder.Decompress(Convert.FromHexString(MeasuredOkFrame), new byte[16], out _, out _));
 
         var status = decoder.Decompress(Convert.FromHexString(trailingHex), new byte[16], out _, out var written);
 
+        diagnostics.Act("status", status);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Act("written", written);
+        diagnostics.Assert("status", OperationStatus.InvalidData, status);
+        diagnostics.Assert("error raised", ZstandardDecodeError.PrefixUnknown, decoder.LastError);
         Assert.AreEqual(OperationStatus.InvalidData, status);
         Assert.AreEqual(ZstandardDecodeError.PrefixUnknown, decoder.LastError);
         Assert.AreEqual(0, written);
@@ -157,12 +193,20 @@ public sealed class ZstandardDecoderTests
     [DataRow("532A4D", "18")]
     public void Decompress_PartialMagicAfterAFrame_NeedsMoreDataAndDecodesTheNextFrameOnceComplete(string prefixHex, string restHex)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var decoder = new ZstandardDecoder();
         decoder.Decompress(Convert.FromHexString(MeasuredOkFrame), new byte[16], out _, out _);
         var prefix = Convert.FromHexString(prefixHex);
+        diagnostics.ArrangeSource("first call: measured ok frame", Convert.FromHexString(MeasuredOkFrame));
+        diagnostics.Arrange("partial magic", prefixHex);
+        diagnostics.Arrange("rest of the magic", restHex);
 
         var status = decoder.Decompress(prefix, new byte[16], out var consumed, out _);
 
+        diagnostics.Act("status after the partial magic", status);
+        diagnostics.Act("consumed", consumed);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Assert("status after the partial magic", OperationStatus.NeedMoreData, status);
         Assert.AreEqual(OperationStatus.NeedMoreData, status);
         Assert.AreEqual(prefix.Length, consumed);
         Assert.AreEqual(ZstandardDecodeError.None, decoder.LastError);
@@ -178,6 +222,8 @@ public sealed class ZstandardDecoderTests
             written += restWritten;
         }
 
+        diagnostics.Act("status after the next frame", nextStatus);
+        diagnostics.ActOutput(Ascii("ok"), destination.AsSpan(0, written));
         Assert.AreEqual(OperationStatus.Done, nextStatus);
         CollectionAssert.AreEqual(Ascii("ok"), destination[..written]);
     }
@@ -185,10 +231,17 @@ public sealed class ZstandardDecoderTests
     [TestMethod]
     public void Decompress_FirstByteCannotBeginAMagic_FailsAtOnceWithPrefixUnknown()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var decoder = new ZstandardDecoder();
+        diagnostics.Bytes("source", [0x78]);
+        diagnostics.Arrange("source", "one byte 0x78, which no magic number begins with");
 
         var status = decoder.Decompress([0x78], new byte[16], out var consumed, out _);
 
+        diagnostics.Act("status", status);
+        diagnostics.Act("consumed", consumed);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Assert("error raised", ZstandardDecodeError.PrefixUnknown, decoder.LastError);
         Assert.AreEqual(OperationStatus.InvalidData, status);
         Assert.AreEqual(0, consumed);
         Assert.AreEqual(ZstandardDecodeError.PrefixUnknown, decoder.LastError);
@@ -199,10 +252,18 @@ public sealed class ZstandardDecoderTests
     [DataRow("28B52FFD20031100006F6B", ZstandardDecodeError.CorruptionDetected)]
     public void Decompress_MeasuredFrameThatFailsInOneCall_ReportsNothingConsumedOrWritten(string frameHex, ZstandardDecodeError expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var decoder = new ZstandardDecoder();
+        diagnostics.ArrangeSource("measured failing frame", Convert.FromHexString(frameHex));
 
         var status = decoder.Decompress(Convert.FromHexString(frameHex), new byte[16384], out var consumed, out var written);
 
+        diagnostics.Act("status", status);
+        diagnostics.Act("consumed", consumed);
+        diagnostics.Act("written", written);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Assert("error raised", expected, decoder.LastError);
+        diagnostics.Assert("consumed and written", "0 and 0", $"{consumed} and {written}");
         Assert.AreEqual(OperationStatus.InvalidData, status);
         Assert.AreEqual(0, written);
         Assert.AreEqual(0, consumed);
@@ -217,9 +278,19 @@ public sealed class ZstandardDecoderTests
         var decoder = new ZstandardDecoder();
         var destination = new byte[16384];
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource("first call: header and a raw block of \"Hello, \"", firstCall);
+        diagnostics.Bytes("second call: last raw block of \"world\" and checksum 00000000", secondCall);
+        diagnostics.Arrange("second call", "a last raw block of \"world\" and a wrong checksum 00000000");
+
         var firstStatus = decoder.Decompress(firstCall, destination, out var firstConsumed, out var firstWritten);
         var secondStatus = decoder.Decompress(secondCall, destination.AsSpan(firstWritten), out var secondConsumed, out var secondWritten);
 
+        diagnostics.Act("first call", $"{firstStatus}, consumed {firstConsumed}, written {firstWritten}");
+        diagnostics.Act("second call", $"{secondStatus}, consumed {secondConsumed}, written {secondWritten}");
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.ActOutput(Ascii("Hello, "), destination.AsSpan(0, firstWritten));
+        diagnostics.Assert("error raised", ZstandardDecodeError.ChecksumWrong, decoder.LastError);
         Assert.AreEqual(OperationStatus.NeedMoreData, firstStatus);
         Assert.AreEqual(firstCall.Length, firstConsumed);
         CollectionAssert.AreEqual(Ascii("Hello, "), destination[..firstWritten]);
@@ -234,10 +305,18 @@ public sealed class ZstandardDecoderTests
     {
         var decoder = new ZstandardDecoder();
         ReadOnlySpan<byte> source = Convert.FromHexString("28B52FFD24021100006F6B00000000");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource("\"ok\" with a wrong checksum", source);
+        diagnostics.Arrange("destination per call", "1 byte");
 
         var firstStatus = decoder.Decompress(source, new byte[1], out var firstConsumed, out var firstWritten);
         var secondStatus = decoder.Decompress(source[firstConsumed..], new byte[1], out var secondConsumed, out var secondWritten);
 
+        diagnostics.Act("first call", $"{firstStatus}, consumed {firstConsumed}, written {firstWritten}");
+        diagnostics.Act("second call", $"{secondStatus}, consumed {secondConsumed}, written {secondWritten}");
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Assert("first call", "DestinationTooSmall, consumed 10, written 1", $"{firstStatus}, consumed {firstConsumed}, written {firstWritten}");
+        diagnostics.Assert("second call", "InvalidData, consumed 0, written 0", $"{secondStatus}, consumed {secondConsumed}, written {secondWritten}");
         Assert.AreEqual(OperationStatus.DestinationTooSmall, firstStatus);
         Assert.AreEqual(10, firstConsumed);
         Assert.AreEqual(1, firstWritten);
@@ -256,7 +335,14 @@ public sealed class ZstandardDecoderTests
     [TestMethod]
     public void LastError_NewDecoder_IsNone()
     {
-        Assert.AreEqual(ZstandardDecodeError.None, new ZstandardDecoder().LastError);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("decoder", "new, nothing decoded");
+
+        var lastError = new ZstandardDecoder().LastError;
+
+        diagnostics.Act("last error", lastError);
+        diagnostics.Assert("last error", ZstandardDecodeError.None, lastError);
+        Assert.AreEqual(ZstandardDecodeError.None, lastError);
     }
 
     [TestMethod]
@@ -267,10 +353,16 @@ public sealed class ZstandardDecoderTests
         var decoder = new ZstandardDecoder();
         var destination = new byte[64];
         var source = Concatenate(first, skippable, first);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource("measured frame, skippable frame, measured frame", source);
 
         var firstStatus = decoder.Decompress(source, destination, out var firstConsumed, out var firstWritten);
         var secondStatus = decoder.Decompress(source.AsSpan(firstConsumed), destination, out var secondConsumed, out var secondWritten);
 
+        diagnostics.Act("first call", $"{firstStatus}, consumed {firstConsumed}, written {firstWritten}");
+        diagnostics.Act("second call", $"{secondStatus}, consumed {secondConsumed}, written {secondWritten}");
+        diagnostics.Assert("first call", $"Done, consumed {first.Length}, written {HelloWorld.Length}", $"{firstStatus}, consumed {firstConsumed}, written {firstWritten}");
+        diagnostics.Assert("second call", $"Done, consumed {skippable.Length}, written 0", $"{secondStatus}, consumed {secondConsumed}, written {secondWritten}");
         Assert.AreEqual(OperationStatus.Done, firstStatus);
         Assert.AreEqual(first.Length, firstConsumed);
         Assert.AreEqual(HelloWorld.Length, firstWritten);
@@ -285,9 +377,17 @@ public sealed class ZstandardDecoderTests
         var source = Concatenate(FrameHeader(0x00, OneKibibyteWindow), RawBlock(true, HelloWorld));
         var decoder = new ZstandardDecoder();
         var destination = new byte[5];
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource("raw block of \"Hello, world\"", source);
+        diagnostics.Arrange("source given", $"all but the last 7 bytes ({source.Length - 7} bytes)");
+        diagnostics.Arrange("destination", "5 bytes");
 
         var status = decoder.Decompress(source.AsSpan(0, source.Length - 7), destination, out var consumed, out var written);
 
+        diagnostics.Act("status", status);
+        diagnostics.Act("consumed", consumed);
+        diagnostics.ActOutput(Ascii("Hello"), destination.AsSpan(0, written));
+        diagnostics.Assert("status", OperationStatus.NeedMoreData, status);
         Assert.AreEqual(OperationStatus.NeedMoreData, status);
         Assert.AreEqual(source.Length - 7, consumed);
         Assert.AreEqual(5, written);
@@ -299,7 +399,9 @@ public sealed class ZstandardDecoderTests
     {
         var source = Convert.FromHexString(MeasuredHelloWorldFrame)[..^1];
 
-        Assert.IsFalse(ZstandardDecoder.TryDecompress(source, new byte[64], out _));
+        var decoded = TryDecompressWritingDiagnostics("measured frame without its last byte", source, 64);
+
+        Assert.IsFalse(decoded);
     }
 
     [TestMethod]
@@ -307,7 +409,9 @@ public sealed class ZstandardDecoderTests
     {
         var source = SkippableFrame(0x1, Ascii("xyz"))[..^1];
 
-        Assert.IsFalse(ZstandardDecoder.TryDecompress(source, new byte[64], out _));
+        var decoded = TryDecompressWritingDiagnostics("skippable frame without its last byte", source, 64);
+
+        Assert.IsFalse(decoded);
     }
 
     [TestMethod]
@@ -318,13 +422,23 @@ public sealed class ZstandardDecoderTests
         var block = raw ? RawBlock(true, HelloWorld) : RleBlock(true, (byte)'x', HelloWorld.Length);
         var source = Concatenate(FrameHeader(0x00, OneKibibyteWindow), block);
 
-        Assert.IsFalse(ZstandardDecoder.TryDecompress(source, new byte[HelloWorld.Length - 1], out _));
+        var decoded = TryDecompressWritingDiagnostics(raw ? "raw block, destination one byte short" : "RLE block, destination one byte short", source, HelloWorld.Length - 1);
+
+        Assert.IsFalse(decoded);
     }
 
     [TestMethod]
     public void TryDecompress_EmptySource_WritesNothing()
     {
-        Assert.IsTrue(ZstandardDecoder.TryDecompress([], [], out var bytesWritten));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource("empty source, empty destination", []);
+
+        var decoded = ZstandardDecoder.TryDecompress([], [], out var bytesWritten);
+
+        diagnostics.Act("decoded", decoded);
+        diagnostics.Act("bytes written", bytesWritten);
+        diagnostics.Assert("decoded and bytes written", "True and 0", $"{decoded} and {bytesWritten}");
+        Assert.IsTrue(decoded);
         Assert.AreEqual(0, bytesWritten);
     }
 
@@ -332,8 +446,16 @@ public sealed class ZstandardDecoderTests
     public void TryDecompress_LargestMaxWindowLog_AcceptsA2GiBWindow()
     {
         var source = Concatenate(FrameHeader(0x00, 21 << 3), RawBlock(true, HelloWorld));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource("2 GiB window, raw block of \"Hello, world\"", source);
+        diagnostics.Arrange("max window log", ZstandardDecoder.MaximumMaxWindowLog);
 
-        Assert.IsTrue(ZstandardDecoder.TryDecompress(source, new byte[64], out var bytesWritten, ZstandardDecoder.MaximumMaxWindowLog));
+        var decoded = ZstandardDecoder.TryDecompress(source, new byte[64], out var bytesWritten, ZstandardDecoder.MaximumMaxWindowLog);
+
+        diagnostics.Act("decoded", decoded);
+        diagnostics.Act("bytes written", bytesWritten);
+        diagnostics.Assert("bytes written", HelloWorld.Length, bytesWritten);
+        Assert.IsTrue(decoded);
         Assert.AreEqual(HelloWorld.Length, bytesWritten);
     }
 
@@ -342,7 +464,29 @@ public sealed class ZstandardDecoderTests
     [DataRow(ZstandardDecoder.MaximumMaxWindowLog + 1)]
     public void Constructor_MaxWindowLogOutOfRange_Throws(int maxWindowLog)
     {
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new ZstandardDecoder(maxWindowLog));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("max window log", maxWindowLog);
+        diagnostics.Arrange("allowed range", $"{ZstandardDecoder.MinimumMaxWindowLog} to {ZstandardDecoder.MaximumMaxWindowLog}");
+
+        var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new ZstandardDecoder(maxWindowLog));
+
+        diagnostics.Act("exception", $"{exception.GetType().Name}: {exception.Message}");
+        diagnostics.Assert("exception type", nameof(ArgumentOutOfRangeException), exception.GetType().Name);
+    }
+
+    /// <summary>Writes the source, runs <see cref="ZstandardDecoder.TryDecompress" /> into a destination of <paramref name="destinationLength" /> bytes, and writes its result against the expected false.</summary>
+    private bool TryDecompressWritingDiagnostics(string name, byte[] source, int destinationLength)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource(name, source);
+        diagnostics.Arrange("destination length", destinationLength);
+
+        var decoded = ZstandardDecoder.TryDecompress(source, new byte[destinationLength], out var bytesWritten);
+
+        diagnostics.Act("decoded", decoded);
+        diagnostics.Act("bytes written", bytesWritten);
+        diagnostics.Assert("decoded", false, decoded);
+        return decoded;
     }
 
     /// <summary>
@@ -350,8 +494,12 @@ public sealed class ZstandardDecoderTests
     /// bytes into destinations of <paramref name="destinationPiece" /> bytes, and checks the
     /// output and that one <see cref="OperationStatus.Done" /> came per frame.
     /// </summary>
-    private static void AssertDecodesInPieces(string name, byte[] source, byte[] expected, int frameCount, int sourcePiece, int destinationPiece)
+    private void AssertDecodesInPieces(string name, byte[] source, byte[] expected, int frameCount, int sourcePiece, int destinationPiece)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource(name, source);
+        diagnostics.Arrange("pieces", $"source {sourcePiece} bytes at a time, destination {destinationPiece} bytes at a time");
+        diagnostics.Arrange("frames expected", frameCount);
         var decoder = new ZstandardDecoder();
         var output = new List<byte>();
         var destination = new byte[destinationPiece];
@@ -368,6 +516,12 @@ public sealed class ZstandardDecoderTests
         }
         while (status != OperationStatus.InvalidData && (position < source.Length || status == OperationStatus.DestinationTooSmall));
 
+        diagnostics.Act("last status", status);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Act("Done statuses", doneCount);
+        diagnostics.ActOutput(expected, output.ToArray());
+        diagnostics.Assert("last status", OperationStatus.Done, status);
+        diagnostics.Assert("Done statuses", frameCount, doneCount);
         Assert.AreEqual(OperationStatus.Done, status, name);
         Assert.AreEqual(frameCount, doneCount, name);
         CollectionAssert.AreEqual(expected, output, name);

@@ -113,7 +113,7 @@ public sealed partial class SshProtocolHandlerTests
             "sftp 13 /missing");
     }
 
-    private static async Task<TransferResult> RunFailingAsync(InMemorySshServer server, string path, bool upload = false, string? quote = null)
+    private async Task<TransferResult> RunFailingAsync(InMemorySshServer server, string path, bool upload = false, string? quote = null)
     {
         TransferContext context = new()
         {
@@ -123,20 +123,26 @@ public sealed partial class SshProtocolHandlerTests
             Upload = upload ? new MemoryStream(Hello) : null,
             QuoteCommands = quote is null ? [] : [quote],
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
+
+        ActTransfer(result, context, server);
         return result;
     }
 
     // Everything after the subsystem starts: the SFTP requests, then the channel's close
     // and DISCONNECT.
-    private static void AssertFailedTeardown(InMemorySshServer server, TransferResult result, CurlExitCode exitCode, string message, params string[] requests)
+    private void AssertFailedTeardown(InMemorySshServer server, TransferResult result, CurlExitCode exitCode, string message, params string[] requests)
     {
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
         Assert.AreEqual(exitCode, result.ExitCode);
+        AssertTextDiagnostic("error", message, result.ErrorMessage);
         Assert.AreEqual(message, result.ErrorMessage);
         string[] events = [.. server.Events];
         int subsystem = Array.IndexOf(events, "subsystem sftp");
+        AssertTextDiagnostic("events after the subsystem", string.Join(" | ", [.. requests, .. ChannelClosedThenDisconnected]), string.Join(" | ", events[(subsystem + 1)..]));
         Assert.AreEqual(string.Join(" | ", [.. requests, .. ChannelClosedThenDisconnected]), string.Join(" | ", events[(subsystem + 1)..]));
     }
 }

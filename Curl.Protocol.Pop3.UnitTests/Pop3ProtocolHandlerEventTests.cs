@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -15,6 +16,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerEventTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/";
 
     private const string Greeting = "+OK POP3 ready\r\n";
@@ -37,7 +43,9 @@ public sealed class Pop3ProtocolHandlerEventTests
 
         (TransferResult result, RecordingTransferEvents events, string output) = await RunAsync("1", null, Greeting, CapaReply, retrReply, Bye);
 
+        Diagnostics.AssertValues("result", TransferResult.Success(133), result);
         Assert.AreEqual(TransferResult.Success(133), result);
+        Diagnostics.AssertValues("output", Message, output);
         Assert.AreEqual(Message, output);
         CollectionAssert.AreEqual(
             (string[])[
@@ -55,6 +63,7 @@ public sealed class Pop3ProtocolHandlerEventTests
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync(
             string.Empty, new NetworkCredential("user", "secret"), Greeting, CapaReply, "+OK User accepted\r\n", "+OK Logged in\r\n", "+OK 0 messages\r\n.\r\n", Bye);
 
+        Diagnostics.AssertValues("result", TransferResult.Success(2), result);
         Assert.AreEqual(TransferResult.Success(2), result);
         CollectionAssert.AreEqual(
             (string[])[
@@ -72,6 +81,7 @@ public sealed class Pop3ProtocolHandlerEventTests
     {
         (_, RecordingTransferEvents events, string output) = await RunAsync("1", null, Greeting, CapaReply, "+OK\r\nabc", "\r\n.\r\n", Bye);
 
+        Diagnostics.AssertValues("output", "abc\r\n", output);
         Assert.AreEqual("abc\r\n", output);
         CollectionAssert.AreEqual((string[])["{ 3", "{ 2"], events.Transcript.Where(line => line.StartsWith('{')).ToArray());
     }
@@ -81,6 +91,7 @@ public sealed class Pop3ProtocolHandlerEventTests
     {
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync("1", null, Greeting, CapaReply, "+OK\r\nabc\r\n");
 
+        Diagnostics.AssertValues("result", TransferResult.Success(3), result);
         Assert.AreEqual(TransferResult.Success(3), result);
         CollectionAssert.AreEqual(
             (string[])["{ 3", "* Connection #0 to host 127.0.0.1:18110 left intact"], events.Transcript.TakeLast(2).ToArray());
@@ -91,6 +102,7 @@ public sealed class Pop3ProtocolHandlerEventTests
     {
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync("1", null, Greeting, CapaReply, "-ERR no such message\r\n", Bye);
 
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])[.. OpenedSession, "> RETR 1\r\n", "< -ERR no such message\r\n", "* shutting down connection #0"],
@@ -102,6 +114,7 @@ public sealed class Pop3ProtocolHandlerEventTests
     {
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync("1", null, Greeting, CapaReply);
 
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])["> RETR 1\r\n", "* response reading failed (errno: 0)", "* shutting down connection #0"],
@@ -113,6 +126,7 @@ public sealed class Pop3ProtocolHandlerEventTests
     {
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync("1", null, "-ERR go away\r\n");
 
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])["< -ERR go away\r\n", "* Got unexpected pop3-server response", "* closing connection #0"],
@@ -125,6 +139,7 @@ public sealed class Pop3ProtocolHandlerEventTests
         (TransferResult result, RecordingTransferEvents events, _) = await RunAsync(
             "1", new NetworkCredential("user", "secret"), Greeting, CapaReply, "+OK User accepted\r\n", "-ERR denied\r\n");
 
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.LoginDenied, result.ExitCode);
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])["< -ERR denied\r\n", "* Access denied. -", "* closing connection #0"],
@@ -145,6 +160,7 @@ public sealed class Pop3ProtocolHandlerEventTests
 
         TransferResult result = await ExecuteAsync(context, Greeting);
 
+        Diagnostics.AssertValues("result.ExitCode", CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         CollectionAssert.AreEqual((string[])["* closing connection #0"], events.Transcript);
     }
@@ -156,8 +172,12 @@ public sealed class Pop3ProtocolHandlerEventTests
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { WritesBeforeFailure = 0 };
         var context = new TransferContext { Url = CurlUrl.Parse(Url + "1"), Output = Stream.Null, Events = events };
 
-        await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        Diagnostics.ArrangeRun(Url + "1", connection.Script);
+        Diagnostics.Arrange("writes before failure", connection.WritesBeforeFailure);
+        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        Diagnostics.ActTransfer(result, events, connection.Sent);
 
+        Diagnostics.AssertValues("events.Transcript.Any(line => line.StartsWith('>'))", false, events.Transcript.Any(line => line.StartsWith('>')));
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('>')));
     }
 
@@ -171,8 +191,12 @@ public sealed class Pop3ProtocolHandlerEventTests
         var tls = new QueuedTlsProvider(ConnectResult.Connected(SecuredSession()));
         var connector = new OpenedReportingConnector(ConnectResult.Connected(StlsAcceptingSession()));
 
-        await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(TlsRequiredContext(events));
+        Diagnostics.Arrange("sessions", $"plaintext {Pop3Diagnostics.Show(StlsAcceptingSession().Script)}, secured {Pop3Diagnostics.Show(SecuredSession().Script)}");
+        Diagnostics.Arrange("connector", "reports connection #3 opened");
+        TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(TlsRequiredContext(events));
+        Diagnostics.ActTransfer(result, events, []);
 
+        Diagnostics.AssertValues("tls.HandshakeEvents.Single() is events", true, ReferenceEquals(events, tls.HandshakeEvents.Single()));
         Assert.AreSame(events, tls.HandshakeEvents.Single());
         CollectionAssert.AreEqual(
             (string[])[
@@ -191,9 +215,12 @@ public sealed class Pop3ProtocolHandlerEventTests
         var events = new RecordingTransferEvents();
         var tls = new QueuedTlsProvider(ConnectResult.Connected(SecuredSession()));
 
-        await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(StlsAcceptingSession())), tls).ExecuteAsync(TlsRequiredContext(events));
+        Diagnostics.Arrange("sessions", $"plaintext {Pop3Diagnostics.Show(StlsAcceptingSession().Script)}, secured {Pop3Diagnostics.Show(SecuredSession().Script)}");
+        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(StlsAcceptingSession())), tls).ExecuteAsync(TlsRequiredContext(events));
+        Diagnostics.ActTransfer(result, events, []);
 
         Assert.Contains("< +OK Begin TLS negotiation\r\n", events.Transcript);
+        Diagnostics.AssertValues("events.Transcript.Any(line => line.StartsWith('+'))", false, events.Transcript.Any(line => line.StartsWith('+')));
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('+')));
     }
 
@@ -206,7 +233,7 @@ public sealed class Pop3ProtocolHandlerEventTests
     private static TransferContext TlsRequiredContext(RecordingTransferEvents events) =>
         new() { Url = CurlUrl.Parse(Url), Output = new MemoryStream(), Events = events, SslLevel = TransportSecurityLevel.Required };
 
-    private static async Task<(TransferResult Result, RecordingTransferEvents Events, string Output)> RunAsync(
+    private async Task<(TransferResult Result, RecordingTransferEvents Events, string Output)> RunAsync(
         string path, NetworkCredential? credentials, params string[] reads)
     {
         var events = new RecordingTransferEvents();
@@ -218,9 +245,21 @@ public sealed class Pop3ProtocolHandlerEventTests
         return (result, events, Encoding.Latin1.GetString(output.ToArray()));
     }
 
-    private static ValueTask<TransferResult> ExecuteAsync(TransferContext context, params string[] reads)
+    private async ValueTask<TransferResult> ExecuteAsync(TransferContext context, params string[] reads)
     {
         var connection = new ScriptedConnection([.. reads.Select(Encoding.Latin1.GetBytes)]);
-        return new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        Diagnostics.ArrangeRun(context.Url.ToString(), connection.Script, context.SslLevel);
+        Diagnostics.Arrange("credentials", context.Credentials is null ? "(none)" : context.Credentials.UserName);
+        TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider()).ExecuteAsync(context);
+        if (context.Events is RecordingTransferEvents events)
+        {
+            Diagnostics.ActTransfer(result, events, connection.Sent);
+        }
+        else
+        {
+            Diagnostics.ActResult(result);
+        }
+
+        return result;
     }
 }

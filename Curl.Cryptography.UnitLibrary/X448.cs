@@ -21,6 +21,9 @@ public static class X448
     /// <summary>(A - 2) / 4 for Curve448's A = 156326, the ladder's a24 (RFC 7748 section 5).</summary>
     private const ushort A24 = 39081;
 
+    /// <summary>The field elements one ladder step works in: A, AA, B, BB, E, C, D, DA and CB.</summary>
+    private const int LadderScratchElements = 9;
+
     /// <summary>
     /// Fills <paramref name="privateKey" /> with <see cref="KeySize" /> bytes from
     /// <see cref="RandomNumberGenerator" />; clamping happens when the key is used.
@@ -81,7 +84,7 @@ public static class X448
     private static void ScalarMultiply(ReadOnlySpan<byte> scalar, ReadOnlySpan<byte> uCoordinate, Span<byte> result)
     {
         Span<byte> clamped = stackalloc byte[KeySize];
-        Span<long> ladder = stackalloc long[5 * Field448.LimbCount];
+        Span<long> ladder = stackalloc long[(5 + LadderScratchElements) * Field448.LimbCount];
         Span<long> x1 = ladder[..Field448.LimbCount];
         Span<long> x2 = ladder.Slice(Field448.LimbCount, Field448.LimbCount);
         Span<long> z2 = ladder.Slice(2 * Field448.LimbCount, Field448.LimbCount);
@@ -97,7 +100,7 @@ public static class X448
             Field448.SetSmall(z2, 0);
             x1.CopyTo(x3);
             Field448.SetSmall(z3, 1);
-            RunLadder(clamped, x1, x2, z2, x3, z3);
+            RunLadder(clamped, x1, x2, z2, x3, z3, ladder[(5 * Field448.LimbCount)..]);
             Field448.Invert(z2, z2);
             Field448.Multiply(x2, x2, z2);
             Field448.Encode(result, x2);
@@ -119,7 +122,8 @@ public static class X448
         Span<long> x2,
         Span<long> z2,
         Span<long> x3,
-        Span<long> z3)
+        Span<long> z3,
+        Span<long> scratch)
     {
         uint swap = 0;
         for (int bit = (8 * KeySize) - 1; bit >= 0; bit--)
@@ -129,7 +133,7 @@ public static class X448
             Field448.ConditionalSwap(x2, x3, swap);
             Field448.ConditionalSwap(z2, z3, swap);
             swap = scalarBit;
-            LadderStep(x1, x2, z2, x3, z3);
+            LadderStep(x1, x2, z2, x3, z3, scratch);
         }
 
         Field448.ConditionalSwap(x2, x3, swap);
@@ -142,9 +146,9 @@ public static class X448
         Span<long> x2,
         Span<long> z2,
         Span<long> x3,
-        Span<long> z3)
+        Span<long> z3,
+        Span<long> scratch)
     {
-        Span<long> scratch = stackalloc long[9 * Field448.LimbCount];
         Span<long> a = scratch[..Field448.LimbCount];
         Span<long> aa = scratch.Slice(Field448.LimbCount, Field448.LimbCount);
         Span<long> b = scratch.Slice(2 * Field448.LimbCount, Field448.LimbCount);
@@ -154,31 +158,23 @@ public static class X448
         Span<long> d = scratch.Slice(6 * Field448.LimbCount, Field448.LimbCount);
         Span<long> da = scratch.Slice(7 * Field448.LimbCount, Field448.LimbCount);
         Span<long> cb = scratch.Slice(8 * Field448.LimbCount, Field448.LimbCount);
-        try
-        {
-            Field448.Add(a, x2, z2);
-            Field448.Square(aa, a);
-            Field448.Subtract(b, x2, z2);
-            Field448.Square(bb, b);
-            Field448.Subtract(e, aa, bb);
-            Field448.Add(c, x3, z3);
-            Field448.Subtract(d, x3, z3);
-            Field448.Multiply(da, d, a);
-            Field448.Multiply(cb, c, b);
-            Field448.Add(x3, da, cb);
-            Field448.Square(x3, x3);
-            Field448.Subtract(z3, da, cb);
-            Field448.Square(z3, z3);
-            Field448.Multiply(z3, z3, x1);
-            Field448.Multiply(x2, aa, bb);
-            Field448.SetSmall(a, A24);
-            Field448.Multiply(z2, e, a);
-            Field448.Add(z2, z2, aa);
-            Field448.Multiply(z2, z2, e);
-        }
-        finally
-        {
-            Field448.Clear(scratch);
-        }
+        Field448.Add(a, x2, z2);
+        Field448.Square(aa, a);
+        Field448.Subtract(b, x2, z2);
+        Field448.Square(bb, b);
+        Field448.Subtract(e, aa, bb);
+        Field448.Add(c, x3, z3);
+        Field448.Subtract(d, x3, z3);
+        Field448.Multiply(da, d, a);
+        Field448.Multiply(cb, c, b);
+        Field448.Add(x3, da, cb);
+        Field448.Square(x3, x3);
+        Field448.Subtract(z3, da, cb);
+        Field448.Square(z3, z3);
+        Field448.Multiply(z3, z3, x1);
+        Field448.Multiply(x2, aa, bb);
+        Field448.MultiplySmall(z2, e, A24);
+        Field448.Add(z2, z2, aa);
+        Field448.Multiply(z2, z2, e);
     }
 }

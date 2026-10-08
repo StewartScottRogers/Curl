@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -19,9 +20,15 @@ public sealed class FileProtocolHandlerNulBytePathTests
 {
     private const string UrlMalformed = "URL using bad/illegal format or missing URL";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_DownloadOfPathDecodingToNul_FailsWithUrlMalformatBeforeOpeningAnything()
     {
+        Diagnostics.Arrange("url", "file:///dir/f.txt%00x");
+        Diagnostics.Arrange("file system entries", 0);
         var fileSystem = new FakeFileSystem();
         var events = new RecordingTransferEvents();
         var progress = new RecordingTransferProgress { Transcript = events.Transcript };
@@ -34,6 +41,12 @@ public sealed class FileProtocolHandlerNulBytePathTests
             Progress = progress,
         });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("file system calls", fileSystem.Calls.Count);
+        Diagnostics.Act("transcript lines", events.Transcript.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
+        Diagnostics.Assert("error message", UrlMalformed, result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(UrlMalformed, result.ErrorMessage);
         Assert.IsEmpty(fileSystem.Calls);
@@ -43,6 +56,8 @@ public sealed class FileProtocolHandlerNulBytePathTests
     [TestMethod]
     public async Task ExecuteAsync_UploadToPathDecodingToNul_FailsWithUrlMalformatBeforeCreatingAnything()
     {
+        Diagnostics.Arrange("url", "file:///dir/up%00x");
+        Diagnostics.Arrange("upload", "hi\\n");
         var fileSystem = new FakeFileSystem();
         var events = new RecordingTransferEvents();
         var progress = new RecordingTransferProgress { Transcript = events.Transcript };
@@ -56,6 +71,12 @@ public sealed class FileProtocolHandlerNulBytePathTests
             Progress = progress,
         });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("file system calls", fileSystem.Calls.Count);
+        Diagnostics.Act("transcript lines", events.Transcript.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
+        Diagnostics.Assert("error message", UrlMalformed, result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(UrlMalformed, result.ErrorMessage);
         Assert.IsEmpty(fileSystem.Calls);
@@ -69,6 +90,9 @@ public sealed class FileProtocolHandlerNulBytePathTests
         string osPath = "/dir/f\ntxt".Replace('/', Path.DirectorySeparatorChar);
         fileSystem.AddFile(osPath, Encoding.ASCII.GetBytes("hello\n"));
         var output = new MemoryStream();
+        Diagnostics.Arrange("url", "file:///dir/f%0atxt");
+        Diagnostics.Arrange("file system entry", osPath.Replace(Path.DirectorySeparatorChar, '/'));
+        Diagnostics.Bytes("file content", Encoding.ASCII.GetBytes("hello\n"));
 
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext
         {
@@ -76,6 +100,11 @@ public sealed class FileProtocolHandlerNulBytePathTests
             Output = output,
         });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Bytes("output", output.ToArray());
+        string text = Encoding.ASCII.GetString(output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "hello\n", text);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("hello\n", Encoding.ASCII.GetString(output.ToArray()));
     }

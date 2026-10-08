@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -10,6 +11,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class ClientWriterTraceEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void TheMeasuredTwoByteResponse_WritesCurlsWriteLines()
     {
@@ -22,6 +27,9 @@ public sealed class ClientWriterTraceEventsTests
         events.ReportResponseHeader("\r\n"u8);
         events.ReportDataReceived("hi"u8);
         events.ReportInfo("Connection #0 to host 127.0.0.1:47813 left intact");
+        Diagnostics.Arrange("response", "200 OK, Content-Length: 2, body hi");
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 25, inner.Calls.Count);
 
         CollectionAssert.AreEqual(
             new[]
@@ -66,6 +74,9 @@ public sealed class ClientWriterTraceEventsTests
         events.ReportResponseHeader("Content-Length: 0\r\n"u8);
         events.ReportResponseHeader("\r\n"u8);
         events.ReportInfo("shutting down connection #0");
+        Diagnostics.Arrange("response", "200 OK, Content-Length: 0");
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("last call", "Info shutting down connection #0", inner.Calls[^1]);
 
         CollectionAssert.AreEqual(
             new[] { "Info [WRITE] xfer_write_resp(len=38, eos=0) -> 0", "Info [WRITE] [OUT] done", "Info shutting down connection #0" },
@@ -81,6 +92,10 @@ public sealed class ClientWriterTraceEventsTests
         events.ReportResponseHeader("\r\n"u8);
         events.ReportDataReceived("ab"u8);
         events.ReportDataReceived("cde"u8);
+        Diagnostics.Arrange("body blocks", "ab, cde");
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("first block line", "Info [WRITE] xfer_write_resp(len=4, eos=0) -> 0", inner.Calls[10]);
+        Diagnostics.Assert("last line", "Info [WRITE] xfer_write_resp(len=3, eos=0) -> 0", inner.Calls[^1]);
 
         Assert.AreEqual("Info [WRITE] xfer_write_resp(len=4, eos=0) -> 0", inner.Calls[10]);
         Assert.AreEqual("Info [WRITE] xfer_write_resp(len=3, eos=0) -> 0", inner.Calls[^1]);
@@ -95,6 +110,9 @@ public sealed class ClientWriterTraceEventsTests
         events.ReportResponseHeader("HTTP/1.1 100 Continue\r\n"u8);
         events.ReportResponseHeader("\r\n"u8);
         events.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);
+        Diagnostics.Arrange("headers", "100 Continue, blank line, 200 OK");
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("status line call", "ResponseHeader 17", inner.Calls[11]);
 
         CollectionAssert.AreEqual(
             new[] { "ResponseHeader 17", "Info [WRITE] [OUT] wrote 17 header bytes -> 17" },
@@ -110,6 +128,9 @@ public sealed class ClientWriterTraceEventsTests
         events.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);
         events.ReportInfo("Connection #0 to host 127.0.0.1:1 left intact");
         events.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);
+        Diagnostics.Arrange("transfers", 2);
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("last call", "Info [WRITE] client_write(type=c, len=17) -> 0", inner.Calls[^1]);
 
         Assert.AreEqual("Info [WRITE] client_write(type=c, len=17) -> 0", inner.Calls[^1]);
     }
@@ -121,7 +142,10 @@ public sealed class ClientWriterTraceEventsTests
     {
         CallRecordingEvents inner = new();
 
+        Diagnostics.Arrange("info line", line);
         new ClientWriterTraceEvents(inner).ReportInfo(line);
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 1, inner.Calls.Count);
 
         CollectionAssert.AreEqual(new[] { $"Info {line}" }, inner.Calls);
     }
@@ -135,7 +159,10 @@ public sealed class ClientWriterTraceEventsTests
         ClientWriterTraceEvents events = new(inner);
         events.ReportDataReceived("hi"u8);
 
+        Diagnostics.Arrange("info line", line);
         events.ReportInfo(line);
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("last call", $"Info {line}", inner.Calls[^1]);
 
         Assert.AreEqual($"Info {line}", inner.Calls[^1]);
         Assert.AreEqual("Info [WRITE] xfer_write_resp(len=2, eos=0) -> 0", inner.Calls[^2]);
@@ -157,6 +184,9 @@ public sealed class ClientWriterTraceEventsTests
         events.ReportTlsEarlyData(-7);
         events.ReportRequestHeader([2]);
         events.ReportDataSent([4, 5]);
+        Diagnostics.Arrange("event kinds", 10);
+        Diagnostics.Act("call count", inner.Calls.Count);
+        Diagnostics.Assert("call count", 10, inner.Calls.Count);
 
         CollectionAssert.AreEqual(
             new[]

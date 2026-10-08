@@ -1,4 +1,5 @@
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Keys;
@@ -10,11 +11,20 @@ namespace Curl.Protocol.Ssh.Keys;
 [TestClass]
 public sealed class SshPublicKeyFileTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_OpenSshPublicKeyFile_ReadsTheTypeAndBlob()
     {
+        Diagnostics.ArrangeText("text", TestUserKeys.EcdsaP256PublicKeyFile);
+
         SshPublicKeyReading reading = SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile);
 
+        Diagnostics.ActReading(reading);
+        Diagnostics.Assert("key type", "ecdsa-sha2-nistp256", reading.Key?.KeyType);
+        Diagnostics.AssertBytes("public key blob", SshPrivateKeyReader.Read(TestUserKeys.EcdsaP256Sec1, [])!.PublicKeyBlob, reading.Key?.Blob);
         Assert.AreEqual("ecdsa-sha2-nistp256", reading.Key!.KeyType);
         CollectionAssert.AreEqual(SshPrivateKeyReader.Read(TestUserKeys.EcdsaP256Sec1, [])!.PublicKeyBlob, reading.Key.Blob);
         Assert.IsNull(reading.DenialReason);
@@ -27,8 +37,13 @@ public sealed class SshPublicKeyFileTests
     [DataRow("ssh-rsa AAAA=B3Nz", DisplayName = "characters outside the alphabet skipped")]
     public void Parse_Variants_ReadsTheFirstLinesKey(string text)
     {
+        Diagnostics.ArrangeText("text", text);
+
         SshPublicKey? key = SshPublicKeyFile.Parse(text).Key;
 
+        Diagnostics.ActPublicKey(key);
+        Diagnostics.Assert("key type", "ssh-rsa", key?.KeyType);
+        Diagnostics.AssertBytes("public key blob", Name("ssh-rsa")[..6], key?.Blob);
         Assert.AreEqual("ssh-rsa", key!.KeyType);
         CollectionAssert.AreEqual(Name("ssh-rsa")[..6], key.Blob);
     }
@@ -36,7 +51,13 @@ public sealed class SshPublicKeyFileTests
     [TestMethod]
     public void Parse_TypeTakenAsWritten_EvenWhenTheBlobSaysOtherwise()
     {
-        Assert.AreEqual("anything", SshPublicKeyFile.Parse("anything AAAAB3Nz").Key!.KeyType);
+        Diagnostics.ArrangeText("text", "anything AAAAB3Nz");
+
+        SshPublicKey? key = SshPublicKeyFile.Parse("anything AAAAB3Nz").Key;
+
+        Diagnostics.ActPublicKey(key);
+        Diagnostics.Assert("key type", "anything", key?.KeyType);
+        Assert.AreEqual("anything", key!.KeyType);
     }
 
     [TestMethod]
@@ -44,8 +65,12 @@ public sealed class SshPublicKeyFileTests
     [DataRow("ssh-rsa === comment", DisplayName = "padding only")]
     public void Parse_NoBase64Characters_ReadsAnEmptyBlobAsLibssh2Does(string text)
     {
+        Diagnostics.ArrangeText("text", text);
+
         SshPublicKey? key = SshPublicKeyFile.Parse(text).Key;
 
+        Diagnostics.ActPublicKey(key);
+        Diagnostics.Assert("blob length", 0, key?.Blob.Length);
         Assert.AreEqual("ssh-rsa", key!.KeyType);
         Assert.IsEmpty(key.Blob);
     }
@@ -61,8 +86,12 @@ public sealed class SshPublicKeyFileTests
     [DataRow("ssh-rsa AAAAB", "Invalid key data, not base64 encoded", DisplayName = "a lone leftover base64 character")]
     public void Parse_NotAPublicKeyLine_GivesFileReadPublicKeysReason(string text, string reason)
     {
+        Diagnostics.ArrangeText("text", text);
+
         SshPublicKeyReading reading = SshPublicKeyFile.Parse(text);
 
+        Diagnostics.ActReading(reading);
+        Diagnostics.Diff("denial reason", reason, reading.DenialReason ?? string.Empty);
         Assert.IsNull(reading.Key);
         Assert.AreEqual(reason, reading.DenialReason);
     }

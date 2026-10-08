@@ -23,4 +23,11 @@ public enum KerberosCryptographyError
     /// MIT Kerberos refuses too (<c>KRB5_BAD_MSIZE</c>).
     /// </summary>
     CiphertextNotWholeBlocks,
+
+    /// <summary>
+    /// The <c>des3-cbc-sha1</c> key, or a key derived from it, is one .NET's triple DES calls
+    /// weak: its first and second, or second and third, 8-byte parts are equal, which makes
+    /// it single DES. MIT Kerberos would use it as given; Curl refuses it (ADR-0424).
+    /// </summary>
+    WeakKey,
 }

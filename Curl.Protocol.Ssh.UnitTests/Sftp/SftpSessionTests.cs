@@ -3,6 +3,7 @@ using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.Transport;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Sftp;
@@ -17,14 +18,23 @@ public sealed class SftpSessionTests
 {
     private const string InitializationFailedPrefix = "Failure initializing sftp session: ";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task StartAsync_ServerAnswersVersion3_SendsInitForVersion3()
     {
-        ScriptedConnection connection = new(SftpServerScript.Started().Bytes);
+        SftpServerScript script = SftpServerScript.Started();
+        Diagnostics.ArrangeScript(script);
+        ScriptedConnection connection = new(script.Bytes);
 
         await SftpSession.StartAsync(Transport(connection), CancellationToken.None);
+        Diagnostics.ActRequests(connection.Written);
 
         List<byte[]> requests = SftpServerScript.SftpRequests(connection.Written);
+        Diagnostics.Assert("request count", 1, requests.Count);
+        Diagnostics.Diff("SSH_FXP_INIT", new byte[] { SftpPacketType.Init, 0, 0, 0, 3 }, requests[0]);
         Assert.HasCount(1, requests);
         CollectionAssert.AreEqual(new byte[] { SftpPacketType.Init, 0, 0, 0, 3 }, requests[0]);
     }
@@ -35,8 +45,13 @@ public sealed class SftpSessionTests
     public async Task StartAsync_ServerNamesAnotherVersion_AcceptsIt(uint version)
     {
         SftpServerScript script = Subsystem().Sftp([SftpPacketType.Version, .. UInt32(version)]);
+        Diagnostics.ArrangeScript(script);
+        ScriptedConnection connection = new(script.Bytes);
 
-        await SftpSession.StartAsync(Transport(new ScriptedConnection(script.Bytes)), CancellationToken.None);
+        SftpSession session = await SftpSession.StartAsync(Transport(connection), CancellationToken.None);
+        Diagnostics.ActRequests(connection.Written);
+
+        Diagnostics.Assert("session started", true, session is not null);
     }
 
     [TestMethod]
@@ -47,8 +62,13 @@ public sealed class SftpSessionTests
             .Sftp(SftpPacketType.Version)
             .Sftp(SftpPacketType.Version, 0, 0)
             .Sftp(Join([SftpPacketType.Version], UInt32(3), Name("xyz"), Name("1")));
+        Diagnostics.ArrangeScript(script);
+        ScriptedConnection connection = new(script.Bytes);
 
-        await SftpSession.StartAsync(Transport(new ScriptedConnection(script.Bytes)), CancellationToken.None);
+        SftpSession session = await SftpSession.StartAsync(Transport(connection), CancellationToken.None);
+        Diagnostics.ActRequests(connection.Written);
+
+        Diagnostics.Assert("session started", true, session is not null);
     }
 
     [TestMethod]
@@ -112,12 +132,16 @@ public sealed class SftpSessionTests
     public async Task ShutdownAsync_ClosesTheChannelAsLibssh2Does()
     {
         SftpServerScript script = SftpServerScript.Started().Ssh([SshConnectionMessageNumber.ChannelClose, .. UInt32(0)]);
+        Diagnostics.ArrangeScript(script);
         ScriptedConnection connection = new(script.Bytes);
         SftpSession session = await SftpSession.StartAsync(Transport(connection), CancellationToken.None);
 
         await session.ShutdownAsync(CancellationToken.None);
 
         List<byte[]> written = SftpServerScript.SshPayloads(connection.Written);
+        Diagnostics.Act("SSH payloads written", $"{written.Count}, message numbers {string.Join(", ", written.Select(payload => payload[0]))}");
+        Diagnostics.Diff("second-last payload, SSH_MSG_CHANNEL_EOF", Join([SshConnectionMessageNumber.ChannelEof], UInt32(SftpServerScript.ServerChannel)), written[^2]);
+        Diagnostics.Diff("last payload, SSH_MSG_CHANNEL_CLOSE", Join([SshConnectionMessageNumber.ChannelClose], UInt32(SftpServerScript.ServerChannel)), written[^1]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelEof], UInt32(SftpServerScript.ServerChannel)), written[^2]);
         CollectionAssert.AreEqual(Join([SshConnectionMessageNumber.ChannelClose], UInt32(SftpServerScript.ServerChannel)), written[^1]);
     }
@@ -128,11 +152,16 @@ public sealed class SftpSessionTests
     private static SftpServerScript Subsystem() =>
         new SftpServerScript().Confirm().Ssh([SshConnectionMessageNumber.ChannelSuccess, .. UInt32(0)]);
 
-    private static async Task AssertStartFailsAsync(SftpServerScript script, string expected)
+    private async Task AssertStartFailsAsync(SftpServerScript script, string expected)
     {
+        Diagnostics.ArrangeScript(script);
+
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await SftpSession.StartAsync(Transport(new ScriptedConnection(script.Bytes)), CancellationToken.None));
+        Diagnostics.ActFailure(failure);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, failure.ExitCode);
+        Diagnostics.Diff("message", InitializationFailedPrefix + expected, failure.Message);
         Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
         Assert.AreEqual(InitializationFailedPrefix + expected, failure.Message);
     }

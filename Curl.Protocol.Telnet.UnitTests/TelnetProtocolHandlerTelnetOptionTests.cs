@@ -1,5 +1,6 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Telnet.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Telnet;
 
@@ -21,11 +22,18 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
 
     private static readonly CurlUrl TelnetUrl = CurlUrl.Parse("telnet://example.test/");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_TerminalTypeAskedFor_SendsWillTtypeOffersAndTheLowerCaseOptionsValue()
     {
         Exchange exchange = await RunAsync(["ttype=vt100"], Read("FF FD 18"), Read("FF FA 18 01 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FB 18 " + Offers + " FF FA 18 00 76 74 31 30 30 FF F0", exchange.Sent);
+        Diagnostics.Diff("output", string.Empty, exchange.Output);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual("FF FB 18 " + Offers + " FF FA 18 00 76 74 31 30 30 FF F0", exchange.Sent);
         Assert.AreEqual(string.Empty, exchange.Output);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
@@ -36,6 +44,8 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["XDISPLOC=host:0"], Read("FF FD 23"), Read("FF FA 23 01 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FB 23 " + Offers + " FF FA 23 00 68 6F 73 74 3A 30 FF F0", exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual("FF FB 23 " + Offers + " FF FA 23 00 68 6F 73 74 3A 30 FF F0", exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
     }
@@ -45,6 +55,8 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["NEW_ENV=USER,bob"], Read("FF FD 27"), Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FB 27 " + Offers + " FF FA 27 00 00 55 53 45 52 01 62 6F 62 FF F0", exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual("FF FB 27 " + Offers + " FF FA 27 00 00 55 53 45 52 01 62 6F 62 FF F0", exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
     }
@@ -57,6 +69,10 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
             Read("FF FD 27"),
             Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Diff(
+            "sent",
+            "FF FB 27 " + Offers + " FF FA 27 00 00 55 53 45 52 01 62 6F 62 00 54 45 52 4D 00 41 01 62 2C 63 FF F0",
+            exchange.Sent);
         Assert.AreEqual(
             "FF FB 27 " + Offers + " FF FA 27 00 00 55 53 45 52 01 62 6F 62 00 54 45 52 4D 00 41 01 62 2C 63 FF F0",
             exchange.Sent);
@@ -67,6 +83,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["NEW_ENV=,x", "NEW_ENV=", "NEW_ENV=a,"], Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FA 27 00 00 01 78 00 00 61 01 FF F0", exchange.Sent);
         Assert.AreEqual("FF FA 27 00 00 01 78 00 00 61 01 FF F0", exchange.Sent);
     }
 
@@ -78,6 +95,12 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
             Read("FF FD 18 FF FD 23 FF FD 27"),
             Read("FF FA 18 01 FF F0 FF FA 23 01 FF F0 FF FA 27 01 FF F0"));
 
+        string expectedSent = "FF FB 18 FF FB 23 FF FB 27 " + Offers
+            + " FF FA 18 00 76 74 31 30 30 FF F0"
+            + " FF FA 23 00 68 6F 73 74 3A 30 FF F0"
+            + " FF FA 27 00 00 55 53 45 52 01 62 6F 62 FF F0";
+        Diagnostics.Diff("sent", expectedSent, exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual(
             "FF FB 18 FF FB 23 FF FB 27 " + Offers
             + " FF FA 18 00 76 74 31 30 30 FF F0"
@@ -94,6 +117,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
             ["TTYPE=vt100", "XDISPLOC=host:0", "NEW_ENV=USER,bob"],
             Read("FF FB 01"));
 
+        Diagnostics.Diff("sent", "FF FD 01 " + Offers + " FF FB 18 FF FB 23 FF FB 27", exchange.Sent);
         Assert.AreEqual("FF FD 01 " + Offers + " FF FB 18 FF FB 23 FF FB 27", exchange.Sent);
     }
 
@@ -104,6 +128,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["TTYPE=x"], Read(received));
 
+        Diagnostics.Diff("sent", "FF FA 18 00 78 FF F0", exchange.Sent);
         Assert.AreEqual("FF FA 18 00 78 FF F0", exchange.Sent);
     }
 
@@ -112,6 +137,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["NEW_ENV=x"], Read("FF FA 27 02 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FA 27 00 00 78 FF F0", exchange.Sent);
         Assert.AreEqual("FF FA 27 00 00 78 FF F0", exchange.Sent);
     }
 
@@ -120,6 +146,8 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["TTYPE=x"], Read("FF FA 05 FF F0"));
 
+        Diagnostics.Diff("sent", string.Empty, exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual(string.Empty, exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
     }
@@ -129,6 +157,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["TTYPE="], Read("FF FA 18 01 FF F0"));
 
+        Diagnostics.Diff("sent", "FF FA 18 00 FF F0", exchange.Sent);
         Assert.AreEqual("FF FA 18 00 FF F0", exchange.Sent);
     }
 
@@ -139,6 +168,8 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync([option], Read("FF FA 18 01 FF F0"));
 
+        Diagnostics.AssertExitCode(CurlExitCode.BadFunctionArgument, exchange.Result.ExitCode);
+        Diagnostics.Diff("sent", string.Empty, exchange.Sent);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, exchange.Result.ExitCode);
         Assert.AreEqual(string.Empty, exchange.Sent);
     }
@@ -148,6 +179,8 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["TTYPE=" + new string('a', 1000)], Read("FF FA 18 01 FF F0"));
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
+        Diagnostics.Assert("sent length", 1006, exchange.SentBytes.Length);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.HasCount(1006, exchange.SentBytes);
     }
@@ -162,6 +195,10 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync([optionName + new string('a', 1001)], Read("61 " + received), Read("62"));
 
+        Diagnostics.AssertExitCode(CurlExitCode.SendError, exchange.Result.ExitCode);
+        Diagnostics.Diff("error", expectedMessage, exchange.Result.ErrorMessage ?? string.Empty);
+        Diagnostics.Diff("output", "61", exchange.Output);
+        Diagnostics.Diff("sent", string.Empty, exchange.Sent);
         Assert.AreEqual(CurlExitCode.SendError, exchange.Result.ExitCode);
         Assert.AreEqual(expectedMessage, exchange.Result.ErrorMessage);
         Assert.AreEqual("61", exchange.Output);
@@ -176,6 +213,9 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["NEW_ENV=" + new string('a', length)], Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Assert("sent length", expectedSentLength, exchange.SentBytes.Length);
+        Diagnostics.Diff("sent start", "FF FA 27 00", ToHex(exchange.SentBytes[..4]));
+        Diagnostics.Diff("sent end", "FF F0", ToHex(exchange.SentBytes[^2..]));
         Assert.HasCount(expectedSentLength, exchange.SentBytes);
         Assert.AreEqual("FF FA 27 00", ToHex(exchange.SentBytes[..4]));
         Assert.AreEqual("FF F0", ToHex(exchange.SentBytes[^2..]));
@@ -193,6 +233,8 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
             ["NEW_ENV=" + new string('a', 1000), "NEW_ENV=" + new string('b', secondLength), "NEW_ENV=c"],
             Read("FF FA 27 01 FF F0"));
 
+        Diagnostics.Assert("sent length", expectedSentLength, exchange.SentBytes.Length);
+        Diagnostics.Assert("sent ends with", expectedEnd, exchange.Sent[Math.Max(0, exchange.Sent.Length - expectedEnd.Length)..]);
         Assert.HasCount(expectedSentLength, exchange.SentBytes);
         Assert.EndsWith(expectedEnd, exchange.Sent);
     }
@@ -203,10 +245,18 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
         var connection = new ScriptedConnection(Read("68 69"));
         var connector = new RecordingConnector(ConnectResult.Connected(connection));
         var output = new MemoryStream();
+        Diagnostics.Arrange("telnet options (-t)", "BOGUS=1");
+        Diagnostics.ArrangeReads([Read("68 69")]);
 
         TransferResult result = await new TelnetProtocolHandler(connector).ExecuteAsync(
             new TransferContext { Url = TelnetUrl, Output = output, TelnetOptions = ["BOGUS=1"] });
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection.Sent);
+        Diagnostics.Act("connects", connector.Targets.Count);
+        Diagnostics.AssertExitCode(CurlExitCode.UnknownOption, result.ExitCode);
+        Diagnostics.Diff("error", GenericUnknownOptionMessage, result.ErrorMessage ?? string.Empty);
+        Diagnostics.Assert("connects", 1, connector.Targets.Count);
         Assert.AreEqual(CurlExitCode.UnknownOption, result.ExitCode);
         Assert.AreEqual(GenericUnknownOptionMessage, result.ErrorMessage);
         Assert.AreEqual(0L, result.BytesTransferred);
@@ -222,10 +272,18 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
         var connection = new ScriptedConnection(Read("68 69"));
         var connector = new RecordingConnector(ConnectResult.Connected(connection));
         var output = new MemoryStream();
+        Diagnostics.Arrange("telnet options (-t)", "TTYPE");
+        Diagnostics.ArrangeReads([Read("68 69")]);
 
         TransferResult result = await new TelnetProtocolHandler(connector).ExecuteAsync(
             new TransferContext { Url = TelnetUrl, Output = output, TelnetOptions = ["TTYPE"] });
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection.Sent);
+        Diagnostics.Act("connects", connector.Targets.Count);
+        Diagnostics.AssertExitCode(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
+        Diagnostics.Diff("error", "Syntax error in telnet option: TTYPE", result.ErrorMessage ?? string.Empty);
+        Diagnostics.Assert("connects", 1, connector.Targets.Count);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual("Syntax error in telnet option: TTYPE", result.ErrorMessage);
         Assert.HasCount(1, connector.Targets);
@@ -252,6 +310,9 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync([option], Read("68 69"));
 
+        Diagnostics.AssertExitCode(CurlExitCode.UnknownOption, exchange.Result.ExitCode);
+        Diagnostics.Diff("error", expectedMessage, exchange.Result.ErrorMessage ?? string.Empty);
+        Diagnostics.Diff("output", string.Empty, exchange.Output);
         Assert.AreEqual(CurlExitCode.UnknownOption, exchange.Result.ExitCode);
         Assert.AreEqual(expectedMessage, exchange.Result.ErrorMessage);
         Assert.AreEqual(string.Empty, exchange.Output);
@@ -274,6 +335,9 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync([option], Read("68 69"));
 
+        Diagnostics.AssertExitCode(CurlExitCode.SetoptOptionSyntax, exchange.Result.ExitCode);
+        Diagnostics.Diff("error", "Syntax error in telnet option: " + option, exchange.Result.ErrorMessage ?? string.Empty);
+        Diagnostics.Diff("output", string.Empty, exchange.Output);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, exchange.Result.ExitCode);
         Assert.AreEqual("Syntax error in telnet option: " + option, exchange.Result.ErrorMessage);
         Assert.AreEqual(string.Empty, exchange.Output);
@@ -287,6 +351,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(options, Read("68 69"));
 
+        Diagnostics.AssertExitCode(expected, exchange.Result.ExitCode);
         Assert.AreEqual(expected, exchange.Result.ExitCode);
     }
 
@@ -306,6 +371,9 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync([option], Read("68 69"));
 
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
+        Diagnostics.Diff("output", "68 69", exchange.Output);
+        Diagnostics.Diff("sent", string.Empty, exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual("68 69", exchange.Output);
         Assert.AreEqual(string.Empty, exchange.Sent);
@@ -316,6 +384,8 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["BINARY=0"], Read("FF FD 00"), Read("FF FB 00"));
 
+        Diagnostics.Diff("sent", "FF FC 00 FF FB 03 FF FD 03 FF FE 00", exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual("FF FC 00 FF FB 03 FF FD 03 FF FE 00", exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
     }
@@ -325,6 +395,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["BINARY=0"], Read("FF FD 00 FF FB 00"));
 
+        Diagnostics.Diff("sent", "FF FC 00 FF FE 00 FF FB 03 FF FD 03", exchange.Sent);
         Assert.AreEqual("FF FC 00 FF FE 00 FF FB 03 FF FD 03", exchange.Sent);
     }
 
@@ -333,6 +404,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["BINARY=0"], Read("FF FB 01"));
 
+        Diagnostics.Diff("sent", "FF FD 01 FF FB 03 FF FD 03", exchange.Sent);
         Assert.AreEqual("FF FD 01 FF FB 03 FF FD 03", exchange.Sent);
     }
 
@@ -341,6 +413,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     {
         Exchange exchange = await RunAsync(["BINARY=0", "TTYPE=vt"], Read("FF FD 00"), Read("FF FB 00"));
 
+        Diagnostics.Diff("sent", "FF FC 00 FF FB 03 FF FD 03 FF FB 18 FF FE 00", exchange.Sent);
         Assert.AreEqual("FF FC 00 FF FB 03 FF FD 03 FF FB 18 FF FE 00", exchange.Sent);
     }
 
@@ -374,6 +447,9 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
         Exchange exchange = await RunAsync(options, Read("FF FD 00"), Read("FF FB 00"));
 
         string expected = binaryKept ? Offers : "FF FC 00 FF FB 03 FF FD 03 FF FE 00";
+        Diagnostics.Arrange("binary kept", binaryKept);
+        Diagnostics.Diff("sent", expected, exchange.Sent);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, exchange.Result.ExitCode);
         Assert.AreEqual(expected, exchange.Sent);
         Assert.AreEqual(CurlExitCode.Ok, exchange.Result.ExitCode);
     }
@@ -383,7 +459,7 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
     private static string ToHex(byte[] bytes) =>
         string.Join(' ', Convert.ToHexString(bytes).Chunk(2).Select(pair => new string(pair)));
 
-    private static async Task<Exchange> RunAsync(string[] telnetOptions, params ScriptedRead[] reads)
+    private async Task<Exchange> RunAsync(string[] telnetOptions, params ScriptedRead[] reads)
     {
         var connection = new ScriptedConnection(reads);
         var output = new MemoryStream();
@@ -394,10 +470,19 @@ public sealed class TelnetProtocolHandlerTelnetOptionTests
             Upload = new MemoryStream(),
             TelnetOptions = telnetOptions,
         };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReads(reads);
 
-        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
-            .ExecuteAsync(context);
+        TransferResult result;
+        using (Diagnostics.Phase("session"))
+        {
+            result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+                .ExecuteAsync(context);
+        }
 
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection.Sent);
+        Diagnostics.ActOutput(output.ToArray());
         Assert.IsTrue(connection.IsDisposed);
         byte[] sent = connection.Sent;
         return new Exchange(result, sent, ToHex(sent), ToHex(output.ToArray()));

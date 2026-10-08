@@ -24,8 +24,11 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, "-sS", "-p", "-x", "127.0.0.1:18238", include, "http://example.com/a");
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", ConnectRequest + TunnelledGet, Latin1(server.Written));
         Assert.AreEqual(ConnectRequest + TunnelledGet, Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", EstablishedWithHeader + Hello, run.StandardOutput);
         Assert.AreEqual(EstablishedWithHeader + Hello, run.StandardOutput);
     }
 
@@ -39,8 +42,11 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, ["-sS", "-p", "-x", "127.0.0.1:18238", .. options, "http://example.com/a"]);
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("Latin1(server.Written)", ConnectRequest + TunnelledGet, Latin1(server.Written));
         Assert.AreEqual(ConnectRequest + TunnelledGet, Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", Hello, run.StandardOutput);
         Assert.AreEqual(Hello, run.StandardOutput);
     }
 
@@ -51,6 +57,7 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, "-sS", "-p", "-x", "127.0.0.1:18238", "--suppress-connect-headers", "--no-suppress-connect-headers", "-i", "http://example.com/a");
 
+        Diagnostics.Assert("run.StandardOutput", EstablishedWithHeader + Hello, run.StandardOutput);
         Assert.AreEqual(EstablishedWithHeader + Hello, run.StandardOutput);
     }
 
@@ -62,7 +69,9 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, "-sS", "-p", "-x", "127.0.0.1:18238", "-D", "-", "http://example.com/a");
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
+        Diagnostics.Assert("run.StandardOutput", EstablishedWithHeader + Hello, run.StandardOutput);
         Assert.AreEqual(EstablishedWithHeader + Hello, run.StandardOutput);
     }
 
@@ -74,6 +83,7 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, "-sS", "-p", "-x", "127.0.0.1:18238", "-D", "-", "--suppress-connect-headers", "http://example.com/a");
 
+        Diagnostics.Assert("run.StandardOutput", Hello, run.StandardOutput);
         Assert.AreEqual(Hello, run.StandardOutput);
     }
 
@@ -85,10 +95,12 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, "-sS", "-p", "-x", "127.0.0.1:18238", "-I", "http://example.com/a");
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
             ConnectRequest + "HEAD /a HTTP/1.1\r\nHost: example.com\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", EstablishedWithHeader + "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n", run.StandardOutput);
         Assert.AreEqual(EstablishedWithHeader + "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n", run.StandardOutput);
     }
 
@@ -100,10 +112,12 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, "-sS", "-p", "--proxy1.0", "127.0.0.1:18238", "-i", "http://example.com/a");
 
+        Diagnostics.Assert("run.ExitCode", 0, run.ExitCode);
         Assert.AreEqual(0, run.ExitCode);
         Assert.AreEqual(
             "CONNECT example.com:80 HTTP/1.0\r\nHost: example.com:80\r\nUser-Agent: curl/8.21.0\r\nProxy-Connection: Keep-Alive\r\n\r\n" + TunnelledGet,
             Latin1(server.Written));
+        Diagnostics.Assert("run.StandardOutput", "HTTP/1.0 200 OK\r\n\r\n" + Hello, run.StandardOutput);
         Assert.AreEqual("HTTP/1.0 200 OK\r\n\r\n" + Hello, run.StandardOutput);
     }
 
@@ -115,8 +129,11 @@ public sealed partial class CurlCompositionProxyTests
 
         Run run = await RunThroughTcpConnectorAsync(server, "-sS", "-p", "-x", "127.0.0.1:18238", "-i", "http://example.com/a");
 
+        Diagnostics.Assert("run.ExitCode", 7, run.ExitCode);
         Assert.AreEqual(7, run.ExitCode);
+        Diagnostics.Assert("run.StandardOutput", "HTTP/1.1 403 Forbidden\r\nContent-Length: 3\r\n\r\n", run.StandardOutput);
         Assert.AreEqual("HTTP/1.1 403 Forbidden\r\nContent-Length: 3\r\n\r\n", run.StandardOutput);
+        Diagnostics.Assert("run.StandardError", ($"curl: (7) CONNECT tunnel failed, response 403{Environment.NewLine}").ReplaceLineEndings("\n"), run.StandardError.ReplaceLineEndings("\n"));
         Assert.AreEqual($"curl: (7) CONNECT tunnel failed, response 403{Environment.NewLine}", run.StandardError);
     }
 }

@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using Curl.Testing;
 using static Curl.Tls.Rfc8448Messages;
 using static Curl.Tls.Rfc8448Records;
 
@@ -18,24 +20,30 @@ public sealed class Rfc8448RecordTests
 
     public TestContext TestContext { get; set; } = null!;
 
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(ServerHandshakeTrafficSecret, SimpleEncryptedExtensions + SimpleCertificate + SimpleCertificateVerify + SimpleServerFinished, ServerHandshakeFlight, 22)]
     [DataRow(ClientHandshakeTrafficSecret, SimpleClientFinished, ClientFinished, 22)]
     [DataRow(ServerApplicationTrafficSecret, SimpleNewSessionTicket, ServerNewSessionTicket, 22)]
     public void ProtectReproducesTheTraceFirstRecordUnderEachSecret(string secret, string content, string record, int contentType)
     {
-        using Tls13RecordProtection protection = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, Hex(secret));
+        using Tls13RecordProtection protection = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, Diagnostics.ArrangeHex("traffic secret", secret));
+        byte[] plaintext = Diagnostics.ArrangeHex("content", content);
+        Diagnostics.Arrange("content type", (TlsContentType)contentType);
 
-        byte[] protectedRecord = protection.Protect((TlsContentType)contentType, Hex(content));
+        byte[] protectedRecord = protection.Protect((TlsContentType)contentType, plaintext);
 
         AssertHex(record, protectedRecord);
+        Diagnostics.Assert("sequence number", 1ul, protection.SequenceNumber);
         Assert.AreEqual(1ul, protection.SequenceNumber);
     }
 
     [TestMethod]
     public void ProtectReproducesTheTraceClientApplicationDataAndCloseNotify()
     {
-        using Tls13RecordProtection protection = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, Hex(ClientApplicationTrafficSecret));
+        using Tls13RecordProtection protection = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, Diagnostics.ArrangeHex(nameof(ClientApplicationTrafficSecret), ClientApplicationTrafficSecret));
+        Diagnostics.Bytes("application data", ApplicationData);
 
         AssertHex(ClientApplicationData, protection.Protect(TlsContentType.ApplicationData, ApplicationData));
         AssertHex(ClientCloseNotify, protection.Protect(TlsContentType.Alert, [1, 0]));
@@ -44,11 +52,16 @@ public sealed class Rfc8448RecordTests
     [TestMethod]
     public void UnprotectReadsTheTraceServerApplicationRecordsInOrder()
     {
-        using Tls13RecordProtection protection = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, Hex(ServerApplicationTrafficSecret));
+        using Tls13RecordProtection protection = Tls13RecordProtection.Create(Tls13CipherSuite.Aes128GcmSha256, Diagnostics.ArrangeHex(nameof(ServerApplicationTrafficSecret), ServerApplicationTrafficSecret));
 
-        Tls13RecordContent ticket = protection.Unprotect(Hex(ServerNewSessionTicket)).Value;
-        Tls13RecordContent data = protection.Unprotect(Hex(ServerApplicationData)).Value;
-        Tls13RecordContent alert = protection.Unprotect(Hex(ServerCloseNotify)).Value;
+        Tls13RecordContent ticket = protection.Unprotect(Diagnostics.ArrangeHex(nameof(ServerNewSessionTicket), ServerNewSessionTicket)).Value;
+        Tls13RecordContent data = protection.Unprotect(Diagnostics.ArrangeHex(nameof(ServerApplicationData), ServerApplicationData)).Value;
+        Tls13RecordContent alert = protection.Unprotect(Diagnostics.ArrangeHex(nameof(ServerCloseNotify), ServerCloseNotify)).Value;
+
+        Diagnostics.Act("content types", $"{ticket.Type}, {data.Type}, {alert.Type}");
+        Diagnostics.Diff("application data", ApplicationData, data.Content);
+        Diagnostics.Diff("alert", new byte[] { 1, 0 }, alert.Content);
+        Diagnostics.Assert("sequence number", 3ul, protection.SequenceNumber);
 
         Assert.AreEqual(TlsContentType.Handshake, ticket.Type);
         AssertHex(SimpleNewSessionTicket, ticket.Content);
@@ -62,18 +75,34 @@ public sealed class Rfc8448RecordTests
     [TestMethod]
     public async Task ConnectionWritesEveryClientRecordOfTheTrace()
     {
-        ScriptedTransport transport = new(Hex(ServerHelloRecord + ServerHandshakeFlight + ServerNewSessionTicket + ServerApplicationData + ServerCloseNotify));
+        ScriptedTransport transport = new(Diagnostics.ArrangeHex("server records", ServerHelloRecord + ServerHandshakeFlight + ServerNewSessionTicket + ServerApplicationData + ServerCloseNotify));
+        Diagnostics.Arrange("client random", ClientRandom);
+        Diagnostics.Arrange("client x25519 private key", ClientPrivateKey);
 
-        Tls13ConnectResult result = await Tls13ClientConnection.ConnectAsync(
-            transport, TraceSettings(), TraceRandom(), new RecordingCertificateVerifier(), TestContext.CancellationToken);
+        Tls13ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await Tls13ClientConnection.ConnectAsync(
+                transport, TraceSettings(), TraceRandom(), new RecordingCertificateVerifier(), TestContext.CancellationToken);
+        }
+
         await using Tls13ClientStream stream = result.Stream!;
         AssertHex(ClientHelloRecord + ClientFinished, transport.Written);
 
-        await stream.WriteAsync(ApplicationData, TestContext.CancellationToken);
         byte[] received = new byte[100];
-        int count = await stream.ReadAsync(received, TestContext.CancellationToken);
-        await stream.ShutdownAsync(TestContext.CancellationToken);
-        int end = await stream.ReadAsync(received, TestContext.CancellationToken);
+        int count;
+        int end;
+        using (Diagnostics.Phase("application data and close_notify"))
+        {
+            await stream.WriteAsync(ApplicationData, TestContext.CancellationToken);
+            count = await stream.ReadAsync(received, TestContext.CancellationToken);
+            await stream.ShutdownAsync(TestContext.CancellationToken);
+            end = await stream.ReadAsync(received, TestContext.CancellationToken);
+        }
+
+        Diagnostics.Act("failure", result.Failure);
+        Diagnostics.Act("bytes read after close_notify", end);
+        Diagnostics.Diff("application data received", ApplicationData, received[..count]);
 
         AssertHex(ClientHelloRecord + ClientFinished + ClientApplicationData + ClientCloseNotify, transport.Written);
         CollectionAssert.AreEqual(ApplicationData, received[..count]);
@@ -114,5 +143,6 @@ public sealed class Rfc8448RecordTests
 
     private static byte[] Hex(string hex) => Convert.FromHexString(hex);
 
-    private static void AssertHex(string expected, byte[] actual) => Assert.AreEqual(expected, Convert.ToHexStringLower(actual));
+    private void AssertHex(string expected, byte[] actual, [CallerArgumentExpression(nameof(actual))] string label = "") =>
+        Assert.AreEqual(expected, Diagnostics.ActAndDiffHex(label, expected, actual));
 }

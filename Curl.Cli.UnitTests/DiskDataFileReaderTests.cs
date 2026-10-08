@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -7,13 +9,23 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class DiskDataFileReaderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void TryReadFile_Readable_ReturnsTheBytes()
     {
+        Diagnostics.Arrange("file name", "body.txt");
+        Diagnostics.Bytes("injected file contents", [1, 2, 3]);
         DiskDataFileReader reader = new(_ => [1, 2, 3], () => Stream.Null, NoModificationTime, true);
 
         bool read = reader.TryReadFile("body.txt", out byte[] contents);
+        Diagnostics.Act("read", read);
+        Diagnostics.Bytes("contents", contents);
 
+        Diagnostics.Assert("read", true, read);
+        Diagnostics.Diff("contents", new byte[] { 1, 2, 3 }, contents);
         Assert.IsTrue(read);
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, contents);
     }
@@ -26,11 +38,17 @@ public sealed class DiskDataFileReaderTests
     [DataRow(typeof(NotSupportedException))]
     public void TryReadFile_Unreadable_ReturnsFalseAndNoBytes(Type exceptionType)
     {
+        Diagnostics.Arrange("file name", "missing");
+        Diagnostics.Arrange("injected failure", exceptionType.Name);
         Exception failure = (Exception)Activator.CreateInstance(exceptionType)!;
         DiskDataFileReader reader = new(_ => throw failure, () => Stream.Null, NoModificationTime, true);
 
         bool read = reader.TryReadFile("missing", out byte[] contents);
+        Diagnostics.Act("read", read);
+        Diagnostics.Bytes("contents", contents);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("contents length", 0, contents.Length);
         Assert.IsFalse(read);
         Assert.IsEmpty(contents);
     }
@@ -38,19 +56,29 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void TryReadFile_UnexpectedFailure_IsNotSwallowed()
     {
+        Diagnostics.Arrange("file name", "x");
+        Diagnostics.Arrange("injected failure", nameof(InvalidOperationException));
         DiskDataFileReader reader = new(_ => throw new InvalidOperationException(), () => Stream.Null, NoModificationTime, true);
 
-        Assert.ThrowsExactly<InvalidOperationException>(() => reader.TryReadFile("x", out _));
+        InvalidOperationException thrown = Assert.ThrowsExactly<InvalidOperationException>(() => reader.TryReadFile("x", out _));
+        Diagnostics.Act("thrown exception type", thrown.GetType().Name);
+
+        Diagnostics.Assert("thrown exception type", nameof(InvalidOperationException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public void ReadStandardInput_Always_ReturnsEveryByteAndClosesTheStream()
     {
         MemoryStream standardInput = new([0x71, 0x20, 0x72, 0x0A]);
+        Diagnostics.Arrange("standard input", Convert.ToHexString(standardInput.ToArray()));
         DiskDataFileReader reader = new(_ => [], () => standardInput, NoModificationTime, true);
 
         byte[] contents = reader.ReadStandardInput();
+        Diagnostics.Bytes("contents", contents);
+        Diagnostics.Act("standard input still readable", standardInput.CanRead);
 
+        Diagnostics.Diff("contents", new byte[] { 0x71, 0x20, 0x72, 0x0A }, contents);
+        Diagnostics.Assert("standard input still readable", false, standardInput.CanRead);
         CollectionAssert.AreEqual(new byte[] { 0x71, 0x20, 0x72, 0x0A }, contents);
         Assert.IsFalse(standardInput.CanRead);
     }
@@ -58,10 +86,14 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void TryReadModificationTime_Readable_ReturnsTheTimeToTheWholeSecond()
     {
+        Diagnostics.Arrange("injected last write time", new DateTime(2026, 9, 26, 21, 5, 24, 602, DateTimeKind.Utc).ToString("o"));
         DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => new DateTime(2026, 9, 26, 21, 5, 24, 602, DateTimeKind.Utc), true);
 
-        bool read = reader.TryReadModificationTime("CLAUDE.md", out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(reader, "CLAUDE.md", "CLAUDE.md", out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", true, read);
+        Diagnostics.Assert("modification time", new DateTimeOffset(2026, 9, 26, 21, 5, 24, TimeSpan.Zero).ToString("o"), modificationTime.ToString("o"));
+        Diagnostics.Assert("failure reason", "<null>", failureReason ?? "<null>");
         Assert.IsTrue(read);
         Assert.AreEqual(new DateTimeOffset(2026, 9, 26, 21, 5, 24, TimeSpan.Zero), modificationTime);
         Assert.IsNull(failureReason);
@@ -84,11 +116,15 @@ public sealed class DiskDataFileReaderTests
     [DataRow("NoWindowsErrorCode", "CreateFile failed: GetLastError 0x00000003")]
     public void TryReadModificationTime_Unreadable_ReportsCurlsWindowsReason(string failureKind, string? expectedReason)
     {
+        Diagnostics.Arrange("failure kind", failureKind);
+        Diagnostics.Arrange("isWindows", true);
         Exception failure = LookupFailure(failureKind);
         DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw failure, true);
 
-        bool read = reader.TryReadModificationTime("x", out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(reader, "x", "x", out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", expectedReason ?? "<null>", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual(default, modificationTime);
         Assert.AreEqual(expectedReason, failureReason);
@@ -114,11 +150,15 @@ public sealed class DiskDataFileReaderTests
     [DataRow("NotSupported", "No such file or directory")]
     public void TryReadModificationTime_UnreadableWithoutWindowsErrors_ReportsCurlsStatReason(string failureKind, string expectedReason)
     {
+        Diagnostics.Arrange("failure kind", failureKind);
+        Diagnostics.Arrange("isWindows", false);
         Exception failure = StatFailure(failureKind);
         DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw failure, false);
 
-        bool read = reader.TryReadModificationTime("x", out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(reader, "x", "x", out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", expectedReason, failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual(default, modificationTime);
         Assert.AreEqual(expectedReason, failureReason);
@@ -139,10 +179,13 @@ public sealed class DiskDataFileReaderTests
     public void TryReadModificationTime_ForPlatformOffWindowsUnreadable_ReportsCurlsStatReason(string relativePath, string expectedReason)
     {
         using ScratchDirectory scratch = new();
+        Diagnostics.Arrange("isWindows", false);
 
-        bool read = DiskDataFileReader.ForPlatform(isWindows: false).TryReadModificationTime(
-            Path.Combine(scratch.Path, relativePath), out _, out string? failureReason);
+        bool read = ActReadModificationTime(
+            DiskDataFileReader.ForPlatform(isWindows: false), Path.Combine(scratch.Path, relativePath), scratch.Relative(Path.Combine(scratch.Path, relativePath)), out _, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", expectedReason, failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual(expectedReason, failureReason);
     }
@@ -150,8 +193,12 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void TryReadModificationTime_ForPlatformOffWindowsEmptyPath_IsNoSuchFileOrDirectory()
     {
-        bool read = DiskDataFileReader.ForPlatform(isWindows: false).TryReadModificationTime(string.Empty, out _, out string? failureReason);
+        Diagnostics.Arrange("isWindows", false);
 
+        bool read = ActReadModificationTime(DiskDataFileReader.ForPlatform(isWindows: false), string.Empty, "<empty>", out _, out string? failureReason);
+
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", "No such file or directory", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual("No such file or directory", failureReason);
     }
@@ -170,9 +217,14 @@ public sealed class DiskDataFileReaderTests
         using ScratchDirectory scratch = new();
         string path = Path.Combine(scratch.Path, relativePath);
         long expectedSeconds = new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero).ToUnixTimeSeconds();
+        Diagnostics.Arrange("isWindows", false);
+        Diagnostics.Arrange("expected unix seconds", expectedSeconds);
 
-        bool read = DiskDataFileReader.ForPlatform(isWindows: false).TryReadModificationTime(path, out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(DiskDataFileReader.ForPlatform(isWindows: false), path, scratch.Relative(path), out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", true, read);
+        Diagnostics.Assert("unix seconds", expectedSeconds, modificationTime.ToUnixTimeSeconds());
+        Diagnostics.Assert("failure reason", "<null>", failureReason ?? "<null>");
         Assert.IsTrue(read);
         Assert.AreEqual(expectedSeconds, modificationTime.ToUnixTimeSeconds());
         Assert.IsNull(failureReason);
@@ -192,12 +244,15 @@ public sealed class DiskDataFileReaderTests
     public void TryReadModificationTime_ForStatLinkThatCannotBeFollowed_ReportsCurlsStatReason(string linkTarget, string expectedReason)
     {
         using ScratchDirectory scratch = new();
+        Diagnostics.Arrange("link target", linkTarget);
         DiskDataFileReader reader = DiskDataFileReader.ForStatFollowingLinksWith(_ => linkTarget == "loop"
             ? throw new IOException("Too many levels of symbolic links in '/tmp/loop1'.")
             : new FileInfo(Path.Combine(scratch.Path, linkTarget)));
 
-        bool read = reader.TryReadModificationTime(Path.Combine(scratch.Path, "file"), out _, out string? failureReason);
+        bool read = ActReadModificationTime(reader, Path.Combine(scratch.Path, "file"), scratch.Relative(Path.Combine(scratch.Path, "file")), out _, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", expectedReason, failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual(expectedReason, failureReason);
     }
@@ -206,10 +261,13 @@ public sealed class DiskDataFileReaderTests
     public void TryReadModificationTime_ForStatLinkFailingOtherwise_ReportsThatFailure()
     {
         using ScratchDirectory scratch = new();
+        Diagnostics.Arrange("injected failure", nameof(UnauthorizedAccessException));
         DiskDataFileReader reader = DiskDataFileReader.ForStatFollowingLinksWith(_ => throw new UnauthorizedAccessException());
 
-        bool read = reader.TryReadModificationTime(Path.Combine(scratch.Path, "file"), out _, out string? failureReason);
+        bool read = ActReadModificationTime(reader, Path.Combine(scratch.Path, "file"), scratch.Relative(Path.Combine(scratch.Path, "file")), out _, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", "Permission denied", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual("Permission denied", failureReason);
     }
@@ -229,10 +287,15 @@ public sealed class DiskDataFileReaderTests
         string target = Path.Combine(scratch.Path, targetName);
         DateTime targetTime = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
         Directory.SetLastWriteTimeUtc(target, targetTime);
+        Diagnostics.Arrange("link target", scratch.Relative(target));
+        Diagnostics.Arrange("target last write time", targetTime.ToString("o"));
         DiskDataFileReader reader = DiskDataFileReader.ForStatFollowingLinksWith(_ => new FileInfo(target));
 
-        bool read = reader.TryReadModificationTime(Path.Combine(scratch.Path, "file"), out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(reader, Path.Combine(scratch.Path, "file"), scratch.Relative(Path.Combine(scratch.Path, "file")), out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", true, read);
+        Diagnostics.Assert("modification time", new DateTimeOffset(targetTime).ToString("o"), modificationTime.ToString("o"));
+        Diagnostics.Assert("failure reason", "<null>", failureReason ?? "<null>");
         Assert.IsTrue(read);
         Assert.AreEqual(new DateTimeOffset(targetTime), modificationTime);
         Assert.IsNull(failureReason);
@@ -251,13 +314,16 @@ public sealed class DiskDataFileReaderTests
     public void TryReadModificationTime_ForPlatformOffWindowsUnfollowableLink_ReportsCurlsStatReason(string linkName, string expectedReason)
     {
         using ScratchDirectory scratch = new();
+        Diagnostics.Arrange("links", "dangling -> nothing; loop2 -> loop1; loop1 -> loop2");
         File.CreateSymbolicLink(Path.Combine(scratch.Path, "dangling"), "nothing");
         File.CreateSymbolicLink(Path.Combine(scratch.Path, "loop2"), "loop1");
         File.CreateSymbolicLink(Path.Combine(scratch.Path, "loop1"), "loop2");
 
-        bool read = DiskDataFileReader.ForPlatform(isWindows: false).TryReadModificationTime(
-            Path.Combine(scratch.Path, linkName), out _, out string? failureReason);
+        bool read = ActReadModificationTime(
+            DiskDataFileReader.ForPlatform(isWindows: false), Path.Combine(scratch.Path, linkName), scratch.Relative(Path.Combine(scratch.Path, linkName)), out _, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", expectedReason, failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual(expectedReason, failureReason);
     }
@@ -272,9 +338,14 @@ public sealed class DiskDataFileReaderTests
         File.SetLastWriteTimeUtc(Path.Combine(scratch.Path, "file"), targetTime);
         string link = Path.Combine(scratch.Path, "goodlink");
         File.CreateSymbolicLink(link, "file");
+        Diagnostics.Arrange("link", "goodlink -> file");
+        Diagnostics.Arrange("target last write time", targetTime.ToString("o"));
 
-        bool read = DiskDataFileReader.ForPlatform(isWindows: false).TryReadModificationTime(link, out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(DiskDataFileReader.ForPlatform(isWindows: false), link, scratch.Relative(link), out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", true, read);
+        Diagnostics.Assert("modification time", new DateTimeOffset(targetTime).ToString("o"), modificationTime.ToString("o"));
+        Diagnostics.Assert("failure reason", "<null>", failureReason ?? "<null>");
         Assert.IsTrue(read);
         Assert.AreEqual(new DateTimeOffset(targetTime), modificationTime);
         Assert.IsNull(failureReason);
@@ -286,10 +357,13 @@ public sealed class DiskDataFileReaderTests
     public void TryReadModificationTime_ForPlatformWindowsDirectory_IsAccessDenied()
     {
         using ScratchDirectory scratch = new();
+        Diagnostics.Arrange("isWindows", true);
 
-        bool read = DiskDataFileReader.ForPlatform(isWindows: true).TryReadModificationTime(
-            Path.Combine(scratch.Path, "dir"), out _, out string? failureReason);
+        bool read = ActReadModificationTime(
+            DiskDataFileReader.ForPlatform(isWindows: true), Path.Combine(scratch.Path, "dir"), scratch.Relative(Path.Combine(scratch.Path, "dir")), out _, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", "CreateFile failed: GetLastError 0x00000005", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual("CreateFile failed: GetLastError 0x00000005", failureReason);
     }
@@ -306,8 +380,12 @@ public sealed class DiskDataFileReaderTests
     [DataRow("nul", "GetFileTime failed: GetLastError 0x00000057")]
     public void TryReadModificationTime_ForPlatformWindowsDosDevice_ReportsTheCallThatFailed(string device, string expectedReason)
     {
-        bool read = DiskDataFileReader.ForPlatform(isWindows: true).TryReadModificationTime(device, out _, out string? failureReason);
+        Diagnostics.Arrange("isWindows", true);
 
+        bool read = ActReadModificationTime(DiskDataFileReader.ForPlatform(isWindows: true), device, device, out _, out string? failureReason);
+
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", expectedReason, failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual(expectedReason, failureReason);
     }
@@ -329,9 +407,12 @@ public sealed class DiskDataFileReaderTests
     {
         using ScratchDirectory scratch = new();
         string path = relativePath.Length == 0 ? relativePath : Path.Combine(scratch.Path, relativePath);
+        Diagnostics.Arrange("isWindows", true);
 
-        bool read = DiskDataFileReader.ForPlatform(isWindows: true).TryReadModificationTime(path, out _, out string? failureReason);
+        bool read = ActReadModificationTime(DiskDataFileReader.ForPlatform(isWindows: true), path, scratch.Relative(path), out _, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", expectedReason ?? "<null>", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual(expectedReason, failureReason);
     }
@@ -343,9 +424,14 @@ public sealed class DiskDataFileReaderTests
         using ScratchDirectory scratch = new();
         string path = Path.Combine(scratch.Path, "file");
         DateTimeOffset lastWrite = new(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
+        Diagnostics.Arrange("isWindows", true);
+        Diagnostics.Arrange("last write time", lastWrite.ToString("o"));
 
-        bool read = DiskDataFileReader.ForPlatform(isWindows: true).TryReadModificationTime(path, out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(DiskDataFileReader.ForPlatform(isWindows: true), path, scratch.Relative(path), out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", true, read);
+        Diagnostics.Assert("modification time", DateTimeOffset.FromUnixTimeSeconds(lastWrite.ToUnixTimeSeconds()).ToString("o"), modificationTime.ToString("o"));
+        Diagnostics.Assert("failure reason", "<null>", failureReason ?? "<null>");
         Assert.IsTrue(read);
         Assert.AreEqual(DateTimeOffset.FromUnixTimeSeconds(lastWrite.ToUnixTimeSeconds()), modificationTime);
         Assert.IsNull(failureReason);
@@ -354,10 +440,13 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void TryReadModificationTime_LookupFailedInANamedCall_NamesThatCall()
     {
+        Diagnostics.Arrange("injected failure", "FileTimeLookupException(GetFileTime, 0x57)");
         DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw new FileTimeLookupException("GetFileTime", 0x57), true);
 
-        bool read = reader.TryReadModificationTime("x", out _, out string? failureReason);
+        bool read = ActReadModificationTime(reader, "x", "x", out _, out string? failureReason);
 
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", "GetFileTime failed: GetLastError 0x00000057", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual("GetFileTime failed: GetLastError 0x00000057", failureReason);
     }
@@ -365,8 +454,19 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void FileTimeLookupException_Always_CarriesTheCallAndTheWindowsErrorCode()
     {
-        FileTimeLookupException exception = new("CreateFile", 0x20);
+        Diagnostics.Arrange("failed call", "CreateFile");
+        Diagnostics.Arrange("error code", 0x20);
 
+        FileTimeLookupException exception = new("CreateFile", 0x20);
+        Diagnostics.Act("failed call", exception.FailedCall);
+        Diagnostics.Act("error code", exception.ErrorCode);
+        Diagnostics.Act("HResult", exception.HResult);
+        Diagnostics.Act("message", exception.Message);
+
+        Diagnostics.Assert("failed call", "CreateFile", exception.FailedCall);
+        Diagnostics.Assert("error code", 0x20, exception.ErrorCode);
+        Diagnostics.Assert("HResult", unchecked((int)0x80070020), exception.HResult);
+        Diagnostics.Assert("message", "CreateFile failed: GetLastError 0x00000020", exception.Message);
         Assert.AreEqual("CreateFile", exception.FailedCall);
         Assert.AreEqual(0x20, exception.ErrorCode);
         Assert.AreEqual(unchecked((int)0x80070020), exception.HResult);
@@ -376,9 +476,14 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void TryReadModificationTime_UnexpectedFailure_IsNotSwallowed()
     {
+        Diagnostics.Arrange("path", "x");
+        Diagnostics.Arrange("injected failure", nameof(InvalidOperationException));
         DiskDataFileReader reader = new(_ => [], () => Stream.Null, _ => throw new InvalidOperationException(), true);
 
-        Assert.ThrowsExactly<InvalidOperationException>(() => reader.TryReadModificationTime("x", out _, out _));
+        InvalidOperationException thrown = Assert.ThrowsExactly<InvalidOperationException>(() => reader.TryReadModificationTime("x", out _, out _));
+        Diagnostics.Act("thrown exception type", thrown.GetType().Name);
+
+        Diagnostics.Assert("thrown exception type", nameof(InvalidOperationException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -386,9 +491,13 @@ public sealed class DiskDataFileReaderTests
     {
         string path = typeof(DiskDataFileReaderTests).Assembly.Location;
         DateTimeOffset lastWrite = new(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
+        Diagnostics.Arrange("last write time", lastWrite.ToString("o"));
 
-        bool read = DiskDataFileReader.ForProcess.TryReadModificationTime(path, out DateTimeOffset modificationTime, out string? failureReason);
+        bool read = ActReadModificationTime(DiskDataFileReader.ForProcess, path, "<test assembly>/" + Path.GetFileName(path), out DateTimeOffset modificationTime, out string? failureReason);
 
+        Diagnostics.Assert("read", true, read);
+        Diagnostics.Assert("modification time", DateTimeOffset.FromUnixTimeSeconds(lastWrite.ToUnixTimeSeconds()).ToString("o"), modificationTime.ToString("o"));
+        Diagnostics.Assert("failure reason", "<null>", failureReason ?? "<null>");
         Assert.IsTrue(read);
         Assert.AreEqual(DateTimeOffset.FromUnixTimeSeconds(lastWrite.ToUnixTimeSeconds()), modificationTime);
         Assert.IsNull(failureReason);
@@ -398,9 +507,13 @@ public sealed class DiskDataFileReaderTests
     [OSCondition(OperatingSystems.Windows)]
     public void TryReadModificationTime_ForProcessMissingFileOnWindows_IsFileNotFoundWithNoReason()
     {
-        bool read = DiskDataFileReader.ForProcess.TryReadModificationTime(
-            Path.Combine(AppContext.BaseDirectory, "no-such-file.bl246"), out _, out string? failureReason);
+        Diagnostics.Arrange("platform", "Windows");
 
+        bool read = ActReadModificationTime(
+            DiskDataFileReader.ForProcess, Path.Combine(AppContext.BaseDirectory, "no-such-file.bl246"), "<base>/no-such-file.bl246", out _, out string? failureReason);
+
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", "<null>", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.IsNull(failureReason);
     }
@@ -409,9 +522,13 @@ public sealed class DiskDataFileReaderTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void TryReadModificationTime_ForProcessMissingFileOffWindows_IsNoSuchFileOrDirectory()
     {
-        bool read = DiskDataFileReader.ForProcess.TryReadModificationTime(
-            Path.Combine(AppContext.BaseDirectory, "no-such-file.bl246"), out _, out string? failureReason);
+        Diagnostics.Arrange("platform", "not Windows");
 
+        bool read = ActReadModificationTime(
+            DiskDataFileReader.ForProcess, Path.Combine(AppContext.BaseDirectory, "no-such-file.bl246"), "<base>/no-such-file.bl246", out _, out string? failureReason);
+
+        Diagnostics.Assert("read", false, read);
+        Diagnostics.Assert("failure reason", "No such file or directory", failureReason ?? "<null>");
         Assert.IsFalse(read);
         Assert.AreEqual("No such file or directory", failureReason);
     }
@@ -419,9 +536,23 @@ public sealed class DiskDataFileReaderTests
     [TestMethod]
     public void ForProcess_Always_IsTheSameReader()
     {
+        Diagnostics.Arrange("reader", "DiskDataFileReader.ForProcess read twice");
         var first = DiskDataFileReader.ForProcess;
         var second = DiskDataFileReader.ForProcess;
+        Diagnostics.Act("same instance", ReferenceEquals(first, second));
+        Diagnostics.Assert("same instance", true, ReferenceEquals(first, second));
         Assert.AreSame(first, second);
+    }
+
+    /// <summary>Reads a modification time and writes the shown path (ARRANGE) and the three results (ACT); the shown path hides the temporary folder.</summary>
+    private bool ActReadModificationTime(DiskDataFileReader reader, string path, string shownPath, out DateTimeOffset modificationTime, out string? failureReason)
+    {
+        Diagnostics.Arrange("path", shownPath);
+        bool read = reader.TryReadModificationTime(path, out modificationTime, out failureReason);
+        Diagnostics.Act("read", read);
+        Diagnostics.Act("modification time", modificationTime.ToString("o"));
+        Diagnostics.Act("failure reason", failureReason ?? "<null>");
+        return read;
     }
 
     private static DateTime NoModificationTime(string path) => throw new FileNotFoundException(null, path);
@@ -460,6 +591,9 @@ public sealed class DiskDataFileReaderTests
         }
 
         public string Path { get; }
+
+        /// <summary>The path with the scratch directory replaced by <c>&lt;temp&gt;</c> and separators written as <c>/</c>, so it reads the same on every platform.</summary>
+        public string Relative(string fullPath) => fullPath.Replace(Path, "<temp>", StringComparison.Ordinal).Replace('\\', '/');
 
         public void Dispose() => Directory.Delete(Path, recursive: true);
     }

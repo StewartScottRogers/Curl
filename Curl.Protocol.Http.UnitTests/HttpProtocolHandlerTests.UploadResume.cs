@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
@@ -28,6 +29,7 @@ public sealed partial class HttpProtocolHandlerTests
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(ResumedUploadContext("http://127.0.0.1:18332/up", ResumeUploadFileStream(), 3));
 
+            WriteUploadOutcome(result, expected, connection.Written);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(7L, result.Report!.UploadSize, $"Chunk size {chunkSize}");
         }
@@ -44,6 +46,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(ResumedUploadContext("http://127.0.0.1:18334/up", ResumeUploadFileStream(), 0));
 
+        WriteUploadOutcome(result, expected, connection.Written);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -59,6 +62,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(ResumedUploadContext("http://127.0.0.1:18338/up", ResumeUploadFileStream(), 3, http: http));
 
+        WriteUploadOutcome(result, expected, connection.Written);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -73,6 +77,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(ResumedUploadContext($"http://127.0.0.1:{port}/up", ResumeUploadFileStream(), resumeFrom));
 
+        WriteUploadOutcome(result, string.Empty, connection.Written);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual("File already completely uploaded", result.ErrorMessage);
         Assert.IsEmpty(connection.Written);
@@ -87,6 +92,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(ResumedUploadContext("http://127.0.0.1:18339/up", new MemoryStream(), 3));
 
+        WriteUploadOutcome(result, string.Empty, connection.Written);
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual("Unable to resume from offset 3", result.ErrorMessage);
         Assert.IsEmpty(connection.Written);
@@ -109,6 +115,7 @@ public sealed partial class HttpProtocolHandlerTests
         time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
+        WriteUploadOutcome(result, head + body, connection.Written);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(head + body, Latin1(connection.Written));
     }
@@ -127,6 +134,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(UnknownOffsetUploadContext($"http://127.0.0.1:{port}/up", ResumeUploadFileStream(), resumeFrom));
 
+        WriteUploadOutcome(result, expected, connection.Written);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(10L, result.Report!.UploadSize);
     }
@@ -142,6 +150,7 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(QueueConnector.For(connection))
             .ExecuteAsync(UnknownOffsetUploadContext("http://127.0.0.1:18353/up", new MemoryStream(), null));
 
+        WriteUploadOutcome(result, expected, connection.Written);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
@@ -161,14 +170,18 @@ public sealed partial class HttpProtocolHandlerTests
         time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
+        WriteUploadOutcome(result, head + body, connection.Written);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(head + body, Latin1(connection.Written));
     }
 
     private static MemoryStream ResumeUploadFileStream() => new(Encoding.Latin1.GetBytes(ResumeUploadFile));
 
-    private static TransferContext ResumedUploadContext(string url, Stream upload, long resumeFrom, TimeProvider? time = null, HttpRequestOptions? http = null) =>
-        new()
+    private TransferContext ResumedUploadContext(string url, Stream upload, long resumeFrom, TimeProvider? time = null, HttpRequestOptions? http = null)
+    {
+        Diagnostics.Arrange("upload", $"{(upload.CanSeek ? $"{upload.Length}-byte file" : "standard input")}, resumed from {resumeFrom}");
+        Diagnostics.Arrange("extra headers", http is null ? "(none)" : string.Join(" | ", http.Headers));
+        return new()
         {
             Http = http,
             Url = CurlUrl.Parse(url),
@@ -177,9 +190,12 @@ public sealed partial class HttpProtocolHandlerTests
             ResumeFrom = resumeFrom,
             TimeProvider = time ?? TimeProvider.System,
         };
+    }
 
-    private static TransferContext UnknownOffsetUploadContext(string url, Stream upload, long? resumeFrom, TimeProvider? time = null) =>
-        new()
+    private TransferContext UnknownOffsetUploadContext(string url, Stream upload, long? resumeFrom, TimeProvider? time = null)
+    {
+        Diagnostics.Arrange("upload", $"{(upload.CanSeek ? $"{upload.Length}-byte file" : "standard input")}, -C -, -o offset {resumeFrom?.ToString(CultureInfo.InvariantCulture) ?? "(none)"}");
+        return new()
         {
             Url = CurlUrl.Parse(url),
             Output = new MemoryStream(),
@@ -188,4 +204,12 @@ public sealed partial class HttpProtocolHandlerTests
             ResumeUploadFromUnknownOffset = true,
             TimeProvider = time ?? TimeProvider.System,
         };
+    }
+
+    /// <summary>Writes the ACT line for the transfer and the ASSERT line for the bytes written to the connection.</summary>
+    private void WriteUploadOutcome(TransferResult result, string expectedWritten, byte[] written)
+    {
+        WriteResult(result);
+        Diagnostics.Assert("written", OneLine(expectedWritten), OneLine(Latin1(written)));
+    }
 }

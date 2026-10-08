@@ -99,7 +99,7 @@ public static class UpstreamTestFileExpander
             expanded = included ? substitution.Substitute(expanded) : expanded;
         }
 
-        expanded = UpstreamTestInstructions.Apply(UpstreamTestInstructions.ReplaceCharacterMacros(expanded));
+        expanded = UpstreamTestInstructions.Apply(UpstreamTestInstructions.ReplaceCharacterMacros(expanded), unsupportedInstructions);
         if (readFile is null)
         {
             UpstreamTestFileInclusions.AddUnread(expanded, unsupportedInstructions);

@@ -1,5 +1,7 @@
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.HostKeys;
 
@@ -32,15 +34,18 @@ public sealed partial class SshHostKeyCheckerTests
 
     private static readonly KnownHostsFile Absent = KnownHostsFile.Parse($"[127.0.0.2]:2222 ecdsa-sha2-nistp256 {KnownHostsFileTests.HostKeyBase64}\n");
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Check_KnownHostsMatch_Accepts() =>
-        Check(new SshOptions(), Matching);
+        AssertAccepted(new SshOptions(), Matching);
 
     [TestMethod]
     public void Check_KnownHostsAbsent_IsExit60()
     {
         SshTransferException exception = Assert.ThrowsExactly<SshTransferException>(() => Check(new SshOptions(), Absent));
 
+        WriteFailure(CurlExitCode.PeerFailedVerification, PeerFailedVerification, exception);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, exception.ExitCode);
         Assert.AreEqual(PeerFailedVerification, exception.Message);
     }
@@ -50,25 +55,26 @@ public sealed partial class SshHostKeyCheckerTests
     {
         SshTransferException exception = Assert.ThrowsExactly<SshTransferException>(() => Check(new SshOptions(), Mismatching));
 
+        WriteFailure(CurlExitCode.PeerFailedVerification, PeerFailedVerification, exception);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, exception.ExitCode);
         Assert.AreEqual(PeerFailedVerification, exception.Message);
     }
 
     [TestMethod]
     public void Check_Insecure_AcceptsAnyKey() =>
-        Check(new SshOptions(), knownHosts: null);
+        AssertAccepted(new SshOptions(), knownHosts: null);
 
     [TestMethod]
     [DataRow(Md5, DisplayName = "measured: lower case")]
     [DataRow("F844DAFD8E0D77290B7D4E8377418B88", DisplayName = "measured: upper case")]
     public void Check_Md5Matches_AcceptsWithoutKnownHosts(string md5) =>
-        Check(new SshOptions { HostPublicKeyMd5 = md5 }, Absent);
+        AssertAccepted(new SshOptions { HostPublicKeyMd5 = md5 }, Absent);
 
     [TestMethod]
     [DataRow(Sha256, DisplayName = "measured: padded")]
     [DataRow("c4nEydciX4yHnXnQAkUIFU6HFGMS8bFT8zZXUIpUX+U", DisplayName = "measured: unpadded")]
     public void Check_Sha256Matches_AcceptsWithoutKnownHosts(string sha256) =>
-        Check(new SshOptions { HostPublicKeySha256 = sha256 }, Absent);
+        AssertAccepted(new SshOptions { HostPublicKeySha256 = sha256 }, Absent);
 
     [TestMethod]
     [DataRow(true, DisplayName = "measured: with a matching known-hosts entry")]
@@ -104,7 +110,7 @@ public sealed partial class SshHostKeyCheckerTests
 
     [TestMethod]
     public void Check_Sha256WithTextAfterItsPadding_Accepts() =>
-        Check(new SshOptions { HostPublicKeySha256 = Sha256 + "extra" }, Absent);
+        AssertAccepted(new SshOptions { HostPublicKeySha256 = Sha256 + "extra" }, Absent);
 
     [TestMethod]
     public void Check_Sha256ThatIsAPrefixOfTheFingerprint_IsRefused() =>
@@ -120,6 +126,7 @@ public sealed partial class SshHostKeyCheckerTests
 
         SshAlgorithmPreferences narrowed = Narrow(new SshOptions(), file);
 
+        AssertHostKeyList("rsa-sha2-256,rsa-sha2-512,ssh-rsa", narrowed);
         Assert.AreEqual("rsa-sha2-256,rsa-sha2-512,ssh-rsa", string.Join(',', narrowed.ServerHostKey));
     }
 
@@ -130,22 +137,38 @@ public sealed partial class SshHostKeyCheckerTests
 
         SshAlgorithmPreferences narrowed = Narrow(new SshOptions { HostPublicKeySha256 = Sha256 }, file);
 
+        AssertHostKeyList("rsa-sha2-256,rsa-sha2-512,ssh-rsa", narrowed);
         Assert.AreEqual("rsa-sha2-256,rsa-sha2-512,ssh-rsa", string.Join(',', narrowed.ServerHostKey));
     }
 
     [TestMethod]
-    public void NarrowHostKeys_WithMd5_LeavesTheList() =>
+    public void NarrowHostKeys_WithMd5_LeavesTheList()
+    {
+        SshAlgorithmPreferences narrowed = Narrow(new SshOptions { HostPublicKeyMd5 = Md5 }, KnownHostsFile.Parse($"127.0.0.1 ssh-ed25519 {KnownHostsFileTests.HostKeyBase64}"));
+
+        AssertUnchanged(narrowed);
         Assert.AreSame(
             SshAlgorithmPreferences.WindowsReference,
-            Narrow(new SshOptions { HostPublicKeyMd5 = Md5 }, KnownHostsFile.Parse($"127.0.0.1 ssh-ed25519 {KnownHostsFileTests.HostKeyBase64}")));
+            narrowed);
+    }
 
     [TestMethod]
-    public void NarrowHostKeys_Insecure_LeavesTheList() =>
-        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, Narrow(new SshOptions(), knownHosts: null));
+    public void NarrowHostKeys_Insecure_LeavesTheList()
+    {
+        SshAlgorithmPreferences narrowed = Narrow(new SshOptions(), knownHosts: null);
+
+        AssertUnchanged(narrowed);
+        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, narrowed);
+    }
 
     [TestMethod]
-    public void NarrowHostKeys_NoEntryForTheHost_LeavesTheList() =>
-        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, Narrow(new SshOptions(), Absent));
+    public void NarrowHostKeys_NoEntryForTheHost_LeavesTheList()
+    {
+        SshAlgorithmPreferences narrowed = Narrow(new SshOptions(), Absent);
+
+        AssertUnchanged(narrowed);
+        Assert.AreSame(SshAlgorithmPreferences.WindowsReference, narrowed);
+    }
 
     [TestMethod]
     public void NarrowHostKeys_AnRsa1Entry_IsExit79()
@@ -154,6 +177,7 @@ public sealed partial class SshHostKeyCheckerTests
 
         SshTransferException exception = Assert.ThrowsExactly<SshTransferException>(() => Narrow(new SshOptions(), file));
 
+        WriteFailure(CurlExitCode.Ssh, "Found host key type RSA1 which is not supported", exception);
         Assert.AreEqual(CurlExitCode.Ssh, exception.ExitCode);
         Assert.AreEqual("Found host key type RSA1 which is not supported", exception.Message);
     }
@@ -168,6 +192,7 @@ public sealed partial class SshHostKeyCheckerTests
 
         SshTransferException exception = Assert.ThrowsExactly<SshTransferException>(() => Narrow(new SshOptions(), file));
 
+        WriteFailure(CurlExitCode.Ssh, "Unknown host key type: 3932160", exception);
         Assert.AreEqual(CurlExitCode.Ssh, exception.ExitCode);
         Assert.AreEqual("Unknown host key type: 3932160", exception.Message);
     }
@@ -179,23 +204,83 @@ public sealed partial class SshHostKeyCheckerTests
     [DataRow("ssh-ed25519")]
     public void NarrowHostKeys_EachOtherRecognizedType_NarrowsToItself(string typeName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         KnownHostsFile file = KnownHostsFile.Parse($"127.0.0.1 {typeName} {KnownHostsFileTests.HostKeyBase64}");
+        diagnostics.Arrange("preferences", "OpenSslReference");
+        diagnostics.Arrange("known hosts", Entries(file));
 
         SshAlgorithmPreferences narrowed = SshHostKeyChecker.NarrowHostKeys(SshAlgorithmPreferences.OpenSslReference, Host, Port, new SshOptions(), file);
 
+        AssertHostKeyList(typeName, narrowed);
         Assert.AreEqual(typeName, string.Join(',', narrowed.ServerHostKey));
     }
 
-    private static void Check(SshOptions options, KnownHostsFile? knownHosts) =>
+    private static string Entries(KnownHostsFile? file) =>
+        file is null
+            ? "(none, -k)"
+            : $"{file.Entries.Count} entries [{string.Join(", ", file.Entries.Select(entry => $"{entry.PlainName ?? "(hashed)"} {entry.KeyType}"))}]";
+
+    private static string Fingerprints(SshOptions options) =>
+        $"MD5 {options.HostPublicKeyMd5 ?? "(none)"}, SHA256 {options.HostPublicKeySha256 ?? "(none)"}";
+
+    private void WriteArrange(SshOptions options, KnownHostsFile? knownHosts)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("host and port", $"{Host}:{Port}");
+        diagnostics.Arrange("fingerprints", Fingerprints(options));
+        diagnostics.Arrange("known hosts", Entries(knownHosts));
+    }
+
+    private void Check(SshOptions options, KnownHostsFile? knownHosts)
+    {
+        WriteArrange(options, knownHosts);
+        TestDiagnostics.For(TestContext).Bytes("host key", KnownHostsFileTests.HostKey);
         SshHostKeyChecker.Check(KnownHostsFileTests.HostKey, Host, Port, options, knownHosts);
+    }
 
-    private static SshAlgorithmPreferences Narrow(SshOptions options, KnownHostsFile? knownHosts) =>
-        SshHostKeyChecker.NarrowHostKeys(SshAlgorithmPreferences.WindowsReference, Host, Port, options, knownHosts);
+    private void AssertAccepted(SshOptions options, KnownHostsFile? knownHosts)
+    {
+        Check(options, knownHosts);
 
-    private static void AssertDenied(SshOptions options, KnownHostsFile? knownHosts, string message)
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Act("outcome", "accepted");
+        diagnostics.Assert("outcome", "accepted", "accepted");
+    }
+
+    private SshAlgorithmPreferences Narrow(SshOptions options, KnownHostsFile? knownHosts)
+    {
+        WriteArrange(options, knownHosts);
+        TestDiagnostics.For(TestContext).Arrange("preferences", "WindowsReference");
+        return SshHostKeyChecker.NarrowHostKeys(SshAlgorithmPreferences.WindowsReference, Host, Port, options, knownHosts);
+    }
+
+    private void AssertHostKeyList(string expected, SshAlgorithmPreferences narrowed)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string actual = string.Join(',', narrowed.ServerHostKey);
+        diagnostics.Act("server host key algorithms", actual);
+        diagnostics.Diff("server host key algorithms", expected, actual);
+    }
+
+    private void AssertUnchanged(SshAlgorithmPreferences narrowed)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Act("server host key algorithms", string.Join(',', narrowed.ServerHostKey));
+        diagnostics.Assert("same preferences as WindowsReference", true, ReferenceEquals(SshAlgorithmPreferences.WindowsReference, narrowed));
+    }
+
+    private void WriteFailure(CurlExitCode expectedExitCode, string expectedMessage, SshTransferException exception)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ActFailure(exception);
+        diagnostics.AssertFailure(expectedExitCode, expectedMessage, exception);
+    }
+
+    private void AssertDenied(SshOptions options, KnownHostsFile? knownHosts, string message)
     {
         SshTransferException exception = Assert.ThrowsExactly<SshTransferException>(() => Check(options, knownHosts));
 
+        WriteFailure(CurlExitCode.PeerFailedVerification, message, exception);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, exception.ExitCode);
         Assert.AreEqual(message, exception.Message);
     }

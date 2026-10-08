@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -9,6 +11,10 @@ namespace Curl.Networking;
 public sealed class ClientCertificateStorePathTests
 {
     private const string Thumbprint = "1AE11B120B6AA2E1EAB4A3B13C9B47F7DC578FB0";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow(@"CurrentUser\MY\" + Thumbprint, nameof(ClientCertificateStoreLocation.CurrentUser), "MY")]
@@ -28,7 +34,13 @@ public sealed class ClientCertificateStorePathTests
         string expectedLocation,
         string expectedStoreName)
     {
+        Diagnostics.Arrange("path", path);
+        Diagnostics.Arrange("expected location", expectedLocation);
+        Diagnostics.Arrange("expected store name", expectedStoreName);
         var storePath = ClientCertificateStorePath.Parse(path);
+        Diagnostics.Act("store path", storePath);
+        var expected = new ClientCertificateStorePath(Enum.Parse<ClientCertificateStoreLocation>(expectedLocation), expectedStoreName, Thumbprint);
+        Diagnostics.Assert("store path", expected, storePath);
 
         Assert.AreEqual(new ClientCertificateStorePath(Enum.Parse<ClientCertificateStoreLocation>(expectedLocation), expectedStoreName, Thumbprint), storePath);
     }
@@ -37,8 +49,11 @@ public sealed class ClientCertificateStorePathTests
     public void Parse_WithAThumbprintThatIsNotHex_KeepsItForTheLoaderToRefuse()
     {
         var thumbprint = new string('z', 40);
+        Diagnostics.Arrange("thumbprint", thumbprint);
 
         var storePath = ClientCertificateStorePath.Parse(@"CurrentUser\MY\" + thumbprint);
+        Diagnostics.Act("parsed thumbprint", storePath?.Thumbprint);
+        Diagnostics.Assert("parsed thumbprint", thumbprint, storePath?.Thumbprint);
 
         Assert.AreEqual(thumbprint, storePath?.Thumbprint);
     }
@@ -54,6 +69,10 @@ public sealed class ClientCertificateStorePathTests
     [DataRow("")]
     public void Parse_WithAPathThatIsNotAStorePath_ReturnsNull(string path)
     {
+        Diagnostics.Arrange("path", path);
+        var storePath = ClientCertificateStorePath.Parse(path);
+        Diagnostics.Act("store path is null", storePath is null);
+        Diagnostics.Assert("store path is null", true, storePath is null);
         Assert.IsNull(ClientCertificateStorePath.Parse(path));
     }
 }

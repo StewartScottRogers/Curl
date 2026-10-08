@@ -33,10 +33,13 @@ public sealed partial class SshUserAuthenticationTests
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         AssertMethods(written, "none", "password", "publickey", "publickey");
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[2]);
         AssertSigned(peer, written[3], "ssh-rsa", RsaBlob);
         Assert.HasCount(2, agent.Requests);
+        Diagnostics.Diff("agent.Requests[0]", RequestIdentities, agent.Requests[0]);
         CollectionAssert.AreEqual(RequestIdentities, agent.Requests[0]);
+        Diagnostics.Diff("agent.Requests[1]", SignRequest(peer, RsaBlob, "ssh-rsa", flags: 0), agent.Requests[1]);
         CollectionAssert.AreEqual(SignRequest(peer, RsaBlob, "ssh-rsa", flags: 0), agent.Requests[1]);
         AssertAgentLines(peer, TryingAgent, "* SSH: agent authenticated user 'tester' with key 'k1-comment'");
     }
@@ -52,7 +55,9 @@ public sealed partial class SshUserAuthenticationTests
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         AssertMethods(written, "none", "password", "publickey", "publickey", "publickey");
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[2]);
+        Diagnostics.Diff("client message 3", PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[3]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[3]);
         AssertSigned(peer, written[4], "ssh-ed25519", Ed25519Blob);
         Assert.AreEqual(1, agent.Connections);
@@ -126,8 +131,10 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", algorithm, RsaBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", algorithm, RsaBlob, signed: false), written[2]);
         AssertSigned(peer, written[3], algorithm, RsaBlob);
+        Diagnostics.Diff("agent.Requests[1]", SignRequest(peer, RsaBlob, algorithm, flags), agent.Requests[1]);
         CollectionAssert.AreEqual(SignRequest(peer, RsaBlob, algorithm, flags), agent.Requests[1]);
     }
 
@@ -174,7 +181,9 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-256", RsaBlob, signed: false), written[2]);
+        Diagnostics.Diff("client message 3", PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[3]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[3]);
     }
 
@@ -210,6 +219,7 @@ public sealed partial class SshUserAuthenticationTests
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         AssertMethods(written, "none", "password", "publickey", "publickey", "publickey", "keyboard-interactive");
         AssertSigned(peer, written[3], "ssh-rsa", RsaBlob);
+        Diagnostics.Diff("client message 4", PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[4]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-ed25519", Ed25519Blob, signed: false), written[4]);
     }
 
@@ -265,8 +275,11 @@ public sealed partial class SshUserAuthenticationTests
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         AssertMethods(written, "none", "password", "publickey", "publickey", "publickey");
+        Diagnostics.Diff("client message 2", PublicKeyRequest("tester", "rsa-sha2-512", RsaBlob, signed: false), written[2]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "rsa-sha2-512", RsaBlob, signed: false), written[2]);
+        Diagnostics.Diff("client message 3", PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[3]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: false), written[3]);
+        Diagnostics.Diff("client message 4", Join(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: true), String(Join(Name("ssh-rsa"), String(signature)))), written[4]);
         CollectionAssert.AreEqual(Join(PublicKeyRequest("tester", "ssh-rsa", RsaBlob, signed: true), String(Join(Name("ssh-rsa"), String(signature)))), written[4]);
         byte[] agentWritten = agent.Written;
         CollectionAssert.AreEqual(
@@ -306,6 +319,7 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 3", Join(PublicKeyRequest("tester", keyType, blob, signed: true), String(Join(Name(signatureMethod), String(signature)))), written[3]);
         CollectionAssert.AreEqual(Join(PublicKeyRequest("tester", keyType, blob, signed: true), String(Join(Name(signatureMethod), String(signature)))), written[3]);
     }
 
@@ -324,6 +338,7 @@ public sealed partial class SshUserAuthenticationTests
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
+        Diagnostics.Diff("client message 3", Join(PublicKeyRequest("tester", keyType, blob, signed: true), String(Join(Name(plainMethod), signature))), written[3]);
         CollectionAssert.AreEqual(Join(PublicKeyRequest("tester", keyType, blob, signed: true), String(Join(Name(plainMethod), signature))), written[3]);
     }
 
@@ -363,6 +378,8 @@ public sealed partial class SshUserAuthenticationTests
 
         await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None);
 
+        Diagnostics.Act("agent connections", agent.Connections);
+        Diagnostics.Assert("agent connections", 0, agent.Connections);
         Assert.AreEqual(0, agent.Connections);
     }
 
@@ -374,6 +391,10 @@ public sealed partial class SshUserAuthenticationTests
 
         await Assert.ThrowsExactlyAsync<SshTransferException>(async () => await peer.Authentication.AuthenticateAsync(WrongPassword, CancellationToken.None));
 
+        Diagnostics.Act("agent connections", agent.Connections);
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("agent connections", 0, agent.Connections);
+        Diagnostics.Assert("agent line reported", false, peer.Events.Transcript.Contains(TryingAgent));
         Assert.AreEqual(0, agent.Connections);
         CollectionAssert.DoesNotContain(peer.Events.Transcript, TryingAgent);
     }
@@ -386,6 +407,8 @@ public sealed partial class SshUserAuthenticationTests
 
         await peer.Authentication.AuthenticateAsync(null, CancellationToken.None);
 
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.Assert("line reported: * SSH: agent authenticated user '' with key 'k1-comment'", true, peer.Events.Transcript.Contains("* SSH: agent authenticated user '' with key 'k1-comment'"));
         CollectionAssert.Contains(peer.Events.Transcript, "* SSH: agent authenticated user '' with key 'k1-comment'");
     }
 
@@ -399,9 +422,11 @@ public sealed partial class SshUserAuthenticationTests
     private static byte[] SignRequest(KeyedPeer peer, byte[] blob, string algorithm, uint flags) =>
         Join([SshAgentMessageNumber.SignRequest], String(blob), String(Join(String(peer.SessionIdentifier), PublicKeyRequest("tester", algorithm, blob, signed: true))), UInt32(flags));
 
-    private static void AssertAgentLines(KeyedPeer peer, params string[] expected)
+    private void AssertAgentLines(KeyedPeer peer, params string[] expected)
     {
         List<string> agentLines = [.. peer.Events.Transcript.SkipWhile(line => line != TryingAgent).TakeWhile(line => !line.Contains("keyboard", StringComparison.Ordinal))];
+        Diagnostics.ActLines(peer.Events.Transcript);
+        Diagnostics.AssertLines("agent lines", expected, agentLines);
         CollectionAssert.AreEqual(expected, agentLines, string.Join(Environment.NewLine, peer.Events.Transcript));
     }
 }

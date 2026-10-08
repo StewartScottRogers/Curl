@@ -21,6 +21,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Diagnostics.Assert("verify results", "(18, false)", VerifyResultsText(events));
         CollectionAssert.AreEqual(new[] { (18L, false) }, events.VerifyResults);
         await result.Connection!.DisposeAsync();
     }
@@ -35,6 +36,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await ReportingHandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), events);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Diagnostics.Assert("verify results", "(0, false)", VerifyResultsText(events));
         CollectionAssert.AreEqual(new[] { (0L, false) }, events.VerifyResults);
         await result.Connection!.DisposeAsync();
     }
@@ -47,6 +49,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await ReportingHandshakeAsync(new TlsClientOptions(), events);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Diagnostics.Assert("verify results", "(18, false)", VerifyResultsText(events));
         CollectionAssert.AreEqual(new[] { (18L, false) }, events.VerifyResults);
     }
 
@@ -60,6 +63,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await ReportingHandshakeAsync(new TlsClientOptions(CaCertificateFile: caFile), events, targetHost: "other.test");
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Diagnostics.Assert("verify results", "(1, false)", VerifyResultsText(events));
         CollectionAssert.AreEqual(new[] { (1L, false) }, events.VerifyResults);
     }
 
@@ -71,6 +75,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, targetHost: "other.test");
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Diagnostics.Assert("verify results", "(18, false)", VerifyResultsText(events));
         CollectionAssert.AreEqual(new[] { (18L, false) }, events.VerifyResults);
         await result.Connection!.DisposeAsync();
     }
@@ -83,6 +88,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, isProxy: true);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Diagnostics.Assert("verify results", "(18, true)", VerifyResultsText(events));
         CollectionAssert.AreEqual(new[] { (18L, true) }, events.VerifyResults);
         await result.Connection!.DisposeAsync();
     }
@@ -96,7 +102,11 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await AlpnReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, []);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Diagnostics.Assert("verify results", "", VerifyResultsText(events));
         Assert.IsEmpty(events.VerifyResults);
         await result.Connection!.DisposeAsync();
     }
+
+    private static string VerifyResultsText(RecordingTransferEvents events) =>
+        string.Join(", ", events.VerifyResults.Select(reported => $"({reported.VerifyResult}, {(reported.IsProxy ? "true" : "false")})"));
 }

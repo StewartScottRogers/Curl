@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -24,6 +25,10 @@ public sealed class FileProtocolHandlerTransferEventTests
 
     private static byte[] Content => Encoding.ASCII.GetBytes("hello\n");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     // curl --trace-ascii - file:///<dir>/a.txt:
     //   <= Recv data, 6 bytes (0x6)
     //   0000: hello.
@@ -32,9 +37,16 @@ public sealed class FileProtocolHandlerTransferEventTests
     public async Task ExecuteAsync_Download_ReportsTheBodyThenShuttingDown()
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("file /dir/a.txt", "hello\\n");
 
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Events = events });
 
+        string[] expected = ["<= hello\n", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "<= hello\n", ShuttingDown }, events.Transcript);
     }
@@ -49,15 +61,25 @@ public sealed class FileProtocolHandlerTransferEventTests
         fileSystem.AddFile(OsPath, Encoding.ASCII.GetBytes(new string('a', 250000)));
         var events = new RecordingTransferEvents();
         var output = new ChunkRecordingStream();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("file /dir/a.txt length", 250000);
 
         var result = await new FileProtocolHandler(fileSystem)
             .ExecuteAsync(new TransferContext { Url = FileUrl, Output = output, Events = events });
 
+        int[] receivedLengths = events.Transcript.Where(line => line.StartsWith("<= ", StringComparison.Ordinal)).Select(line => line.Length - 3).ToArray();
+        int[] oneRead = [16384, 16384, 16384, 16384, 16384, 16384, 4095];
+        int[] expectedWrites = oneRead.Concat(oneRead).Concat([16384, 16384, 12434]).ToArray();
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("received chunk lengths", string.Join(",", receivedLengths));
+        Diagnostics.Act("write lengths", string.Join(",", output.WriteLengths));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("received chunk lengths", "102399,102399,45202", string.Join(",", receivedLengths));
+        Diagnostics.Assert("write lengths", string.Join(",", expectedWrites), string.Join(",", output.WriteLengths));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { 102399, 102399, 45202 },
             events.Transcript.Where(line => line.StartsWith("<= ", StringComparison.Ordinal)).Select(line => line.Length - 3).ToArray());
-        int[] oneRead = [16384, 16384, 16384, 16384, 16384, 16384, 4095];
         CollectionAssert.AreEqual(
             oneRead.Concat(oneRead).Concat([16384, 16384, 12434]).ToArray(),
             output.WriteLengths.ToArray());
@@ -71,9 +93,15 @@ public sealed class FileProtocolHandlerTransferEventTests
         var events = new RecordingTransferEvents();
         var progress = new RecordingTransferProgress { Transcript = events.Transcript };
         var context = new TransferContext { Url = FileUrl, Output = new MemoryStream(), MaxFileSize = 3, Events = events, Progress = progress };
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("MaxFileSize", 3);
 
-        await DownloadAsync(context);
+        TransferResult result = await DownloadAsync(context);
 
+        string[] expected = ["<= hello\n", "* Exceeded the maximum allowed file size (3) with 3 bytes", "ReportTransferDone", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         CollectionAssert.AreEqual(
             new[] { "<= hello\n", "* Exceeded the maximum allowed file size (3) with 3 bytes", "ReportTransferDone", ShuttingDown },
             events.Transcript);
@@ -85,9 +113,15 @@ public sealed class FileProtocolHandlerTransferEventTests
         var events = new RecordingTransferEvents();
         var progress = new RecordingTransferProgress { Transcript = events.Transcript };
         var context = new TransferContext { Url = FileUrl, Output = new MemoryStream(), Upload = new MemoryStream(Content), Events = events, Progress = progress };
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Bytes("upload", Content);
 
-        await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(context);
+        TransferResult result = await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(context);
 
+        string[] expected = ["ReportTransferDone", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         CollectionAssert.AreEqual(new[] { "ReportTransferDone", ShuttingDown }, events.Transcript);
     }
 
@@ -96,10 +130,15 @@ public sealed class FileProtocolHandlerTransferEventTests
     {
         var events = new RecordingTransferEvents();
         var progress = new RecordingTransferProgress { Transcript = events.Transcript };
+        Diagnostics.Arrange("url", MissingUrl);
+        Diagnostics.Arrange("file system", "empty");
 
-        await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(
+        TransferResult result = await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(
             new TransferContext { Url = MissingUrl, Output = new MemoryStream(), Events = events, Progress = progress });
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript contains ReportTransferDone", false, events.Transcript.Contains("ReportTransferDone"));
         CollectionAssert.DoesNotContain(events.Transcript, "ReportTransferDone");
     }
 
@@ -115,9 +154,15 @@ public sealed class FileProtocolHandlerTransferEventTests
             Upload = new MemoryStream(Content),
             Events = events,
         };
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Bytes("upload", Content);
 
         var result = await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(context);
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("transcript", ShuttingDown, string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { ShuttingDown }, events.Transcript);
     }
@@ -136,9 +181,15 @@ public sealed class FileProtocolHandlerTransferEventTests
             NoBody = true,
             Events = events,
         };
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("NoBody", true);
 
         var result = await DownloadAsync(context);
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("transcript", ShuttingDown, string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(new[] { ShuttingDown }, events.Transcript);
     }
@@ -149,9 +200,16 @@ public sealed class FileProtocolHandlerTransferEventTests
     {
         var events = new RecordingTransferEvents();
         var handler = new FileProtocolHandler(new FakeFileSystem());
+        Diagnostics.Arrange("url", MissingUrl);
+        Diagnostics.Arrange("file system", "empty");
 
         var result = await handler.ExecuteAsync(new TransferContext { Url = MissingUrl, Output = new MemoryStream(), Events = events });
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("ErrorMessage", result.ErrorMessage);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.FileCouldntReadFile, result.ExitCode);
+        Diagnostics.Assert("transcript", "* Could not open file /dir/nope.txt", string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "* Could not open file /dir/nope.txt" }, events.Transcript);
     }
@@ -164,12 +222,17 @@ public sealed class FileProtocolHandlerTransferEventTests
         fileSystem.AddFile(OsPath, Content);
         var handler = new FileProtocolHandler(fileSystem);
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("urls", "a.txt, a.txt, nope.txt, a.txt");
+        Diagnostics.Arrange("file /dir/a.txt", "hello\\n");
 
         foreach (CurlUrl url in new[] { FileUrl, FileUrl, MissingUrl, FileUrl })
         {
             await handler.ExecuteAsync(new TransferContext { Url = url, Output = new MemoryStream(), Events = events });
         }
 
+        string[] expected = ["shutting down connection #0", "shutting down connection #1", "Could not open file /dir/nope.txt", "shutting down connection #2"];
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info", string.Join(" | ", expected), string.Join(" | ", events.Info));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -192,11 +255,18 @@ public sealed class FileProtocolHandlerTransferEventTests
         connectionNumbers.NumberNextConnection();
         var handler = new FileProtocolHandler(fileSystem, connectionNumbers);
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("connections already numbered", 1);
 
         await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Events = events });
 
+        long nextNumber = connectionNumbers.NumberNextConnection();
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Act("next connection number", nextNumber);
+        Diagnostics.Assert("info", "shutting down connection #1", string.Join(" | ", events.Info));
+        Diagnostics.Assert("next connection number", 2L, nextNumber);
         CollectionAssert.AreEqual(new[] { "shutting down connection #1" }, events.Info);
-        Assert.AreEqual(2L, connectionNumbers.NumberNextConnection());
+        Assert.AreEqual(2L, nextNumber);
     }
 
     [TestMethod]
@@ -206,9 +276,14 @@ public sealed class FileProtocolHandlerTransferEventTests
         connectionNumbers.NumberNextConnection();
         var handler = new FileProtocolHandler(new FakeFileSystem(), connectionNumbers);
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("connections already numbered", 1);
 
-        await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Upload = new MemoryStream(Content), Events = events });
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Upload = new MemoryStream(Content), Events = events });
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info", "shutting down connection #1", string.Join(" | ", events.Info));
         CollectionAssert.AreEqual(new[] { "shutting down connection #1" }, events.Info);
     }
 
@@ -218,9 +293,20 @@ public sealed class FileProtocolHandlerTransferEventTests
     {
         var events = new RecordingTransferEvents();
         var output = new MemoryStream();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("MaxFileSize", 3);
 
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = output, MaxFileSize = 3, Events = events });
 
+        string[] expected = ["<= hello\n", "* Exceeded the maximum allowed file size (3) with 3 bytes", ShuttingDown];
+        string written = Encoding.ASCII.GetString(output.ToArray());
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("ErrorMessage", result.ErrorMessage);
+        Diagnostics.Bytes("output", output.ToArray());
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Diff("written", "hel", written);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual("hel", Encoding.ASCII.GetString(output.ToArray()));
         CollectionAssert.AreEqual(
@@ -233,9 +319,17 @@ public sealed class FileProtocolHandlerTransferEventTests
     public async Task ExecuteAsync_OutputRefusesTheBody_ReportsTheChunkThenClosing()
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("output", "stream failing on write 1");
 
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = FaultingStream.FailingOnWrite(1), Events = events });
 
+        string[] expected = ["<= hello\n", "* " + result.ErrorMessage, "* closing connection #0"];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("ErrorMessage", result.ErrorMessage);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.WriteError, result.ExitCode);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "<= hello\n", "* " + result.ErrorMessage, "* closing connection #0" },
@@ -247,9 +341,17 @@ public sealed class FileProtocolHandlerTransferEventTests
     public async Task ExecuteAsync_ResumePastTheEnd_ReportsTheFailureThenShuttingDown()
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("ResumeFrom", 100);
 
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), ResumeFrom = 100, Events = events });
 
+        string[] expected = ["* failed to resume file:// transfer", ShuttingDown];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("ErrorMessage", result.ErrorMessage);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.BadDownloadResume, result.ExitCode);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "* failed to resume file:// transfer", ShuttingDown },
@@ -262,9 +364,14 @@ public sealed class FileProtocolHandlerTransferEventTests
         var fileSystem = new FakeFileSystem();
         fileSystem.AddFile(OsPath, []);
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("file /dir/a.txt length", 0);
 
-        await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Events = events });
+        TransferResult result = await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), Events = events });
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript", ShuttingDown, string.Join(" | ", events.Transcript));
         CollectionAssert.AreEqual(new[] { ShuttingDown }, events.Transcript);
     }
 
@@ -276,9 +383,16 @@ public sealed class FileProtocolHandlerTransferEventTests
         fileSystem.FailOpenForWrite(OsPath, FileAccessStatus.NotFound);
         var events = new RecordingTransferEvents();
         var context = new TransferContext { Url = FileUrl, Output = new MemoryStream(), Upload = new MemoryStream(Content), Events = events };
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("open for write of /dir/a.txt fails with", FileAccessStatus.NotFound);
 
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
 
+        string[] expected = [$"* cannot open {OsPath} for writing", "* closing connection #0"];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript).Replace(Path.DirectorySeparatorChar, '/'));
+        Diagnostics.Assert("ExitCode", CurlExitCode.WriteError, result.ExitCode);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected).Replace(Path.DirectorySeparatorChar, '/'), string.Join(" | ", events.Transcript).Replace(Path.DirectorySeparatorChar, '/'));
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"* cannot open {OsPath} for writing", "* closing connection #0" },
@@ -297,9 +411,17 @@ public sealed class FileProtocolHandlerTransferEventTests
             Upload = FaultingStream.FailingOnRead(Content, 1),
             Events = events,
         };
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Bytes("upload source", Content);
 
         var result = await new FileProtocolHandler(new FakeFileSystem()).ExecuteAsync(context);
 
+        string[] expected = ["* client read function EOF fail, only 0/6 of needed bytes read", "* closing connection #0"];
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("ErrorMessage", result.ErrorMessage);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.ReadError, result.ExitCode);
+        Diagnostics.Assert("transcript", string.Join(" | ", expected), string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "* client read function EOF fail, only 0/6 of needed bytes read", "* closing connection #0" },
@@ -315,9 +437,15 @@ public sealed class FileProtocolHandlerTransferEventTests
         fileSystem.WriteInto(OsPath, FaultingStream.FailingOnWrite(1));
         var events = new RecordingTransferEvents();
         var context = new TransferContext { Url = FileUrl, Output = new MemoryStream(), Upload = new MemoryStream(Content), Events = events };
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("destination /dir/a.txt", "stream failing on write 1");
 
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("transcript", ShuttingDown, string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         CollectionAssert.AreEqual(new[] { ShuttingDown }, events.Transcript);
     }
@@ -326,9 +454,15 @@ public sealed class FileProtocolHandlerTransferEventTests
     public async Task ExecuteAsync_NegativeResume_ReportsOnlyTheFailure()
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url", FileUrl);
+        Diagnostics.Arrange("ResumeFrom", -1);
 
         var result = await DownloadAsync(new TransferContext { Url = FileUrl, Output = new MemoryStream(), ResumeFrom = -1, Events = events });
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.BadDownloadResume, result.ExitCode);
+        Diagnostics.Assert("transcript", "* failed to resume file:// transfer", string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.BadDownloadResume, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "* failed to resume file:// transfer" }, events.Transcript);
     }
@@ -338,9 +472,16 @@ public sealed class FileProtocolHandlerTransferEventTests
     {
         var events = new RecordingTransferEvents();
         var handler = new FileProtocolHandler(new FakeFileSystem());
+        CurlUrl url = CurlUrl.Parse("http://example.com/a.txt");
+        Diagnostics.Arrange("url", url);
 
-        var result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("http://example.com/a.txt"), Output = new MemoryStream(), Events = events });
+        var result = await handler.ExecuteAsync(new TransferContext { Url = url, Output = new MemoryStream(), Events = events });
 
+        Diagnostics.Act("ExitCode", result.ExitCode);
+        Diagnostics.Act("ErrorMessage", result.ErrorMessage);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ExitCode", CurlExitCode.UrlMalformat, result.ExitCode);
+        Diagnostics.Assert("transcript", "* " + result.ErrorMessage, string.Join(" | ", events.Transcript));
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "* " + result.ErrorMessage }, events.Transcript);
     }

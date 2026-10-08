@@ -17,6 +17,9 @@ internal sealed class ScriptedSshAgent(byte[] output) : ISshAgentConnector
     /// <summary>Gets or sets a value indicating whether a write fails as a broken pipe's does.</summary>
     internal bool FailsWrites { get; init; }
 
+    /// <summary>Gets the bytes the agent sends.</summary>
+    internal byte[] Output => output;
+
     /// <summary>Gets the bytes written to the last connection.</summary>
     internal byte[] Written => connection?.Written.ToArray() ?? [];
 

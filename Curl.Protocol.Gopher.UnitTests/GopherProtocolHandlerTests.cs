@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Gopher.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Gopher;
 
@@ -19,26 +20,45 @@ public sealed class GopherProtocolHandlerTests
     /// <summary>The line end each measured server line closed with.</summary>
     private static readonly byte[] CarriageReturnLineFeed = "\r\n"u8.ToArray();
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void SupportedSchemes_IsExactlyGopherAndGophers()
     {
         GopherProtocolHandler handler = new(FakeConnector.For(new ScriptedConnection()));
+        Diagnostics.Arrange("handler", "a GopherProtocolHandler over a fake connector");
 
+        string schemes = string.Join(", ", handler.SupportedSchemes);
+        Diagnostics.Act("supported schemes", schemes);
+
+        Diagnostics.Diff("supported schemes", "gopher, gophers", schemes);
         CollectionAssert.AreEqual(new[] { "gopher", "gophers" }, handler.SupportedSchemes.ToArray());
     }
 
     [TestMethod]
     public void Constructor_NullConnector_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new GopherProtocolHandler(null!));
+        Diagnostics.Arrange("connector", "null");
+
+        Exception thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new GopherProtocolHandler(null!));
+        Diagnostics.Act("thrown", thrown.GetType().Name + ": " + thrown.Message);
+
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws()
     {
         GopherProtocolHandler handler = new(FakeConnector.For(new ScriptedConnection()));
+        Diagnostics.Arrange("context", "null");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        Exception thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        Diagnostics.Act("thrown", thrown.GetType().Name + ": " + thrown.Message);
+
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -130,9 +150,12 @@ public sealed class GopherProtocolHandlerTests
     {
         // "é" is two UTF-8 bytes, so "/é" is three and only its last byte stays.
         ScriptedConnection connection = new();
+        Diagnostics.Arrange("url", "gopher://h/é/x");
 
-        await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(Context("gopher://h/é/x"));
+        TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(Context("gopher://h/é/x"));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
 
+        Diagnostics.Diff("selector sent", new byte[] { 0xA9, (byte)'/', (byte)'x', 13, 10 }, connection.Written);
         CollectionAssert.AreEqual(new byte[] { 0xA9, (byte)'/', (byte)'x', 13, 10 }, connection.Written);
     }
 
@@ -184,9 +207,13 @@ public sealed class GopherProtocolHandlerTests
     public async Task ExecuteAsync_Gopher_ConnectsToPort70WithoutTls()
     {
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        Diagnostics.Arrange("url", "gopher://h/");
 
-        await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://h/"));
+        TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://h/"));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
 
+        Diagnostics.Assert("connect target", new ConnectTarget("h", 70, false), connector.Targets.SingleOrDefault());
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 70, false) }, connector.Targets);
     }
 
@@ -194,9 +221,13 @@ public sealed class GopherProtocolHandlerTests
     public async Task ExecuteAsync_Gophers_ConnectsToPort70WithTls()
     {
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        Diagnostics.Arrange("url", "gophers://h/");
 
-        await new GopherProtocolHandler(connector).ExecuteAsync(Context("gophers://h/"));
+        TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gophers://h/"));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
 
+        Diagnostics.Assert("connect target", new ConnectTarget("h", 70, true), connector.Targets.SingleOrDefault());
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 70, true) }, connector.Targets);
     }
 
@@ -211,9 +242,15 @@ public sealed class GopherProtocolHandlerTests
             Output = new MemoryStream(),
             Proxy = proxy,
         };
+        Diagnostics.Arrange("url", "gopher://example.com/");
+        Diagnostics.Arrange("proxy", proxy);
 
-        await new GopherProtocolHandler(connector).ExecuteAsync(context);
+        TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
 
+        ConnectTarget expected = new("example.com", 70, false) { Proxy = proxy };
+        Diagnostics.Assert("connect target", expected, connector.Targets.SingleOrDefault());
         CollectionAssert.AreEqual(new[] { new ConnectTarget("example.com", 70, false) { Proxy = proxy } }, connector.Targets);
     }
 
@@ -223,9 +260,14 @@ public sealed class GopherProtocolHandlerTests
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());
         var events = new IgnoringTransferEvents();
         var context = new TransferContext { Url = CurlUrl.Parse("gopher://example.com/"), Output = new MemoryStream(), Events = events };
+        Diagnostics.Arrange("url", "gopher://example.com/");
+        Diagnostics.Arrange("events", nameof(IgnoringTransferEvents));
 
-        await new GopherProtocolHandler(connector).ExecuteAsync(context);
+        TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("connect targets", connector.Targets.Count);
 
+        Diagnostics.Assert("connect target's events are the context's", true, ReferenceEquals(events, connector.Targets.SingleOrDefault()?.Events));
         Assert.AreSame(events, connector.Targets.Single().Events);
     }
 
@@ -233,9 +275,14 @@ public sealed class GopherProtocolHandlerTests
     public async Task ExecuteAsync_ContextWithoutProxy_ConnectsDirectly()
     {
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        Diagnostics.Arrange("url", "gopher://example.com/");
+        Diagnostics.Arrange("proxy", "none");
 
-        await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://example.com/"));
+        TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://example.com/"));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
 
+        Diagnostics.Assert("connect target's proxy", "null", connector.Targets.SingleOrDefault()?.Proxy?.ToString() ?? "null");
         Assert.IsNull(connector.Targets.Single().Proxy);
     }
 
@@ -243,9 +290,13 @@ public sealed class GopherProtocolHandlerTests
     public async Task ExecuteAsync_ExplicitPort_ConnectsToThatPort()
     {
         FakeConnector connector = FakeConnector.For(new ScriptedConnection());
+        Diagnostics.Arrange("url", "gophers://h:7070/");
 
-        await new GopherProtocolHandler(connector).ExecuteAsync(Context("gophers://h:7070/"));
+        TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gophers://h:7070/"));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
 
+        Diagnostics.Assert("connect target", new ConnectTarget("h", 7070, true), connector.Targets.SingleOrDefault());
         CollectionAssert.AreEqual(new[] { new ConnectTarget("h", 7070, true) }, connector.Targets);
     }
 
@@ -254,10 +305,17 @@ public sealed class GopherProtocolHandlerTests
     {
         ScriptedConnection connection = new(MeasuredReply[..10], MeasuredReply[10..]);
         MemoryStream output = new();
+        Diagnostics.Arrange("url", "gopher://h/1");
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines([Encoding.ASCII.GetString(MeasuredReply[..10]), Encoding.ASCII.GetString(MeasuredReply[10..])]));
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
             .ExecuteAsync(Context("gopher://h/1", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("output", output.ToArray());
 
+        Diagnostics.Assert("result", TransferResult.Success(MeasuredReply.Length), result);
+        Diagnostics.Diff("output", MeasuredReply, output.ToArray());
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.AreEqual(TransferResult.Success(MeasuredReply.Length), result);
         CollectionAssert.AreEqual(MeasuredReply, output.ToArray());
         Assert.IsTrue(connection.IsDisposed);
@@ -270,10 +328,15 @@ public sealed class GopherProtocolHandlerTests
         // printed nothing and exited 0.
         ScriptedConnection connection = new();
         MemoryStream output = new();
+        Diagnostics.Arrange("url", "gopher://h/1/foo");
+        Diagnostics.Arrange("scripted reads", "none: the server closes at once");
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
             .ExecuteAsync(Context("gopher://h/1/foo", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Assert("output length", 0, output.Length);
         Assert.AreEqual(TransferResult.Success(0), result);
         Assert.AreEqual(0, output.Length);
     }
@@ -283,9 +346,14 @@ public sealed class GopherProtocolHandlerTests
     {
         FakeConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect to h port 70"));
         MemoryStream output = new();
+        Diagnostics.Arrange("connect result", "Failed CouldntConnect \"Failed to connect to h port 70\"");
 
         TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://h/", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
 
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.CouldntConnect, 0, "Failed to connect to h port 70"), result);
+        Diagnostics.Assert("output length", 0, output.Length);
+        Diagnostics.Assert("connection refused", false, result.IsConnectionRefused);
         Assert.AreEqual(new TransferResult(CurlExitCode.CouldntConnect, 0, "Failed to connect to h port 70"), result);
         Assert.AreEqual(0, output.Length);
         Assert.IsFalse(result.IsConnectionRefused);
@@ -295,9 +363,13 @@ public sealed class GopherProtocolHandlerTests
     public async Task ExecuteAsync_ConnectRefused_ReturnsExit7MarkedConnectionRefused()
     {
         FakeConnector connector = new(ConnectResult.Refused("Failed to connect to h port 70"));
+        Diagnostics.Arrange("connect result", "Refused \"Failed to connect to h port 70\"");
 
         TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://h/", new MemoryStream()));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("connection refused", true, result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsTrue(result.IsConnectionRefused);
     }
@@ -309,9 +381,17 @@ public sealed class GopherProtocolHandlerTests
         ScriptedConnection connection = new(MeasuredReply);
         FakeConnector connector = FakeConnector.For(connection);
         MemoryStream output = new();
+        Diagnostics.Arrange("url", "gopher://h/0/a%00b");
 
         TransferResult result = await new GopherProtocolHandler(connector).ExecuteAsync(Context("gopher://h/0/a%00b", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("selector sent", connection.Written);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"), result);
+        Diagnostics.Assert("connect count", 1, connector.Targets.Count);
+        Diagnostics.Assert("bytes sent", 0, connection.Written.Length);
+        Diagnostics.Assert("output length", 0, output.Length);
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"),
             result);
@@ -326,10 +406,14 @@ public sealed class GopherProtocolHandlerTests
     {
         ScriptedConnection connection = new(MeasuredReply) { FailWrites = true };
         MemoryStream output = new();
+        Diagnostics.Arrange("connection", "every write throws a plain IOException");
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
             .ExecuteAsync(Context("gopher://h/", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
+        Diagnostics.Assert("output length", 0, output.Length);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         Assert.AreEqual(0, output.Length);
     }
@@ -339,10 +423,15 @@ public sealed class GopherProtocolHandlerTests
     {
         ScriptedConnection connection = new(MeasuredReply[..5], null);
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Escape(Encoding.ASCII.GetString(MeasuredReply[..5])) + ", then a read that throws IOException");
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
             .ExecuteAsync(Context("gopher://h/", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Bytes("output", output.ToArray());
 
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 5, "Failure when receiving data from the peer"), result);
+        Diagnostics.Diff("output", MeasuredReply[..5], output.ToArray());
         Assert.AreEqual(
             new TransferResult(CurlExitCode.RecvError, 5, "Failure when receiving data from the peer"),
             result);
@@ -354,10 +443,18 @@ public sealed class GopherProtocolHandlerTests
     {
         ScriptedConnection connection = new(MeasuredReply);
         WriteRefusingStream output = new();
+        Diagnostics.Arrange("output", "every write throws a plain IOException");
+        Diagnostics.Arrange("reply length", MeasuredReply.Length);
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
             .ExecuteAsync(Context("gopher://h/", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
 
+        TransferResult expected = new(
+            CurlExitCode.WriteError,
+            0,
+            $"Failure writing output to destination, passed {MeasuredReply.Length} returned 0");
+        Diagnostics.Assert("result", expected, result);
         Assert.AreEqual(
             new TransferResult(
                 CurlExitCode.WriteError,
@@ -385,10 +482,18 @@ public sealed class GopherProtocolHandlerTests
         byte[] line = [.. Enumerable.Repeat((byte)'x', size - 2), .. CarriageReturnLineFeed];
         ScriptedConnection connection = new([.. Enumerable.Repeat(line, count)]);
         BufferOverflowRefusingStream output = new(4096);
+        Diagnostics.Arrange("scripted reads", $"{count} lines of {size} bytes, one per read");
+        Diagnostics.Arrange("output", "a 4096-byte buffer that refuses the write that overflows it");
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection))
             .ExecuteAsync(Context("gopher://h/0/x", output));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
 
+        TransferResult expected = new(
+            CurlExitCode.WriteError,
+            (long)linesBuffered * size,
+            $"Failure writing output to destination, passed {size} returned {returned}");
+        Diagnostics.Assert("result", expected, result);
         Assert.AreEqual(
             new TransferResult(
                 CurlExitCode.WriteError,
@@ -409,18 +514,27 @@ public sealed class GopherProtocolHandlerTests
             Output = new MemoryStream(),
             CancellationToken = cancellation.Token,
         };
+        Diagnostics.Arrange("cancellation token", "already cancelled");
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+        Exception thrown = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context));
+        Diagnostics.Act("thrown", thrown.GetType().Name + ": " + thrown.Message);
+
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.IsTrue(connection.IsDisposed);
     }
 
-    private static async Task AssertSelectorSent(string url, string expectedBytes)
+    private async Task AssertSelectorSent(string url, string expectedBytes)
     {
         ScriptedConnection connection = new();
+        Diagnostics.Arrange("url", url);
 
         TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(Context(url));
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("selector sent", DiagnosticText.Escape(Encoding.Latin1.GetString(connection.Written)));
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Diff("selector sent", Encoding.ASCII.GetBytes(expectedBytes), connection.Written);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes(expectedBytes), connection.Written);
     }
@@ -432,9 +546,13 @@ public sealed class GopherProtocolHandlerTests
         ScriptedConnection connection = new("hel"u8.ToArray(), "lo\r\n"u8.ToArray());
         RecordingProgress progress = new();
         var context = new TransferContext { Url = CurlUrl.Parse("gopher://h/1"), Output = new MemoryStream(), Progress = progress };
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines(["hel", "lo\r\n"]));
 
-        await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+        TransferResult result = await new GopherProtocolHandler(FakeConnector.For(connection)).ExecuteAsync(context);
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Act("progress reports", DiagnosticText.Lines(progress.Reports));
 
+        Diagnostics.Diff("progress reports", "started|downloaded 3|downloaded 7", string.Join("|", progress.Reports));
         CollectionAssert.AreEqual(new[] { "started", "downloaded 3", "downloaded 7" }, progress.Reports);
     }
 

@@ -1,4 +1,5 @@
 using System.Net;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -11,65 +12,97 @@ public sealed class TransferContextTests
 {
     private static readonly CurlUrl AnyUrl = CurlUrl.Parse("tftp://example.com/file");
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void FtpPort_WhenNotSet_IsNullForPassiveMode()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "Url and Output only");
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
 
+        diagnostics.Act("FtpPort", context.FtpPort);
+        diagnostics.Assert("FtpPort", null, context.FtpPort);
         Assert.IsNull(context.FtpPort);
     }
 
     [TestMethod]
     public void FtpUseEprt_WhenNotSet_IsTrue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "Url and Output only");
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
 
+        diagnostics.Act("FtpUseEprt", context.FtpUseEprt);
+        diagnostics.Assert("FtpUseEprt", true, context.FtpUseEprt);
         Assert.IsTrue(context.FtpUseEprt);
     }
 
     [TestMethod]
     public void SslLevel_WhenNotSet_IsNone()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "Url and Output only");
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
 
+        diagnostics.Act("SslLevel", context.SslLevel);
+        diagnostics.Assert("SslLevel", TransportSecurityLevel.None, context.SslLevel);
         Assert.AreEqual(TransportSecurityLevel.None, context.SslLevel);
     }
 
     [TestMethod]
     public void FtpSslControlOnly_WhenNotSet_IsFalse()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "Url and Output only");
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
 
+        diagnostics.Act("FtpSslControlOnly", context.FtpSslControlOnly);
+        diagnostics.Assert("FtpSslControlOnly", false, context.FtpSslControlOnly);
         Assert.IsFalse(context.FtpSslControlOnly);
     }
 
     [TestMethod]
     public void FtpCommandChannelClearing_WhenNotSet_IsOff()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "Url and Output only");
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null };
 
+        diagnostics.Act("FtpCommandChannelClearing", context.FtpCommandChannelClearing);
+        diagnostics.Assert("FtpCommandChannelClearing", FtpCommandChannelClearing.Off, context.FtpCommandChannelClearing);
         Assert.AreEqual(FtpCommandChannelClearing.Off, context.FtpCommandChannelClearing);
     }
 
     [TestMethod]
     public void FtpCommandChannelClearing_WhenSet_ReadsBackUnchanged()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("FtpCommandChannelClearing", FtpCommandChannelClearing.Active);
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null, FtpCommandChannelClearing = FtpCommandChannelClearing.Active };
 
+        diagnostics.Act("FtpCommandChannelClearing", context.FtpCommandChannelClearing);
+        diagnostics.Assert("FtpCommandChannelClearing", FtpCommandChannelClearing.Active, context.FtpCommandChannelClearing);
         Assert.AreEqual(FtpCommandChannelClearing.Active, context.FtpCommandChannelClearing);
     }
 
     [TestMethod]
     public void RemoteTime_WhenSet_ReadsBackTrue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("RemoteTime", true);
         var context = new TransferContext { Url = AnyUrl, Output = Stream.Null, RemoteTime = true };
 
+        diagnostics.Act("RemoteTime", context.RemoteTime);
+        diagnostics.Assert("RemoteTime", true, context.RemoteTime);
         Assert.IsTrue(context.RemoteTime);
     }
 
     [TestMethod]
     public void FtpActiveModeAndTlsOptions_WhenSet_ReadBackUnchanged()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "FtpPort -, FtpUseEprt false, SslLevel Required, FtpSslControlOnly true");
         var context = new TransferContext
         {
             Url = AnyUrl,
@@ -80,6 +113,11 @@ public sealed class TransferContextTests
             FtpSslControlOnly = true,
         };
 
+        diagnostics.Act("FtpPort", context.FtpPort);
+        diagnostics.Act("FtpUseEprt", context.FtpUseEprt);
+        diagnostics.Act("SslLevel", context.SslLevel);
+        diagnostics.Act("FtpSslControlOnly", context.FtpSslControlOnly);
+        diagnostics.Assert("FtpPort", "-", context.FtpPort);
         Assert.AreEqual("-", context.FtpPort);
         Assert.IsFalse(context.FtpUseEprt);
         Assert.AreEqual(TransportSecurityLevel.Required, context.SslLevel);
@@ -89,10 +127,16 @@ public sealed class TransferContextTests
     [TestMethod]
     public void TransferContext_OnlyRequiredMembersSet_ReportsNotGivenForEveryOption()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "Url and Output only");
         using var output = new MemoryStream();
 
         var context = new TransferContext { Url = AnyUrl, Output = output };
 
+        diagnostics.Act("FtpFileMethod", context.FtpFileMethod);
+        diagnostics.Act("CreateFileMode", context.CreateFileMode);
+        diagnostics.Act("FtpSkipPasvIp", context.FtpSkipPasvIp);
+        diagnostics.Assert("FtpFileMethod", FtpFileMethod.MultiCwd, context.FtpFileMethod);
         Assert.IsNull(context.Upload);
         Assert.IsNull(context.ResumeFrom);
         Assert.IsFalse(context.ResumeUploadFromUnknownOffset);
@@ -139,6 +183,7 @@ public sealed class TransferContextTests
     [TestMethod]
     public void TransferContext_EveryMemberSet_RoundTripsEveryValue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         using var output = new MemoryStream();
         using var upload = new MemoryStream();
         using var headerOutput = new MemoryStream();
@@ -159,6 +204,7 @@ public sealed class TransferContextTests
         var ssh = new SshOptions { Compression = true };
         var events = new StubTransferEvents();
         var progress = new StubTransferProgress();
+        diagnostics.Arrange("options", "every TransferContext member set");
 
         var context = new TransferContext
         {
@@ -206,6 +252,10 @@ public sealed class TransferContextTests
             CancellationToken = cancellation.Token,
         };
 
+        diagnostics.Act("ResumeFrom", context.ResumeFrom);
+        diagnostics.Act("RangeText", context.RangeText);
+        diagnostics.Act("MaxTime", context.MaxTime);
+        diagnostics.Assert("ResumeFrom", 42L, context.ResumeFrom);
         Assert.AreSame(AnyUrl, context.Url);
         Assert.AreSame(output, context.Output);
         Assert.AreSame(upload, context.Upload);

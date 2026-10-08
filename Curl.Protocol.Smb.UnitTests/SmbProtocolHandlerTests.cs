@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smb.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smb;
 
@@ -22,26 +23,44 @@ public sealed class SmbProtocolHandlerTests
 
     private static readonly byte[] Upload = Encoding.ASCII.GetBytes(SmbRecordedExchange.FileContent);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void SupportedSchemes_AreSmbAndSmbs()
     {
         var handler = new SmbProtocolHandler(new RecordingConnector(ConnectResult.Connected(new ScriptedConnection())));
+        Diagnostics.Arrange("handler", "SmbProtocolHandler over a connected scripted connection");
 
-        CollectionAssert.AreEqual(new[] { "smb", "smbs" }, handler.SupportedSchemes.ToArray());
+        string[] schemes = handler.SupportedSchemes.ToArray();
+        Diagnostics.Act("supported schemes", string.Join(", ", schemes));
+
+        Diagnostics.Assert("supported schemes", "smb, smbs", string.Join(", ", schemes));
+        CollectionAssert.AreEqual(new[] { "smb", "smbs" }, schemes);
     }
 
     [TestMethod]
     public void Constructor_NullConnector_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new SmbProtocolHandler(null!));
+        Diagnostics.Arrange("connector", "null");
+
+        var thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new SmbProtocolHandler(null!));
+
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name} for {thrown.ParamName}");
+        Diagnostics.Assert("thrown", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws()
     {
         var handler = new SmbProtocolHandler(new RecordingConnector(ConnectResult.Connected(new ScriptedConnection())));
+        Diagnostics.Arrange("context", "null");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        var thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name} for {thrown.ParamName}");
+        Diagnostics.Assert("thrown", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -50,8 +69,22 @@ public sealed class SmbProtocolHandlerTests
         var connection = FileDownload();
         var output = new MemoryStream();
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, output));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User, output));
 
+        Diagnostics.ActOutput(output);
+        byte[] expectedSent = Concat(
+            SmbRecordedExchange.NegotiateRequest,
+            SmbRecordedExchange.SessionSetupRequest,
+            SmbRecordedExchange.TreeConnectRequest,
+            SmbRecordedExchange.OpenRequest,
+            SmbRecordedExchange.ReadRequest,
+            SmbRecordedExchange.CloseRequest,
+            SmbRecordedExchange.TreeDisconnectRequest);
+        Diagnostics.AssertResult(CurlExitCode.Ok, null, result);
+        Diagnostics.Assert("bytes transferred", 11L, result.BytesTransferred);
+        Diagnostics.Diff("output", SmbRecordedExchange.FileContent, Encoding.ASCII.GetString(output.ToArray()));
+        Diagnostics.DiffSent(expectedSent, connection.Sent);
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(11L, result.BytesTransferred);
         Assert.AreEqual(SmbRecordedExchange.FileContent, Encoding.ASCII.GetString(output.ToArray()));
@@ -79,9 +112,11 @@ public sealed class SmbProtocolHandlerTests
             Credentials = User,
             RemoteTime = true,
         };
+        Diagnostics.Arrange("remote time", context.RemoteTime);
 
-        TransferResult result = await Handler(FileDownload()).ExecuteAsync(context);
+        TransferResult result = await RunAsync(FileDownload(), context);
 
+        Diagnostics.Assert("remote time", SmbRecordedExchange.FileLastChangeTimeUtc, result.SourceLastWriteTimeUtc);
         Assert.AreEqual(SmbRecordedExchange.FileLastChangeTimeUtc, result.SourceLastWriteTimeUtc);
     }
 
@@ -90,8 +125,14 @@ public sealed class SmbProtocolHandlerTests
     {
         var connection = FileDownload();
 
-        await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, new NetworkCredential(@"DOM\Us", "pw")));
+        await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, new NetworkCredential(@"DOM\Us", "pw")));
 
+        byte[] sessionSetup = connection.Sent
+            .Skip(SmbRecordedExchange.NegotiateRequest.Length)
+            .Take(SmbRecordedExchange.DomainSessionSetupRequest.Length)
+            .ToArray();
+        Diagnostics.Bytes("session setup sent", sessionSetup);
+        Diagnostics.Diff("session setup sent", SmbRecordedExchange.DomainSessionSetupRequest, sessionSetup);
         CollectionAssert.AreEqual(
             SmbRecordedExchange.DomainSessionSetupRequest,
             connection.Sent
@@ -108,8 +149,10 @@ public sealed class SmbProtocolHandlerTests
             SmbRecordedExchange.SessionSetupAccepted,
             SmbRecordedExchange.TreeConnectMissingShare);
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User));
 
+        Diagnostics.AssertResult(CurlExitCode.RemoteFileNotFound, "Remote file not found", result);
+        Diagnostics.DiffSentEnding(SmbRecordedExchange.TreeConnectRequest, connection.Sent);
         Assert.AreEqual(CurlExitCode.RemoteFileNotFound, result.ExitCode);
         Assert.AreEqual("Remote file not found", result.ErrorMessage);
         Assert.IsTrue(connection.Sent.AsSpan().EndsWith(SmbRecordedExchange.TreeConnectRequest));
@@ -123,8 +166,9 @@ public sealed class SmbProtocolHandlerTests
             SmbRecordedExchange.SessionSetupAccepted,
             SmbRecordedExchange.TreeConnectNoAccess);
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User));
 
+        Diagnostics.AssertResult(CurlExitCode.RemoteAccessDenied, "Access denied to remote resource", result);
         Assert.AreEqual(CurlExitCode.RemoteAccessDenied, result.ExitCode);
         Assert.AreEqual("Access denied to remote resource", result.ErrorMessage);
     }
@@ -139,8 +183,10 @@ public sealed class SmbProtocolHandlerTests
             SmbRecordedExchange.OpenMissingFile,
             SmbRecordedExchange.TreeDisconnectAccepted);
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User));
 
+        Diagnostics.AssertResult(CurlExitCode.RemoteFileNotFound, "Remote file not found", result);
+        Diagnostics.DiffSentEnding(Concat(SmbRecordedExchange.OpenRequest, SmbRecordedExchange.TreeDisconnectRequest), connection.Sent);
         Assert.AreEqual(CurlExitCode.RemoteFileNotFound, result.ExitCode);
         Assert.AreEqual("Remote file not found", result.ErrorMessage);
         Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
@@ -160,8 +206,13 @@ public sealed class SmbProtocolHandlerTests
             SmbRecordedExchange.TreeDisconnectAccepted);
         var output = new MemoryStream();
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(SmbRecordedExchange.DownloadUrl, User, output));
+        TransferResult result = await RunAsync(connection, Context(SmbRecordedExchange.DownloadUrl, User, output));
 
+        Diagnostics.ActOutput(output);
+        Diagnostics.AssertResult(CurlExitCode.RecvError, "Failure when receiving data from the peer", result);
+        Diagnostics.Assert("output length", 0L, output.Length);
+        Diagnostics.DiffSentEnding(
+            Concat(SmbRecordedExchange.ReadRequest, SmbRecordedExchange.CloseRequest, SmbRecordedExchange.TreeDisconnectRequest), connection.Sent);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
         Assert.AreEqual(0L, output.Length);
@@ -174,8 +225,9 @@ public sealed class SmbProtocolHandlerTests
     {
         var connection = new ScriptedConnection(SmbRecordedExchange.NegotiateResponse, SmbRecordedExchange.SessionSetupRefused);
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(Url, new NetworkCredential("User", "Password")));
+        TransferResult result = await RunAsync(connection, Context(Url, new NetworkCredential("User", "Password")));
 
+        Diagnostics.AssertResult(CurlExitCode.LoginDenied, "Login denied", result);
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
         Assert.AreEqual("Login denied", result.ErrorMessage);
     }
@@ -185,8 +237,10 @@ public sealed class SmbProtocolHandlerTests
     {
         var connection = new ScriptedConnection(SmbRecordedExchange.NegotiateRefused);
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(Url, new NetworkCredential("User", "Password")));
+        TransferResult result = await RunAsync(connection, Context(Url, new NetworkCredential("User", "Password")));
 
+        Diagnostics.AssertResult(CurlExitCode.CouldntConnect, "Could not connect to server", result);
+        Diagnostics.DiffSent(SmbRecordedExchange.NegotiateRequest, connection.Sent);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Could not connect to server", result.ErrorMessage);
         CollectionAssert.AreEqual(SmbRecordedExchange.NegotiateRequest, connection.Sent);
@@ -197,8 +251,11 @@ public sealed class SmbProtocolHandlerTests
     {
         var connection = new ScriptedConnection();
 
-        TransferResult result = await Handler(connection).ExecuteAsync(Context(Url, null));
+        TransferResult result = await RunAsync(connection, Context(Url, null));
 
+        Diagnostics.AssertResult(CurlExitCode.LoginDenied, "Login denied", result);
+        Diagnostics.Assert("bytes sent", 0, connection.Sent.Length);
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
         Assert.AreEqual("Login denied", result.ErrorMessage);
         Assert.IsEmpty(connection.Sent);
@@ -209,10 +266,15 @@ public sealed class SmbProtocolHandlerTests
     public async Task ExecuteAsync_PathWithoutShare_Exits3BeforeConnecting()
     {
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+        TransferContext context = Context("smb://h/x.txt", new NetworkCredential("User", "Password"));
+        Diagnostics.ArrangeContext(context);
 
-        TransferResult result = await new SmbProtocolHandler(connector).ExecuteAsync(
-            Context("smb://h/x.txt", new NetworkCredential("User", "Password")));
+        TransferResult result = await new SmbProtocolHandler(connector).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("connect targets", connector.Targets.Count);
+        Diagnostics.AssertResult(CurlExitCode.UrlMalformat, "missing share in URL path for SMB", result);
+        Diagnostics.Assert("connect targets", 0, connector.Targets.Count);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual("missing share in URL path for SMB", result.ErrorMessage);
         Assert.IsEmpty(connector.Targets);
@@ -222,9 +284,15 @@ public sealed class SmbProtocolHandlerTests
     public async Task ExecuteAsync_ConnectRefused_ReturnsTheConnectorsFailure()
     {
         var connector = new RecordingConnector(ConnectResult.Refused("Failed to connect"));
+        TransferContext context = Context(Url, null);
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.Arrange("connector", "refuses with \"Failed to connect\"");
 
-        TransferResult result = await new SmbProtocolHandler(connector).ExecuteAsync(Context(Url, null));
+        TransferResult result = await new SmbProtocolHandler(connector).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertResult(CurlExitCode.CouldntConnect, "Failed to connect", result);
+        Diagnostics.Assert("connection refused", true, result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect", result.ErrorMessage);
         Assert.IsTrue(result.IsConnectionRefused);
@@ -237,9 +305,14 @@ public sealed class SmbProtocolHandlerTests
     public async Task ExecuteAsync_Url_ConnectsToItsHostAndPortWithTlsForSmbs(string url, string host, int port, bool useTls)
     {
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
+        TransferContext context = Context(url, null);
+        Diagnostics.ArrangeContext(context);
 
-        await new SmbProtocolHandler(connector).ExecuteAsync(Context(url, null));
+        TransferResult result = await new SmbProtocolHandler(connector).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
+        Diagnostics.Assert("connect target", new ConnectTarget(host, port, useTls), connector.Targets.SingleOrDefault());
         Assert.AreEqual(new ConnectTarget(host, port, useTls), connector.Targets.Single());
     }
 
@@ -249,9 +322,13 @@ public sealed class SmbProtocolHandlerTests
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
         var proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null);
         var context = new TransferContext { Url = CurlUrl.Parse("smb://h/s/f"), Output = new MemoryStream(), Proxy = proxy };
+        Diagnostics.ArrangeContext(context);
 
-        await new SmbProtocolHandler(connector).ExecuteAsync(context);
+        TransferResult result = await new SmbProtocolHandler(connector).ExecuteAsync(context);
 
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("connect targets", string.Join(", ", connector.Targets));
+        Diagnostics.Assert("connect target", new ConnectTarget("h", 445, false) { Proxy = proxy }, connector.Targets.SingleOrDefault());
         Assert.AreEqual(new ConnectTarget("h", 445, false) { Proxy = proxy }, connector.Targets.Single());
     }
 
@@ -261,8 +338,22 @@ public sealed class SmbProtocolHandlerTests
         var connection = FileUpload(SmbRecordedExchange.UploadOpenCreated, SmbRecordedExchange.WriteAccepted(11));
         var progress = new RecordingProgress();
 
-        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload), progress));
+        TransferResult result = await RunAsync(connection, UploadContext(new MemoryStream(Upload), progress));
 
+        Diagnostics.Act("progress", $"started {progress.Started}, uploads [{string.Join(", ", progress.Uploads)}]");
+        Diagnostics.AssertResult(CurlExitCode.Ok, null, result);
+        Diagnostics.Assert("bytes transferred", 11L, result.BytesTransferred);
+        Diagnostics.Assert("report upload size", 11L, result.Report?.UploadSize);
+        Diagnostics.DiffSent(
+            Concat(
+                SmbRecordedExchange.NegotiateRequest,
+                SmbRecordedExchange.SessionSetupRequest,
+                SmbRecordedExchange.TreeConnectRequest,
+                SmbRecordedExchange.UploadOpenRequest,
+                SmbRecordedExchange.WriteRequest,
+                SmbRecordedExchange.CloseRequest,
+                SmbRecordedExchange.TreeDisconnectRequest),
+            connection.Sent);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(11L, result.BytesTransferred);
         Assert.AreEqual(11L, result.Report!.UploadSize);
@@ -287,9 +378,13 @@ public sealed class SmbProtocolHandlerTests
         byte[] overwritten = SmbRecordedExchange.UploadOpenCreated;
         overwritten[44] = 3; // FILE_OVERWRITTEN
         var connection = FileUpload(overwritten, SmbRecordedExchange.WriteAccepted(11));
+        Diagnostics.Arrange("open response create action", "3 (FILE_OVERWRITTEN)");
 
-        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload)));
+        TransferResult result = await RunAsync(connection, UploadContext(new MemoryStream(Upload)));
 
+        Diagnostics.AssertResult(CurlExitCode.Ok, null, result);
+        Diagnostics.DiffSentEnding(
+            Concat(SmbRecordedExchange.WriteRequest, SmbRecordedExchange.CloseRequest, SmbRecordedExchange.TreeDisconnectRequest), connection.Sent);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsTrue(connection.Sent.AsSpan().EndsWith(
             Concat(SmbRecordedExchange.WriteRequest, SmbRecordedExchange.CloseRequest, SmbRecordedExchange.TreeDisconnectRequest)));
@@ -305,8 +400,11 @@ public sealed class SmbProtocolHandlerTests
             SmbRecordedExchange.OpenAccessDenied,
             SmbRecordedExchange.TreeDisconnectAccepted);
 
-        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload)));
+        TransferResult result = await RunAsync(connection, UploadContext(new MemoryStream(Upload)));
 
+        Diagnostics.AssertResult(CurlExitCode.RemoteFileNotFound, "Remote file not found", result);
+        Diagnostics.Assert("report", "none", result.Report is null ? "none" : "present");
+        Diagnostics.DiffSentEnding(Concat(SmbRecordedExchange.UploadOpenRequest, SmbRecordedExchange.TreeDisconnectRequest), connection.Sent);
         Assert.AreEqual(CurlExitCode.RemoteFileNotFound, result.ExitCode);
         Assert.AreEqual("Remote file not found", result.ErrorMessage);
         Assert.IsNull(result.Report);
@@ -319,8 +417,12 @@ public sealed class SmbProtocolHandlerTests
     {
         var connection = FileUpload(SmbRecordedExchange.UploadOpenCreated, SmbRecordedExchange.WriteRefused);
 
-        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new MemoryStream(Upload)));
+        TransferResult result = await RunAsync(connection, UploadContext(new MemoryStream(Upload)));
 
+        Diagnostics.AssertResult(CurlExitCode.UploadFailed, "Upload failed (at start/before it took off)", result);
+        Diagnostics.Assert("report upload size", 0L, result.Report?.UploadSize);
+        Diagnostics.DiffSentEnding(
+            Concat(SmbRecordedExchange.WriteRequest, SmbRecordedExchange.CloseRequest, SmbRecordedExchange.TreeDisconnectRequest), connection.Sent);
         Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
         Assert.AreEqual("Upload failed (at start/before it took off)", result.ErrorMessage);
         Assert.AreEqual(0L, result.Report!.UploadSize);
@@ -333,8 +435,10 @@ public sealed class SmbProtocolHandlerTests
     {
         var connection = FileUpload(SmbRecordedExchange.UploadOpenCreated, SmbRecordedExchange.WriteAccepted(11));
 
-        TransferResult result = await Handler(connection).ExecuteAsync(UploadContext(new UnseekableStream(Upload)));
+        TransferResult result = await RunAsync(connection, UploadContext(new UnseekableStream(Upload)));
 
+        Diagnostics.AssertResult(CurlExitCode.SendError, "SMB upload needs to know the size up front", result);
+        Diagnostics.DiffSent(Concat(SmbRecordedExchange.NegotiateRequest, SmbRecordedExchange.SessionSetupRequest), connection.Sent);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual("SMB upload needs to know the size up front", result.ErrorMessage);
         CollectionAssert.AreEqual(Concat(SmbRecordedExchange.NegotiateRequest, SmbRecordedExchange.SessionSetupRequest), connection.Sent);
@@ -360,6 +464,22 @@ public sealed class SmbProtocolHandlerTests
 
     private static SmbProtocolHandler Handler(ScriptedConnection connection) =>
         new(new RecordingConnector(ConnectResult.Connected(connection)), SmbCurlOperatingSystem.Linux);
+
+    // Runs the handler over the scripted connection, writing the context and replies before and the result and bytes sent after.
+    private async Task<TransferResult> RunAsync(ScriptedConnection connection, TransferContext context)
+    {
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReplies(connection);
+        TransferResult result;
+        using (Diagnostics.Phase("execute"))
+        {
+            result = await Handler(connection).ExecuteAsync(context);
+        }
+
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection);
+        return result;
+    }
 
     private static TransferContext Context(string url, NetworkCredential? credentials, Stream? output = null) =>
         new() { Url = CurlUrl.Parse(url), Output = output ?? new MemoryStream(), Credentials = credentials };

@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -32,6 +33,10 @@ public sealed class CurlCommandRunnerProgressBarTests
     private readonly FileProtocolHandler fileHandler =
         new(new InMemoryFileSystem { ReadContent = Encoding.ASCII.GetBytes("0123456789") });
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -39,6 +44,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", FileUrl, "-o", "out"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBar + NewLine, StandardErrorText);
     }
@@ -48,6 +55,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["--progress-bar", FileUrl, "-o", "out"], StartedHandler("file", 10));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBar + NewLine, StandardErrorText);
     }
@@ -56,9 +65,13 @@ public sealed class CurlCommandRunnerProgressBarTests
     public async Task RunAsync_ProgressBarContinueAt5_WritesTwoFullBarsAndNoResumingLine()
     {
         outputFiles.ExistingContent["out"] = Encoding.ASCII.GetBytes("01234");
+        Diagnostics.Arrange("existing out", "01234");
 
         int exitCode = await RunAsync(["-#", "-C", "5", FileUrl, "-o", "out"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + FullBar + NewLine), Visible(StandardErrorText));
+        Diagnostics.Diff("out", "0123456789", Encoding.ASCII.GetString(outputFiles.Written["out"].ToArray()));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBar + FullBar + NewLine, StandardErrorText);
         Assert.AreEqual("0123456789", Encoding.ASCII.GetString(outputFiles.Written["out"].ToArray()));
@@ -69,6 +82,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", FileUrl, "-o", "out"], StartedHandler("file", 0));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(NewLine), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(NewLine, StandardErrorText);
     }
@@ -78,6 +93,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", HttpUrl, "-o", "out"], Reporting200000Bytes());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBar + NewLine, StandardErrorText);
     }
@@ -87,6 +104,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", HttpUrl, "-o", "out"], Reporting200000Bytes(), terminalColumns: 40);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBarAt40Columns + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBarAt40Columns + NewLine, StandardErrorText);
     }
@@ -96,6 +115,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", HttpUrl], Reporting200000Bytes());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBar + NewLine, StandardErrorText);
     }
@@ -105,6 +126,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", HttpUrl], Reporting200000Bytes(), standardOutputIsTerminal: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
@@ -116,6 +139,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync([option, "-#", HttpUrl, "-o", "out"], Reporting200000Bytes());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
@@ -125,6 +150,9 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", HttpUrl, "-o", "out"], Reporting200000Bytes());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains % Total", false, StandardErrorText.Contains("% Total", StringComparison.Ordinal));
+        Diagnostics.Assert("stderr contains Dload", false, StandardErrorText.Contains("Dload", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.IsFalse(StandardErrorText.Contains("% Total", StringComparison.Ordinal));
         Assert.IsFalse(StandardErrorText.Contains("Dload", StringComparison.Ordinal));
@@ -133,6 +161,7 @@ public sealed class CurlCommandRunnerProgressBarTests
     [TestMethod]
     public async Task RunAsync_ProgressBarOnAFailureAfterTheStart_WritesTheNewlineAfterTheFailureLine()
     {
+        Diagnostics.Arrange("handler", "http reports the transfer started, then fails with 404");
         RecordingProtocolHandler notFound = new("http", context =>
         {
             context.Progress.ReportTransferStarted();
@@ -143,6 +172,9 @@ public sealed class CurlCommandRunnerProgressBarTests
 
         int exitCode = await RunAsync(["-#", "-f", "-w", "[%{exitcode}]", HttpUrl, "-o", "out"], notFound);
 
+        Diagnostics.Assert("exit code", 22, exitCode);
+        Diagnostics.Diff("stderr", Visible("curl: (22) The requested URL returned error: 404" + NewLine + NewLine), Visible(StandardErrorText));
+        Diagnostics.Diff("stdout", "[22]", Encoding.ASCII.GetString(standardOutput.ToArray()));
         Assert.AreEqual(22, exitCode);
         Assert.AreEqual("curl: (22) The requested URL returned error: 404" + NewLine + NewLine, StandardErrorText);
         Assert.AreEqual("[22]", Encoding.ASCII.GetString(standardOutput.ToArray()));
@@ -151,6 +183,7 @@ public sealed class CurlCommandRunnerProgressBarTests
     [TestMethod]
     public async Task RunAsync_ProgressBarContinueAt5OnAFailedResume_WritesTheBarThenTheFailureLineThenTheNewline()
     {
+        Diagnostics.Arrange("handler", "file reports the transfer started, then fails with 36");
         RecordingProtocolHandler cannotResume = new("file", context =>
         {
             context.Progress.ReportTransferStarted();
@@ -161,6 +194,8 @@ public sealed class CurlCommandRunnerProgressBarTests
 
         int exitCode = await RunAsync(["-#", "-C", "5", FileUrl, "-o", "out"], cannotResume);
 
+        Diagnostics.Assert("exit code", 36, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + "curl: (36) failed to resume file:// transfer" + NewLine + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(36, exitCode);
         Assert.AreEqual(FullBar + "curl: (36) failed to resume file:// transfer" + NewLine + NewLine, StandardErrorText);
     }
@@ -171,8 +206,12 @@ public sealed class CurlCommandRunnerProgressBarTests
         RecordingProtocolHandler refused =
             RecordingProtocolHandler.Failing("http", CurlExitCode.CouldntConnect, "Failed to connect");
 
+        Diagnostics.Arrange("handler", "http fails with 7 before the transfer starts");
+
         int exitCode = await RunAsync(["-#", HttpUrl, "-o", "out"], refused);
 
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Diagnostics.Diff("stderr", Visible("curl: (7) Failed to connect" + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(7, exitCode);
         Assert.AreEqual("curl: (7) Failed to connect" + NewLine, StandardErrorText);
     }
@@ -182,6 +221,8 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", "-w", "%{stderr}[done]", HttpUrl, "-o", "out"], Reporting200000Bytes());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + NewLine + "[done]"), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBar + NewLine + "[done]", StandardErrorText);
     }
@@ -191,9 +232,14 @@ public sealed class CurlCommandRunnerProgressBarTests
     {
         int exitCode = await RunAsync(["-#", HttpUrl, "-o", "o1", HttpUrl, "-o", "o2"], Reporting200000Bytes());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Visible(FullBar + NewLine + FullBar + NewLine), Visible(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(FullBar + NewLine + FullBar + NewLine, StandardErrorText);
     }
+
+    private static string Visible(string text) =>
+        text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "\\r", StringComparison.Ordinal);
 
     private static RecordingProtocolHandler StartedHandler(string scheme, long bytes) =>
         new(scheme, context =>
@@ -213,22 +259,36 @@ public sealed class CurlCommandRunnerProgressBarTests
             return ValueTask.FromResult(TransferResult.Success(200000));
         });
 
-    private Task<int> RunAsync(
+    private async Task<int> RunAsync(
         IReadOnlyList<string> arguments,
         IProtocolHandler? handler = null,
         int terminalColumns = TerminalColumns.Default,
-        bool standardOutputIsTerminal = false) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([handler ?? fileHandler])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                terminalColumns: terminalColumns,
-                writesProgressMeter: true,
-                standardOutputIsTerminal: standardOutputIsTerminal,
-                timeProvider: clock)
-            .RunAsync(arguments);
+        bool standardOutputIsTerminal = false)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("terminal columns", terminalColumns);
+        Diagnostics.Arrange("standard output is a terminal", standardOutputIsTerminal);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([handler ?? fileHandler])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    terminalColumns: terminalColumns,
+                    writesProgressMeter: true,
+                    standardOutputIsTerminal: standardOutputIsTerminal,
+                    timeProvider: clock)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Visible(Encoding.UTF8.GetString(standardOutput.ToArray())));
+        Diagnostics.Act("stderr", Visible(StandardErrorText));
+        return exitCode;
+    }
 }

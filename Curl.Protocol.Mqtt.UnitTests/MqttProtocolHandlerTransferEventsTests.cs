@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Mqtt.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Mqtt;
 
@@ -28,6 +29,14 @@ public sealed class MqttProtocolHandlerTransferEventsTests
     /// <summary>A PUBLISH to topic <c>t</c> of <c>hello</c>.</summary>
     private const string Publish = "30 08 00 01 74 68 65 6C 6C 6F";
 
+    /// <summary>The transcript of the transfer the test ran, kept for its DIFF and ASSERT lines.</summary>
+    private List<string> transcript = [];
+
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_SubscribeReceivingOnePublishThenClose_ReportsCurlsTraceInOrder()
     {
@@ -36,10 +45,10 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         Assert.AreEqual(CurlExitCode.RecvError, run.Result.ExitCode);
         CollectionAssert.AreEqual(
-            ConnectedAndSubscribed()
+            DiffTranscript(ConnectedAndSubscribed()
                 .Concat(PublishReceived())
                 .Concat([State(0), "* Connection disconnected", "* shutting down connection #0"])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -51,10 +60,10 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         CollectionAssert.AreEqual(
-            ConnectedAndSubscribed()
+            DiffTranscript(ConnectedAndSubscribed()
                 .Concat(PublishReceived())
                 .Concat([State(0), Received("E0"), Received("00"), "* Got DISCONNECT", "* shutting down connection #0"])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -66,9 +75,9 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         CollectionAssert.AreEqual(
-            ConnectAccepted()
+            DiffTranscript(ConnectAccepted()
                 .Concat([Sent("30 0A 00 01 74 70 61 79 6C 6F 61 64"), Sent("E0 00"), "* shutting down connection #0"])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -80,13 +89,13 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, run.Result.ExitCode);
         CollectionAssert.AreEqual(
-            ConnectSent()
+            DiffTranscript(ConnectSent()
                 .Concat(
                 [
                     State(0), Received("20"), Received("02"), State(2), Received("00 05"),
                     "* Expected 0000 but got 0005", "* shutting down connection #0",
                 ])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -97,13 +106,13 @@ public sealed class MqttProtocolHandlerTransferEventsTests
         Run run = await RunAsync("mqtt://h/t", Hex("20 03 00 00 00"));
 
         CollectionAssert.AreEqual(
-            ConnectSent()
+            DiffTranscript(ConnectSent()
                 .Concat(
                 [
                     State(0), Received("20"), Received("03"), State(2),
                     "* CONNACK expected Remaining Length 2, got 3", "* shutting down connection #0",
                 ])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -115,7 +124,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         Assert.AreEqual(CurlExitCode.PartialFile, run.Result.ExitCode);
         CollectionAssert.AreEqual(
-            ConnectedAndSubscribed()
+            DiffTranscript(ConnectedAndSubscribed()
                 .Concat(
                 [
                     State(0), Received("D0"), Received("00"), "* Received ping response.",
@@ -123,7 +132,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
                     "<= " + Latin1("00 01 74 68"), State(6), "* server disconnected",
                     "* shutting down connection #0",
                 ])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -137,14 +146,14 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             "mqtt://h/t", null, [3], Hex(Connack), Hex(Suback), Hex("30 0B"), Hex("00 01 74 68 65 6C 6C 6F 77 6F 72"));
 
         CollectionAssert.AreEqual(
-            ConnectedAndSubscribed()
+            DiffTranscript(ConnectedAndSubscribed()
                 .Concat(
                 [
                     State(0), Received("30"), Received("0B"), State(5), "* Remaining length: 11 bytes",
                     "* EEEE AAAAGAIN", State(6), "<= " + Latin1("00 01 74 68 65 6C 6C 6F 77 6F 72"),
                     State(0), "* Connection disconnected", "* shutting down connection #0",
                 ])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -158,7 +167,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             "mqtt://h/t", null, [3, 4], Hex(Connack), Hex(Suback), Hex("30 0B"), Hex("00 01 74 68 65 6C"), Hex("6C 6F 77 6F 72"));
 
         CollectionAssert.AreEqual(
-            ConnectedAndSubscribed()
+            DiffTranscript(ConnectedAndSubscribed()
                 .Concat(
                 [
                     State(0), Received("30"), Received("0B"), State(5), "* Remaining length: 11 bytes",
@@ -166,7 +175,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
                     State(6), "* EEEE AAAAGAIN", State(6), "<= " + Latin1("6C 6F 77 6F 72"),
                     State(0), "* Connection disconnected", "* shutting down connection #0",
                 ])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -176,6 +185,8 @@ public sealed class MqttProtocolHandlerTransferEventsTests
         // Measured (BL-1434): the PUBLISH in one segment; curl wrote no "EEEE AAAAGAIN".
         Run run = await RunHeldAsync("mqtt://h/t", null, [3], Hex(Connack), Hex(Suback + Publish), Hex("E0 00"));
 
+        Diagnostics.Assert("\"EEEE AAAAGAIN\" lines", 0, run.Transcript.Count(line => line == "* EEEE AAAAGAIN"));
+        Diagnostics.Assert("\"Got DISCONNECT\" lines", 1, run.Transcript.Count(line => line == "* Got DISCONNECT"));
         CollectionAssert.DoesNotContain(run.Transcript, "* EEEE AAAAGAIN");
         CollectionAssert.Contains(run.Transcript, "* Got DISCONNECT");
     }
@@ -186,7 +197,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
         Run run = await RunAsync("mqtt://h/t", Hex(Connack), Hex(Suback + "30 08"));
 
         CollectionAssert.AreEqual(
-            new[] { State(5), "* Remaining length: 8 bytes", "* server disconnected", "* shutting down connection #0" },
+            AssertTranscriptEnds(new[] { State(5), "* Remaining length: 8 bytes", "* server disconnected", "* shutting down connection #0" }),
             run.Transcript.TakeLast(4).ToArray());
     }
 
@@ -199,7 +210,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         CollectionAssert.AreEqual(
-            ConnectedAndSubscribed()
+            DiffTranscript(ConnectedAndSubscribed()
                 .Concat(
                 [
                     State(0), Received("40"), Received("00"),
@@ -207,7 +218,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
                     State(0), Received("00"), Received("01"),
                     State(7), "* State not handled yet", "* shutting down connection #0",
                 ])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -221,6 +232,11 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         string[] transcript = [.. run.Transcript];
         int remaining = Array.IndexOf(transcript, "* Remaining length: 5003 bytes");
+        Diagnostics.Act("index of the remaining length line", remaining);
+        Diagnostics.Assert(
+            "the 3 lines after it",
+            $"{4096 + 3} characters, {MqttDiagnostics.Escape(State(6))}, {907 + 3} characters",
+            string.Join(", ", transcript.Skip(remaining + 1).Take(3).Select((line, index) => index == 1 ? MqttDiagnostics.Escape(line) : $"{line.Length} characters")));
         Assert.AreEqual(4096 + 3, transcript[remaining + 1].Length);
         Assert.AreEqual(State(6), transcript[remaining + 2]);
         Assert.AreEqual(907 + 3, transcript[remaining + 3].Length);
@@ -240,11 +256,11 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             Events = events,
         };
 
-        TransferResult result = await Handler(connection, 4).ExecuteAsync(context);
+        TransferResult result = await ExecuteAsync(connection, context, 4);
 
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { "<= " + Latin1("00 01 74 68 65 6C 6C 6F"), "* " + result.ErrorMessage, "* closing connection #4" },
+            AssertTranscriptEnds(new[] { "<= " + Latin1("00 01 74 68 65 6C 6C 6F"), "* " + result.ErrorMessage, "* closing connection #4" }),
             events.Transcript.TakeLast(3).ToArray());
     }
 
@@ -255,9 +271,9 @@ public sealed class MqttProtocolHandlerTransferEventsTests
         Run run = await RunAsync("mqtt://h/", Hex(Connack));
 
         CollectionAssert.AreEqual(
-            ConnectAccepted()
+            DiffTranscript(ConnectAccepted()
                 .Concat(["* No MQTT topic found. Forgot to URL encode it?", "* shutting down connection #0"])
-                .ToArray(),
+                .ToArray()),
             run.Transcript);
     }
 
@@ -268,7 +284,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, run.Result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { State(3), "* shutting down connection #0" },
+            AssertTranscriptEnds(new[] { State(3), "* shutting down connection #0" }),
             run.Transcript.TakeLast(2).ToArray());
     }
 
@@ -286,11 +302,11 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             MaxFileSize = 9,
         };
 
-        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+        TransferResult result = await ExecuteAsync(connection, context, 0);
 
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { State(5), "* Remaining length: 10 bytes", "* Maximum file size exceeded", "* shutting down connection #0" },
+            AssertTranscriptEnds(new[] { State(5), "* Remaining length: 10 bytes", "* Maximum file size exceeded", "* shutting down connection #0" }),
             events.Transcript.TakeLast(4).ToArray());
     }
 
@@ -303,14 +319,14 @@ public sealed class MqttProtocolHandlerTransferEventsTests
         RecordingStream output = new();
         TransferContext context = new() { Url = CurlUrl.Parse("mqtt://h/t"), Output = output, Events = events, NoBody = true };
 
-        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+        TransferResult result = await ExecuteAsync(connection, context, 0);
 
         Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Weird server reply"), result);
         Assert.IsEmpty(output.Writes);
         CollectionAssert.AreEqual(
-            ConnectedAndSubscribed()
+            DiffTranscript(ConnectedAndSubscribed()
                 .Concat([State(0), Received("30"), Received("05"), State(5), "* Remaining length: 5 bytes", "<= " + Latin1("00 01 74 68 69"), "* shutting down connection #0"])
-                .ToArray(),
+                .ToArray()),
             events.Transcript);
     }
 
@@ -329,11 +345,11 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             NoBody = true,
         };
 
-        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+        TransferResult result = await ExecuteAsync(connection, context, 0);
 
         Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 0, "Maximum file size exceeded"), result);
         CollectionAssert.AreEqual(
-            new[] { "* Remaining length: 10 bytes", "* Maximum file size exceeded", "* shutting down connection #0" },
+            AssertTranscriptEnds(new[] { "* Remaining length: 10 bytes", "* Maximum file size exceeded", "* shutting down connection #0" }),
             events.Transcript.TakeLast(3).ToArray());
     }
 
@@ -352,13 +368,13 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             NoBody = true,
         };
 
-        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+        TransferResult result = await ExecuteAsync(connection, context, 0);
 
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(
-            ConnectAccepted()
+            DiffTranscript(ConnectAccepted()
                 .Concat([Sent("30 0A 00 01 74 70 61 79 6C 6F 61 64"), Sent("E0 00"), "* shutting down connection #0"])
-                .ToArray(),
+                .ToArray()),
             events.Transcript);
     }
 
@@ -391,12 +407,52 @@ public sealed class MqttProtocolHandlerTransferEventsTests
     private static MqttProtocolHandler Handler(IConnection connection, long connectionNumber) =>
         new(new FakeConnector(ConnectResult.Connected(connection, null, connectionNumber: connectionNumber)), () => FixedSuffix);
 
-    private static Task<Run> RunAsync(string url, params byte[][] reads) => RunTransferAsync(url, null, reads);
+    /// <summary>
+    /// Runs the transfer on connection number <paramref name="connectionNumber" />, writing its
+    /// URL, options and scripted reads as ARRANGE lines and its result, bytes sent and
+    /// transcript as ACT lines, and keeping the transcript for <see cref="DiffTranscript" />.
+    /// </summary>
+    private async Task<TransferResult> ExecuteAsync(ScriptedConnection connection, TransferContext context, long connectionNumber)
+    {
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReads(connection.Reads);
+        if (connection.HeldReads.Count > 0)
+        {
+            Diagnostics.Arrange("reads held a turn", string.Join(", ", connection.HeldReads));
+        }
 
-    private static Task<Run> RunTransferAsync(string url, byte[]? postData, params byte[][] reads) =>
+        TransferResult result = await Handler(connection, connectionNumber).ExecuteAsync(context);
+
+        transcript = ((TranscriptTransferEvents)context.Events).Transcript;
+        Diagnostics.ActResult(result);
+        Diagnostics.ActPackets("sent", connection.Written);
+        Diagnostics.ActTranscript(transcript);
+        return result;
+    }
+
+    /// <summary>Writes a DIFF line comparing the whole transcript with <paramref name="expected" />, and returns it.</summary>
+    private string[] DiffTranscript(string[] expected)
+    {
+        Diagnostics.Diff("transcript", string.Join("\n", expected), string.Join("\n", transcript));
+        return expected;
+    }
+
+    /// <summary>Writes an ASSERT line comparing the transcript's last lines with <paramref name="expected" />, and returns it.</summary>
+    private string[] AssertTranscriptEnds(string[] expected)
+    {
+        Diagnostics.Assert(
+            $"last {expected.Length} transcript lines",
+            MqttDiagnostics.Lines(expected),
+            MqttDiagnostics.Lines(transcript.TakeLast(expected.Length)));
+        return expected;
+    }
+
+    private Task<Run> RunAsync(string url, params byte[][] reads) => RunTransferAsync(url, null, reads);
+
+    private Task<Run> RunTransferAsync(string url, byte[]? postData, params byte[][] reads) =>
         RunHeldAsync(url, postData, [], reads);
 
-    private static async Task<Run> RunHeldAsync(string url, byte[]? postData, int[] heldReads, params byte[][] reads)
+    private async Task<Run> RunHeldAsync(string url, byte[]? postData, int[] heldReads, params byte[][] reads)
     {
         ScriptedConnection connection = new(reads);
         connection.HeldReads.UnionWith(heldReads);
@@ -409,7 +465,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
             Events = events,
         };
 
-        TransferResult result = await Handler(connection, 0).ExecuteAsync(context);
+        TransferResult result = await ExecuteAsync(connection, context, 0);
         return new Run(result, events.Transcript);
     }
 

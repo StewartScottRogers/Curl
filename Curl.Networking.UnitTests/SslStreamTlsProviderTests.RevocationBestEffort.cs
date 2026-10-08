@@ -23,11 +23,13 @@ public sealed partial class SslStreamTlsProviderTests
         using var root = CreateRootAuthority();
         using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         var caFile = WriteCaFile("root.pem", root.ExportCertificatePem());
+        Diagnostics.Arrange("TLS settings", $"CA file holding {root.Subject} {root.Thumbprint}, revoke best effort, Schannel build");
 
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile, RevocationCheckBestEffort: true), SchannelBuild),
             leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -48,9 +50,18 @@ public sealed partial class SslStreamTlsProviderTests
             _ = await sslStream.ReadAtLeastAsync(new byte[1], 1, throwOnEndOfStream: false);
         });
         IHandshakeReportingTlsProvider provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile, RevocationCheckBestEffort: true), SchannelBuild);
+        Diagnostics.Arrange("TLS settings", $"CA file holding {root.Subject} {root.Thumbprint}, revoke best effort, Schannel build");
+        Diagnostics.Arrange("server certificate", $"{leaf.Subject} {leaf.Thumbprint}, issued by {leaf.Issuer}");
 
-        var result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, capturing, false, [], CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, capturing, false, [], CancellationToken.None);
+        }
 
+        ActResult(result);
+        Diagnostics.Act("revocation check incomplete", capturing.RevocationCheckIncomplete);
+        Diagnostics.Assert("revocation check incomplete", true, capturing.RevocationCheckIncomplete);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.IsTrue(capturing.RevocationCheckIncomplete);
         await result.Connection!.DisposeAsync();
@@ -65,11 +76,13 @@ public sealed partial class SslStreamTlsProviderTests
         using var otherRoot = CreateRootAuthority();
         using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         var caFile = WriteCaFile("other-root.pem", otherRoot.ExportCertificatePem());
+        Diagnostics.Arrange("TLS settings", $"CA file holding another root {otherRoot.Thumbprint}, revoke best effort, Schannel build");
 
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile, RevocationCheckBestEffort: true), SchannelBuild),
             leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
     }
 
@@ -79,11 +92,13 @@ public sealed partial class SslStreamTlsProviderTests
         using var root = CreateRootAuthority();
         using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         var caFile = WriteCaFile("root.pem", root.ExportCertificatePem());
+        Diagnostics.Arrange("TLS settings", $"CA file holding {root.Subject} {root.Thumbprint}, revoke best effort, OpenSSL build");
 
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile, RevocationCheckBestEffort: true), OpenSslBuild),
             leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -92,9 +107,12 @@ public sealed partial class SslStreamTlsProviderTests
     public void VerifyPeer_WithNoChainAndRevocationCheckBestEffortInTheSchannelBuild_StillRefuses()
     {
         var provider = new SslStreamTlsProvider(new TlsClientOptions(RevocationCheckBestEffort: true), SchannelBuild);
+        Diagnostics.Arrange("policy errors", "RemoteCertificateChainErrors, no chain, revoke best effort, Schannel build");
 
         var failure = provider.VerifyPeer(SslPolicyErrors.RemoteCertificateChainErrors, null, CertificateHost, []);
 
+        Diagnostics.Act("failure", failure);
+        Diagnostics.Assert("failure", (CurlExitCode.PeerFailedVerification, UntrustedRootLine), failure);
         Assert.AreEqual((CurlExitCode.PeerFailedVerification, UntrustedRootLine), failure);
     }
 
@@ -105,8 +123,13 @@ public sealed partial class SslStreamTlsProviderTests
     public void HasOnlyUnavailableRevocationStatus_WithOnlyUnknownOrOfflineRevocation_IsTrue(X509ChainStatusFlags flags)
     {
         X509ChainStatus[] statuses = [new() { Status = flags }, new() { Status = X509ChainStatusFlags.OfflineRevocation }];
+        Diagnostics.Arrange("chain statuses", $"{flags}; {X509ChainStatusFlags.OfflineRevocation}");
 
-        Assert.IsTrue(ServerCertificateVerification.HasOnlyUnavailableRevocationStatus(statuses));
+        var onlyUnavailable = ServerCertificateVerification.HasOnlyUnavailableRevocationStatus(statuses);
+
+        Diagnostics.Act("only unavailable revocation status", onlyUnavailable);
+        Diagnostics.Assert("only unavailable revocation status", true, onlyUnavailable);
+        Assert.IsTrue(onlyUnavailable);
     }
 
     [TestMethod]
@@ -116,13 +139,24 @@ public sealed partial class SslStreamTlsProviderTests
     public void HasOnlyUnavailableRevocationStatus_WithAnyOtherFault_IsFalse(X509ChainStatusFlags flags)
     {
         X509ChainStatus[] statuses = [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }, new() { Status = flags }];
+        Diagnostics.Arrange("chain statuses", $"{X509ChainStatusFlags.RevocationStatusUnknown}; {flags}");
 
-        Assert.IsFalse(ServerCertificateVerification.HasOnlyUnavailableRevocationStatus(statuses));
+        var onlyUnavailable = ServerCertificateVerification.HasOnlyUnavailableRevocationStatus(statuses);
+
+        Diagnostics.Act("only unavailable revocation status", onlyUnavailable);
+        Diagnostics.Assert("only unavailable revocation status", false, onlyUnavailable);
+        Assert.IsFalse(onlyUnavailable);
     }
 
     [TestMethod]
     public void HasOnlyUnavailableRevocationStatus_WithNoFault_IsFalse()
     {
-        Assert.IsFalse(ServerCertificateVerification.HasOnlyUnavailableRevocationStatus([]));
+        Diagnostics.Arrange("chain statuses", "none");
+
+        var onlyUnavailable = ServerCertificateVerification.HasOnlyUnavailableRevocationStatus([]);
+
+        Diagnostics.Act("only unavailable revocation status", onlyUnavailable);
+        Diagnostics.Assert("only unavailable revocation status", false, onlyUnavailable);
+        Assert.IsFalse(onlyUnavailable);
     }
 }

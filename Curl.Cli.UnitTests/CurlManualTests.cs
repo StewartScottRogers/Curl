@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -13,12 +14,23 @@ public sealed class CurlManualTests
 {
     private const string MeasuredSha256 = "b283726b16afd8394477299ce5780f7fcaf2043bc4d664d736a09ab591349e9f";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Lines_JoinedWithCrLf_AreTheMeasuredBytes()
     {
-        IReadOnlyList<string> lines = CurlManual.Lines();
+        Diagnostics.Arrange("line terminator", "CR LF");
+        IReadOnlyList<string> lines = Lines();
         byte[] bytes = Encoding.ASCII.GetBytes(string.Concat(lines.Select(line => line + "\r\n")));
+        string sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        Diagnostics.Bytes("manual", bytes);
+        Diagnostics.Act("sha-256", sha256);
 
+        Diagnostics.Assert("line count", 7849, lines.Count);
+        Diagnostics.Assert("byte count", 299744, bytes.Length);
+        Diagnostics.Assert("sha-256", MeasuredSha256, sha256);
         Assert.HasCount(7849, lines);
         Assert.AreEqual(299744, bytes.Length);
         Assert.AreEqual(MeasuredSha256, Convert.ToHexStringLower(SHA256.HashData(bytes)));
@@ -27,10 +39,22 @@ public sealed class CurlManualTests
     [TestMethod]
     public void Lines_StartWithTheBannerAndEndWithABlankLine()
     {
-        IReadOnlyList<string> lines = CurlManual.Lines();
+        Diagnostics.Arrange("lines checked", "first, sixth and last");
+        IReadOnlyList<string> lines = Lines();
 
+        Diagnostics.Assert("first line", "\"          _   _ ____  _\"", "\"" + lines[0] + "\"");
+        Diagnostics.Assert("sixth line", "NAME", lines[5]);
+        Diagnostics.Assert("last line", "\"\"", "\"" + lines[^1] + "\"");
         Assert.AreEqual("          _   _ ____  _", lines[0]);
         Assert.AreEqual("NAME", lines[5]);
         Assert.AreEqual(string.Empty, lines[^1]);
+    }
+
+    /// <summary>Returns <see cref="CurlManual.Lines"/>, writing how many there are as a diagnostic.</summary>
+    private IReadOnlyList<string> Lines()
+    {
+        IReadOnlyList<string> lines = CurlManual.Lines();
+        Diagnostics.Act("line count", lines.Count);
+        return lines;
     }
 }

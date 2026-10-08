@@ -87,6 +87,7 @@ public abstract class KerberosEncryption
     /// <param name="plaintext">The bytes to encrypt.</param>
     /// <returns>The ciphertext, confounder and checksum included.</returns>
     /// <exception cref="ArgumentException"><paramref name="key" /> is not <see cref="KeySize" /> bytes.</exception>
+    /// <exception cref="KerberosCryptographyException"><see cref="KerberosCryptographyError.WeakKey" />: a <c>des3-cbc-sha1</c> key triple DES calls weak.</exception>
     public byte[] Encrypt(ReadOnlySpan<byte> key, int usage, ReadOnlySpan<byte> plaintext)
     {
         RequireKeySize(key);
@@ -101,8 +102,9 @@ public abstract class KerberosEncryption
     /// <exception cref="ArgumentException"><paramref name="key" /> is not <see cref="KeySize" /> bytes.</exception>
     /// <exception cref="KerberosCryptographyException">
     /// <see cref="KerberosCryptographyError.CiphertextTooShort" />,
-    /// <see cref="KerberosCryptographyError.CiphertextNotWholeBlocks" /> or
-    /// <see cref="KerberosCryptographyError.IntegrityCheckFailed" />.
+    /// <see cref="KerberosCryptographyError.CiphertextNotWholeBlocks" />,
+    /// <see cref="KerberosCryptographyError.IntegrityCheckFailed" />, or
+    /// <see cref="KerberosCryptographyError.WeakKey" /> for a <c>des3-cbc-sha1</c> key triple DES calls weak.
     /// </exception>
     public byte[] Decrypt(ReadOnlySpan<byte> key, int usage, ReadOnlySpan<byte> ciphertext)
     {
@@ -116,6 +118,7 @@ public abstract class KerberosEncryption
     /// <param name="data">The bytes to checksum.</param>
     /// <returns>A checksum of <see cref="ChecksumSize" /> bytes.</returns>
     /// <exception cref="ArgumentException"><paramref name="key" /> is not <see cref="KeySize" /> bytes.</exception>
+    /// <exception cref="KerberosCryptographyException"><see cref="KerberosCryptographyError.WeakKey" />: a <c>des3-cbc-sha1</c> key triple DES calls weak.</exception>
     public byte[] ComputeChecksum(ReadOnlySpan<byte> key, int usage, ReadOnlySpan<byte> data)
     {
         RequireKeySize(key);
@@ -129,6 +132,7 @@ public abstract class KerberosEncryption
     /// <param name="checksum">The checksum to check.</param>
     /// <returns><see langword="true" /> when it matches.</returns>
     /// <exception cref="ArgumentException"><paramref name="key" /> is not <see cref="KeySize" /> bytes.</exception>
+    /// <exception cref="KerberosCryptographyException"><see cref="KerberosCryptographyError.WeakKey" />: a <c>des3-cbc-sha1</c> key triple DES calls weak.</exception>
     public bool VerifyChecksum(ReadOnlySpan<byte> key, int usage, ReadOnlySpan<byte> data, ReadOnlySpan<byte> checksum)
     {
         byte[] expected = ComputeChecksum(key, usage, data);
@@ -147,6 +151,7 @@ public abstract class KerberosEncryption
     /// <param name="input">The octet string to feed it.</param>
     /// <returns>The type's pseudorandom output.</returns>
     /// <exception cref="ArgumentException"><paramref name="key" /> is not <see cref="KeySize" /> bytes.</exception>
+    /// <exception cref="KerberosCryptographyException"><see cref="KerberosCryptographyError.WeakKey" />: a <c>des3-cbc-sha1</c> key triple DES calls weak.</exception>
     public byte[] ComputePseudoRandom(ReadOnlySpan<byte> key, ReadOnlySpan<byte> input)
     {
         RequireKeySize(key);

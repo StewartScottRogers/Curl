@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Mqtt.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Mqtt;
 
@@ -26,6 +27,11 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
     /// <summary>A PUBLISH to topic <c>t</c> with payload <c>hi</c>: five bytes after the fixed header.</summary>
     private static readonly byte[] PublishHi = [0x30, 0x05, 0x00, 0x01, .. "thi"u8];
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_SubscribeAtInfo_LogsConnackSubscribeAndTransferEnd()
     {
@@ -33,6 +39,8 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Connack, Suback, PublishHi, Disconnect), log);
 
+        Diagnostics.AssertResult(TransferResult.Success(5), result);
+        AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 250 ms"], log);
         Assert.AreEqual(TransferResult.Success(5), result);
         CollectionAssert.AreEqual(
             new[] { "CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 250 ms" },
@@ -48,6 +56,8 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Connack), log, "mqtt://h/a%2Fb", "hello"u8.ToArray());
 
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
+        AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 250 ms"], log);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(
             new[] { "CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 250 ms" },
@@ -61,6 +71,17 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         await RunAsync(new ScriptedConnection(Connack, Suback, PublishHi, Disconnect), log);
 
+        AssertLog(
+            DiagnosticLogLevel.Verbose,
+            [
+                "sent CONNECT, remaining length 24",
+                "received CONNACK, remaining length 2",
+                "sent SUBSCRIBE, remaining length 6",
+                "received SUBACK, remaining length 3",
+                "received PUBLISH, remaining length 5",
+                "received DISCONNECT, remaining length 0",
+            ],
+            log);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -81,6 +102,15 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         await RunAsync(new ScriptedConnection(Connack), log, "mqtt://h/t", new byte[200]);
 
+        AssertLog(
+            DiagnosticLogLevel.Verbose,
+            [
+                "sent CONNECT, remaining length 24",
+                "received CONNACK, remaining length 2",
+                "sent PUBLISH, remaining length 203",
+                "sent DISCONNECT, remaining length 0",
+            ],
+            log);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -99,6 +129,8 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Hex("20 02 00 05")), log);
 
+        Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
+        AssertLog(DiagnosticLogLevel.Error, ["failed with WeirdServerReply (8): Expected 0000 but got 0005"], log);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         CollectionAssert.AreEqual(new[] { "CONNACK return code 5" }, log.At(DiagnosticLogLevel.Info));
         CollectionAssert.AreEqual(
@@ -112,8 +144,9 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
         var connector = new FakeConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect"));
 
-        await new MqttProtocolHandler(connector, () => "PBadK4E3").ExecuteAsync(Context("mqtt://h/t", log));
+        await ExecuteAsync(connector, Context("mqtt://h/t", log), log);
 
+        AssertLog(DiagnosticLogLevel.Error, ["failed with CouldntConnect (7): Failed to connect"], log);
         CollectionAssert.AreEqual(new[] { "failed with CouldntConnect (7): Failed to connect" }, log.At(DiagnosticLogLevel.Error));
         Assert.HasCount(1, log.Lines);
     }
@@ -125,6 +158,8 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Connack, Suback, PublishHi), log);
 
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("log lines", 1, log.Lines.Count);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.HasCount(1, log.Lines);
         Assert.AreEqual((DiagnosticLogLevel.Error, DiagnosticLogComponents.Mqtt, "failed with RecvError (56): Connection disconnected"), log.Lines[0]);
@@ -136,8 +171,9 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Info);
         FakeConnector connector = FakeConnector.For(new ScriptedConnection(Connack, Suback, Disconnect));
 
-        await new MqttProtocolHandler(connector, () => "PBadK4E3").ExecuteAsync(Context("mqtt://h/t", log));
+        await ExecuteAsync(connector, Context("mqtt://h/t", log), log);
 
+        Diagnostics.Assert("target log is the context's", true, connector.Targets.Select(target => ReferenceEquals(log, target.DiagnosticLog)).FirstOrDefault());
         Assert.AreSame(log, connector.Targets.Single().DiagnosticLog);
     }
 
@@ -154,9 +190,10 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
             Credentials = new NetworkCredential("user", Secret),
         };
 
-        TransferResult result = await new MqttProtocolHandler(FakeConnector.For(new ScriptedConnection(Connack, Suback, Disconnect)), () => "PBadK4E3")
-            .ExecuteAsync(context);
+        TransferResult result = await ExecuteAsync(FakeConnector.For(new ScriptedConnection(Connack, Suback, Disconnect)), context, log);
 
+        Diagnostics.Assert("success", true, result.IsSuccess);
+        Diagnostics.Assert("a line contains the password", false, log.Lines.Any(line => line.Message.Contains(Secret, StringComparison.OrdinalIgnoreCase)));
         Assert.IsTrue(result.IsSuccess);
         Assert.IsNotEmpty(log.Lines);
         CollectionAssert.Contains(log.At(DiagnosticLogLevel.Verbose), "sent CONNECT, remaining length 38");
@@ -170,6 +207,7 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         await RunAsync(new ScriptedConnection(Hex("30 02 00 00"), Suback, Disconnect), log);
 
+        AssertLog(DiagnosticLogLevel.Warning, ["unexpected PUBLISH, remaining length 2: taken as the CONNACK"], log);
         CollectionAssert.AreEqual(
             new[] { "unexpected PUBLISH, remaining length 2: taken as the CONNACK" },
             log.At(DiagnosticLogLevel.Warning));
@@ -184,6 +222,7 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Hex("40 00"), Hex("20 02 41 42")), log);
 
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(
             new[]
@@ -206,13 +245,40 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
         TimeProvider = new SteppingTimeProvider(),
     };
 
-    private static async Task<TransferResult> RunAsync(
+    private Task<TransferResult> RunAsync(
         ScriptedConnection connection,
-        IDiagnosticLog log,
+        RecordingDiagnosticLog log,
         string url = "mqtt://h/t",
         ReadOnlyMemory<byte>? postData = null) =>
-        await new MqttProtocolHandler(FakeConnector.For(connection), () => "PBadK4E3")
-            .ExecuteAsync(Context(url, log, postData));
+        ExecuteAsync(FakeConnector.For(connection), Context(url, log, postData), log);
+
+    /// <summary>
+    /// Runs the transfer, writing its URL, options and scripted reads as ARRANGE lines and its
+    /// result, bytes sent and the log's lines as ACT lines.
+    /// </summary>
+    private async Task<TransferResult> ExecuteAsync(FakeConnector connector, TransferContext context, RecordingDiagnosticLog log)
+    {
+        ScriptedConnection? scripted = connector.Connection as ScriptedConnection;
+        Diagnostics.ArrangeContext(context);
+        if (scripted is not null)
+        {
+            Diagnostics.ArrangeReads(scripted.Reads);
+        }
+
+        TransferResult result = await new MqttProtocolHandler(connector, () => "PBadK4E3").ExecuteAsync(context);
+
+        Diagnostics.ActResult(result);
+        if (scripted is not null)
+        {
+            Diagnostics.ActPackets("sent", scripted.Written);
+        }
+
+        Diagnostics.ActLog(log);
+        return result;
+    }
+
+    private void AssertLog(DiagnosticLogLevel level, string[] expected, RecordingDiagnosticLog log) =>
+        Diagnostics.Assert($"{level} lines", MqttDiagnostics.Lines(expected), MqttDiagnostics.Lines(log.At(level)));
 
     /// <summary>A clock that moves 250 ms each time it is read, so the elapsed time logged is fixed.</summary>
     private sealed class SteppingTimeProvider : TimeProvider

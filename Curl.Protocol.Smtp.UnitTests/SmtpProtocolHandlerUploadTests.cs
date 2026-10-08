@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -18,6 +19,11 @@ namespace Curl.Protocol.Smtp;
 public sealed class SmtpProtocolHandlerUploadTests
 {
     private const string Url = "smtp://127.0.0.1:18025/dom";
+
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private const string Greeting = "220 localhost ESMTP\r\n";
 
@@ -53,10 +59,13 @@ public sealed class SmtpProtocolHandlerUploadTests
     public async Task ExecuteAsync_Upload_SendsTheMessageAsCurlDoes(string body, string sentMessage)
     {
         var progress = new RecordingProgress();
+        Diagnostics.Bytes("message body sent", Encoding.Latin1.GetBytes(body));
         SmtpRun run = await RunAsync(Accepting, new MemoryStream(Encoding.Latin1.GetBytes(body)), progress: progress);
 
+        Diagnostics.Diff("sent", Envelope + sentMessage + Quit, run.Sent);
         Assert.AreEqual(Envelope + sentMessage + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.Ok, null, 250, sentMessage.Length);
+        Diagnostics.AssertValues("last progress", ((long)sentMessage.Length, (long?)body.Length), progress.Uploaded[^1]);
         Assert.AreEqual(((long)sentMessage.Length, (long?)body.Length), progress.Uploaded[^1]);
     }
 
@@ -65,10 +74,13 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         // -T - with "hi\n.x\n" on standard input: size_upload 11, the meter's Total the bytes sent.
         var progress = new RecordingProgress();
+        Diagnostics.Bytes("message body sent", "hi\n.x\n"u8);
         SmtpRun run = await RunAsync(Accepting, new NonSeekableStream("hi\n.x\n"u8.ToArray()), progress: progress);
 
+        Diagnostics.Diff("sent", Envelope + "hi\n.x\n\r\n.\r\n" + Quit, run.Sent);
         Assert.AreEqual(Envelope + "hi\n.x\n\r\n.\r\n" + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.Ok, null, 250, 11);
+        Diagnostics.AssertValues("progress count", 2, progress.Uploaded.Count);
         // The body and the end-of-data mark go out as two sends, as curl sends an upload of unknown size (BL-1198).
         CollectionAssert.AreEqual(new (long, long?)[] { (6, null), (11, null) }, progress.Uploaded);
     }
@@ -79,8 +91,11 @@ public sealed class SmtpProtocolHandlerUploadTests
         var upload = new MemoryStream("skip:one\r\n"u8.ToArray()) { Position = 5 };
         var progress = new RecordingProgress();
 
+        Diagnostics.Arrange("upload position", upload.Position);
+        Diagnostics.Bytes("message body sent", "one\r\n"u8);
         await RunAsync(Accepting, upload, progress: progress);
 
+        Diagnostics.AssertValues("last progress", (8L, (long?)5), progress.Uploaded[^1]);
         Assert.AreEqual((8L, (long?)5), progress.Uploaded[^1]);
     }
 
@@ -92,6 +107,7 @@ public sealed class SmtpProtocolHandlerUploadTests
             Body("one\r\n"),
             new MailRequestOptions { From = "a@b", Recipients = ["c@d", "e@f"] });
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nMAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\nDATA\r\none\r\n.\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\nDATA\r\none\r\n.\r\n" + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.Ok, null, 250, 8);
     }
@@ -106,6 +122,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Accepting, Body("one\r\n"), new MailRequestOptions { From = from, Recipients = [recipient] });
 
+        Diagnostics.Diff("sent", "EHLO dom\r\n" + envelope + "DATA\r\none\r\n.\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\n" + envelope + "DATA\r\none\r\n.\r\n" + Quit, run.Sent);
     }
 
@@ -124,6 +141,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + "550 bad sender\r\n" + Bye, Body("one\r\n"));
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nMAIL FROM:<a@b>\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b>\r\n" + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.SendError, "MAIL failed: 550", 550, 0);
     }
@@ -135,6 +153,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + rcptReply + Bye, Body("one\r\n"));
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nMAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\n" + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.SendError, message, code, 0);
     }
@@ -147,6 +166,7 @@ public sealed class SmtpProtocolHandlerUploadTests
             Body("one\r\n"),
             new MailRequestOptions { From = "a@b", Recipients = ["c@d", "e@f"] });
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nMAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\nRCPT TO:<e@f>\r\n" + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.SendError, "RCPT failed: 550", 550, 0);
     }
@@ -158,6 +178,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Ok + dataReply + Bye, Body("one\r\n"));
 
+        Diagnostics.Diff("sent", Envelope + Quit, run.Sent);
         Assert.AreEqual(Envelope + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.SendError, message, code, 0);
     }
@@ -169,6 +190,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Ok + StartData + doneReply + Bye, Body("one\r\n"));
 
+        Diagnostics.Diff("sent", Envelope + "one\r\n.\r\n" + Quit, run.Sent);
         Assert.AreEqual(Envelope + "one\r\n.\r\n" + Quit, run.Sent);
         AssertResult(run.Result, CurlExitCode.WeirdServerReply, "Weird server reply", code, 8);
     }
@@ -178,6 +200,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply, Body("one\r\n"));
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nMAIL FROM:<a@b>\r\n", run.Sent);
         Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b>\r\n", run.Sent);
         AssertResult(run.Result, CurlExitCode.RecvError, "response reading failed (errno: 0)", 250, 0);
     }
@@ -187,6 +210,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Ok + StartData, Body("one\r\n"));
 
+        Diagnostics.Diff("sent", Envelope + "one\r\n.\r\n", run.Sent);
         Assert.AreEqual(Envelope + "one\r\n.\r\n", run.Sent);
         AssertResult(run.Result, CurlExitCode.RecvError, "response reading failed (errno: 0)", 0, 8);
     }
@@ -196,6 +220,7 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + "250 " + new string('x', 70000) + "\r\n", Body("one\r\n"));
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nMAIL FROM:<a@b>\r\n", run.Sent);
         Assert.AreEqual("EHLO dom\r\nMAIL FROM:<a@b>\r\n", run.Sent);
         AssertResult(run.Result, CurlExitCode.TooLarge, "A value or data field grew larger than allowed", 250, 0);
     }
@@ -206,7 +231,9 @@ public sealed class SmtpProtocolHandlerUploadTests
         // Measured (BL-543): -T mail.txt smtp://127.0.0.1:18125/ with no --mail-rcpt sends HELP.
         SmtpRun run = await RunAsync(Greeting + EhloReply + SmtpRun.HelpReply + Bye, Body("one\r\n"), new MailRequestOptions { From = "a@b" });
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nHELP\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\nHELP\r\n" + Quit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -216,9 +243,11 @@ public sealed class SmtpProtocolHandlerUploadTests
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Upload = Body("one\r\n") };
 
         SmtpRun run = await SmtpRun.ExecuteAsync(
-            context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + SmtpRun.HelpReply + Bye)));
+            Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + SmtpRun.HelpReply + Bye)));
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nHELP\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\nHELP\r\n" + Quit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -227,14 +256,21 @@ public sealed class SmtpProtocolHandlerUploadTests
     {
         SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Bye, null);
 
+        Diagnostics.Diff("sent", "EHLO dom\r\nVRFY c@d\r\n" + Quit, run.Sent);
         Assert.AreEqual("EHLO dom\r\nVRFY c@d\r\n" + Quit, run.Sent);
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
     }
 
     private static MemoryStream Body(string text) => new(Encoding.Latin1.GetBytes(text));
 
-    private static void AssertResult(TransferResult result, CurlExitCode exitCode, string? message, int responseCode, long uploadSize)
+    private void AssertResult(TransferResult result, CurlExitCode exitCode, string? message, int responseCode, long uploadSize)
     {
+        Diagnostics.AssertValues("exit code", exitCode, result.ExitCode);
+        Diagnostics.AssertValues("error message", message, result.ErrorMessage);
+        Diagnostics.AssertValues("bytes transferred", uploadSize, result.BytesTransferred);
+        Diagnostics.AssertValues("response code", responseCode, result.Report?.ResponseCode);
+        Diagnostics.AssertValues("upload size", uploadSize, result.Report?.UploadSize);
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         Assert.AreEqual(uploadSize, result.BytesTransferred);
@@ -242,7 +278,7 @@ public sealed class SmtpProtocolHandlerUploadTests
         Assert.AreEqual(uploadSize, result.Report.UploadSize);
     }
 
-    private static Task<SmtpRun> RunAsync(
+    private Task<SmtpRun> RunAsync(
         string replies,
         Stream? upload,
         MailRequestOptions? mail = null,
@@ -256,6 +292,6 @@ public sealed class SmtpProtocolHandlerUploadTests
             Mail = mail ?? new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
             Progress = progress ?? new RecordingProgress(),
         };
-        return SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
+        return SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
     }
 }

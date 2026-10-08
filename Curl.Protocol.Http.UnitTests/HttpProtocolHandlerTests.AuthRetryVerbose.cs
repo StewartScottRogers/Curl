@@ -25,6 +25,7 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = await AuthRetryEventsAsync(
             new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest }, new ScriptedTokenSource(), KeepAliveDigestChallenge, OkHead + "ok");
 
+        WriteExpectedLines("events to the retry", ExpectedAuthRetryEvents("Digest", "WWW-Authenticate: Digest realm=\"r\", nonce=\"abc\""), AuthRetryLines(events));
         CollectionAssert.AreEqual(ExpectedAuthRetryEvents("Digest", "WWW-Authenticate: Digest realm=\"r\", nonce=\"abc\""), AuthRetryLines(events));
     }
 
@@ -38,6 +39,7 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = await AuthRetryEventsAsync(
             new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Ntlm }, tokens, KeepAliveNtlmChallenge, OkHead + "ok");
 
+        WriteExpectedLines("events to the retry", ExpectedAuthRetryEvents("NTLM", "WWW-Authenticate: NTLM BAUG"), AuthRetryLines(events));
         CollectionAssert.AreEqual(ExpectedAuthRetryEvents("NTLM", "WWW-Authenticate: NTLM BAUG"), AuthRetryLines(events));
     }
 
@@ -47,6 +49,8 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = await AuthRetryEventsAsync(
             new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest }, new ScriptedTokenSource(), KeepAliveDigestChallenge, OkHead + "ok");
 
+        Diagnostics.Act("connections reused", string.Join(" | ", events.Reused));
+        Diagnostics.Assert("connections reused", 1, events.Reused.Count);
         Assert.AreEqual(
             new ConnectionReusedEvent { Scheme = "http", IsProxy = false, HostName = "127.0.0.1", Port = 18183, ConnectionNumber = 0 },
             events.Reused.Single());
@@ -63,6 +67,8 @@ public sealed partial class HttpProtocolHandlerTests
 
         RecordingTransferEvents events = await AuthRetryEventsAsync(options, new ScriptedTokenSource(), KeepAliveDigestChallenge, OkHead + "ok");
 
+        Diagnostics.Act("connections reused", string.Join(" | ", events.Reused));
+        Diagnostics.Assert("connections reused", 1, events.Reused.Count);
         Assert.AreEqual(
             new ConnectionReusedEvent { Scheme = "http", IsProxy = true, HostName = "10.0.0.5", Port = 1080, ConnectionNumber = 0 },
             events.Reused.Single());
@@ -73,6 +79,7 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, KeepAliveProxyDigestChallengeHead + "PPP", ProxyOkHead + "ok");
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url, proxy, auth", $"{ProxyAuthUrl}, {ChallengingProxy.Host}:{ChallengingProxy.Port}, Digest");
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Digest, "e395f7bf9cdabe6947113bd005a4ce2a")
             .ExecuteAsync(new TransferContext
@@ -83,7 +90,12 @@ public sealed partial class HttpProtocolHandlerTests
                 Events = events,
             });
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Act("connections reused", string.Join(" | ", events.Reused));
+        Diagnostics.Assert("connections reused", 1, events.Reused.Count);
         Assert.AreEqual(
             new ConnectionReusedEvent { Scheme = "http", IsProxy = true, HostName = "127.0.0.1", Port = 18603, ConnectionNumber = 0 },
             events.Reused.Single());
@@ -121,14 +133,17 @@ public sealed partial class HttpProtocolHandlerTests
     /// Runs one <c>-u u:p -v</c> transfer of <see cref="AuthUrl" /> against
     /// <paramref name="responses" /> on one connection and gives its events.
     /// </summary>
-    private static async Task<RecordingTransferEvents> AuthRetryEventsAsync(HttpRequestOptions options, ScriptedTokenSource tokens, params string[] responses)
+    private async Task<RecordingTransferEvents> AuthRetryEventsAsync(HttpRequestOptions options, ScriptedTokenSource tokens, params string[] responses)
     {
         TurnTakingConnection connection = new(65536, responses);
         RecordingTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse(AuthUrl), Output = new MemoryStream(), Credentials = new NetworkCredential("u", "p"), Http = options, Events = events };
+        Diagnostics.Arrange("url, auth schemes, responses", $"{AuthUrl}, {options.AuthSchemes}, {responses.Length}");
 
         TransferResult result = await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         return events;
     }

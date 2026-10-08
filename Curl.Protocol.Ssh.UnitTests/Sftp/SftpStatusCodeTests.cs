@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -9,6 +10,8 @@ namespace Curl.Protocol.Ssh.Sftp;
 [TestClass]
 public sealed class SftpStatusCodeTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(1u, CurlExitCode.Ssh, "Unknown error in libssh2")]
     [DataRow(2u, CurlExitCode.RemoteFileNotFound, "No such file or directory")]
@@ -35,7 +38,17 @@ public sealed class SftpStatusCodeTests
     [DataRow(99u, CurlExitCode.Ssh, "Unknown error in libssh2")]
     public void ExitCodeForAndDescriptionOf_EachCode_MatchWhatCurlPrintedAsMeasured(uint code, CurlExitCode exitCode, string description)
     {
-        Assert.AreEqual(exitCode, SftpStatusCode.ExitCodeFor(code));
-        Assert.AreEqual(description, SftpStatusCode.DescriptionOf(code));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("SSH_FXP_STATUS code", code);
+
+        CurlExitCode actualExitCode = SftpStatusCode.ExitCodeFor(code);
+        string actualDescription = SftpStatusCode.DescriptionOf(code);
+        diagnostics.Act("exit code", actualExitCode);
+        diagnostics.Act("description", actualDescription);
+
+        diagnostics.Assert("exit code", exitCode, actualExitCode);
+        diagnostics.Diff("description", description, actualDescription);
+        Assert.AreEqual(exitCode, actualExitCode);
+        Assert.AreEqual(description, actualDescription);
     }
 }

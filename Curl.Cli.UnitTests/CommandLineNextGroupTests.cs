@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -57,11 +58,23 @@ public sealed class CommandLineNextGroupTests
         "krb4", "krb", "delegation", "service-name", "proxy-service-name",
     ];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void OptionTable_EveryRow_IsClassifiedAsGlobalOrPerGroupExactlyOnce()
     {
         HashSet<string> perGroup = new(PerGroupOptionLongNames, StringComparer.Ordinal);
+        Diagnostics.Arrange("per-group long names", perGroup.Count);
+        Diagnostics.Arrange("global long names", CommandLineOptionTable.GlobalOptionLongNames.Count);
 
+        string[] unclassified = [.. CommandLineOptionTable.Rows
+            .Where(row => !(CommandLineOptionTable.GlobalOptionLongNames.Contains(row.LongName) ^ perGroup.Contains(row.LongName)))
+            .Select(row => row.LongName)];
+        Diagnostics.Act("rows", CommandLineOptionTable.Rows.Count);
+        Diagnostics.Assert("rows not in exactly one list", "[]", CommandLineParseDiagnostics.QuoteEach(unclassified));
+        Diagnostics.Assert("rows", CommandLineOptionTable.Rows.Count, CommandLineOptionTable.GlobalOptionLongNames.Count + perGroup.Count);
         foreach (CommandLineOption row in CommandLineOptionTable.Rows)
         {
             Assert.IsTrue(
@@ -77,9 +90,12 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 1, result.Groups.Count);
         Assert.HasCount(1, result.Groups);
         Assert.AreSame(result.Options, result.Groups[0]);
+        Diagnostics.Assert("refusal after groups", null, result.RefusalAfterGroups);
         Assert.IsNull(result.RefusalAfterGroups);
     }
 
@@ -91,9 +107,13 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl, next, SecondUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
+        Diagnostics.Assert("group 0 urls", CommandLineParseDiagnostics.QuoteEach([FirstUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[0].Urls));
         CollectionAssert.AreEqual(new[] { FirstUrl }, result.Groups[0].Urls.ToArray());
+        Diagnostics.Assert("group 1 urls", CommandLineParseDiagnostics.QuoteEach([SecondUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[1].Urls));
         CollectionAssert.AreEqual(new[] { SecondUrl }, result.Groups[1].Urls.ToArray());
     }
 
@@ -102,9 +122,14 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(["-w", "[w]", "-o", "f508a", "-H", "X-A: 1", "-d", "x", FirstUrl, "--next", SecondUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CommandLineOptions first = result.Groups[0];
         CommandLineOptions second = result.Groups[1];
+        Diagnostics.Assert("group 0 write-out", "[w]", first.WriteOut);
+        Diagnostics.Assert("group 1 write-out", null, second.WriteOut);
+        Diagnostics.Assert("group 0 output files", "[\"f508a\"]", CommandLineParseDiagnostics.QuoteEach(first.OutputFiles));
+        Diagnostics.Assert("group 1 headers", "[]", CommandLineParseDiagnostics.QuoteEach(second.Headers));
         Assert.AreEqual("[w]", first.WriteOut);
         Assert.IsNull(second.WriteOut);
         CollectionAssert.AreEqual(new[] { "f508a" }, first.OutputFiles.ToArray());
@@ -120,9 +145,13 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl, "--next", "-v", "-s", "--fail-early", SecondUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         foreach (CommandLineOptions group in result.Groups)
         {
+            Diagnostics.Assert("trace", TraceKind.Verbose, group.Trace);
+            Diagnostics.Assert("silent", true, group.Silent);
+            Diagnostics.Assert("fail early", true, group.FailEarly);
             Assert.AreEqual(TraceKind.Verbose, group.Trace);
             Assert.IsTrue(group.Silent);
             Assert.IsTrue(group.FailEarly);
@@ -134,8 +163,12 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(["--trace-ascii", "t.txt", "--trace-time", "-S", "--no-progress-meter", FirstUrl, "--next", SecondUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
         CommandLineOptions second = result.Groups[1];
+        Diagnostics.Assert("group 1 trace", TraceKind.AsciiDump, second.Trace);
+        Diagnostics.Assert("group 1 trace file", "t.txt", second.TraceFile);
+        Diagnostics.Assert("group 1 trace time, show error, progress meter off", "True, True, True", $"{second.TraceTime}, {second.ShowError}, {second.ProgressMeterOff}");
         Assert.AreEqual(TraceKind.AsciiDump, second.Trace);
         Assert.AreEqual("t.txt", second.TraceFile);
         Assert.IsTrue(second.TraceTime);
@@ -148,8 +181,11 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl, "-:s", SecondUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
+        Diagnostics.Assert("silent", false, CommandLineParseDiagnostics.Peek(result.Options)?.Silent);
         Assert.IsFalse(result.Options.Silent);
     }
 
@@ -158,9 +194,13 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl, "-s:A", SecondUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
+        Diagnostics.Assert("group 1 silent", true, result.Groups[1].Silent);
         Assert.IsTrue(result.Groups[1].Silent);
+        Diagnostics.Assert("group 1 urls", CommandLineParseDiagnostics.QuoteEach([SecondUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[1].Urls));
         CollectionAssert.AreEqual(new[] { SecondUrl }, result.Groups[1].Urls.ToArray());
     }
 
@@ -173,10 +213,15 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
         Assert.IsFalse(result.IsAccepted);
+        Diagnostics.Assert("group count", 0, result.Groups.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
+        Diagnostics.Assert("found at transfer setup", false, CommandLineParseDiagnostics.Peek(result.Refusal)?.FoundAtTransferSetup);
         Assert.IsEmpty(result.Groups);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         Assert.IsFalse(result.Refusal.FoundAtTransferSetup);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { "curl: missing URL before --next", $"curl: option {spelled}: is badly used here", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[] { "curl: missing URL before --next", $"curl: option {spelled}: is badly used here", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
@@ -189,7 +234,9 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
         Assert.IsFalse(result.IsAccepted);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { $"curl: option {spelled}: is badly used here", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelled}: is badly used here", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
@@ -200,7 +247,9 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl, "--no-next", SecondUrl]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
         Assert.IsFalse(result.IsAccepted);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { "curl: option --no-next: the given option cannot be reversed with a --no- prefix", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[] { "curl: option --no-next: the given option cannot be reversed with a --no- prefix", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
@@ -213,9 +262,14 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(silent ? ["-s", FirstUrl, "--next"] : [FirstUrl, "--next"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 1, result.Groups.Count);
         Assert.HasCount(1, result.Groups);
+        Diagnostics.Assert("group 0 urls", CommandLineParseDiagnostics.QuoteEach([FirstUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[0].Urls));
         CollectionAssert.AreEqual(new[] { FirstUrl }, result.Groups[0].Urls.ToArray());
+        Diagnostics.Assert("refusal after groups exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.RefusalAfterGroups)?.ExitCode);
+        Diagnostics.Assert("refusal after groups stderr lines", CommandLineParseDiagnostics.QuoteEach(refusalLines), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.RefusalAfterGroups)?.StandardErrorLines ?? []));
         Assert.IsNotNull(result.RefusalAfterGroups);
         Assert.AreEqual(CurlExitCode.FailedInit, result.RefusalAfterGroups.ExitCode);
         CollectionAssert.AreEqual(refusalLines, result.RefusalAfterGroups.StandardErrorLines.ToArray());
@@ -226,7 +280,10 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(["-s", "-F", "a=b", "-d", "z", FirstUrl, "--next", SecondUrl]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
         Assert.IsFalse(result.IsAccepted);
+        Diagnostics.Assert("found at transfer setup", true, CommandLineParseDiagnostics.Peek(result.Refusal)?.FoundAtTransferSetup);
+        Diagnostics.Assert("stderr lines", "[]", CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         Assert.IsTrue(result.Refusal.FoundAtTransferSetup);
         Assert.IsEmpty(result.Refusal.StandardErrorLines);
     }
@@ -236,10 +293,13 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl, "--next", SecondUrl, "--next", "-F", "a=b", "-d", "z", ThirdUrl]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
         Assert.IsNotNull(result.RefusalAfterGroups);
         CommandLineParseResult alone = Parse(["-F", "a=b", "-d", "z", ThirdUrl]);
+        Diagnostics.Assert("refusal after groups stderr lines", CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(alone.Refusal)?.StandardErrorLines ?? []), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.RefusalAfterGroups)?.StandardErrorLines ?? []));
         Assert.IsNotEmpty(alone.Refusal!.StandardErrorLines);
         CollectionAssert.AreEqual(alone.Refusal.StandardErrorLines.ToArray(), result.RefusalAfterGroups.StandardErrorLines.ToArray());
     }
@@ -252,7 +312,9 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(arguments);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("warning lines after transfers", warnings, result.WarningLinesAfterTransfers.Count);
         CollectionAssert.AreEqual(
             Enumerable.Repeat(CommandLineWarning.MoreOutputOptionsThanUrls, warnings).ToArray(),
             result.WarningLinesAfterTransfers.ToArray());
@@ -263,9 +325,13 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(["-s", "-K", "k1.txt"], ("k1.txt", $"url = \"{FirstUrl}\"\nnext\nurl = \"{SecondUrl}\"\n"));
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
+        Diagnostics.Assert("group 0 urls", CommandLineParseDiagnostics.QuoteEach([FirstUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[0].Urls));
         CollectionAssert.AreEqual(new[] { FirstUrl }, result.Groups[0].Urls.ToArray());
+        Diagnostics.Assert("group 1 urls", CommandLineParseDiagnostics.QuoteEach([SecondUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[1].Urls));
         CollectionAssert.AreEqual(new[] { SecondUrl }, result.Groups[1].Urls.ToArray());
     }
 
@@ -274,8 +340,12 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(["-K", "k2.txt"], ("k2.txt", $"next\nurl = \"{SecondUrl}\"\n"));
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 1, result.Groups.Count);
         Assert.HasCount(1, result.Groups);
+        Diagnostics.Assert("urls", CommandLineParseDiagnostics.QuoteEach([SecondUrl]), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Options)?.Urls ?? []));
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         CollectionAssert.AreEqual(new[] { SecondUrl }, result.Options.Urls.ToArray());
         Assert.IsEmpty(result.WarningLines);
     }
@@ -285,11 +355,15 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(["-s", FirstUrl, "-K", "k4.txt", SecondUrl], ("k4.txt", "-d x\n-:\n-H \"X-B: 2\"\n"));
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
+        Diagnostics.Assert("group 1 headers", "[\"X-B: 2\"]", CommandLineParseDiagnostics.QuoteEach(result.Groups[1].Headers));
         Assert.IsNotNull(result.Groups[0].PostData);
         Assert.IsEmpty(result.Groups[0].Headers);
         CollectionAssert.AreEqual(new[] { "X-B: 2" }, result.Groups[1].Headers.ToArray());
+        Diagnostics.Assert("group 1 urls", CommandLineParseDiagnostics.QuoteEach([SecondUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[1].Urls));
         CollectionAssert.AreEqual(new[] { SecondUrl }, result.Groups[1].Urls.ToArray());
     }
 
@@ -301,8 +375,11 @@ public sealed class CommandLineNextGroupTests
             ("outer.txt", "-K inner.txt\nnext\n"),
             ("inner.txt", $"url = \"{FirstUrl}\"\nnext\n"));
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
+        Diagnostics.Assert("group 1 urls", CommandLineParseDiagnostics.QuoteEach([SecondUrl]), CommandLineParseDiagnostics.QuoteEach(result.Groups[1].Urls));
         CollectionAssert.AreEqual(new[] { SecondUrl }, result.Groups[1].Urls.ToArray());
     }
 
@@ -311,7 +388,9 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse(["-K", "k.txt", "--next", FirstUrl], ("k.txt", "silent\n"));
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
         Assert.IsFalse(result.IsAccepted);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { "curl: option --next: is badly used here", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(new[] { "curl: option --next: is badly used here", TryHelp }, result.Refusal.StandardErrorLines.ToArray());
     }
 
@@ -319,13 +398,24 @@ public sealed class CommandLineNextGroupTests
     public void Parse_UserWithoutPasswordInSeveralGroups_PromptsForEachWithItsUrlNumber()
     {
         RecordingPasswordPrompt prompt = new("pw");
+        string[] arguments = ["-u", "bob", FirstUrl, "--next", "-U", "pat;opts", SecondUrl];
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("prompt answer", "pw");
 
         CommandLineParseResult result = CommandLineParser.Parse(
-            ["-u", "bob", FirstUrl, "--next", "-U", "pat;opts", SecondUrl],
+            arguments,
             _ => true,
             prompt,
             new RecordingDataFileReader());
+        ActGroups(result);
+        Diagnostics.Act("prompts", CommandLineParseDiagnostics.QuoteEach(prompt.Prompts));
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert(
+            "prompts",
+            "[\"Enter host password for user 'bob' on URL #1:\", \"Enter proxy password for user 'pat' on URL #2:\"]",
+            CommandLineParseDiagnostics.QuoteEach(prompt.Prompts));
+        Diagnostics.Assert("group passwords", "pw, pw", $"{result.Groups.ElementAtOrDefault(0)?.Credentials?.Password}, {result.Groups.ElementAtOrDefault(1)?.ProxyCredentials?.Password}");
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "Enter host password for user 'bob' on URL #1:", "Enter proxy password for user 'pat' on URL #2:" },
@@ -339,26 +429,59 @@ public sealed class CommandLineNextGroupTests
     {
         CommandLineParseResult result = Parse([FirstUrl, "--next", "-V", "--bogus"]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("version requested", true, CommandLineParseDiagnostics.Peek(result.Options)?.VersionRequested);
         Assert.IsTrue(result.Options.VersionRequested);
+        Diagnostics.Assert("group count", 2, result.Groups.Count);
         Assert.HasCount(2, result.Groups);
     }
 
     [TestMethod]
     public void NextGroup_NullLongName_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineOption.NextGroup(null!, ':'));
+        Diagnostics.Arrange("long name", null);
+        Diagnostics.Arrange("short name", ':');
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineOption.NextGroup(null!, ':'));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "longName", exception.ParamName);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, params (string Name, string Contents)[] files)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, params (string Name, string Contents)[] files)
     {
+        Diagnostics.ArrangeArguments(arguments);
         RecordingDataFileReader reader = new();
         foreach ((string name, string contents) in files)
         {
-            reader.Files[name] = Encoding.UTF8.GetBytes(contents);
+            byte[] bytes = Encoding.UTF8.GetBytes(contents);
+            Diagnostics.Bytes("config file " + name, bytes);
+            reader.Files[name] = bytes;
         }
 
-        return CommandLineParser.Parse(arguments, _ => true, new RecordingPasswordPrompt(string.Empty), reader);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new RecordingPasswordPrompt(string.Empty), reader);
+        ActGroups(result);
+        return result;
+    }
+
+    private void ActGroups(CommandLineParseResult result)
+    {
+        Diagnostics.ActParse(result);
+        Diagnostics.Act("group count", result.Groups.Count);
+        for (int index = 0; index < result.Groups.Count; index++)
+        {
+            Diagnostics.Act($"group {index} urls", CommandLineParseDiagnostics.QuoteEach(result.Groups[index].Urls));
+        }
+
+        if (result.RefusalAfterGroups is { } refusal)
+        {
+            Diagnostics.Act("refusal after groups exit code", $"{(int)refusal.ExitCode} ({refusal.ExitCode})");
+            foreach (string line in refusal.StandardErrorLines)
+            {
+                Diagnostics.Act("refusal after groups stderr", line);
+            }
+        }
     }
 
     private sealed class RecordingPasswordPrompt(string answer) : IPasswordPrompt

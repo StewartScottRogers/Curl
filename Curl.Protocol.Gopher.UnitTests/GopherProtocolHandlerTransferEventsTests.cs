@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Gopher.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Gopher;
 
@@ -19,6 +20,11 @@ public sealed class GopherProtocolHandlerTransferEventsTests
 
     private const string MissingCloseNotify = "schannel: server closed abruptly (missing close_notify)";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("gopher://h/1/")]
     [DataRow("gopher://h/0/file")]
@@ -28,9 +34,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
         // and no "=> Send data" for the selector.
         ScriptedConnection connection = new(Latin1(MeasuredMenu));
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines([MeasuredMenu]));
 
-        await new GopherProtocolHandler(Connector(connection, 2)).ExecuteAsync(Context(url, events));
+        TransferResult result = await new GopherProtocolHandler(Connector(connection, 2)).ExecuteAsync(Context(url, events));
+        Report(result, events);
 
+        AssertTranscript(["<= " + MeasuredMenu, "<= ", "* shutting down connection #2"], events);
         CollectionAssert.AreEqual(
             new[] { "<= " + MeasuredMenu, "<= ", "* shutting down connection #2" },
             events.Transcript);
@@ -41,9 +51,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     {
         ScriptedConnection connection = new(Latin1("iHello"), Latin1("\r\n.\r\n"));
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("url", "gopher://h/1/");
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines(["iHello", "\r\n.\r\n"]));
 
-        await new GopherProtocolHandler(Connector(connection, 0)).ExecuteAsync(Context("gopher://h/1/", events));
+        TransferResult result = await new GopherProtocolHandler(Connector(connection, 0)).ExecuteAsync(Context("gopher://h/1/", events));
+        Report(result, events);
 
+        AssertTranscript(["<= iHello", "<= \r\n.\r\n", "<= ", "* shutting down connection #0"], events);
         CollectionAssert.AreEqual(
             new[] { "<= iHello", "<= \r\n.\r\n", "<= ", "* shutting down connection #0" },
             events.Transcript);
@@ -54,9 +68,12 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     {
         // Measured: gopher://127.0.0.1:47939/1a%00b wrote "* shutting down connection #0" and exited 3.
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("url", "gopher://h/1a%00b");
 
-        await new GopherProtocolHandler(Connector(new ScriptedConnection(), 0)).ExecuteAsync(Context("gopher://h/1a%00b", events));
+        TransferResult result = await new GopherProtocolHandler(Connector(new ScriptedConnection(), 0)).ExecuteAsync(Context("gopher://h/1a%00b", events));
+        Report(result, events);
 
+        AssertTranscript(["* shutting down connection #0"], events);
         CollectionAssert.AreEqual(new[] { "* shutting down connection #0" }, events.Transcript);
     }
 
@@ -71,9 +88,14 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             ReadFailure = new MissingCloseNotifyException(MissingCloseNotify),
         };
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("url", "gophers://h/1/");
+        Diagnostics.Arrange("scripted reads", "\"iHello\\tfake\\t(NULL)\\t0\\r\\n.\\r\\n\", then a read that throws MissingCloseNotifyException");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 0)).ExecuteAsync(Context("gophers://h/1/", events));
+        Report(result, events);
 
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 25, MissingCloseNotify), result);
+        AssertTranscript(["<= iHello\tfake\t(NULL)\t0\r\n.\r\n", "* " + MissingCloseNotify, "* closing connection #0"], events);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 25, MissingCloseNotify), result);
         CollectionAssert.AreEqual(
             new[] { "<= iHello\tfake\t(NULL)\t0\r\n.\r\n", "* " + MissingCloseNotify, "* closing connection #0" },
@@ -88,9 +110,15 @@ public sealed class GopherProtocolHandlerTransferEventsTests
         ScriptedConnection connection = new(Latin1("x\r\n"));
         TranscriptTransferEvents events = new();
         TransferContext context = new() { Url = CurlUrl.Parse("gopher://h/1"), Output = new WriteRefusingStream(), Events = events };
+        Diagnostics.Arrange("url", "gopher://h/1");
+        Diagnostics.Arrange("scripted reads", DiagnosticText.Lines(["x\r\n"]));
+        Diagnostics.Arrange("output", "every write throws a plain IOException");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 0)).ExecuteAsync(context);
+        Report(result, events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.WriteError, result.ExitCode);
+        AssertTranscript(["<= x\r\n", "* " + result.ErrorMessage, "* closing connection #0"], events);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "<= x\r\n", "* " + result.ErrorMessage, "* closing connection #0" },
@@ -102,9 +130,14 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     {
         ScriptedConnection connection = new(Latin1("iHe"), null);
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("url", "gopher://h/1/");
+        Diagnostics.Arrange("scripted reads", "\"iHe\", then a read that throws a plain IOException");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 1)).ExecuteAsync(Context("gopher://h/1/", events));
+        Report(result, events);
 
+        Diagnostics.Diff("error message", "Failure when receiving data from the peer", result.ErrorMessage ?? string.Empty);
+        AssertTranscript(["<= iHe", "* closing connection #1"], events);
         Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
         CollectionAssert.AreEqual(new[] { "<= iHe", "* closing connection #1" }, events.Transcript);
     }
@@ -123,9 +156,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             WriteFailure = new IOException("reset", new SocketException((int)SocketError.ConnectionReset)),
         };
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("failing write", $"write {failingWrite} throws a connection reset");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 3)).ExecuteAsync(Context("gopher://h/1sel", events));
+        Report(result, events);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
+        AssertTranscript(["* Send failure: Connection was reset", "* Failed sending Gopher request", "* closing connection #3"], events);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
         CollectionAssert.AreEqual(
             new[] { "* Send failure: Connection was reset", "* Failed sending Gopher request", "* closing connection #3" },
@@ -145,9 +182,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             WriteFailure = new IOException("reset", reset),
         };
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("failing write", $"write {failingWrite} throws a connection reset: {reset.Message}");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 3)).ExecuteAsync(Context("gopher://h/1sel", events));
+        Report(result, events);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + reset.Message), result);
+        AssertTranscript(["* Send failure: " + reset.Message, "* Failed sending Gopher request", "* closing connection #3"], events);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + reset.Message), result);
         CollectionAssert.AreEqual(
             new[] { "* Send failure: " + reset.Message, "* Failed sending Gopher request", "* closing connection #3" },
@@ -161,9 +202,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     {
         ScriptedConnection connection = new() { FailingWriteNumber = failingWrite };
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("failing write", $"write {failingWrite} throws a plain IOException");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 0)).ExecuteAsync(Context("gopher://h/1sel", events));
+        Report(result, events);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
+        AssertTranscript(["* Failed sending Gopher request", "* closing connection #0"], events);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         CollectionAssert.AreEqual(
             new[] { "* Failed sending Gopher request", "* closing connection #0" },
@@ -179,10 +224,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             FailWrites = true,
             WriteFailure = new IOException("aborted", new SocketException((int)SocketError.ConnectionAborted)),
         };
+        Diagnostics.Arrange("connection", "every write throws a connection abort");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 0))
             .ExecuteAsync(Context("gopher://h/1sel", new TranscriptTransferEvents()));
+        Report(result, null);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
     }
 
@@ -196,10 +244,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             FailWrites = true,
             WriteFailure = new IOException("aborted", aborted),
         };
+        Diagnostics.Arrange("connection", "every write throws a connection abort: " + aborted.Message);
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 0))
             .ExecuteAsync(Context("gopher://h/1sel", new TranscriptTransferEvents()));
+        Report(result, null);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + aborted.Message), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + aborted.Message), result);
     }
 
@@ -217,9 +268,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             ReadFailure = new IOException("failed", new SocketException((int)error)),
         };
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("scripted reads", $"\"iHe\", then a read that throws socket error {error}");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 2)).ExecuteAsync(Context("gopher://h/1/", events));
+        Report(result, events);
 
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + words), result);
+        AssertTranscript(["<= iHe", "* Recv failure: " + words, "* closing connection #2"], events);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + words), result);
         CollectionAssert.AreEqual(
             new[] { "<= iHe", "* Recv failure: " + words, "* closing connection #2" },
@@ -238,9 +293,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
             ReadFailure = new IOException("failed", failure),
         };
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("scripted reads", $"\"iHe\", then a read that throws socket error {error}: {failure.Message}");
 
         TransferResult result = await new GopherProtocolHandler(Connector(connection, 2)).ExecuteAsync(Context("gopher://h/1/", events));
+        Report(result, events);
 
+        Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + failure.Message), result);
+        AssertTranscript(["<= iHe", "* Recv failure: " + failure.Message, "* closing connection #2"], events);
         Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + failure.Message), result);
         CollectionAssert.AreEqual(
             new[] { "<= iHe", "* Recv failure: " + failure.Message, "* closing connection #2" },
@@ -251,10 +310,13 @@ public sealed class GopherProtocolHandlerTransferEventsTests
     public async Task ExecuteAsync_ConnectFails_ReportsNothing()
     {
         TranscriptTransferEvents events = new();
+        Diagnostics.Arrange("connect result", "Failed CouldntConnect \"refused\"");
 
-        await new GopherProtocolHandler(new FakeConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused")))
+        TransferResult result = await new GopherProtocolHandler(new FakeConnector(ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused")))
             .ExecuteAsync(Context("gopher://h/1/", events));
+        Report(result, events);
 
+        Diagnostics.Assert("transcript line count", 0, events.Transcript.Count);
         Assert.IsEmpty(events.Transcript);
     }
 
@@ -265,4 +327,16 @@ public sealed class GopherProtocolHandlerTransferEventsTests
         new() { Url = CurlUrl.Parse(url), Output = new MemoryStream(), Events = events };
 
     private static byte[] Latin1(string text) => System.Text.Encoding.Latin1.GetBytes(text);
+
+    private void Report(TransferResult result, TranscriptTransferEvents? events)
+    {
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        if (events is not null)
+        {
+            Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
+        }
+    }
+
+    private void AssertTranscript(string[] expected, TranscriptTransferEvents events) =>
+        Diagnostics.Diff("transcript", DiagnosticText.Lines(expected), DiagnosticText.Lines(events.Transcript));
 }

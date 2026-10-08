@@ -1,6 +1,7 @@
 using System.Formats.Asn1;
 using System.Text;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Keys;
@@ -14,6 +15,10 @@ namespace Curl.Protocol.Ssh.Keys;
 public sealed class SshPrivateKeyReaderTests
 {
     private static readonly byte[] Secret = Encoding.UTF8.GetBytes(TestUserKeys.Passphrase);
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow(TestUserKeys.RsaPkcs1, DisplayName = "PKCS #1")]
@@ -33,8 +38,12 @@ public sealed class SshPrivateKeyReaderTests
     [DataRow(TestUserKeys.RsaPkcs1TripleDes, DisplayName = "PKCS #1, PEM 3DES")]
     public void Read_RsaKeyInEachFormat_ReadsTheKeyOfItsPublicKeyFile(string text)
     {
+        Diagnostics.ArrangeText("key file", text);
+
         SshPrivateKey? key = SshPrivateKeyReader.Read(text, Secret);
 
+        Diagnostics.ActKey(key);
+        Diagnostics.AssertBytes("public key blob", SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob, key?.PublicKeyBlob);
         Assert.IsInstanceOfType<RsaSshPrivateKey>(key);
         Assert.AreEqual("ssh-rsa", key.KeyType);
         CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob, key.PublicKeyBlob);
@@ -51,9 +60,14 @@ public sealed class SshPrivateKeyReaderTests
     public void Read_EcdsaKeyInEachFormat_ReadsTheKeyOfItsPublicKeyFile(string text, string publicKeyFile)
     {
         SshPublicKey expected = SshPublicKeyFile.Parse(publicKeyFile).Key!;
+        Diagnostics.ArrangeText("key file", text);
+        Diagnostics.ArrangeText("public key file", publicKeyFile);
 
         SshPrivateKey? key = SshPrivateKeyReader.Read(text, Secret);
 
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key type", expected.KeyType, key?.KeyType);
+        Diagnostics.AssertBytes("public key blob", expected.Blob, key?.PublicKeyBlob);
         Assert.IsInstanceOfType<EcdsaSshPrivateKey>(key);
         Assert.AreEqual(expected.KeyType, key.KeyType);
         CollectionAssert.AreEqual(expected.Blob, key.PublicKeyBlob);
@@ -71,9 +85,13 @@ public sealed class SshPrivateKeyReaderTests
             "pkcs8" => Pem("PRIVATE KEY", TestDsaKey.Pkcs8()),
             _ => Pem("OPENSSH PRIVATE KEY", TestDsaKey.OpenSsh()),
         };
+        Diagnostics.Arrange("format", format);
+        Diagnostics.ArrangeText("key file", text);
 
         SshPrivateKey? key = SshPrivateKeyReader.Read(text, []);
 
+        Diagnostics.ActKey(key);
+        Diagnostics.AssertBytes("public key blob", TestDsaKey.PublicKeyBlob, key?.PublicKeyBlob);
         Assert.IsInstanceOfType<DsaSshPrivateKey>(key);
         CollectionAssert.AreEqual(TestDsaKey.PublicKeyBlob, key.PublicKeyBlob);
     }
@@ -86,8 +104,16 @@ public sealed class SshPrivateKeyReaderTests
     [DataRow(TestUserKeys.EcdsaP256Sec1Aes128, DisplayName = "EC PEM AES-128")]
     public void Read_EncryptedKeyWithoutOrWithAWrongPassphrase_ReadsNoneAsMeasured(string text)
     {
-        Assert.IsNull(SshPrivateKeyReader.Read(text, []), "no --pass");
-        Assert.IsNull(SshPrivateKeyReader.Read(text, Encoding.UTF8.GetBytes("nope")), "wrong --pass");
+        Diagnostics.ArrangeText("key file", text);
+        Diagnostics.Arrange("passphrases", "none, then \"nope\"");
+
+        SshPrivateKey? withoutPassphrase = SshPrivateKeyReader.Read(text, []);
+        SshPrivateKey? withWrongPassphrase = SshPrivateKeyReader.Read(text, Encoding.UTF8.GetBytes("nope"));
+
+        WriteKeyExpectingNone("no --pass", withoutPassphrase);
+        WriteKeyExpectingNone("wrong --pass", withWrongPassphrase);
+        Assert.IsNull(withoutPassphrase, "no --pass");
+        Assert.IsNull(withWrongPassphrase, "wrong --pass");
     }
 
     [TestMethod]
@@ -102,7 +128,12 @@ public sealed class SshPrivateKeyReaderTests
     [DataRow("", DisplayName = "empty file")]
     public void Read_KeyThisDoesNotRead_ReadsNone(string text)
     {
-        Assert.IsNull(SshPrivateKeyReader.Read(text, Secret));
+        Diagnostics.ArrangeText("key file", text);
+
+        SshPrivateKey? key = SshPrivateKeyReader.Read(text, Secret);
+
+        WriteKeyExpectingNone("key", key);
+        Assert.IsNull(key);
     }
 
     [TestMethod]
@@ -117,8 +148,16 @@ public sealed class SshPrivateKeyReaderTests
     [DataRow("aes256-gcm@openssh.com")]
     public void Read_Ed25519KeyEncryptedWithEachCipher_ReadsTheKeyOfItsPublicKeyFile(string cipher)
     {
-        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSshEncrypted[cipher], Secret);
+        Diagnostics.Arrange("cipher", cipher);
 
+        SshPrivateKey? key;
+        using (Diagnostics.Phase("read and decrypt"))
+        {
+            key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSshEncrypted[cipher], Secret);
+        }
+
+        Diagnostics.ActKey(key);
+        Diagnostics.AssertBytes("public key blob", SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile).Key!.Blob, key?.PublicKeyBlob);
         Assert.IsInstanceOfType<Ed25519SshPrivateKey>(key);
         Assert.AreEqual("ssh-ed25519", key.KeyType);
         CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile).Key!.Blob, key.PublicKeyBlob);
@@ -130,30 +169,60 @@ public sealed class SshPrivateKeyReaderTests
     public void Read_EncryptedOpenSshKeyWithoutOrWithAWrongPassphrase_ReadsNone(string cipher)
     {
         string text = TestUserKeys.Ed25519OpenSshEncrypted[cipher];
+        Diagnostics.Arrange("cipher", cipher);
+        Diagnostics.Arrange("passphrases", "none, then \"nope\"");
 
-        Assert.IsNull(SshPrivateKeyReader.Read(text, []), "no --pass");
-        Assert.IsNull(SshPrivateKeyReader.Read(text, Encoding.UTF8.GetBytes("nope")), "wrong --pass");
+        SshPrivateKey? withoutPassphrase;
+        SshPrivateKey? withWrongPassphrase;
+        using (Diagnostics.Phase("read without a passphrase"))
+        {
+            withoutPassphrase = SshPrivateKeyReader.Read(text, []);
+        }
+
+        using (Diagnostics.Phase("read with a wrong passphrase"))
+        {
+            withWrongPassphrase = SshPrivateKeyReader.Read(text, Encoding.UTF8.GetBytes("nope"));
+        }
+
+        WriteKeyExpectingNone("no --pass", withoutPassphrase);
+        WriteKeyExpectingNone("wrong --pass", withWrongPassphrase);
+        Assert.IsNull(withoutPassphrase, "no --pass");
+        Assert.IsNull(withWrongPassphrase, "wrong --pass");
     }
 
     [TestMethod]
     public void Read_Ed25519KeyEncryptedWithChaCha20Poly1305_ReadsNoneAsLibssh2Does()
     {
-        Assert.IsNull(SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSshEncrypted["chacha20-poly1305@openssh.com"], Secret));
+        Diagnostics.Arrange("cipher", "chacha20-poly1305@openssh.com");
+
+        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSshEncrypted["chacha20-poly1305@openssh.com"], Secret);
+
+        WriteKeyExpectingNone("key", key);
+        Assert.IsNull(key);
     }
 
     [TestMethod]
     public void Read_Ed25519OpenSsh_ReadsTheKeyOfItsPublicKeyFile()
     {
+        Diagnostics.ArrangeText("key file", TestUserKeys.Ed25519OpenSsh);
+
         SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519OpenSsh, []);
 
+        Diagnostics.ActKey(key);
+        Diagnostics.AssertBytes("public key blob", SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile).Key!.Blob, key?.PublicKeyBlob);
         CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.Ed25519PublicKeyFile).Key!.Blob, key!.PublicKeyBlob);
     }
 
     [TestMethod]
     public void Read_Ed25519Pkcs8_ReadsTheKeyOpenSslDerives()
     {
+        byte[] expected = SshPublicKeyFile.Parse("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGX8BTc94jNCFKn//daYyhhor97hE+LfZyYTJxcsfXpY").Key!.Blob;
+        Diagnostics.ArrangeText("key file", TestUserKeys.Ed25519Pkcs8);
+
         SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.Ed25519Pkcs8, []);
 
+        Diagnostics.ActKey(key);
+        Diagnostics.AssertBytes("public key blob", expected, key?.PublicKeyBlob);
         Assert.IsInstanceOfType<Ed25519SshPrivateKey>(key);
         CollectionAssert.AreEqual(SshPublicKeyFile.Parse("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGX8BTc94jNCFKn//daYyhhor97hE+LfZyYTJxcsfXpY").Key!.Blob, key.PublicKeyBlob);
     }
@@ -161,17 +230,40 @@ public sealed class SshPrivateKeyReaderTests
     [TestMethod]
     public void Read_RsaOpenSshEncrypted_ReadsAnRsaKey()
     {
-        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.RsaOpenSshEncrypted, Encoding.UTF8.GetBytes("enc"));
+        Diagnostics.Arrange("passphrases", "\"enc\", then the wrong one");
 
+        SshPrivateKey? key;
+        SshPrivateKey? withWrongPassphrase;
+        using (Diagnostics.Phase("read with the passphrase"))
+        {
+            key = SshPrivateKeyReader.Read(TestUserKeys.RsaOpenSshEncrypted, Encoding.UTF8.GetBytes("enc"));
+        }
+
+        using (Diagnostics.Phase("read with a wrong passphrase"))
+        {
+            withWrongPassphrase = SshPrivateKeyReader.Read(TestUserKeys.RsaOpenSshEncrypted, Secret);
+        }
+
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key class", nameof(RsaSshPrivateKey), key?.GetType().Name);
+        WriteKeyExpectingNone("wrong --pass", withWrongPassphrase);
         Assert.IsInstanceOfType<RsaSshPrivateKey>(key);
-        Assert.IsNull(SshPrivateKeyReader.Read(TestUserKeys.RsaOpenSshEncrypted, Secret), "wrong --pass");
+        Assert.IsNull(withWrongPassphrase, "wrong --pass");
     }
 
     [TestMethod]
     public void Read_EcdsaOpenSshEncryptedWithAes256Gcm_ReadsTheKeyOfItsPublicKeyFile()
     {
-        SshPrivateKey? key = SshPrivateKeyReader.Read(TestUserKeys.EcdsaP256OpenSshAes256Gcm, Secret);
+        Diagnostics.Arrange("cipher", "aes256-gcm@openssh.com");
 
+        SshPrivateKey? key;
+        using (Diagnostics.Phase("read and decrypt"))
+        {
+            key = SshPrivateKeyReader.Read(TestUserKeys.EcdsaP256OpenSshAes256Gcm, Secret);
+        }
+
+        Diagnostics.ActKey(key);
+        Diagnostics.AssertBytes("public key blob", SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile).Key!.Blob, key?.PublicKeyBlob);
         CollectionAssert.AreEqual(SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile).Key!.Blob, key!.PublicKeyBlob);
     }
 
@@ -188,21 +280,46 @@ public sealed class SshPrivateKeyReaderTests
             }
         }
 
-        Assert.IsNull(SshPrivateKeyReader.Read(Pem("DSA PRIVATE KEY", writer.Encode()), []));
+        string text = Pem("DSA PRIVATE KEY", writer.Encode());
+        Diagnostics.Arrange("DSA fields", "version 0, p q g y x all 7");
+        Diagnostics.ArrangeText("key file", text);
+
+        SshPrivateKey? key = SshPrivateKeyReader.Read(text, []);
+
+        WriteKeyExpectingNone("key", key);
+        Assert.IsNull(key);
     }
 
     [TestMethod]
     public void Read_CrLfLineEnds_ReadsTheKey()
     {
         string text = TestUserKeys.RsaPkcs1.Replace("\n", "\r\n", StringComparison.Ordinal);
+        Diagnostics.ArrangeText("key file", text);
 
-        Assert.IsNotNull(SshPrivateKeyReader.Read(text, []));
+        SshPrivateKey? key = SshPrivateKeyReader.Read(text, []);
+
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key read", true, key is not null);
+        Assert.IsNotNull(key);
     }
 
     [TestMethod]
     public void Read_TextBeforeTheBlock_ReadsTheKey()
     {
-        Assert.IsNotNull(SshPrivateKeyReader.Read("Bag Attributes\n" + TestUserKeys.EcdsaP256Sec1, []));
+        string text = "Bag Attributes\n" + TestUserKeys.EcdsaP256Sec1;
+        Diagnostics.ArrangeText("key file", text);
+
+        SshPrivateKey? key = SshPrivateKeyReader.Read(text, []);
+
+        Diagnostics.ActKey(key);
+        Diagnostics.Assert("key read", true, key is not null);
+        Assert.IsNotNull(key);
+    }
+
+    private void WriteKeyExpectingNone(string label, SshPrivateKey? key)
+    {
+        Diagnostics.Act(label, key is null ? "(none)" : $"{key.GetType().Name} {key.KeyType}");
+        Diagnostics.Assert(label, "(none)", key?.KeyType ?? "(none)");
     }
 
     private static string Pem(string label, byte[] body) =>

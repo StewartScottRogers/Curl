@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -31,6 +32,11 @@ public sealed class SmtpProtocolHandlerEventTests
     private static readonly string[] OpenedSession =
         ["< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 SMTPUTF8\r\n"];
 
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_Upload_ReportsEachLineTheMessageAsOneDataEventAndLeavesTheConnectionIntact()
     {
@@ -38,18 +44,18 @@ public sealed class SmtpProtocolHandlerEventTests
 
         await RunAsync(Greeting + EhloReply + Ok + Ok + StartData + Accepted + Bye, events, "Subject: hi\r\n\r\nHello\r\n");
 
-        CollectionAssert.AreEqual(
-            (string[])[
-                .. OpenedSession,
-                "> MAIL FROM:<a@b>\r\n", "< 250 OK\r\n",
-                "> RCPT TO:<c@d>\r\n", "< 250 OK\r\n",
-                "> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n",
-                "} 25",
-                "* upload completely sent off: 25 bytes",
-                "< 250 OK message accepted\r\n",
-                "* Connection #0 to host 127.0.0.1:18025 left intact",
-            ],
-            events.Transcript);
+        string[] expected = [
+            .. OpenedSession,
+            "> MAIL FROM:<a@b>\r\n", "< 250 OK\r\n",
+            "> RCPT TO:<c@d>\r\n", "< 250 OK\r\n",
+            "> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n",
+            "} 25",
+            "* upload completely sent off: 25 bytes",
+            "< 250 OK message accepted\r\n",
+            "* Connection #0 to host 127.0.0.1:18025 left intact",
+        ];
+        AssertTranscript(expected, events.Transcript);
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
@@ -59,9 +65,10 @@ public sealed class SmtpProtocolHandlerEventTests
 
         await RunAsync(Greeting + EhloReply + Ok + Ok + StartData + Accepted + Bye, events, new string('x', 65536) + "yz");
 
-        CollectionAssert.AreEqual(
-            (string[])["} 65536", "} 7", "* upload completely sent off: 65543 bytes"],
-            events.Transcript.Where(line => line[0] is '}' or '*').SkipLast(1).ToArray());
+        string[] expected = ["} 65536", "} 7", "* upload completely sent off: 65543 bytes"];
+        string[] actual = events.Transcript.Where(line => line[0] is '}' or '*').SkipLast(1).ToArray();
+        AssertTranscript(expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -71,15 +78,15 @@ public sealed class SmtpProtocolHandlerEventTests
 
         await RunAsync(Greeting + EhloReply + Ok + "550 no such user\r\n" + Bye, events, "one\r\n");
 
-        CollectionAssert.AreEqual(
-            (string[])[
-                .. OpenedSession,
-                "> MAIL FROM:<a@b>\r\n", "< 250 OK\r\n",
-                "> RCPT TO:<c@d>\r\n", "< 550 no such user\r\n",
-                "* RCPT failed: 550",
-                "* shutting down connection #0",
-            ],
-            events.Transcript);
+        string[] expected = [
+            .. OpenedSession,
+            "> MAIL FROM:<a@b>\r\n", "< 250 OK\r\n",
+            "> RCPT TO:<c@d>\r\n", "< 550 no such user\r\n",
+            "* RCPT failed: 550",
+            "* shutting down connection #0",
+        ];
+        AssertTranscript(expected, events.Transcript);
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
@@ -89,9 +96,9 @@ public sealed class SmtpProtocolHandlerEventTests
 
         await RunAsync("554 go away\r\n", events, "one\r\n");
 
-        CollectionAssert.AreEqual(
-            (string[])["< 554 go away\r\n", "* Got unexpected smtp-server response: 554", "* closing connection #0"],
-            events.Transcript);
+        string[] expected = ["< 554 go away\r\n", "* Got unexpected smtp-server response: 554", "* closing connection #0"];
+        AssertTranscript(expected, events.Transcript);
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
@@ -104,16 +111,20 @@ public sealed class SmtpProtocolHandlerEventTests
 
         SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Ok + StartData + "554 rejected\r\n" + Bye, events, "hi\r\n");
 
+        string[] expected = [
+            "} 7",
+            "* upload completely sent off: 7 bytes",
+            "< 554 rejected\r\n",
+            "* Connection #0 to host 127.0.0.1:18025 left intact",
+        ];
+        Diagnostics.AssertValues("exit code", CurlExitCode.WeirdServerReply, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Weird server reply", run.Result.ErrorMessage);
+        AssertTranscript(expected, events.Transcript.TakeLast(4));
+        Diagnostics.Assert("transcript holds \"* Weird server reply\"", false, events.Transcript.Contains("* Weird server reply"));
+        Diagnostics.AssertValues("sent ends with", "QUIT\r\n", run.Sent.Length >= 6 ? run.Sent[^6..] : run.Sent);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, run.Result.ExitCode);
         Assert.AreEqual("Weird server reply", run.Result.ErrorMessage);
-        CollectionAssert.AreEqual(
-            (string[])[
-                "} 7",
-                "* upload completely sent off: 7 bytes",
-                "< 554 rejected\r\n",
-                "* Connection #0 to host 127.0.0.1:18025 left intact",
-            ],
-            events.Transcript.TakeLast(4).ToArray());
+        CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(4).ToArray());
         CollectionAssert.DoesNotContain(events.Transcript.ToArray(), "* Weird server reply");
         StringAssert.EndsWith(run.Sent, "QUIT\r\n");
     }
@@ -125,10 +136,11 @@ public sealed class SmtpProtocolHandlerEventTests
 
         SmtpRun run = await RunAsync(Greeting + EhloReply + "552 too big\r\n" + Bye, events, "hi\r\n");
 
+        string[] expected = ["< 552 too big\r\n", "* MAIL failed: 552", "* shutting down connection #0"];
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
+        AssertTranscript(expected, events.Transcript.TakeLast(3));
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
-        CollectionAssert.AreEqual(
-            (string[])["< 552 too big\r\n", "* MAIL failed: 552", "* shutting down connection #0"],
-            events.Transcript.TakeLast(3).ToArray());
+        CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(3).ToArray());
     }
 
     [TestMethod]
@@ -138,10 +150,11 @@ public sealed class SmtpProtocolHandlerEventTests
 
         SmtpRun run = await RunAsync(Greeting + EhloReply + Ok + Ok + StartData + "554 re\0jected\r\n" + Bye, events, "hi\r\n");
 
+        string[] expected = ["* upload completely sent off: 7 bytes", "* Nul byte in server response line", "* closing connection #0"];
+        Diagnostics.AssertValues("exit code", CurlExitCode.WeirdServerReply, run.Result.ExitCode);
+        AssertTranscript(expected, events.Transcript.TakeLast(3));
         Assert.AreEqual(CurlExitCode.WeirdServerReply, run.Result.ExitCode);
-        CollectionAssert.AreEqual(
-            (string[])["* upload completely sent off: 7 bytes", "* Nul byte in server response line", "* closing connection #0"],
-            events.Transcript.TakeLast(3).ToArray());
+        CollectionAssert.AreEqual(expected, events.Transcript.TakeLast(3).ToArray());
     }
 
     [TestMethod]
@@ -151,14 +164,14 @@ public sealed class SmtpProtocolHandlerEventTests
 
         await RunAsync(Greeting + EhloReply + "250 Recorder <recorder@localhost>\r\n" + Bye, events, upload: null);
 
-        CollectionAssert.AreEqual(
-            (string[])[
-                .. OpenedSession,
-                "> VRFY c@d\r\n", "< 250 Recorder <recorder@localhost>\r\n",
-                "{ 35",
-                "* Connection #0 to host 127.0.0.1:18025 left intact",
-            ],
-            events.Transcript);
+        string[] expected = [
+            .. OpenedSession,
+            "> VRFY c@d\r\n", "< 250 Recorder <recorder@localhost>\r\n",
+            "{ 35",
+            "* Connection #0 to host 127.0.0.1:18025 left intact",
+        ];
+        AssertTranscript(expected, events.Transcript);
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
@@ -168,9 +181,9 @@ public sealed class SmtpProtocolHandlerEventTests
 
         await RunAsync("hello\n220 ready\n" + EhloReply + "250 x\r\n" + Bye, events, upload: null);
 
-        CollectionAssert.AreEqual(
-            (string[])["< hello\n", "< 220 ready\n", "> EHLO client\r\n"],
-            events.Transcript.Take(3).ToArray());
+        string[] expected = ["< hello\n", "< 220 ready\n", "> EHLO client\r\n"];
+        AssertTranscript(expected, events.Transcript.Take(3));
+        CollectionAssert.AreEqual(expected, events.Transcript.Take(3).ToArray());
     }
 
     [TestMethod]
@@ -180,11 +193,12 @@ public sealed class SmtpProtocolHandlerEventTests
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Events = events };
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { WritesBeforeFailure = 0 };
 
-        await SmtpRun.ExecuteAsync(context, connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, connection);
+        Diagnostics.ActEvents(run.Result, events);
 
-        CollectionAssert.AreEqual(
-            (string[])["< 220 localhost ESMTP\r\n", "* closing connection #0"],
-            events.Transcript);
+        string[] expected = ["< 220 localhost ESMTP\r\n", "* closing connection #0"];
+        AssertTranscript(expected, events.Transcript);
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
@@ -201,11 +215,12 @@ public sealed class SmtpProtocolHandlerEventTests
         };
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + Ok + Ok + StartData)) { WritesBeforeFailure = 4 };
 
-        await SmtpRun.ExecuteAsync(context, connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, connection);
+        Diagnostics.ActEvents(run.Result, events);
 
-        CollectionAssert.AreEqual(
-            (string[])["> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n", "* closing connection #0"],
-            events.Transcript.Skip(OpenedSession.Length + 4).Take(3).ToArray());
+        string[] expected = ["> DATA\r\n", "< 354 End data with <CR><LF>.<CR><LF>\r\n", "* closing connection #0"];
+        AssertTranscript(expected, events.Transcript.Skip(OpenedSession.Length + 4).Take(3));
+        CollectionAssert.AreEqual(expected, events.Transcript.Skip(OpenedSession.Length + 4).Take(3).ToArray());
     }
 
     [TestMethod]
@@ -226,19 +241,24 @@ public sealed class SmtpProtocolHandlerEventTests
             SslLevel = TransportSecurityLevel.Required,
         };
 
-        TransferResult result = await new SmtpProtocolHandler(connector, tls).ExecuteAsync(context);
+        Diagnostics.ArrangeContext(context, plaintext.Script + " / after STARTTLS: " + secured.Script);
 
+        TransferResult result = await new SmtpProtocolHandler(connector, tls).ExecuteAsync(context);
+        Diagnostics.ActEvents(result, events);
+
+        string[] expected = [
+            "+ opened #3 to 127.0.0.1",
+            "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 STARTTLS\r\n",
+            "> STARTTLS\r\n", "< 220 Ready to start TLS\r\n",
+            "+ opened #3 to 127.0.0.1",
+            "> EHLO client\r\n",
+        ];
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, result);
+        Diagnostics.Assert("handshake events are the transfer's events", true, ReferenceEquals(events, tls.HandshakeEvents.Single()));
+        AssertTranscript(expected, events.Transcript.Take(9));
         Assert.AreEqual(SmtpRun.HelpAnswered, result);
         Assert.AreSame(events, tls.HandshakeEvents.Single());
-        CollectionAssert.AreEqual(
-            (string[])[
-                "+ opened #3 to 127.0.0.1",
-                "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 STARTTLS\r\n",
-                "> STARTTLS\r\n", "< 220 Ready to start TLS\r\n",
-                "+ opened #3 to 127.0.0.1",
-                "> EHLO client\r\n",
-            ],
-            events.Transcript.Take(9).ToArray());
+        CollectionAssert.AreEqual(expected, events.Transcript.Take(9).ToArray());
     }
 
     [TestMethod]
@@ -255,10 +275,15 @@ public sealed class SmtpProtocolHandlerEventTests
         };
 
         SmtpRun run = await SmtpRun.ExecuteAsync(
+            Diagnostics,
             context,
             new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + "250-localhost\r\n250 STARTTLS\r\n220 Ready to start TLS\r\n")),
+            null,
             ConnectResult.Connected(secured));
+        Diagnostics.ActEvents(run.Result, events);
 
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
+        Diagnostics.Assert("a transcript line starts with '+'", false, events.Transcript.Any(line => line.StartsWith('+')));
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith('+')));
     }
@@ -276,15 +301,21 @@ public sealed class SmtpProtocolHandlerEventTests
             events,
             new NonSeekableStream("Subject: x\r\n\r\nhi\r\n"u8.ToArray()));
 
-        CollectionAssert.AreEqual(
-            (string[])["< 354 End data with <CR><LF>.<CR><LF>\r\n", "} 18", "} 3", "* upload completely sent off: 21 bytes"],
-            events.Transcript.SkipWhile(line => !line.StartsWith("< 354", StringComparison.Ordinal)).Take(4).ToArray());
+        string[] expected = ["< 354 End data with <CR><LF>.<CR><LF>\r\n", "} 18", "} 3", "* upload completely sent off: 21 bytes"];
+        string[] actual = events.Transcript.SkipWhile(line => !line.StartsWith("< 354", StringComparison.Ordinal)).Take(4).ToArray();
+        AssertTranscript(expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
-    private static Task<SmtpRun> RunAsync(string replies, RecordingTransferEvents events, string? upload) =>
+    private static string Join(IEnumerable<string> lines) => string.Join(" | ", lines.Select(SmtpDiagnostics.Show));
+
+    private void AssertTranscript(string[] expected, IEnumerable<string> actual) =>
+        Diagnostics.Assert("transcript", Join(expected), Join(actual));
+
+    private Task<SmtpRun> RunAsync(string replies, RecordingTransferEvents events, string? upload) =>
         RunUploadAsync(replies, events, upload is null ? null : new MemoryStream(Encoding.Latin1.GetBytes(upload)));
 
-    private static Task<SmtpRun> RunUploadAsync(string replies, RecordingTransferEvents events, Stream? upload)
+    private async Task<SmtpRun> RunUploadAsync(string replies, RecordingTransferEvents events, Stream? upload)
     {
         var context = new TransferContext
         {
@@ -294,6 +325,8 @@ public sealed class SmtpProtocolHandlerEventTests
             Upload = upload,
             Mail = new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
         };
-        return SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
+        Diagnostics.ActEvents(run.Result, events);
+        return run;
     }
 }

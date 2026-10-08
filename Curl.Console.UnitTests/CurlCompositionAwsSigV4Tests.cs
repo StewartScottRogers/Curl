@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -15,6 +16,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionAwsSigV4Tests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Ok = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello";
 
     private const string EmptyPayloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -32,6 +37,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl628, "--aws-sigv4", "aws:amz:us-east-1:s3", "http://127.0.0.1:18628/bucket/key%20a?b=2&a=1&c");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual(
             "GET /bucket/key%20a?b=2&a=1&c HTTP/1.1\r\n"
@@ -51,6 +57,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl628, "--aws-sigv4", "aws:amz:us-east-1:s3", "-d", "hello=world", "http://127.0.0.1:18628/upload");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual(
             "POST /upload HTTP/1.1\r\n"
@@ -73,6 +80,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl628.AddSeconds(1), "--aws-sigv4", "osc", "--connect-to", "::127.0.0.1:18628", "http://fcu.eu-west-2.outscale.com:18628/path");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual(
             "GET /path HTTP/1.1\r\n"
@@ -91,6 +99,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "--aws-sigv4", "aws:amz:us-east-1:s3", "-H", "X-Custom:  a   b ", "-H", "Content-Type: text/plain", "http://127.0.0.1:18629/bucket/key");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual(
             "GET /bucket/key HTTP/1.1\r\n"
@@ -116,6 +125,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "-L", "--aws-sigv4", "aws:amz:us-east-1:s3", "http://127.0.0.1:18630/first");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual(
             "GET /first HTTP/1.1\r\n"
@@ -146,6 +156,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, new DateTimeOffset(2026, 9, 29, 20, 42, 0, TimeSpan.Zero), "-v", "--aws-sigv4", "aws:amz:us-east-1:s3", "http://127.0.0.1:18633/x");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         StringAssert.Contains(
             standardError.Replace("\r\n", "\n", StringComparison.Ordinal),
@@ -169,6 +180,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "-v", "--aws-sigv4", "aws:amz", "http://s3.eu-west-1.localhost:18644/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         StringAssert.Contains(
             standardError.Replace("\r\n", "\n", StringComparison.Ordinal),
@@ -186,6 +198,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "-v", "--aws-sigv4", "aws:amz:us-east-1:s3", "http://s3.eu-west-1.localhost:18644/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.DoesNotContain("picked", standardError, StringComparison.Ordinal);
         StringAssert.Contains(standardError, "* aws_sigv4: String to sign", StringComparison.Ordinal);
@@ -198,6 +211,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "--aws-sigv4", "aws:amz", "http://s3.eu-west-1.localhost:18644/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual(string.Empty, standardError);
     }
@@ -213,6 +227,7 @@ public sealed class CurlCompositionAwsSigV4Tests
 
         (int exitCode, string standardError) = await RunAsync(server, MeasuredForBl629, "--aws-sigv4", "aws", "http://localhost:18631/x");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.UrlMalformat, exitCode);
         Assert.AreEqual((int)CurlExitCode.UrlMalformat, exitCode);
         Assert.AreEqual("curl: (3) aws-sigv4: service missing in parameters and hostname\n", standardError.Replace("\r\n", "\n", StringComparison.Ordinal));
         Assert.AreEqual(0, server.Written.Length);
@@ -222,22 +237,32 @@ public sealed class CurlCompositionAwsSigV4Tests
     /// Runs <c>-sS -u AKID:SECRET</c> and <paramref name="arguments" /> through the production
     /// composition over <paramref name="server" />, signing at <paramref name="now" />.
     /// </summary>
-    private static async Task<(int ExitCode, string StandardError)> RunAsync(ScriptedConnector server, DateTimeOffset now, params string[] arguments)
+    private async Task<(int ExitCode, string StandardError)> RunAsync(ScriptedConnector server, DateTimeOffset now, params string[] arguments)
     {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
+        Diagnostics.Arrange("arguments", "-sS -u AKID:SECRET " + string.Join(' ', arguments));
+        Diagnostics.Arrange("signing clock", now.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
 
-        int exitCode = await CurlComposition
-            .CreateRunner(
-                standardOutput,
-                standardError,
-                standardInput,
-                server,
-                new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
-                signingClock: new FixedUtcClock(now))
-            .RunAsync(["-sS", "-u", "AKID:SECRET", .. arguments]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await CurlComposition
+                .CreateRunner(
+                    standardOutput,
+                    standardError,
+                    standardInput,
+                    server,
+                    new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"),
+                    signingClock: new FixedUtcClock(now))
+                .RunAsync(["-sS", "-u", "AKID:SECRET", .. arguments]);
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("request", server.Written);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
         return (exitCode, Encoding.Latin1.GetString(standardError.ToArray()));
     }
 

@@ -3,6 +3,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -26,6 +27,10 @@ public sealed class CurlCommandRunnerTransferOptionTests
     private readonly FileProtocolHandler fileHandler =
         new(new InMemoryFileSystem { ReadContent = Encoding.ASCII.GetBytes("0123456789") });
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());
@@ -35,8 +40,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-r", "0-4", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "01234", StandardOutputText);
         Assert.AreEqual("01234", StandardOutputText);
+        Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
@@ -49,10 +57,14 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-s", "-k", "-r", rangeText, SshUrl], sftp);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, StandardErrorText);
+        Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
         Assert.AreEqual(string.Empty, StandardErrorText);
         ITransferContext context = sftp.Contexts.Single();
+        Diagnostics.Assert("range text", rangeText, context.RangeText);
         Assert.AreEqual(rangeText, context.RangeText);
+        Diagnostics.Assert("range", "null", context.Range?.ToString() ?? "null");
         Assert.IsNull(context.Range);
     }
 
@@ -66,10 +78,14 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-s", "-r", rangeText, scheme + "://127.0.0.1/f"], http);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
         Assert.AreEqual(string.Empty, StandardErrorText);
         ITransferContext context = http.Contexts.Single();
+        Diagnostics.Assert("range text", rangeText, context.RangeText);
         Assert.AreEqual(rangeText, context.RangeText);
+        Diagnostics.Assert("range", "null", context.Range?.ToString() ?? "null");
         Assert.IsNull(context.Range);
     }
 
@@ -80,9 +96,12 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-r", "0-9,20-29", "http://127.0.0.1/f"], http);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         ITransferContext context = http.Contexts.Single();
+        Diagnostics.Assert("range text", "0-9,20-29", context.RangeText);
         Assert.AreEqual("0-9,20-29", context.RangeText);
+        Diagnostics.Assert("range", ByteRange.Bounded(0, 9), context.Range);
         Assert.AreEqual(ByteRange.Bounded(0, 9), context.Range);
     }
 
@@ -93,13 +112,23 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-k", "-r", "abc", SshUrl], sftp);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode, StandardErrorText);
+        Diagnostics.Assert(
+            "stderr starts with the invalid-character warning",
+            true,
+            Normalized(StandardErrorText).StartsWith(
+                "Warning: Invalid character is found in given range. A specified range MUST \n"
+                + "Warning: have only digits in 'start'-'stop'. The server's response to this \n"
+                + "Warning: request is uncertain.\n",
+                StringComparison.Ordinal));
         Assert.StartsWith(
             Lines(
                 "Warning: Invalid character is found in given range. A specified range MUST ",
                 "Warning: have only digits in 'start'-'stop'. The server's response to this ",
                 "Warning: request is uncertain."),
             StandardErrorText);
+        Diagnostics.Assert("range text", "abc", sftp.Contexts.Single().RangeText);
         Assert.AreEqual("abc", sftp.Contexts.Single().RangeText);
     }
 
@@ -108,7 +137,9 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-r", "3-1", "-o", "out.txt", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 33, exitCode);
         Assert.AreEqual(33, exitCode);
+        Diagnostics.Assert("out.txt written", false, outputFiles.Written.ContainsKey("out.txt"));
         Assert.IsFalse(outputFiles.Written.ContainsKey("out.txt"));
     }
 
@@ -126,12 +157,16 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-r", "5abc", SourceUrl], file);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         string warning = Lines(
             "Warning: A specified range MUST include at least one dash (-). Appending one ",
             "Warning: for you");
+        Diagnostics.Diff("stderr", Normalized(warning), Normalized(StandardErrorText));
         Assert.AreEqual(warning, StandardErrorText);
+        Diagnostics.Assert("stderr bytes at dispatch", Encoding.UTF8.GetByteCount(warning), standardErrorLengthAtDispatch);
         Assert.AreEqual(Encoding.UTF8.GetByteCount(warning), standardErrorLengthAtDispatch);
+        Diagnostics.Assert("range", ByteRange.FromOffset(5), file.Contexts.Single().Range);
         Assert.AreEqual(ByteRange.FromOffset(5), file.Contexts.Single().Range);
     }
 
@@ -140,7 +175,16 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-r", "abc", "--bogus", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.FailedInit, exitCode);
         Assert.AreEqual((int)CurlExitCode.FailedInit, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Invalid character is found in given range. A specified range MUST \n"
+            + "Warning: have only digits in 'start'-'stop'. The server's response to this \n"
+            + "Warning: request is uncertain.\n"
+            + "curl: option --bogus: is unknown\n"
+            + CommandLineRefusal.TryHelpLine + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines(
                 "Warning: Invalid character is found in given range. A specified range MUST ",
@@ -158,7 +202,15 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-r", "abc", "-r", "5", "--bogus", SourceUrl], fileHandler, terminalColumns: 200);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.FailedInit, exitCode);
         Assert.AreEqual((int)CurlExitCode.FailedInit, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Invalid character is found in given range. A specified range MUST have only digits in 'start'-'stop'. The server's response to this request is uncertain.\n"
+            + "Warning: A specified range MUST include at least one dash (-). Appending one for you\n"
+            + "curl: option --bogus: is unknown\n"
+            + CommandLineRefusal.TryHelpLine + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines(
                 "Warning: Invalid character is found in given range. A specified range MUST have only digits in 'start'-'stop'. The server's response to this request is uncertain.",
@@ -173,7 +225,22 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-r", "abc", "-r", "5", "--bogus", SourceUrl], fileHandler, terminalColumns: 40);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.FailedInit, exitCode);
         Assert.AreEqual((int)CurlExitCode.FailedInit, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Invalid character is found in \n"
+            + "Warning: given range. A specified range \n"
+            + "Warning: MUST have only digits in \n"
+            + "Warning: 'start'-'stop'. The server's \n"
+            + "Warning: response to this request is \n"
+            + "Warning: uncertain.\n"
+            + "Warning: A specified range MUST include \n"
+            + "Warning: at least one dash (-). \n"
+            + "Warning: Appending one for you\n"
+            + "curl: option --bogus: is unknown\n"
+            + CommandLineRefusal.TryHelpLine + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines(
                 "Warning: Invalid character is found in ",
@@ -195,8 +262,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["--max-filesize", "9", "-o", "out.txt", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 63, exitCode);
         Assert.AreEqual(63, exitCode);
+        Diagnostics.Diff("out.txt", "012345678", WrittenText("out.txt"));
         Assert.AreEqual("012345678", WrittenText("out.txt"));
+        Diagnostics.Diff("stderr", "curl: (63) Exceeded the maximum allowed file size (9) with 9 bytes\n", Normalized(StandardErrorText));
         Assert.AreEqual("curl: (63) Exceeded the maximum allowed file size (9) with 9 bytes" + NewLine, StandardErrorText);
     }
 
@@ -208,8 +278,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
         await RunAsync([SourceUrl], file);
 
         ITransferContext context = file.Contexts.Single();
+        Diagnostics.Assert("range", "null", context.Range?.ToString() ?? "null");
         Assert.IsNull(context.Range);
+        Diagnostics.Assert("resume from", "null", context.ResumeFrom?.ToString() ?? "null");
         Assert.IsNull(context.ResumeFrom);
+        Diagnostics.Assert("max file size", "null", context.MaxFileSize?.ToString() ?? "null");
         Assert.IsNull(context.MaxFileSize);
     }
 
@@ -218,7 +291,9 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-C", "5", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "56789", StandardOutputText);
         Assert.AreEqual("56789", StandardOutputText);
     }
 
@@ -229,8 +304,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-C", "5", "-o", "out.txt", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("out.txt", "XYZ56789", WrittenText("out.txt"));
         Assert.AreEqual("XYZ56789", WrittenText("out.txt"));
+        Diagnostics.Assert("write modes", FileWriteMode.Append, string.Join(", ", outputFiles.WriteModes));
         CollectionAssert.AreEqual(new[] { FileWriteMode.Append }, outputFiles.WriteModes);
     }
 
@@ -241,8 +319,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-C", "0", "-o", "out.txt", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("out.txt", "0123456789", WrittenText("out.txt"));
         Assert.AreEqual("0123456789", WrittenText("out.txt"));
+        Diagnostics.Assert("write modes", FileWriteMode.Truncate, string.Join(", ", outputFiles.WriteModes));
         CollectionAssert.AreEqual(new[] { FileWriteMode.Truncate }, outputFiles.WriteModes);
     }
 
@@ -253,7 +334,9 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-C", "-", "-o", "out.txt", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("out.txt", "ABCD456789", WrittenText("out.txt"));
         Assert.AreEqual("ABCD456789", WrittenText("out.txt"));
     }
 
@@ -264,8 +347,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-C", "-", "-o", "out.txt", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("out.txt", "0123456789", WrittenText("out.txt"));
         Assert.AreEqual("0123456789", WrittenText("out.txt"));
+        Diagnostics.Assert("write modes", FileWriteMode.Truncate, string.Join(", ", outputFiles.WriteModes));
         CollectionAssert.AreEqual(new[] { FileWriteMode.Truncate }, outputFiles.WriteModes);
     }
 
@@ -276,8 +362,11 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-C", "-", "-o", "out.txt", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 36, exitCode);
         Assert.AreEqual(36, exitCode);
+        Diagnostics.Diff("out.txt", "0123456789AB", WrittenText("out.txt"));
         Assert.AreEqual("0123456789AB", WrittenText("out.txt"));
+        Diagnostics.Diff("stderr", "curl: (36) failed to resume file:// transfer\n", Normalized(StandardErrorText));
         Assert.AreEqual("curl: (36) failed to resume file:// transfer" + NewLine, StandardErrorText);
     }
 
@@ -288,6 +377,7 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         await RunAsync(["-C", "-", SourceUrl], file);
 
+        Diagnostics.Assert("resume from", "null", file.Contexts.Single().ResumeFrom?.ToString() ?? "null");
         Assert.IsNull(file.Contexts.Single().ResumeFrom);
     }
 
@@ -299,11 +389,17 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-C", "3", "-o", "d", SourceUrl], file);
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: cannot open 'd'\ncurl: (23) Failed writing received data to disk/application\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: cannot open 'd'" + NewLine
             + "curl: (23) Failed writing received data to disk/application" + NewLine,
             StandardErrorText);
+        Diagnostics.Assert("dispatched contexts", 0, file.Contexts.Count);
         Assert.IsEmpty(file.Contexts);
     }
 
@@ -315,12 +411,19 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-C", "3", SourceUrl, SourceUrl, "-o", "d", "-o", "o9.txt"], file);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.WriteError, exitCode);
         Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: cannot open 'd'\ncurl: (23) Failed writing received data to disk/application\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: cannot open 'd'" + NewLine
             + "curl: (23) Failed writing received data to disk/application" + NewLine,
             StandardErrorText);
+        Diagnostics.Assert("dispatched contexts", 0, file.Contexts.Count);
         Assert.IsEmpty(file.Contexts);
+        Diagnostics.Assert("o9.txt written", false, outputFiles.Written.ContainsKey("o9.txt"));
         Assert.IsFalse(outputFiles.Written.ContainsKey("o9.txt"));
     }
 
@@ -331,7 +434,9 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(["-s", "-C", "3", "-o", "d", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
@@ -342,6 +447,10 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         await RunAsync(["-z", "-1 Jan 2000", SourceUrl], file);
 
+        Diagnostics.Assert(
+            "time condition",
+            new TimeCondition(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfUnmodifiedSince),
+            file.Contexts.Single().TimeCondition);
         Assert.AreEqual(
             new TimeCondition(new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero), TimeConditionKind.IfUnmodifiedSince),
             file.Contexts.Single().TimeCondition);
@@ -354,6 +463,7 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         await RunAsync([SourceUrl], file);
 
+        Diagnostics.Assert("time condition", "null", file.Contexts.Single().TimeCondition?.ToString() ?? "null");
         Assert.IsNull(file.Contexts.Single().TimeCondition);
     }
 
@@ -369,8 +479,15 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "0123456789", StandardOutputText);
         Assert.AreEqual("0123456789", StandardOutputText);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Illegal date format for -z, --time-cond (and not a filename). \n"
+            + "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "Warning: Illegal date format for -z, --time-cond (and not a filename). " + NewLine
             + "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax." + NewLine,
@@ -385,7 +502,12 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 200);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines("Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax."),
             StandardErrorText);
@@ -397,7 +519,16 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 40);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Illegal date format for -z, \n"
+            + "Warning: --time-cond (and not a \n"
+            + "Warning: filename). Disabling time \n"
+            + "Warning: condition. See curl_getdate(3) \n"
+            + "Warning: for valid date syntax.\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines(
                 "Warning: Illegal date format for -z, ",
@@ -417,8 +548,16 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "0123456789", StandardOutputText);
         Assert.AreEqual("0123456789", StandardOutputText);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Failed to get filetime: No such file or directory\n"
+            + "Warning: Illegal date format for -z, --time-cond (and not a filename). \n"
+            + "Warning: Disabling time condition. See curl_getdate(3) for valid date syntax.\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines(
                 "Warning: Failed to get filetime: No such file or directory",
@@ -433,7 +572,13 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 200);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Failed to get filetime: No such file or directory\n"
+            + "Warning: Illegal date format for -z, --time-cond (and not a filename). Disabling time condition. See curl_getdate(3) for valid date syntax.\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines(
                 "Warning: Failed to get filetime: No such file or directory",
@@ -447,7 +592,18 @@ public sealed class CurlCommandRunnerTransferOptionTests
     {
         int exitCode = await RunAsync(["-z", "notadate", SourceUrl], fileHandler, terminalColumns: 40);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: Failed to get filetime: No \n"
+            + "Warning: such file or directory\n"
+            + "Warning: Illegal date format for -z, \n"
+            + "Warning: --time-cond (and not a \n"
+            + "Warning: filename). Disabling time \n"
+            + "Warning: condition. See curl_getdate(3) \n"
+            + "Warning: for valid date syntax.\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             Lines(
                 "Warning: Failed to get filetime: No ",
@@ -471,7 +627,12 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
         int exitCode = await RunAsync(arguments, new FileProtocolHandler(destination));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "uploaded bytes",
+            Encoding.ASCII.GetBytes(expected).AsSpan(),
+            destination.Written.Values.Single().ToArray().AsSpan());
         Assert.AreEqual(expected, Encoding.ASCII.GetString(destination.Written.Values.Single().ToArray()));
     }
 
@@ -479,7 +640,35 @@ public sealed class CurlCommandRunnerTransferOptionTests
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, int terminalColumns = TerminalColumns.Default) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false, terminalColumns)
-            .RunAsync(arguments);
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler, int terminalColumns = TerminalColumns.Default)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("handler", handler.GetType().Name);
+        Diagnostics.Arrange("terminal columns", terminalColumns);
+        Diagnostics.Arrange("unreadable paths", string.Join(", ", outputFiles.UnreadablePaths));
+        Diagnostics.Arrange("unwritable paths", string.Join(", ", outputFiles.UnwritablePaths));
+        foreach (KeyValuePair<string, byte[]> existing in outputFiles.ExistingContent)
+        {
+            Diagnostics.Bytes("existing output file " + existing.Key, existing.Value);
+        }
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false, terminalColumns)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout bytes", standardOutput.ToArray());
+        Diagnostics.Act("stderr", Normalized(StandardErrorText));
+        foreach (string path in outputFiles.Written.Keys)
+        {
+            Diagnostics.Bytes("written " + path, outputFiles.Written[path].ToArray());
+        }
+
+        return exitCode;
+    }
 }

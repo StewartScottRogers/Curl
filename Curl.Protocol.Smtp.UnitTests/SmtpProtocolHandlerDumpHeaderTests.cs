@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -17,6 +18,11 @@ public sealed class SmtpProtocolHandlerDumpHeaderTests
 {
     private const string Url = "smtp://127.0.0.1:18725/dom";
 
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Greeting = "220 localhost ESMTP\r\n";
 
     private const string EhloReply =
@@ -30,8 +36,11 @@ public sealed class SmtpProtocolHandlerDumpHeaderTests
         // -Response '220 hi\r\n554 no\r\n': exit 56, the -D file "220 hi\r\n554 no\r\n", stdout empty.
         DumpRun run = await RunAsync("220 hi\r\n554 no\r\n", mail: null, upload: null);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.RecvError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, run.Result.ExitCode);
+        Diagnostics.Diff("dumped headers", "220 hi\r\n554 no\r\n", run.Dumped);
         Assert.AreEqual("220 hi\r\n554 no\r\n", run.Dumped);
+        Diagnostics.Diff("output", string.Empty, run.Output);
         Assert.AreEqual(string.Empty, run.Output);
     }
 
@@ -48,8 +57,11 @@ public sealed class SmtpProtocolHandlerDumpHeaderTests
             new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
             new MemoryStream(Encoding.Latin1.GetBytes("Subject: x\r\n\r\nhi\r\n")));
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Diff("dumped headers", Replies, run.Dumped);
         Assert.AreEqual(Replies, run.Dumped);
+        Diagnostics.Diff("output", string.Empty, run.Output);
         Assert.AreEqual(string.Empty, run.Output);
     }
 
@@ -62,8 +74,11 @@ public sealed class SmtpProtocolHandlerDumpHeaderTests
         DumpRun run = await RunAsync(
             Greeting + EhloReply + Reply + Bye, new MailRequestOptions { CustomCommand = "VRFY c@d" }, upload: null);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Diff("dumped headers", Greeting + EhloReply + Reply, run.Dumped);
         Assert.AreEqual(Greeting + EhloReply + Reply, run.Dumped);
+        Diagnostics.Diff("output", Reply, run.Output);
         Assert.AreEqual(Reply, run.Output);
     }
 
@@ -75,8 +90,11 @@ public sealed class SmtpProtocolHandlerDumpHeaderTests
 
         DumpRun run = await RunAsync(Replies + Bye, mail: null, upload: null);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Diff("dumped headers", Replies, run.Dumped);
         Assert.AreEqual(Replies, run.Dumped);
+        Diagnostics.Diff("output", SmtpRun.HelpReply, run.Output);
         Assert.AreEqual(SmtpRun.HelpReply, run.Output);
     }
 
@@ -94,13 +112,15 @@ public sealed class SmtpProtocolHandlerDumpHeaderTests
         };
 
         SmtpRun run = await SmtpRun.ExecuteAsync(
-            context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + SmtpRun.HelpReply + Bye)));
+            Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + EhloReply + SmtpRun.HelpReply + Bye)));
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Diff("output", SmtpRun.HelpReply, Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(SmtpRun.HelpReply, Encoding.Latin1.GetString(output.ToArray()));
     }
 
-    private static async Task<DumpRun> RunAsync(string replies, MailRequestOptions? mail, Stream? upload)
+    private async Task<DumpRun> RunAsync(string replies, MailRequestOptions? mail, Stream? upload)
     {
         var output = new MemoryStream();
         var dump = new MemoryStream();
@@ -114,7 +134,7 @@ public sealed class SmtpProtocolHandlerDumpHeaderTests
             Progress = new RecordingProgress(),
         };
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
 
         return new DumpRun(run.Result, Encoding.Latin1.GetString(dump.ToArray()), Encoding.Latin1.GetString(output.ToArray()));
     }

@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Mqtt.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Mqtt;
 
@@ -25,6 +26,11 @@ public sealed class MqttProtocolHandlerSendFailureTests
     private static readonly byte[] Subscribe = [0x82, 0x06, 0x00, 0x01, 0x00, 0x01, 0x74, 0x00];
 
     private static readonly byte[] Publish = [0x30, 0x04, 0x00, 0x01, 0x74, 0x78];
+
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
@@ -71,6 +77,7 @@ public sealed class MqttProtocolHandlerSendFailureTests
     {
         Run run = await RunAsync(WithoutSocketError(), writesBeforeFailure: 0, postData: null);
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
         Assert.IsTrue(run.Transcript[^3].StartsWith("> ", StringComparison.Ordinal));
         CollectionAssert.AreEqual(new[] { ConnectNotSent, ShuttingDown }, run.Transcript.TakeLast(2).ToArray());
@@ -101,6 +108,7 @@ public sealed class MqttProtocolHandlerSendFailureTests
     {
         Run run = await RunAsync(WithoutSocketError(), writesBeforeFailure: 1, postData: null);
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
         CollectionAssert.AreEqual(new[] { Sent(Subscribe), ShuttingDown }, run.Transcript.TakeLast(2).ToArray());
     }
@@ -130,6 +138,7 @@ public sealed class MqttProtocolHandlerSendFailureTests
     {
         Run run = await RunAsync(WithoutSocketError(), writesBeforeFailure: 1, postData: "x"u8.ToArray());
 
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
         CollectionAssert.AreEqual(new[] { Sent(Publish), ShuttingDown }, run.Transcript.TakeLast(2).ToArray());
     }
@@ -139,12 +148,14 @@ public sealed class MqttProtocolHandlerSendFailureTests
     /// <paramref name="neighbour" />: the line after it for the CONNECT, the packet sent
     /// before it otherwise.
     /// </summary>
-    private static void AssertSendFailure(Run run, string message, string neighbour)
+    private void AssertSendFailure(Run run, string message, string neighbour)
     {
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, message), run.Result);
         Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, message), run.Result);
         string[] expected = neighbour == ConnectNotSent
             ? ["* " + message, neighbour, ShuttingDown]
             : [neighbour, "* " + message, ShuttingDown];
+        Diagnostics.Assert("last 3 transcript lines", MqttDiagnostics.Lines(expected), MqttDiagnostics.Lines(run.Transcript.TakeLast(3)));
         CollectionAssert.AreEqual(expected, run.Transcript.TakeLast(3).ToArray());
     }
 
@@ -155,7 +166,22 @@ public sealed class MqttProtocolHandlerSendFailureTests
 
     private static string Sent(byte[] packet) => "> " + Encoding.Latin1.GetString(packet);
 
-    private static async Task<Run> RunAsync(IOException failure, int writesBeforeFailure, byte[]? postData)
+    /// <summary>
+    /// Runs <c>mqtt://h/t</c> against a peer that sends a CONNACK and fails the write after
+    /// <paramref name="writesBeforeFailure" /> writes, writing what it arranged and got.
+    /// </summary>
+    private async Task<Run> RunAsync(IOException failure, int writesBeforeFailure, byte[]? postData)
+    {
+        Diagnostics.Arrange("url", "mqtt://h/t");
+        Diagnostics.Arrange("write failure", $"{failure.Message} (socket error {(failure.InnerException as SocketException)?.SocketErrorCode.ToString() ?? "none"}) after {writesBeforeFailure} writes");
+        Diagnostics.Arrange("post data", postData is null ? "none (subscribe)" : Encoding.Latin1.GetString(postData));
+        Run run = await TransferAsync(failure, writesBeforeFailure, postData);
+        Diagnostics.ActResult(run.Result);
+        Diagnostics.ActTranscript(run.Transcript);
+        return run;
+    }
+
+    private static async Task<Run> TransferAsync(IOException failure, int writesBeforeFailure, byte[]? postData)
     {
         ScriptedConnection connection = new(Connack) { WriteFailure = failure, WritesBeforeFailure = writesBeforeFailure };
         TranscriptTransferEvents events = new();

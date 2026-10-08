@@ -38,9 +38,16 @@ public sealed partial class HttpProtocolHandlerTests
         {
             ScriptedConnection connection = Connection("HTTP/1.1 302 Found\r\nLocation: /a\r\nLocation: /b\r\nContent-Length: 0\r\n\r\n", chunkSize);
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size, options", $"{chunkSize}, -L");
+            Diagnostics.Arrange("scripted response", "302, Location: /a, Location: /b, Content-Length: 0");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(RefusedHeaderContext(output, null, "-L"));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
+            Diagnostics.Assert("error text", "Multiple Location headers", result.ErrorMessage);
+            Diagnostics.Assert("requests sent", 1, Latin1(connection.Written).Split("GET ").Length - 1);
+            Diagnostics.Assert("output length", 0L, output.Length);
             Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("Multiple Location headers", result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual(1, Latin1(connection.Written).Split("GET ").Length - 1, $"Chunk size {chunkSize}");
@@ -57,25 +64,37 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("location lines", OneLine(locations));
 
             TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\n" + locations + "Content-Length: 2\r\n\r\nok", chunkSize)))
                 .ExecuteAsync(RefusedHeaderContext(output, null, string.Empty));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Assert("body", "ok", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
     }
 
-    private static async Task AssertWeirdHeaderLineAsync(string response, string options, string message, string[] reportedHead)
+    private async Task AssertWeirdHeaderLineAsync(string response, string options, string message, string[] reportedHead)
     {
         foreach (int chunkSize in ChunkSizes)
         {
             RecordingTransferEvents events = new();
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size, options", $"{chunkSize}, {(options.Length == 0 ? "(none)" : options)}");
+            Diagnostics.Arrange("scripted response", OneLine(response.Replace("\0", "\\0", StringComparison.Ordinal)));
 
             TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize)))
                 .ExecuteAsync(RefusedHeaderContext(output, null, options, events));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
+            Diagnostics.Assert("error text", message, result.ErrorMessage);
+            WriteExpectedLines("reported head", reportedHead, HeadEvents(events));
+            Diagnostics.Assert("output length", 0L, output.Length);
             Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(reportedHead, HeadEvents(events), $"Chunk size {chunkSize}");

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -15,6 +16,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerPassReplyTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:47663/f.txt";
 
     private const string Greeting = "220 Recorder ready\r\n331 Password required\r\n";
@@ -30,11 +33,18 @@ public sealed class FtpProtocolHandlerPassReplyTests
     [DataRow("231 Other")]
     public async Task ExecuteAsync_PassAnsweredWithAny2xx_LogsInAndDownloads(string reply)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("reply", reply);
+
         // curl -sS -u u:p ftp://127.0.0.1:47663/f.txt, PASS answered 202 or 231: exit 0.
+        diagnostics.ArrangeFtp(Url);
         FtpRun run = await FtpRun.ExecuteAsync(Url, Greeting + reply + "\r\n" + Retrieved, "x");
+        diagnostics.ActRun(run);
 
         StringAssert.StartsWith(run.Sent, PassSent + "PWD\r\n");
+        diagnostics.Assert("result", TransferResult.Success(1), run.Result);
         Assert.AreEqual(TransferResult.Success(1), run.Result);
+        diagnostics.Diff("output", "x", run.OutputText);
         Assert.AreEqual("x", run.OutputText);
     }
 
@@ -45,36 +55,58 @@ public sealed class FtpProtocolHandlerPassReplyTests
     [DataRow("332 Need account", "ACCT requested but none available")]
     public async Task ExecuteAsync_PassAnsweredWithAnythingElse_FailsWithExit67AndNoQuit(string reply, string message)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("reply", reply);
+        diagnostics.Arrange("message", message);
+
         // curl: (67) Access denied: 530 - and for 332 without --ftp-account,
         // curl: (67) ACCT requested but none available.
+        diagnostics.ArrangeFtp(Url);
         FtpRun run = await FtpRun.ExecuteAsync(Url, Greeting + reply + "\r\n");
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(PassSent, run.Sent);
         Assert.AreEqual(PassSent, run.Sent);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LoginDenied, message), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, message), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_PassAnswered421_FailsWithExit28TimeoutWasReached()
     {
-        // curl: (28) Timeout was reached
-        FtpRun run = await FtpRun.ExecuteAsync(Url, Greeting + "421 Bye\r\n");
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl: (28) Timeout was reached
+        diagnostics.ArrangeFtp(Url);
+        FtpRun run = await FtpRun.ExecuteAsync(Url, Greeting + "421 Bye\r\n");
+        diagnostics.ActRun(run);
+
+        diagnostics.DiffSent(PassSent, run.Sent);
         Assert.AreEqual(PassSent, run.Sent);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NoFtpSkipPasvIpWithAnUnroutableAddress_EndsWithTheConnectorsTimeoutNotExit15()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS --no-ftp-skip-pasv-ip, PASV naming 10.255.255.1: curl: (28) Failed to
         // connect to 127.0.0.1:47705 via 10.255.255.1:56902 after 21066 ms: Could not connect to server
         const string message = "Failed to connect to 10.255.255.1:56902 after 21066 ms: Could not connect to server";
+        diagnostics.ArrangeFtp(Url);
+        diagnostics.Arrange("PASV reply", "227 Entering Passive Mode (10,255,255,1,222,70)");
+        diagnostics.Arrange("skip PASV address", false);
         TransferResult result = await RunPasvAsync(
             "227 Entering Passive Mode (10,255,255,1,222,70)",
             skipPasvIp: false,
             ConnectResult.Failed(CurlExitCode.OperationTimedOut, message),
             out QueuedConnector connector);
 
+        diagnostics.ActResult(result);
+
+        diagnostics.Assert("data connect target", new ConnectTarget("10.255.255.1", 56902, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(new ConnectTarget("10.255.255.1", 56902, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.OperationTimedOut, "Failed to connect to 127.0.0.1:47663 via 10.255.255.1:56902 after 21066 ms: Could not connect to server"),
@@ -84,14 +116,22 @@ public sealed class FtpProtocolHandlerPassReplyTests
     [TestMethod]
     public async Task ExecuteAsync_FtpSkipPasvIpWithAnUnroutableAddress_ConnectsToTheControlHost()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS, PASV naming 10.255.255.1: the address is skipped and the data connection
         // goes to the control host (exit 0 when it answers); here it is refused to end the run.
+        diagnostics.ArrangeFtp(Url);
+        diagnostics.Arrange("PASV reply", "227 Entering Passive Mode (10,255,255,1,222,70)");
+        diagnostics.Arrange("skip PASV address", true);
         TransferResult result = await RunPasvAsync(
             "227 Entering Passive Mode (10,255,255,1,222,70)",
             skipPasvIp: true,
             ConnectResult.Failed(CurlExitCode.CouldntConnect, "unused"),
             out QueuedConnector connector);
 
+        diagnostics.ActResult(result);
+
+        diagnostics.Assert("data connect target", new ConnectTarget("127.0.0.1", 56902, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 56902, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
     }
@@ -99,6 +139,8 @@ public sealed class FtpProtocolHandlerPassReplyTests
     [TestMethod]
     public async Task ExecuteAsync_DataHostThatCannotBeResolved_EndsWithTheConnectorsExit6NotExit15()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl 8.21.0 no longer carries "cannot resolve new host": the data host is resolved
         // by the ordinary connect, so a name that fails is exit 6 like any other.
         const string message = "Could not resolve host: ftp.invalid";
@@ -108,9 +150,14 @@ public sealed class FtpProtocolHandlerPassReplyTests
             ConnectResult.Connected(control),
             ConnectResult.Failed(CurlExitCode.CouldntResolveHost, message));
 
+        diagnostics.ArrangeFtp("ftp://ftp.invalid/f.txt");
+        diagnostics.Arrange("data connection result", message);
         TransferResult result = await new FtpProtocolHandler(connector).ExecuteAsync(
             new TransferContext { Url = CurlUrl.Parse("ftp://ftp.invalid/f.txt"), Output = new MemoryStream(), FtpDisableEpsv = true });
 
+        diagnostics.ActResult(result);
+
+        diagnostics.Assert("data connect target", new ConnectTarget("ftp.invalid", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(new ConnectTarget("ftp.invalid", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, connector.Targets[1]);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.CouldntResolveHost, message), result with { Report = null });
     }

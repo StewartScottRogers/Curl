@@ -3,6 +3,7 @@ using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File;
 using Curl.Protocol.Telnet;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -21,6 +22,10 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
     private readonly FailingWriteStream closedStandardOutput = new();
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -28,7 +33,9 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
     {
         int exitCode = await RunFileAsync(4095);
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stderr", "curl: Failed writing body\n", Lf(StandardErrorText));
         Assert.AreEqual("curl: Failed writing body" + NewLine, StandardErrorText);
     }
 
@@ -43,7 +50,9 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
     {
         int exitCode = await RunFileAsync(bodyLength);
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stderr", "curl: (23) Failure writing output to destination, " + counts + "\n", Lf(StandardErrorText));
         Assert.AreEqual("curl: (23) Failure writing output to destination, " + counts + NewLine, StandardErrorText);
     }
 
@@ -60,13 +69,18 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
     {
         int exitCode = await RunTelnetAsync(lineLength, lineCount);
 
+        Diagnostics.Assert("exit code", 23, exitCode);
         Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stderr", "curl: (23) Failure writing output to destination, " + counts + "\n", Lf(StandardErrorText));
         Assert.AreEqual("curl: (23) Failure writing output to destination, " + counts + NewLine, StandardErrorText);
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private Task<int> RunFileAsync(int bodyLength)
     {
         FileProtocolHandler file = new(new InMemoryFileSystem { ReadContent = new byte[bodyLength] });
+        Diagnostics.Arrange("file body length", bodyLength);
 
         return RunAsync(["-sS", "file:///body.bin"], file);
     }
@@ -75,18 +89,32 @@ public sealed class CurlCommandRunnerStandardOutputFailureTests
     {
         byte[] line = [.. Enumerable.Repeat((byte)'a', lineLength - 2), (byte)'\r', (byte)'\n'];
         ScriptedConnector server = new(Enumerable.Repeat(line, lineCount));
+        Diagnostics.Arrange("telnet line length", lineLength);
+        Diagnostics.Arrange("telnet line count", lineCount);
+        Diagnostics.Bytes("scripted telnet line", line);
 
         return RunAsync(["-sS", "telnet://127.0.0.1:2323/"], new TelnetProtocolHandler(server));
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(
-            _ => new TransferDispatch(new ProtocolDispatcher(handlers)),
-            new InMemoryFileSystem(),
-            new InMemoryFileSystem(),
-            closedStandardOutput,
-            standardError,
-            new MemoryStream(),
-            runsOnWindows: false)
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                _ => new TransferDispatch(new ProtocolDispatcher(handlers)),
+                new InMemoryFileSystem(),
+                new InMemoryFileSystem(),
+                closedStandardOutput,
+                standardError,
+                new MemoryStream(),
+                runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
+    }
 }

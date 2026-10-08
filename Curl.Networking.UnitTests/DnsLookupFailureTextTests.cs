@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -7,6 +9,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class DnsLookupFailureTextTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(DnsLookupFailure.None, "")]
     [DataRow(DnsLookupFailure.NoData, "DNS server returned answer with no data")]
@@ -24,6 +30,12 @@ public sealed class DnsLookupFailureTextTests
     [DataRow((DnsLookupFailure)(-1), "")]
     public void Describe_EachFailure_IsCaresText(DnsLookupFailure failure, string expected)
     {
+        Diagnostics.Arrange("failure", failure);
+
+        var text = DnsLookupFailureText.Describe(failure);
+
+        Diagnostics.Act("text", text);
+        Diagnostics.Diff("text", expected, text);
         Assert.AreEqual(expected, DnsLookupFailureText.Describe(failure));
     }
 }

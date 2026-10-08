@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -55,6 +56,10 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
     private readonly InMemoryFileSystem outputFiles = new();
     private readonly ManualTimeProvider clock = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -62,7 +67,17 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
     {
         int exitCode = await RunAsync(["-v", SourceUrl, "-o", "o1"], ExchangingSixBytes(TransferResult.Success(6)));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr (CRLF shown as LF)",
+            Normalized(
+                ConnectLines
+                + HeaderLines + ZeroStatusLine
+                + ExchangeLines
+                + SixOfSixStatusLine + SixOfSixStatusLine + SixOfSixStatusLine + NewLine
+                + "* Connection #0 to host 127.0.0.1:18421 left intact\n"),
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             ConnectLines
             + HeaderLines + ZeroStatusLine
@@ -87,7 +102,19 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
                 ["end of response with 4 bytes missing"],
                 "closing connection #0"));
 
+        Diagnostics.Assert("exit code", 18, exitCode);
         Assert.AreEqual(18, exitCode);
+        Diagnostics.Diff(
+            "stderr (CRLF shown as LF)",
+            Normalized(
+                ConnectLines
+                + HeaderLines + ZeroStatusLine
+                + ExchangeLines
+                + "* end of response with 4 bytes missing\n"
+                + NewLine
+                + "* closing connection #0\n"
+                + "curl: (18) end of response with 4 bytes missing" + NewLine),
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             ConnectLines
             + HeaderLines + ZeroStatusLine
@@ -104,7 +131,12 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
     {
         int exitCode = await RunAsync(["-s", "-v", SourceUrl, "-o", "o1"], ExchangingSixBytes(TransferResult.Success(6)));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "stderr (CRLF shown as LF)",
+            Normalized(ConnectLines + ExchangeLines + "* Connection #0 to host 127.0.0.1:18421 left intact\n"),
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             ConnectLines + ExchangeLines + "* Connection #0 to host 127.0.0.1:18421 left intact\n",
             StandardErrorText);
@@ -113,8 +145,16 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
     private RecordingProtocolHandler ExchangingSixBytes(TransferResult result) =>
         ExchangingSixBytes(result, [], "Connection #0 to host 127.0.0.1:18421 left intact");
 
-    private RecordingProtocolHandler ExchangingSixBytes(TransferResult result, IReadOnlyList<string> linesBeforeDone, string connectionEndLine) =>
-        new("http", context =>
+    private RecordingProtocolHandler ExchangingSixBytes(TransferResult result, IReadOnlyList<string> linesBeforeDone, string connectionEndLine)
+    {
+        Diagnostics.Arrange(
+            "handler behaviour",
+            "http reports the connect, request, response and 6 data bytes, advances the clock 40 ms, then ends with exit "
+            + (int)result.ExitCode);
+        Diagnostics.Arrange("info lines before done", string.Join(" | ", linesBeforeDone));
+        Diagnostics.Arrange("connection end line", connectionEndLine);
+
+        return new("http", context =>
         {
             ITransferEvents events = context.Events;
             events.ReportInfo("  Trying 127.0.0.1:18421...");
@@ -140,9 +180,16 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
 
             return ValueTask.FromResult(result);
         });
+    }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler) =>
-        new CurlCommandRunner(
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("writes progress meter", true);
+
+        CurlCommandRunner runner = new(
                 _ => new TransferDispatch(new ProtocolDispatcher([handler])),
                 outputFiles,
                 outputFiles,
@@ -151,6 +198,16 @@ public sealed class CurlCommandRunnerVerboseProgressMeterTests
                 new MemoryStream(),
                 runsOnWindows: false,
                 writesProgressMeter: true,
-                timeProvider: clock)
-            .RunAsync(arguments);
+                timeProvider: clock);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await runner.RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr (CRLF shown as LF)", Encoding.UTF8.GetBytes(Normalized(StandardErrorText)));
+        return exitCode;
+    }
 }

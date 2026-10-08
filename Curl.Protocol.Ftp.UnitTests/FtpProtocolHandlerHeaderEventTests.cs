@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -15,6 +16,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerHeaderEventTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:18931/f.txt";
 
     private const string Greeting = "220 Recorder ready\r\n";
@@ -44,6 +47,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_AnonymousRetr_ReportsEveryCommandAndReplyButQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_AnonymousRetr_ReportsEveryCommandAndReplyButQuit");
+
         // curl -v ftp://127.0.0.1:18931/f.txt
         var events = new RecordingTransferEvents();
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -62,6 +68,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
             .. PwdToOpenedHeaders,
             "< 226 Transfer complete\r\n",
         ];
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         CollectionAssert.AreEqual(expected, events.Headers);
         StringAssert.EndsWith(run.Sent, "QUIT\r\n", StringComparison.Ordinal);
         Assert.AreEqual(TransferResult.Success(6), run.Result);
@@ -70,6 +78,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_UserAndPassword_ReportsThePasswordInClear()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_UserAndPassword_ReportsThePasswordInClear");
+
         // curl -v -u user:pw ftp://127.0.0.1:18932/f.txt
         var events = new RecordingTransferEvents();
         await FtpRun.ExecuteAsync(
@@ -78,6 +89,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
             "hello\n",
             c => With(c, events, new NetworkCredential("user", "pw")));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         CollectionAssert.AreEqual(
             new[] { "< 220 Recorder ready\r\n", "> USER user\r\n", "< 331 Password required\r\n", "> PASS pw\r\n", "< 230 Logged in\r\n" },
             events.Headers.Take(5).ToArray());
@@ -86,6 +99,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_MultiLineReply_ReportsEachLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_MultiLineReply_ReportsEachLine");
+
         // curl -v ftp://127.0.0.1:18933/f.txt, PASS answered 230-Welcome, 230-Second line, 230 Logged in
         var events = new RecordingTransferEvents();
         await FtpRun.ExecuteAsync(
@@ -94,6 +110,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
             "hello\n",
             adjust: c => With(c, events));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         CollectionAssert.AreEqual(
             new[] { "> PASS ftp@example.com\r\n", "< 230-Welcome\r\n", "< 230-Second line\r\n", "< 230 Logged in\r\n", "> PWD\r\n" },
             events.Headers.Skip(3).Take(5).ToArray());
@@ -102,6 +120,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_Retr550_ReportsTheRefusalAndNotQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_Retr550_ReportsTheRefusalAndNotQuit");
+
         // curl -v ftp://127.0.0.1:18934/f.txt, RETR answered 550 No such file: exit 78.
         var events = new RecordingTransferEvents();
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -109,6 +130,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
             Greeting + "331 Password required\r\n230 Logged in\r\n" + PwdToOpened.Replace("150 Opening BINARY mode data connection", "550 No such file", StringComparison.Ordinal) + Bye,
             adjust: c => With(c, events));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual("> RETR f.txt\r\n", events.Headers[^2]);
         Assert.AreEqual("< 550 No such file\r\n", events.Headers[^1]);
         Assert.HasCount(15, events.Headers);
@@ -118,6 +141,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_SslReqdAndAuthRefused_ReportsBothAuthAttempts()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_SslReqdAndAuthRefused_ReportsBothAuthAttempts");
+
         // curl -v --ssl-reqd ftp://127.0.0.1:18935/f.txt, AUTH answered 500: exit 64.
         var events = new RecordingTransferEvents();
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -129,6 +155,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
                 m.Events = events;
             }));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         CollectionAssert.AreEqual(
             new[] { "< 220 Recorder ready\r\n", "> AUTH SSL\r\n", "< 500 AUTH not understood\r\n", "> AUTH TLS\r\n", "< 500 AUTH not understood\r\n" },
             events.Headers);
@@ -138,6 +166,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_AuthAccepted_ReportsTheCommandsOnTheSecuredControl()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_AuthAccepted_ReportsTheCommandsOnTheSecuredControl");
+
         // curl -k -v --ssl-reqd: the login after AUTH SSL is reported as in plaintext.
         var events = new RecordingTransferEvents();
         var securedControl = new ScriptedConnection(Encoding.Latin1.GetBytes("331 Password required\r\n230 Logged in\r\n"));
@@ -153,6 +184,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
 
         await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         CollectionAssert.AreEqual(
             new[] { "< 220 Recorder ready\r\n", "> AUTH SSL\r\n", "< 234 AUTH accepted\r\n", "> USER anonymous\r\n", "< 331 Password required\r\n", "> PASS ftp@example.com\r\n", "< 230 Logged in\r\n", "> PBSZ 0\r\n" },
             events.Headers.Take(8).ToArray());
@@ -161,6 +194,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_AuthAccepted_ReportsTheHandshakeAndTheConnectionOpenedAgainBeforeUser()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_AuthAccepted_ReportsTheHandshakeAndTheConnectionOpenedAgainBeforeUser");
+
         // curl 8.21.0 -k -v --ssl-reqd: between "< 234 AUTH accepted" and USER it writes the TLS
         // lines and the connect's "Established connection" line again (measured, BL-1084).
         var events = new RecordingTransferEvents();
@@ -177,6 +213,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
 
         await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreSame(events, tls.HandshakeEvents.Single());
         Assert.HasCount(2, events.ConnectionsOpened);
         Assert.AreSame(events.ConnectionsOpened[0], events.ConnectionsOpened[1]);
@@ -185,6 +223,9 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_RangeEndsWithAbor_ReportsAborAndItsReplyButNotQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_RangeEndsWithAbor_ReportsAborAndItsReplyButNotQuit");
+
         // curl -v -r 0-2 ftp://127.0.0.1:18990/f.txt: ABOR is reported, read 226; QUIT is not.
         var events = new RecordingTransferEvents();
         FtpRun run = await FtpRun.ExecuteAsync(
@@ -193,6 +234,8 @@ public sealed class FtpProtocolHandlerHeaderEventTests
             "hello\n",
             c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 2), Events = events });
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.AreEqual("> ABOR\r\n", events.Headers[^2]);
         Assert.AreEqual("< 226 Transfer complete\r\n", events.Headers[^1]);
         StringAssert.EndsWith(run.Sent, "ABOR\r\nQUIT\r\n", StringComparison.Ordinal);
@@ -201,9 +244,14 @@ public sealed class FtpProtocolHandlerHeaderEventTests
     [TestMethod]
     public async Task ExecuteAsync_ReplyCutOffMidLine_ReportsNoPartialLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test", "ExecuteAsync_ReplyCutOffMidLine_ReportsNoPartialLine");
+
         var events = new RecordingTransferEvents();
         await FtpRun.ExecuteAsync(Url, "220 Recor", adjust: c => With(c, events));
 
+        diagnostics.Act("steps before the checks", "completed");
+        diagnostics.Assert("outcome checked by the assertions below", "passes", "checking");
         Assert.IsEmpty(events.Headers);
     }
 

@@ -25,8 +25,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 8080, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 8080, UseTls: false));
 
+        Diagnostics.Assert("timings", new ConnectTimings(100, 110, 120, null), result.Timings);
         Assert.AreEqual(new ConnectTimings(100, 110, 120, null), result.Timings);
         Assert.AreSame(DialerLocalEndPoint, result.LocalEndPoint);
         Assert.AreEqual(new IPEndPoint(Loopback, 8080), result.Connection!.RemoteEndPoint);
@@ -39,8 +40,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection(), LocalEndPoint = DialerLocalEndPoint };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true));
 
+        Diagnostics.Assert("timings", new ConnectTimings(100, 110, 120, 130), result.Timings);
         Assert.AreEqual(new ConnectTimings(100, 110, 120, 130), result.Timings);
         Assert.AreSame(DialerLocalEndPoint, result.LocalEndPoint);
     }
@@ -52,8 +54,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection(), LocalEndPoint = DialerLocalEndPoint };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, tlsProvider, new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true));
 
+        Diagnostics.Assert("timings", new ConnectTimings(100, 110, 120, 125), result.Timings);
         Assert.AreSame(tlsProvider.SecuredConnection, result.Connection);
         Assert.AreEqual(new ConnectTimings(100, 110, 120, 125), result.Timings);
         Assert.AreSame(DialerLocalEndPoint, result.LocalEndPoint);
@@ -67,8 +70,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, tlsProvider, new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true));
 
+        Diagnostics.Assert("peer certificates", certificates.Length, result.PeerCertificates.Count);
         Assert.AreSame(certificates, result.PeerCertificates);
     }
 
@@ -82,8 +86,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 1, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false));
 
+        Diagnostics.Assert("timings", new ConnectTimings(100, 110, null, null), result.Timings);
         Assert.IsTrue(result.IsConnectionRefused);
         Assert.AreEqual(new ConnectTimings(100, 110, null, null), result.Timings);
     }
@@ -97,7 +102,9 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("0.0.0.0", 1, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("0.0.0.0", 1, UseTls: false));
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.IsFalse(result.IsConnectionRefused);
@@ -113,10 +120,11 @@ public sealed partial class TcpConnectorTests
         };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "localhost", 1, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "localhost", 1, null) });
 
+        Diagnostics.Assert("timings", new ConnectTimings(100, 110, null, null), result.Timings);
         Assert.IsTrue(result.IsConnectionRefused);
         Assert.AreEqual(new ConnectTimings(100, 110, null, null), result.Timings);
     }
@@ -127,7 +135,9 @@ public sealed partial class TcpConnectorTests
         // curl 8.21.0, http://nonexistent.invalid/: exit 6, ns=0.000000 (measured 2026-09-27, BL-382).
         var connector = new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("nonexistent.invalid", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("nonexistent.invalid", 80, UseTls: false));
+
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.IsNull(result.Timings);
@@ -139,8 +149,9 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, UseTls: false), CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 80, UseTls: false));
 
+        Diagnostics.Assert("peer certificates", 0, result.PeerCertificates.Count);
         Assert.IsEmpty(result.PeerCertificates);
     }
 
@@ -152,10 +163,11 @@ public sealed partial class TcpConnectorTests
         var timeProvider = new SteppingTimeProvider(100);
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), timeProvider);
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null) });
 
+        Diagnostics.Assert("timings", new ConnectTimings(100, 110, 120, null), result.Timings);
         Assert.AreEqual(new ConnectTimings(100, 110, 120, null), result.Timings);
         Assert.AreSame(DialerLocalEndPoint, result.LocalEndPoint);
         Assert.AreEqual(200, result.ProxyConnectResponseCode);
@@ -168,10 +180,11 @@ public sealed partial class TcpConnectorTests
         var dialer = new FakeTcpDialer { DialOutcome = _ => proxyConnection, LocalEndPoint = DialerLocalEndPoint };
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new SteppingTimeProvider(100));
 
-        var result = await connector.ConnectAsync(
-            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null) },
-            CancellationToken.None);
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = new ProxyEndpoint(ProxyKind.Http, "proxy.example", 3128, null) });
 
+        Diagnostics.Assert("timings", new ConnectTimings(100, 110, 120, 130), result.Timings);
         Assert.AreEqual(new ConnectTimings(100, 110, 120, 130), result.Timings);
         Assert.AreSame(DialerLocalEndPoint, result.LocalEndPoint);
         Assert.AreEqual(200, result.ProxyConnectResponseCode);

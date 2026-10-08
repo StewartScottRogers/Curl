@@ -20,15 +20,29 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingDiagnosticLog log = new();
 
+        Diagnostics.Arrange("url, version, log level", $"{LogUrl}, Http2PriorKnowledge, Verbose");
+        Diagnostics.Arrange("response", "HTTP/2 HEADERS :status 200 content-length 5, DATA hello");
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536)))
             .ExecuteAsync(Http2LogContext(log));
 
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("all lines are http2", true, log.Lines.All(line => line.Component == DiagnosticLogComponents.Http2));
         Assert.IsTrue(log.Lines.All(line => line.Component == DiagnosticLogComponents.Http2));
         string[] verbose = log.MessagesAt(DiagnosticLogLevel.Verbose);
+        Diagnostics.Assert("HEADERS sent line", true, verbose.Any(line => line.StartsWith("HEADERS sent on stream 1, ", StringComparison.Ordinal)));
         Assert.IsTrue(verbose.Any(line => line.StartsWith("HEADERS sent on stream 1, ", StringComparison.Ordinal)), string.Join('\n', verbose));
+        Diagnostics.Assert("HEADERS received line", true, verbose.Any(line => line.StartsWith("HEADERS received on stream 1, ", StringComparison.Ordinal)));
         Assert.IsTrue(verbose.Any(line => line.StartsWith("HEADERS received on stream 1, ", StringComparison.Ordinal)), string.Join('\n', verbose));
+        Diagnostics.Assert("verbose contains DATA line", "DATA received on stream 1, 5 bytes", string.Join(" | ", verbose));
         CollectionAssert.Contains(verbose, "DATA received on stream 1, 5 bytes");
+        Diagnostics.Assert(
+            "info contains SETTINGS line",
+            "SETTINGS received: max concurrent streams unlimited, initial window 65535, max frame 16384, header table 4096",
+            string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Info)));
         CollectionAssert.Contains(
             log.MessagesAt(DiagnosticLogLevel.Info),
             "SETTINGS received: max concurrent streams unlimited, initial window 65535, max frame 16384, header table 4096");
@@ -40,9 +54,17 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingDiagnosticLog log = new();
         HttpRequestOptions options = new() { Version = HttpVersionPreference.Http2PriorKnowledge, Headers = ["X-Secret: s3cret-frame"] };
 
-        await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536)))
+        Diagnostics.Arrange("url, version, header", $"{LogUrl}, Http2PriorKnowledge, X-Secret: s3cret-frame");
+
+        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536)))
             .ExecuteAsync(Http2LogContext(log, options));
 
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert(
+            "frame line holding the secret",
+            false,
+            log.Lines.Any(line => line.Message.Contains("on stream", StringComparison.Ordinal) && line.Message.Contains("s3cret", StringComparison.Ordinal)));
         Assert.IsFalse(log.Lines.Any(line => line.Message.Contains("on stream", StringComparison.Ordinal) && line.Message.Contains("s3cret", StringComparison.Ordinal)));
     }
 
@@ -60,8 +82,13 @@ public sealed partial class HttpProtocolHandlerTests
             TimeProvider = new FakeTimeProvider(DateTimeOffset.UnixEpoch),
         };
 
-        await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536))).ExecuteAsync(context);
+        Diagnostics.Arrange("url, version, upload", "http://127.0.0.1:18922/up, Http2PriorKnowledge, abc");
 
+        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536))).ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("verbose contains DATA line", "DATA sent on stream 1, 3 bytes", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Verbose)));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Verbose), "DATA sent on stream 1, 3 bytes");
     }
 
@@ -74,10 +101,18 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200")]), isEndStream: false, isEndHeaders: true),
             Http2FrameFactory.CreateGoAway(0, Http2ErrorCode.InternalError, ReadOnlyMemory<byte>.Empty));
 
+        Diagnostics.Arrange("url, response", $"{LogUrl}, HEADERS :status 200 then GOAWAY last stream 0 INTERNAL_ERROR");
+        Diagnostics.Bytes("response frames", response);
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536))).ExecuteAsync(Http2LogContext(log));
 
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("warning contains GOAWAY line", "GOAWAY received: last stream 0, error INTERNAL_ERROR (2)", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Warning)));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Warning), "GOAWAY received: last stream 0, error INTERNAL_ERROR (2)");
+        Diagnostics.Assert("all lines are http2", true, log.Lines.All(line => line.Component == DiagnosticLogComponents.Http2));
         Assert.IsTrue(log.Lines.All(line => line.Component == DiagnosticLogComponents.Http2));
     }
 
@@ -90,9 +125,16 @@ public sealed partial class HttpProtocolHandlerTests
             Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "200")]), isEndStream: false, isEndHeaders: true),
             Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.Cancel));
 
+        Diagnostics.Arrange("url, response", $"{LogUrl}, HEADERS :status 200 then RST_STREAM on stream 1 CANCEL");
+        Diagnostics.Bytes("response frames", response);
+
         TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 65536))).ExecuteAsync(Http2LogContext(log));
 
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2Stream, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http2Stream, result.ExitCode);
+        Diagnostics.Assert("warning contains RST_STREAM line", "RST_STREAM received on stream 1: error CANCEL (8)", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Warning)));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Warning), "RST_STREAM received on stream 1: error CANCEL (8)");
     }
 
@@ -101,8 +143,13 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Info);
 
-        await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536))).ExecuteAsync(Http2LogContext(log));
+        Diagnostics.Arrange("url, version, log level", $"{LogUrl}, Http2PriorKnowledge, Info");
 
+        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(Http2HelloResponse(), 65536))).ExecuteAsync(Http2LogContext(log));
+
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("any frame line", false, log.Lines.Any(line => line.Message.Contains(" on stream ", StringComparison.Ordinal)));
         Assert.IsFalse(log.Lines.Any(line => line.Message.Contains(" on stream ", StringComparison.Ordinal)), string.Join('\n', log.Lines.Select(line => line.Message)));
     }
 
@@ -112,12 +159,21 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingDiagnosticLog log = new();
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "5")), Http3Data("hello")), 65536);
 
+        Diagnostics.Arrange("url, version", "https://example.com/, Http3Only");
+        Diagnostics.Arrange("response", "HTTP/3 HEADERS :status 200 content-length 5, DATA hello");
+
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(Http3LogContext(log));
 
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         string[] frames = [.. log.Lines.Where(line => line.Component == DiagnosticLogComponents.Http3 && line.Level == DiagnosticLogLevel.Verbose).Select(line => line.Message)];
+        Diagnostics.Assert("HEADERS sent line", true, frames.Any(line => line.StartsWith("HEADERS sent on stream 0, ", StringComparison.Ordinal)));
         Assert.IsTrue(frames.Any(line => line.StartsWith("HEADERS sent on stream 0, ", StringComparison.Ordinal)), string.Join('\n', frames));
+        Diagnostics.Assert("HEADERS received line", true, frames.Any(line => line.StartsWith("HEADERS received on stream 0, ", StringComparison.Ordinal)));
         Assert.IsTrue(frames.Any(line => line.StartsWith("HEADERS received on stream 0, ", StringComparison.Ordinal)), string.Join('\n', frames));
+        Diagnostics.Assert("frames contain DATA line", "DATA received on stream 0, 5 bytes", string.Join(" | ", frames));
         CollectionAssert.Contains(frames, "DATA received on stream 0, 5 bytes");
     }
 
@@ -128,8 +184,13 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "0"))), 65536);
         TransferContext context = Http3LogContext(log, new MemoryStream("abc"u8.ToArray()));
 
-        await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(context);
+        Diagnostics.Arrange("url, version, upload", "https://example.com/, Http3Only, abc");
 
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("verbose contains DATA line", "DATA sent on stream 0, 3 bytes", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Verbose)));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Verbose), "DATA sent on stream 0, 3 bytes");
     }
 
@@ -142,8 +203,13 @@ public sealed partial class HttpProtocolHandlerTests
             EndException = new MultiplexedStreamResetException(0x10c, "cancelled"),
         };
 
-        await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(Http3LogContext(log));
+        Diagnostics.Arrange("url, version, stream end", "https://example.com/, Http3Only, reset with error 0x10c");
 
+        TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(Http3LogContext(log));
+
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("warning contains RESET_STREAM line", "RESET_STREAM received on stream 0: error 0x10c", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Warning)));
         CollectionAssert.Contains(log.MessagesAt(DiagnosticLogLevel.Warning), "RESET_STREAM received on stream 0: error 0x10c");
     }
 
@@ -154,12 +220,24 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream control = new(3, [0x00, .. new Http3SettingsFrame([new Http3Setting(0x06, 100)]).ToBytes(), .. new Http3GoawayFrame(4).ToBytes()]) { StaysOpen = true };
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "5")), Http3Data("hello")), 65536);
 
+        Diagnostics.Arrange("url, version", "https://example.com/, Http3Only");
+        Diagnostics.Arrange("control stream", "SETTINGS MAX_FIELD_SECTION_SIZE 100, GOAWAY 4");
+
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream) { ServerStreams = [control] })).ExecuteAsync(Http3LogContext(log));
 
+        WriteResult(result);
+        WriteLogLines(log);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("info SETTINGS line", "SETTINGS received: MAX_FIELD_SECTION_SIZE 100", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Info)));
         CollectionAssert.Contains(log.Lines, (DiagnosticLogLevel.Info, DiagnosticLogComponents.Http3, "SETTINGS received: MAX_FIELD_SECTION_SIZE 100"));
+        Diagnostics.Assert("warning GOAWAY line", "GOAWAY received: stream 4", string.Join(" | ", log.MessagesAt(DiagnosticLogLevel.Warning)));
         CollectionAssert.Contains(log.Lines, (DiagnosticLogLevel.Warning, DiagnosticLogComponents.Http3, "GOAWAY received: stream 4"));
     }
+
+    /// <summary>Writes an ACT line with every recorded log line, level and component first.</summary>
+    private void WriteLogLines(RecordingDiagnosticLog log) =>
+        Diagnostics.Act("log lines", string.Join(" | ", log.Lines.Select(line => $"{line.Level} {line.Component} {line.Message}")));
 
     private static byte[] Http2HelloResponse()
     {

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ws;
 
@@ -11,6 +12,8 @@ namespace Curl.Protocol.Ws;
 [TestClass]
 public sealed class WsAuthProblemLinesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(401, HttpAuthSchemes.Basic, true, false, "Basic")]
     [DataRow(401, HttpAuthSchemes.Bearer, false, true, "Bearer")]
@@ -21,9 +24,18 @@ public sealed class WsAuthProblemLinesTests
     [DataRow(401, HttpAuthSchemes.Digest, true, false, null)]
     public void ProblemScheme_Request_PicksAsCurl(int statusCode, HttpAuthSchemes schemes, bool hasUser, bool hasToken, string? expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var request = new HttpAuthRequest("GET", CurlUrl.Parse("ws://h/"), "/", hasUser ? new NetworkCredential("u", "p") : null, hasToken ? "tok" : null, schemes, IsProxy: false);
+        diagnostics.Arrange("status code", statusCode);
+        diagnostics.Arrange("allowed schemes", schemes);
+        diagnostics.Arrange("has user", hasUser);
+        diagnostics.Arrange("has bearer token", hasToken);
 
-        Assert.AreEqual(expected, WsAuthProblemLines.ProblemScheme(request, statusCode));
+        string? actual = WsAuthProblemLines.ProblemScheme(request, statusCode);
+
+        diagnostics.Act("problem scheme", actual ?? "(null)");
+        diagnostics.Assert("problem scheme", expected ?? "(null)", actual ?? "(null)");
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -37,9 +49,17 @@ public sealed class WsAuthProblemLinesTests
     [DataRow("WWW-Authenticate: Bearer\r\n", "Bearer", 1)]
     public void LinesBefore_HeadLine_WritesOneLinePerOfferingChallenge(string line, string scheme, int expected)
     {
-        string[] lines = [.. WsAuthProblemLines.LinesBefore(Encoding.Latin1.GetBytes(line), scheme)];
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] head = Encoding.Latin1.GetBytes(line);
+        diagnostics.Arrange("scheme", scheme);
+        diagnostics.Bytes("head line", head);
 
+        string[] lines = [.. WsAuthProblemLines.LinesBefore(head, scheme)];
+
+        diagnostics.Act("lines written", lines.Length);
+        diagnostics.Assert("line count", expected, lines.Length);
         Assert.HasCount(expected, lines);
+        diagnostics.Assert("every line is the problem line", true, lines.All(text => text == scheme + " authentication problem, ignoring."));
         Assert.IsTrue(lines.All(text => text == scheme + " authentication problem, ignoring."));
     }
 }

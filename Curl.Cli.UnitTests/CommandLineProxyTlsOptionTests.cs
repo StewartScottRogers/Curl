@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -19,12 +20,17 @@ public sealed class CommandLineProxyTlsOptionTests
 
     private static readonly Func<string, bool> NoPathExists = _ => false;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoProxyTlsOptions_LeavesThemNotGiven()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url], NoPathExists);
+        CommandLineParseResult result = Parse([Url], NoPathExists);
 
         Assert.IsTrue(result.IsAccepted);
+        AssertProxyTlsOptionsNotGiven(result.Options);
         Assert.IsNull(result.Options.ProxyClientCertificate);
         Assert.IsNull(result.Options.ProxyPrivateKey);
         Assert.IsNull(result.Options.ProxyClientCertificateType);
@@ -47,9 +53,11 @@ public sealed class CommandLineProxyTlsOptionTests
     public void Parse_ProxyCert_RecordsProxyClientCertificateVerbatimAndLeavesCertUnset(string certificate)
     {
         // The certificate[:password] split, escaped colons included, happens where it is applied (ADR-0066).
-        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-cert", certificate, Url], NoPathExists);
+        CommandLineParseResult result = Parse(["--proxy-cert", certificate, Url], NoPathExists);
 
         Assert.IsTrue(result.IsAccepted);
+        AssertText("proxy client certificate", certificate, result.Options.ProxyClientCertificate);
+        AssertText("client certificate", null, result.Options.ClientCertificate);
         Assert.AreEqual(certificate, result.Options.ProxyClientCertificate);
         Assert.IsNull(result.Options.ClientCertificate);
     }
@@ -60,8 +68,9 @@ public sealed class CommandLineProxyTlsOptionTests
     public void Parse_ProxyCertOrKeyGivenFlagLikeValue_WarnsAsAFileName(string option)
     {
         // curl --proxy-cert -zz file:///nosuch/zz warns, then exit 37 from the file URL (curl 8.21.0, 2026-09-28).
-        CommandLineParseResult result = CommandLineParser.Parse([option, "-zz", Url], NoPathExists);
+        CommandLineParseResult result = Parse([option, "-zz", Url], NoPathExists);
 
+        AssertWarnings(["Warning: The filename argument '-zz' looks like a flag."], result);
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[] { "Warning: The filename argument '-zz' looks like a flag." },
@@ -78,8 +87,9 @@ public sealed class CommandLineProxyTlsOptionTests
     public void Parse_ProxyTextOptionGivenFlagLikeValue_AcceptsWithoutWarning(string option)
     {
         // curl --proxy-pass -zz file:///nosuch/zz -> no filename warning, exit 37 (curl 8.21.0, 2026-09-28).
-        CommandLineParseResult result = CommandLineParser.Parse([option, "-zz", Url], NoPathExists);
+        CommandLineParseResult result = Parse([option, "-zz", Url], NoPathExists);
 
+        AssertWarnings([], result);
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(0, result.WarningLines.Count());
     }
@@ -87,7 +97,7 @@ public sealed class CommandLineProxyTlsOptionTests
     [TestMethod]
     public void Parse_EveryProxyTextOption_RecordsItsProxyValueAndLeavesTheOriginOnesUnset()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             [
                 "--proxy-key", "proxy.key",
                 "--proxy-cert-type", "P12",
@@ -102,6 +112,23 @@ public sealed class CommandLineProxyTlsOptionTests
             EveryPathExists);
 
         Assert.IsTrue(result.IsAccepted);
+        CommandLineOptions options = result.Options;
+        AssertText("proxy private key", "proxy.key", options.ProxyPrivateKey);
+        AssertText("proxy client certificate type", "P12", options.ProxyClientCertificateType);
+        AssertText("proxy private key type", "DER", options.ProxyPrivateKeyType);
+        AssertText("proxy passphrase", "phrase", options.ProxyPassphrase);
+        AssertText("proxy ciphers", "ECDHE-RSA-AES128-GCM-SHA256", options.ProxyCiphers);
+        AssertText("proxy TLS 1.3 ciphers", "TLS_AES_128_GCM_SHA256", options.ProxyTls13Ciphers);
+        AssertText("proxy CRL file", "proxy.crl", options.ProxyCertificateRevocationListFile);
+        AssertText("proxy pinned public key", "sha256//abc=", options.ProxyPinnedPublicKey);
+        AssertText("private key", null, options.PrivateKey);
+        AssertText("client certificate type", null, options.ClientCertificateType);
+        AssertText("private key type", null, options.PrivateKeyType);
+        AssertText("passphrase", null, options.Passphrase);
+        AssertText("ciphers", null, options.Ciphers);
+        AssertText("TLS 1.3 ciphers", null, options.Tls13Ciphers);
+        AssertText("CRL file", null, options.CertificateRevocationListFile);
+        AssertText("pinned public key", null, options.PinnedPublicKey);
         Assert.AreEqual("proxy.key", result.Options.ProxyPrivateKey);
         Assert.AreEqual("P12", result.Options.ProxyClientCertificateType);
         Assert.AreEqual("DER", result.Options.ProxyPrivateKeyType);
@@ -123,7 +150,7 @@ public sealed class CommandLineProxyTlsOptionTests
     [TestMethod]
     public void Parse_EveryOriginTextOption_LeavesTheProxyOnesUnset()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             [
                 "--cert", "client.pem:secret",
                 "--key", "client.key",
@@ -142,6 +169,7 @@ public sealed class CommandLineProxyTlsOptionTests
             EveryPathExists);
 
         Assert.IsTrue(result.IsAccepted);
+        AssertProxyTlsOptionsNotGiven(result.Options);
         Assert.IsNull(result.Options.ProxyClientCertificate);
         Assert.IsNull(result.Options.ProxyPrivateKey);
         Assert.IsNull(result.Options.ProxyClientCertificateType);
@@ -159,11 +187,15 @@ public sealed class CommandLineProxyTlsOptionTests
     [TestMethod]
     public void Parse_ProxyAndOriginCertificatesTogether_KeepEachOnItsOwnProperty()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--cert", "client.pem:a", "--proxy-cert", "proxy.pem:b", "--pass", "origin", "--proxy-pass", "proxy", Url],
             NoPathExists);
 
         Assert.IsTrue(result.IsAccepted);
+        AssertText("client certificate", "client.pem:a", result.Options.ClientCertificate);
+        AssertText("proxy client certificate", "proxy.pem:b", result.Options.ProxyClientCertificate);
+        AssertText("passphrase", "origin", result.Options.Passphrase);
+        AssertText("proxy passphrase", "proxy", result.Options.ProxyPassphrase);
         Assert.AreEqual("client.pem:a", result.Options.ClientCertificate);
         Assert.AreEqual("proxy.pem:b", result.Options.ProxyClientCertificate);
         Assert.AreEqual("origin", result.Options.Passphrase);
@@ -175,7 +207,7 @@ public sealed class CommandLineProxyTlsOptionTests
     {
         string? checkedPath = null;
 
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--proxy-crlfile", "proxy.crl", Url],
             path =>
             {
@@ -183,7 +215,10 @@ public sealed class CommandLineProxyTlsOptionTests
                 return true;
             });
 
+        Diagnostics.Act("checked path", checkedPath);
         Assert.IsTrue(result.IsAccepted);
+        AssertText("proxy CRL file", "proxy.crl", result.Options.ProxyCertificateRevocationListFile);
+        AssertText("checked path", "proxy.crl", checkedPath);
         Assert.AreEqual("proxy.crl", result.Options.ProxyCertificateRevocationListFile);
         Assert.AreEqual("proxy.crl", checkedPath);
     }
@@ -192,7 +227,7 @@ public sealed class CommandLineProxyTlsOptionTests
     public void Parse_ProxyCrlfileThatDoesNotExist_RefusesNamingProxyCrlfile()
     {
         // curl --proxy-crlfile nosuchfile.x file:///nosuch/zz -> exit 2 with these lines (curl 8.21.0, 2026-09-28).
-        CommandLineParseResult result = CommandLineParser.Parse(["--proxy-crlfile", "nosuchfile.x", Url], NoPathExists);
+        CommandLineParseResult result = Parse(["--proxy-crlfile", "nosuchfile.x", Url], NoPathExists);
 
         AssertRefused(
             result,
@@ -206,9 +241,13 @@ public sealed class CommandLineProxyTlsOptionTests
     [DataRow("--proxy-ssl-allow-beast", nameof(CommandLineOptions.ProxyAllowBeast))]
     public void Parse_ProxySwitch_SetsOnlyTheProxyProperty(string option, string property)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, Url], NoPathExists);
+        CommandLineParseResult result = Parse([option, Url], NoPathExists);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert(property, true, ReadSwitch(result.Options, property));
+        Diagnostics.Assert("use native CA store", false, result.Options.UseNativeCaStore);
+        Diagnostics.Assert("auto client certificate", false, result.Options.AutoClientCertificate);
+        Diagnostics.Assert("allow beast", false, result.Options.AllowBeast);
         Assert.IsTrue(ReadSwitch(result.Options, property));
         Assert.IsFalse(result.Options.UseNativeCaStore);
         Assert.IsFalse(result.Options.AutoClientCertificate);
@@ -222,9 +261,10 @@ public sealed class CommandLineProxyTlsOptionTests
     public void Parse_ProxySwitchThenItsNoForm_TurnsItOff(string option, string property)
     {
         // curl --no-proxy-ca-native file:///nosuch/zz -> accepted, exit 37 from the file URL (curl 8.21.0, 2026-09-28).
-        CommandLineParseResult result = CommandLineParser.Parse([option, "--no" + option[1..], Url], NoPathExists);
+        CommandLineParseResult result = Parse([option, "--no" + option[1..], Url], NoPathExists);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert(property, false, ReadSwitch(result.Options, property));
         Assert.IsFalse(ReadSwitch(result.Options, property));
     }
 
@@ -241,7 +281,7 @@ public sealed class CommandLineProxyTlsOptionTests
     public void Parse_NoFormOfAProxyValueOption_RefusesAsNotReversible(string option)
     {
         // curl --no-proxy-cert x file:///nosuch/zz -> exit 2 (curl 8.21.0, 2026-09-28).
-        CommandLineParseResult result = CommandLineParser.Parse([option, "x", Url], EveryPathExists);
+        CommandLineParseResult result = Parse([option, "x", Url], EveryPathExists);
 
         AssertRefused(result, $"curl: option {option}: the given option cannot be reversed with a --no- prefix");
     }
@@ -253,8 +293,50 @@ public sealed class CommandLineProxyTlsOptionTests
         _ => options.ProxyAllowBeast,
     };
 
-    private static void AssertRefused(CommandLineParseResult result, params string[] expectedLinesBeforeTryHelp)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists)
     {
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("paths that exist", pathExists == NoPathExists ? "none" : "every path");
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, pathExists);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertText(string label, string? expected, string? actual) =>
+        Diagnostics.Assert(label, Quote(expected), Quote(actual));
+
+    private static string Quote(string? value) => value is null ? "null" : "\"" + value + "\"";
+
+    private void AssertWarnings(string[] expected, CommandLineParseResult result) =>
+        Diagnostics.Assert(
+            "warnings",
+            CommandLineParseDiagnostics.QuoteEach(expected),
+            CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+
+    private void AssertProxyTlsOptionsNotGiven(CommandLineOptions options)
+    {
+        AssertText("proxy client certificate", null, options.ProxyClientCertificate);
+        AssertText("proxy private key", null, options.ProxyPrivateKey);
+        AssertText("proxy client certificate type", null, options.ProxyClientCertificateType);
+        AssertText("proxy private key type", null, options.ProxyPrivateKeyType);
+        AssertText("proxy passphrase", null, options.ProxyPassphrase);
+        AssertText("proxy ciphers", null, options.ProxyCiphers);
+        AssertText("proxy TLS 1.3 ciphers", null, options.ProxyTls13Ciphers);
+        AssertText("proxy CRL file", null, options.ProxyCertificateRevocationListFile);
+        AssertText("proxy pinned public key", null, options.ProxyPinnedPublicKey);
+        Diagnostics.Assert("proxy use native CA store", false, options.ProxyUseNativeCaStore);
+        Diagnostics.Assert("proxy auto client certificate", false, options.ProxyAutoClientCertificate);
+        Diagnostics.Assert("proxy allow beast", false, options.ProxyAllowBeast);
+    }
+
+    private void AssertRefused(CommandLineParseResult result, params string[] expectedLinesBeforeTryHelp)
+    {
+        CommandLineRefusal? refusal = CommandLineParseDiagnostics.Peek(result.Refusal);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach(expectedLinesBeforeTryHelp.Append(CommandLineRefusal.TryHelpLine)),
+            CommandLineParseDiagnostics.QuoteEach(refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(

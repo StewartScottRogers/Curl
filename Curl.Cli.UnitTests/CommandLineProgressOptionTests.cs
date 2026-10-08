@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -15,11 +16,17 @@ public sealed class CommandLineProgressOptionTests
 {
     private const string Url = "http://127.0.0.1:1/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoProgressOption_LeavesMeterOnAndNotBar()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
+        Diagnostics.Assert("progress meter off", false, result.Options?.ProgressMeterOff);
+        Diagnostics.Assert("progress bar", false, result.Options?.ProgressBar);
         Assert.IsNotNull(result.Options);
         Assert.IsFalse(result.Options.ProgressMeterOff);
         Assert.IsFalse(result.Options.ProgressBar);
@@ -31,8 +38,9 @@ public sealed class CommandLineProgressOptionTests
     [DataRow("--no-progress-meter=x")]
     public void Parse_NoProgressMeterLast_TurnsMeterOff(string progressArguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. progressArguments.Split(' '), Url]);
+        CommandLineParseResult result = Parse([.. progressArguments.Split(' '), Url]);
 
+        Diagnostics.Assert("progress meter off", true, result.Options?.ProgressMeterOff);
         Assert.IsNotNull(result.Options);
         Assert.IsTrue(result.Options.ProgressMeterOff);
     }
@@ -43,8 +51,9 @@ public sealed class CommandLineProgressOptionTests
     [DataRow("--no-progress-meter --progress-meter=x")]
     public void Parse_ProgressMeterLast_LeavesMeterOn(string progressArguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. progressArguments.Split(' '), Url]);
+        CommandLineParseResult result = Parse([.. progressArguments.Split(' '), Url]);
 
+        Diagnostics.Assert("progress meter off", false, result.Options?.ProgressMeterOff);
         Assert.IsNotNull(result.Options);
         Assert.IsFalse(result.Options.ProgressMeterOff);
     }
@@ -57,8 +66,9 @@ public sealed class CommandLineProgressOptionTests
     [DataRow("-#s")]
     public void Parse_ProgressBarLast_ChoosesBar(string progressArguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. progressArguments.Split(' '), Url]);
+        CommandLineParseResult result = Parse([.. progressArguments.Split(' '), Url]);
 
+        Diagnostics.Assert("progress bar", true, result.Options?.ProgressBar);
         Assert.IsNotNull(result.Options);
         Assert.IsTrue(result.Options.ProgressBar);
     }
@@ -69,8 +79,9 @@ public sealed class CommandLineProgressOptionTests
     [DataRow("--progress-bar --no-progress-bar=x")]
     public void Parse_NoProgressBarLast_DoesNotChooseBar(string progressArguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. progressArguments.Split(' '), Url]);
+        CommandLineParseResult result = Parse([.. progressArguments.Split(' '), Url]);
 
+        Diagnostics.Assert("progress bar", false, result.Options?.ProgressBar);
         Assert.IsNotNull(result.Options);
         Assert.IsFalse(result.Options.ProgressBar);
     }
@@ -80,8 +91,10 @@ public sealed class CommandLineProgressOptionTests
     [DataRow("--no-progress-meter -#")]
     public void Parse_ProgressBarAndNoProgressMeter_RecordsBothInEitherOrder(string progressArguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. progressArguments.Split(' '), Url]);
+        CommandLineParseResult result = Parse([.. progressArguments.Split(' '), Url]);
 
+        Diagnostics.Assert("progress meter off", true, result.Options?.ProgressMeterOff);
+        Diagnostics.Assert("progress bar", true, result.Options?.ProgressBar);
         Assert.IsNotNull(result.Options);
         Assert.IsTrue(result.Options.ProgressMeterOff);
         Assert.IsTrue(result.Options.ProgressBar);
@@ -92,12 +105,22 @@ public sealed class CommandLineProgressOptionTests
     [DataRow("--Progress-bar")]
     public void Parse_MisspelledProgressOption_IsRefusedAsUnknown(string argument)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, Url]);
+        CommandLineParseResult result = Parse([argument, Url]);
 
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("first stderr line", $"curl: option {argument}: is unknown", CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines[0]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {argument}: is unknown", CommandLineRefusal.TryHelpLine },
             result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }

@@ -1,4 +1,5 @@
 using System.Net;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -9,39 +10,28 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class DnsSocketOpenerTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task OpenDatagramChannel_BindsTheLocalAddressItIsGiven()
     {
         var server = new IPEndPoint(IPAddress.Loopback, 53);
+        Diagnostics.Arrange("server", server);
+        Diagnostics.Arrange("local address", IPAddress.Loopback);
 
         var channel = (UdpDatagramChannel)new DnsSocketOpener().OpenDatagramChannel(server, IPAddress.Loopback);
         await using (channel)
         {
+            var localAddress = ((IPEndPoint)channel.LocalEndPoint).Address;
+            Diagnostics.Act("bound local address", localAddress);
+            Diagnostics.Act("server end point", channel.ServerEndPoint);
+            Diagnostics.Assert("bound local address", IPAddress.Loopback, localAddress);
+            Diagnostics.Assert("server end point", server, channel.ServerEndPoint);
             Assert.AreEqual(IPAddress.Loopback, ((IPEndPoint)channel.LocalEndPoint).Address);
             Assert.AreEqual(server, channel.ServerEndPoint);
         }
     }
 
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task ConnectStreamAsync_ToALoopbackListener_ConnectsFromTheLocalAddress()
-    {
-        var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        try
-        {
-            var server = (IPEndPoint)listener.LocalEndpoint;
-
-            var stream = await new DnsSocketOpener().ConnectStreamAsync(server, IPAddress.Loopback, CancellationToken.None);
-            await using (stream)
-            {
-                using var accepted = await listener.AcceptTcpClientAsync();
-                Assert.AreEqual(IPAddress.Loopback, ((IPEndPoint)accepted.Client.RemoteEndPoint!).Address);
-            }
-        }
-        finally
-        {
-            listener.Stop();
-        }
-    }
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -15,6 +16,11 @@ namespace Curl.Protocol.Imap;
 [TestClass]
 public sealed class ImapProtocolHandlerSaslCancelTests
 {
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "imap://127.0.0.1:18143/";
 
     private const string Greeting = "* OK ready\r\n";
@@ -42,6 +48,10 @@ public sealed class ImapProtocolHandlerSaslCancelTests
             sasl,
             log: log);
 
+        const string ExpectedSent = Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n";
+        Diagnostics.Diff("sent", ExpectedSent, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
+        Diagnostics.Act("log warnings", DiagnosticText.Lines(log.MessagesAt(DiagnosticLogLevel.Warning)));
         Assert.AreEqual(
             Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n",
             run.Sent);
@@ -63,6 +73,9 @@ public sealed class ImapProtocolHandlerSaslCancelTests
         ImapRun run = await RunAsync(
             Caps("AUTH=CRAM-MD5 AUTH=PLAIN") + NotBase64 + reply + "+ \r\nA003 OK done\r\n" + ListAndLogout("A004", "A005"), sasl);
 
+        Diagnostics.Arrange("reply to the cancel", DiagnosticText.Escape(reply));
+        Diagnostics.Assert("sent starts with", true, run.Sent.StartsWith(Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\n", StringComparison.Ordinal));
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         StringAssert.StartsWith(run.Sent, Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\n");
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -78,6 +91,8 @@ public sealed class ImapProtocolHandlerSaslCancelTests
                 + ListAndLogout("A004", "A005"),
             sasl);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 LOGIN user secret\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 LOGIN user secret\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -95,6 +110,9 @@ public sealed class ImapProtocolHandlerSaslCancelTests
             sasl,
             events);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), run.Result);
+        Diagnostics.Act("info", DiagnosticText.Lines(events.Info));
         Assert.AreEqual(Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), run.Result);
         CollectionAssert.Contains(events.Info, AuthenticationCancelled);
@@ -109,6 +127,8 @@ public sealed class ImapProtocolHandlerSaslCancelTests
         ImapRun run = await RunAsync(
             Caps("AUTH=CRAM-MD5 AUTH=PLAIN") + NotBase64 + "A002 BAD cancelled\r\n+ \r\nA003 NO denied\r\n", sasl);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual(Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
     }
@@ -120,6 +140,9 @@ public sealed class ImapProtocolHandlerSaslCancelTests
 
         ImapRun run = await RunAsync(Caps("AUTH=PLAIN LOGINDISABLED") + NotBase64 + "A002 BAD cancelled\r\n", sasl);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), run.Result);
+        Diagnostics.Assert("choices made", 1, sasl.ChoicesMade);
         Assert.AreEqual(Capability + "A002 AUTHENTICATE CRAM-MD5\r\n*\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), run.Result);
         Assert.AreEqual(1, sasl.ChoicesMade);
@@ -134,6 +157,8 @@ public sealed class ImapProtocolHandlerSaslCancelTests
         ImapRun run = await RunAsync(
             Caps("AUTH=NTLM AUTH=PLAIN") + "+ \r\n" + NotBase64 + "A002 BAD cancelled\r\n+ \r\nA003 OK done\r\n" + ListAndLogout("A004", "A005"), sasl);
 
+        Diagnostics.Assert("sent starts with", true, run.Sent.StartsWith(Capability + "A002 AUTHENTICATE NTLM\r\nVDE=\r\n*\r\nA003 AUTHENTICATE PLAIN\r\n", StringComparison.Ordinal));
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         StringAssert.StartsWith(run.Sent, Capability + "A002 AUTHENTICATE NTLM\r\nVDE=\r\n*\r\nA003 AUTHENTICATE PLAIN\r\n");
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.IsEmpty(sasl.Challenges);
@@ -148,6 +173,8 @@ public sealed class ImapProtocolHandlerSaslCancelTests
             Caps("AUTH=GSSAPI AUTH=PLAIN") + "+ \r\n+ AAAA\r\n" + NotBase64 + "A002 BAD cancelled\r\n+ \r\nA003 OK done\r\n" + ListAndLogout("A004", "A005"),
             sasl);
 
+        Diagnostics.Assert("sent starts with", true, run.Sent.StartsWith(Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\ncg==\r\n*\r\nA003 AUTHENTICATE PLAIN\r\n", StringComparison.Ordinal));
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         StringAssert.StartsWith(run.Sent, Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\ncg==\r\n*\r\nA003 AUTHENTICATE PLAIN\r\n");
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.HasCount(1, sasl.Challenges);
@@ -162,6 +189,8 @@ public sealed class ImapProtocolHandlerSaslCancelTests
         ImapRun run = await RunAsync(
             Caps("AUTH=DIGEST-MD5") + "+ AAAA\r\n" + NotBase64 + "A002 OK done\r\n" + ListAndLogout("A003", "A004"), sasl);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE DIGEST-MD5\r\nZA==\r\n=\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(Capability + "A002 AUTHENTICATE DIGEST-MD5\r\nZA==\r\n=\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.IsEmpty(sasl.Challenges[1].Challenge);
@@ -177,6 +206,9 @@ public sealed class ImapProtocolHandlerSaslCancelTests
 
         ImapRun run = await RunAsync(Caps("AUTH=CRAM-MD5") + challenge + "A002 OK done\r\n" + ListAndLogout("A003", "A004"), sasl);
 
+        Diagnostics.Arrange("challenge", DiagnosticText.Escape(challenge));
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE CRAM-MD5\r\ncg==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(Capability + "A002 AUTHENTICATE CRAM-MD5\r\ncg==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.IsEmpty(sasl.Challenges.Single().Challenge);
@@ -195,6 +227,9 @@ public sealed class ImapProtocolHandlerSaslCancelTests
 
         ImapRun run = await RunAsync(Caps("AUTH=" + mechanism) + NotBase64 + "A002 OK done\r\n" + ListAndLogout("A003", "A004"), sasl);
 
+        Diagnostics.Arrange("mechanism", mechanism);
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE " + mechanism + "\r\neA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(Capability + "A002 AUTHENTICATE " + mechanism + "\r\neA==\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.IsEmpty(sasl.Challenges.Single());
@@ -214,6 +249,9 @@ public sealed class ImapProtocolHandlerSaslCancelTests
             sasl,
             events);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n*\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), run.Result);
+        Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
         Assert.AreEqual(Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n*\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, AuthenticationCancelled), run.Result);
         Assert.HasCount(1, sasl.Challenges);
@@ -235,6 +273,9 @@ public sealed class ImapProtocolHandlerSaslCancelTests
             sasl,
             events);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
+        Diagnostics.Act("info", DiagnosticText.Lines(events.Info));
         Assert.AreEqual(
             Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n*\r\nA003 AUTHENTICATE PLAIN\r\nAHVzZXIAc2VjcmV0\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n",
             run.Sent);
@@ -251,13 +292,17 @@ public sealed class ImapProtocolHandlerSaslCancelTests
 
         ImapRun run = await RunAsync(Caps("AUTH=GSSAPI AUTH=PLAIN") + "+ \r\n+ AAAA\r\n", sasl, events);
 
+        Diagnostics.Diff("sent", Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual(Capability + "A002 AUTHENTICATE GSSAPI\r\nRw==\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         CollectionAssert.DoesNotContain(events.Info, SecurityLayerFailure);
     }
 
-    private static Task<ImapRun> RunAsync(string script, ISaslAuthenticator sasl, RecordingTransferEvents? events = null, RecordingDiagnosticLog? log = null)
+    private async Task<ImapRun> RunAsync(string script, ISaslAuthenticator sasl, RecordingTransferEvents? events = null, RecordingDiagnosticLog? log = null)
     {
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Greeting + script));
         var context = new TransferContext
         {
             Url = CurlUrl.Parse(Url),
@@ -266,7 +311,10 @@ public sealed class ImapProtocolHandlerSaslCancelTests
             Events = (ITransferEvents?)events ?? NoTransferEvents.Instance,
             DiagnosticLog = (IDiagnosticLog?)log ?? NoDiagnosticLog.Instance,
         };
-        return ImapRun.ExecuteAsync(context, new ScriptedConnection(Latin1(Greeting + script)), sasl);
+        ImapRun run = await ImapRun.ExecuteAsync(context, new ScriptedConnection(Latin1(Greeting + script)), sasl);
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        return run;
     }
 
     private static string Caps(string words) => "* CAPABILITY " + words + "\r\nA001 OK done\r\n";

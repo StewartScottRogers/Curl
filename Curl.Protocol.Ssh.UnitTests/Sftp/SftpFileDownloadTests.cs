@@ -1,6 +1,9 @@
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Sftp;
@@ -15,6 +18,10 @@ namespace Curl.Protocol.Ssh.Sftp;
 [TestClass]
 public sealed partial class SftpFileDownloadTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const UnixFileMode Mode0644 =
         UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
 
@@ -27,8 +34,11 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/x/file.txt");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
+        Diagnostics.AssertProgress(new[] { (5L, (long?)5) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (5L, (long?)5) }, outcome.Progress);
         AssertRequests(
             outcome,
@@ -47,8 +57,11 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/size/0/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
         Assert.AreEqual(TransferResult.Success(0), outcome.Result);
+        Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
+        Diagnostics.AssertProgress([], outcome.Progress);
         Assert.IsEmpty(outcome.Progress);
         byte[][] expectedReads = [.. Enumerable.Range(0, 14).Select(index => SftpServerScript.ReadRequest((uint)(3 + index), (ulong)(index * 30000), 30000))];
         AssertRequests(outcome, 4, [.. expectedReads, SftpServerScript.CloseRequest(17)]);
@@ -68,10 +81,21 @@ public sealed partial class SftpFileDownloadTests
         ScriptedConnection connection = new(script.Bytes);
         MemoryStream output = new();
         RecordingProgress progress = new();
+        Diagnostics.ArrangeTransfer("/big", script.Bytes);
 
-        TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
-            .DownloadAsync("/big", Mode0644, output, progress, CancellationToken.None);
+        TransferResult result;
+        using (Diagnostics.Phase("download"))
+        {
+            result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
+                .DownloadAsync("/big", Mode0644, output, progress, CancellationToken.None);
+        }
 
+        Diagnostics.ActTransfer(result, output.ToArray(), progress.Reports);
+        Diagnostics.ActSftpRequests(connection.Written);
+        Diagnostics.AssertResult(TransferResult.Success(Size), result);
+        Diagnostics.Diff("output", content, output.ToArray());
+
+        Diagnostics.AssertResult(TransferResult.Success(Size), result);
         Assert.AreEqual(TransferResult.Success(Size), result);
         CollectionAssert.AreEqual(content, output.ToArray());
         Assert.HasCount(100, progress.Reports);
@@ -95,7 +119,9 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/bigsize/f");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing", 5), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing", 5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
         AssertRequests(outcome, 4, SftpServerScript.ReadRequest(3, 0, 40), SftpServerScript.ReadRequest(4, 5, 20), SftpServerScript.CloseRequest(5));
     }
@@ -107,6 +133,7 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/readfail/1");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing", 0), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing", 0), outcome.Result);
     }
 
@@ -120,6 +147,7 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/readfail/x");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
         AssertRequests(outcome, 4, SftpServerScript.ReadRequest(3, 0, 20), SftpServerScript.CloseRequest(4));
     }
@@ -138,7 +166,9 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/statfail/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
+        Diagnostics.AssertProgress(new[] { (5L, (long?)null) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (5L, (long?)null) }, outcome.Progress);
         List<byte[]> requests = Requests(outcome);
         CollectionAssert.AreEqual(SftpServerScript.ReadRequest(17, 5, 30000), requests[18]);
@@ -160,6 +190,7 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
     }
 
@@ -179,7 +210,9 @@ public sealed partial class SftpFileDownloadTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Download(connection, "/missing"));
 
+        Diagnostics.Assert("exit code", exitCode, failure.ExitCode);
         Assert.AreEqual(exitCode, failure.ExitCode);
+        Diagnostics.AssertText("message", "Could not open remote file for reading: " + description, failure.Message);
         Assert.AreEqual("Could not open remote file for reading: " + description, failure.Message);
         Assert.HasCount(3, SftpServerScript.SftpRequests(connection.Written), "no close without a handle");
     }
@@ -197,6 +230,7 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
     }
 
@@ -214,7 +248,9 @@ public sealed partial class SftpFileDownloadTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Download(new ScriptedConnection(script.Bytes), "/~/f"));
 
+        Diagnostics.Assert("exit code", exitCode, failure.ExitCode);
         Assert.AreEqual(exitCode, failure.ExitCode);
+        Diagnostics.AssertText("message", message, failure.Message);
         Assert.AreEqual(message, failure.Message);
     }
 
@@ -231,6 +267,7 @@ public sealed partial class SftpFileDownloadTests
         Outcome outcome = await DownloadAsync(script, urlPath);
 
         List<byte[]> requests = Requests(outcome);
+        Diagnostics.DiffRequests(requests, 2, [SftpServerScript.OpenRequest(expected), SftpServerScript.StatRequest(expected)]);
         CollectionAssert.AreEqual(SftpServerScript.OpenRequest(expected), requests[2]);
         CollectionAssert.AreEqual(SftpServerScript.StatRequest(expected), requests[3]);
     }
@@ -240,10 +277,18 @@ public sealed partial class SftpFileDownloadTests
     {
         SftpServerScript script = SftpServerScript.Started().Opened(5).Data(3, Hello).Status(4, SftpStatusCode.Ok);
         ScriptedConnection connection = new(script.Bytes);
+        Diagnostics.ArrangeTransfer("/f", script.Bytes);
+        Diagnostics.Arrange("create file mode", "0600");
 
-        await new SftpFileDownload(SftpSessionTests.Transport(connection))
+        TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
             .DownloadAsync("/f", UnixFileMode.UserRead | UnixFileMode.UserWrite, new MemoryStream(), new RecordingProgress(), CancellationToken.None);
 
+        Diagnostics.Act("result", result);
+        Diagnostics.ActSftpRequests(connection.Written);
+        Diagnostics.AssertBytes(
+            "request 2 (OPEN)",
+            Join([SftpPacketType.Open], UInt32(1), Name("/f"), UInt32(1), UInt32(4), UInt32(0x8180)),
+            SftpServerScript.SftpRequests(connection.Written)[2]);
         CollectionAssert.AreEqual(
             Join([SftpPacketType.Open], UInt32(1), Name("/f"), UInt32(1), UInt32(4), UInt32(0x8180)),
             SftpServerScript.SftpRequests(connection.Written)[2]);
@@ -256,6 +301,7 @@ public sealed partial class SftpFileDownloadTests
 
         TransferResult result = await Download(new ScriptedConnection(script.Bytes), "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
@@ -267,7 +313,9 @@ public sealed partial class SftpFileDownloadTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Download(new ScriptedConnection(script.Bytes), "/f"));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
+        Diagnostics.AssertText("message", "Error in the SSH layer", failure.Message);
         Assert.AreEqual("Error in the SSH layer", failure.Message);
     }
 
@@ -279,6 +327,7 @@ public sealed partial class SftpFileDownloadTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Download(new ScriptedConnection(script.Bytes), "/f"));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
     }
 
@@ -290,6 +339,7 @@ public sealed partial class SftpFileDownloadTests
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await Download(new ScriptedConnection(script.Bytes), "/f"));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ssh, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.Ssh, failure.ExitCode);
     }
 
@@ -300,7 +350,9 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 5), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 5), outcome.Result);
+        Diagnostics.AssertBytes("output", Hello, outcome.Output);
         CollectionAssert.AreEqual(Hello, outcome.Output);
     }
 
@@ -311,6 +363,7 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.Ssh, "Error in the SSH layer", 0), outcome.Result);
     }
 
@@ -321,6 +374,7 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
     }
 
@@ -331,30 +385,65 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, "/f");
 
+        Diagnostics.AssertResult(TransferResult.Success(5), outcome.Result);
         Assert.AreEqual(TransferResult.Success(5), outcome.Result);
     }
 
-    private static ValueTask<TransferResult> Download(ScriptedConnection connection, string urlPath) =>
-        new SftpFileDownload(SftpSessionTests.Transport(connection))
-            .DownloadAsync(urlPath, Mode0644, new MemoryStream(), new RecordingProgress(), CancellationToken.None);
-
-    private static async Task<Outcome> DownloadAsync(SftpServerScript script, string urlPath)
+    private async Task<TransferResult> Download(ScriptedConnection connection, string urlPath)
     {
-        ScriptedConnection connection = new(script.Bytes);
-        MemoryStream output = new();
-        RecordingProgress progress = new();
-        TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
-            .DownloadAsync(urlPath, Mode0644, output, progress, CancellationToken.None);
-        return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
+        Diagnostics.Arrange("url path", urlPath);
+        using (Diagnostics.Phase("download"))
+        {
+            try
+            {
+                TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
+                    .DownloadAsync(urlPath, Mode0644, new MemoryStream(), new RecordingProgress(), CancellationToken.None);
+                Diagnostics.Act("result", result);
+                return result;
+            }
+            catch (SshTransferException failure)
+            {
+                Diagnostics.ActFailure(failure);
+                Diagnostics.ActSftpRequests(connection.Written);
+                throw;
+            }
+        }
+    }
+
+    private Task<Outcome> DownloadAsync(SftpServerScript script, string urlPath) =>
+        RecordAsync(script, urlPath, "(none)", async () =>
+        {
+            ScriptedConnection connection = new(script.Bytes);
+            MemoryStream output = new();
+            RecordingProgress progress = new();
+            TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
+                .DownloadAsync(urlPath, Mode0644, output, progress, CancellationToken.None);
+            return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
+        });
+
+    private async Task<Outcome> RecordAsync(SftpServerScript script, string urlPath, string options, Func<Task<Outcome>> download)
+    {
+        Diagnostics.ArrangeTransfer(urlPath, script.Bytes);
+        Diagnostics.Arrange("options", options);
+        Outcome outcome;
+        using (Diagnostics.Phase("download"))
+        {
+            outcome = await download();
+        }
+
+        Diagnostics.ActTransfer(outcome.Result, outcome.Output, outcome.Progress);
+        Diagnostics.ActSftpRequests(outcome.Written);
+        return outcome;
     }
 
     private static List<byte[]> Requests(Outcome outcome) => SftpServerScript.SftpRequests(outcome.Written);
 
-    private static void AssertRequests(Outcome outcome, params byte[][] expected) => AssertRequests(outcome, 0, expected);
+    private void AssertRequests(Outcome outcome, params byte[][] expected) => AssertRequests(outcome, 0, expected);
 
-    private static void AssertRequests(Outcome outcome, int skipped, params byte[][] expected)
+    private void AssertRequests(Outcome outcome, int skipped, params byte[][] expected)
     {
         List<byte[]> requests = Requests(outcome);
+        Diagnostics.DiffRequests(requests, skipped, expected);
         Assert.HasCount(skipped + expected.Length, requests);
         for (int index = 0; index < expected.Length; index++)
         {

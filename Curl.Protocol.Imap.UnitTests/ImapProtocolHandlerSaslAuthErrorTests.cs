@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -16,6 +17,11 @@ namespace Curl.Protocol.Imap;
 public sealed class ImapProtocolHandlerSaslAuthErrorTests
 {
     private const string Url = "imap://127.0.0.1:18143/";
+
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     // realm="localhost",qop="auth",algorithm=md5-sess,charset=utf-8 - no nonce.
     private const string NoNonceChallenge = "cmVhbG09ImxvY2FsaG9zdCIscW9wPSJhdXRoIixhbGdvcml0aG09bWQ1LXNlc3MsY2hhcnNldD11dGYtOA==";
@@ -32,6 +38,7 @@ public sealed class ImapProtocolHandlerSaslAuthErrorTests
                     + NoNonceChallenge + "\r\nA002 NO failed\r\n")),
             sasl);
 
+        Report("DIGEST-MD5", "A001 CAPABILITY\r\nA002 AUTHENTICATE DIGEST-MD5\r\n", run);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 AUTHENTICATE DIGEST-MD5\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), run.Result);
         Assert.AreEqual(
@@ -50,6 +57,7 @@ public sealed class ImapProtocolHandlerSaslAuthErrorTests
                 "* OK ready\r\n* CAPABILITY IMAP4rev1 SASL-IR AUTH=DIGEST-MD5\r\nA001 OK done\r\n+ " + NoNonceChallenge + "\r\nA002 NO failed\r\n")),
             sasl);
 
+        Report("DIGEST-MD5 with SASL-IR offered", "A001 CAPABILITY\r\nA002 AUTHENTICATE DIGEST-MD5\r\n", run);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 AUTHENTICATE DIGEST-MD5\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), run.Result);
         Assert.AreEqual(1, sasl.InitialResponsesAsked);
@@ -77,9 +85,20 @@ public sealed class ImapProtocolHandlerSaslAuthErrorTests
                 "* OK ready\r\n* CAPABILITY IMAP4rev1 AUTH=GSSAPI" + saslIr + "\r\nA001 OK done\r\n+ \r\nA002 NO failed\r\n")),
             sasl);
 
+        Report("GSSAPI saslInitialResponse=" + saslInitialResponse + " saslIr=" + DiagnosticText.Escape(saslIr), expectedSent, run);
         Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), run.Result);
         Assert.AreEqual(1, sasl.InitialResponsesAsked);
         Assert.IsEmpty(sasl.Challenges);
+    }
+
+    private void Report(string mechanism, string expectedSent, ImapRun run)
+    {
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("sasl mechanism", mechanism);
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        Diagnostics.Diff("sent", expectedSent, run.Sent);
+        Diagnostics.Assert("exit code", CurlExitCode.AuthError, run.Result.ExitCode);
     }
 }

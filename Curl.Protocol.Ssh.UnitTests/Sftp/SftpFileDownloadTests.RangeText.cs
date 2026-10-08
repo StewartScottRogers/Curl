@@ -1,5 +1,7 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -24,6 +26,8 @@ public sealed partial class SftpFileDownloadTests
     [DataRow("2-x", NotDelivered, DisplayName = "text left over after no last number")]
     [DataRow("99999999999999999999-", NotDelivered, DisplayName = "first number overflows")]
     [DataRow("1-99999999999999999999", NotDelivered, DisplayName = "second number overflows")]
+    [DataRow("9223372036854775808-", NotDelivered, DisplayName = "first number one past long.MaxValue")]
+    [DataRow("-9223372036854775808", NotDelivered, DisplayName = "last bytes one past long.MaxValue")]
     [DataRow("11-12", "Offset (11) was beyond file size (10)", DisplayName = "start beyond the file")]
     public async Task DownloadAsync_RangeTextCurlSshRangeRefuses_EndsWithExit33AfterOpenAndStatWritingNothing(string text, string message)
     {
@@ -31,8 +35,11 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadWithTextAsync(script, text);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
+        Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
+        Diagnostics.AssertProgress([], outcome.Progress);
         Assert.IsEmpty(outcome.Progress);
         AssertReadsThenClose(outcome, SftpServerScript.CloseRequest(3));
     }
@@ -45,18 +52,28 @@ public sealed partial class SftpFileDownloadTests
     [DataRow("- 3", 7L, 3L, DisplayName = "last bytes")]
     [DataRow("-20", 0L, 10L, DisplayName = "more last bytes than the file")]
     [DataRow("5-100", 5L, 5L, DisplayName = "end past the file")]
+    [DataRow("-9223372036854775807", 0L, 10L, DisplayName = "last bytes exactly long.MaxValue")]
     public void Choose_RangeTextCurlSshRangeReads_ChoosesThePartItNames(string text, long offset, long length)
     {
+        Diagnostics.ArrangeText("range text", text);
+        Diagnostics.Arrange("file size", 10);
+
         SftpDownloadPart part = SftpDownloadPart.Choose(null, null, 10, text);
 
+        Diagnostics.Act("part", part);
+        Diagnostics.Assert("part", new SftpDownloadPart(offset, length), part);
         Assert.AreEqual(new SftpDownloadPart(offset, length), part);
     }
 
     [TestMethod]
     public void Choose_RangeAndRangeText_ReadsTheRange()
     {
+        Diagnostics.Arrange("range, range text, file size", "2-3, \"5-2\", 10");
+
         SftpDownloadPart part = SftpDownloadPart.Choose(ByteRange.Bounded(2, 3), null, 10, "5-2");
 
+        Diagnostics.Act("part", part);
+        Diagnostics.Assert("part", new SftpDownloadPart(2, 2), part);
         Assert.AreEqual(new SftpDownloadPart(2, 2), part);
     }
 
@@ -67,18 +84,20 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadWithTextAsync(script, "5-2");
 
+        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
         Assert.AreEqual(TransferResult.Success(0), outcome.Result);
         byte[][] reads = [.. Enumerable.Range(0, 14).Select(index => SftpServerScript.ReadRequest((uint)(3 + index), (ulong)(index * 30000), 30000))];
         AssertReadsThenClose(outcome, [.. reads, SftpServerScript.CloseRequest(17)]);
     }
 
-    private static async Task<Outcome> DownloadWithTextAsync(SftpServerScript script, string rangeText)
-    {
-        ScriptedConnection connection = new(script.Bytes);
-        MemoryStream output = new();
-        RecordingProgress progress = new();
-        TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
-            .DownloadAsync("/f", Mode0644, output, progress, CancellationToken.None, rangeText: rangeText);
-        return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
-    }
+    private Task<Outcome> DownloadWithTextAsync(SftpServerScript script, string rangeText) =>
+        RecordAsync(script, "/f", "range text \"" + rangeText + "\"", async () =>
+        {
+            ScriptedConnection connection = new(script.Bytes);
+            MemoryStream output = new();
+            RecordingProgress progress = new();
+            TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
+                .DownloadAsync("/f", Mode0644, output, progress, CancellationToken.None, rangeText: rangeText);
+            return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
+        });
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -8,6 +10,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class OpenSslSignatureAlgorithmListTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("ECDSA+SHA256", new ushort[] { 0x0403 })]
     [DataRow("rsa_pss_rsae_sha256:ECDSA+SHA256", new ushort[] { 0x0804, 0x0403 })]
@@ -22,8 +28,12 @@ public sealed class OpenSslSignatureAlgorithmListTests
     [DataRow("RSA+SHA1", new ushort[0])]
     public void Parse_WithAnAcceptedValue_OffersTheMeasuredSchemes(string value, ushort[] expected)
     {
+        Diagnostics.Arrange("--sigalgs", value);
+
         var schemes = OpenSslSignatureAlgorithmList.Parse(value);
 
+        Diagnostics.Act("schemes", schemes is null ? "null" : Hex(schemes.ToArray()));
+        Diagnostics.Assert("schemes", Hex(expected), schemes is null ? "null" : Hex(schemes.ToArray()));
         Assert.IsNotNull(schemes);
         CollectionAssert.AreEqual(expected, schemes.ToArray());
     }
@@ -35,10 +45,27 @@ public sealed class OpenSslSignatureAlgorithmListTests
     [DataRow("RSA+SHA256:bogus")]
     [DataRow("RSA+SHA256,ECDSA+SHA256")]
     [DataRow("")]
-    public void Parse_WithARefusedValue_ReturnsNull(string value) =>
-        Assert.IsNull(OpenSslSignatureAlgorithmList.Parse(value));
+    public void Parse_WithARefusedValue_ReturnsNull(string value)
+    {
+        Diagnostics.Arrange("--sigalgs", value);
+
+        var schemes = OpenSslSignatureAlgorithmList.Parse(value);
+
+        Diagnostics.Act("schemes", schemes is null ? "null" : Hex(schemes.ToArray()));
+        Diagnostics.Assert("schemes", "null", schemes is null ? "null" : Hex(schemes.ToArray()));
+        Assert.IsNull(schemes);
+    }
 
     [TestMethod]
-    public void Parse_WithNull_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => OpenSslSignatureAlgorithmList.Parse(null!));
+    public void Parse_WithNull_Throws()
+    {
+        Diagnostics.Arrange("--sigalgs", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => OpenSslSignatureAlgorithmList.Parse(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
+
+    private static string Hex(ushort[] schemes) => string.Join(", ", schemes.Select(scheme => $"0x{scheme:x4}"));
 }

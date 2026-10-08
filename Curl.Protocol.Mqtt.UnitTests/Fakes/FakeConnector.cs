@@ -15,6 +15,11 @@ public sealed class FakeConnector(ConnectResult result) : IConnector
     public List<ConnectTarget> Targets { get; } = [];
 
     /// <summary>
+    /// Gets the connection every connect hands out, or <see langword="null" /> when connecting fails.
+    /// </summary>
+    public IConnection? Connection => result.Connection;
+
+    /// <summary>
     /// Creates a connector that hands out <paramref name="connection" />.
     /// </summary>
     /// <param name="connection">The connection every connect returns.</param>

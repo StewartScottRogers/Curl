@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -17,6 +18,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerDataConnectionEventTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Host = "127.0.0.1";
 
     private const int ControlPort = 47931;
@@ -62,8 +65,10 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     [TestMethod]
     public async Task ExecuteAsync_PassiveRetr_ReportsCurlsLinesAndTheDataInOrder()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:47931/dir/file.txt; --trace-ascii - for the data blocks.
-        DataRun run = await RunAsync("/dir/file.txt", LoggedIn + "250 OK\r\n" + Epsv + Retrieved, _ => { });
+        DataRun run = await RunAsync(diagnostics, "/dir/file.txt", LoggedIn + "250 OK\r\n" + Epsv + Retrieved, _ => { });
 
         string[] expected =
         [
@@ -85,58 +90,85 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "< " + Complete,
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
+        DiffLines(diagnostics, "transcript", expected, run.Events.Transcript);
         CollectionAssert.AreEqual(expected, run.Events.Transcript);
+        DiffLines(diagnostics, "data received", [File, string.Empty], run.Events.DataReceived);
         CollectionAssert.AreEqual(new[] { File, string.Empty }, run.Events.DataReceived);
+        diagnostics.Assert("result", TransferResult.Success(11), run.Result);
         Assert.AreEqual(TransferResult.Success(11), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RetrOfAKnownSize_ReadsTheBytesStillExpectedAndNoFurther()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -s -v --trace-config tcp ftp://127.0.0.1:P/a.txt: [TCP-1] recv(len=<bytes still
         // expected>), and no read after the last byte (BL-1259 Notes).
         var data = new ScriptedConnection(Encoding.Latin1.GetBytes("hello "), Encoding.Latin1.GetBytes("ftp\r\n"));
+        diagnostics.Arrange("data chunks", "hello |ftp\\r\\n");
 
-        DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + Retrieved, _ => { }, data);
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + Epsv + Retrieved, _ => { }, data);
 
+        diagnostics.Act("read lengths", string.Join(",", data.ReadLengths));
+        diagnostics.Assert("read lengths", "11,5", string.Join(",", data.ReadLengths));
         CollectionAssert.AreEqual(new[] { 11, 5 }, data.ReadLengths);
+        DiffLines(diagnostics, "data received", ["hello ", "ftp\r\n", string.Empty], run.Events.DataReceived);
         CollectionAssert.AreEqual(new[] { "hello ", "ftp\r\n", string.Empty }, run.Events.DataReceived);
+        diagnostics.Assert("result", TransferResult.Success(11), run.Result);
         Assert.AreEqual(TransferResult.Success(11), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RetrSendingMoreThanSizeAnnounced_IsCutOffAtTheAnnouncedSize()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // Record-CurlExchange.ps1 -Ftp -FtpData hello -FtpReply 'SIZE=213 3': curl writes "hel",
         // exit 0, after [TCP-1] recv(len=3) -> 0, 3 (BL-1259 Notes).
         var data = new ScriptedConnection(Encoding.Latin1.GetBytes(File));
+        diagnostics.Arrange("announced size", 3);
 
-        DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + "200 Type set\r\n213 3\r\n" + Opened + Complete + Bye, _ => { }, data);
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + Epsv + "200 Type set\r\n213 3\r\n" + Opened + Complete + Bye, _ => { }, data);
 
+        diagnostics.Act("read lengths", string.Join(",", data.ReadLengths));
+        diagnostics.Assert("read lengths", "3", string.Join(",", data.ReadLengths));
         CollectionAssert.AreEqual(new[] { 3 }, data.ReadLengths);
+        DiffLines(diagnostics, "data received", ["hel", string.Empty], run.Events.DataReceived);
         CollectionAssert.AreEqual(new[] { "hel", string.Empty }, run.Events.DataReceived);
+        diagnostics.Assert("result", TransferResult.Success(3), run.Result);
         Assert.AreEqual(TransferResult.Success(3), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ListOfAnUnknownSize_ReadsCurlsWholeBufferToTheEnd()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -s -v --trace-config tcp ftp://127.0.0.1:P/: [TCP-1] recv(len=102400) -> 0, 14, then
         // -> 0, 0 (BL-1259 Notes).
         var data = new ScriptedConnection(Encoding.Latin1.GetBytes(File));
+        diagnostics.Arrange("announced size", "none");
 
-        DataRun run = await RunAsync("/", LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye, _ => { }, data);
+        DataRun run = await RunAsync(diagnostics, "/", LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye, _ => { }, data);
 
+        diagnostics.Act("read lengths", string.Join(",", data.ReadLengths));
+        diagnostics.Assert("read lengths", "102400,102400", string.Join(",", data.ReadLengths));
         CollectionAssert.AreEqual(new[] { 102400, 102400 }, data.ReadLengths);
+        diagnostics.Assert("result", TransferResult.Success(11), run.Result);
         Assert.AreEqual(TransferResult.Success(11), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ActiveRetr_ReportsTheAcceptedConnectionBeforeTheData()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -P - ftp://127.0.0.1:47931/file.txt
         var accepted = new ScriptedConnection(Encoding.Latin1.GetBytes(File)) { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 55823) };
+        diagnostics.Arrange("option", "-P -");
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + "200 EPRT command successful\r\n" + Retrieved,
             context => context.FtpPort = "-",
@@ -167,68 +199,89 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "< " + Complete,
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
+        DiffLines(diagnostics, "transcript", expected, run.Events.Transcript);
         CollectionAssert.AreEqual(expected, run.Events.Transcript);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ActiveRetrWithAnUnknownServerEnd_ReportsNoEstablishedLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("option", "-P -");
+
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + "200 EPRT command successful\r\n" + Retrieved,
             context => context.FtpPort = "-",
             pending: new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 55822), ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes(File)))));
 
-        CollectionAssert.AreEqual(
-            new[] { "Connection accepted from server", "Remembering we are in directory \"\"" },
-            run.Events.Info.Skip(7).Take(2).ToArray());
+        string[] expected = ["Connection accepted from server", "Remembering we are in directory \"\""];
+        string[] actual = run.Events.Info.Skip(7).Take(2).ToArray();
+        DiffLines(diagnostics, "info lines 7 and 8", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_EprtRefused_ReportsDisablingEprtUsageBeforePort()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -P 127.0.0.1 ftp://127.0.0.1:<port>/f.txt, EPRT answered 500 no (BL-1239).
+        diagnostics.Arrange("option", "-P -");
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + "500 no\r\n200 PORT command successful\r\n" + Retrieved,
             context => context.FtpPort = "-",
             pending: new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 55822), ConnectResult.Connected(new ScriptedConnection())),
             portPending: new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 55823), ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes(File)))));
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "> EPRT |1|127.0.0.1|55822|\r\n",
-                "< 500 no\r\n",
-                "* disabling EPRT usage",
-                "> PORT 127,0,0,1,218,15\r\n",
-                "< 200 PORT command successful\r\n",
-                "* Connect data stream actively",
-            },
-            run.Events.Transcript.SkipWhile(line => !line.StartsWith("> EPRT", StringComparison.Ordinal)).Take(6).ToArray());
+        string[] expected =
+        [
+            "> EPRT |1|127.0.0.1|55822|\r\n",
+            "< 500 no\r\n",
+            "* disabling EPRT usage",
+            "> PORT 127,0,0,1,218,15\r\n",
+            "< 200 PORT command successful\r\n",
+            "* Connect data stream actively",
+        ];
+        string[] actual = run.Events.Transcript.SkipWhile(line => !line.StartsWith("> EPRT", StringComparison.Ordinal)).Take(6).ToArray();
+        DiffLines(diagnostics, "transcript from EPRT", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("result", TransferResult.Success(11), run.Result);
         Assert.AreEqual(TransferResult.Success(11), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Pwd421_ReportsWeGotA421TimeoutAndSendsNothingMore()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:<port>/f.txt, PWD answered 421 Timeout (BL-1239).
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n421 Timeout\r\n",
             _ => { });
 
-        CollectionAssert.AreEqual(
-            new[] { "> PWD\r\n", "< 421 Timeout\r\n", "* We got a 421 - timeout" },
-            run.Events.Transcript.Skip(5).ToArray());
+        string[] expected = ["> PWD\r\n", "< 421 Timeout\r\n", "* We got a 421 - timeout"];
+        string[] actual = run.Events.Transcript.Skip(5).ToArray();
+        DiffLines(diagnostics, "transcript after login", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.OperationTimedOut, "Timeout was reached"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ActiveWithPort_ReportsTheActiveLineAfterPort()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -P - --disable-eprt ftp://127.0.0.1:47931/file.txt
+        diagnostics.Arrange("options", "-P - --disable-eprt");
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + "200 PORT command successful\r\n" + Retrieved,
             context =>
@@ -238,16 +291,21 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             },
             pending: new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 55822), ConnectResult.Connected(new ScriptedConnection(Encoding.Latin1.GetBytes(File)))));
 
-        CollectionAssert.AreEqual(
-            new[] { "> PORT 127,0,0,1,218,14\r\n", "< 200 PORT command successful\r\n", "* Connect data stream actively" },
-            run.Events.Transcript.Skip(9).Take(3).ToArray());
+        string[] expected = ["> PORT 127,0,0,1,218,14\r\n", "< 200 PORT command successful\r\n", "* Connect data stream actively"];
+        string[] actual = run.Events.Transcript.Skip(9).Take(3).ToArray();
+        DiffLines(diagnostics, "transcript lines 9 to 11", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Upload_ReportsTheSentDataAndCurlsUploadLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -T - ftp://127.0.0.1:47931/up.txt, with "upload bytes\r\n" on standard input.
+        diagnostics.Arrange("upload", "upload bytes\\r\\n");
         DataRun run = await RunAsync(
+            diagnostics,
             "/up.txt",
             LoggedIn + Epsv + "200 Type set\r\n" + Opened + Complete + Bye,
             context => context.Upload = new MemoryStream(Encoding.Latin1.GetBytes("upload bytes\r\n")),
@@ -268,15 +326,21 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "< " + Complete,
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
+        DiffLines(diagnostics, "transcript", expected, run.Events.Transcript);
         CollectionAssert.AreEqual(expected, run.Events.Transcript);
+        DiffLines(diagnostics, "data sent", ["upload bytes\r\n"], run.Events.DataSent);
         CollectionAssert.AreEqual(new[] { "upload bytes\r\n" }, run.Events.DataSent);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ListOnly_ReportsMaxdownloadButNoFileSize()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -l ftp://127.0.0.1:47931/dir/
+        diagnostics.Arrange("option", "-l");
         DataRun run = await RunAsync(
+            diagnostics,
             "/dir/",
             LoggedIn + "250 OK\r\n" + Epsv + "200 Type set\r\n" + Opened + Complete + Bye,
             context => context.ListOnly = true);
@@ -292,7 +356,10 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "< " + Complete,
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(16).ToArray());
+        string[] actual = run.Events.Transcript.Skip(16).ToArray();
+        DiffLines(diagnostics, "transcript from NLST", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        DiffLines(diagnostics, "data received", [File, string.Empty], run.Events.DataReceived);
         CollectionAssert.AreEqual(new[] { File, string.Empty }, run.Events.DataReceived);
     }
 
@@ -302,21 +369,32 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     [DataRow(FtpFileMethod.MultiCwd, 2, "a/b/", DisplayName = "multicwd")]
     public async Task ExecuteAsync_FtpMethod_RemembersThePathsDirectories(FtpFileMethod method, int changes, string remembered)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v --ftp-method <method> ftp://127.0.0.1:47931/a/b/file.txt
+        diagnostics.Arrange("ftp method", method);
+        diagnostics.Arrange("directory changes", changes);
+        diagnostics.Arrange("remembered directory", remembered);
         DataRun run = await RunAsync(
+            diagnostics,
             "/a/b/file.txt",
             LoggedIn + string.Concat(Enumerable.Repeat("250 OK\r\n", changes)) + Epsv + Retrieved,
             context => context.FtpFileMethod = method);
 
+        diagnostics.Assert("remembered line", "Remembering we are in directory \"" + remembered + "\"", run.Events.Info[^2]);
         Assert.AreEqual("Remembering we are in directory \"" + remembered + "\"", run.Events.Info[^2]);
+        diagnostics.Assert("result", TransferResult.Success(11), run.Result);
         Assert.AreEqual(TransferResult.Success(11), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_DisableEpsv_ReportsThePassiveLineAfterPasvAndTheSkippedAddress()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v --disable-epsv ftp://127.0.0.1:47931/file.txt
-        DataRun run = await RunAsync("/file.txt", LoggedIn + Pasv + Retrieved, context => context.FtpDisableEpsv = true);
+        diagnostics.Arrange("option", "--disable-epsv");
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + Pasv + Retrieved, context => context.FtpDisableEpsv = true);
 
         string[] expected =
         [
@@ -327,14 +405,19 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Connecting to 127.0.0.1 port 64816",
             "> TYPE I\r\n",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(9).Take(6).ToArray());
+        string[] actual = run.Events.Transcript.Skip(9).Take(6).ToArray();
+        DiffLines(diagnostics, "transcript lines 9 to 14", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_EpsvRefused_ReportsCurlsFallbackLineAndNoSecondPassiveLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:47931/file.txt, EPSV answered 500 no
-        DataRun run = await RunAsync("/file.txt", LoggedIn + "500 no\r\n" + Pasv + Retrieved, _ => { });
+        diagnostics.Arrange("EPSV answer", "500 no");
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + "500 no\r\n" + Pasv + Retrieved, _ => { });
 
         string[] expected =
         [
@@ -347,53 +430,76 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Skip 127.0.0.1 for data connection, reuse 127.0.0.1 instead",
             "* Connecting to 127.0.0.1 port 64816",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(9).Take(8).ToArray());
+        string[] actual = run.Events.Transcript.Skip(9).Take(8).ToArray();
+        DiffLines(diagnostics, "transcript lines 9 to 16", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_EpsvRefusedOverIPv6_FailsWithExit8AndSendsNeitherPasvNorQuit()
     {
-        // curl -v -g ftp://[::1]:47931/file.txt, EPSV answered 500 no (BL-903)
-        DataRun run = await RunAsync("/file.txt", LoggedIn + "500 no\r\n" + Pasv + Retrieved, _ => { }, controlPeer: new IPEndPoint(IPAddress.IPv6Loopback, ControlPort));
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -v -g ftp://[::1]:47931/file.txt, EPSV answered 500 no (BL-903)
+        diagnostics.Arrange("control peer", "[::1]");
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + "500 no\r\n" + Pasv + Retrieved, _ => { }, controlPeer: new IPEndPoint(IPAddress.IPv6Loopback, ControlPort));
+
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, "Failed EPSV attempt, exiting"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Failed EPSV attempt, exiting"), run.Result);
-        CollectionAssert.AreEqual(
-            new[] { "> EPSV\r\n", "* Connect data stream passively", "< 500 no\r\n" },
-            run.Events.Transcript.Skip(9).ToArray());
+        string[] expected = ["> EPSV\r\n", "* Connect data stream passively", "< 500 no\r\n"];
+        string[] actual = run.Events.Transcript.Skip(9).ToArray();
+        DiffLines(diagnostics, "transcript after login", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_DisableEpsvOverIPv6_StillSendsEpsv()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -sS -g --disable-epsv ftp://[::1]:47931/file.txt sends EPSV all the same (BL-903)
+        diagnostics.Arrange("option", "--disable-epsv");
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + Epsv + Retrieved,
             context => context.FtpDisableEpsv = true,
             controlPeer: new IPEndPoint(IPAddress.IPv6Loopback, ControlPort));
 
+        diagnostics.Assert("transcript line 9", "> EPSV\r\n", run.Events.Transcript[9]);
         Assert.AreEqual("> EPSV\r\n", run.Events.Transcript[9]);
+        diagnostics.Assert("result", TransferResult.Success(11), run.Result);
         Assert.AreEqual(TransferResult.Success(11), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_EpsvRefusedOverIPv4MappedPeer_StillFallsBackToPasv()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("control peer", "IPv4-mapped loopback");
+
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + "500 no\r\n" + Pasv + Retrieved,
             _ => { },
             controlPeer: new IPEndPoint(IPAddress.Loopback.MapToIPv6(), ControlPort));
 
+        diagnostics.Assert("transcript line 13", "> PASV\r\n", run.Events.Transcript[13]);
         Assert.AreEqual("> PASV\r\n", run.Events.Transcript[13]);
+        diagnostics.Assert("result", TransferResult.Success(11), run.Result);
         Assert.AreEqual(TransferResult.Success(11), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NoFtpSkipPasvIp_ConnectsToThe227AddressWithNoSkipLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v --disable-epsv --no-ftp-skip-pasv-ip ftp://127.0.0.1:47931/file.txt
+        diagnostics.Arrange("options", "--disable-epsv --no-ftp-skip-pasv-ip");
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + Pasv + Retrieved,
             context =>
@@ -402,47 +508,67 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
                 context.FtpSkipPasvIp = false;
             });
 
-        CollectionAssert.AreEqual(
-            new[] { "< " + Pasv, "* Connecting to 127.0.0.1 port 64816", "> TYPE I\r\n" },
-            run.Events.Transcript.Skip(11).Take(3).ToArray());
+        string[] expected = ["< " + Pasv, "* Connecting to 127.0.0.1 port 64816", "> TYPE I\r\n"];
+        string[] actual = run.Events.Transcript.Skip(11).Take(3).ToArray();
+        DiffLines(diagnostics, "transcript lines 11 to 13", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_LocalhostUrl_ReusesTheUrlHostButConnectsToTheControlPeer()
     {
-        // curl -v --disable-epsv ftp://localhost:47934/file.txt: the control connection went to 127.0.0.1.
-        DataRun run = await RunAsync("/file.txt", LoggedIn + Pasv + Retrieved, context => context.FtpDisableEpsv = true, host: "localhost", controlPeer: new IPEndPoint(IPAddress.Loopback, ControlPort));
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -v --disable-epsv ftp://localhost:47934/file.txt: the control connection went to 127.0.0.1.
+        diagnostics.Arrange("host", "localhost");
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + Pasv + Retrieved, context => context.FtpDisableEpsv = true, host: "localhost", controlPeer: new IPEndPoint(IPAddress.Loopback, ControlPort));
+
+        diagnostics.Assert("info line 3", "Skip 127.0.0.1 for data connection, reuse localhost instead", run.Events.Info[3]);
         Assert.AreEqual("Skip 127.0.0.1 for data connection, reuse localhost instead", run.Events.Info[3]);
+        diagnostics.Assert("info line 4", "Connecting to 127.0.0.1 port 64816", run.Events.Info[4]);
         Assert.AreEqual("Connecting to 127.0.0.1 port 64816", run.Events.Info[4]);
+        diagnostics.Assert("last info line", "Connection #0 to host localhost:47931 left intact", run.Events.Info[^1]);
         Assert.AreEqual("Connection #0 to host localhost:47931 left intact", run.Events.Info[^1]);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ControlPeerUnknown_NamesTheUrlHostAsWhereTheDataIsDialled()
     {
-        DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + Retrieved, _ => { }, host: "localhost");
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("host", "localhost");
 
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + Epsv + Retrieved, _ => { }, host: "localhost");
+
+        diagnostics.Assert("info line 3", "Connecting to localhost port 55801", run.Events.Info[3]);
         Assert.AreEqual("Connecting to localhost port 55801", run.Events.Info[3]);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_IPv4MappedControlPeer_NamesItAsPlainIPv4()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("control peer", "IPv4-mapped loopback");
+
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + Epsv + Retrieved,
             _ => { },
             controlPeer: new IPEndPoint(IPAddress.Loopback.MapToIPv6(), ControlPort));
 
+        diagnostics.Assert("info line 3", "Connecting to 127.0.0.1 port 55801", run.Events.Info[3]);
         Assert.AreEqual("Connecting to 127.0.0.1 port 55801", run.Events.Info[3]);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_Range_ReportsTheRangeThenClosesTheConnection()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -r 0-4 ftp://127.0.0.1:47931/file.txt: ABOR, then the connection is shut down.
+        diagnostics.Arrange("option", "-r 0-4");
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 11\r\n" + Opened + Complete + Bye,
             context => context.Range = ByteRange.Bounded(0, 4),
@@ -459,14 +585,20 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* partial download completed, closing connection",
             "* shutting down connection #3",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(19).ToArray());
+        string[] actual = run.Events.Transcript.Skip(19).ToArray();
+        DiffLines(diagnostics, "transcript from line 19", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeFrom_ReportsTheOffsetBeforeRestAndTheBytesLeft()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -C 3 ftp://127.0.0.1:47931/file.txt
+        diagnostics.Arrange("option", "-C 3");
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 11\r\n350 Restarting at 3\r\n" + Opened + Complete + Bye,
             context => context.ResumeFrom = 3,
@@ -483,27 +615,39 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Maxdownload = -1",
             "* Getting file with size: 8",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.Skip(16).Take(8).ToArray());
+        string[] actual = run.Events.Transcript.Skip(16).Take(8).ToArray();
+        DiffLines(diagnostics, "transcript lines 16 to 23", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_SizeRefused_ReportsAnUnknownFileSize()
     {
-        // curl -v ftp://127.0.0.1:47931/file.txt, SIZE answered 500 no
-        DataRun run = await RunAsync("/file.txt", LoggedIn + Epsv + "200 Type set\r\n500 no\r\n" + Opened + Complete + Bye, _ => { });
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -v ftp://127.0.0.1:47931/file.txt, SIZE answered 500 no
+        diagnostics.Arrange("SIZE answer", "500 no");
+        DataRun run = await RunAsync(diagnostics, "/file.txt", LoggedIn + Epsv + "200 Type set\r\n500 no\r\n" + Opened + Complete + Bye, _ => { });
+
+        diagnostics.Assert("info line 5", "Getting file with size: -1", run.Events.Info[5]);
         Assert.AreEqual("Getting file with size: -1", run.Events.Info[5]);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_PostTransferQuoteRefused_ReportsNoLeftIntactLine()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("option", "-Q -NOOP");
+
         DataRun run = await RunAsync(
+            diagnostics,
             "/file.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 11\r\n" + Opened + Complete + "500 no\r\n" + Bye,
             context => context.QuoteCommands.Add("-NOOP"));
 
+        diagnostics.Assert("last transcript line", "< 500 no\r\n", run.Events.Transcript[^1]);
         Assert.AreEqual("< 500 no\r\n", run.Events.Transcript[^1]);
+        diagnostics.Assert("exit code", CurlExitCode.QuoteError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.QuoteError, run.Result.ExitCode);
     }
 
@@ -512,8 +656,11 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     [DataRow("229 Entering Extended Passive Mode (|||123x)\r\n")]
     public async Task ExecuteAsync_EpsvReplyWithAnIllegalPort_ReportsCurlsLinesAndFailsWithExit13(string reply)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:<port>/f.txt, measured 2026-10-02 (BL-1240).
-        DataRun run = await RunAsync("/f.txt", LoggedIn + reply + Bye, _ => { });
+        diagnostics.Arrange("EPSV reply", FtpDiagnostics.Escape(reply));
+        DataRun run = await RunAsync(diagnostics, "/f.txt", LoggedIn + reply + Bye, _ => { });
 
         string[] expected =
         [
@@ -525,15 +672,20 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
+        DiffLines(diagnostics, "transcript", expected, run.Events.Transcript);
         CollectionAssert.AreEqual(expected, run.Events.Transcript);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Illegal port number in EPSV reply"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Illegal port number in EPSV reply"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_PasvRefusedAfterARefusedEpsv_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit13()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:<port>/f.txt, EPSV and PASV answered 500 no, measured 2026-10-02 (BL-1251).
-        DataRun run = await RunAsync("/f.txt", LoggedIn + "500 no\r\n500 no\r\n" + Bye, _ => { });
+        diagnostics.Arrange("EPSV and PASV answers", "500 no");
+        DataRun run = await RunAsync(diagnostics, "/f.txt", LoggedIn + "500 no\r\n500 no\r\n" + Bye, _ => { });
 
         string[] expected =
         [
@@ -546,15 +698,21 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
+        DiffLines(diagnostics, "last transcript lines", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Bad PASV/EPSV response: 500"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpWeirdPasvReply, "Bad PASV/EPSV response: 500"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_TypeRefused_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit17()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:<port>/f.txt, TYPE answered 500 no, measured 2026-10-02 (BL-1251).
-        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "500 no\r\n" + Bye, _ => { });
+        diagnostics.Arrange("TYPE answer", "500 no");
+        DataRun run = await RunAsync(diagnostics, "/f.txt", LoggedIn + Epsv + "500 no\r\n" + Bye, _ => { });
 
         string[] expected =
         [
@@ -563,7 +721,10 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
+        DiffLines(diagnostics, "last transcript lines", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("exit code", CurlExitCode.FtpCouldntSetType, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.FtpCouldntSetType, run.Result.ExitCode);
     }
 
@@ -572,8 +733,12 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     [DataRow("213 11\r\n", "> RETR f.txt\r\n", DisplayName = "RETR 550")]
     public async Task ExecuteAsync_FileNotFound_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit78(string sizeReply, string refusedCommand)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:<port>/f.txt, SIZE or RETR answered 550 no, measured 2026-10-02 (BL-1251).
-        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n" + sizeReply + "550 no\r\n" + Bye, _ => { });
+        diagnostics.Arrange("SIZE reply", FtpDiagnostics.Escape(sizeReply));
+        diagnostics.Arrange("refused command", FtpDiagnostics.Escape(refusedCommand));
+        DataRun run = await RunAsync(diagnostics, "/f.txt", LoggedIn + Epsv + "200 Type set\r\n" + sizeReply + "550 no\r\n" + Bye, _ => { });
 
         string[] expected =
         [
@@ -582,16 +747,22 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
+        DiffLines(diagnostics, "last transcript lines", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("exit code", CurlExitCode.RemoteFileNotFound, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.RemoteFileNotFound, run.Result.ExitCode);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ChangeDirectoryRefused_ReportsOnlyTheLeftIntactLineAndFailsWithExit9()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:<port>/d/f.txt, CWD answered 550 no, measured 2026-10-02 (BL-1251):
         // no directory is remembered after a refused CWD.
-        DataRun run = await RunAsync("/d/f.txt", LoggedIn + "550 no\r\n" + Bye, _ => { });
+        diagnostics.Arrange("CWD answer", "550 no");
+        DataRun run = await RunAsync(diagnostics, "/d/f.txt", LoggedIn + "550 no\r\n" + Bye, _ => { });
 
         string[] expected =
         [
@@ -600,7 +771,9 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "< 550 no\r\n",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
+        DiffLines(diagnostics, "transcript", expected, run.Events.Transcript);
         CollectionAssert.AreEqual(expected, run.Events.Transcript);
+        diagnostics.Assert("exit code", CurlExitCode.RemoteAccessDenied, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.RemoteAccessDenied, run.Result.ExitCode);
     }
 
@@ -609,8 +782,12 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     [DataRow("552 full\r\n", CurlExitCode.RemoteDiskFull)]
     public async Task ExecuteAsync_TransferEndedWithoutOk_ReportsTheLeftIntactLineAfterTheReply(string reply, CurlExitCode exitCode)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v ftp://127.0.0.1:<port>/f.txt, the reply after RETR's data 451 or 552, measured 2026-10-02 (BL-1251).
-        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 11\r\n" + Opened + reply + Bye, _ => { });
+        diagnostics.Arrange("closing reply", FtpDiagnostics.Escape(reply));
+        diagnostics.Arrange("expected exit code", exitCode);
+        DataRun run = await RunAsync(diagnostics, "/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 11\r\n" + Opened + reply + Bye, _ => { });
 
         string[] expected =
         [
@@ -618,15 +795,21 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "< " + reply,
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
+        DiffLines(diagnostics, "last transcript lines", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("exit code", exitCode, run.Result.ExitCode);
         Assert.AreEqual(exitCode, run.Result.ExitCode);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeBeyondTheFileSize_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit36()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -C 200 ftp://127.0.0.1:<port>/f.txt, SIZE answered 213 5, measured 2026-10-02 (BL-1251).
-        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 5\r\n" + Bye, context => context.ResumeFrom = 200);
+        diagnostics.Arrange("option", "-C 200");
+        DataRun run = await RunAsync(diagnostics, "/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 5\r\n" + Bye, context => context.ResumeFrom = 200);
 
         string[] expected =
         [
@@ -635,15 +818,21 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
+        DiffLines(diagnostics, "last transcript lines", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (200) was beyond file size (5)"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (200) was beyond file size (5)"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_MaxFileSizeExceeded_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit63()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v --max-filesize 50 ftp://127.0.0.1:<port>/f.txt, SIZE answered 213 100, measured 2026-10-02 (BL-1251).
-        DataRun run = await RunAsync("/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 100\r\n" + Bye, context => context.MaxFileSize = 50);
+        diagnostics.Arrange("option", "--max-filesize 50");
+        DataRun run = await RunAsync(diagnostics, "/f.txt", LoggedIn + Epsv + "200 Type set\r\n213 100\r\n" + Bye, context => context.MaxFileSize = 50);
 
         string[] expected =
         [
@@ -652,16 +841,23 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
+        DiffLines(diagnostics, "last transcript lines", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_MaxFileSizeExceededWithARange_AbortsAndShutsTheConnectionDown()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
         // curl -v -r 0-2 --max-filesize 50 ftp://127.0.0.1:<port>/f.txt, SIZE answered 213 100,
         // measured 2026-10-02 (BL-1251): ABOR, and the connection is not left intact.
+        diagnostics.Arrange("options", "-r 0-2 --max-filesize 50");
         DataRun run = await RunAsync(
+            diagnostics,
             "/f.txt",
             LoggedIn + Epsv + "200 Type set\r\n213 100\r\n502 Command not implemented\r\n" + Bye,
             context =>
@@ -679,11 +875,18 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* partial download completed, closing connection",
             "* shutting down connection #0",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.TakeLast(expected.Length).ToArray());
+        string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
+        DiffLines(diagnostics, "last transcript lines", expected, actual);
+        CollectionAssert.AreEqual(expected, actual);
+        diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
     }
 
+    private static void DiffLines(TestDiagnostics diagnostics, string label, IEnumerable<string> expected, IEnumerable<string> actual) =>
+        diagnostics.Diff(label, FtpDiagnostics.Escape(string.Join(" | ", expected)), FtpDiagnostics.Escape(string.Join(" | ", actual)));
+
     private static async Task<DataRun> RunAsync(
+        TestDiagnostics diagnostics,
         string path,
         string replies,
         Action<MutableContext> adjust,
@@ -694,6 +897,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         long connectionNumber = 0,
         ScriptedPendingConnection? portPending = null)
     {
+        diagnostics.ArrangeFtp($"ftp://{host}:{ControlPort}{path}", replies);
         var events = new RecordingTransferEvents();
         var control = new ScriptedConnection(Encoding.Latin1.GetBytes(replies))
         {
@@ -713,7 +917,13 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
                 adjust(mutable);
             });
 
-        TransferResult result = await new FtpProtocolHandler(connector, listener, new QueuedTlsProvider()).ExecuteAsync(context);
+        TransferResult result;
+        using (diagnostics.Phase("transfer"))
+        {
+            result = await new FtpProtocolHandler(connector, listener, new QueuedTlsProvider()).ExecuteAsync(context);
+        }
+
+        diagnostics.ActResult(result);
         return new DataRun(result with { Report = null }, events);
     }
 

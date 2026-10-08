@@ -24,9 +24,17 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             ScriptedConnection connection = Connection(response, chunkSize, RangeRequest(18995, "5-"));
             TransferContext context = new() { Url = ConditionUrl(18995), Output = output, Events = events, ResumeFrom = 5 };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", OneLine(response));
+            Diagnostics.Arrange("resume from", 5);
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+            WriteResult(result);
+            WriteEvents("events from status line", EventsFromStatusLine(events));
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Assert("output length", 0L, output.Length);
+            Diagnostics.Assert("connection reusable", true, connection.IsMarkedReusable);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
             Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
@@ -54,10 +62,15 @@ public sealed partial class HttpProtocolHandlerTests
             ConnectResult.Connected(connection, null, connectionNumber: 0),
             ConnectResult.Connected(connection, null, isReused: true, connectionNumber: 0)));
         MemoryStream secondOutput = new();
+        Diagnostics.Arrange("scripted responses", "416 with body abcd, then 200 ok, one byte per read, same connection");
 
         TransferResult first = await handler.ExecuteAsync(new TransferContext { Url = ConditionUrl(18996), Output = new MemoryStream(), ResumeFrom = 5 });
         TransferResult second = await handler.ExecuteAsync(new TransferContext { Url = ConditionUrl(18996), Output = secondOutput });
 
+        WriteResult(first);
+        WriteResult(second);
+        Diagnostics.Assert("second body", "ok", Latin1(secondOutput.ToArray()));
+        Diagnostics.Assert("returned reusable", 2, connection.ReturnedReusableCount);
         Assert.AreEqual(CurlExitCode.Ok, first.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
         Assert.AreEqual("ok", Latin1(secondOutput.ToArray()));
@@ -79,9 +92,15 @@ public sealed partial class HttpProtocolHandlerTests
             Events = events,
             TimeCondition = new TimeCondition(ConditionTime, TimeConditionKind.IfModifiedSince),
         };
+        Diagnostics.Arrange("scripted response", OneLine(response));
+        Diagnostics.Arrange("time condition", "If-Modified-Since");
 
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("connection reusable", true, connection.IsMarkedReusable);
+        Diagnostics.Assert("last event", "* Connection #0 to host 127.0.0.1:18997 left intact", events.Events[^1]);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsTrue(connection.IsMarkedReusable);
         CollectionAssert.DoesNotContain(events.Info.ToList(), "setting size while ignoring");

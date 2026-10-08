@@ -13,8 +13,10 @@ public sealed partial class TcpConnectorQuicTests
         var events = new RecordingTransferEvents();
         var connector = Connector(new QuicServerChannelOpener(), new ManualTimeProvider(), resolver: resolver);
 
-        var result = await connector.ConnectMultiplexedAsync(new ConnectTarget("quic.onion", 443, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, new ConnectTarget("quic.onion", 443, UseTls: true) { Events = events, PoolScheme = "https" });
 
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual("Not resolving .onion address (RFC 7686)", result.ErrorMessage);
         CollectionAssert.AreEqual(

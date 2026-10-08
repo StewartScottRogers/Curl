@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -11,6 +13,10 @@ public sealed class ClientCertificateArgumentTests
     private const bool WindowsBuild = true;
 
     private const bool OpenSslBuild = false;
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow("nonexist.p12", "nonexist.p12", null)]
@@ -26,9 +32,17 @@ public sealed class ClientCertificateArgumentTests
     [DataRow("PKCS11:foo", "PKCS11:foo", null)]
     public void Split_OnEitherBuild_SplitsAsCurlDoes(string value, string expectedPath, string? expectedPassphrase)
     {
+        Diagnostics.Arrange("value", value);
+        Diagnostics.Arrange("expected path", expectedPath);
+        Diagnostics.Arrange("expected passphrase", expectedPassphrase);
         foreach (var recognisesDriveLetters in new[] { WindowsBuild, OpenSslBuild })
         {
+            Diagnostics.Arrange("recognises drive letters", recognisesDriveLetters);
             var (path, passphrase) = ClientCertificateArgument.Split(value, recognisesDriveLetters);
+            Diagnostics.Act("path", path);
+            Diagnostics.Act("passphrase", passphrase);
+            Diagnostics.Assert("path", expectedPath, path);
+            Diagnostics.Assert("passphrase", expectedPassphrase, passphrase);
 
             Assert.AreEqual(expectedPath, path);
             Assert.AreEqual(expectedPassphrase, passphrase);
@@ -46,7 +60,14 @@ public sealed class ClientCertificateArgumentTests
     [DataRow("C:", "C", null)]
     public void Split_OnTheWindowsBuild_KeepsADriveLettersColon(string value, string expectedPath, string? expectedPassphrase)
     {
+        Diagnostics.Arrange("value", value);
+        Diagnostics.Arrange("expected path", expectedPath);
+        Diagnostics.Arrange("expected passphrase", expectedPassphrase);
         var (path, passphrase) = ClientCertificateArgument.Split(value, WindowsBuild);
+        Diagnostics.Act("path", path);
+        Diagnostics.Act("passphrase", passphrase);
+        Diagnostics.Assert("path", expectedPath, path);
+        Diagnostics.Assert("passphrase", expectedPassphrase, passphrase);
 
         Assert.AreEqual(expectedPath, path);
         Assert.AreEqual(expectedPassphrase, passphrase);
@@ -55,7 +76,13 @@ public sealed class ClientCertificateArgumentTests
     [TestMethod]
     public void Split_OnTheOpenSslBuild_SplitsAtADriveLettersColon()
     {
-        var (path, passphrase) = ClientCertificateArgument.Split(@"C:\nonexist.pem:pw", OpenSslBuild);
+        const string value = @"C:\nonexist.pem:pw";
+        Diagnostics.Arrange("value", value);
+        var (path, passphrase) = ClientCertificateArgument.Split(value, OpenSslBuild);
+        Diagnostics.Act("path", path);
+        Diagnostics.Act("passphrase", passphrase);
+        Diagnostics.Assert("path", "C", path);
+        Diagnostics.Assert("passphrase", @"\nonexist.pem:pw", passphrase);
 
         Assert.AreEqual("C", path);
         Assert.AreEqual(@"\nonexist.pem:pw", passphrase);

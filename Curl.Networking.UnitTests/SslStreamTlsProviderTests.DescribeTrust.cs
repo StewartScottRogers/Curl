@@ -15,8 +15,12 @@ public sealed partial class SslStreamTlsProviderTests
     [DataRow("example.com", false)]
     public void DescribeTrust_TargetHost_SaysWhetherItIsAnIpAddress(string targetHost, bool expected)
     {
+        Diagnostics.Arrange("target host", targetHost);
+
         var trust = SslStreamTlsProvider.DescribeTrust(new TlsClientOptions(), targetHost);
 
+        Diagnostics.Act("targets IP address", trust.TargetsIpAddress);
+        Diagnostics.Assert("targets IP address", expected, trust.TargetsIpAddress);
         Assert.AreEqual(expected, trust.TargetsIpAddress);
     }
 
@@ -25,8 +29,12 @@ public sealed partial class SslStreamTlsProviderTests
     [DataRow(false)]
     public void DescribeTrust_AutoClientCertificate_IsCarried(bool autoClientCertificate)
     {
+        Diagnostics.Arrange("auto client cert", autoClientCertificate);
+
         var trust = SslStreamTlsProvider.DescribeTrust(new TlsClientOptions(AutoClientCertificate: autoClientCertificate), "localhost");
 
+        Diagnostics.Act("uses automatic client certificate", trust.UsesAutomaticClientCertificate);
+        Diagnostics.Assert("uses automatic client certificate", autoClientCertificate, trust.UsesAutomaticClientCertificate);
         Assert.AreEqual(autoClientCertificate, trust.UsesAutomaticClientCertificate);
     }
 }

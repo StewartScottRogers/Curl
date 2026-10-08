@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -12,6 +13,8 @@ namespace Curl.Protocol.Ssh.Sftp;
 public sealed class SftpQuoteCommandTests
 {
     private static readonly byte[] Home = "/home/fake"u8.ToArray();
+
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     [DataRow("chgrp 1000 /f", nameof(SftpQuoteOperation.ChangeGroup), "1000", "/f")]
@@ -28,8 +31,16 @@ public sealed class SftpQuoteCommandTests
     [DataRow("statvfs /", nameof(SftpQuoteOperation.StatFileSystem), "/", "")]
     public void Parse_EachCommandCurlKnows_ReadsItsOperationAndPaths(string value, string operation, string first, string second)
     {
-        SftpQuoteCommand command = SftpQuoteCommand.Parse(value, Home);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-Q command", value);
+        diagnostics.Arrange("home directory", Encoding.UTF8.GetString(Home));
 
+        SftpQuoteCommand command = SftpQuoteCommand.Parse(value, Home);
+        diagnostics.Act("parsed command", Describe(command));
+
+        diagnostics.Assert("operation", operation, command.Operation);
+        diagnostics.Diff("first path", first, Encoding.UTF8.GetString(command.FirstPath));
+        diagnostics.Diff("second path", second, Encoding.UTF8.GetString(command.SecondPath));
         Assert.AreEqual(Enum.Parse<SftpQuoteOperation>(operation), command.Operation);
         Assert.IsFalse(command.IgnoresFailure);
         Assert.AreEqual(value, command.Text);
@@ -42,8 +53,14 @@ public sealed class SftpQuoteCommandTests
     [DataRow("PWD", DisplayName = "upper case, as measured")]
     public void Parse_Pwd_StandsAloneInAnyCase(string value)
     {
-        SftpQuoteCommand command = SftpQuoteCommand.Parse(value, Home);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-Q command", value);
+        diagnostics.Arrange("home directory", Encoding.UTF8.GetString(Home));
 
+        SftpQuoteCommand command = SftpQuoteCommand.Parse(value, Home);
+        diagnostics.Act("parsed command", Describe(command));
+
+        diagnostics.Assert("operation", SftpQuoteOperation.PrintWorkingDirectory, command.Operation);
         Assert.AreEqual(SftpQuoteOperation.PrintWorkingDirectory, command.Operation);
         Assert.IsEmpty(command.FirstPath);
     }
@@ -51,8 +68,15 @@ public sealed class SftpQuoteCommandTests
     [TestMethod]
     public void Parse_LeadingAsterisk_IgnoresFailureAndDropsItFromTheText()
     {
-        SftpQuoteCommand command = SftpQuoteCommand.Parse("*rm /zz", Home);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-Q command", "*rm /zz");
+        diagnostics.Arrange("home directory", Encoding.UTF8.GetString(Home));
 
+        SftpQuoteCommand command = SftpQuoteCommand.Parse("*rm /zz", Home);
+        diagnostics.Act("parsed command", Describe(command));
+
+        diagnostics.Assert("ignores failure", true, command.IgnoresFailure);
+        diagnostics.Diff("text", "rm /zz", command.Text);
         Assert.IsTrue(command.IgnoresFailure);
         Assert.AreEqual("rm /zz", command.Text);
         Assert.AreEqual(SftpQuoteOperation.Remove, command.Operation);
@@ -69,8 +93,14 @@ public sealed class SftpQuoteCommandTests
     [DataRow("rm /f\tg", "/f\tg", DisplayName = "a tab inside a word")]
     public void Parse_Path_ReadsItAsCurlGetPathnameDoes(string value, string expected)
     {
-        SftpQuoteCommand command = SftpQuoteCommand.Parse(value, Home);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-Q command", value);
+        diagnostics.Arrange("home directory", Encoding.UTF8.GetString(Home));
 
+        SftpQuoteCommand command = SftpQuoteCommand.Parse(value, Home);
+        diagnostics.Act("parsed command", Describe(command));
+
+        diagnostics.Diff("first path", expected, Encoding.UTF8.GetString(command.FirstPath));
         Assert.AreEqual(expected, Encoding.UTF8.GetString(command.FirstPath));
     }
 
@@ -94,9 +124,21 @@ public sealed class SftpQuoteCommandTests
     [DataRow("ln /a /b /c", "Suspicious data after the command line", DisplayName = "a third argument")]
     public void Parse_Malformed_FailsWithExit21AndCurlsMessage(string value, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("-Q command", value);
+        diagnostics.Arrange("home directory", Encoding.UTF8.GetString(Home));
+
         SshTransferException failure = Assert.ThrowsExactly<SshTransferException>(() => SftpQuoteCommand.Parse(value, Home));
+        diagnostics.Act("failure", $"exit {failure.ExitCode}: {failure.Message}");
+
+        diagnostics.Assert("exit code", CurlExitCode.QuoteError, failure.ExitCode);
+        diagnostics.Diff("message", expected, failure.Message);
 
         Assert.AreEqual(CurlExitCode.QuoteError, failure.ExitCode);
         Assert.AreEqual(expected, failure.Message);
     }
+
+    private static string Describe(SftpQuoteCommand command) =>
+        $"operation {command.Operation}, ignores failure {command.IgnoresFailure}, text '{command.Text}', "
+        + $"first path '{Encoding.UTF8.GetString(command.FirstPath)}', second path '{Encoding.UTF8.GetString(command.SecondPath)}'";
 }

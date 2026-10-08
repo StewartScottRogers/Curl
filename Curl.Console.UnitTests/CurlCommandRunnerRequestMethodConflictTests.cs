@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -30,6 +31,10 @@ public sealed class CurlCommandRunnerRequestMethodConflictTests
 
     private readonly RecordingProtocolHandler http = RecordingProtocolHandler.Failing(
         "http", CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1 port 1");
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
@@ -98,8 +103,11 @@ public sealed class CurlCommandRunnerRequestMethodConflictTests
     {
         int exitCode = await RunAsync([.. options, Url]);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.CouldntConnect, exitCode);
         Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
+        Diagnostics.Assert("transfers run", 1, http.Contexts.Count);
         Assert.HasCount(1, http.Contexts);
+        Diagnostics.Assert("stderr mentions the conflict", false, StandardErrorText.Contains("You can only select one HTTP request method", StringComparison.Ordinal));
         Assert.DoesNotContain("You can only select one HTTP request method", StandardErrorText);
     }
 
@@ -111,32 +119,55 @@ public sealed class CurlCommandRunnerRequestMethodConflictTests
     {
         int exitCode = await RunAsync([.. options, Url]);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.CouldntConnect, exitCode);
         Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
+        Diagnostics.Assert("transfers run", 1, http.Contexts.Count);
         Assert.HasCount(1, http.Contexts);
     }
 
     private void AssertRefused(int exitCode, string expectedStandardError)
     {
+        Diagnostics.Assert("exit code", (int)CurlExitCode.FailedInit, exitCode);
         Assert.AreEqual((int)CurlExitCode.FailedInit, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(expectedStandardError, StandardErrorText);
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(0, standardOutput.Length);
+        Diagnostics.Assert("dispatches created", 0, dispatchesCreated);
         Assert.AreEqual(0, dispatchesCreated);
+        Diagnostics.Assert("transfers run", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, int terminalColumns = TerminalColumns.Default) =>
-        new CurlCommandRunner(
-                _ =>
-                {
-                    dispatchesCreated++;
-                    return new TransferDispatch(new ProtocolDispatcher([http]), []);
-                },
-                fileSystem,
-                fileSystem,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                terminalColumns)
-            .RunAsync(arguments);
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, int terminalColumns = TerminalColumns.Default)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("terminal columns", terminalColumns);
+        Diagnostics.Arrange("handler", "http handler failing with CouldntConnect");
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ =>
+                    {
+                        dispatchesCreated++;
+                        return new TransferDispatch(new ProtocolDispatcher([http]), []);
+                    },
+                    fileSystem,
+                    fileSystem,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    terminalColumns)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        Diagnostics.Act("transfers run", http.Contexts.Count);
+        return exitCode;
+    }
 }

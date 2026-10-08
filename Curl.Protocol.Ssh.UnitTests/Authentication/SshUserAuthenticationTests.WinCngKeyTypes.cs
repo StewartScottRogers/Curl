@@ -36,6 +36,7 @@ public sealed partial class SshUserAuthenticationTests
 
         List<byte[]> written = await AuthenticationMessagesAsync(peer);
         AssertMethods(written, "none", "publickey", "password");
+        Diagnostics.Diff("client message 1", PublicKeyRequest("tester", publicKey.KeyType, publicKey.Blob, signed: false), written[1]);
         CollectionAssert.AreEqual(PublicKeyRequest("tester", publicKey.KeyType, publicKey.Blob, signed: false), written[1]);
         AssertLines(peer.Events, Offered, TryingPublicKey, TryingKey, "* SSH: publickey authentication denied: Callback returned error", "* SSH: trying publickey authentication via agent", "* SSH: failure connecting to agent");
     }
@@ -78,6 +79,8 @@ public sealed partial class SshUserAuthenticationTests
 
             List<byte[]> written = await AuthenticationMessagesAsync(peer);
             Assert.HasCount(3, written);
+            Diagnostics.ActLines(peer.Events.Transcript);
+            Diagnostics.Assert("verbose line ^1", "* SSH: authenticated via publickey", peer.Events.Transcript[^1]);
             Assert.AreEqual("* SSH: authenticated via publickey", peer.Events.Transcript[^1]);
         }
     }

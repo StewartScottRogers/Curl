@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -10,11 +11,20 @@ namespace Curl.Console;
 [TestClass]
 public sealed class OutputFileOpenWarningTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void For_MissingParentDirectory_MatchesCurlsLine()
     {
-        string line = OutputFileOpenWarning.For("Z:/nonexist/x", FileAccessStatus.NotFound);
+        Diagnostics.Arrange("path", "Z:/nonexist/x");
+        Diagnostics.Arrange("status", FileAccessStatus.NotFound);
 
+        string line = OutputFileOpenWarning.For("Z:/nonexist/x", FileAccessStatus.NotFound);
+        Diagnostics.Act("warning line", line);
+
+        Diagnostics.Diff("warning line", "Warning: Failed to open the file Z:/nonexist/x: No such file or directory", line);
         Assert.AreEqual("Warning: Failed to open the file Z:/nonexist/x: No such file or directory", line);
     }
 
@@ -28,6 +38,12 @@ public sealed class OutputFileOpenWarningTests
     [DataRow((FileAccessStatus)99, "Invalid argument")]
     public void ReasonFor_EachStatus_IsCurlsStrerrorText(FileAccessStatus status, string expected)
     {
+        Diagnostics.Arrange("status", (int)status);
+
+        string actual = OutputFileOpenWarning.ReasonFor(status);
+        Diagnostics.Act("reason", actual);
+
+        Diagnostics.Diff("reason", expected, actual);
         Assert.AreEqual(expected, OutputFileOpenWarning.ReasonFor(status));
     }
 }

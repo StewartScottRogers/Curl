@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -17,6 +18,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionImapTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Greeting = "* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN] ready\r\n";
 
     private const string CapabilityReply = "* CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN\r\nA001 OK CAPABILITY completed\r\n";
@@ -55,6 +60,7 @@ public sealed class CurlCompositionImapTests
         Assert.AreEqual(("127.0.0.1", 18143, useTls), (connector.Targets.Single().Host, connector.Targets.Single().Port, connector.Targets.Single().UseTls));
         Assert.AreEqual(Message, standardOutput);
         Assert.AreEqual(string.Empty, standardError);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
     }
 
@@ -74,6 +80,7 @@ public sealed class CurlCompositionImapTests
         Assert.AreEqual("A001 CAPABILITY\r\nA002 SELECT INBOX\r\nA003 LOGOUT\r\n", Encoding.ASCII.GetString(connector.Written));
         Assert.AreEqual(string.Empty, standardOutput);
         Assert.AreEqual("curl: (78) Mailbox UIDVALIDITY has changed" + Environment.NewLine, standardError);
+        Diagnostics.Assert("exit code", 78, exitCode);
         Assert.AreEqual(78, exitCode);
     }
 
@@ -101,6 +108,7 @@ public sealed class CurlCompositionImapTests
         Assert.AreEqual(useTls, connector.Targets.Single().UseTls);
         Assert.AreEqual("21 0", standardOutput);
         Assert.AreEqual(string.Empty, standardError);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
     }
 
@@ -125,26 +133,31 @@ public sealed class CurlCompositionImapTests
             Encoding.ASCII.GetString(connector.Written));
         Assert.AreEqual("21 25", standardOutput);
         Assert.AreEqual("curl: (25) Upload failed (at start/before it took off)" + Environment.NewLine, standardError);
+        Diagnostics.Assert("exit code", 25, exitCode);
         Assert.AreEqual(25, exitCode);
     }
 
     private static byte[][] Reads(params string[] writes) => [.. writes.Select(Encoding.ASCII.GetBytes)];
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
+    private async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(
         ScriptedConnector connector, string[] arguments)
     {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
 
+        Diagnostics.ArrangeCommandLine(["-sS", .. arguments.Select(argument => Path.IsPathRooted(argument) ? Path.GetFileName(argument) : argument)]);
         int exitCode = await CurlComposition
             .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
             .RunAsync(["-sS", .. arguments]);
 
-        return (exitCode, Encoding.UTF8.GetString(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()));
+        (int ExitCode, string StandardOutput, string StandardError) result = (exitCode, Encoding.UTF8.GetString(standardOutput.ToArray()), Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.ActRun(result.ExitCode, result.StandardOutput, result.StandardError);
+        Diagnostics.ActWritten(connector);
+        return result;
     }
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunUploadAsync(
+    private async Task<(int ExitCode, string StandardOutput, string StandardError)> RunUploadAsync(
         ScriptedConnector connector, string[] extraArguments, string url)
     {
         string directory = Path.Combine(Path.GetTempPath(), $"curl-bl558-{Guid.NewGuid():N}");

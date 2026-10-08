@@ -2,6 +2,7 @@ using System.Net;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Protocol.Ssh.Sftp;
 
 namespace Curl.Protocol.Ssh;
 
@@ -35,6 +36,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", options: Compressed, preferences: preferences);
 
+        Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result, $"{platform} {compression}");
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
@@ -55,10 +57,13 @@ public sealed partial class SshProtocolHandlerTests
             Upload = new MemoryStream(large),
             Ssh = Compressed,
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(large, server.Files["/data/up.bin"]);
     }
@@ -71,6 +76,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"scp://{Host}/data/hello.txt", options: Compressed);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, outcome.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, outcome.Result.ExitCode);
         CollectionAssert.AreEqual(Hello, outcome.Output);
     }

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 using Transport = Curl.Protocol.Abstractions.TransportSecurityLevel;
 
 namespace Curl.Protocol.Imap;
@@ -28,12 +29,19 @@ public sealed class ImapProtocolHandlerSessionTests
 
     private const Transport Required = Transport.Required;
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_DefaultSession_SendsCapabilityThenLogout()
     {
         ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"));
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 18143, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsTrue(run.Connection.IsDisposed);
@@ -44,6 +52,9 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync("imap://127.0.0.1/", Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"));
 
+        ConnectTarget target = run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance };
+        Diagnostics.Act("target", target.ToString());
+        Diagnostics.Assert("target", new ConnectTarget("127.0.0.1", 143, false), target);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 143, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
@@ -55,11 +66,15 @@ public sealed class ImapProtocolHandlerSessionTests
         var connection = new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003")));
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Proxy = proxy, Events = events };
 
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("proxy", "socks5 proxy:1080");
         ImapRun run = await ImapRun.ExecuteAsync(context, connection);
+        Report(run);
 
         Assert.AreSame(proxy, run.Connector.Targets.Single().Proxy);
         run.Connector.Targets.Single().Events.ReportInfo("from the connector");
         Assert.AreEqual("from the connector", events.Info.Last());
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -70,9 +85,11 @@ public sealed class ImapProtocolHandlerSessionTests
         // LOGOUT; a connection already TLS satisfies --ssl-reqd. Here without the port.
         ImapRun run = await RunAsync("imaps://127.0.0.1/", Greeting + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"), Required);
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 993, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -85,6 +102,7 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync(Url, greeting);
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WeirdServerReply, "Got unexpected imap-server response"),
@@ -99,7 +117,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // Measured: curl waits past the line, then exit 56 once the server hangs up.
         ImapRun run = await RunAsync(Url, greeting);
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
 
@@ -112,7 +132,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // STARTTLS is advertised but PREAUTH rules it out.
         ImapRun run = await RunAsync(Url, "* PREAUTH ready\r\n" + CapabilityReply("A001") + ListReply("A002") + LogoutReply("A003"), sslLevel);
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -122,7 +144,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // GREETING=* PREAUTH ready, --ssl-reqd: exit 64, "STARTTLS not available.", no LOGOUT.
         ImapRun run = await RunAsync(Url, "* PREAUTH ready\r\n" + CapabilityReply("A001"), Required);
 
+        Diagnostics.Diff("sent", Capability, run.Sent);
         Assert.AreEqual(Capability, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
     }
 
@@ -135,7 +159,9 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync(Url, Greeting + capabilityReply + ListReply("A002") + LogoutReply("A003"));
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -148,8 +174,10 @@ public sealed class ImapProtocolHandlerSessionTests
             new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001")), Latin1("A002 NO refused\r\n"), Latin1(ListReply("A003") + LogoutReply("A004"))),
             Try);
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.IsEmpty(run.Tls.Handshakes);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -161,7 +189,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // --ssl-reqd: exit 64, "STARTTLS denied", no LOGOUT.
         ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + startTlsReply, Required);
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS denied"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS denied"), run.Result);
     }
 
@@ -176,7 +206,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // Each measured: exit 64, "STARTTLS not available.", no LOGOUT.
         ImapRun run = await RunAsync(Url, Greeting + capabilityReply, Required);
 
+        Diagnostics.Diff("sent", Capability, run.Sent);
         Assert.AreEqual(Capability, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
     }
 
@@ -185,7 +217,9 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync(Url, Greeting + "* CAPABILITY IMAP4rev1\r\nA001 OK done\r\n" + ListReply("A002") + LogoutReply("A003"), Try);
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -201,11 +235,13 @@ public sealed class ImapProtocolHandlerSessionTests
             Required,
             ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual("A003 CAPABILITY\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
         Assert.AreSame(run.Connection, run.Tls.Handshakes.Single().Plaintext);
         Assert.AreEqual("127.0.0.1", run.Tls.Handshakes.Single().TargetHost);
         Assert.IsTrue(secured.IsDisposed);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -221,7 +257,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // The first four measured; the rest follow curl's imap_matchresp and word scan.
         ImapRun run = await RunUpgradedAsync(capabilityReply);
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -237,7 +275,9 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync(Url, Greeting + untagged + "A001 OK done\r\n", Required);
 
+        Diagnostics.Diff("sent", Capability, run.Sent);
         Assert.AreEqual(Capability, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
     }
 
@@ -251,7 +291,9 @@ public sealed class ImapProtocolHandlerSessionTests
 
         ImapRun run = await RunAsync(Url, new ScriptedConnection([.. replies.Chunk(3)]), Required, ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -266,7 +308,9 @@ public sealed class ImapProtocolHandlerSessionTests
 
         ImapRun run = await RunAsync(Url, new ScriptedConnection([.. replies.Chunk(5)]), Required, ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -280,7 +324,9 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync(Url, Greeting + untagged + "A001 OK done\r\n", Required);
 
+        Diagnostics.Diff("sent", Capability, run.Sent);
         Assert.AreEqual(Capability, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS not available."), run.Result);
     }
 
@@ -290,7 +336,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // CAPABILITY=* 1 X {3}\r\nabc\r\n* CAPABILITY IMAP4rev1 STARTTLS\r\nOK done: STARTTLS.
         ImapRun run = await RunUpgradedAsync("* 1 X {3}\r\nabc\r\n* CAPABILITY IMAP4rev1 STARTTLS\r\nA001 OK done\r\n");
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -306,6 +354,7 @@ public sealed class ImapProtocolHandlerSessionTests
             ConnectResult.Connected(secured));
 
         Assert.AreEqual("A003 CAPABILITY\r\nA004 LIST \"\" *\r\nA005 LOGOUT\r\n", Encoding.Latin1.GetString(secured.Sent));
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -321,8 +370,10 @@ public sealed class ImapProtocolHandlerSessionTests
             new ScriptedConnection(Latin1(Greeting + CapabilityReply("A001")), Latin1(startTlsReply)),
             Required);
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.IsEmpty(run.Tls.Handshakes);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
     }
 
@@ -335,7 +386,9 @@ public sealed class ImapProtocolHandlerSessionTests
             Required,
             ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "schannel: untrusted"));
 
+        Diagnostics.Diff("sent", Capability + "A002 STARTTLS\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 STARTTLS\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.PeerFailedVerification, "schannel: untrusted"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PeerFailedVerification, "schannel: untrusted"), run.Result);
     }
 
@@ -349,7 +402,9 @@ public sealed class ImapProtocolHandlerSessionTests
         // LOGOUT=CLOSE measured: exit 0.
         ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + ListReply("A002") + logoutReply);
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -358,6 +413,7 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         ImapRun run = await RunAsync(Url, Greeting + CapabilityReply("A001") + ListReply("A002") + "* BYE " + new string('x', 70000) + "\r\n");
 
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -367,7 +423,12 @@ public sealed class ImapProtocolHandlerSessionTests
         var connector = new QueuedConnector(ConnectResult.Refused("Failed to connect to 127.0.0.1 port 18143"));
         var handler = new ImapProtocolHandler(connector, new QueuedTlsProvider());
 
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("connector", "refuses the connection");
         TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null });
+        Diagnostics.Act("result", DiagnosticText.Result(result));
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("error message", "Failed to connect to 127.0.0.1 port 18143", result.ErrorMessage);
 
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1 port 18143", result.ErrorMessage);
@@ -383,7 +444,12 @@ public sealed class ImapProtocolHandlerSessionTests
             WriteFailure = new OperationCanceledException(),
         };
 
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("write", "throws OperationCanceledException");
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await ImapRun.ExecuteAsync(Url, connection));
+
+        Diagnostics.Act("exception", "OperationCanceledException");
+        Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
 
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -393,14 +459,21 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         var handler = new ImapProtocolHandler(new QueuedConnector(), new QueuedTlsProvider());
 
+        string[] schemes = handler.SupportedSchemes.ToArray();
+        Diagnostics.Arrange("handler", "ImapProtocolHandler");
+        Diagnostics.Act("schemes", string.Join(",", schemes));
+        Diagnostics.Assert("schemes", "imap,imaps", string.Join(",", schemes));
         CollectionAssert.AreEqual(new[] { "imap", "imaps" }, handler.SupportedSchemes.ToArray());
     }
 
     [TestMethod]
     public void Constructor_NullArgument_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new ImapProtocolHandler(null!, new QueuedTlsProvider()));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new ImapProtocolHandler(new QueuedConnector(), null!));
+        Diagnostics.Arrange("arguments", "a null connector, then a null TLS provider");
+        ArgumentNullException nullConnector = Assert.ThrowsExactly<ArgumentNullException>(() => new ImapProtocolHandler(null!, new QueuedTlsProvider()));
+        ArgumentNullException nullTls = Assert.ThrowsExactly<ArgumentNullException>(() => new ImapProtocolHandler(new QueuedConnector(), null!));
+        Diagnostics.Act("thrown parameters", nullConnector.ParamName + ", " + nullTls.ParamName);
+        Diagnostics.Assert("thrown types", "ArgumentNullException, ArgumentNullException", nullConnector.GetType().Name + ", " + nullTls.GetType().Name);
     }
 
     [TestMethod]
@@ -408,7 +481,10 @@ public sealed class ImapProtocolHandlerSessionTests
     {
         var handler = new ImapProtocolHandler(new QueuedConnector(), new QueuedTlsProvider());
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        Diagnostics.Arrange("context", "null");
+        ArgumentNullException thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        Diagnostics.Act("thrown parameter", thrown.ParamName);
+        Diagnostics.Assert("thrown type", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     private static string CapabilityReply(string tag) =>
@@ -425,19 +501,39 @@ public sealed class ImapProtocolHandlerSessionTests
     /// <paramref name="capabilityReply" />, then <c>STARTTLS</c> <c>OK</c> and a secured
     /// connection that answers the rest.
     /// </summary>
-    private static Task<ImapRun> RunUpgradedAsync(string capabilityReply) =>
+    private Task<ImapRun> RunUpgradedAsync(string capabilityReply) =>
         RunAsync(
             Url,
             new ScriptedConnection(Latin1(Greeting + capabilityReply), Latin1("A002 OK go\r\n")),
             Required,
             ConnectResult.Connected(new ScriptedConnection(Latin1(CapabilityReply("A003") + ListReply("A004") + LogoutReply("A005")))));
 
-    private static Task<ImapRun> RunAsync(string url, string replies, Transport sslLevel = Transport.None) =>
-        ImapRun.ExecuteAsync(url, new ScriptedConnection(Latin1(replies)), sslLevel);
+    private async Task<ImapRun> RunAsync(string url, string replies, Transport sslLevel = Transport.None)
+    {
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("ssl level", sslLevel);
+        Diagnostics.Arrange("server", DiagnosticText.Escape(replies));
+        return Report(await ImapRun.ExecuteAsync(url, new ScriptedConnection(Latin1(replies)), sslLevel));
+    }
 
-    private static Task<ImapRun> RunAsync(string url, ScriptedConnection connection, Transport sslLevel) =>
-        ImapRun.ExecuteAsync(url, connection, sslLevel);
+    private async Task<ImapRun> RunAsync(string url, ScriptedConnection connection, Transport sslLevel)
+    {
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("ssl level", sslLevel);
+        return Report(await ImapRun.ExecuteAsync(url, connection, sslLevel));
+    }
 
-    private static Task<ImapRun> RunAsync(string url, ScriptedConnection connection, Transport sslLevel, ConnectResult handshake) =>
-        ImapRun.ExecuteAsync(url, connection, sslLevel, handshake);
+    private async Task<ImapRun> RunAsync(string url, ScriptedConnection connection, Transport sslLevel, ConnectResult handshake)
+    {
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("ssl level", sslLevel);
+        return Report(await ImapRun.ExecuteAsync(url, connection, sslLevel, handshake));
+    }
+
+    private ImapRun Report(ImapRun run)
+    {
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        return run;
+    }
 }

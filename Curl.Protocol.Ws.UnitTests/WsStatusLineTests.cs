@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ws;
 
@@ -9,6 +10,8 @@ namespace Curl.Protocol.Ws;
 [TestClass]
 public sealed class WsStatusLineTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("HTTP/1.1 101 Switching Protocols", 101)]
     [DataRow("HTTP/1.1 101", 101)]
@@ -17,7 +20,14 @@ public sealed class WsStatusLineTests
     [DataRow("http/1.1 101 Sw", 200)]
     public void ParseStatusCode_AcceptedLine_ReturnsTheCode(string line, int statusCode)
     {
-        Assert.AreEqual(statusCode, WsStatusLine.ParseStatusCode(line));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("status line", line);
+
+        int actual = WsStatusLine.ParseStatusCode(line);
+
+        diagnostics.Act("status code", actual);
+        diagnostics.Assert("status code", statusCode, actual);
+        Assert.AreEqual(statusCode, actual);
     }
 
     [TestMethod]
@@ -33,9 +43,15 @@ public sealed class WsStatusLineTests
     [DataRow("HTTP/1.1 099 Sw", "Unsupported response code in HTTP response")]
     public void ParseStatusCode_RefusedLine_FailsWithExit1(string line, string message)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("status line", line);
+
         WsTransferException failure = Assert.ThrowsExactly<WsTransferException>(() => WsStatusLine.ParseStatusCode(line));
 
+        diagnostics.Act("failure", $"{failure.GetType().Name}: {failure.ExitCode} ({failure.Message})");
+        diagnostics.Assert("exit code", CurlExitCode.UnsupportedProtocol, failure.ExitCode);
         Assert.AreEqual(CurlExitCode.UnsupportedProtocol, failure.ExitCode);
+        diagnostics.Assert("message", message, failure.Message);
         Assert.AreEqual(message, failure.Message);
     }
 
@@ -47,6 +63,15 @@ public sealed class WsStatusLineTests
     [DataRow("HTX", false)]
     public void CanBegin_ReceivedBytes_MatchesTheStartOfHttp(string received, bool canBegin)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] bytes = System.Text.Encoding.Latin1.GetBytes(received);
+        diagnostics.Bytes("received bytes", bytes);
+        diagnostics.Arrange("received", received);
+
+        bool actual = WsStatusLine.CanBegin(bytes);
+
+        diagnostics.Act("can begin", actual);
+        diagnostics.Assert("can begin", canBegin, actual);
         Assert.AreEqual(canBegin, WsStatusLine.CanBegin(System.Text.Encoding.Latin1.GetBytes(received)));
     }
 }

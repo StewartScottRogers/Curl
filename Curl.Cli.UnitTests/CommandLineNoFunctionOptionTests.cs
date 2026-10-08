@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -20,6 +21,10 @@ public sealed class CommandLineNoFunctionOptionTests
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("--sslv2", "sslv2")]
     [DataRow("--sslv3", "sslv3")]
@@ -36,9 +41,11 @@ public sealed class CommandLineNoFunctionOptionTests
     [DataRow("--metalink=x", "metalink")]
     public void Parse_NoFunctionFlag_WarnsAndChangesNothing(string argument, string longName)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, Url]);
+        CommandLineParseResult result = Parse([argument, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("urls", CommandLineParseDiagnostics.QuoteEach([Url]), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Options)?.Urls ?? []));
         CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
         AssertNothingElseSet(result.Options);
         CollectionAssert.AreEqual(new[] { Warning(longName) }, result.WarningLines.ToArray());
@@ -50,9 +57,11 @@ public sealed class CommandLineNoFunctionOptionTests
     [DataRow("--krb4", "krb4")]
     public void Parse_NoFunctionValueOption_TakesItsValueAndWarns(string argument, string longName)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, "x", Url]);
+        CommandLineParseResult result = Parse([argument, "x", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("urls", CommandLineParseDiagnostics.QuoteEach([Url]), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Options)?.Urls ?? []));
         CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
         AssertNothingElseSet(result.Options);
         CollectionAssert.AreEqual(new[] { Warning(longName) }, result.WarningLines.ToArray());
@@ -63,29 +72,37 @@ public sealed class CommandLineNoFunctionOptionTests
     [DataRow("--egd-file=")]
     public void Parse_NoFunctionValueOptionWithAttachedValue_TakesItAndWarns(string argument)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, Url]);
+        CommandLineParseResult result = Parse([argument, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("urls", CommandLineParseDiagnostics.QuoteEach([Url]), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Options)?.Urls ?? []));
         CollectionAssert.AreEqual(new[] { Url }, result.Options.Urls.ToArray());
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach([Warning("egd-file")]), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         CollectionAssert.AreEqual(new[] { Warning("egd-file") }, result.WarningLines.ToArray());
     }
 
     [TestMethod]
     public void Parse_NoFunctionValueOptionWithEmptyValue_TakesItAndWarns()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--krb4", string.Empty, Url]);
+        CommandLineParseResult result = Parse(["--krb4", string.Empty, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach([Warning("krb4")]), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         CollectionAssert.AreEqual(new[] { Warning("krb4") }, result.WarningLines.ToArray());
     }
 
     [TestMethod]
     public void Parse_NoFunctionValueOptionBeforeTheUrl_TakesTheUrlAsItsValue()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--egd-file", Url]);
+        CommandLineParseResult result = Parse(["--egd-file", Url]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach([Warning("egd-file")]), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         CollectionAssert.AreEqual(new[] { Warning("egd-file") }, result.WarningLines.ToArray());
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { "curl: (2) no URL specified", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[] { "curl: (2) no URL specified", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
@@ -97,10 +114,13 @@ public sealed class CommandLineNoFunctionOptionTests
     [DataRow("--krb4")]
     public void Parse_NoFunctionValueOptionLast_RequiresParameterWithoutWarning(string argument)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url, argument]);
+        CommandLineParseResult result = Parse([Url, argument]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsEmpty(result.WarningLines);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { $"curl: option {argument}: requires parameter", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[] { $"curl: option {argument}: requires parameter", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
@@ -114,9 +134,11 @@ public sealed class CommandLineNoFunctionOptionTests
     [DataRow("--no-krb4")]
     public void Parse_NegatedNoFunctionOptionThatCannotBeReversed_IsRefused(string argument)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, Url]);
+        CommandLineParseResult result = Parse([argument, Url]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { $"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[] { $"curl: option {argument}: the given option cannot be reversed with a --no- prefix", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
@@ -129,10 +151,13 @@ public sealed class CommandLineNoFunctionOptionTests
     [DataRow("-3s", "sslv3")]
     public void Parse_NoFunctionLetterInABundle_EndsTheBundle(string argument, string longName)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([argument, Url]);
+        CommandLineParseResult result = Parse([argument, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("Silent", false, CommandLineParseDiagnostics.Peek(result.Options)?.Silent);
         Assert.IsFalse(result.Options.Silent);
+        Diagnostics.Assert("Verbosity", 0, CommandLineParseDiagnostics.Peek(result.Options)?.Verbosity);
         Assert.AreEqual(0, result.Options.Verbosity);
         CollectionAssert.AreEqual(new[] { Warning(longName) }, result.WarningLines.ToArray());
     }
@@ -140,10 +165,13 @@ public sealed class CommandLineNoFunctionOptionTests
     [TestMethod]
     public void Parse_LetterBeforeANoFunctionLetter_IsApplied()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-v2", Url]);
+        CommandLineParseResult result = Parse(["-v2", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("Verbosity", 1, CommandLineParseDiagnostics.Peek(result.Options)?.Verbosity);
         Assert.AreEqual(1, result.Options.Verbosity);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach([Warning("sslv2")]), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         CollectionAssert.AreEqual(new[] { Warning("sslv2") }, result.WarningLines.ToArray());
     }
 
@@ -153,37 +181,45 @@ public sealed class CommandLineNoFunctionOptionTests
     [DataRow("--no-npn")]
     public void Parse_SilentThenNoFunctionFlag_DropsTheWarning(string argument)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", argument, Url]);
+        CommandLineParseResult result = Parse(["-s", argument, Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
     public void Parse_SilentThenNoFunctionValueOption_DropsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--egd-file", "x", Url]);
+        CommandLineParseResult result = Parse(["-s", "--egd-file", "x", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("warning lines", "[]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
     public void Parse_NoFunctionFlagThenSilent_KeepsTheWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--metalink", "-s", Url]);
+        CommandLineParseResult result = Parse(["--metalink", "-s", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach([Warning("metalink")]), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         CollectionAssert.AreEqual(new[] { Warning("metalink") }, result.WarningLines.ToArray());
     }
 
     [TestMethod]
     public void Parse_EveryNoFunctionOptionTogether_WarnsForEachInOrder()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["-2", "-3", "--metalink", "--npn", "--ntlm-wb", "--egd-file", "e", "--random-file", "r", "--krb4", "k", "--false-start", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("warning count", 9, result.WarningLines.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -196,9 +232,11 @@ public sealed class CommandLineNoFunctionOptionTests
     [TestMethod]
     public void Parse_UnknownOption_IsStillRefusedAsUnknown()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--bogus", Url]);
+        CommandLineParseResult result = Parse(["--bogus", Url]);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
+        Diagnostics.Assert("stderr lines", CommandLineParseDiagnostics.QuoteEach(new[] { "curl: option --bogus: is unknown", TryHelp }), CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         CollectionAssert.AreEqual(
             new[] { "curl: option --bogus: is unknown", TryHelp },
             result.Refusal.StandardErrorLines.ToArray());
@@ -207,8 +245,15 @@ public sealed class CommandLineNoFunctionOptionTests
     [TestMethod]
     public void NoFunctionRowsAndNext_EndTheBundleAndOnlyTheyDo()
     {
+        Diagnostics.Arrange("rows", CommandLineOptionTable.Rows.Count);
+
         string[] endingBundle = CommandLineOptionTable.Rows.Where(row => row.EndsBundle).Select(row => row.LongName).ToArray();
 
+        Diagnostics.Act("rows ending the bundle", CommandLineParseDiagnostics.QuoteEach(endingBundle));
+        Diagnostics.Assert(
+            "rows ending the bundle, sorted",
+            "[\"false-start\", \"metalink\", \"next\", \"npn\", \"ntlm-wb\", \"sslv2\", \"sslv3\"]",
+            CommandLineParseDiagnostics.QuoteEach(endingBundle.Order(StringComparer.Ordinal)));
         CollectionAssert.AreEquivalent(
             new[] { "sslv2", "sslv3", "metalink", "npn", "ntlm-wb", "false-start", "next" },
             endingBundle);
@@ -217,13 +262,31 @@ public sealed class CommandLineNoFunctionOptionTests
     [TestMethod]
     public void NoFunctionFlag_NullLongName_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineOption.NoFunctionFlag(null!, null, negatable: false));
+        Diagnostics.Arrange("long name", null);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineOption.NoFunctionFlag(null!, null, negatable: false));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "longName", exception.ParamName);
     }
 
     [TestMethod]
     public void NoFunctionValue_NullLongName_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineOption.NoFunctionValue(null!));
+        Diagnostics.Arrange("long name", null);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineOption.NoFunctionValue(null!));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "longName", exception.ParamName);
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 
     private static string Warning(string longName) => $"Warning: --{longName} is deprecated and has no function anymore";

@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using CertificateRequest = System.Security.Cryptography.X509Certificates.CertificateRequest;
 
 namespace Curl.Networking;
@@ -34,8 +35,10 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         string anchorFile = WritePem(ProxyCertificate.Value);
         InsecureTransferConnector connector = new(ProxyCertificate.Value);
 
-        byte[] reply = await AnchoredTransport(connector).PostAsync(ProxyHost, 443, "KdcProxy", [$"FILE:{anchorFile}"], new byte[] { 0x30 }, TestContext.CancellationToken);
+        byte[] reply = await PostAnchoredAsync(AnchoredTransport(connector), [$"FILE:{anchorFile}"], new byte[] { 0x30 }, TestContext.CancellationToken);
 
+        Diagnostics.Diff("body", new byte[] { 0xAA, 0xBB }, reply);
+        Diagnostics.Assert("request line", "POST /KdcProxy HTTP/1.0", connector.ReceivedRequestLine);
         CollectionAssert.AreEqual(new byte[] { 0xAA, 0xBB }, reply);
         Assert.AreEqual("POST /KdcProxy HTTP/1.0", connector.ReceivedRequestLine);
     }
@@ -47,8 +50,12 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         InsecureTransferConnector connector = new(ProxyCertificate.Value);
 
         IOException failure = await Assert.ThrowsExactlyAsync<IOException>(
-            () => AnchoredTransport(connector).PostAsync(ProxyHost, 443, "KdcProxy", [$"FILE:{anchorFile}"], new byte[] { 0x30 }, TestContext.CancellationToken));
+            () => PostAnchoredAsync(AnchoredTransport(connector), [$"FILE:{anchorFile}"], new byte[] { 0x30 }, TestContext.CancellationToken));
 
+        Diagnostics.Assert("message starts with \"The KDC proxy localhost sent a certificate that does not verify: \"", true, failure.Message.StartsWith("The KDC proxy localhost sent a certificate that does not verify: ", StringComparison.Ordinal));
+        Diagnostics.Assert("message names RemoteCertificateChainErrors", true, failure.Message.Contains(nameof(SslPolicyErrors.RemoteCertificateChainErrors), StringComparison.Ordinal));
+        Diagnostics.Assert("transfer TLS asked for", false, connector.Targets.Single().UseTls);
+        Diagnostics.Assert("request line", "null", connector.ReceivedRequestLine ?? "null");
         StringAssert.StartsWith(failure.Message, "The KDC proxy localhost sent a certificate that does not verify: ");
         StringAssert.Contains(failure.Message, nameof(SslPolicyErrors.RemoteCertificateChainErrors));
         Assert.IsFalse(connector.Targets.Single().UseTls, "The transfer's -k TLS is never asked for.");
@@ -61,8 +68,9 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         InsecureTransferConnector connector = new(ProxyCertificate.Value);
 
         await Assert.ThrowsExactlyAsync<IOException>(
-            () => AnchoredTransport(connector).PostAsync(ProxyHost, 443, "KdcProxy", new byte[] { 0x30 }, TestContext.CancellationToken));
+            () => PostAnchoredAsync(AnchoredTransport(connector), [], new byte[] { 0x30 }, TestContext.CancellationToken));
 
+        Diagnostics.Assert("request line", "null", connector.ReceivedRequestLine ?? "null");
         Assert.IsNull(connector.ReceivedRequestLine);
     }
 
@@ -73,8 +81,10 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         KerberosKdcProxyHttpsTransport transport = new(connector, TimeSpan.FromSeconds(10), TimeProvider.System, new KerberosKdcProxyTlsClient(), _ => null);
 
         IOException failure = await Assert.ThrowsExactlyAsync<IOException>(
-            () => transport.PostAsync(ProxyHost, 443, "KdcProxy", ["ENV:KDCPROXY_CA"], new byte[] { 0x30 }, TestContext.CancellationToken));
+            () => PostAnchoredAsync(transport, ["ENV:KDCPROXY_CA"], new byte[] { 0x30 }, TestContext.CancellationToken));
 
+        Diagnostics.Diff("message", "The http_anchors environment variable KDCPROXY_CA is not set.", failure.Message);
+        Diagnostics.Assert("connections opened", 0, connector.Targets.Count);
         Assert.AreEqual("The http_anchors environment variable KDCPROXY_CA is not set.", failure.Message);
         Assert.IsEmpty(connector.Targets);
     }
@@ -85,10 +95,14 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
         var (client, _) = InMemoryDuplexStream.CreatePair();
         using CancellationTokenSource cancelled = new();
         await cancelled.CancelAsync();
+        Diagnostics.Arrange("host", ProxyHost);
+        Diagnostics.Arrange("cancellation", "cancelled before the handshake");
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
+        var failure = await Assert.ThrowsAsync<OperationCanceledException>(
             () => new KerberosKdcProxyTlsClient().AuthenticateAsync(client, ProxyHost, null, cancelled.Token));
 
+        Diagnostics.Act("exception", failure.GetType().Name);
+        Diagnostics.Assert("stream disposed", true, client.IsDisposed);
         Assert.IsTrue(client.IsDisposed);
     }
 
@@ -97,12 +111,52 @@ public sealed partial class KerberosKdcProxyHttpsTransportTests
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
         await server.DisposeAsync();
+        Diagnostics.Arrange("host", ProxyHost);
+        Diagnostics.Arrange("peer", "closed before the handshake");
 
-        IOException failure = await Assert.ThrowsExactlyAsync<IOException>(
-            () => new KerberosKdcProxyTlsClient().AuthenticateAsync(client, ProxyHost, null, TestContext.CancellationToken));
+        IOException failure;
+        using (Diagnostics.Phase("handshake"))
+        {
+            failure = await Assert.ThrowsExactlyAsync<IOException>(
+                () => new KerberosKdcProxyTlsClient().AuthenticateAsync(client, ProxyHost, null, TestContext.CancellationToken));
+        }
 
+        Diagnostics.Act("exception", failure.GetType().Name);
+        Diagnostics.Assert("message starts with \"The KDC proxy localhost failed the TLS handshake: \"", true, failure.Message.StartsWith("The KDC proxy localhost failed the TLS handshake: ", StringComparison.Ordinal));
+        Diagnostics.Assert("stream disposed", true, client.IsDisposed);
         StringAssert.StartsWith(failure.Message, "The KDC proxy localhost failed the TLS handshake: ");
         Assert.IsTrue(client.IsDisposed);
+    }
+
+    // The anchor file's path differs by platform and run, so the lines name only the anchor kind;
+    // a failed handshake's words are the platform's own, so they show only the exception's type.
+    private async Task<byte[]> PostAnchoredAsync(KerberosKdcProxyHttpsTransport transport, IReadOnlyList<string> httpAnchors, byte[] body, CancellationToken cancellationToken)
+    {
+        Diagnostics.Arrange("proxy", $"{ProxyHost} port 443");
+        Diagnostics.Arrange("http_anchors", httpAnchors.Count == 0 ? "none" : string.Join(", ", httpAnchors.Select(anchor => anchor.StartsWith("FILE:", StringComparison.Ordinal) ? "FILE:<anchor file>" : anchor)));
+        Diagnostics.Bytes("KDC request", body);
+        try
+        {
+            byte[] reply;
+            using (Diagnostics.Phase("post with TLS handshake"))
+            {
+                reply = await transport.PostAsync(ProxyHost, 443, "KdcProxy", httpAnchors, body, cancellationToken);
+            }
+
+            Diagnostics.Bytes("reply body", reply);
+            Diagnostics.Act("reply body length", reply.Length);
+            return reply;
+        }
+        catch (Exception exception) when (WriteFailureType(exception))
+        {
+            throw;
+        }
+    }
+
+    private bool WriteFailureType(Exception exception)
+    {
+        Diagnostics.Act("exception", exception.GetType().Name);
+        return false;
     }
 
     private static KerberosKdcProxyHttpsTransport AnchoredTransport(IConnector connector) =>

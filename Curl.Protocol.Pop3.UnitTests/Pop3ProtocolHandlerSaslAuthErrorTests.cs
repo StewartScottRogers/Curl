@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -15,6 +16,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerSaslAuthErrorTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/1";
 
     // realm="localhost",qop="auth",algorithm=md5-sess,charset=utf-8 - no nonce.
@@ -27,11 +33,17 @@ public sealed class Pop3ProtocolHandlerSaslAuthErrorTests
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(
             "+OK POP3 ready <1896.697170952@localhost>\r\n+OK\r\nUSER\r\nSASL DIGEST-MD5 PLAIN\r\n.\r\n+ " + NoNonceChallenge + "\r\n+OK Bye\r\n"));
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("user", "pencil") };
+        Diagnostics.ArrangeRun(Url, connection.Script);
+        Diagnostics.Arrange("sasl", "DIGEST-MD5 rejecting the challenge");
 
         TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider(), sasl)
             .ExecuteAsync(context);
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("challenges handed over", string.Join(" | ", sasl.Challenges.Select(challenge => Pop3Diagnostics.Show(Encoding.Latin1.GetString(challenge)))));
 
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", "CAPA\r\nAUTH DIGEST-MD5\r\n", Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual("CAPA\r\nAUTH DIGEST-MD5\r\n", Encoding.Latin1.GetString(connection.Sent));
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), result);
         Assert.AreEqual(
             "realm=\"localhost\",qop=\"auth\",algorithm=md5-sess,charset=utf-8",
@@ -53,13 +65,21 @@ public sealed class Pop3ProtocolHandlerSaslAuthErrorTests
             Credentials = new NetworkCredential(@"DOMAIN\u", "p"),
             Mail = new MailRequestOptions { SaslInitialResponse = saslInitialResponse },
         };
+        Diagnostics.ArrangeRun(Url, connection.Script);
+        Diagnostics.Arrange("sasl", $"GSSAPI failing its initial response, sasl ir {saslInitialResponse}");
 
         TransferResult result = await new Pop3ProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider(), sasl)
             .ExecuteAsync(context);
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("initial responses asked", sasl.InitialResponsesAsked);
 
+        Diagnostics.AssertValues("Encoding.Latin1.GetString(connection.Sent)", expectedSent, Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual(expectedSent, Encoding.Latin1.GetString(connection.Sent));
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.AuthError, "An authentication function returned an error"), result);
+        Diagnostics.AssertValues("sasl.InitialResponsesAsked", 1, sasl.InitialResponsesAsked);
         Assert.AreEqual(1, sasl.InitialResponsesAsked);
+        Diagnostics.AssertValues("sasl.Challenges count", 0, sasl.Challenges.Count());
         Assert.IsEmpty(sasl.Challenges);
     }
 }

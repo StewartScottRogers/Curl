@@ -7,6 +7,7 @@ using System.Security.Cryptography.X509Certificates;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -24,8 +25,16 @@ public sealed partial class CurlCompositionTests
     {
         // curl -sS --proxy https://127.0.0.1:47611 --proxy-insecure --proxy-pinnedpubkey sha256//AAAA...= http://example.test/
         // curl: (90) SSL: public key does not match pinned public key (curl 8.21.0, 2026-09-30).
-        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => ["--proxy-pinnedpubkey", WrongProxyPin]);
+        Diagnostics.Arrange("proxy tls arguments", "--proxy-pinnedpubkey " + WrongProxyPin);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(_ => ["--proxy-pinnedpubkey", WrongProxyPin]);
+        }
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslPinnedPubKeyNotMatch, result.ExitCode);
         Assert.AreEqual("SSL: public key does not match pinned public key", result.ErrorMessage);
     }
@@ -34,9 +43,16 @@ public sealed partial class CurlCompositionTests
     public async Task CreateTransports_TheProxysKeyPinned_CompletesTheProxysHandshake()
     {
         // curl ... --proxy-pinnedpubkey sha256//<the proxy's key> http://example.test/ -> exit 0.
-        ConnectResult result = await LoopbackProxyHandshakeAsync(
-            key => ["--proxy-pinnedpubkey", "sha256//" + Convert.ToBase64String(SHA256.HashData(key))]);
+        Diagnostics.Arrange("proxy tls arguments", "--proxy-pinnedpubkey sha256//<the proxy's key hash>");
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(
+                key => ["--proxy-pinnedpubkey", "sha256//" + Convert.ToBase64String(SHA256.HashData(key))]);
+        }
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await result.Connection!.DisposeAsync();
     }
@@ -45,8 +61,15 @@ public sealed partial class CurlCompositionTests
     public async Task CreateTransports_WrongOriginPinnedpubkey_LeavesTheProxysHandshakeAlone()
     {
         // curl ... --proxy-insecure --pinnedpubkey sha256//AAAA...= http://example.test/ -> exit 0.
-        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => ["--pinnedpubkey", WrongProxyPin]);
+        Diagnostics.Arrange("proxy tls arguments", "--pinnedpubkey " + WrongProxyPin);
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(_ => ["--pinnedpubkey", WrongProxyPin]);
+        }
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         await result.Connection!.DisposeAsync();
     }
@@ -57,10 +80,19 @@ public sealed partial class CurlCompositionTests
     {
         // curl -s -o /dev/null --proxy-insecure -x https://localhost:18443 -w '%{ssl_verify_result} %{proxy_ssl_verify_result}'
         // http://example.invalid/ -> "0 18" (curl 8.18.0, OpenSSL 3.5.5, 2026-09-30, BL-661 Notes).
+        Diagnostics.Arrange("proxy tls arguments", "--proxy-insecure only");
         RunningTransferState state = NewRunningTransferState();
 
-        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+        }
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("proxy ssl verify result", state.ProxySslVerifyResult);
+        Diagnostics.Act("ssl verify result", state.SslVerifyResult);
+        Diagnostics.Assert("proxy ssl verify result", 18L, state.ProxySslVerifyResult);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.AreEqual(18L, state.ProxySslVerifyResult);
         Assert.AreEqual(0L, state.SslVerifyResult);
@@ -72,10 +104,18 @@ public sealed partial class CurlCompositionTests
     public async Task CreateTransports_SelfSignedProxyUnderProxyInsecure_RecordsProxySslVerifyResult0OnWindows()
     {
         // curl 8.21.0 (Schannel) prints 0 for both, whatever it found (ADR-0043).
+        Diagnostics.Arrange("proxy tls arguments", "--proxy-insecure only");
         RunningTransferState state = NewRunningTransferState();
 
-        ConnectResult result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await LoopbackProxyHandshakeAsync(_ => [], new TlsResultRecordingTransferEvents(NoTransferEvents.Instance, state));
+        }
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("ssl verify result", state.SslVerifyResult);
+        Diagnostics.Assert("proxy ssl verify result", 0L, state.ProxySslVerifyResult);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         Assert.AreEqual(0L, state.ProxySslVerifyResult);
         Assert.AreEqual(0L, state.SslVerifyResult);
@@ -85,9 +125,13 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_ProxyPinnedpubkeyAndProxyCrlfile_ReachTheProxysOptionsOnly()
     {
+        Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-pinnedpubkey {WrongProxyPin} --proxy-crlfile proxy.crl {ProxiedUrl}");
         CurlTransports transports = CurlComposition.CreateTransports(
             Parse("-x", HttpsProxyUrl, "--proxy-pinnedpubkey", WrongProxyPin, "--proxy-crlfile", "proxy.crl", ProxiedUrl));
 
+        Diagnostics.Act("proxy pinned public key", transports.ProxyTlsClientOptions.PinnedPublicKey);
+        Diagnostics.Act("target pinned public key", transports.TlsClientOptions.PinnedPublicKey);
+        Diagnostics.Assert("proxy pinned public key", WrongProxyPin, transports.ProxyTlsClientOptions.PinnedPublicKey);
         Assert.AreEqual(WrongProxyPin, transports.ProxyTlsClientOptions.PinnedPublicKey);
         Assert.AreEqual("proxy.crl", transports.ProxyTlsClientOptions.CertificateRevocationListFile);
         Assert.IsNull(transports.TlsClientOptions.PinnedPublicKey);
@@ -103,6 +147,10 @@ public sealed partial class CurlCompositionTests
         CurlTransports with = CurlComposition.CreateTransports(
             Parse("-x", HttpsProxyUrl, "--proxy-ca-native", "--proxy-ssl-allow-beast", ProxiedUrl));
 
+        Diagnostics.Arrange("arguments", $"-x {HttpsProxyUrl} --proxy-ca-native --proxy-ssl-allow-beast {ProxiedUrl}");
+        Diagnostics.Act("proxy tls client options without", without.ProxyTlsClientOptions);
+        Diagnostics.Act("proxy tls client options with", with.ProxyTlsClientOptions);
+        Diagnostics.Assert("proxy tls client options", without.ProxyTlsClientOptions with { AllowBeast = true }, with.ProxyTlsClientOptions);
         Assert.AreEqual(without.ProxyTlsClientOptions with { AllowBeast = true }, with.ProxyTlsClientOptions);
         Assert.AreEqual(without.TlsClientOptions, with.TlsClientOptions);
     }

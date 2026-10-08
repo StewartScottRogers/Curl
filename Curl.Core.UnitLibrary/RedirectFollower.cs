@@ -74,6 +74,12 @@ namespace Curl.Core;
 /// one <c>--max-redirs</c> limit, as curl 8.21.0's do (measured, BL-396 Notes).
 /// </para>
 /// <para>
+/// Every hop after the first is sent the previous hop's
+/// <see cref="TransferReport.ResponseHeadersStored" /> as
+/// <see cref="HttpRequestOptions.ResponseHeadersStored" />, so the hops' headers share one limit
+/// of 5000, as curl 8.21.0's do (measured, BL-1448 Notes).
+/// </para>
+/// <para>
 /// Every hop after the first carries the chain's start as
 /// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
 /// curl's does, rather than each hop (measured, BL-299 Notes).
@@ -212,7 +218,7 @@ public sealed class RedirectFollower(
             log.Followed(responseCode, target, bodyDropped, methodDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 

@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -23,11 +24,17 @@ public sealed class CommandLineWriteOutOptionTests
 
     private const string CannotBeReversed = "the given option cannot be reversed with a --no- prefix";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoWriteOut_HasNoTemplate()
     {
         CommandLineParseResult result = Parse([Url], new RecordingDataFileReader());
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("write-out", null, Recorded(result)?.WriteOut);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.WriteOut);
     }
@@ -44,6 +51,10 @@ public sealed class CommandLineWriteOutOptionTests
 
         CommandLineParseResult result = Parse([.. arguments, Url], reader);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("write-out", template, Recorded(result)?.WriteOut);
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach([]), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+        Diagnostics.Assert("reads", CommandLineParseDiagnostics.QuoteEach([]), CommandLineParseDiagnostics.QuoteEach(reader.Reads));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(template, result.Options.WriteOut);
         Assert.IsEmpty(result.WarningLines);
@@ -55,6 +66,8 @@ public sealed class CommandLineWriteOutOptionTests
     {
         CommandLineParseResult result = Parse(["-w", "foo", "-w", string.Empty, Url], new RecordingDataFileReader());
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("write-out", "\"\"", Quoted(Recorded(result)?.WriteOut));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(string.Empty, result.Options.WriteOut);
     }
@@ -67,9 +80,14 @@ public sealed class CommandLineWriteOutOptionTests
     public void Parse_WriteOutAtFile_ReadsTheFileWithoutCarriageReturnsLineFeedsAndNuls(byte[] contents, string template)
     {
         RecordingDataFileReader reader = new() { Files = { ["wo.txt"] = contents } };
+        Diagnostics.Bytes("wo.txt", contents);
 
         CommandLineParseResult result = Parse(["-w", "@wo.txt", Url], reader);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("write-out", Quoted(template), Quoted(Recorded(result)?.WriteOut));
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach([]), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
+        Diagnostics.Assert("reads", CommandLineParseDiagnostics.QuoteEach(["wo.txt"]), CommandLineParseDiagnostics.QuoteEach(reader.Reads));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual(template, result.Options.WriteOut);
         Assert.IsEmpty(result.WarningLines);
@@ -80,9 +98,13 @@ public sealed class CommandLineWriteOutOptionTests
     public void Parse_WriteOutAtDash_ReadsStandardInput()
     {
         RecordingDataFileReader reader = new() { StandardInput = "q%{http_code}"u8.ToArray() };
+        Diagnostics.Bytes("standard input", reader.StandardInput);
 
         CommandLineParseResult result = Parse(["--write-out", "@-", Url], reader);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("write-out", "q%{http_code}", Recorded(result)?.WriteOut);
+        Diagnostics.Assert("reads", CommandLineParseDiagnostics.QuoteEach(["-"]), CommandLineParseDiagnostics.QuoteEach(reader.Reads));
         Assert.IsTrue(result.IsAccepted);
         Assert.AreEqual("q%{http_code}", result.Options.WriteOut);
         CollectionAssert.AreEqual(new[] { "-" }, reader.Reads);
@@ -92,9 +114,13 @@ public sealed class CommandLineWriteOutOptionTests
     public void Parse_WriteOutAtEmptyFile_ClearsTheTemplateAndWarns()
     {
         RecordingDataFileReader reader = new() { Files = { ["empty.txt"] = [] } };
+        Diagnostics.Bytes("empty.txt", []);
 
         CommandLineParseResult result = Parse(["-w", "foo", "-w", "@empty.txt", Url], reader);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("write-out", null, Recorded(result)?.WriteOut);
+        AssertWarnings(result, "Warning: Failed to read empty.txt");
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.WriteOut);
         CollectionAssert.AreEqual(new[] { "Warning: Failed to read empty.txt" }, result.WarningLines.ToArray());
@@ -103,8 +129,12 @@ public sealed class CommandLineWriteOutOptionTests
     [TestMethod]
     public void Parse_WriteOutAtEmptyStandardInput_WarnsNamingStdin()
     {
+        Diagnostics.Arrange("standard input", "empty");
         CommandLineParseResult result = Parse(["-w", "@-", Url], new RecordingDataFileReader());
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Diagnostics.Assert("write-out", null, Recorded(result)?.WriteOut);
+        AssertWarnings(result, "Warning: Failed to read <stdin>");
         Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.Options.WriteOut);
         CollectionAssert.AreEqual(new[] { "Warning: Failed to read <stdin>" }, result.WarningLines.ToArray());
@@ -114,9 +144,12 @@ public sealed class CommandLineWriteOutOptionTests
     public void Parse_SilentThenWriteOutAtEmptyFile_DoesNotWarn()
     {
         RecordingDataFileReader reader = new() { Files = { ["empty.txt"] = [] } };
+        Diagnostics.Bytes("empty.txt", []);
 
         CommandLineParseResult result = Parse(["-s", "-w", "@empty.txt", Url], reader);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        AssertWarnings(result);
         Assert.IsTrue(result.IsAccepted);
         Assert.IsEmpty(result.WarningLines);
     }
@@ -125,9 +158,12 @@ public sealed class CommandLineWriteOutOptionTests
     public void Parse_WriteOutAtEmptyFileThenSilent_StillWarns()
     {
         RecordingDataFileReader reader = new() { Files = { ["empty.txt"] = [] } };
+        Diagnostics.Bytes("empty.txt", []);
 
         CommandLineParseResult result = Parse(["-w", "@empty.txt", "-s", "-S", Url], reader);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        AssertWarnings(result, "Warning: Failed to read empty.txt");
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(new[] { "Warning: Failed to read empty.txt" }, result.WarningLines.ToArray());
     }
@@ -140,6 +176,10 @@ public sealed class CommandLineWriteOutOptionTests
     {
         CommandLineParseResult result = Parse([.. arguments, Url], new RecordingDataFileReader());
 
+        Diagnostics.AssertRefusal(
+            result,
+            CurlExitCode.ReadError,
+            [$"curl: Failed to open {file}", $"curl: option {spelledOption}: error encountered when reading a file", CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -152,6 +192,10 @@ public sealed class CommandLineWriteOutOptionTests
     {
         CommandLineParseResult result = Parse(["-s", "-w", "@nonexist", Url], new RecordingDataFileReader());
 
+        Diagnostics.AssertRefusal(
+            result,
+            CurlExitCode.ReadError,
+            ["curl: option -w: error encountered when reading a file", CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.ReadError, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -166,6 +210,10 @@ public sealed class CommandLineWriteOutOptionTests
     {
         CommandLineParseResult result = Parse([spelledOption, Url], new RecordingDataFileReader());
 
+        Diagnostics.AssertRefusal(
+            result,
+            CurlExitCode.FailedInit,
+            [$"curl: option {spelledOption}: {CannotBeReversed}", CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(
@@ -174,11 +222,38 @@ public sealed class CommandLineWriteOutOptionTests
     }
 
     [TestMethod]
-    public void FailedToRead_Null_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineWarning.FailedToRead(null!));
+    public void FailedToRead_Null_Throws()
+    {
+        Diagnostics.Arrange("file name", "null");
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineWarning.FailedToRead(null!));
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+    /// <summary>
+    /// Returns the parsed options, or null for a refusal, for diagnostic lines written before the test asserts
+    /// acceptance, without making the compiler treat <see cref="CommandLineParseResult.Options"/> as possibly null.
+    /// </summary>
+    private static CommandLineOptions? Recorded(CommandLineParseResult result) => result.Options;
+
+    private static string Quoted(string? value) => value is null ? "null" : "\"" + value + "\"";
+
+    /// <summary>Parses <paramref name="arguments"/>, writing them, the outcome and the write-out template as diagnostics.</summary>
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            Diagnostics.Act("write-out", Quoted(result.Options.WriteOut));
+        }
+
+        return result;
+    }
+
+    private void AssertWarnings(CommandLineParseResult result, params string[] expected) =>
+        Diagnostics.Assert("warning lines", CommandLineParseDiagnostics.QuoteEach(expected), CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
 
     private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
     {

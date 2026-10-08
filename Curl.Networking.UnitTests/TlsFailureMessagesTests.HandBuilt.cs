@@ -26,6 +26,13 @@ public sealed partial class TlsFailureMessagesTests
     {
         var failure = new TlsHandshakeFailure(TlsAlertDescription.HandshakeFailure, null) { Origin = origin };
 
+        Diagnostics.Arrange("origin, offersOnlyVersionsBelowTls12", $"{origin}, {offersOnlyVersionsBelowTls12}");
+
+        var message = TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, offersOnlyVersionsBelowTls12);
+
+        Diagnostics.Act("message", message);
+        Diagnostics.Assert("message", expected, message);
+
         Assert.AreEqual(expected, TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, offersOnlyVersionsBelowTls12));
     }
 
@@ -42,6 +49,13 @@ public sealed partial class TlsFailureMessagesTests
         string expected)
     {
         var failure = new TlsHandshakeFailure(alert, null) { Origin = origin };
+
+        Diagnostics.Arrange("origin, alert", $"{origin}, {alert}");
+
+        var message = TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure);
+
+        Diagnostics.Act("message", message);
+        Diagnostics.Assert("message", expected, message);
 
         Assert.AreEqual(expected, TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure));
     }

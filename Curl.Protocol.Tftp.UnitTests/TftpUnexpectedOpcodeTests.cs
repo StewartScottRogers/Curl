@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Tftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Tftp;
 
@@ -43,6 +44,10 @@ public sealed class TftpUnexpectedOpcodeTests
 
     private static readonly (byte[]? Datagram, EndPoint Source) Silence = (null, TransferEndPoint);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     /// <summary>Measured: an RRQ, a WRQ or opcode 9 as the first reply is exit 71, one <c>-v</c> line, nothing sent.</summary>
     /// <param name="opcode">The reply's opcode.</param>
     [TestMethod]
@@ -53,13 +58,19 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Packet(opcode), Data(1, "end"));
+        Diagnostics.Arrange("first reply opcode", opcode);
+        var channel = Channel(clock, Packet(opcode), Data(1, "end"));
 
-        var result = await Handler(channel).ExecuteAsync(Context(events, clock));
+        var result = await Run(channel, Context(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.TftpIllegal, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Diagnostics.Assert("error message", UnexpectedPacket, result.ErrorMessage);
         Assert.AreEqual(UnexpectedPacket, result.ErrorMessage);
-        CollectionAssert.AreEqual(new[] { Trying, Established, StartTimeouts, SendFirst, ShuttingDown }, events.Steps);
+        var expectedSteps = new[] { Trying, Established, StartTimeouts, SendFirst, ShuttingDown };
+        Diagnostics.Assert("events", Steps(expectedSteps), Steps(events.Steps));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps);
+        Diagnostics.Assert("datagrams sent", 1, channel.Sent.Count);
         Assert.HasCount(1, channel.Sent);
     }
 
@@ -74,15 +85,22 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Data(1, FullBlock), Packet(opcode), Data(2, "end"));
+        Diagnostics.Arrange("second reply opcode", opcode);
+        var channel = Channel(clock, Data(1, FullBlock), Packet(opcode), Data(2, "end"));
         var context = Context(events, clock);
 
-        var result = await Handler(channel).ExecuteAsync(context);
+        var result = await Run(channel, context, events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.TftpIllegal, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Diagnostics.Assert("error message", UnexpectedPacket, result.ErrorMessage);
         Assert.AreEqual(UnexpectedPacket, result.ErrorMessage);
-        CollectionAssert.AreEqual(new[] { UnexpectedPacket, ReceiveInternalError, ShuttingDown }, events.Steps.TakeLast(3).ToArray());
+        var expectedSteps = new[] { UnexpectedPacket, ReceiveInternalError, ShuttingDown };
+        Diagnostics.Assert("last 3 events", Steps(expectedSteps), Steps(events.Steps.TakeLast(3)));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps.TakeLast(3).ToArray());
+        Diagnostics.Assert("datagrams sent", 2, channel.Sent.Count);
         Assert.HasCount(2, channel.Sent);
+        Diagnostics.Assert("output length", 512, ((MemoryStream)context.Output).Length);
         Assert.AreEqual(512, ((MemoryStream)context.Output).Length);
     }
 
@@ -92,14 +110,20 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Data(1, FullBlock), Packet(4, 1), Data(2, "end"));
+        var channel = Channel(clock, Data(1, FullBlock), Packet(4, 1), Data(2, "end"));
 
-        var result = await Handler(channel).ExecuteAsync(Context(events, clock));
+        var result = await Run(channel, Context(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.TftpIllegal, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Diagnostics.Assert("error message", ReceiveInternalError, result.ErrorMessage);
         Assert.AreEqual(ReceiveInternalError, result.ErrorMessage);
-        CollectionAssert.AreEqual(new[] { ReceiveInternalError, ShuttingDown }, events.Steps.TakeLast(2).ToArray());
+        var expectedSteps = new[] { ReceiveInternalError, ShuttingDown };
+        Diagnostics.Assert("last 2 events", Steps(expectedSteps), Steps(events.Steps.TakeLast(2)));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps.TakeLast(2).ToArray());
+        Diagnostics.Assert("events contain the unexpected-packet line", false, events.Steps.Contains(UnexpectedPacket));
         CollectionAssert.DoesNotContain(events.Steps, UnexpectedPacket);
+        Diagnostics.Assert("datagrams sent", 2, channel.Sent.Count);
         Assert.HasCount(2, channel.Sent);
     }
 
@@ -115,18 +139,24 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Packet(opcode), Data(1, FullBlock), Data(2, "end"));
+        Diagnostics.Arrange("first reply opcode", opcode);
+        var channel = Channel(clock, Packet(opcode), Data(1, FullBlock), Data(2, "end"));
         var context = Context(events, clock);
 
-        var result = await Handler(channel).ExecuteAsync(context);
+        var result = await Run(channel, context, events);
 
+        Diagnostics.Assert("succeeded", true, result.IsSuccess);
         Assert.IsTrue(result.IsSuccess);
+        Diagnostics.Assert("output length", 515, ((MemoryStream)context.Output).Length);
         Assert.AreEqual(515, ((MemoryStream)context.Output).Length);
-        CollectionAssert.AreEqual(
-            new[] { Trying, Established, StartTimeouts, UnexpectedPacket, "<= " + FullBlock, "Connected for receive", ReceiveTimeouts, "<= end", ShuttingDown },
-            events.Steps);
+        var expectedSteps = new[] { Trying, Established, StartTimeouts, UnexpectedPacket, "<= " + FullBlock, "Connected for receive", ReceiveTimeouts, "<= end", ShuttingDown };
+        Diagnostics.Assert("events", Steps(expectedSteps), Steps(events.Steps));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps);
+        Diagnostics.Assert("datagrams sent", 4, channel.Sent.Count);
         Assert.HasCount(4, channel.Sent);
+        Diagnostics.Diff("request re-sent byte-identical", channel.Sent[0], channel.Sent[1]);
         CollectionAssert.AreEqual(channel.Sent[0], channel.Sent[1]);
+        Diagnostics.Diff("sent 2 is ACK 1", new byte[] { 0, 4, 0, 1 }, channel.Sent[2]);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[2]);
     }
 
@@ -136,17 +166,21 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Data(1, FullBlock), Packet(7), Data(2, "end"));
+        var channel = Channel(clock, Data(1, FullBlock), Packet(7), Data(2, "end"));
         var context = Context(events, clock);
 
-        var result = await Handler(channel).ExecuteAsync(context);
+        var result = await Run(channel, context, events);
 
+        Diagnostics.Assert("succeeded", true, result.IsSuccess);
         Assert.IsTrue(result.IsSuccess);
+        Diagnostics.Assert("output length", 515, ((MemoryStream)context.Output).Length);
         Assert.AreEqual(515, ((MemoryStream)context.Output).Length);
-        CollectionAssert.AreEqual(
-            new[] { ReceiveTimeouts, UnexpectedPacket, "Timeout waiting for block 2 ACK. Retries = 1", "<= end", ShuttingDown },
-            events.Steps.TakeLast(5).ToArray());
+        var expectedSteps = new[] { ReceiveTimeouts, UnexpectedPacket, "Timeout waiting for block 2 ACK. Retries = 1", "<= end", ShuttingDown };
+        Diagnostics.Assert("last 5 events", Steps(expectedSteps), Steps(events.Steps.TakeLast(5)));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps.TakeLast(5).ToArray());
+        Diagnostics.Assert("datagrams sent", 4, channel.Sent.Count);
         Assert.HasCount(4, channel.Sent);
+        Diagnostics.Diff("sent 2 is ACK 1", new byte[] { 0, 4, 0, 1 }, channel.Sent[2]);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[2]);
     }
 
@@ -159,14 +193,18 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(
-            ServerEndPoint, clock, Data(1, FullBlock), Packet(7), Packet(7), Packet(7), Packet(7));
+        var channel = Channel(
+            clock, Data(1, FullBlock), Packet(7), Packet(7), Packet(7), Packet(7));
 
-        var result = await Handler(channel).ExecuteAsync(Context(events, clock));
+        var result = await Run(channel, Context(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Diagnostics.Assert("error message", UnexpectedPacket, result.ErrorMessage);
         Assert.AreEqual(UnexpectedPacket, result.ErrorMessage);
+        Diagnostics.Assert("second-last event", "Timeout waiting for block 2 ACK. Retries = 4", events.Steps[^2]);
         Assert.AreEqual("Timeout waiting for block 2 ACK. Retries = 4", events.Steps[^2]);
+        Diagnostics.Assert("datagrams sent", 5, channel.Sent.Count);
         Assert.HasCount(5, channel.Sent);
     }
 
@@ -180,26 +218,31 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(
-            ServerEndPoint, clock, Packet(4, 0), Data(1, FullBlock), Silence, Silence, Silence, Silence);
+        var channel = Channel(
+            clock, Packet(4, 0), Data(1, FullBlock), Silence, Silence, Silence, Silence);
         var context = Context(events, clock);
 
-        var result = await Handler(channel).ExecuteAsync(context);
+        var result = await Run(channel, context, events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Diagnostics.Assert("error message", "tftp_tx: internal error, event: 3", result.ErrorMessage);
         Assert.AreEqual("tftp_tx: internal error, event: 3", result.ErrorMessage);
+        Diagnostics.Assert("output length", 0, ((MemoryStream)context.Output).Length);
         Assert.AreEqual(0, ((MemoryStream)context.Output).Length);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                Trying, Established, StartTimeouts, "Connected for transmit", TransmitTimeouts, "tftp_tx: internal error, event: 3",
-                "Timeout waiting for block 2 ACK. Retries = 1", "Timeout waiting for block 2 ACK. Retries = 2",
-                "Timeout waiting for block 2 ACK. Retries = 3", "Timeout waiting for block 2 ACK. Retries = 4", ShuttingDown,
-            },
-            events.Steps);
+        var expectedSteps = new[]
+        {
+            Trying, Established, StartTimeouts, "Connected for transmit", TransmitTimeouts, "tftp_tx: internal error, event: 3",
+            "Timeout waiting for block 2 ACK. Retries = 1", "Timeout waiting for block 2 ACK. Retries = 2",
+            "Timeout waiting for block 2 ACK. Retries = 3", "Timeout waiting for block 2 ACK. Retries = 4", ShuttingDown,
+        };
+        Diagnostics.Assert("events", Steps(expectedSteps), Steps(events.Steps));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps);
+        Diagnostics.Assert("datagrams sent", 5, channel.Sent.Count);
         Assert.HasCount(5, channel.Sent);
         foreach (var sent in channel.Sent.Skip(1))
         {
+            Diagnostics.Diff("re-sent empty DATA 1", new byte[] { 0, 3, 0, 1 }, sent);
             CollectionAssert.AreEqual(new byte[] { 0, 3, 0, 1 }, sent);
         }
     }
@@ -210,13 +253,18 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Packet(4, 0), Packet(3, 1), Packet(4, 1));
+        var channel = Channel(clock, Packet(4, 0), Packet(3, 1), Packet(4, 1));
 
-        var result = await Handler(channel).ExecuteAsync(UploadContext(events, clock));
+        var result = await Run(channel, UploadContext(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        CollectionAssert.AreEqual(new[] { "tftp_tx: internal error, event: 3", ShuttingDown }, events.Steps.TakeLast(2).ToArray());
+        var expectedSteps = new[] { "tftp_tx: internal error, event: 3", ShuttingDown };
+        Diagnostics.Assert("last 2 events", Steps(expectedSteps), Steps(events.Steps.TakeLast(2)));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps.TakeLast(2).ToArray());
+        Diagnostics.Assert("events contain the unexpected-packet line", false, events.Steps.Contains(UnexpectedPacket));
         CollectionAssert.DoesNotContain(events.Steps, UnexpectedPacket);
+        Diagnostics.Assert("datagrams sent", 2, channel.Sent.Count);
         Assert.HasCount(2, channel.Sent);
     }
 
@@ -230,14 +278,17 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Packet(4, 0), Packet(opcode), Packet(4, 1));
+        Diagnostics.Arrange("second reply opcode", opcode);
+        var channel = Channel(clock, Packet(4, 0), Packet(opcode), Packet(4, 1));
 
-        var result = await Handler(channel).ExecuteAsync(UploadContext(events, clock));
+        var result = await Run(channel, UploadContext(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        CollectionAssert.AreEqual(
-            new[] { UnexpectedPacket, $"tftp_tx: internal error, event: {opcode}", ShuttingDown },
-            events.Steps.TakeLast(3).ToArray());
+        var expectedSteps = new[] { UnexpectedPacket, $"tftp_tx: internal error, event: {opcode}", ShuttingDown };
+        Diagnostics.Assert("last 3 events", Steps(expectedSteps), Steps(events.Steps.TakeLast(3)));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps.TakeLast(3).ToArray());
+        Diagnostics.Assert("datagrams sent", 2, channel.Sent.Count);
         Assert.HasCount(2, channel.Sent);
     }
 
@@ -247,13 +298,18 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Packet(9), Packet(4, 0), Packet(4, 1));
+        var channel = Channel(clock, Packet(9), Packet(4, 0), Packet(4, 1));
 
-        var result = await Handler(channel).ExecuteAsync(UploadContext(events, clock));
+        var result = await Run(channel, UploadContext(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.TftpIllegal, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TftpIllegal, result.ExitCode);
+        Diagnostics.Assert("error message", UnexpectedPacket, result.ErrorMessage);
         Assert.AreEqual(UnexpectedPacket, result.ErrorMessage);
-        CollectionAssert.AreEqual(new[] { Trying, Established, StartTimeouts, SendFirst, ShuttingDown }, events.Steps);
+        var expectedSteps = new[] { Trying, Established, StartTimeouts, SendFirst, ShuttingDown };
+        Diagnostics.Assert("events", Steps(expectedSteps), Steps(events.Steps));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps);
+        Diagnostics.Assert("datagrams sent", 1, channel.Sent.Count);
         Assert.HasCount(1, channel.Sent);
     }
 
@@ -269,15 +325,19 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Packet(opcode), Packet(4, 0), Packet(4, 1));
+        Diagnostics.Arrange("first reply opcode", opcode);
+        var channel = Channel(clock, Packet(opcode), Packet(4, 0), Packet(4, 1));
 
-        var result = await Handler(channel).ExecuteAsync(UploadContext(events, clock));
+        var result = await Run(channel, UploadContext(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        CollectionAssert.AreEqual(
-            new[] { Trying, Established, StartTimeouts, UnexpectedPacket, "Connected for transmit", TransmitTimeouts, ShuttingDown },
-            events.Steps);
+        var expectedSteps = new[] { Trying, Established, StartTimeouts, UnexpectedPacket, "Connected for transmit", TransmitTimeouts, ShuttingDown };
+        Diagnostics.Assert("events", Steps(expectedSteps), Steps(events.Steps));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps);
+        Diagnostics.Assert("datagrams sent", 3, channel.Sent.Count);
         Assert.HasCount(3, channel.Sent);
+        Diagnostics.Diff("request re-sent byte-identical", channel.Sent[0], channel.Sent[1]);
         CollectionAssert.AreEqual(channel.Sent[0], channel.Sent[1]);
     }
 
@@ -287,15 +347,18 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Packet(4, 0), Packet(7), Packet(4, 1));
+        var channel = Channel(clock, Packet(4, 0), Packet(7), Packet(4, 1));
 
-        var result = await Handler(channel).ExecuteAsync(UploadContext(events, clock));
+        var result = await Run(channel, UploadContext(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        CollectionAssert.AreEqual(
-            new[] { TransmitTimeouts, UnexpectedPacket, "Timeout waiting for block 2 ACK. Retries = 1", ShuttingDown },
-            events.Steps.TakeLast(4).ToArray());
+        var expectedSteps = new[] { TransmitTimeouts, UnexpectedPacket, "Timeout waiting for block 2 ACK. Retries = 1", ShuttingDown };
+        Diagnostics.Assert("last 4 events", Steps(expectedSteps), Steps(events.Steps.TakeLast(4)));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps.TakeLast(4).ToArray());
+        Diagnostics.Assert("datagrams sent", 3, channel.Sent.Count);
         Assert.HasCount(3, channel.Sent);
+        Diagnostics.Diff("DATA 1 re-sent byte-identical", channel.Sent[1], channel.Sent[2]);
         CollectionAssert.AreEqual(channel.Sent[1], channel.Sent[2]);
     }
 
@@ -309,17 +372,22 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(ServerEndPoint, clock, Data(1, "A"), Packet(4, 0));
+        var channel = Channel(clock, Data(1, "A"), Packet(4, 0));
         var context = UploadContext(events, clock);
 
-        var result = await Handler(channel).ExecuteAsync(context);
+        var result = await Run(channel, context, events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual("A", Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray()));
-        CollectionAssert.AreEqual(
-            new[] { Trying, Established, StartTimeouts, "<= A", "Connected for receive", ReceiveTimeouts, ShuttingDown },
-            events.Steps);
+        var output = Encoding.ASCII.GetString(((MemoryStream)context.Output).ToArray());
+        Diagnostics.Diff("output text", "A", output);
+        Assert.AreEqual("A", output);
+        var expectedSteps = new[] { Trying, Established, StartTimeouts, "<= A", "Connected for receive", ReceiveTimeouts, ShuttingDown };
+        Diagnostics.Assert("events", Steps(expectedSteps), Steps(events.Steps));
+        CollectionAssert.AreEqual(expectedSteps, events.Steps);
+        Diagnostics.Assert("datagrams sent", 2, channel.Sent.Count);
         Assert.HasCount(2, channel.Sent);
+        Diagnostics.Diff("sent 1 is ACK 1", new byte[] { 0, 4, 0, 1 }, channel.Sent[1]);
         CollectionAssert.AreEqual(new byte[] { 0, 4, 0, 1 }, channel.Sent[1]);
     }
 
@@ -332,21 +400,80 @@ public sealed class TftpUnexpectedOpcodeTests
     {
         var events = new RecordingTransferEvents();
         var clock = new ManualTimeProvider();
-        var channel = new PausingDatagramChannel(
-            ServerEndPoint, clock, Packet(4, 0), Packet(3, 1), Packet(7), Packet(7), Packet(7), Packet(7));
+        var channel = Channel(
+            clock, Packet(4, 0), Packet(3, 1), Packet(7), Packet(7), Packet(7), Packet(7));
 
-        var result = await Handler(channel).ExecuteAsync(UploadContext(events, clock));
+        var result = await Run(channel, UploadContext(events, clock), events);
 
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Diagnostics.Assert("error message", "tftp_tx: internal error, event: 3", result.ErrorMessage);
         Assert.AreEqual("tftp_tx: internal error, event: 3", result.ErrorMessage);
+        Diagnostics.Assert("datagrams sent", 5, channel.Sent.Count);
         Assert.HasCount(5, channel.Sent);
     }
 
     private static TftpProtocolHandler Handler(IDatagramChannel channel) =>
         new(new RecordingDatagramConnector(DatagramOpenResult.Opened(channel)));
 
-    private static TransferContext Context(ITransferEvents events, TimeProvider clock, Stream? upload = null) =>
-        new()
+    private static string Steps(IEnumerable<string> steps) =>
+        string.Join(" | ", steps.Select(step => step.Length > 60 ? step[..60] + "..." : step));
+
+    private static (byte[]? Datagram, EndPoint Source) Data(ushort block, string payload) =>
+        ([0, 3, (byte)(block >> 8), (byte)block, .. Encoding.ASCII.GetBytes(payload)], TransferEndPoint);
+
+    private static (byte[]? Datagram, EndPoint Source) Packet(ushort opcode, ushort field = 0) =>
+        ([(byte)(opcode >> 8), (byte)opcode, (byte)(field >> 8), (byte)field], TransferEndPoint);
+
+    /// <summary>Builds the scripted channel and writes each scripted datagram (or silence) as ARRANGE lines.</summary>
+    private PausingDatagramChannel Channel(ManualTimeProvider clock, params (byte[]? Datagram, EndPoint Source)[] script)
+    {
+        for (int index = 0; index < script.Length; index++)
+        {
+            var (datagram, source) = script[index];
+            if (datagram is null)
+            {
+                Diagnostics.Arrange($"scripted {index}", "silence: the ManualTimeProvider advances to the next timer");
+            }
+            else
+            {
+                TftpTestDiagnostics.Scripted(Diagnostics, index, datagram, source);
+            }
+        }
+
+        return new PausingDatagramChannel(ServerEndPoint, clock, script);
+    }
+
+    /// <summary>Runs the handler in a phase, then writes the exit code, error, events, output and datagrams sent.</summary>
+    private async Task<TransferResult> Run(PausingDatagramChannel channel, TransferContext context, RecordingTransferEvents events)
+    {
+        TransferResult result;
+        using (Diagnostics.Phase("execute tftp transfer"))
+        {
+            result = await Handler(channel).ExecuteAsync(context);
+        }
+
+        TftpTestDiagnostics.Result(Diagnostics, result);
+        Diagnostics.Act("events", Steps(events.Steps));
+        if (context.Output is MemoryStream output)
+        {
+            Diagnostics.Bytes("output written", output.ToArray());
+        }
+
+        Diagnostics.Act("datagrams sent", channel.Sent.Count);
+        for (int index = 0; index < channel.Sent.Count; index++)
+        {
+            TftpTestDiagnostics.Datagram(Diagnostics, $"sent {index}", channel.Sent[index]);
+        }
+
+        return result;
+    }
+
+    private TransferContext Context(ITransferEvents events, TimeProvider clock, Stream? upload = null)
+    {
+        Diagnostics.Arrange("url", "tftp://127.0.0.1/file.txt");
+        Diagnostics.Arrange("options", $"TftpNoOptions=true, upload={(upload is null ? "none" : "yes")}");
+        return new()
         {
             Url = CurlUrl.Parse("tftp://127.0.0.1/file.txt"),
             Output = new MemoryStream(),
@@ -355,13 +482,12 @@ public sealed class TftpUnexpectedOpcodeTests
             TftpNoOptions = true,
             Upload = upload,
         };
+    }
 
-    private static TransferContext UploadContext(ITransferEvents events, TimeProvider clock) =>
-        Context(events, clock, new MemoryStream("upload me"u8.ToArray()));
-
-    private static (byte[]? Datagram, EndPoint Source) Data(ushort block, string payload) =>
-        ([0, 3, (byte)(block >> 8), (byte)block, .. Encoding.ASCII.GetBytes(payload)], TransferEndPoint);
-
-    private static (byte[]? Datagram, EndPoint Source) Packet(ushort opcode, ushort field = 0) =>
-        ([(byte)(opcode >> 8), (byte)opcode, (byte)(field >> 8), (byte)field], TransferEndPoint);
+    private TransferContext UploadContext(ITransferEvents events, TimeProvider clock)
+    {
+        var upload = "upload me"u8.ToArray();
+        Diagnostics.Arrange("upload payload", Encoding.ASCII.GetString(upload));
+        return Context(events, clock, new MemoryStream(upload));
+    }
 }

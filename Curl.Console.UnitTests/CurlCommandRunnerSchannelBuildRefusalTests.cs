@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -15,6 +16,10 @@ public sealed class CurlCommandRunnerSchannelBuildRefusalTests
 {
     private const string Url = "http://127.0.0.1:48295/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("--http2")]
     [DataRow("--tlsuser|1")]
@@ -27,10 +32,26 @@ public sealed class CurlCommandRunnerSchannelBuildRefusalTests
         RecordingConnector connector = new(CurlExitCode.CouldntConnect, "unused");
         string[] optionArguments = option.Split('|');
 
-        int exitCode = await CurlComposition
-            .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), parsesAsWindowsBuild: true)
-            .RunAsync(["-s", .. optionArguments, Url]);
+        Diagnostics.Arrange("arguments", string.Join(' ', ["-s", .. optionArguments, Url]));
+        Diagnostics.Arrange("build", "parses as the Windows Schannel build; connector fails with CouldntConnect");
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), parsesAsWindowsBuild: true)
+                .RunAsync(["-s", .. optionArguments, Url]);
+        }
 
+        string errorText = Encoding.Latin1.GetString(standardError.ToArray()).Replace("\r\n", "\n", StringComparison.Ordinal);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("connection targets", connector.Targets.Count);
+        Diagnostics.Act("stderr", errorText);
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Assert("connection targets", 0, connector.Targets.Count);
+        Diagnostics.Diff(
+            "stderr",
+            $"curl: option {optionArguments[0]}: the installed libcurl version does not support this\ncurl: try 'curl --help' or 'curl --manual' for more information\n",
+            errorText);
         Assert.AreEqual(2, exitCode);
         Assert.IsEmpty(connector.Targets);
         Assert.AreEqual(

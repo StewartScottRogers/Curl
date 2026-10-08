@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -8,6 +10,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class KerberosDiskFileReaderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ReadAllBytes_ExistingFile_ReturnsItsBytes()
     {
@@ -16,8 +22,15 @@ public sealed class KerberosDiskFileReaderTests
         {
             string path = Path.Combine(directory, "krb5cc_1000");
             File.WriteAllBytes(path, [0x05, 0x04]);
+            Diagnostics.Arrange("file name", "krb5cc_1000");
+            Diagnostics.Bytes("file content", new byte[] { 0x05, 0x04 });
 
-            CollectionAssert.AreEqual(new byte[] { 0x05, 0x04 }, new KerberosDiskFileReader().ReadAllBytes(path));
+            byte[]? actual = new KerberosDiskFileReader().ReadAllBytes(path);
+
+            Diagnostics.Act("read bytes", actual is null ? "null" : Convert.ToHexString(actual));
+
+            Diagnostics.Diff("read bytes", new byte[] { 0x05, 0x04 }, actual ?? []);
+            CollectionAssert.AreEqual(new byte[] { 0x05, 0x04 }, actual);
         }
         finally
         {
@@ -28,7 +41,14 @@ public sealed class KerberosDiskFileReaderTests
     [TestMethod]
     public void ReadAllBytes_MissingFile_ReturnsNull()
     {
-        Assert.IsNull(new KerberosDiskFileReader().ReadAllBytes(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "krb5.conf")));
+        Diagnostics.Arrange("file", "random missing krb5.conf");
+
+        byte[]? actual = new KerberosDiskFileReader().ReadAllBytes(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "krb5.conf"));
+
+        Diagnostics.Act("read bytes", actual is null ? "null" : "not null");
+
+        Diagnostics.Assert("read bytes is null", true, actual is null);
+        Assert.IsNull(actual);
     }
 
     [TestMethod]
@@ -37,7 +57,14 @@ public sealed class KerberosDiskFileReaderTests
         string directory = Directory.CreateTempSubdirectory().FullName;
         try
         {
-            Assert.IsNull(new KerberosDiskFileReader().ReadAllBytes(directory));
+            Diagnostics.Arrange("path", "an existing directory");
+
+            byte[]? actual = new KerberosDiskFileReader().ReadAllBytes(directory);
+
+            Diagnostics.Act("read bytes", actual is null ? "null" : "not null");
+
+            Diagnostics.Assert("read bytes is null", true, actual is null);
+            Assert.IsNull(actual);
         }
         finally
         {
@@ -53,8 +80,14 @@ public sealed class KerberosDiskFileReaderTests
         {
             File.WriteAllText(Path.Combine(directory, "a.conf"), string.Empty);
             Directory.CreateDirectory(Path.Combine(directory, "sub"));
+            Diagnostics.Arrange("directory contents", "a.conf (file), sub (directory)");
 
-            CollectionAssert.AreEqual(new[] { "a.conf" }, new KerberosDiskFileReader().ListFileNames(directory)!.ToArray());
+            string[] actual = new KerberosDiskFileReader().ListFileNames(directory)!.ToArray();
+
+            Diagnostics.Act("file names", string.Join(",", actual));
+
+            Diagnostics.Assert("file names", "a.conf", string.Join(",", actual));
+            CollectionAssert.AreEqual(new[] { "a.conf" }, actual);
         }
         finally
         {
@@ -65,6 +98,13 @@ public sealed class KerberosDiskFileReaderTests
     [TestMethod]
     public void ListFileNames_MissingDirectory_ReturnsNull()
     {
-        Assert.IsNull(new KerberosDiskFileReader().ListFileNames(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))));
+        Diagnostics.Arrange("directory", "random missing directory");
+
+        var names = new KerberosDiskFileReader().ListFileNames(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")));
+
+        Diagnostics.Act("file names", names is null ? "null" : "not null");
+
+        Diagnostics.Assert("file names is null", true, names is null);
+        Assert.IsNull(names);
     }
 }

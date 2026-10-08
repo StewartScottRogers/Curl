@@ -177,4 +177,11 @@ public sealed record TransferReport
     /// directory (BL-514).
     /// </summary>
     public string? FtpEntryPath { get; init; }
+
+    /// <summary>
+    /// Gets how many response headers the transfer had stored when this exchange ended: the
+    /// earlier exchanges' and hops' and this exchange's heads and trailers, which curl 8.21.0
+    /// counts toward its limit of 5000 (measured, BL-1448 Notes). 0 for a transfer that is not HTTP.
+    /// </summary>
+    public int ResponseHeadersStored { get; init; }
 }

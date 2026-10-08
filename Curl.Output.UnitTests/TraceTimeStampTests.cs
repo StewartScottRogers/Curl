@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Output;
 
 /// <summary>
@@ -12,29 +14,61 @@ public sealed class TraceTimeStampTests
     private static readonly FixedTimeProvider Clock =
         new(new DateTimeOffset(2026, 9, 27, 3, 30, 30, TimeSpan.Zero).AddTicks(9_395_120), TimeZoneInfo.Utc);
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Read_TruncatingToTheMillisecond_EndsTheFractionInThreeZeros()
     {
-        Assert.AreEqual("03:30:30.939000 ", TraceTimeStamp.Read(Clock, truncatesToMillisecond: true));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("truncatesToMillisecond", true);
+        diagnostics.Arrange("clock UTC", Clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        string stamp = TraceTimeStamp.Read(Clock, truncatesToMillisecond: true);
+
+        diagnostics.Act("stamp", stamp);
+        diagnostics.Diff("stamp", "03:30:30.939000 ", stamp);
+        Assert.AreEqual("03:30:30.939000 ", stamp);
     }
 
     [TestMethod]
     public void Read_NotTruncating_ShowsTheMicroseconds()
     {
-        Assert.AreEqual("03:30:30.939512 ", TraceTimeStamp.Read(Clock, truncatesToMillisecond: false));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("truncatesToMillisecond", false);
+        diagnostics.Arrange("clock UTC", Clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        string stamp = TraceTimeStamp.Read(Clock, truncatesToMillisecond: false);
+
+        diagnostics.Act("stamp", stamp);
+        diagnostics.Diff("stamp", "03:30:30.939512 ", stamp);
+        Assert.AreEqual("03:30:30.939512 ", stamp);
     }
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void Read_OnWindows_TruncatesToTheMillisecond()
     {
-        Assert.AreEqual("03:30:30.939000 ", TraceTimeStamp.Read(Clock));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("clock UTC", Clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        string stamp = TraceTimeStamp.Read(Clock);
+
+        diagnostics.Act("stamp", stamp);
+        diagnostics.Diff("stamp", "03:30:30.939000 ", stamp);
+        Assert.AreEqual("03:30:30.939000 ", stamp);
     }
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void Read_OffWindows_ShowsTheMicroseconds()
     {
-        Assert.AreEqual("03:30:30.939512 ", TraceTimeStamp.Read(Clock));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("clock UTC", Clock.GetUtcNow().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+
+        string stamp = TraceTimeStamp.Read(Clock);
+
+        diagnostics.Act("stamp", stamp);
+        diagnostics.Diff("stamp", "03:30:30.939512 ", stamp);
+        Assert.AreEqual("03:30:30.939512 ", stamp);
     }
 }

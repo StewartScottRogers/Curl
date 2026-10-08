@@ -2,6 +2,7 @@ using System.Formats.Asn1;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Keys;
 
@@ -25,20 +26,36 @@ public sealed class Pkcs8DecryptionTests
 
     private static readonly byte[] Plain = Encoding.ASCII.GetBytes("a PrivateKeyInfo");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Decrypt_Pbes2WithAKeyLength_SkipsItAndDecrypts()
     {
         byte[] der = Pbes2(iterations: 1000, keyLength: 16, prfOid: HmacWithSha256, cipherOid: Aes128Cbc, Encrypt(HashAlgorithmName.SHA256, 1000));
+        Diagnostics.Arrange("PBES2", "PBKDF2 HMAC-SHA-256, 1000 iterations, key length 16, AES-128-CBC");
+        Diagnostics.Bytes("EncryptedPrivateKeyInfo", der);
 
-        CollectionAssert.AreEqual(Plain, Pkcs8Decryption.Decrypt(der, Secret));
+        byte[] decrypted = Pkcs8Decryption.Decrypt(der, Secret);
+
+        Diagnostics.ActBytes("decrypted", decrypted);
+        Diagnostics.AssertBytes("decrypted", Plain, decrypted);
+        CollectionAssert.AreEqual(Plain, decrypted);
     }
 
     [TestMethod]
     public void Decrypt_Pbes2NamingHmacSha1Explicitly_Decrypts()
     {
         byte[] der = Pbes2(iterations: 1000, keyLength: null, prfOid: "1.2.840.113549.2.7", cipherOid: Aes128Cbc, Encrypt(HashAlgorithmName.SHA1, 1000));
+        Diagnostics.Arrange("PBES2", "PBKDF2 HMAC-SHA-1 named, 1000 iterations, AES-128-CBC");
+        Diagnostics.Bytes("EncryptedPrivateKeyInfo", der);
 
-        CollectionAssert.AreEqual(Plain, Pkcs8Decryption.Decrypt(der, Secret));
+        byte[] decrypted = Pkcs8Decryption.Decrypt(der, Secret);
+
+        Diagnostics.ActBytes("decrypted", decrypted);
+        Diagnostics.AssertBytes("decrypted", Plain, decrypted);
+        CollectionAssert.AreEqual(Plain, decrypted);
     }
 
     [TestMethod]
@@ -55,7 +72,12 @@ public sealed class Pkcs8DecryptionTests
             writer.WriteOctetString(new byte[16]);
         }
 
-        Assert.ThrowsExactly<CryptographicException>(() => Pkcs8Decryption.Decrypt(writer.Encode(), Secret));
+        Diagnostics.Arrange("scheme OID", "1.2.840.113549.1.12.1.3 (PKCS #12 SHA-1 3DES)");
+        Diagnostics.Bytes("EncryptedPrivateKeyInfo", writer.Encode());
+
+        var failure = Assert.ThrowsExactly<CryptographicException>(() => Pkcs8Decryption.Decrypt(writer.Encode(), Secret));
+
+        Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
     [TestMethod]
@@ -79,7 +101,12 @@ public sealed class Pkcs8DecryptionTests
             writer.WriteOctetString(new byte[16]);
         }
 
-        Assert.ThrowsExactly<CryptographicException>(() => Pkcs8Decryption.Decrypt(writer.Encode(), Secret));
+        Diagnostics.Arrange("key derivation OID", "1.3.6.1.4.1.11591.4.11 (scrypt)");
+        Diagnostics.Bytes("EncryptedPrivateKeyInfo", writer.Encode());
+
+        var failure = Assert.ThrowsExactly<CryptographicException>(() => Pkcs8Decryption.Decrypt(writer.Encode(), Secret));
+
+        Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
     [TestMethod]
@@ -90,8 +117,13 @@ public sealed class Pkcs8DecryptionTests
     public void Decrypt_ParametersNotRead_Throws(string prfOid, string cipherOid, long iterations)
     {
         byte[] der = Pbes2(iterations, keyLength: null, prfOid, cipherOid, new byte[16]);
+        Diagnostics.Arrange("PRF OID", prfOid);
+        Diagnostics.Arrange("cipher OID", cipherOid);
+        Diagnostics.Arrange("iterations", iterations);
 
-        Assert.ThrowsExactly<CryptographicException>(() => Pkcs8Decryption.Decrypt(der, Secret));
+        var failure = Assert.ThrowsExactly<CryptographicException>(() => Pkcs8Decryption.Decrypt(der, Secret));
+
+        Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
     private static byte[] Encrypt(HashAlgorithmName prf, int iterations)

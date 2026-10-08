@@ -3,6 +3,8 @@ using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -15,6 +17,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionHttpTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "http://127.0.0.1:18231/";
 
     private const string Head = "Host: 127.0.0.1:18231\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n";
@@ -26,6 +32,7 @@ public sealed class CurlCompositionHttpTests
     {
         (ScriptedConnector server, int exitCode, string standardOutput) = await RunAsync("-sS", "http://127.0.0.1:18231/a?b");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual($"GET /a?b HTTP/1.1\r\n{Head}\r\n", Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
@@ -37,6 +44,7 @@ public sealed class CurlCompositionHttpTests
     {
         (ScriptedConnector server, int exitCode, string standardOutput) = await RunAsync("-sS", "https://localhost:18232/s");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             "GET /s HTTP/1.1\r\nHost: localhost:18232\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
@@ -154,6 +162,7 @@ public sealed class CurlCompositionHttpTests
     {
         (ScriptedConnector server, int exitCode, string standardOutput) = await RunAsync(["-sS", .. arguments]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(expectedRequest, Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
@@ -191,6 +200,7 @@ public sealed class CurlCompositionHttpTests
 
         (int exitCode, string standardOutput) = await RunAsync(server, "-sS", schemeOption, "-u", "user:pw", "http://127.0.0.1:18231/p");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             $"GET /p HTTP/1.1\r\n{Head}\r\nGET /p HTTP/1.1\r\nHost: 127.0.0.1:18231\r\n{authorization}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
@@ -202,7 +212,7 @@ public sealed class CurlCompositionHttpTests
     /// Runs <paramref name="arguments" /> through the production composition over a
     /// <see cref="ScriptedConnector" /> answering <c>200 OK</c> with the body <c>hello</c>.
     /// </summary>
-    private static async Task<(ScriptedConnector Server, int ExitCode, string StandardOutput)> RunAsync(params string[] arguments)
+    private async Task<(ScriptedConnector Server, int ExitCode, string StandardOutput)> RunAsync(params string[] arguments)
     {
         ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
         (int exitCode, string standardOutput) = await RunAsync(server, arguments);
@@ -213,12 +223,13 @@ public sealed class CurlCompositionHttpTests
     /// <summary>
     /// Runs <paramref name="arguments" /> through the production composition over <paramref name="server" />.
     /// </summary>
-    private static async Task<(int ExitCode, string StandardOutput)> RunAsync(ScriptedConnector server, params string[] arguments)
+    private async Task<(int ExitCode, string StandardOutput)> RunAsync(ScriptedConnector server, params string[] arguments)
     {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
 
+        Diagnostics.ArrangeCommandLine(arguments);
         int exitCode = await CurlComposition
             .CreateRunner(
                 standardOutput,
@@ -228,7 +239,10 @@ public sealed class CurlCompositionHttpTests
                 new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"))
             .RunAsync(arguments);
 
-        return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()));
+        string output = Encoding.Latin1.GetString(standardOutput.ToArray());
+        Diagnostics.ActRun(exitCode, output, Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.ActWritten(server);
+        return (exitCode, output);
     }
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);

@@ -25,10 +25,15 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             ScriptedConnection connection = Connection(EmptyOk, chunkSize, expected);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("upload", "seekable file holding hello");
+            Diagnostics.Arrange("expected request", OneLine(expected));
 
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(UploadContext("http://127.0.0.1:18184/u", new MemoryStream("hello"u8.ToArray())));
 
+            WriteResult(result);
+            Diagnostics.Assert("upload size", 5L, result.Report?.UploadSize);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(5L, result.Report!.UploadSize, $"Chunk size {chunkSize}");
         }
@@ -45,14 +50,20 @@ public sealed partial class HttpProtocolHandlerTests
         {
             FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
             GatedConnection connection = new(Encoding.Latin1.GetBytes(EmptyOk), chunkSize, head.Length + body.Length);
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("upload", "standard input holding hello");
 
             Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
                 .ExecuteAsync(UploadContext("http://127.0.0.1:18185/u", StandardInput("hello"u8.ToArray()), time)).AsTask();
             await time.TimerCreatedAsync(HttpRequestOptions.DefaultContinueWait);
+            Diagnostics.Assert("written before the wait ends", OneLine(head), OneLine(Latin1(connection.Written)));
             Assert.AreEqual(head, Latin1(connection.Written), $"Chunk size {chunkSize}");
             time.Advance(HttpRequestOptions.DefaultContinueWait);
             TransferResult result = await transfer;
 
+            WriteResult(result);
+            Diagnostics.Assert("written", OneLine(head + body), OneLine(Latin1(connection.Written)));
+            Diagnostics.Assert("upload size", 5L, result.Report?.UploadSize);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(head + body, Latin1(connection.Written), $"Chunk size {chunkSize}");
             Assert.AreEqual(5L, result.Report!.UploadSize, $"Chunk size {chunkSize}");
@@ -68,6 +79,7 @@ public sealed partial class HttpProtocolHandlerTests
         string expected = head + Chunks(65524, 65524, 65524, 3428);
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection connection = new(Encoding.Latin1.GetBytes(EmptyOk), 65536, expected.Length);
+        Diagnostics.Arrange("upload", "standard input holding 200000 letters, Expect: 100-continue");
 
         Task<TransferResult> transfer = Handler(QueueConnector.For(connection))
             .ExecuteAsync(UploadContext("http://127.0.0.1:18190/u", StandardInput(Letters(200000)), time)).AsTask();
@@ -75,6 +87,9 @@ public sealed partial class HttpProtocolHandlerTests
         time.Advance(HttpRequestOptions.DefaultContinueWait);
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("written length", expected.Length, connection.Written.Length);
+        Diagnostics.Assert("written matches chunks 65524, 65524, 65524, 3428", true, expected == Latin1(connection.Written));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(expected, Latin1(connection.Written));
     }
@@ -88,9 +103,13 @@ public sealed partial class HttpProtocolHandlerTests
         string expected = head + Chunks(65416, 65524, 65524, 3536);
         ScriptedConnection connection = Connection(EmptyOk, 65536, expected);
         TransferContext context = UploadContext("http://127.0.0.1:18191/u", StandardInput(Letters(200000)), http: new HttpRequestOptions { Headers = ["Expect:"] });
+        Diagnostics.Arrange("upload", "standard input holding 200000 letters, Expect: removed");
+        Diagnostics.Arrange("expected request length", expected.Length);
 
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("upload size", 200000L, result.Report?.UploadSize);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(200000L, result.Report!.UploadSize);
     }
@@ -104,9 +123,13 @@ public sealed partial class HttpProtocolHandlerTests
             + "Content-Length: 100000\r\n\r\n";
         FailingReadStream upload = new(new byte[65432], int.MaxValue, new IOException("Lock violation."), 100000);
         ScriptedConnection connection = Connection(EmptyOk, 65536);
+        Diagnostics.Arrange("upload", "100000 bytes declared, the read after 65432 fails");
 
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(UploadContext("http://127.0.0.1:18188/u", upload));
 
+        WriteResult(result);
+        Diagnostics.Assert("bytes written", 104 + 65432, connection.Written.Length);
+        Diagnostics.Assert("written starts with the head", true, Latin1(connection.Written).StartsWith(head, StringComparison.Ordinal));
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual("client read function EOF fail, only 65432/100000 of needed bytes read", result.ErrorMessage);
         Assert.AreEqual(104 + 65432, connection.Written.Length);
@@ -120,9 +143,12 @@ public sealed partial class HttpProtocolHandlerTests
         // the server, then "client read function EOF fail, only 0/100000 of needed bytes read".
         FailingReadStream upload = new([], int.MaxValue, new IOException("Lock violation."), 100000);
         ScriptedConnection connection = Connection(EmptyOk, 65536);
+        Diagnostics.Arrange("upload", "100000 bytes declared, the first read fails");
 
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(UploadContext("http://127.0.0.1:18188/u", upload));
 
+        WriteResult(result);
+        Diagnostics.Assert("bytes written", 0, connection.Written.Length);
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual("client read function EOF fail, only 0/100000 of needed bytes read", result.ErrorMessage);
         Assert.IsEmpty(connection.Written);

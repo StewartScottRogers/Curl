@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -35,6 +36,11 @@ public sealed class SmtpProtocolHandlerSendFailureTests
 
     private const string Envelope = MailFrom + "RCPT TO:<c@d>\r\nDATA\r\n";
 
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     [DataRow(0, "", 1, DisplayName = "EHLO")]
@@ -44,10 +50,14 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, Reset());
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(new RecordingTransferEvents()), connection);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Send failure: Connection was reset", run.Result.ErrorMessage);
         Assert.AreEqual("Send failure: Connection was reset", run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", sent, run.Sent);
+        Diagnostics.Assert("reads", reads, connection.ReadCount);
         Assert.AreEqual(sent, run.Sent);
         Assert.AreEqual(reads, connection.ReadCount);
     }
@@ -62,10 +72,14 @@ public sealed class SmtpProtocolHandlerSendFailureTests
         IOException failure = Reset();
         ScriptedConnection connection = Conversation(writesBeforeFailure, failure);
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(new RecordingTransferEvents()), connection);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
         Assert.AreEqual("Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", sent, run.Sent);
+        Diagnostics.Assert("reads", reads, connection.ReadCount);
         Assert.AreEqual(sent, run.Sent);
         Assert.AreEqual(reads, connection.ReadCount);
     }
@@ -78,10 +92,14 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, Aborted());
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(new RecordingTransferEvents()), connection);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Send failure: Connection was aborted", run.Result.ErrorMessage);
         Assert.AreEqual("Send failure: Connection was aborted", run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", sent, run.Sent);
+        Diagnostics.Assert("reads", reads, connection.ReadCount);
         Assert.AreEqual(sent, run.Sent);
         Assert.AreEqual(reads, connection.ReadCount);
     }
@@ -95,10 +113,14 @@ public sealed class SmtpProtocolHandlerSendFailureTests
         IOException failure = Aborted();
         ScriptedConnection connection = Conversation(writesBeforeFailure, failure);
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(new RecordingTransferEvents()), connection);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
         Assert.AreEqual("Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", sent, run.Sent);
+        Diagnostics.Assert("reads", reads, connection.ReadCount);
         Assert.AreEqual(sent, run.Sent);
         Assert.AreEqual(reads, connection.ReadCount);
     }
@@ -111,10 +133,14 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(writesBeforeFailure, new IOException("The pipe is broken."));
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(new RecordingTransferEvents()), connection);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Failed sending data to the peer", run.Result.ErrorMessage);
         Assert.AreEqual("Failed sending data to the peer", run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", sent, run.Sent);
+        Diagnostics.Assert("reads", reads, connection.ReadCount);
         Assert.AreEqual(sent, run.Sent);
         Assert.AreEqual(reads, connection.ReadCount);
     }
@@ -125,14 +151,15 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         RecordingTransferEvents events = new();
 
-        await SmtpRun.ExecuteAsync(MailContext(events), Conversation(1, Reset()));
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(events), Conversation(1, Reset()));
+        Diagnostics.ActEvents(run.Result, events);
 
-        CollectionAssert.AreEqual(
-            (string[])[
-                "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 SMTPUTF8\r\n",
-                "* Send failure: Connection was reset", "* closing connection #0",
-            ],
-            events.Transcript);
+        string[] expected = [
+            "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 SMTPUTF8\r\n",
+            "* Send failure: Connection was reset", "* closing connection #0",
+        ];
+        AssertTranscript(expected, events.Transcript);
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
@@ -142,14 +169,15 @@ public sealed class SmtpProtocolHandlerSendFailureTests
         RecordingTransferEvents events = new();
         IOException failure = Reset();
 
-        await SmtpRun.ExecuteAsync(MailContext(events), Conversation(1, failure));
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(events), Conversation(1, failure));
+        Diagnostics.ActEvents(run.Result, events);
 
-        CollectionAssert.AreEqual(
-            (string[])[
-                "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 SMTPUTF8\r\n",
-                "* Send failure: " + failure.InnerException!.Message, "* closing connection #0",
-            ],
-            events.Transcript);
+        string[] expected = [
+            "< 220 localhost ESMTP\r\n", "> EHLO client\r\n", "< 250-localhost\r\n", "< 250 SMTPUTF8\r\n",
+            "* Send failure: " + failure.InnerException!.Message, "* closing connection #0",
+        ];
+        AssertTranscript(expected, events.Transcript);
+        CollectionAssert.AreEqual(expected, events.Transcript);
     }
 
     [TestMethod]
@@ -157,8 +185,11 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         RecordingTransferEvents events = new();
 
-        await SmtpRun.ExecuteAsync(MailContext(events), Conversation(1, new IOException("The pipe is broken.")));
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(events), Conversation(1, new IOException("The pipe is broken.")));
+        Diagnostics.ActEvents(run.Result, events);
 
+        Diagnostics.AssertValues("last transcript line", "* closing connection #0", events.Transcript[^1]);
+        Diagnostics.AssertValues("second to last transcript line", "< 250 SMTPUTF8\r\n", events.Transcript[^2]);
         Assert.AreEqual("* closing connection #0", events.Transcript[^1]);
         Assert.AreEqual("< 250 SMTPUTF8\r\n", events.Transcript[^2]);
     }
@@ -168,8 +199,10 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         ScriptedConnection connection = Conversation(5, Reset());
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(MailContext(new RecordingTransferEvents()), connection);
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, MailContext(new RecordingTransferEvents()), connection);
 
+        Diagnostics.AssertValues("exit code", CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Diff("sent", Ehlo + Envelope + "one\r\n.\r\n", run.Sent);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(Ehlo + Envelope + "one\r\n.\r\n", run.Sent);
     }
@@ -179,8 +212,11 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         var connection = new ScriptedConnection(Bytes(Greeting), Bytes(EhloReply), Bytes(SmtpRun.HelpReply)) { WritesBeforeFailure = 2, WriteFailure = Reset() };
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(Url, connection);
+        Diagnostics.Arrange("writes before failure", 2);
 
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, Url, connection);
+
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -190,8 +226,14 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     {
         var connection = new ScriptedConnection(Bytes(Greeting), Bytes(EhloReply), Bytes(SmtpRun.HelpReply)) { WritesBeforeFailure = 1, WriteFailure = Reset() };
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(Url, connection);
+        Diagnostics.Arrange("writes before failure", 1);
 
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, Url, connection);
+
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Send failure: Connection was reset", run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", Ehlo, run.Sent);
+        Diagnostics.Assert("reads", 2, connection.ReadCount);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual("Send failure: Connection was reset", run.Result.ErrorMessage);
         Assert.AreEqual(Ehlo, run.Sent);
@@ -205,8 +247,14 @@ public sealed class SmtpProtocolHandlerSendFailureTests
         IOException failure = Reset();
         var connection = new ScriptedConnection(Bytes(Greeting), Bytes(EhloReply), Bytes(SmtpRun.HelpReply)) { WritesBeforeFailure = 1, WriteFailure = failure };
 
-        SmtpRun run = await SmtpRun.ExecuteAsync(Url, connection);
+        Diagnostics.Arrange("writes before failure", 1);
 
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, Url, connection);
+
+        Diagnostics.AssertValues("exit code", CurlExitCode.SendError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", Ehlo, run.Sent);
+        Diagnostics.Assert("reads", 2, connection.ReadCount);
         Assert.AreEqual(CurlExitCode.SendError, run.Result.ExitCode);
         Assert.AreEqual("Send failure: " + failure.InnerException!.Message, run.Result.ErrorMessage);
         Assert.AreEqual(Ehlo, run.Sent);
@@ -219,10 +267,19 @@ public sealed class SmtpProtocolHandlerSendFailureTests
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
         TransferContext context = MailContext(new RecordingTransferEvents(), cancellation.Token);
+        Diagnostics.ArrangeContext(context, "(the conversation's replies)");
+        Diagnostics.Arrange("cancellation token", "already cancelled; the second write throws OperationCanceledException");
+        Diagnostics.Act("ExecuteAsync", "awaited below");
+        Diagnostics.Assert("exception type", nameof(OperationCanceledException), "OperationCanceledException expected from the awaited call");
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             () => SmtpRun.ExecuteAsync(context, Conversation(1, new OperationCanceledException(cancellation.Token))));
     }
+
+    private static string Join(IEnumerable<string> lines) => string.Join(" | ", lines.Select(SmtpDiagnostics.Show));
+
+    private void AssertTranscript(string[] expected, IEnumerable<string> actual) =>
+        Diagnostics.Assert("transcript", Join(expected), Join(actual));
 
     private static IOException Reset() =>
         new("Unable to write data to the transport connection.", new SocketException((int)SocketError.ConnectionReset));

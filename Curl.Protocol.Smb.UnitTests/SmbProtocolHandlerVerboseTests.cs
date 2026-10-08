@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smb.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smb;
 
@@ -17,6 +18,10 @@ public sealed class SmbProtocolHandlerVerboseTests
 {
     private static readonly NetworkCredential User = new("User", "Password");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_File_ReportsTheDataThenShuttingDown()
     {
@@ -31,6 +36,7 @@ public sealed class SmbProtocolHandlerVerboseTests
             SmbRecordedExchange.CloseAccepted,
             SmbRecordedExchange.TreeDisconnectAccepted);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "<= hello world", "* shutting down connection #0" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(new[] { "<= hello world", "* shutting down connection #0" }, transcript);
     }
 
@@ -46,6 +52,7 @@ public sealed class SmbProtocolHandlerVerboseTests
             SmbRecordedExchange.OpenMissingFile,
             SmbRecordedExchange.TreeDisconnectAccepted);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "* shutting down connection #0" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(new[] { "* shutting down connection #0" }, transcript);
     }
 
@@ -54,6 +61,7 @@ public sealed class SmbProtocolHandlerVerboseTests
     {
         string[] transcript = await RunAsync(SmbRecordedExchange.DownloadUrl, null);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "* closing connection #0" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(new[] { "* closing connection #0" }, transcript);
     }
 
@@ -62,6 +70,7 @@ public sealed class SmbProtocolHandlerVerboseTests
     {
         string[] transcript = await RunAsync(SmbRecordedExchange.DownloadUrl, User, SmbRecordedExchange.TooSmallFrame);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "* too small NetBIOS frame size 5", "* closing connection #0" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(new[] { "* too small NetBIOS frame size 5", "* closing connection #0" }, transcript);
     }
 
@@ -70,6 +79,7 @@ public sealed class SmbProtocolHandlerVerboseTests
     {
         string[] transcript = await RunAsync("smb://" + SmbRecordedExchange.Host + "/x.txt", User);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "* missing share in URL path for SMB", "* closing connection #-1" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(new[] { "* missing share in URL path for SMB", "* closing connection #-1" }, transcript);
     }
 
@@ -87,8 +97,10 @@ public sealed class SmbProtocolHandlerVerboseTests
             Events = events,
         };
 
-        await Handler(connection).ExecuteAsync(context);
+        await RunHandlerAsync(connection, context);
+        Diagnostics.ActTranscript(events.Transcript);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "* SMB upload needs to know the size up front", "* shutting down connection #0" }), string.Join(" | ", events.Transcript));
         CollectionAssert.AreEqual(
             new[] { "* SMB upload needs to know the size up front", "* shutting down connection #0" },
             events.Transcript);
@@ -99,6 +111,7 @@ public sealed class SmbProtocolHandlerVerboseTests
     {
         string[] transcript = await RunAsync(SmbRecordedExchange.DownloadUrl, User, DownloadReplies(), noBody: true);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "<= hello world", "* shutting down connection #0" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(new[] { "<= hello world", "* shutting down connection #0" }, transcript);
     }
 
@@ -107,6 +120,7 @@ public sealed class SmbProtocolHandlerVerboseTests
     {
         string[] transcript = await RunAsync(SmbRecordedExchange.DownloadUrl, User, DownloadReplies(), maxFileSize: 3);
 
+        Diagnostics.Diff("transcript", string.Join(" | ", new[] { "<= hello world", "* Exceeded the maximum allowed file size (3) with 3 bytes", "* shutting down connection #0" }), string.Join(" | ", transcript));
         CollectionAssert.AreEqual(
             new[] { "<= hello world", "* Exceeded the maximum allowed file size (3) with 3 bytes", "* shutting down connection #0" },
             transcript);
@@ -123,10 +137,10 @@ public sealed class SmbProtocolHandlerVerboseTests
         SmbRecordedExchange.TreeDisconnectAccepted,
     ];
 
-    private static Task<string[]> RunAsync(string url, NetworkCredential? credentials, params byte[][] replies) =>
+    private Task<string[]> RunAsync(string url, NetworkCredential? credentials, params byte[][] replies) =>
         RunAsync(url, credentials, replies, noBody: false);
 
-    private static async Task<string[]> RunAsync(
+    private async Task<string[]> RunAsync(
         string url, NetworkCredential? credentials, byte[][] replies, bool noBody = false, long? maxFileSize = null)
     {
         var events = new TranscriptTransferEvents();
@@ -140,9 +154,26 @@ public sealed class SmbProtocolHandlerVerboseTests
             MaxFileSize = maxFileSize,
         };
 
-        await Handler(new ScriptedConnection(replies)).ExecuteAsync(context);
+        var connection = new ScriptedConnection(replies);
+        await RunHandlerAsync(connection, context);
+        Diagnostics.ActTranscript(events.Transcript);
 
         return [.. events.Transcript];
+    }
+
+    // Runs the handler over the scripted connection, writing the context and replies before and the result and bytes sent after.
+    private async Task RunHandlerAsync(ScriptedConnection connection, TransferContext context)
+    {
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.ArrangeReplies(connection);
+        TransferResult result;
+        using (Diagnostics.Phase("execute"))
+        {
+            result = await Handler(connection).ExecuteAsync(context);
+        }
+
+        Diagnostics.ActResult(result);
+        Diagnostics.ActSent(connection);
     }
 
     private static SmbProtocolHandler Handler(ScriptedConnection connection) =>

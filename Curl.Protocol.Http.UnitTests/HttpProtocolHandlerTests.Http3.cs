@@ -29,11 +29,18 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream headerOutput = new();
             RecordingTransferEvents events = new();
 
+            Diagnostics.Arrange("url, chunk size", $"https://example.com/, {chunkSize}");
+            Diagnostics.Arrange("scripted response", "200 text/plain content-length 5, body hello");
+
             TransferResult result = await Handler(QuicConnector(quic))
                 .ExecuteAsync(Http3Context("https://example.com/", output, headerOutput, events: events));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("head", "HTTP/3 200 \r\ncontent-type: text/plain\r\ncontent-length: 5\r\n\r\n", Latin1(headerOutput.ToArray()));
             Assert.AreEqual("HTTP/3 200 \r\ncontent-type: text/plain\r\ncontent-length: 5\r\n\r\n", Latin1(headerOutput.ToArray()));
+            Diagnostics.Diff("body", "hello", Latin1(output.ToArray()));
             Assert.AreEqual("hello", Latin1(output.ToArray()));
             Assert.AreEqual(new Version(3, 0), result.Report!.HttpVersion);
             Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 443), result.Report.RemoteEndPoint);
@@ -59,9 +66,13 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("204")), 65536);
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3Stream_ReportsItOpenedAndEachHeaderBeforeTheRequestHead");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), new MemoryStream(), events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         int opened = events.Events.IndexOf("* [HTTP/3] [0] OPENED stream for https://example.com/");
         CollectionAssert.AreEqual(
@@ -88,9 +99,13 @@ public sealed partial class HttpProtocolHandlerTests
         // with Huffman coding where it is shorter, as nghttp3 1.15 encodes under curl's 0 capacity.
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("204")));
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3GetHeaders_PinsTheEncodedFieldSection");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(
             "011b" + "0000" + "d1" + "d7" + "50882f91d35d055c87a7" + "c1" + "5f508825b650c3cb85e5c1" + "dd",
@@ -103,6 +118,8 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "2")), Http3Data("ok")));
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url", "https://example.com/form");
+        Diagnostics.Arrange("scenario", "Http3PostWithDataAndCustomHeaders_SendsThemInCurlsOrderThenOneDataFrameEndingTheStream");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(Http3Context(
             "https://example.com/form",
             output,
@@ -112,7 +129,10 @@ public sealed partial class HttpProtocolHandlerTests
                 Headers = ["X-Custom: One", "Accept: text/html", "Connection: keep-alive"],
             }));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual("ok", Latin1(output.ToArray()));
         Assert.AreEqual(10L, result.Report!.UploadSize);
         CollectionAssert.AreEqual(
@@ -133,11 +153,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("201", ("content-length", "0"))));
 
+        Diagnostics.Arrange("url", "https://example.com/up");
+        Diagnostics.Arrange("scenario", "Http3UploadOfUnknownLength_EndsTheStreamAfterTheBody");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream))).ExecuteAsync(Http3Context(
             "https://example.com/up",
             new MemoryStream(),
             upload: new UnseekableStream("abc"u8.ToArray())));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         List<Http3Frame> frames = await RequestFramesAsync(stream);
         Assert.AreEqual("abc", Latin1(((Http3DataFrame)frames[1]).Payload.ToArray()));
@@ -156,9 +180,13 @@ public sealed partial class HttpProtocolHandlerTests
                 chunkSize);
             MemoryStream output = new();
 
+            Diagnostics.Arrange("url", "https://example.com/");
+            Diagnostics.Arrange("scenario", "Http3ResponseWithTrailers_WritesThemAfterTheBodyWithNoEmptyLine");
             TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
                 .ExecuteAsync(Http3Context("https://example.com/", output, output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(
                 "HTTP/3 200 \r\ncontent-type: text/plain\r\ncontent-length: 5\r\n\r\nhellox-checksum: abc\r\nx-second: two\r\n",
@@ -172,10 +200,15 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("103", ("link", "</a>")), Http3Head("200"), Http3Data("x")));
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3InterimHead_WritesItBeforeTheFinalOne");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", output, output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "HTTP/3 103 \r\nlink: </a>\r\n\r\nHTTP/3 200 \r\n\r\nx", Latin1(output.ToArray()));
         Assert.AreEqual("HTTP/3 103 \r\nlink: </a>\r\n\r\nHTTP/3 200 \r\n\r\nx", Latin1(output.ToArray()));
     }
 
@@ -189,11 +222,17 @@ public sealed partial class HttpProtocolHandlerTests
         };
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamResetMidBody_FailsWithExit18AndCurlsMessage");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
+        Diagnostics.Assert("error text", "HTTP/3 stream 0 reset by server (error 0x10c REQUEST_CANCELLED)", result.ErrorMessage);
         Assert.AreEqual("HTTP/3 stream 0 reset by server (error 0x10c REQUEST_CANCELLED)", result.ErrorMessage);
+        Diagnostics.Diff("output", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
 
@@ -205,10 +244,15 @@ public sealed partial class HttpProtocolHandlerTests
             EndException = new MultiplexedStreamResetException(0x10c, "reset"),
         };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamResetBeforeAnyBody_FailsWithExit95");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http3, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http3, result.ExitCode);
+        Diagnostics.Assert("error text", "HTTP/3 stream 4 reset by server (error 0x10c REQUEST_CANCELLED)", result.ErrorMessage);
         Assert.AreEqual("HTTP/3 stream 4 reset by server (error 0x10c REQUEST_CANCELLED)", result.ErrorMessage);
     }
 
@@ -217,10 +261,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("100")));
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamEndedBeforeTheHead_FailsWithExit95");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http3, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http3, result.ExitCode);
+        Diagnostics.Assert("error text", "HTTP/3 stream 0 was closed cleanly, but before getting all response header fields, treated as error", result.ErrorMessage);
         Assert.AreEqual("HTTP/3 stream 0 was closed cleanly, but before getting all response header fields, treated as error", result.ErrorMessage);
     }
 
@@ -229,10 +278,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head(null, ("content-length", "0"))));
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3HeadWithoutStatus_ResetsTheStreamWithMessageErrorAndFailsWithExit95");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http3, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http3, result.ExitCode);
+        Diagnostics.Assert("error text", "HTTP/3 stream 0 reset by server (error 0x10e MESSAGE_ERROR)", result.ErrorMessage);
         Assert.AreEqual("HTTP/3 stream 0 reset by server (error 0x10e MESSAGE_ERROR)", result.ErrorMessage);
         Assert.AreEqual(0x10eL, stream.AbortCode, "H3_MESSAGE_ERROR");
     }
@@ -250,13 +304,18 @@ public sealed partial class HttpProtocolHandlerTests
         MemoryStream output = new();
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamRefusedBeforeAnyResponse_SendsTheRequestAgainOnANewQuicConnection");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
             "https://example.com/",
             output,
             options: new HttpRequestOptions { Body = new BytesBody("a=b"u8.ToArray(), "application/x-www-form-urlencoded") },
             events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual("ok", Latin1(output.ToArray()));
         Assert.HasCount(2, connector.MultiplexedTargets);
         Assert.IsTrue(first.IsDisposed, "the refusing connection is closed");
@@ -305,9 +364,13 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedConnection second = new(answered);
         QueueConnector connector = QuicConnector(first, second);
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3RetryAfterGoaway_GoesOnANewQuicConnection");
         TransferResult result = await new HttpProtocolHandler(connector, new ScriptedAuthenticator(null, "Basic dTpw"))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.HasCount(2, connector.MultiplexedTargets, "the connection the GOAWAY came on takes no second request");
         Assert.AreEqual(2, result.Report!.ConnectionCount);
@@ -324,9 +387,14 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = QuicConnector(connections);
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamRefusedEveryTime_GivesUpAfterFiveRetriesWithExit56");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error text", "Connection died, tried 5 times before giving up", result.ErrorMessage);
         Assert.AreEqual("Connection died, tried 5 times before giving up", result.ErrorMessage);
         Assert.HasCount(6, connector.MultiplexedTargets, "the first attempt and five retries");
         CollectionAssert.AreEqual(
@@ -346,9 +414,14 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = QuicConnector(new FakeMultiplexedConnection(refused));
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamRefusedOnceTheResponseBegan_FailsWithExit56WithoutRetrying");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error text", "Failure when receiving data from the peer", result.ErrorMessage);
         Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
         Assert.HasCount(1, connector.MultiplexedTargets);
         CollectionAssert.Contains(events.Info, "HTTP/3 stream 0 refused by server, try again on a new connection");
@@ -367,8 +440,12 @@ public sealed partial class HttpProtocolHandlerTests
         MemoryStream upload = new("--hello"u8.ToArray()) { Position = 2 };
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamRefusedWithASeekableUpload_RewindsItAndSendsItWholeOnANewQuicConnection");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), upload: upload, events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.HasCount(2, connector.MultiplexedTargets);
         Assert.AreEqual("hello", Latin1(((Http3DataFrame)(await RequestFramesAsync(refused))[1]).Payload.ToArray()));
@@ -388,13 +465,18 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = QuicConnector(first);
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamRefusedWithAnUnseekableUpload_FailsWithExit65BeforeConnectingAgain");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
             "https://example.com/",
             new MemoryStream(),
             upload: new UnseekableStream("abc"u8.ToArray()),
             events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendFailRewind, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendFailRewind, result.ExitCode);
+        Diagnostics.Assert("error text", "seek callback returned error 2", result.ErrorMessage);
         Assert.AreEqual("seek callback returned error 2", result.ErrorMessage);
         Assert.HasCount(1, connector.MultiplexedTargets, "no second connection is opened");
         Assert.IsTrue(first.IsDisposed);
@@ -416,10 +498,16 @@ public sealed partial class HttpProtocolHandlerTests
         };
         MemoryStream headerOutput = new();
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3HeadRequestResetAfterTheHead_EndsWithExit0");
+        Diagnostics.Arrange("errorCode", errorCode);
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream(), headerOutput, noBody: true));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "HTTP/3 200 \r\ncontent-length: 5\r\n\r\n", Latin1(headerOutput.ToArray()));
         Assert.AreEqual("HTTP/3 200 \r\ncontent-length: 5\r\n\r\n", Latin1(headerOutput.ToArray()));
     }
 
@@ -428,10 +516,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         FakeMultiplexedStream stream = new(0, []) { EndException = new MultiplexedStreamResetException(0x100, "closed") };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3StreamResetWithNoErrorBeforeTheHead_FailsAsAStreamClosedBeforeItsHead");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Http3, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Http3, result.ExitCode);
+        Diagnostics.Assert("error text", "HTTP/3 stream 0 was closed cleanly, but before getting all response header fields, treated as error", result.ErrorMessage);
         Assert.AreEqual("HTTP/3 stream 0 was closed cleanly, but before getting all response header fields, treated as error", result.ErrorMessage);
     }
 
@@ -455,10 +548,17 @@ public sealed partial class HttpProtocolHandlerTests
         };
         FakeMultiplexedStream stream = new(0, response);
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3FramesBreakingTheRfc_FailWithExit56AndNghttp3sErrorName");
+        Diagnostics.Arrange("kind", kind);
+        Diagnostics.Arrange("errorName", errorName);
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error text", $"nghttp3_conn_read_stream returned error: {errorName}", result.ErrorMessage);
         Assert.AreEqual($"nghttp3_conn_read_stream returned error: {errorName}", result.ErrorMessage);
     }
 
@@ -470,10 +570,15 @@ public sealed partial class HttpProtocolHandlerTests
             EndException = new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "QUIC: connection lost"),
         };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3ConnectionLostWhileReading_FailsWithTheConnectionsExitAndMessage");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error text", "QUIC: connection lost", result.ErrorMessage);
         Assert.AreEqual("QUIC: connection lost", result.ErrorMessage);
     }
 
@@ -485,9 +590,14 @@ public sealed partial class HttpProtocolHandlerTests
             OpenException = new MultiplexedConnectionFailedException(CurlExitCode.QuicConnectError, "QUIC connection lacks 3 uni streams to run HTTP/3"),
         };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3ConnectionLostOpeningTheStream_FailsWithTheConnectionsExitAndMessage");
         TransferResult result = await Handler(QuicConnector(quic)).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.QuicConnectError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.QuicConnectError, result.ExitCode);
+        Diagnostics.Assert("error text", "QUIC connection lacks 3 uni streams to run HTTP/3", result.ErrorMessage);
         Assert.AreEqual("QUIC connection lacks 3 uni streams to run HTTP/3", result.ErrorMessage);
     }
 
@@ -499,9 +609,14 @@ public sealed partial class HttpProtocolHandlerTests
             BidirectionalOpenException = new IOException("the server's bidirectional stream limit is used up"),
         };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3RequestStreamCannotBeOpened_FailsWithExit55AndCannotOpenBidiStreams");
         TransferResult result = await Handler(QuicConnector(quic)).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("error text", "cannot open bidi streams", result.ErrorMessage);
         Assert.AreEqual("cannot open bidi streams", result.ErrorMessage);
     }
 
@@ -513,9 +628,14 @@ public sealed partial class HttpProtocolHandlerTests
             BidirectionalOpenException = new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "QUIC: connection lost"),
         };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3ConnectionLostOpeningTheRequestStream_FailsWithTheConnectionsExitAndMessage");
         TransferResult result = await Handler(QuicConnector(quic)).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error text", "QUIC: connection lost", result.ErrorMessage);
         Assert.AreEqual("QUIC: connection lost", result.ErrorMessage);
     }
 
@@ -527,10 +647,15 @@ public sealed partial class HttpProtocolHandlerTests
             WriteException = new MultiplexedConnectionFailedException(CurlExitCode.SendError, "ngtcp2_conn_writev_stream returned error: ERR_CLOSING"),
         };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3ConnectionLostSendingTheHead_FailsWithTheConnectionsExitAndMessage");
         TransferResult result = await Handler(QuicConnector(new FakeMultiplexedConnection(stream)))
             .ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("error text", "ngtcp2_conn_writev_stream returned error: ERR_CLOSING", result.ErrorMessage);
         Assert.AreEqual("ngtcp2_conn_writev_stream returned error: ERR_CLOSING", result.ErrorMessage);
     }
 
@@ -540,8 +665,12 @@ public sealed partial class HttpProtocolHandlerTests
         FakeMultiplexedStream stream = new(0, Http3Response(Http3Head("200", ("content-length", "0"))));
         FakeMultiplexedConnection quic = new(stream) { CloseException = new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "lost") };
 
+        Diagnostics.Arrange("url", "https://example.com/");
+        Diagnostics.Arrange("scenario", "Http3ConnectionAlreadyLostAtClose_StillDisposesIt");
         TransferResult result = await Handler(QuicConnector(quic)).ExecuteAsync(Http3Context("https://example.com/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(quic.CloseCode);
         Assert.IsTrue(quic.IsDisposed);
@@ -554,10 +683,15 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new();
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "http://127.0.0.1:18731/");
+        Diagnostics.Arrange("scenario", "Http3OnlyWithHttpUrl_FailsWithExit3BeforeConnecting");
         TransferResult result = await Handler(connector).ExecuteAsync(
             Http3Context("http://127.0.0.1:18731/", new MemoryStream(), events: events));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
+        Diagnostics.Assert("error text", "HTTP/3 requested for non-HTTPS URL", result.ErrorMessage);
         Assert.AreEqual("HTTP/3 requested for non-HTTPS URL", result.ErrorMessage);
         CollectionAssert.AreEqual(new[] { "HTTP/3 requested for non-HTTPS URL", "closing connection #-1" }, events.Info);
         Assert.IsEmpty(connector.Targets);
@@ -570,9 +704,14 @@ public sealed partial class HttpProtocolHandlerTests
         QueueConnector connector = new();
         connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Failed(CurlExitCode.SendError, "ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT"));
 
+        Diagnostics.Arrange("url", "https://127.0.0.1:18731/");
+        Diagnostics.Arrange("scenario", "Http3OnlyQuicFails_FailsWithTheQuicExitAndNeverTriesTcp");
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context("https://127.0.0.1:18731/", new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("error text", "ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT", result.ErrorMessage);
         Assert.AreEqual("ngtcp2_conn_handle_expiry returned error: ERR_HANDSHAKE_TIMEOUT", result.ErrorMessage);
         Assert.IsEmpty(connector.Targets);
     }
@@ -585,10 +724,15 @@ public sealed partial class HttpProtocolHandlerTests
         connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Failed(CurlExitCode.RecvError, "QUIC: recvfrom() unexpectedly returned -1"));
         MemoryStream output = new();
 
+        Diagnostics.Arrange("url", "https://127.0.0.1:18731/");
+        Diagnostics.Arrange("scenario", "Http3QuicFails_FallsBackToTcp");
         TransferResult result = await Handler(connector).ExecuteAsync(
             Http3Context("https://127.0.0.1:18731/", output, version: HttpVersionPreference.Http3));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual("ok", Latin1(output.ToArray()));
         Assert.AreEqual(new Version(1, 1), result.Report!.HttpVersion);
         Assert.HasCount(1, connector.MultiplexedTargets);
@@ -604,10 +748,15 @@ public sealed partial class HttpProtocolHandlerTests
         connector.MultiplexedResults.Enqueue(MultiplexedConnectResult.Failed(CurlExitCode.RecvError, "QUIC: recvfrom() unexpectedly returned -1"));
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("url", "https://127.0.0.1:18731/");
+        Diagnostics.Arrange("scenario", "Http3QuicAndTcpFail_FailsWithTheQuicAttemptsExitAndMessage");
         TransferResult result = await Handler(connector).ExecuteAsync(
             Http3Context("https://127.0.0.1:18731/", new MemoryStream(), events: events, version: HttpVersionPreference.Http3));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Diagnostics.Assert("error text", "QUIC: recvfrom() unexpectedly returned -1", result.ErrorMessage);
         Assert.AreEqual("QUIC: recvfrom() unexpectedly returned -1", result.ErrorMessage);
         Assert.AreEqual(timings, result.Report!.Timings!.Connect);
         CollectionAssert.Contains(events.Info, "closing connection #3");
@@ -620,12 +769,18 @@ public sealed partial class HttpProtocolHandlerTests
     {
         QueueConnector connector = QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", 65536));
 
+        Diagnostics.Arrange("url", "n/a");
+        Diagnostics.Arrange("scenario", "Http3WithoutHttpsOrThroughAProxy_ConnectsOverTcpOnly");
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("throughProxy", throughProxy);
         TransferResult result = await Handler(connector).ExecuteAsync(Http3Context(
             url,
             new MemoryStream(),
             options: new HttpRequestOptions { ForwardProxy = throughProxy ? new ProxyEndpoint(ProxyKind.Socks5, "127.0.0.1", 1080, null) : null },
             version: HttpVersionPreference.Http3));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsEmpty(connector.MultiplexedTargets);
     }
@@ -637,12 +792,17 @@ public sealed partial class HttpProtocolHandlerTests
         StalledConnector connector = new();
         TransferContext context = Http3Context("https://10.255.255.1/", new MemoryStream(), time: time);
 
+        Diagnostics.Arrange("url", "https://10.255.255.1/");
+        Diagnostics.Arrange("scenario", "Http3ConnectPassesTheConnectTimeout_FailsWithExit28");
         Task<TransferResult> transfer = new HttpProtocolHandler(connector, new SilentAuthenticator()).ExecuteAsync(context).AsTask();
         await connector.Started;
         time.Advance(TimeSpan.FromMilliseconds(1000));
         TransferResult result = await transfer;
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.OperationTimedOut, result.ExitCode);
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
+        Diagnostics.Assert("error text", "Connection timed out after 1000 milliseconds", result.ErrorMessage);
         Assert.AreEqual("Connection timed out after 1000 milliseconds", result.ErrorMessage);
     }
 

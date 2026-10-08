@@ -1,4 +1,5 @@
 using System.Net;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -9,24 +10,35 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class ListenResultTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Listening_WithNullPendingConnection_ThrowsArgumentNullException()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         IPendingConnection? pendingConnection = null;
+        diagnostics.Arrange("pending connection", "null");
 
         var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => ListenResult.Listening(pendingConnection!));
 
+        diagnostics.Act("exception parameter", exception.ParamName);
+        diagnostics.Assert("parameter name", "pendingConnection", exception.ParamName);
         Assert.AreEqual("pendingConnection", exception.ParamName);
     }
 
     [TestMethod]
     public void Listening_WithPendingConnection_ExposesItWithOkAndNoMessage()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var pendingConnection = new UnusedPendingConnection();
+        diagnostics.Arrange("pending connection", nameof(UnusedPendingConnection));
 
         var result = ListenResult.Listening(pendingConnection);
 
+        diagnostics.Act("exit code", result.ExitCode);
+        diagnostics.Act("error message", result.ErrorMessage ?? "null");
+        diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreSame(pendingConnection, result.PendingConnection);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(result.ErrorMessage);
@@ -35,17 +47,28 @@ public sealed class ListenResultTests
     [TestMethod]
     public void Failed_WithOk_ThrowsArgumentOutOfRangeException()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("exit code", CurlExitCode.Ok);
+
         var exception = Assert.ThrowsExactly<ArgumentOutOfRangeException>(
             () => ListenResult.Failed(CurlExitCode.Ok, "unused"));
 
+        diagnostics.Act("exception parameter", exception.ParamName);
+        diagnostics.Assert("parameter name", "exitCode", exception.ParamName);
         Assert.AreEqual("exitCode", exception.ParamName);
     }
 
     [TestMethod]
     public void Failed_WithCouldntConnect_ExposesCodeAndMessageWithNoPendingConnection()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("exit code", CurlExitCode.CouldntConnect);
+
         var result = ListenResult.Failed(CurlExitCode.CouldntConnect, "bind failed");
 
+        diagnostics.Act("exit code", result.ExitCode);
+        diagnostics.Act("error message", result.ErrorMessage);
+        diagnostics.Assert("error message", "bind failed", result.ErrorMessage);
         Assert.IsNull(result.PendingConnection);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("bind failed", result.ErrorMessage);

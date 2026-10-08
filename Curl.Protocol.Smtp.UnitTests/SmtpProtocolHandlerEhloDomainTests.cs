@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -16,6 +17,11 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
 {
     private const string Replies = "220 localhost ESMTP\r\n250 localhost\r\n" + SmtpRun.HelpReply + "221 Bye\r\n";
 
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("a%20b", "a b", DisplayName = "an escaped space")]
     [DataRow("caf%C3%A9", "cafÃ©", DisplayName = "UTF-8 bytes go out as bytes")]
@@ -23,9 +29,11 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
     [DataRow("a%4", "a%4", DisplayName = "an escape cut short")]
     public async Task ExecuteAsync_PathWithEscapes_NamesTheDecodedBytes(string path, string expectedDomain)
     {
-        SmtpRun run = await SmtpRun.ExecuteAsync("smtp://127.0.0.1:18025/" + path, Scripted());
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, "smtp://127.0.0.1:18025/" + path, Scripted());
 
+        Diagnostics.Diff("sent", "EHLO " + expectedDomain + "\r\nHELP\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual("EHLO " + expectedDomain + "\r\nHELP\r\nQUIT\r\n", run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -33,8 +41,9 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
     public async Task ExecuteAsync_EmptyPath_NamesTheLocalHostName()
     {
         // -T - smtp://127.0.0.1:18025/: EHLO with the machine's host name.
-        SmtpRun run = await SmtpRun.ExecuteAsync("smtp://127.0.0.1:18025/", Scripted());
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, "smtp://127.0.0.1:18025/", Scripted());
 
+        Diagnostics.Diff("sent", "EHLO " + SmtpRun.LocalHostName + "\r\nHELP\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual("EHLO " + SmtpRun.LocalHostName + "\r\nHELP\r\nQUIT\r\n", run.Sent);
     }
 
@@ -42,10 +51,14 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
     public async Task ExecuteAsync_EmptyPathWithThePublicConstructor_NamesTheMachinesHostName()
     {
         ScriptedConnection connection = Scripted();
+        Diagnostics.ArrangeRun("smtp://127.0.0.1:18025/", Replies);
         var handler = new SmtpProtocolHandler(new QueuedConnector(ConnectResult.Connected(connection)), new QueuedTlsProvider());
 
-        await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("smtp://127.0.0.1:18025/"), Output = Stream.Null });
+        TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse("smtp://127.0.0.1:18025/"), Output = Stream.Null });
+        Diagnostics.ActResult(result);
+        Diagnostics.Act("sent", SmtpDiagnostics.Show(Encoding.Latin1.GetString(connection.Sent)));
 
+        Diagnostics.Diff("sent", "EHLO " + Dns.GetHostName() + "\r\nHELP\r\nQUIT\r\n", Encoding.Latin1.GetString(connection.Sent));
         Assert.AreEqual("EHLO " + Dns.GetHostName() + "\r\nHELP\r\nQUIT\r\n", Encoding.Latin1.GetString(connection.Sent));
     }
 
@@ -54,11 +67,15 @@ public sealed class SmtpProtocolHandlerEhloDomainTests
     [DataRow("a%00b", DisplayName = "NUL")]
     public async Task ExecuteAsync_PathDecodingToAControlCharacter_FailsWithExit3AfterConnecting(string path)
     {
-        SmtpRun run = await SmtpRun.ExecuteAsync("smtp://127.0.0.1:18025/" + path, Scripted());
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, "smtp://127.0.0.1:18025/" + path, Scripted());
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
+        Diagnostics.AssertValues("connect target count", 1, run.Connector.Targets.Count);
         Assert.HasCount(1, run.Connector.Targets);
+        Diagnostics.AssertValues("connection disposed", true, run.Connection.IsDisposed);
         Assert.IsTrue(run.Connection.IsDisposed);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"), run.Result);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"),
             run.Result);

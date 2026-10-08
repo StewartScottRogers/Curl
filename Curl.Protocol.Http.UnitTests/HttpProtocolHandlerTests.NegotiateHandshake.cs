@@ -27,15 +27,26 @@ public sealed partial class HttpProtocolHandlerTests
                 new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [1, 2, 3]),
                 new SecurityContextStep(SecurityContextStatus.Completed, [7, 8, 9]));
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "401 Negotiate BAUG, 200 ok");
+            Diagnostics.Arrange("context steps", "ContinueNeeded 1 2 3, Completed 7 8 9");
 
             TransferResult result = await NegotiateHandler(connector, tokens).ExecuteAsync(NegotiateContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("request written", OneLine(NegotiateRequest("AQID") + NegotiateRequest("BwgJ")), OneLine(connection.Written));
             Assert.AreEqual(NegotiateRequest("AQID") + NegotiateRequest("BwgJ"), connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connections opened", 1, connector.Targets.Count);
             Assert.HasCount(1, connector.Targets, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("contexts made", 1, tokens.ContextsMade);
             Assert.AreEqual(1, tokens.ContextsMade, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("contexts disposed", 1, tokens.ContextsDisposed);
             Assert.AreEqual(1, tokens.ContextsDisposed, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("second incoming token", "4 5 6", string.Join(" ", tokens.IncomingTokens[1]));
             CollectionAssert.AreEqual(new byte[] { 4, 5, 6 }, tokens.IncomingTokens[1], $"Chunk size {chunkSize}");
         }
     }
@@ -46,12 +57,19 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, NegotiateChallengeHead(string.Empty) + "nope");
         ScriptedTokenSource tokens = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [1, 2, 3]));
         MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "401 Negotiate without token");
+        Diagnostics.Arrange("context steps", "ContinueNeeded 1 2 3");
 
         TransferResult result = await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(NegotiateContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("request written", OneLine(NegotiateRequest("AQID")), OneLine(connection.Written));
         Assert.AreEqual(NegotiateRequest("AQID"), connection.Written);
+        Diagnostics.Assert("output", "nope", Latin1(output.ToArray()));
         Assert.AreEqual("nope", Latin1(output.ToArray()));
+        Diagnostics.Assert("contexts disposed", 1, tokens.ContextsDisposed);
         Assert.AreEqual(1, tokens.ContextsDisposed);
     }
 
@@ -66,14 +84,23 @@ public sealed partial class HttpProtocolHandlerTests
             new SecurityContextStep(finalStep, []));
         MemoryStream output = new();
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("scripted response", "200 ok with final Negotiate token BAUG");
+        Diagnostics.Arrange("final step", finalStep);
 
         TransferResult result = await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(AuthUrl), Output = output, Credentials = new NetworkCredential(string.Empty, string.Empty), Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Negotiate }, Events = events });
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("request written", OneLine(NegotiateRequest("AQID")), OneLine(connection.Written));
         Assert.AreEqual(NegotiateRequest("AQID"), connection.Written);
+        Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
         Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Diagnostics.Assert("contexts disposed", 1, tokens.ContextsDisposed);
         Assert.AreEqual(1, tokens.ContextsDisposed);
+        Diagnostics.Assert("incoming tokens", 1, tokens.IncomingTokens.Count);
         Assert.HasCount(1, tokens.IncomingTokens);
+        Diagnostics.Assert("info lines containing failed", 0, events.Info.Count(line => line.Contains("failed", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.Contains("failed", StringComparison.Ordinal)));
     }
 

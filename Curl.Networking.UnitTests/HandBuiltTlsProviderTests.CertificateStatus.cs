@@ -23,9 +23,18 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCertStatusAndAGoodStapledResponse_Connects(bool matchesSchannelBuild)
     {
         using var pki = new OcspTestPki();
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("server", "TLS 1.3 staples a good OCSP response");
 
-        var (result, _) = await HandshakeWithStaplingServerAsync(pki, pki.Response(DateTimeOffset.UtcNow).Build(), matchesSchannelBuild);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithStaplingServerAsync(pki, pki.Response(DateTimeOffset.UtcNow).Build(), matchesSchannelBuild);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         await result.Connection!.DisposeAsync();
     }
@@ -37,9 +46,24 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         using var pki = new OcspTestPki();
         var revoked = (pki.Response(DateTimeOffset.UtcNow) with { CertStatus = OcspStapleStatus.Revoked, RevocationReason = 1 }).Build();
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("server", "TLS 1.3 staples a revoked OCSP response, reason 1");
+        Diagnostics.Bytes("stapled response", revoked);
 
-        var (result, plaintextDisposed) = await HandshakeWithStaplingServerAsync(pki, revoked, matchesSchannelBuild);
+        ConnectResult result;
+        bool plaintextDisposed;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, plaintextDisposed) = await HandshakeWithStaplingServerAsync(pki, revoked, matchesSchannelBuild);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("plaintext disposed", plaintextDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.SslInvalidCertStatus, result.ExitCode);
+        Diagnostics.Assert("error message", "SSL certificate revocation reason: keyCompromise (1)", result.ErrorMessage);
+        Diagnostics.Assert("connection is null", true, result.Connection is null);
+        Diagnostics.Assert("plaintext disposed", true, plaintextDisposed);
         Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, result.ExitCode);
         Assert.AreEqual("SSL certificate revocation reason: keyCompromise (1)", result.ErrorMessage);
         Assert.IsNull(result.Connection);
@@ -52,9 +76,19 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCertStatusAndNoStapledResponse_FailsWithExit91(bool matchesSchannelBuild)
     {
         using var pki = new OcspTestPki();
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("server", "TLS 1.3 staples nothing");
 
-        var (result, _) = await HandshakeWithStaplingServerAsync(pki, null, matchesSchannelBuild);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithStaplingServerAsync(pki, null, matchesSchannelBuild);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslInvalidCertStatus, result.ExitCode);
+        Diagnostics.Assert("error message", "No OCSP response received", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, result.ExitCode);
         Assert.AreEqual("No OCSP response received", result.ErrorMessage);
     }
@@ -70,12 +104,28 @@ public sealed partial class HandBuiltTlsProviderTests
         using var pki = new OcspTestPki();
         var response = (pki.Response(DateTimeOffset.UtcNow) with { CertStatus = status, RevocationReason = 1 }).Build();
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("stapled status", status);
+        Diagnostics.Arrange("expected status line", expectedLine);
+        Diagnostics.Arrange("expected exit code", expectedExitCode);
+        Diagnostics.Bytes("stapled response", response);
 
-        var (result, _) = await HandshakeWithStaplingServerAsync(pki, response, OpenSslBuild, events);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithStaplingServerAsync(pki, response, OpenSslBuild, events);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Act("handshake events", events.Handshakes.Count);
+        Diagnostics.Assert("exit code", expectedExitCode, result.ExitCode);
         Assert.AreEqual(expectedExitCode, result.ExitCode, result.ErrorMessage);
+        Diagnostics.Assert("status line", expectedLine, string.Join(" | ", events.Info));
         Assert.AreEqual(expectedLine, events.Info.Single());
         var handshake = Assert.ContainsSingle(events.Handshakes);
+        Diagnostics.Assert("handshake failed", status != OcspStapleStatus.Good, handshake.Failed);
+        Diagnostics.Assert("protocol version", SslProtocols.Tls13, handshake.ProtocolVersion);
         Assert.AreEqual(status != OcspStapleStatus.Good, handshake.Failed);
         Assert.AreEqual(SslProtocols.Tls13, handshake.ProtocolVersion);
         if (result.Connection is { } connection)
@@ -90,9 +140,20 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         using var pki = new OcspTestPki();
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("server", "TLS 1.3 staples nothing");
 
-        var (result, _) = await HandshakeWithStaplingServerAsync(pki, null, SchannelBuild, events);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithStaplingServerAsync(pki, null, SchannelBuild, events);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("info lines", events.Info.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.SslInvalidCertStatus, result.ExitCode);
+        Diagnostics.Assert("info lines", 0, events.Info.Count);
         Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, result.ExitCode);
         Assert.IsEmpty(events.Info);
     }
@@ -102,9 +163,23 @@ public sealed partial class HandBuiltTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCertStatusOverTls12AndNoStapledResponse_FailsWithExit91()
     {
         var provider = Provider(Tls12Only(new TlsClientOptions(Insecure: true, RequireCertificateStatus: true)), OpenSslBuild);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true, MaximumVersion: Tls12");
+        Diagnostics.Arrange("server", "TLS 1.2 SslStream staples nothing");
+        ArrangeCertificate("server certificate", s_serverCertificate);
 
-        var (result, plaintextDisposed) = await HandshakeAsync(provider, CertificateHost);
+        ConnectResult result;
+        bool plaintextDisposed;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, plaintextDisposed) = await HandshakeAsync(provider, CertificateHost);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("plaintext disposed", plaintextDisposed);
+        Diagnostics.Assert("exit code", CurlExitCode.SslInvalidCertStatus, result.ExitCode);
+        Diagnostics.Assert("error message", "No OCSP response received", result.ErrorMessage);
+        Diagnostics.Assert("plaintext disposed", true, plaintextDisposed);
         Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, result.ExitCode);
         Assert.AreEqual("No OCSP response received", result.ErrorMessage);
         Assert.IsTrue(plaintextDisposed);
@@ -122,11 +197,25 @@ public sealed partial class HandBuiltTlsProviderTests
         var testServer = new Tls13TestServer(pki.LeafCredential) { RequestClientCertificate = true };
         var provider = new HandBuiltTlsProvider(
             new TlsClientOptions(Insecure: true, AutoClientCertificate: true), OpenSslBuild, TimeProvider.System, store, SystemTlsRandomSource.Instance);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, AutoClientCertificate: true");
+        Diagnostics.Arrange("server", "TLS 1.3 requests a client certificate");
+        ArrangeCertificate("personal store certificate", s_clientCertificate);
 
-        var (result, _) = await HandshakeWithTestServerAsync(provider, testServer);
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithTestServerAsync(provider, testServer);
+        }
 
+        ActConnectResult(result);
+        Diagnostics.Act("client certificates the server saw", testServer.ClientCertificates.Count);
+        Diagnostics.Act("stores opened", store.Opened.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Diagnostics.Diff("presented certificate", s_clientCertificate.RawData, testServer.ClientCertificates.Single());
         CollectionAssert.AreEqual(s_clientCertificate.RawData, testServer.ClientCertificates.Single());
+        Diagnostics.Assert("store opened", 1, store.Opened.Count);
         CollectionAssert.AreEqual(new[] { (ClientCertificateStoreLocation.CurrentUser, "MY") }, store.Opened);
         await result.Connection!.DisposeAsync();
     }

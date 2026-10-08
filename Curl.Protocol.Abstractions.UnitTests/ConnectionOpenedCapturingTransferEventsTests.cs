@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Authentication;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -12,9 +13,13 @@ public sealed class ConnectionOpenedCapturingTransferEventsTests
 {
     private static readonly IPEndPoint EndPoint = new(IPAddress.Loopback, 25);
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void EveryReport_IsPassedOnToTheInnerEvents()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("reports", "13 different events");
         var inner = new CallRecordingTransferEvents();
         var capturing = new ConnectionOpenedCapturingTransferEvents(inner);
 
@@ -40,6 +45,9 @@ public sealed class ConnectionOpenedCapturingTransferEventsTests
         capturing.ReportDataSent([5]);
         capturing.ReportDataReceived([6]);
 
+        string[] expected = ["info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received"];
+        diagnostics.Act("inner calls", string.Join(", ", inner.Calls));
+        diagnostics.Diff("inner calls", string.Join(", ", expected), string.Join(", ", inner.Calls));
         CollectionAssert.AreEqual(
             new[] { "info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
             inner.Calls);
@@ -48,20 +56,28 @@ public sealed class ConnectionOpenedCapturingTransferEventsTests
     [TestMethod]
     public void Opened_BeforeAnyConnectionIsReported_IsNull()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("reported connections", 0);
         var capturing = new ConnectionOpenedCapturingTransferEvents(new CallRecordingTransferEvents());
 
+        diagnostics.Act("opened", capturing.Opened);
+        diagnostics.Assert("opened", null, capturing.Opened);
         Assert.IsNull(capturing.Opened);
     }
 
     [TestMethod]
     public void Opened_AfterAFirstAndASecondConnection_IsTheFirst()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("reported connections", "first then second");
         var capturing = new ConnectionOpenedCapturingTransferEvents(new CallRecordingTransferEvents());
         ConnectionOpenedEvent first = Opened(isSecondConnection: false);
 
         capturing.ReportConnectionOpened(first);
         capturing.ReportConnectionOpened(Opened(isSecondConnection: true));
 
+        diagnostics.Act("captured is second connection", capturing.Opened!.IsSecondConnection);
+        diagnostics.Assert("captured is the first event", true, ReferenceEquals(first, capturing.Opened));
         Assert.AreSame(first, capturing.Opened);
     }
 

@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -30,6 +31,10 @@ public sealed class CurlCommandRunnerUnimplementedOptionTests
             .Select(alias => alias.Name)
             .FirstOrDefault(name => !CommandLineOptionTable.Rows.Any(row => row.LongName == name));
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -38,6 +43,8 @@ public sealed class CurlCommandRunnerUnimplementedOptionTests
     public async Task RunAsync_UnimplementedOption_PrintsNotSupportedAndExitsTwoWithoutATransfer(bool silent)
     {
         string? name = FirstUnimplementedName;
+        Diagnostics.Arrange("first unimplemented option", name ?? "(none)");
+        Diagnostics.Arrange("silent", silent);
         if (name is null)
         {
             Assert.Inconclusive("Every curl 8.21.0 option has a row: nothing is unimplemented.");
@@ -48,16 +55,42 @@ public sealed class CurlCommandRunnerUnimplementedOptionTests
 
         int exitCode = await RunAsync([.. silentOption, $"--{name}", Url], file);
 
+        Diagnostics.Assert("exit code", 2, exitCode);
         Assert.AreEqual(2, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            $"curl: option --{name}: the installed libcurl version does not support this\n"
+            + "curl: try 'curl --help' or 'curl --manual' for more information\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             $"curl: option --{name}: the installed libcurl version does not support this" + NewLine
             + "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
             StandardErrorText);
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(0, standardOutput.Length);
+        Diagnostics.Assert("handler call count", 0, file.Contexts.Count);
         Assert.IsEmpty(file.Contexts);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
-            .RunAsync(arguments);
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, params IProtocolHandler[] handlers)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange(
+            "handler schemes",
+            string.Join(", ", handlers.Select(handler => string.Join('/', handler.SupportedSchemes))));
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Act("stderr", Normalized(StandardErrorText));
+        return exitCode;
+    }
 }

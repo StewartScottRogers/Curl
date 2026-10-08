@@ -1,50 +1,29 @@
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
-/// Pins, per operating system, which <see cref="NativeExtendedAttributeWriter" /> the composition
-/// gets: none on Windows, where no curl build writes extended attributes, and one that sets a real
-/// attribute on Linux and macOS (ADR-0320).
+/// Pins that Windows, where no curl build writes extended attributes, gets no
+/// <see cref="NativeExtendedAttributeWriter" /> (ADR-0320). The Linux and macOS writer, which sets
+/// a real attribute, is pinned in <c>NativeExtendedAttributeWriterIntegrationTests</c>.
 /// </summary>
 [TestClass]
 public sealed class NativeExtendedAttributeWriterTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
-    public void ForCurrentPlatform_OnWindows_GivesNoWriter() =>
-        Assert.IsNull(NativeExtendedAttributeWriter.ForCurrentPlatform());
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
-    public void TryWrite_OnAFileOnLinuxOrMacOS_SetsTheAttribute()
+    public void ForCurrentPlatform_OnWindows_GivesNoWriter()
     {
-        string path = Path.Combine(Path.GetTempPath(), "bl651-" + Guid.NewGuid().ToString("N"));
-        File.WriteAllText(path, "hello");
-        try
-        {
-            NativeExtendedAttributeWriter writer = NativeExtendedAttributeWriter.ForCurrentPlatform()!;
+        Diagnostics.Arrange("platform", "Windows");
 
-            bool written = writer.TryWrite(path, OutputFileExtendedAttributes.MimeTypeName, "text/plain", out string errorText);
+        NativeExtendedAttributeWriter? writer = NativeExtendedAttributeWriter.ForCurrentPlatform();
+        Diagnostics.Act("writer is null", writer is null);
 
-            Assert.IsTrue(written, errorText);
-            Assert.AreEqual(string.Empty, errorText);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX | OperatingSystems.FreeBSD)]
-    public void TryWrite_OnAMissingFile_FailsWithTheSystemText()
-    {
-        NativeExtendedAttributeWriter writer = NativeExtendedAttributeWriter.ForCurrentPlatform()!;
-
-        bool written = writer.TryWrite("/nonexistent-bl651/x", OutputFileExtendedAttributes.CreatorName, "curl", out string errorText);
-
-        Assert.IsFalse(written);
-        Assert.AreEqual("No such file or directory", errorText);
+        Diagnostics.Assert("writer", null, writer);
+        Assert.IsNull(writer);
     }
 }

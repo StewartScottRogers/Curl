@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Authentication;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -13,11 +14,15 @@ public sealed class InfoLineStoppingTransferEventsTests
 {
     private static readonly IPEndPoint EndPoint = new(IPAddress.Loopback, 21);
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void EveryReport_IsPassedOnToTheTransfersEvents()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var inner = new CallRecordingTransferEvents();
         var events = new InfoLineStoppingTransferEvents(inner);
+        diagnostics.Arrange("events fired", "info, opened, reused, handshake, tls data, tls message, trust, verify, early data, request, response, sent, received");
 
         events.ReportInfo("info");
         events.ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = EndPoint, LocalEndPoint = EndPoint, ConnectionNumber = 0 });
@@ -41,6 +46,11 @@ public sealed class InfoLineStoppingTransferEventsTests
         events.ReportDataSent([5]);
         events.ReportDataReceived([6]);
 
+        diagnostics.Act("recorded calls", string.Join(", ", inner.Calls));
+        diagnostics.Assert(
+            "call count",
+            13,
+            inner.Calls.Count);
         CollectionAssert.AreEqual(
             new[] { "info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
             inner.Calls);
@@ -49,13 +59,17 @@ public sealed class InfoLineStoppingTransferEventsTests
     [TestMethod]
     public void ReportInfo_AfterStopInfoLines_IsDropped()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var inner = new CallRecordingTransferEvents();
         var events = new InfoLineStoppingTransferEvents(inner);
+        diagnostics.Arrange("events fired", "info, StopInfoLines, info");
 
         events.ReportInfo("[TCP] send(len=16) -> 0, 16");
         events.StopInfoLines();
         events.ReportInfo("[TCP] send(len=6) -> 0, 6");
 
+        diagnostics.Act("recorded calls", string.Join(", ", inner.Calls));
+        diagnostics.Assert("call count", 1, inner.Calls.Count);
         CollectionAssert.AreEqual(new[] { "[TCP] send(len=16) -> 0, 16" }, inner.Calls);
     }
 

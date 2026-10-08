@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -7,11 +9,21 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class SshOptionsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void SshOptions_NothingSet_HoldsCurlsNotGivenValues()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "new SshOptions()");
+
         var options = new SshOptions();
 
+        diagnostics.Act("private key path", options.PrivateKeyPath);
+        diagnostics.Act("known hosts path", options.KnownHostsPath);
+        diagnostics.Act("compression", options.Compression);
+        diagnostics.Assert("private key path", null, options.PrivateKeyPath);
+        diagnostics.Assert("compression", false, options.Compression);
         Assert.IsNull(options.PrivateKeyPath);
         Assert.IsNull(options.PublicKeyPath);
         Assert.IsNull(options.PrivateKeyPassphrase);
@@ -24,6 +36,11 @@ public sealed class SshOptionsTests
     [TestMethod]
     public void SshOptions_EveryMemberSet_RoundTripsEveryValue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("private key path", "id_ed25519");
+        diagnostics.Arrange("known hosts path", "known_hosts");
+        diagnostics.Arrange("host public key sha256", "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU");
+
         var options = new SshOptions
         {
             PrivateKeyPath = "id_ed25519",
@@ -35,6 +52,13 @@ public sealed class SshOptionsTests
             Compression = true,
         };
 
+        diagnostics.Act("private key path", options.PrivateKeyPath);
+        diagnostics.Act("public key path", options.PublicKeyPath);
+        diagnostics.Act("known hosts path", options.KnownHostsPath);
+        diagnostics.Act("host public key md5", options.HostPublicKeyMd5);
+        diagnostics.Act("compression", options.Compression);
+        diagnostics.Assert("private key path", "id_ed25519", options.PrivateKeyPath);
+        diagnostics.Assert("compression", true, options.Compression);
         Assert.AreEqual("id_ed25519", options.PrivateKeyPath);
         Assert.AreEqual("id_ed25519.pub", options.PublicKeyPath);
         Assert.AreEqual("secret", options.PrivateKeyPassphrase);
@@ -47,9 +71,19 @@ public sealed class SshOptionsTests
     [TestMethod]
     public void Equals_ForOptionsDifferingOnlyInCompression_ReturnsFalse()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var without = new SshOptions { KnownHostsPath = "known_hosts" };
         var with = without with { Compression = true };
+        diagnostics.Arrange("without", without);
+        diagnostics.Arrange("with", with);
 
+        bool differ = !without.Equals(with);
+        bool sameContentEqual = without.Equals(new SshOptions { KnownHostsPath = "known_hosts" });
+
+        diagnostics.Act("differ", differ);
+        diagnostics.Act("same content equal", sameContentEqual);
+        diagnostics.Assert("differ", true, differ);
+        diagnostics.Assert("same content equal", true, sameContentEqual);
         Assert.AreNotEqual(without, with);
         Assert.AreEqual(without, new SshOptions { KnownHostsPath = "known_hosts" });
     }

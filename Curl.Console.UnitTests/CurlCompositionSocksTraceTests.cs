@@ -1,5 +1,6 @@
 using Curl.Cli;
 using Curl.Networking;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -12,6 +13,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionSocksTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(new[] { "-v", "--trace-config", "socks" })]
     [DataRow(new[] { "-v", "--trace-config", "proxy" })]
@@ -20,7 +25,12 @@ public sealed class CurlCompositionSocksTraceTests
     [DataRow(new[] { "--trace-config", "all", "-vvvv" })]
     public void TracesSocks_UnderSocksProxyOrANamedAll_IsTrue(string[] arguments)
     {
-        Assert.IsTrue(CurlComposition.TracesSocks(Parse(arguments)));
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+        bool tracesSocks = CurlComposition.TracesSocks(Parse(arguments));
+        Diagnostics.Act("traces socks", tracesSocks);
+
+        Diagnostics.Assert("traces socks", true, tracesSocks);
+        Assert.IsTrue(tracesSocks);
     }
 
     [TestMethod]
@@ -33,22 +43,33 @@ public sealed class CurlCompositionSocksTraceTests
     {
         // curl -s -vvvv -x socks5://127.0.0.1:18601 http://127.0.0.1:80/x writes [SETUP] added SOCKS
         // filter but no [SOCKS] line (BL-1191 Notes).
-        Assert.IsFalse(CurlComposition.TracesSocks(Parse(arguments)));
+        Diagnostics.Arrange("command line arguments", string.Join(" ", arguments));
+        bool tracesSocks = CurlComposition.TracesSocks(Parse(arguments));
+        Diagnostics.Act("traces socks", tracesSocks);
+
+        Diagnostics.Assert("traces socks", false, tracesSocks);
+        Assert.IsFalse(tracesSocks);
     }
 
     [TestMethod]
     public void CreateTcpConnector_UnderTraceConfigSocks_TracesTheSocksFilter()
     {
+        Diagnostics.Arrange("command line arguments", "-v --trace-config socks");
         TcpConnector connector = CreateConnector("-v", "--trace-config", "socks");
+        Diagnostics.Act("connector traces socks filter", connector.TracesSocksFilter);
 
+        Diagnostics.Assert("connector traces socks filter", true, connector.TracesSocksFilter);
         Assert.IsTrue(connector.TracesSocksFilter);
     }
 
     [TestMethod]
     public void CreateTcpConnector_UnderPlainVerbose_DoesNotTraceTheSocksFilter()
     {
+        Diagnostics.Arrange("command line arguments", "-v");
         TcpConnector connector = CreateConnector("-v");
+        Diagnostics.Act("connector traces socks filter", connector.TracesSocksFilter);
 
+        Diagnostics.Assert("connector traces socks filter", false, connector.TracesSocksFilter);
         Assert.IsFalse(connector.TracesSocksFilter);
     }
 

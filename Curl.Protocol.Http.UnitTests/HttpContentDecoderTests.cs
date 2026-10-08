@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -29,6 +30,10 @@ public sealed class HttpContentDecoderTests
 
     private static readonly int[] ChunkSizes = [1, 7, 65536];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("gzip", Gzip, DisplayName = "gzip")]
     [DataRow("x-gzip", Gzip, DisplayName = "x-gzip")]
@@ -43,10 +48,14 @@ public sealed class HttpContentDecoderTests
     [DataRow("identity, gzip,, \tbr", GzipThenBrotli, DisplayName = "identity and empty items skipped")]
     public async Task WriteAsync_EncodedBody_WritesTheDecodedBody(string contentEncoding, string encoded)
     {
+        Diagnostics.Arrange("Content-Encoding", contentEncoding);
+        Diagnostics.Arrange("encoded", encoded);
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = await DecodeAsync([Header("Content-Encoding", contentEncoding)], Bytes(encoded), chunkSize);
 
+            Diagnostics.Act($"decoded at chunk size {chunkSize}", Encoding.ASCII.GetString(output.ToArray()));
+            Diagnostics.Assert($"decoded at chunk size {chunkSize}", "hello", Encoding.ASCII.GetString(output.ToArray()));
             Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()), $"Chunk size {chunkSize}");
         }
     }
@@ -55,15 +64,27 @@ public sealed class HttpContentDecoderTests
     public async Task WriteAsync_TwoContentEncodingHeaders_DecodeAsOneStackedList()
     {
         HttpResponseHeader[] headers = [Header("Content-Encoding", "gzip"), Header("Content-Type", "text/plain"), Header("content-encoding", "br")];
+        Diagnostics.Arrange("headers", "Content-Encoding: gzip, Content-Type: text/plain, content-encoding: br");
 
         MemoryStream output = await DecodeAsync(headers, Bytes(GzipThenBrotli), 65536);
 
+        Diagnostics.Act("decoded", Encoding.ASCII.GetString(output.ToArray()));
+        Diagnostics.Assert("decoded", "hello", Encoding.ASCII.GetString(output.ToArray()));
         Assert.AreEqual("hello", Encoding.ASCII.GetString(output.ToArray()));
     }
 
     [TestMethod]
     public void For_NoCodingToDecode_ReturnsNull()
     {
+        Diagnostics.Arrange("headers", "none; Content-Type: gzip; Content-Encoding: identity; Content-Encoding: ' , '");
+
+        bool anyDecoder = HttpContentDecoder.For([]) is not null
+            || HttpContentDecoder.For([Header("Content-Type", "gzip")]) is not null
+            || HttpContentDecoder.For([Header("Content-Encoding", "identity")]) is not null
+            || HttpContentDecoder.For([Header("Content-Encoding", " , ")]) is not null;
+
+        Diagnostics.Act("any decoder returned", anyDecoder);
+        Diagnostics.Assert("any decoder returned", false, anyDecoder);
         Assert.IsNull(HttpContentDecoder.For([]));
         Assert.IsNull(HttpContentDecoder.For([Header("Content-Type", "gzip")]));
         Assert.IsNull(HttpContentDecoder.For([Header("Content-Encoding", "identity")]));
@@ -81,10 +102,13 @@ public sealed class HttpContentDecoderTests
     {
         using HttpContentDecoder decoder = HttpContentDecoder.For([Header("Content-Encoding", contentEncoding)])!;
         MemoryStream output = new();
+        Diagnostics.Arrange("Content-Encoding", contentEncoding);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
             async () => await decoder.WriteAsync(output, Bytes(HttpContentDecoderTests.Gzip), CancellationToken.None));
 
+        Diagnostics.Act("exit", $"{thrown.ExitCode}: {thrown.Message}");
+        Diagnostics.Assert("output length", 0L, output.Length);
         Assert.AreEqual(0L, output.Length);
 
         Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode);

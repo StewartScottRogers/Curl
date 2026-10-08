@@ -3,6 +3,8 @@ using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -13,9 +15,18 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionLocalBindingTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
-    public void LocalBindingOf_WithNeitherOption_IsNull() =>
-        Assert.IsNull(CurlComposition.LocalBindingOf(Parse("http://h/")));
+    public void LocalBindingOf_WithNeitherOption_IsNull()
+    {
+        LocalBinding? binding = LocalBindingOf("http://h/");
+
+        Diagnostics.Assert("binding", null, binding);
+        Assert.IsNull(binding);
+    }
 
     [TestMethod]
     [DataRow("eth0", "eth0", "eth0", null)]
@@ -24,16 +35,22 @@ public sealed class CurlCompositionLocalBindingTests
     [DataRow("ifhost!eth0!127.0.0.1", null, "127.0.0.1", "eth0")]
     public void LocalBindingOf_WithAnInterface_SplitsItByItsPrefix(string value, string? interfaceName, string? hostName, string? deviceName)
     {
-        LocalBinding? binding = CurlComposition.LocalBindingOf(Parse("--interface", value, "http://h/"));
+        LocalBinding? binding = LocalBindingOf("--interface", value, "http://h/");
 
-        Assert.AreEqual(new LocalBinding(interfaceName, hostName, deviceName, 0, 1), binding);
+        LocalBinding expected = new(interfaceName, hostName, deviceName, 0, 1);
+        Diagnostics.Assert("binding", expected, binding);
+        Assert.AreEqual(expected, binding);
     }
 
     [TestMethod]
-    public void LocalBindingOf_WithLocalPortsOnly_BindsThePortsAlone() =>
-        Assert.AreEqual(
-            new LocalBinding(null, null, null, 40000, 11),
-            CurlComposition.LocalBindingOf(Parse("--local-port", "40000-40010", "http://h/")));
+    public void LocalBindingOf_WithLocalPortsOnly_BindsThePortsAlone()
+    {
+        LocalBinding? binding = LocalBindingOf("--local-port", "40000-40010", "http://h/");
+
+        LocalBinding expected = new(null, null, null, 40000, 11);
+        Diagnostics.Assert("binding", expected, binding);
+        Assert.AreEqual(expected, binding);
+    }
 
     [TestMethod]
     public async Task CreateTcpConnector_WithInterfaceAndLocalPort_DialsFromThatAddressAndRange()
@@ -50,7 +67,10 @@ public sealed class CurlCompositionLocalBindingTests
             HttpProxyTunnelOptions.Default);
 
         ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47599, false), CancellationToken.None);
+        Diagnostics.Act("connected", result.Connection is not null);
+        Diagnostics.Act("local binds", string.Join("; ", dialer.LocalBinds));
 
+        Diagnostics.Assert("local bind", (new IPEndPoint(IPAddress.Loopback, 40000), 11), dialer.LocalBinds.Single());
         Assert.IsNotNull(result.Connection);
         Assert.AreEqual((new IPEndPoint(IPAddress.Loopback, 40000), 11), dialer.LocalBinds.Single());
     }
@@ -59,12 +79,23 @@ public sealed class CurlCompositionLocalBindingTests
     public void CreateTransports_WithAnInterface_GivesTheTcpConnectorItsBinding()
     {
         CurlTransports transports = CurlComposition.CreateTransports(Parse("--interface", "host!127.0.0.1", "http://h/"));
+        Diagnostics.Act("TCP connector binding", transports.TcpConnector.LocalBinding);
 
-        Assert.AreEqual(new LocalBinding(null, "127.0.0.1", null, 0, 1), transports.TcpConnector.LocalBinding);
+        LocalBinding expected = new(null, "127.0.0.1", null, 0, 1);
+        Diagnostics.Assert("TCP connector binding", expected, transports.TcpConnector.LocalBinding);
+        Assert.AreEqual(expected, transports.TcpConnector.LocalBinding);
     }
 
-    private static CommandLineOptions Parse(params string[] arguments)
+    private LocalBinding? LocalBindingOf(params string[] arguments)
     {
+        LocalBinding? binding = CurlComposition.LocalBindingOf(Parse(arguments));
+        Diagnostics.Act("binding", binding);
+        return binding;
+    }
+
+    private CommandLineOptions Parse(params string[] arguments)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;

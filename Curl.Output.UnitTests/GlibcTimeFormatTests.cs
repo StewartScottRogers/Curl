@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -16,9 +17,13 @@ public sealed class GlibcTimeFormatTests
 
     private static readonly TimeZoneInfo Utc = TimeZoneInfo.Utc;
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Format_EveryMeasuredFormat_MatchesCurl()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("fixture", FixtureName);
         using JsonDocument fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", FixtureName), Encoding.UTF8));
         long[] instants = [.. fixture.RootElement.GetProperty("instants").EnumerateArray().Select(instant => instant.GetInt64())];
         List<string> mismatches = [];
@@ -38,6 +43,10 @@ public sealed class GlibcTimeFormatTests
             }
         }
 
+        diagnostics.Act("formats compared", compared);
+        diagnostics.Act("mismatch count", mismatches.Count);
+        diagnostics.Act("first mismatches", string.Join(" ;; ", mismatches.Take(5)));
+        diagnostics.Assert("mismatch count", 0, mismatches.Count);
         Assert.IsGreaterThan(4000, compared);
         Assert.AreEqual(0, mismatches.Count, string.Join(Environment.NewLine, mismatches.Take(40)));
     }
@@ -51,7 +60,15 @@ public sealed class GlibcTimeFormatTests
     [DataRow("%s|%-s", "1790480000|1790480000")]
     public void Format_MeasuredConversions_MatchCurl(string format, string expected)
     {
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.Glibc, AtCurlTime(1790480000, Utc)));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("format", format);
+        diagnostics.Arrange("curl time seconds", 1790480000);
+
+        string actual = WriteOutTimeFormatter.Format(format, WriteOutTimeDialect.Glibc, AtCurlTime(1790480000, Utc));
+
+        diagnostics.Act("rendered", actual);
+        diagnostics.Diff("rendered", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -59,17 +76,32 @@ public sealed class GlibcTimeFormatTests
     [DataRow(-5, "1790480000|1790498000")]
     public void Format_SecondsCurlDoesNotRewrite_ReadTheUtcTimeAsLocalStandardTime(int standardOffsetHours, string expected)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("standardOffsetHours", standardOffsetHours);
+
         // TZ=JST-9 and TZ=EST5EDT,M3.2.0,M11.1.0 (in daylight saving time at this instant) printed these.
         TimeZoneInfo zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(standardOffsetHours), "Test", "Test");
 
-        Assert.AreEqual(expected, WriteOutTimeFormatter.Format("%s|%-s", WriteOutTimeDialect.Glibc, AtCurlTime(1790480000, zone)));
+        string actual = WriteOutTimeFormatter.Format("%s|%-s", WriteOutTimeDialect.Glibc, AtCurlTime(1790480000, zone));
+
+        diagnostics.Act("rendered", actual);
+        diagnostics.Diff("rendered", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void Format_NullArgument_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format(null!, WriteOutTimeDialect.Glibc, TimeProvider.System));
-        Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format("%Y", WriteOutTimeDialect.Glibc, null!));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("cases", "null format; null time provider");
+
+        ArgumentNullException nullFormat = Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format(null!, WriteOutTimeDialect.Glibc, TimeProvider.System));
+        ArgumentNullException nullClock = Assert.ThrowsExactly<ArgumentNullException>(() => WriteOutTimeFormatter.Format("%Y", WriteOutTimeDialect.Glibc, null!));
+
+        diagnostics.Act("null format thrown", nullFormat.GetType().Name + ": " + nullFormat.Message);
+        diagnostics.Act("null clock thrown", nullClock.GetType().Name + ": " + nullClock.Message);
+        diagnostics.Assert("null format exception type", nameof(ArgumentNullException), nullFormat.GetType().Name);
+        diagnostics.Assert("null clock exception type", nameof(ArgumentNullException), nullClock.GetType().Name);
     }
 
     /// <summary>

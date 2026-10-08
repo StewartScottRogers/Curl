@@ -4,6 +4,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -22,6 +23,10 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
 {
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -30,6 +35,11 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         // The -v connect lines wait on the dict handler passing its events to the target (BL-774).
         int exitCode = await RunAsync("--connect-timeout", "1", "dict://127.0.0.1/d:x");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert(
+            "stderr",
+            "curl: (28) Connection timed out after 1000 milliseconds<NewLine>",
+            StandardErrorText.Replace(Environment.NewLine, "<NewLine>", StringComparison.Ordinal));
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
         Assert.AreEqual("curl: (28) Connection timed out after 1000 milliseconds" + Environment.NewLine, StandardErrorText);
     }
@@ -40,6 +50,11 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
         // curl -v --connect-timeout 5 -m 1 http://10.255.255.1/ -> curl: (28) Connection timed out after 1000 milliseconds.
         int exitCode = await RunAsync("--connect-timeout", "5", "-m", "1", "dict://127.0.0.1/d:x");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert(
+            "stderr ends with the timeout message",
+            true,
+            StandardErrorText.EndsWith("curl: (28) Connection timed out after 1000 milliseconds" + Environment.NewLine, StringComparison.Ordinal));
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
         StringAssert.EndsWith(StandardErrorText, "curl: (28) Connection timed out after 1000 milliseconds" + Environment.NewLine);
     }
@@ -65,8 +80,17 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
             arguments.AddRange(["-m", maxTime]);
         }
 
-        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "dict://example.com/"], _ => true);
+        Diagnostics.Arrange("command line", string.Join(" ", [.. arguments, "dict://example.com/"]));
 
+        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "dict://example.com/"], _ => true);
+        TimeSpan actual;
+        using (Diagnostics.Phase("connect timeout of"))
+        {
+            actual = CurlComposition.ConnectTimeoutOf(parsed.Options!);
+        }
+
+        Diagnostics.Act("connect timeout", actual);
+        Diagnostics.Assert("connect timeout", TimeSpan.FromMilliseconds(expectedMilliseconds), actual);
         Assert.AreEqual(TimeSpan.FromMilliseconds(expectedMilliseconds), CurlComposition.ConnectTimeoutOf(parsed.Options!));
     }
 
@@ -76,6 +100,8 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
     /// </summary>
     private async Task<int> RunAsync(params string[] arguments)
     {
+        Diagnostics.Arrange("command line", "-sS " + string.Join(" ", arguments));
+        Diagnostics.Arrange("dialer", "every dial stalls until cancelled, on a timer that fires at once");
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
@@ -87,18 +113,26 @@ public sealed class CurlCommandRunnerConnectTimeoutTests
             HttpProxyTunnelOptions.Default);
         InMemoryFileSystem files = new();
 
-        return await new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
-                    [],
-                    loadResolveEntries: connector.LoadResolveEntries),
-                files,
-                files,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(["-sS", .. arguments]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        [],
+                        loadResolveEntries: connector.LoadResolveEntries),
+                    files,
+                    files,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(["-sS", .. arguments]);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stderr, platform newlines as LF", Encoding.ASCII.GetBytes(StandardErrorText.Replace(Environment.NewLine, "\n", StringComparison.Ordinal)));
+        return exitCode;
     }
 
     /// <summary>A dialer whose every dial never completes until its token is cancelled.</summary>

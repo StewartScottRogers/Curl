@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -9,22 +11,36 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class CurlUrlTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void TryParse_WithNullText_ThrowsArgumentNullException()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         string? text = null;
+        diagnostics.Arrange("url text", "null");
 
         var exception = Assert.ThrowsExactly<ArgumentNullException>(
             () => CurlUrl.TryParse(text!, pathAsIs: false, out _));
 
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
+        diagnostics.Assert("parameter name", "text", exception.ParamName);
         Assert.AreEqual("text", exception.ParamName);
     }
 
     [TestMethod]
     public void TryParse_OnThePublicOverload_ParsesAsCurlDoes()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http://example.com/a/../b");
+
         bool parsed = CurlUrl.TryParse("http://example.com/a/../b", pathAsIs: false, out CurlUrl? url);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("absolute path", url?.AbsolutePath);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("absolute path", "/b", url?.AbsolutePath);
         Assert.IsTrue(parsed);
         Assert.AreEqual("/b", url!.AbsolutePath);
     }
@@ -32,44 +48,83 @@ public sealed class CurlUrlTests
     [TestMethod]
     public void Parse_WithAUrlCurlAccepts_ReturnsItParsed()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http://example.com/a/../b");
+
         CurlUrl url = CurlUrl.Parse("http://example.com/a/../b");
 
+        diagnostics.Act("absolute path", url.AbsolutePath);
+        diagnostics.Assert("absolute path", "/b", url.AbsolutePath);
         Assert.AreEqual("/b", url.AbsolutePath);
     }
 
     [TestMethod]
     public void Parse_WithPathAsIs_KeepsTheDotSegments()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http://example.com/a/../b");
+        diagnostics.Arrange("path as is", true);
+
         CurlUrl url = CurlUrl.Parse("http://example.com/a/../b", pathAsIs: true);
 
+        diagnostics.Act("absolute path", url.AbsolutePath);
+        diagnostics.Assert("absolute path", "/a/../b", url.AbsolutePath);
         Assert.AreEqual("/a/../b", url.AbsolutePath);
     }
 
     [TestMethod]
     public void Parse_WithAUrlCurlRejects_ThrowsFormatException()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http://exa mple.com/");
+
         var exception = Assert.ThrowsExactly<FormatException>(() => CurlUrl.Parse("http://exa mple.com/"));
 
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Assert("exception type", nameof(FormatException), exception.GetType().Name);
+        diagnostics.Diff("exception message", "curl rejects the URL \"http://exa mple.com/\".", exception.Message);
         Assert.AreEqual("curl rejects the URL \"http://exa mple.com/\".", exception.Message);
     }
 
     [TestMethod]
     public void Equals_WithTheSameTextParsedTwice_IsTrue()
     {
-        Assert.AreEqual(CurlUrl.Parse("http://example.com/a"), CurlUrl.Parse("http://example.com/a"));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http://example.com/a");
+
+        CurlUrl first = CurlUrl.Parse("http://example.com/a");
+        CurlUrl second = CurlUrl.Parse("http://example.com/a");
+
+        diagnostics.Act("equal", first.Equals(second));
+        diagnostics.Assert("equal", true, first.Equals(second));
+        Assert.AreEqual(first, second);
     }
 
     [TestMethod]
     public void Equals_WithTheSameTextParsedWithAndWithoutPathAsIs_IsFalse()
     {
-        Assert.AreNotEqual(CurlUrl.Parse("http://example.com/a/../b"), CurlUrl.Parse("http://example.com/a/../b", pathAsIs: true));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http://example.com/a/../b");
+
+        CurlUrl normalised = CurlUrl.Parse("http://example.com/a/../b");
+        CurlUrl asIs = CurlUrl.Parse("http://example.com/a/../b", pathAsIs: true);
+
+        diagnostics.Act("equal", normalised.Equals(asIs));
+        diagnostics.Assert("equal", false, normalised.Equals(asIs));
+        Assert.AreNotEqual(normalised, asIs);
     }
 
     [TestMethod]
     public void TryParse_WhenRejected_ReturnsFalseAndNull()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "http://a b/");
+
         bool parsed = CurlUrl.TryParse("http://a b/", pathAsIs: false, out CurlUrl? url);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("url", url);
+        diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
         Assert.IsNull(url);
     }
@@ -91,8 +146,15 @@ public sealed class CurlUrlTests
     [DataRow("http://example.com/a%2Fb", true, "/a%2Fb")]
     public void TryParse_WithAnAdr0010Case_KeepsThePathCurlKeeps(string text, bool pathAsIs, string path)
     {
-        CurlUrl url = Parse(text, pathAsIs);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("path as is", pathAsIs);
 
+        CurlUrl url = Parse(diagnostics, text, pathAsIs: pathAsIs);
+
+        diagnostics.Act("absolute path", url.AbsolutePath);
+        diagnostics.Act("original string", url.OriginalString);
+        diagnostics.Assert("absolute path", path, url.AbsolutePath);
+        diagnostics.Assert("original string", text, url.OriginalString);
         Assert.AreEqual(path, url.AbsolutePath);
         Assert.AreEqual(text, url.OriginalString);
     }
@@ -102,7 +164,9 @@ public sealed class CurlUrlTests
     [DataRow("file://ab:/x")]
     public void TryParse_WithAnAdr0010FileCaseCurlRejects_ReturnsFalse(string text)
     {
-        AssertRejected(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        AssertRejected(diagnostics, text);
     }
 
     // The Uri members handlers read, for each scheme a handler exists for.
@@ -135,8 +199,22 @@ public sealed class CurlUrlTests
         bool isDefaultPort,
         string path)
     {
-        CurlUrl url = Parse(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange(
+            "expected parts",
+            $"scheme={scheme} host={host} idnHost={idnHost} port={port} isDefaultPort={isDefaultPort} path={path}");
 
+        CurlUrl url = Parse(diagnostics, text);
+
+        diagnostics.Act(
+            "actual parts",
+            $"scheme={url.Scheme} host={url.Host} idnHost={url.IdnHost} port={url.Port} isDefaultPort={url.IsDefaultPort} path={url.AbsolutePath}");
+        diagnostics.Assert("scheme", scheme, url.Scheme);
+        diagnostics.Assert("host", host, url.Host);
+        diagnostics.Assert("idn host", idnHost, url.IdnHost);
+        diagnostics.Assert("port", port, url.Port);
+        diagnostics.Assert("is default port", isDefaultPort, url.IsDefaultPort);
+        diagnostics.Assert("absolute path", path, url.AbsolutePath);
         Assert.AreEqual(scheme, url.Scheme);
         Assert.AreEqual(host, url.Host);
         Assert.AreEqual(idnHost, url.IdnHost);
@@ -161,8 +239,14 @@ public sealed class CurlUrlTests
     [DataRow("file://\\server\\share", "/server/share")]
     public void TryParse_WithAFileUrl_KeepsThePathCurlKeepsOnWindows(string text, string path)
     {
-        CurlUrl url = Parse(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
 
+        CurlUrl url = Parse(diagnostics, text);
+
+        diagnostics.Act("host", url.Host);
+        diagnostics.Act("user", url.User);
+        diagnostics.Assert("absolute path", path, url.AbsolutePath);
+        diagnostics.Assert("host", string.Empty, url.Host);
         Assert.AreEqual(path, url.AbsolutePath);
         Assert.AreEqual(string.Empty, url.Host);
         Assert.IsNull(url.User);
@@ -175,7 +259,9 @@ public sealed class CurlUrlTests
     [DataRow("file:C:/nope")]
     public void TryParse_WithAFileAuthorityCurlRejects_ReturnsFalse(string text)
     {
-        AssertRejected(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        AssertRejected(diagnostics, text);
     }
 
     [TestMethod]
@@ -187,8 +273,15 @@ public sealed class CurlUrlTests
         string? query,
         string? fragment)
     {
-        CurlUrl url = Parse(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("expected parts", $"path={path} query={query} fragment={fragment}");
 
+        CurlUrl url = Parse(diagnostics, text);
+
+        diagnostics.Act("actual parts", $"path={url.AbsolutePath} query={url.Query} fragment={url.Fragment}");
+        diagnostics.Assert("absolute path", path, url.AbsolutePath);
+        diagnostics.Assert("query", query, url.Query);
+        diagnostics.Assert("fragment", fragment, url.Fragment);
         Assert.AreEqual(path, url.AbsolutePath);
         Assert.AreEqual(query, url.Query);
         Assert.AreEqual(fragment, url.Fragment);
@@ -201,8 +294,15 @@ public sealed class CurlUrlTests
     [DataRow("file://c|/x")]
     public void TryParse_WithADriveLetterOutsideWindows_ReturnsFalse(string text)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", text);
+        diagnostics.Arrange("drive letters", false);
+
         bool parsed = CurlUrl.TryParse(text, pathAsIs: false, driveLetters: false, out CurlUrl? url);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("url", url);
+        diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed);
         Assert.IsNull(url);
     }
@@ -210,8 +310,16 @@ public sealed class CurlUrlTests
     [TestMethod]
     public void TryParse_WithAFilePathOutsideWindows_KeepsItsSlash()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "file:///x/y");
+        diagnostics.Arrange("drive letters", false);
+
         bool parsed = CurlUrl.TryParse("file:///x/y", pathAsIs: false, driveLetters: false, out CurlUrl? url);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("absolute path", url?.AbsolutePath);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("absolute path", "/x/y", url?.AbsolutePath);
         Assert.IsTrue(parsed);
         Assert.AreEqual("/x/y", url!.AbsolutePath);
     }
@@ -219,8 +327,18 @@ public sealed class CurlUrlTests
     [TestMethod]
     public void TryParse_WithADriveLikeSchemeOutsideWindows_ReadsItAsAScheme()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url text", "c:/x");
+        diagnostics.Arrange("drive letters", false);
+
         bool parsed = CurlUrl.TryParse("c:/x", pathAsIs: false, driveLetters: false, out CurlUrl? url);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Act("scheme", url?.Scheme);
+        diagnostics.Act("host", url?.Host);
+        diagnostics.Assert("parsed", true, parsed);
+        diagnostics.Assert("scheme", "c", url?.Scheme);
+        diagnostics.Assert("host", "x", url?.Host);
         Assert.IsTrue(parsed);
         Assert.AreEqual("c", url!.Scheme);
         Assert.AreEqual("x", url.Host);
@@ -244,8 +362,15 @@ public sealed class CurlUrlTests
         string? password,
         string? options)
     {
-        CurlUrl url = Parse(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("expected login", $"user={user} password={password} options={options}");
 
+        CurlUrl url = Parse(diagnostics, text);
+
+        diagnostics.Act("actual login", $"user={url.User} password={url.Password} options={url.Options}");
+        diagnostics.Assert("user", user, url.User);
+        diagnostics.Assert("password", password, url.Password);
+        diagnostics.Assert("options", options, url.Options);
         Assert.AreEqual(user, url.User);
         Assert.AreEqual(password, url.Password);
         Assert.AreEqual(options, url.Options);
@@ -254,8 +379,19 @@ public sealed class CurlUrlTests
     [TestMethod]
     public void TryParse_WithEveryPart_ExposesEachAsCurlHoldsIt()
     {
-        CurlUrl url = Parse("http://u:p;o@example.com:8080/p?q#f");
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
 
+        CurlUrl url = Parse(diagnostics, "http://u:p;o@example.com:8080/p?q#f");
+
+        diagnostics.Act(
+            "parts",
+            $"host={url.Host} port={url.Port} path={url.AbsolutePath} query={url.Query} fragment={url.Fragment} zoneId={url.ZoneId}");
+        diagnostics.Assert("host", "example.com", url.Host);
+        diagnostics.Assert("port", 8080, url.Port);
+        diagnostics.Assert("absolute path", "/p", url.AbsolutePath);
+        diagnostics.Assert("query", "q", url.Query);
+        diagnostics.Assert("fragment", "f", url.Fragment);
+        diagnostics.Assert("zone id", null, url.ZoneId);
         Assert.AreEqual("example.com", url.Host);
         Assert.AreEqual(8080, url.Port);
         Assert.AreEqual("/p", url.AbsolutePath);
@@ -309,8 +445,14 @@ public sealed class CurlUrlTests
     [DataRow("pop3.x", "pop3", "pop3.x")]
     public void TryParse_WithAHost_HoldsItAsCurlDoes(string text, string scheme, string host)
     {
-        CurlUrl url = Parse(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("expected parts", $"scheme={scheme} host={host}");
 
+        CurlUrl url = Parse(diagnostics, text);
+
+        diagnostics.Act("actual parts", $"scheme={url.Scheme} host={url.Host}");
+        diagnostics.Assert("scheme", scheme, url.Scheme);
+        diagnostics.Assert("host", host, url.Host);
         Assert.AreEqual(scheme, url.Scheme);
         Assert.AreEqual(host, url.Host);
     }
@@ -318,25 +460,34 @@ public sealed class CurlUrlTests
     [TestMethod]
     public void TryParse_WithAHostIdnMappingRefuses_ResolvesTheHostAsWritten()
     {
-        CurlUrl url = Parse("http://a%80b/");
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
 
+        CurlUrl url = Parse(diagnostics, "http://a%80b/");
+
+        diagnostics.Act("idn host", url.IdnHost);
+        diagnostics.Assert("idn host", "a\ufffdb", url.IdnHost);
         Assert.AreEqual("a\ufffdb", url.IdnHost);
     }
 
     [TestMethod]
     public void TryParse_WithASchemeOfFortyCharacters_ReadsTheScheme()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         string scheme = new('a', 40);
 
-        CurlUrl url = Parse(scheme + "://h/");
+        CurlUrl url = Parse(diagnostics, scheme + "://h/");
 
+        diagnostics.Act("scheme", url.Scheme);
+        diagnostics.Assert("scheme", scheme, url.Scheme);
         Assert.AreEqual(scheme, url.Scheme);
     }
 
     [TestMethod]
     public void TryParse_WithASchemeOfFortyOneCharacters_ReturnsFalse()
     {
-        AssertRejected(new string('a', 41) + "://h/");
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        AssertRejected(diagnostics, new string('a', 41) + "://h/");
     }
 
     [TestMethod]
@@ -360,8 +511,16 @@ public sealed class CurlUrlTests
         string? zoneId,
         int port)
     {
-        CurlUrl url = Parse(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("expected parts", $"host={host} idnHost={idnHost} zoneId={zoneId} port={port}");
 
+        CurlUrl url = Parse(diagnostics, text);
+
+        diagnostics.Act("actual parts", $"host={url.Host} idnHost={url.IdnHost} zoneId={url.ZoneId} port={url.Port}");
+        diagnostics.Assert("host", host, url.Host);
+        diagnostics.Assert("idn host", idnHost, url.IdnHost);
+        diagnostics.Assert("zone id", zoneId, url.ZoneId);
+        diagnostics.Assert("port", port, url.Port);
         Assert.AreEqual(host, url.Host);
         Assert.AreEqual(idnHost, url.IdnHost);
         Assert.AreEqual(zoneId, url.ZoneId);
@@ -399,7 +558,14 @@ public sealed class CurlUrlTests
     [DataRow("http:///h/", "/")]
     public void TryParse_WithAPath_RemovesDotSegmentsAsCurlDoes(string text, string path)
     {
-        Assert.AreEqual(path, Parse(text).AbsolutePath);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        string actual = Parse(diagnostics, text).AbsolutePath;
+
+        diagnostics.Act("absolute path", actual);
+        diagnostics.Diff("absolute path", path, actual);
+        diagnostics.Assert("absolute path", path, actual);
+        Assert.AreEqual(path, actual);
     }
 
     [TestMethod]
@@ -408,7 +574,15 @@ public sealed class CurlUrlTests
     [DataRow("file:///C:/dir/../nope", "C:/dir/../nope")]
     public void TryParse_WithPathAsIs_KeepsDotSegments(string text, string path)
     {
-        Assert.AreEqual(path, Parse(text, pathAsIs: true).AbsolutePath);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("path as is", true);
+
+        string actual = Parse(diagnostics, text, pathAsIs: true).AbsolutePath;
+
+        diagnostics.Act("absolute path", actual);
+        diagnostics.Diff("absolute path", path, actual);
+        diagnostics.Assert("absolute path", path, actual);
+        Assert.AreEqual(path, actual);
     }
 
     [TestMethod]
@@ -428,8 +602,15 @@ public sealed class CurlUrlTests
         string? query,
         string? fragment)
     {
-        CurlUrl url = Parse(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("expected parts", $"path={path} query={query} fragment={fragment}");
 
+        CurlUrl url = Parse(diagnostics, text);
+
+        diagnostics.Act("actual parts", $"path={url.AbsolutePath} query={url.Query} fragment={url.Fragment}");
+        diagnostics.Assert("absolute path", path, url.AbsolutePath);
+        diagnostics.Assert("query", query, url.Query);
+        diagnostics.Assert("fragment", fragment, url.Fragment);
         Assert.AreEqual(path, url.AbsolutePath);
         Assert.AreEqual(query, url.Query);
         Assert.AreEqual(fragment, url.Fragment);
@@ -493,68 +674,101 @@ public sealed class CurlUrlTests
     [DataRow("http://[::1%25a%5D/")]
     public void TryParse_WithAUrlCurlRejects_ReturnsFalse(string text)
     {
-        AssertRejected(text);
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        AssertRejected(diagnostics, text);
     }
 
     [TestMethod]
     public void TryParse_WithEveryCharacterCurlRefusesInAHostName_ReturnsFalse()
     {
-        foreach (char character in "!\"#$%&'()*+,/:;<=>?@[\\]^`{|}")
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        const string Refused = "!\"#$%&'()*+,/:;<=>?@[\\]^`{|}";
+        diagnostics.Arrange("refused characters", Refused);
+        int refusedCount = 0;
+
+        foreach (char character in Refused)
         {
             string text = $"http://a%{(int)character:X2}b/";
 
             Assert.IsFalse(CurlUrl.TryParse(text, pathAsIs: false, driveLetters: true, out _), text);
+            refusedCount++;
         }
+
+        diagnostics.Act("refused count", refusedCount);
+        diagnostics.Assert("refused count", Refused.Length, refusedCount);
     }
 
     [TestMethod]
     public void TryParse_WithEveryCharacterCurlAllowsInAHostName_ReturnsTrue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         const string Allowed = "-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz~";
+        diagnostics.Arrange("allowed characters", Allowed);
+        int acceptedCount = 0;
+
         foreach (char character in Allowed)
         {
             string text = $"http://a%{(int)character:X2}b/";
 
             Assert.IsTrue(CurlUrl.TryParse(text, pathAsIs: false, driveLetters: true, out _), text);
+            acceptedCount++;
         }
+
+        diagnostics.Act("accepted count", acceptedCount);
+        diagnostics.Assert("accepted count", Allowed.Length, acceptedCount);
     }
 
     // CURL_MAX_INPUT_LENGTH in curl's source; not measured, as no command line holds it.
     [TestMethod]
     public void TryParse_WithMoreThanEightMillionCharacters_ReturnsFalse()
     {
-        AssertRejected("http://h/" + new string('a', 8_000_000));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        AssertRejected(diagnostics, "http://h/" + new string('a', 8_000_000), "http://h/ plus 8000000 a");
     }
 
     [TestMethod]
     public void TryParse_WithMoreThanEightMillionUtf8Bytes_ReturnsFalse()
     {
-        AssertRejected("http://h/" + new string('\u20ac', 3_000_000));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        AssertRejected(diagnostics, "http://h/" + new string('\u20ac', 3_000_000), "http://h/ plus 3000000 euro signs");
     }
 
     [TestMethod]
     public void TryParse_WithEightMillionCharacters_ReturnsTrue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         const string Prefix = "http://h/";
 
-        CurlUrl url = Parse(Prefix + new string('a', 8_000_000 - Prefix.Length));
+        CurlUrl url = Parse(diagnostics, Prefix + new string('a', 8_000_000 - Prefix.Length), "http://h/ plus a to 8000000 characters");
 
+        diagnostics.Act("absolute path length", url.AbsolutePath.Length);
+        diagnostics.Assert("absolute path length", 8_000_000 - Prefix.Length + 1, url.AbsolutePath.Length);
         Assert.AreEqual(8_000_000 - Prefix.Length + 1, url.AbsolutePath.Length);
     }
 
-    private static CurlUrl Parse(string text, bool pathAsIs = false)
+    private static CurlUrl Parse(TestDiagnostics diagnostics, string text, string? description = null, bool pathAsIs = false)
     {
+        diagnostics.Arrange("url text", description ?? text);
+
         bool parsed = CurlUrl.TryParse(text, pathAsIs, driveLetters: true, out CurlUrl? url);
 
+        diagnostics.Act("parsed", parsed);
         Assert.IsTrue(parsed, text);
 
         return url!;
     }
 
-    private static void AssertRejected(string text)
+    private static void AssertRejected(TestDiagnostics diagnostics, string text, string? description = null)
     {
+        diagnostics.Arrange("url text", description ?? text);
+
         bool parsed = CurlUrl.TryParse(text, pathAsIs: false, driveLetters: true, out CurlUrl? url);
 
+        diagnostics.Act("parsed", parsed);
+        diagnostics.Assert("parsed", false, parsed);
         Assert.IsFalse(parsed, text);
         Assert.IsNull(url);
     }

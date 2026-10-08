@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using Curl.Testing;
 using static Curl.Zstandard.ZstandardTestFrames;
 using static Curl.Zstandard.ZstandardTestLiterals;
 using static Curl.Zstandard.ZstandardTestSequences;
@@ -16,6 +17,8 @@ namespace Curl.Zstandard;
 [TestClass]
 public sealed class ZstandardSequencesDecoderTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     /// <summary>A <c>Window_Descriptor</c> of 0x38: a 128 KiB window.</summary>
     private const byte OneHundredTwentyEightKibibyteWindow = 0x38;
 
@@ -98,10 +101,16 @@ public sealed class ZstandardSequencesDecoderTests
     [DynamicData(nameof(ValidInputs))]
     public void TryDecompress_BlocksWithSequences_WritesWhatTheyRegenerate(string name, byte[] source, byte[] expected, int frameCount)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource(name, source);
         var destination = new byte[expected.Length];
 
         var decoded = ZstandardDecoder.TryDecompress(source, destination, out var bytesWritten);
 
+        diagnostics.Act("decoded", decoded);
+        diagnostics.Act("bytes written", bytesWritten);
+        diagnostics.ActOutput(expected, destination.AsSpan(0, Math.Min(bytesWritten, destination.Length)));
+        diagnostics.Assert("bytes written", expected.Length, bytesWritten);
         Assert.IsTrue(decoded, name);
         Assert.AreEqual(expected.Length, bytesWritten, name);
         CollectionAssert.AreEqual(expected, destination, $"{name} ({frameCount} frames)");
@@ -111,6 +120,9 @@ public sealed class ZstandardSequencesDecoderTests
     [DynamicData(nameof(ValidInputs))]
     public void Decompress_BlocksWithSequencesOneByteAtATime_WritesWhatTheyRegenerate(string name, byte[] source, byte[] expected, int frameCount)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource(name, source);
+        diagnostics.Arrange("frames expected", frameCount);
         var decoder = new ZstandardDecoder();
         var output = new List<byte>();
         var destination = new byte[1];
@@ -126,6 +138,12 @@ public sealed class ZstandardSequencesDecoderTests
         }
         while (status != OperationStatus.InvalidData && (position < source.Length || status == OperationStatus.DestinationTooSmall));
 
+        diagnostics.Act("last status", status);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Act("Done statuses", doneCount);
+        diagnostics.ActOutput(expected, output.ToArray());
+        diagnostics.Assert("last status", OperationStatus.Done, status);
+        diagnostics.Assert("Done statuses", frameCount, doneCount);
         Assert.AreEqual(OperationStatus.Done, status, name);
         Assert.AreEqual(frameCount, doneCount, name);
         CollectionAssert.AreEqual(expected, output, name);
@@ -135,6 +153,8 @@ public sealed class ZstandardSequencesDecoderTests
     [DynamicData(nameof(InvalidInputs))]
     public void Decompress_MalformedSequencesSection_IsCorruptionDetected(string name, byte[] source)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.ArrangeSource(name, source);
         var decoder = new ZstandardDecoder();
 
         OperationStatus status;
@@ -146,6 +166,11 @@ public sealed class ZstandardSequencesDecoderTests
         }
         while (status == OperationStatus.Done);
 
+        diagnostics.Act("status", status);
+        diagnostics.Act("error raised", decoder.LastError);
+        diagnostics.Act("consumed before the failure", position);
+        diagnostics.Assert("status", OperationStatus.InvalidData, status);
+        diagnostics.Assert("error raised", ZstandardDecodeError.CorruptionDetected, decoder.LastError);
         Assert.AreEqual(OperationStatus.InvalidData, status, name);
         Assert.AreEqual(ZstandardDecodeError.CorruptionDetected, decoder.LastError, name);
         Assert.IsFalse(ZstandardDecoder.TryDecompress(source, new byte[200_000], out _), name);

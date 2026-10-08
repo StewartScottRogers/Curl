@@ -12,7 +12,7 @@ Namespace `Curl.Cryptography`. It holds:
 
 - `ConstantTime` (internal): the branch-free helpers (mask from bit, select, less-than and
   equal masks, conditional swap, all-zero check) the primitives share.
-- `Field25519` (internal): GF(2^255 - 19) arithmetic on 16 limbs of 16 bits in a
+- `Field25519` (internal): GF(2^255 - 19) arithmetic on 10 limbs of 26 and 25 bits in a
   caller's `Span<long>`; X25519 uses it and Ed25519 reuses it.
 - `Edwards25519` (internal): edwards25519 points in extended coordinates - addition,
   constant-time scalar multiplication, encoding, and RFC 8032 section 5.1.3 decoding.
@@ -24,7 +24,7 @@ Namespace `Curl.Cryptography`. It holds:
 - `X25519` (public): RFC 7748 key agreement - `GeneratePrivateKey`, `ComputePublicKey`,
   and `TryComputeSharedSecret`, which returns `false` for the all-zero result of a
   low-order peer key.
-- `Field448` (internal): GF(2^448 - 2^224 - 1) arithmetic on 28 limbs of 16 bits in a
+- `Field448` (internal): GF(2^448 - 2^224 - 1) arithmetic on 16 limbs of 28 bits in a
   caller's `Span<long>`; X448 uses it and Ed448 reuses it.
 - `Edwards448` (internal): edwards448 points in projective coordinates - the complete
   addition of RFC 8032 section 5.2.4 (which also doubles), constant-time scalar
@@ -171,8 +171,10 @@ Namespace `Curl.Cryptography`. It holds:
   as `MontgomeryModulus` and the constants in Montgomery form - `For(curve)`,
   `InvertField`, `InvertOrder` (Fermat), `TryReadScalar` ([1, q - 1]) and `ReduceHash`.
 - `BrainpoolPoint` (internal, static): projective points in Montgomery form - `Add` by
-  Renes-Costello-Batina's complete formulas, `MultiplyScalar` (fixed 4-bit window, the
-  table read whole), `TryDecode` of an uncompressed point with the on-curve check,
+  Renes-Costello-Batina's complete formulas, `Double` by the same paper's complete
+  doubling, `MultiplyScalar` (fixed 4-bit window, the table read whole),
+  `MultiplyAndAddPublic` (Shamir's trick for ECDSA verification, skipping zero windows,
+  public values only), `TryDecode` of an uncompressed point with the on-curve check,
   `ToAffine` and `EncodeUncompressed` (ADR-0217).
 - `BrainpoolEcdh` (public, static): ECDH on those curves - `GeneratePrivateKey`,
   `ComputePublicKey` (uncompressed `0x04 || x || y`), `TryComputeSharedSecret` (the
@@ -282,5 +284,8 @@ Namespace `Curl.Cryptography`. It holds:
   with the source cited beside each vector, plus negative cases (a flipped bit, an
   invalid point, a non-canonical encoding). Tests are platform-neutral; a vector that
   takes more than a second is `TestCategory=Integration`.
+- **Optimized in every configuration (ADR-0426).** The project file sets
+  `<Optimize>true</Optimize>`, so the masked table scans run at Release speed under the
+  Debug tests; one bcrypt hash takes tens of milliseconds, not hundreds. Keep it.
 - Same quality gates as every library: 100% line and branch coverage, cyclomatic
   complexity of at most 10, CRAP of at most 30.

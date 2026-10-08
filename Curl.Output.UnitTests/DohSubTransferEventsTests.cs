@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Authentication;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -14,11 +15,15 @@ namespace Curl.Output;
 [TestClass]
 public sealed class DohSubTransferEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(TlsBackend.Schannel)]
     [DataRow(TlsBackend.OpenSsl)]
     public void EveryEvent_IsWrittenAsTheWriterWritesIt_WithEachInfoLinePrefixed(TlsBackend tlsBackend)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("tlsBackend", tlsBackend);
         MemoryStream direct = new();
         MemoryStream prefixed = new();
 
@@ -26,32 +31,47 @@ public sealed class DohSubTransferEventsTests
         ReportEveryEvent(new DohSubTransferEvents(new VerboseTransferEventWriter(prefixed, writesDataLines: true, tlsBackend), tlsBackend));
 
         string[] expected = [.. Lines(direct).Select(line => line.StartsWith("* ", StringComparison.Ordinal) ? "* [DNS] " + line[2..] : line)];
-        CollectionAssert.AreEqual(expected, Lines(prefixed));
+        string[] actual = Lines(prefixed);
+        diagnostics.Act("prefixed lines", string.Join(" | ", actual));
+        diagnostics.Diff("prefixed lines", string.Join("\n", expected), string.Join("\n", actual));
+        diagnostics.Assert("line count", expected.Length, actual.Length);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void ReportTlsTrust_UnderSchannelToAnIpAddress_WritesCurlsPrefixedSniLine()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("tlsBackend", TlsBackend.Schannel);
+        diagnostics.Arrange("trust event", "VerifiesPeer=true, TargetsIpAddress=true");
         MemoryStream output = new();
         DohSubTransferEvents events = new(new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.Schannel), TlsBackend.Schannel);
 
         events.ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = true, TargetsIpAddress = true });
 
-        Assert.Contains("* [DNS] schannel: using IP address, SNI is not supported by OS.", Lines(output));
+        string[] lines = Lines(output);
+        diagnostics.Act("lines", string.Join(" | ", lines));
+        diagnostics.Assert("contains SNI line", true, lines.Contains("* [DNS] schannel: using IP address, SNI is not supported by OS."));
+        Assert.Contains("* [DNS] schannel: using IP address, SNI is not supported by OS.", lines);
     }
 
     [TestMethod]
     public void ReportInfo_TheFilterCreatedLine_KeepsItsOnePrefix()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("info lines", "[DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3; [DNS] added");
         MemoryStream output = new();
         DohSubTransferEvents events = new(new VerboseTransferEventWriter(output, writesDataLines: true, TlsBackend.Schannel), TlsBackend.Schannel);
 
         events.ReportInfo("[DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3");
         events.ReportInfo("[DNS] added");
 
-        CollectionAssert.AreEqual(
-            new[] { "* [DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3", "* [DNS] [DNS] added" },
-            Lines(output));
+        string[] expected = ["* [DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3", "* [DNS] [DNS] added"];
+        string[] actual = Lines(output);
+        diagnostics.Act("lines", string.Join(" | ", actual));
+        diagnostics.Diff("lines", string.Join("\n", expected), string.Join("\n", actual));
+        diagnostics.Assert("line count", expected.Length, actual.Length);
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     private static void ReportEveryEvent(ITransferEvents events)

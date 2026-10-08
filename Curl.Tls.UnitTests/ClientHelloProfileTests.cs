@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Tls;
 
 /// <summary>
@@ -23,6 +25,10 @@ public sealed class ClientHelloProfileTests
 
     private const int X25519MlKem768ShareLength = 1216;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void LibreSslProfileRebuildsTheCapturedHello()
     {
@@ -32,6 +38,12 @@ public sealed class ClientHelloProfileTests
     [TestMethod]
     public void OnlySchannelsTls12HelloIsInARecordOfItsCeiling()
     {
+        Diagnostics.Arrange("profiles", "Schannel, OpenSSL, LibreSSL");
+
+        Diagnostics.Act("Schannel TLS 1.2 record version is the ceiling", ClientHelloProfile.Schannel.Tls12RecordVersionIsTheCeiling);
+        Diagnostics.Act("OpenSSL TLS 1.2 record version is the ceiling", ClientHelloProfile.OpenSsl.Tls12RecordVersionIsTheCeiling);
+        Diagnostics.Act("LibreSSL TLS 1.2 record version is the ceiling", ClientHelloProfile.LibreSsl.Tls12RecordVersionIsTheCeiling);
+        Diagnostics.Assert("only Schannel's is the ceiling", "True, False, False", $"{ClientHelloProfile.Schannel.Tls12RecordVersionIsTheCeiling}, {ClientHelloProfile.OpenSsl.Tls12RecordVersionIsTheCeiling}, {ClientHelloProfile.LibreSsl.Tls12RecordVersionIsTheCeiling}");
         Assert.IsTrue(ClientHelloProfile.Schannel.Tls12RecordVersionIsTheCeiling);
         Assert.IsFalse(ClientHelloProfile.OpenSsl.Tls12RecordVersionIsTheCeiling);
         Assert.IsFalse(ClientHelloProfile.LibreSsl.Tls12RecordVersionIsTheCeiling);
@@ -49,6 +61,8 @@ public sealed class ClientHelloProfileTests
         byte[] mlKemShare = [.. Enumerable.Range(0, X25519MlKem768ShareLength).Select(index => (byte)index)];
         byte[] capture = Convert.FromHexString(OpenSslCaptureBeforeMlKemShare + Convert.ToHexString(mlKemShare) + OpenSslCaptureAfterMlKemShare);
 
+        Diagnostics.Arrange("test ML-KEM share length", X25519MlKem768ShareLength);
+        Diagnostics.Assert("capture length", 1569, capture.Length);
         Assert.HasCount(1569, capture);
         AssertProfileRebuilds(ClientHelloProfile.OpenSsl, capture);
     }
@@ -58,8 +72,12 @@ public sealed class ClientHelloProfileTests
     {
         // The capture ends with compress_certificate (27): zlib and zstd, no brotli (ADR-0199).
         const string CapturedCompressCertificate = "001b00050400010003";
+        Diagnostics.Arrange("captured compress_certificate", CapturedCompressCertificate);
         TlsExtension extension = CompressCertificateExtension.Encode(ClientHelloProfile.OpenSsl.CertificateCompressionAlgorithms);
 
+        Diagnostics.Act("OpenSSL compression algorithms", Groups(ClientHelloProfile.OpenSsl.CertificateCompressionAlgorithms));
+        Diagnostics.Bytes("encoded extension data", extension.Data);
+        Diagnostics.Diff("compress_certificate", CapturedCompressCertificate, "001b0005" + Convert.ToHexString(extension.Data).ToLowerInvariant());
         CollectionAssert.AreEqual(new ushort[] { CertificateCompressionAlgorithm.Zlib, CertificateCompressionAlgorithm.Zstd }, ClientHelloProfile.OpenSsl.CertificateCompressionAlgorithms.ToArray());
         Assert.EndsWith(CapturedCompressCertificate, OpenSslCaptureAfterMlKemShare);
         Assert.AreEqual(CapturedCompressCertificate, "001b0005" + Convert.ToHexString(extension.Data).ToLowerInvariant());
@@ -68,6 +86,14 @@ public sealed class ClientHelloProfileTests
     [TestMethod]
     public void ProfilesShareTheGroupsTheCapturesShare()
     {
+        Diagnostics.Arrange("profiles", "LibreSSL, Schannel, OpenSSL");
+
+        Diagnostics.Act("LibreSSL key share groups", Groups(ClientHelloProfile.LibreSsl.KeyShareGroups));
+        Diagnostics.Act("Schannel key share groups", Groups(ClientHelloProfile.Schannel.KeyShareGroups));
+        Diagnostics.Act("OpenSSL key share groups", Groups(ClientHelloProfile.OpenSsl.KeyShareGroups));
+        Diagnostics.Assert("LibreSSL key share groups", "0x001d", Groups(ClientHelloProfile.LibreSsl.KeyShareGroups));
+        Diagnostics.Assert("Schannel key share groups", "0x001d, 0x0017, 0x0018", Groups(ClientHelloProfile.Schannel.KeyShareGroups));
+        Diagnostics.Assert("OpenSSL key share groups", "0x11ec, 0x001d", Groups(ClientHelloProfile.OpenSsl.KeyShareGroups));
         CollectionAssert.AreEqual(new ushort[] { 0x001d }, ClientHelloProfile.LibreSsl.KeyShareGroups.ToArray());
         CollectionAssert.AreEqual(new ushort[] { 0x001d, 0x0017, 0x0018 }, ClientHelloProfile.Schannel.KeyShareGroups.ToArray());
         CollectionAssert.AreEqual(new ushort[] { 0x11ec, 0x001d }, ClientHelloProfile.OpenSsl.KeyShareGroups.ToArray());
@@ -77,11 +103,15 @@ public sealed class ClientHelloProfileTests
     public void AChangedListKeepsTheExtensionOrder()
     {
         ClientHelloProfile profile = ClientHelloProfile.Schannel with { SupportedGroups = [0x0017] };
+        Diagnostics.Arrange("profile", "Schannel with supported groups 0x0017");
 
         ClientHello hello = profile.Build("a", new byte[ClientHello.RandomLength], [], []);
 
-        CollectionAssert.AreEqual(ClientHelloProfile.Schannel.ExtensionOrder.ToArray(), hello.Extensions.Select(extension => extension.Type).ToArray());
         TlsExtension groups = hello.Extensions.Single(extension => extension.Type == TlsExtensionType.SupportedGroups);
+        Diagnostics.Act("extension order", Names(hello.Extensions.Select(extension => extension.Type)));
+        Diagnostics.Assert("extension order", Names(ClientHelloProfile.Schannel.ExtensionOrder), Names(hello.Extensions.Select(extension => extension.Type)));
+        Diagnostics.Assert("supported groups", "0x0017", Groups(SupportedGroupsExtension.Decode(groups.Data).Value));
+        CollectionAssert.AreEqual(ClientHelloProfile.Schannel.ExtensionOrder.ToArray(), hello.Extensions.Select(extension => extension.Type).ToArray());
         CollectionAssert.AreEqual(new ushort[] { 0x0017 }, SupportedGroupsExtension.Decode(groups.Data).Value.ToArray());
     }
 
@@ -89,24 +119,45 @@ public sealed class ClientHelloProfileTests
     public void AnExtensionNoProfileBuildsIsRefused()
     {
         ClientHelloProfile profile = ClientHelloProfile.LibreSsl with { ExtensionOrder = [TlsExtensionType.Cookie] };
+        Diagnostics.Arrange("profile", "LibreSSL with extension order cookie (0x002c) only");
 
-        Assert.ThrowsExactly<InvalidOperationException>(() => profile.Build("a", new byte[ClientHello.RandomLength], [], []));
+        InvalidOperationException exception = Assert.ThrowsExactly<InvalidOperationException>(() => profile.Build("a", new byte[ClientHello.RandomLength], [], []));
+
+        Diagnostics.Act("exception", exception.Message);
+        Diagnostics.Assert("exception type", nameof(InvalidOperationException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void EncodeRecordRefusesANullHello()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => ClientHelloProfile.OpenSsl.EncodeRecord(null!));
+        Diagnostics.Arrange("hello", "null");
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => ClientHelloProfile.OpenSsl.EncodeRecord(null!));
+
+        Diagnostics.Act("exception parameter", exception.ParamName);
+        Diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
-    private static void AssertProfileRebuilds(ClientHelloProfile profile, byte[] capture)
+    private static string Names<T>(IEnumerable<T> values) =>
+        string.Join(", ", values);
+
+    private static string Groups(IEnumerable<ushort> values) =>
+        string.Join(", ", values.Select(value => $"0x{value:x4}"));
+
+    private void AssertProfileRebuilds(ClientHelloProfile profile, byte[] capture)
     {
+        Diagnostics.Bytes("captured record", capture);
         ClientHello captured = ClientHello.Decode(capture[9..]).Value;
         TlsExtension keyShare = captured.Extensions.Single(extension => extension.Type == TlsExtensionType.KeyShare);
         IReadOnlyList<KeyShareEntry> keyShares = KeyShareExtension.DecodeClientShares(keyShare.Data).Value;
+        Diagnostics.Arrange("captured key share groups", Groups(keyShares.Select(share => share.Group)));
 
         ClientHello rebuilt = profile.Build("localhost", captured.Random, captured.LegacySessionId, keyShares);
 
+        byte[] record = profile.EncodeRecord(rebuilt);
+        Diagnostics.Act("rebuilt record length", record.Length);
+        Diagnostics.Assert("key share groups", Groups(profile.KeyShareGroups), Groups(keyShares.Select(share => share.Group)));
+        Diagnostics.Diff("rebuilt record", capture, record);
         CollectionAssert.AreEqual(profile.KeyShareGroups.ToArray(), keyShares.Select(share => share.Group).ToArray());
         Assert.AreEqual(Convert.ToHexStringLower(capture), Convert.ToHexStringLower(profile.EncodeRecord(rebuilt)));
     }

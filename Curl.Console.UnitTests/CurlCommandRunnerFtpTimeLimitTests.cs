@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -30,6 +31,10 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
     private readonly MemoryStream standardError = new();
     private readonly SteppingTimeProvider clock = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -39,7 +44,9 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
 
         int exitCode = await RunUntilStalledAsync(connector, TimeSpan.FromSeconds(1), "-sS", "-m", "1", "ftp://127.0.0.1/f.txt");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert("stderr", Lf("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine), Lf(StandardErrorText));
         Assert.AreEqual("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine, StandardErrorText);
     }
 
@@ -50,7 +57,9 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
 
         int exitCode = await RunUntilStalledAsync(connector, TimeSpan.FromSeconds(1), "-sS", "--connect-timeout", "1", "ftp://127.0.0.1/f.txt");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert("stderr", Lf("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine), Lf(StandardErrorText));
         Assert.AreEqual("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine, StandardErrorText);
     }
 
@@ -61,7 +70,9 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
 
         int exitCode = await RunUntilStalledAsync(connector, TimeSpan.FromSeconds(1), "-sS", "-m", "1", "ftp://127.0.0.1/f.txt");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert("stderr", Lf("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine), Lf(StandardErrorText));
         Assert.AreEqual("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine, StandardErrorText);
     }
 
@@ -72,7 +83,9 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
 
         int exitCode = await RunUntilStalledAsync(connector, TimeSpan.FromSeconds(1), "-sS", "--disable-epsv", "-m", "1", "ftp://127.0.0.1/f.txt");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert("stderr", Lf("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine), Lf(StandardErrorText));
         Assert.AreEqual("curl: (28) Operation timed out after 1000 milliseconds with 0 bytes received" + NewLine, StandardErrorText);
     }
 
@@ -85,6 +98,7 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
         ScriptedFtpConnector control = new([LoggedIn + "227 Entering Passive Mode (10,255,255,1,4,1)\r\n"]);
         TaskCompletionSource<ConnectResult> systemGivesUp = new(TaskCreationOptions.RunContinuationsAsynchronously);
         GatedDataConnector data = new(systemGivesUp.Task);
+        Diagnostics.Arrange("control script", Lf(LoggedIn + "227 Entering Passive Mode (10,255,255,1,4,1)\r\n"));
         Task<int> run = Run(
             control,
             data,
@@ -101,10 +115,22 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
         systemGivesUp.SetResult(ConnectResult.Failed(
             CurlExitCode.OperationTimedOut,
             "Failed to connect to 10.255.255.1:1025 after 21125 ms: Could not connect to server"));
-        int exitCode = await run;
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await run;
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        Diagnostics.Assert("ended by the connect timeout", false, endedByTheConnectTimeout);
         Assert.IsFalse(endedByTheConnectTimeout);
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert(
+            "stderr",
+            "curl: (28) Failed to connect to 127.0.0.1:47911 via 10.255.255.1:1025 after 21125 ms: Could not connect to server\n",
+            Lf(StandardErrorText));
         Assert.AreEqual(
             "curl: (28) Failed to connect to 127.0.0.1:47911 via 10.255.255.1:1025 after 21125 ms: Could not connect to server" + NewLine,
             StandardErrorText);
@@ -119,10 +145,16 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
 
         int exitCode = await RunUntilStalledAsync(connector, TimeSpan.FromSeconds(1), "-sS", "-m", "1", "ftp://127.0.0.1/f.txt");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.OperationTimedOut, exitCode);
         Assert.AreEqual((int)CurlExitCode.OperationTimedOut, exitCode);
+        Diagnostics.Assert("stderr", Lf("curl: (28) Operation timed out after 1000 milliseconds with 5 out of 100 bytes received" + NewLine), Lf(StandardErrorText));
         Assert.AreEqual("curl: (28) Operation timed out after 1000 milliseconds with 5 out of 100 bytes received" + NewLine, StandardErrorText);
+        Diagnostics.Assert("stdout", "hello", Encoding.ASCII.GetString(standardOutput.ToArray()));
         Assert.AreEqual("hello", Encoding.ASCII.GetString(standardOutput.ToArray()));
     }
+
+    private static string Lf(string text) =>
+        text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace(NewLine, "\n", StringComparison.Ordinal);
 
     /// <summary>Runs <paramref name="arguments" /> and advances the clock by <paramref name="wait" /> once the server has stalled.</summary>
     private async Task<int> RunUntilStalledAsync(ScriptedFtpConnector connector, TimeSpan wait, params string[] arguments)
@@ -130,12 +162,23 @@ public sealed class CurlCommandRunnerFtpTimeLimitTests
         Task<int> run = Run(connector, ftpDataConnector: null, arguments);
         await connector.Stalled;
         clock.Advance(wait);
-        return await run;
+        Diagnostics.Arrange("clock advance", wait);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await run;
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        return exitCode;
     }
 
     /// <summary>Starts <paramref name="arguments" />, the FTP data connections through <paramref name="ftpDataConnector" /> when given.</summary>
     private Task<int> Run(IConnector connector, IConnector? ftpDataConnector, params string[] arguments)
     {
+        Diagnostics.Arrange("command line", "curl " + string.Join(" ", arguments));
         InMemoryFileSystem files = new();
         TransferDispatch dispatch = new(
             new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(

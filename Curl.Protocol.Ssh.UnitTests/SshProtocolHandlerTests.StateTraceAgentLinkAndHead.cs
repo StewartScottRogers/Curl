@@ -24,6 +24,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             "* SSH: trying publickey authentication via agent | * [SSH] [SSH_AUTH_AGENT_INIT] -> [SSH_AUTH_AGENT_LIST] | "
@@ -42,6 +43,7 @@ public sealed partial class SshProtocolHandlerTests
         string lines = await RunTracedAsync("sftp://files.example/d/", setup);
 
         string traced = string.Join(" | ", lines.Split(" | ").Where(line => !line.StartsWith("<= ", StringComparison.Ordinal)));
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             traced,
             "* [SSH] [SSH_SFTP_READDIR_INIT] -> [SSH_SFTP_READDIR] | "
@@ -59,6 +61,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/d/", setup, noBody: true);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(
             lines,
             "* [SSH] [SSH_SFTP_QUOTE_INIT] -> [SSH_SFTP_GETINFO] | * [SSH] [SSH_SFTP_GETINFO] -> [SSH_SFTP_FILETIME] | "

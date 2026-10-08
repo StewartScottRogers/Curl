@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -22,9 +23,20 @@ public sealed class TraceTransferEventWriterOpenSslTlsTests
     private readonly MemoryStream output = new();
 
     // `curl --trace-ascii - -k -s -o /dev/null https://host.docker.internal:28450/`, up to the handshake.
+    public TestContext TestContext { get; set; } = null!;
+
+    private static void WriteTextDiagnostics(TestDiagnostics diagnostics, string label, string expected, string actual)
+    {
+        diagnostics.Act(label, actual);
+        diagnostics.Diff(label, expected, actual);
+        diagnostics.Assert(label, expected, actual);
+    }
+
     [TestMethod]
     public void Tls13HandshakeWithoutVerification_TraceAscii_RendersAsCurlsOpenSslBuild()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "Tls13HandshakeWithoutVerification_TraceAscii_RendersAsCurlsOpenSslBuild");
         var writer = OpenSslWriter(TraceDumpFormat.TextOnly);
 
         writer.ReportInfo("ALPN: curl offers h2,http/1.1");
@@ -53,8 +65,7 @@ public sealed class TraceTransferEventWriterOpenSslTlsTests
         writer.ReportTlsMessage(Message(TlsContentType.InnerContentType, sent: true, HandshakeInnerType));
         writer.ReportTlsMessage(ZeroFilled(TlsContentType.Handshake, sent: true, 52, 20));
 
-        Assert.AreEqual(
-            "* ALPN: curl offers h2,http/1.1\n" +
+        string expectedText = "* ALPN: curl offers h2,http/1.1\n" +
             "=> Send SSL data, 5 bytes (0x5)\n0000: .....\n" +
             "* TLSv1.3 (OUT), TLS handshake, Client hello (1):\n" +
             "=> Send SSL data, 1566 bytes (0x61e)\n" + UnprintableAsciiDump(1566) +
@@ -87,50 +98,69 @@ public sealed class TraceTransferEventWriterOpenSslTlsTests
             "=> Send SSL data, 5 bytes (0x5)\n0000: ....E\n" +
             "=> Send SSL data, 1 bytes (0x1)\n0000: .\n" +
             "* TLSv1.3 (OUT), TLS handshake, Finished (20):\n" +
-            "=> Send SSL data, 52 bytes (0x34)\n" + UnprintableAsciiDump(52),
-            Written());
+            "=> Send SSL data, 52 bytes (0x34)\n" + UnprintableAsciiDump(52);
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     // The same exchange after the response body: the server's close notify.
     [TestMethod]
     public void Tls13CloseNotify_TraceAscii_RendersAsCurlsOpenSslBuild()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "Tls13CloseNotify_TraceAscii_RendersAsCurlsOpenSslBuild");
         var writer = OpenSslWriter(TraceDumpFormat.TextOnly);
 
         writer.ReportTlsMessage(Message(TlsContentType.RecordHeader, sent: false, 0x17, 0x03, 0x03, 0x00, 0x13));
         writer.ReportTlsMessage(Message(TlsContentType.InnerContentType, sent: false, 0x15));
         writer.ReportTlsMessage(Message(TlsContentType.Alert, sent: false, 0x01, 0x00));
 
-        Assert.AreEqual(
-            "<= Recv SSL data, 5 bytes (0x5)\n0000: .....\n" +
+        string expectedText = "<= Recv SSL data, 5 bytes (0x5)\n0000: .....\n" +
             "<= Recv SSL data, 1 bytes (0x1)\n0000: .\n" +
             "* TLSv1.3 (IN), TLS alert, close notify (256):\n" +
-            "<= Recv SSL data, 2 bytes (0x2)\n0000: ..\n",
-            Written());
+            "<= Recv SSL data, 2 bytes (0x2)\n0000: ..\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     // --trace dumps SSL data as hex and text, as it dumps body bytes.
     [TestMethod]
     public void TlsData_Trace_DumpsHexAndText()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsData_Trace_DumpsHexAndText");
         OpenSslWriter(TraceDumpFormat.HexAndText).ReportTlsData([0x17, 0x03, 0x03, 0x00, 0x45], sent: false);
 
-        Assert.AreEqual(
-            "<= Recv SSL data, 5 bytes (0x5)\n0000: 17 03 03 00 45 " + new string(' ', 11 * 3) + "....E\n",
-            Written());
+        string expectedText = "<= Recv SSL data, 5 bytes (0x5)\n0000: 17 03 03 00 45 " + new string(' ', 11 * 3) + "....E\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     [TestMethod]
     public void TlsTrustWithCaFile_WritesTheTrustAnchorLines()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsTrustWithCaFile_WritesTheTrustAnchorLines");
         OpenSslWriter(TraceDumpFormat.TextOnly).ReportTlsTrust(new TlsTrustEvent { VerifiesPeer = true, CaCertificateFile = "/w/cert.pem" });
 
-        Assert.AreEqual("* SSL Trust Anchors:\n*   CAfile: /w/cert.pem\n", Written());
+        string expectedText = "* SSL Trust Anchors:\n*   CAfile: /w/cert.pem\n";
+        string actualText = Written();
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     [TestMethod]
     public void TlsMessage_WithTraceTime_StampsTheLineAndTheDump()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scenario", "TlsMessage_WithTraceTime_StampsTheLineAndTheDump");
         TraceTransferEventWriter writer = new(output, TraceDumpFormat.TextOnly, writesTimestamps: true, new QueuedTimeProvider(
             [new DateTimeOffset(2026, 9, 28, 3, 33, 48, TimeSpan.Zero), new DateTimeOffset(2026, 9, 28, 3, 33, 48, TimeSpan.Zero)]), TlsBackend.OpenSsl);
 
@@ -139,7 +169,11 @@ public sealed class TraceTransferEventWriterOpenSslTlsTests
         var lines = Written().Split('\n');
         StringAssert.EndsWith(lines[0], " * TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):");
         StringAssert.EndsWith(lines[1], " => Send SSL data, 1 bytes (0x1)");
-        Assert.AreEqual("0000: .", lines[2]);
+        string expectedText = "0000: .";
+        string actualText = lines[2];
+        WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
+
+        Assert.AreEqual(expectedText, actualText);
     }
 
     private static TlsMessageEvent Message(TlsContentType contentType, bool sent, params byte[] bytes)

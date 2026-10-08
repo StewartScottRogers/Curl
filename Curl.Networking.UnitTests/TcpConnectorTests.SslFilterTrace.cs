@@ -37,7 +37,9 @@ public sealed partial class TcpConnectorTests
         events = new RecordingTransferEvents { OnInfo = line => openedAtLine.AddRange(line.StartsWith("[SSL", StringComparison.Ordinal) ? [events.Opened.Count] : []) };
         var connector = SslTracingConnector(ConnectResult.Connected(new FakeConnection(), null), tracesSsl: true);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18961, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18961, UseTls: true) { Events = events, PoolScheme = "https" });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(OriginSslLines, SslLines(events));
@@ -50,8 +52,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = SslTracingConnector(ConnectResult.Connected(new FakeConnection(), null, applicationProtocol: "h2"), tracesSsl: true);
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18961, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18961, UseTls: true) { Events = events, PoolScheme = "https" });
 
+        Diagnostics.Assert("last info line", "[SSL] query ALPN: returning 'h2'", events.Info[^1]);
         Assert.AreEqual("[SSL] query ALPN: returning 'h2'", events.Info[^1]);
     }
 
@@ -63,7 +66,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = SslTracingConnector(ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "untrusted"), tracesSsl: true);
 
-        var result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18963, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18963, UseTls: true) { Events = events, PoolScheme = "https" });
+
+        Diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
         CollectionAssert.AreEqual(
@@ -84,8 +89,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = SslTracingConnector(ConnectResult.Connected(new FakeConnection(), null), tracesSslProxy: true);
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 18961, UseTls: true) { Events = events, PoolScheme = "https" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 18961, UseTls: true) { Events = events, PoolScheme = "https" });
 
+        Diagnostics.Assert("SSL lines", 0, SslLines(events).Length);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("[SSL", StringComparison.Ordinal)));
     }
 
@@ -95,8 +101,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = SslTracingConnector(ConnectResult.Connected(new FakeConnection(), null), tracesSsl: true);
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 993, UseTls: true) { Events = events, PoolScheme = "imaps" }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 993, UseTls: true) { Events = events, PoolScheme = "imaps" });
 
+        Diagnostics.Diff("SSL lines", string.Join("\n", OriginSslLines.Take(8)), string.Join("\n", SslLines(events)));
         CollectionAssert.AreEqual(OriginSslLines.Take(8).ToArray(), SslLines(events));
     }
 
@@ -106,8 +113,9 @@ public sealed partial class TcpConnectorTests
         var events = new RecordingTransferEvents();
         var connector = SslTracingConnector(ConnectResult.Connected(new FakeConnection(), null), tracesSsl: true, tracesSslProxy: true);
 
-        await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 3128, UseTls: true) { Events = events, PoolScheme = "https", IsForwardProxy = true }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 3128, UseTls: true) { Events = events, PoolScheme = "https", IsForwardProxy = true });
 
+        Diagnostics.Assert("SSL-PROXY lines", 8, SslLines(events).Length);
         CollectionAssert.AreEqual(OriginSslLines.Take(8).Select(line => line.Replace("[SSL]", "[SSL-PROXY]", StringComparison.Ordinal)).ToArray(), SslLines(events));
     }
 
@@ -120,7 +128,7 @@ public sealed partial class TcpConnectorTests
         var secured = new ScriptedConnection(Encoding.Latin1.GetBytes(TunnelEstablishedReply));
         var connector = HttpsProxyTunnelConnector(new SequencedTlsProvider(ConnectResult.Connected(secured, null)), tracesSslProxy: true);
 
-        await connector.ConnectAsync(HttpsProxyTunnelTarget with { Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, HttpsProxyTunnelTarget with { Events = events });
 
         AssertTunnelLines(
             new[]
@@ -162,8 +170,9 @@ public sealed partial class TcpConnectorTests
             TracesSslFilter = true,
         };
 
-        await connector.ConnectAsync(new ConnectTarget("example.test", 443, UseTls: true) { Proxy = TunnelHttpsProxy, PoolScheme = "https", Events = events }, CancellationToken.None);
+        await ConnectLoggedAsync(connector, new ConnectTarget("example.test", 443, UseTls: true) { Proxy = TunnelHttpsProxy, PoolScheme = "https", Events = events });
 
+        Diagnostics.Diff("SSL lines", string.Join("\n", OriginSslLines), string.Join("\n", SslLines(events)));
         CollectionAssert.AreEqual(OriginSslLines, events.Info.Where(line => line.StartsWith("[SSL", StringComparison.Ordinal)).ToArray());
     }
 

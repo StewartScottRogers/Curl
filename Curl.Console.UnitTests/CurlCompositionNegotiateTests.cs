@@ -3,6 +3,8 @@ using Curl.Authentication;
 using Curl.Cli;
 using Curl.Protocol.Abstractions;
 
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -15,6 +17,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionNegotiateTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "http://127.0.0.1:18527/p";
 
     private const string Request = "GET /p HTTP/1.1\r\nHost: 127.0.0.1:18527\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
@@ -31,6 +37,7 @@ public sealed class CurlCompositionNegotiateTests
 
         (int exitCode, string standardOutput) = await RunAsync(server, tokens, "--negotiate", "-u", ":", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Request.Replace("User-Agent", "Authorization: Negotiate YAEA\r\nUser-Agent", StringComparison.Ordinal), Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
@@ -45,6 +52,7 @@ public sealed class CurlCompositionNegotiateTests
 
         (int exitCode, _) = await RunAsync(server, tokens, "--negotiate", "-u", ":", "--service-name", "svc", "--proxy-service-name", "proxysvc", "--delegation", "always", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(new SecurityContextRequest(SecurityMechanism.Negotiate, "svc", "127.0.0.1") { Delegation = SecurityDelegation.Always }, tokens.Requests.Single());
     }
@@ -58,10 +66,16 @@ public sealed class CurlCompositionNegotiateTests
     [DataRow(new[] { "--delegation", "none" }, null, null, SecurityDelegation.None, DisplayName = "--delegation none")]
     public void NegotiateOptionsMapping_EachOption_ReachesTheNegotiateOptions(string[] arguments, string? serviceName, string? proxyServiceName, SecurityDelegation delegation)
     {
+        Diagnostics.ArrangeCommandLine([.. arguments, Url]);
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, Url], _ => true);
         Assert.IsNotNull(parsed.Options);
 
-        Assert.AreEqual(new NegotiateOptions(serviceName, proxyServiceName, delegation), NegotiateOptionsMapping.FromCommandLine(parsed.Options));
+        NegotiateOptions options = NegotiateOptionsMapping.FromCommandLine(parsed.Options);
+        Diagnostics.Act("Negotiate options", options);
+
+        NegotiateOptions expected = new(serviceName, proxyServiceName, delegation);
+        Diagnostics.Assert("Negotiate options", expected, options);
+        Assert.AreEqual(expected, options);
     }
 
     [TestMethod]
@@ -76,6 +90,7 @@ public sealed class CurlCompositionNegotiateTests
 
         (int exitCode, string standardOutput) = await RunAsync(server, tokens, "--anyauth", "-u", "alice:pw", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Request + Request.Replace("User-Agent", "Authorization: Negotiate YAEA\r\nUser-Agent", StringComparison.Ordinal), Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
@@ -90,6 +105,7 @@ public sealed class CurlCompositionNegotiateTests
 
         (int exitCode, string standardOutput) = await RunAsync(server, tokens, "--negotiate", "-u", ":", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Request, Latin1(server.Written));
         Assert.AreEqual("deny", standardOutput);
@@ -110,23 +126,25 @@ public sealed class CurlCompositionNegotiateTests
         await AssertProductionNegotiateSendsNothingAsync();
     }
 
-    private static async Task AssertProductionNegotiateSendsNothingAsync()
+    private async Task AssertProductionNegotiateSendsNothingAsync()
     {
         ScriptedConnector server = new([Encoding.Latin1.GetBytes(Unauthorized)]);
 
         (int exitCode, string standardOutput) = await RunAsync(server, null, "--negotiate", "-u", ":", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Request, Latin1(server.Written));
         Assert.AreEqual("deny", standardOutput);
     }
 
-    private static async Task<(int ExitCode, string StandardOutput)> RunAsync(ScriptedConnector server, ISecurityContextFactory? tokens, params string[] arguments)
+    private async Task<(int ExitCode, string StandardOutput)> RunAsync(ScriptedConnector server, ISecurityContextFactory? tokens, params string[] arguments)
     {
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
 
+        Diagnostics.ArrangeCommandLine(["-sS", .. arguments]);
         int exitCode = await CurlComposition
             .CreateRunner(
                 standardOutput,
@@ -137,7 +155,10 @@ public sealed class CurlCompositionNegotiateTests
                 securityContexts: tokens)
             .RunAsync(["-sS", .. arguments]);
 
-        return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()));
+        string output = Encoding.Latin1.GetString(standardOutput.ToArray());
+        Diagnostics.ActRun(exitCode, output, Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.ActWritten(server);
+        return (exitCode, output);
     }
 
     private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);

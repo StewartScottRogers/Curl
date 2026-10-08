@@ -3,6 +3,7 @@ using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -28,6 +29,10 @@ public sealed class CurlCommandRunnerOutNullTests
     private readonly MemoryStream standardError = new();
     private readonly InMemoryFileSystem outputFiles = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
@@ -39,6 +44,10 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok], "-s", spelledOption, Url, "-w", "%{http_code}");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "200", StandardOutputText);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
+        Diagnostics.Assert("files written", 0, outputFiles.Written.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("200", StandardOutputText);
         Assert.AreEqual(string.Empty, StandardErrorText);
@@ -50,6 +59,9 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok], "-s", Url, "--out-null");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
+        Diagnostics.Assert("files written", 0, outputFiles.Written.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardOutputText);
         Assert.IsEmpty(outputFiles.Written);
@@ -60,6 +72,10 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok, Ok], "-s", "--out-null", "-o", "b.txt", Url, OtherUrl);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
+        Diagnostics.Diff("files written", "b.txt", string.Join(", ", outputFiles.Written.Keys));
+        Diagnostics.Diff("b.txt content", "hello", WrittenText("b.txt"));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardOutputText);
         CollectionAssert.AreEquivalent(new[] { "b.txt" }, outputFiles.Written.Keys);
@@ -71,6 +87,10 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok, Ok], "-s", "-o", "c.txt", "--out-null", Url, OtherUrl);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
+        Diagnostics.Diff("files written", "c.txt", string.Join(", ", outputFiles.Written.Keys));
+        Diagnostics.Diff("c.txt content", "hello", WrittenText("c.txt"));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardOutputText);
         CollectionAssert.AreEquivalent(new[] { "c.txt" }, outputFiles.Written.Keys);
@@ -82,6 +102,8 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok, Ok], "-s", "--out-null", Url, OtherUrl, "-w", "%{urlnum}\n");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "0\nhello1\n", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("0\nhello1\n", StandardOutputText);
     }
@@ -91,6 +113,8 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok], "-s", "-i", "--out-null", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardOutputText);
     }
@@ -100,8 +124,11 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok], "-s", "-D", "-", "--out-null", Url);
 
+        string expectedHead = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nX-A: b\r\n\r\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", Lf(expectedHead), Lf(StandardOutputText));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nX-A: b\r\n\r\n", StandardOutputText);
+        Assert.AreEqual(expectedHead, StandardOutputText);
     }
 
     [TestMethod]
@@ -109,6 +136,8 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok], "-s", "--out-null", Url, "-w", "%{filename_effective}|%{size_download}");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "|5", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("|5", StandardOutputText);
     }
@@ -118,6 +147,9 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok], "-s", "--remote-name-all", "--out-null", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
+        Diagnostics.Assert("files written", 0, outputFiles.Written.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardOutputText);
         Assert.IsEmpty(outputFiles.Written);
@@ -128,6 +160,8 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         int exitCode = await RunAsync([Ok], runsOnWindows: true, "-s", "--out-null", Url, "-w", "%{http_code}\n");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "200\n", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("200\n", StandardOutputText);
     }
@@ -138,6 +172,9 @@ public sealed class CurlCommandRunnerOutNullTests
         int exitCode = await RunAsync(
             [Ok], runsOnWindows: false, writesProgressMeter: true, standardOutputIsTerminal: true, "--out-null", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr starts with meter header", true, StandardErrorText.StartsWith("  % Total    % Received % Xferd  Average Speed", StringComparison.Ordinal));
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
         Assert.AreEqual(0, exitCode);
         StringAssert.StartsWith(StandardErrorText, "  % Total    % Received % Xferd  Average Speed");
         Assert.AreEqual(string.Empty, StandardOutputText);
@@ -151,7 +188,9 @@ public sealed class CurlCommandRunnerOutNullTests
     private Task<int> RunAsync(string[] responses, bool runsOnWindows, params string[] arguments) =>
         RunAsync(responses, runsOnWindows, writesProgressMeter: false, standardOutputIsTerminal: false, arguments);
 
-    private Task<int> RunAsync(
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(
         string[] responses,
         bool runsOnWindows,
         bool writesProgressMeter,
@@ -160,18 +199,32 @@ public sealed class CurlCommandRunnerOutNullTests
     {
         ScriptedConnector server = new(responses.Select(Encoding.Latin1.GetBytes));
         HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("scripted responses", Lf(string.Join(" | ", responses)));
+        Diagnostics.Arrange("runs on Windows", runsOnWindows);
+        Diagnostics.Arrange("writes progress meter", writesProgressMeter);
+        Diagnostics.Arrange("standard output is terminal", standardOutputIsTerminal);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: runsOnWindows,
+                    writesProgressMeter: writesProgressMeter,
+                    standardOutputIsTerminal: standardOutputIsTerminal,
+                    outputPaths: outputFiles)
+                .RunAsync(arguments);
+        }
 
-        return new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: runsOnWindows,
-                writesProgressMeter: writesProgressMeter,
-                standardOutputIsTerminal: standardOutputIsTerminal,
-                outputPaths: outputFiles)
-            .RunAsync(arguments);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        Diagnostics.Act("files written", string.Join(", ", outputFiles.Written.Keys));
+        return exitCode;
     }
 }

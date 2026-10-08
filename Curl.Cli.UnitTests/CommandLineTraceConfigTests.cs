@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -10,6 +12,10 @@ namespace Curl.Cli;
 public sealed class CommandLineTraceConfigTests
 {
     private const string Url = "http://127.0.0.1:1/";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow("--trace-config", "ids", "-v")]
@@ -24,6 +30,8 @@ public sealed class CommandLineTraceConfigTests
     {
         CommandLineOptions options = Accept(arguments);
 
+        Diagnostics.Assert("trace IDs", true, options.TraceIds);
+        Diagnostics.Assert("trace time", false, options.TraceTime);
         Assert.IsTrue(options.TraceIds);
         Assert.IsFalse(options.TraceTime);
     }
@@ -36,6 +44,8 @@ public sealed class CommandLineTraceConfigTests
     {
         CommandLineOptions options = Accept(arguments);
 
+        Diagnostics.Assert("trace time", true, options.TraceTime);
+        Diagnostics.Assert("trace IDs", false, options.TraceIds);
         Assert.IsTrue(options.TraceTime);
         Assert.IsFalse(options.TraceIds);
     }
@@ -51,6 +61,8 @@ public sealed class CommandLineTraceConfigTests
     {
         CommandLineOptions options = Accept(arguments);
 
+        Diagnostics.Assert("trace IDs", true, options.TraceIds);
+        Diagnostics.Assert("trace time", true, options.TraceTime);
         Assert.IsTrue(options.TraceIds);
         Assert.IsTrue(options.TraceTime);
     }
@@ -76,6 +88,8 @@ public sealed class CommandLineTraceConfigTests
     {
         CommandLineOptions options = Accept(arguments);
 
+        Diagnostics.Assert("trace IDs", false, options.TraceIds);
+        Diagnostics.Assert("trace time", false, options.TraceTime);
         Assert.IsFalse(options.TraceIds);
         Assert.IsFalse(options.TraceTime);
     }
@@ -85,6 +99,7 @@ public sealed class CommandLineTraceConfigTests
     {
         CommandLineOptions options = Accept("--trace-config", "TLS,http/1, Dns,bogus,ids", "-v");
 
+        Diagnostics.Assert("trace components", SortedAndQuoted(["tls", "http/1", "dns", "bogus"]), SortedAndQuoted(options.TraceComponents));
         CollectionAssert.AreEquivalent(new[] { "tls", "http/1", "dns", "bogus" }, options.TraceComponents.ToArray());
     }
 
@@ -93,20 +108,29 @@ public sealed class CommandLineTraceConfigTests
     {
         CommandLineOptions options = Accept("--trace-config", "tls,dns", "--trace-config", "-tls,+doh,-never-on");
 
+        Diagnostics.Assert("trace components", SortedAndQuoted(["dns", "doh"]), SortedAndQuoted(options.TraceComponents));
         CollectionAssert.AreEquivalent(new[] { "dns", "doh" }, options.TraceComponents.ToArray());
     }
 
     [TestMethod]
     public void Parse_TraceConfigAll_TurnsOnEveryComponentUntilMinusAll()
     {
-        Assert.IsTrue(Accept("--trace-config", "all").TraceComponents.Contains("all"));
-        Assert.IsFalse(Accept("--trace-config", "all,-all").TraceComponents.Contains("all"));
+        bool allAfterAll = Accept("--trace-config", "all").TraceComponents.Contains("all");
+        bool allAfterMinusAll = Accept("--trace-config", "all,-all").TraceComponents.Contains("all");
+
+        Diagnostics.Assert("trace components contain all after all", true, allAfterAll);
+        Diagnostics.Assert("trace components contain all after all,-all", false, allAfterMinusAll);
+        Assert.IsTrue(allAfterAll);
+        Assert.IsFalse(allAfterMinusAll);
     }
 
     [TestMethod]
     public void Parse_NoTraceConfig_TurnsOnNoComponent()
     {
-        Assert.AreEqual(0, Accept("-v").TraceComponents.Count);
+        int componentCount = Accept("-v").TraceComponents.Count;
+
+        Diagnostics.Assert("trace component count", 0, componentCount);
+        Assert.AreEqual(0, componentCount);
     }
 
     [TestMethod]
@@ -127,7 +151,10 @@ public sealed class CommandLineTraceConfigTests
     [DataRow(new[] { "-vv", "--trace-config", "setup", "-v" }, new[] { "setup" })]
     public void Parse_VerbosityAndTraceConfig_TurnOnTheComponentsCurlTurnsOn(string[] arguments, string[] expected)
     {
-        CollectionAssert.AreEquivalent(expected, Accept(arguments).TraceComponents.ToArray());
+        CommandLineOptions options = Accept(arguments);
+
+        Diagnostics.Assert("trace components", SortedAndQuoted(expected), SortedAndQuoted(options.TraceComponents));
+        CollectionAssert.AreEquivalent(expected, options.TraceComponents.ToArray());
     }
 
     [TestMethod]
@@ -138,14 +165,20 @@ public sealed class CommandLineTraceConfigTests
     public void Parse_VerbosityAndTraceConfig_KeepsTheComponentsOnlyVerbosityTurnedOn(string[] arguments, string[] expected)
     {
         // -vvvv's all does not write [SOCKS] lines, --trace-config all does (BL-1191 Notes).
-        CollectionAssert.AreEquivalent(expected, Accept(arguments).VerbosityTraceComponents.ToArray());
+        CommandLineOptions options = Accept(arguments);
+
+        Diagnostics.Assert("verbosity trace components", SortedAndQuoted(expected), SortedAndQuoted(options.VerbosityTraceComponents));
+        CollectionAssert.AreEquivalent(expected, options.VerbosityTraceComponents.ToArray());
     }
 
     [TestMethod]
     public void Parse_TraceConfigInFirstGroup_ReachesTheSecondGroup()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--trace-config", "ids,tls", Url, "--next", Url]);
+        CommandLineParseResult result = Parse(["--trace-config", "ids,tls", Url, "--next", Url]);
 
+        Diagnostics.Act("group count", result.Groups.Count);
+        Diagnostics.Assert("group 1 trace IDs", true, result.Groups.Count > 1 && result.Groups[1].TraceIds);
+        Diagnostics.Assert("group 1 trace components contain tls", true, result.Groups.Count > 1 && result.Groups[1].TraceComponents.Contains("tls"));
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Groups[1].TraceIds);
         Assert.IsTrue(result.Groups[1].TraceComponents.Contains("tls"));
@@ -154,14 +187,36 @@ public sealed class CommandLineTraceConfigTests
     [TestMethod]
     public void Parse_NoTraceConfigSpelling_IsRefused()
     {
-        Assert.IsFalse(CommandLineParser.Parse(["--no-trace-config", Url]).IsAccepted);
+        CommandLineParseResult result = Parse(["--no-trace-config", Url]);
+
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Assert.IsFalse(result.IsAccepted);
     }
 
-    private static CommandLineOptions Accept(params string[] arguments)
+    private static string SortedAndQuoted(IEnumerable<string> components) =>
+        CommandLineParseDiagnostics.QuoteEach(components.Order(StringComparer.Ordinal));
+
+    private CommandLineOptions Accept(params string[] arguments)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url]);
+        CommandLineParseResult result = Parse([.. arguments, Url]);
 
         Assert.IsTrue(result.IsAccepted);
         return result.Options;
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            Diagnostics.Act("trace IDs", result.Options.TraceIds);
+            Diagnostics.Act("trace time", result.Options.TraceTime);
+            Diagnostics.Act("trace components", SortedAndQuoted(result.Options.TraceComponents));
+            Diagnostics.Act("verbosity trace components", SortedAndQuoted(result.Options.VerbosityTraceComponents));
+        }
+
+        return result;
     }
 }

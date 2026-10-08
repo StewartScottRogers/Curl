@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -9,6 +10,10 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpUrlTextTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("http://h/a/b?c=d", "/a/b?c=d", DisplayName = "ASCII kept as written")]
     [DataRow("http://h/a", "/a", DisplayName = "no query")]
@@ -19,7 +24,13 @@ public sealed class HttpUrlTextTests
     [DataRow("http://h/?ö=1", "/?Ã¶=1", DisplayName = "non-ASCII query as its UTF-8 bytes")]
     public void RequestTarget_GivesThePathAndQueryCurlSends(string url, string expected)
     {
-        Assert.AreEqual(expected, HttpUrlText.RequestTarget(CurlUrl.Parse(url)));
+        Diagnostics.Arrange("url", url);
+
+        string actual = HttpUrlText.RequestTarget(CurlUrl.Parse(url));
+
+        Diagnostics.Act("request target", actual);
+        Diagnostics.Assert("request target", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -27,7 +38,13 @@ public sealed class HttpUrlTextTests
     [DataRow("http://h/a", "", DisplayName = "no query")]
     public void Query_GivesTheQueryAsWritten(string url, string expected)
     {
-        Assert.AreEqual(expected, HttpUrlText.Query(CurlUrl.Parse(url)));
+        Diagnostics.Arrange("url", url);
+
+        string actual = HttpUrlText.Query(CurlUrl.Parse(url));
+
+        Diagnostics.Act("query", actual);
+        Diagnostics.Assert("query", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -40,7 +57,13 @@ public sealed class HttpUrlTextTests
     [DataRow("http://:p@h/", "http://:p@h", DisplayName = "password without a user")]
     public void Origin_GivesSchemeUserInformationHostAndPort(string url, string expected)
     {
-        Assert.AreEqual(expected, HttpUrlText.Origin(CurlUrl.Parse(url)));
+        Diagnostics.Arrange("url", url);
+
+        string actual = HttpUrlText.Origin(CurlUrl.Parse(url));
+
+        Diagnostics.Act("origin", actual);
+        Diagnostics.Assert("origin", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -50,7 +73,13 @@ public sealed class HttpUrlTextTests
     [DataRow("example.com", "http://example.com/", DisplayName = "guessed scheme")]
     public void Effective_GivesTheUrlCurlNamesForUrlEffective(string url, string expected)
     {
-        Assert.AreEqual(expected, HttpUrlText.Effective(CurlUrl.Parse(url)));
+        Diagnostics.Arrange("url", url);
+
+        string actual = HttpUrlText.Effective(CurlUrl.Parse(url));
+
+        Diagnostics.Act("effective url", actual);
+        Diagnostics.Assert("effective url", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -61,6 +90,12 @@ public sealed class HttpUrlTextTests
     [DataRow("ftp://[::1]:2121/", "[::1]:2121", DisplayName = "ftp IPv6 bracketed")]
     public void HostHeaderAuthority_GivesTheHostAndPortTheHostLineCarries(string url, string expected)
     {
-        Assert.AreEqual(expected, HttpUrlText.HostHeaderAuthority(CurlUrl.Parse(url)));
+        Diagnostics.Arrange("url", url);
+
+        string actual = HttpUrlText.HostHeaderAuthority(CurlUrl.Parse(url));
+
+        Diagnostics.Act("host header authority", actual);
+        Diagnostics.Assert("host header authority", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 }

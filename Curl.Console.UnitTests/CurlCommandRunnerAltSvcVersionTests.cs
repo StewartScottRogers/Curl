@@ -5,6 +5,7 @@ using Curl.Core;
 using Curl.Http2;
 using Curl.Http3;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -41,6 +42,10 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     private readonly MemoryStream standardError = new();
     private readonly InMemoryFileSystem files = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
 
     private string StandardErrorText => Encoding.Latin1.GetString(standardError.ToArray());
@@ -53,6 +58,7 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
     {
         ScriptedConnector firstServer = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nAlt-Svc: h3=\":18443\"\r\n\r\nhi")]);
         await RunAsync(firstServer, ["-s", "--alt-svc", CacheFile, Origin]);
+        Diagnostics.Diff("saved cache file after the first run", Lf(CacheFileText("h1 localhost 18443 h3 localhost 18443 \"20260930 11:05:35\" 0 0")), Lf(SavedCacheFile()));
         Assert.AreEqual(CacheFileText("h1 localhost 18443 h3 localhost 18443 \"20260930 11:05:35\" 0 0"), SavedCacheFile());
         files.ExistingContent[CacheFile] = files.Written[CacheFile].ToArray();
         standardOutput.SetLength(0);
@@ -60,6 +66,10 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(secondServer, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello|3", StandardOutputText);
+        Diagnostics.Assert("QUIC target", new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, secondServer.QuicTargets.Single() with { Events = NoTransferEvents.Instance });
+        Diagnostics.Assert("TCP connects", 0, secondServer.TcpConnectCount);
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|3", StandardOutputText);
         Assert.AreEqual(new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, secondServer.QuicTargets.Single() with { Events = NoTransferEvents.Instance });
@@ -75,6 +85,11 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-s", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hi|1.1", StandardOutputText);
+        Diagnostics.Assert("QUIC targets", 1, connector.QuicTargets.ToArray().Length);
+        Diagnostics.Assert("TCP alt-svc route", "<null>", RouteText(tcp.Targets.Single().AltSvcRoute));
+        Diagnostics.Diff("saved cache file", Lf(CacheFileText("h1 localhost 18443 h3 localhost 18443 \"20260930 11:05:35\" 0 0")), Lf(SavedCacheFile()));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi|1.1", StandardOutputText);
         Assert.HasCount(1, connector.QuicTargets);
@@ -93,6 +108,11 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello|3", StandardOutputText);
+        Diagnostics.Assert("QUIC alt-svc route", new AltSvcRoute("h1", new AltSvcAlternative("h3", "localhost", 18444)), connector.QuicTargets.Single().AltSvcRoute);
+        Diagnostics.Assert("TCP connects", 0, connector.TcpConnectCount);
+        Diagnostics.Diff("saved cache file", Lf(CacheFileText(OtherPortH3Entry)), Lf(SavedCacheFile()));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|3", StandardOutputText);
         Assert.AreEqual(new AltSvcRoute("h1", new AltSvcAlternative("h3", "localhost", 18444)), connector.QuicTargets.Single().AltSvcRoute);
@@ -108,6 +128,10 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.RecvError, exitCode);
+        Diagnostics.Assert("stderr", $"curl: (56) {QuicRecvError}\n", StandardErrorLines);
+        Diagnostics.Assert("TCP connects", 0, connector.TcpConnectCount);
+        Diagnostics.Diff("saved cache file", Lf(CacheFileText(OtherPortH3Entry)), Lf(SavedCacheFile()));
         Assert.AreEqual((int)CurlExitCode.RecvError, exitCode);
         Assert.AreEqual($"curl: (56) {QuicRecvError}\n", StandardErrorText.Replace("\r\n", "\n", StringComparison.Ordinal));
         Assert.AreEqual(0, connector.TcpConnectCount);
@@ -122,6 +146,10 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(server, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello|2", StandardOutputText);
+        Diagnostics.Assert("alt-svc route", new AltSvcRoute("h1", new AltSvcAlternative("h2", "localhost", 18444)), server.Targets.Single().AltSvcRoute);
+        Diagnostics.Assert("request starts with the HTTP/2 client preface", true, server.Written.Take(Http2Connection.ClientPreface.Length).SequenceEqual(Http2Connection.ClientPreface.ToArray()));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|2", StandardOutputText);
         Assert.AreEqual(new AltSvcRoute("h1", new AltSvcAlternative("h2", "localhost", 18444)), server.Targets.Single().AltSvcRoute);
@@ -137,6 +165,10 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(server, ["-sSv", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello|2", StandardOutputText);
+        Diagnostics.Assert("ALPN offer", "h2", string.Join(",", server.Targets.Single().ApplicationProtocols!.ToArray()));
+        Diagnostics.Assert("stderr has the ALPN line", true, StandardErrorLines.Contains("* ALPN: curl offers h2\n", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|2", StandardOutputText);
         CollectionAssert.AreEqual(new[] { "h2" }, server.Targets.Single().ApplicationProtocols!.ToArray());
@@ -151,6 +183,10 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(server, ["-sSv", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("alt-svc route", new AltSvcRoute("h2", new AltSvcAlternative("h1", "localhost", 18444)), server.Targets.Single().AltSvcRoute);
+        Diagnostics.Assert("ALPN offer", "http/1.1", string.Join(",", server.Targets.Single().ApplicationProtocols!.ToArray()));
+        Diagnostics.Assert("stderr has the ALPN line", true, StandardErrorLines.Contains("* ALPN: curl offers http/1.1\n", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual(new AltSvcRoute("h2", new AltSvcAlternative("h1", "localhost", 18444)), server.Targets.Single().AltSvcRoute);
         CollectionAssert.AreEqual(new[] { "http/1.1" }, server.Targets.Single().ApplicationProtocols!.ToArray());
@@ -169,6 +205,12 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hi|1.1", StandardOutputText);
+        Diagnostics.Assert("TCP connects", 1, connector.TcpConnectCount);
+        Diagnostics.Assert("QUIC targets", 0, connector.QuicTargets.ToArray().Length);
+        Diagnostics.Assert("TCP alt-svc route", "<null>", RouteText(tcp.Targets.Single().AltSvcRoute));
+        Diagnostics.Assert("TCP first attempt version", alpn, tcp.Targets.Single().TcpFirstAttemptVersion ?? "<null>");
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hi|1.1", StandardOutputText);
         Assert.AreEqual(1, connector.TcpConnectCount);
@@ -185,6 +227,9 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello|3", StandardOutputText);
+        Diagnostics.Assert("TCP connects", 0, connector.TcpConnectCount);
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|3", StandardOutputText);
         Assert.AreEqual(0, connector.TcpConnectCount);
@@ -199,6 +244,9 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(server, ["-sS", "--http3", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hi", StandardOutputText);
+        Diagnostics.Assert("request has Alt-Used", true, Encoding.Latin1.GetString(server.Written).Contains("Alt-Used: localhost:18444\r\n", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hi", StandardOutputText);
         StringAssert.Contains(Encoding.Latin1.GetString(server.Written), "Alt-Used: localhost:18444\r\n");
@@ -217,6 +265,8 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         await RunAsync(server, ["-s", option, "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("alt-svc route", "<null>", RouteText(server.Targets.Single().AltSvcRoute));
+        Diagnostics.Diff("saved cache file", Lf(CacheFileText(entry)), Lf(SavedCacheFile()));
         Assert.IsNull(server.Targets.Single().AltSvcRoute);
         Assert.AreEqual(CacheFileText(entry), SavedCacheFile());
     }
@@ -229,6 +279,8 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "--http3-only", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("QUIC alt-svc route", "<null>", RouteText(connector.QuicTargets.Single().AltSvcRoute));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.IsNull(connector.QuicTargets.Single().AltSvcRoute);
     }
@@ -242,6 +294,8 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "--http3-only", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("QUIC alt-svc route", new AltSvcRoute("h3", new AltSvcAlternative("h3", "localhost", 18444)), connector.QuicTargets.Single().AltSvcRoute);
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual(new AltSvcRoute("h3", new AltSvcAlternative("h3", "localhost", 18444)), connector.QuicTargets.Single().AltSvcRoute);
     }
@@ -257,8 +311,11 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-s", "--http3", "--alt-svc", CacheFile, Origin]);
 
-        Assert.AreEqual(0, exitCode);
         AltSvcRoute route = new("h1", new AltSvcAlternative("h1", "localhost", 18444));
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("QUIC alt-svc route", route, connector.QuicTargets.Single().AltSvcRoute);
+        Diagnostics.Assert("TCP alt-svc route", route, tcp.Targets.Single().AltSvcRoute);
+        Assert.AreEqual(0, exitCode);
         Assert.AreEqual(route, connector.QuicTargets.Single().AltSvcRoute);
         Assert.AreEqual(route, tcp.Targets.Single().AltSvcRoute);
     }
@@ -274,6 +331,9 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(server, ["-sS", "-w", "|%{http_version}", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello|2", StandardOutputText);
+        Diagnostics.Diff("saved cache file", Lf(CacheFileText($"h2 localhost 18443 h3 localhost 18443 {Future} 0 0")), Lf(SavedCacheFile()));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|2", StandardOutputText);
         Assert.AreEqual(CacheFileText($"h2 localhost 18443 h3 localhost 18443 {Future} 0 0"), SavedCacheFile());
@@ -292,6 +352,9 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "-w", "|%{http_version}", "--http3-only", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello|3", StandardOutputText);
+        Diagnostics.Diff("saved cache file", Lf(CacheFileText($"h3 localhost 18443 h3 localhost 18443 {Future} 0 0")), Lf(SavedCacheFile()));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hello|3", StandardOutputText);
         Assert.AreEqual(CacheFileText($"h3 localhost 18443 h3 localhost 18443 {Future} 0 0"), SavedCacheFile());
@@ -309,6 +372,8 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(secondServer, ["-sS", "--http3-only", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("QUIC alt-svc route", new AltSvcRoute("h3", new AltSvcAlternative("h3", "localhost", 18444)), secondServer.QuicTargets.Single().AltSvcRoute);
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual(new AltSvcRoute("h3", new AltSvcAlternative("h3", "localhost", 18444)), secondServer.QuicTargets.Single().AltSvcRoute);
     }
@@ -323,6 +388,11 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
 
         int exitCode = await RunAsync(connector, ["-sS", "-L", "--alt-svc", CacheFile, Origin]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hi", StandardOutputText);
+        Diagnostics.Assert("QUIC targets", 1, connector.QuicTargets.ToArray().Length);
+        Diagnostics.Assert("redirect host", "other.example", tcp.Targets.Single().Host);
+        Diagnostics.Assert("TCP alt-svc route", "<null>", RouteText(tcp.Targets.Single().AltSvcRoute));
         Assert.AreEqual(0, exitCode, StandardErrorText);
         Assert.AreEqual("hi", StandardOutputText);
         Assert.HasCount(1, connector.QuicTargets);
@@ -335,6 +405,12 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         files.ExistingContent[CacheFile] = Encoding.Latin1.GetBytes(string.Join("\n", [.. AltSvcCacheHeader(), .. entries]) + "\n");
 
     private string SavedCacheFile() => Encoding.Latin1.GetString(files.Written[CacheFile].ToArray());
+
+    /// <summary>The text with each platform newline written as LF, so what a test prints does not depend on the OS.</summary>
+    private static string Lf(string text) => text.Replace(Environment.NewLine, "\n", StringComparison.Ordinal);
+
+    /// <summary>The bytes with each platform newline written as LF, so what a test prints does not depend on the OS.</summary>
+    private static byte[] Lf(byte[] bytes) => Encoding.Latin1.GetBytes(Lf(Encoding.Latin1.GetString(bytes)));
 
     /// <summary>The file as curl writes it: the two comments, then the entries, each line ending in the platform's newline.</summary>
     private static string CacheFileText(params string[] entries) =>
@@ -389,18 +465,48 @@ public sealed class CurlCommandRunnerAltSvcVersionTests
         .. Http2FrameCodec.Serialize(Http2FrameFactory.CreateData(1, Encoding.Latin1.GetBytes(body), isEndStream: true)),
     ];
 
-    private Task<int> RunAsync(IConnector connector, string[] arguments) =>
-        new CurlCommandRunner(
-                options => CreateTransferDispatch(connector),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true,
-                parsesAsWindowsBuild: false,
-                timeProvider: new FixedUtcClock(Now))
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(IConnector connector, string[] arguments)
+    {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("connector", connector.GetType().Name);
+        if (files.ExistingContent.TryGetValue(CacheFile, out byte[]? cacheBefore))
+        {
+            Diagnostics.Bytes("cache file before the run, platform newlines as LF", Lf(cacheBefore));
+        }
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    options => CreateTransferDispatch(connector),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true,
+                    parsesAsWindowsBuild: false,
+                    timeProvider: new FixedUtcClock(Now))
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        if (connector is ScriptedConnector scripted)
+        {
+            Diagnostics.Bytes("request bytes", scripted.Written);
+        }
+
+        if (files.Written.TryGetValue(CacheFile, out MemoryStream? cacheAfter))
+        {
+            Diagnostics.Bytes("cache file after the run, platform newlines as LF", Lf(cacheAfter.ToArray()));
+        }
+
+        return exitCode;
+    }
+
+    private static string RouteText(AltSvcRoute? route) => route?.ToString() ?? "<null>";
 
     private static TransferDispatch CreateTransferDispatch(IConnector connector) =>
         new(new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(

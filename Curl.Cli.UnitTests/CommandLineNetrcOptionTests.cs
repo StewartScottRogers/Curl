@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -17,15 +18,24 @@ public sealed class CommandLineNetrcOptionTests
 
     private static readonly Func<string, bool> NoPathExists = _ => false;
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoNetrcOptions_IgnoresNetrc()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url], NoPathExists);
+        CommandLineParseResult result = Parse([Url], NoPathExists);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("NetrcRequested", false, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcRequested);
         Assert.IsFalse(result.Options.NetrcRequested);
+        Diagnostics.Assert("NetrcOptionalRequested", false, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcOptionalRequested);
         Assert.IsFalse(result.Options.NetrcOptionalRequested);
+        Diagnostics.Assert("NetrcFile", null, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcFile);
         Assert.IsNull(result.Options.NetrcFile);
+        Diagnostics.Assert("NetrcUse", NetrcUse.Ignored, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcUse);
         Assert.AreEqual(NetrcUse.Ignored, result.Options.NetrcUse);
     }
 
@@ -51,12 +61,17 @@ public sealed class CommandLineNetrcOptionTests
     [DataRow(new[] { "--netrc-file", "f", "--netrc-file", "g" }, false, false, "g", NetrcUse.Required)]
     public void Parse_NetrcOptions_RecordWhetherAndWhichNetrcIsRead(string[] arguments, bool requested, bool optionalRequested, string? file, NetrcUse use)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url], EveryPathExists);
+        CommandLineParseResult result = Parse([.. arguments, Url], EveryPathExists);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("NetrcRequested", requested, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcRequested);
         Assert.AreEqual(requested, result.Options.NetrcRequested);
+        Diagnostics.Assert("NetrcOptionalRequested", optionalRequested, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcOptionalRequested);
         Assert.AreEqual(optionalRequested, result.Options.NetrcOptionalRequested);
+        Diagnostics.Assert("NetrcFile", file, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcFile);
         Assert.AreEqual(file, result.Options.NetrcFile);
+        Diagnostics.Assert("NetrcUse", use, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcUse);
         Assert.AreEqual(use, result.Options.NetrcUse);
     }
 
@@ -65,7 +80,7 @@ public sealed class CommandLineNetrcOptionTests
     {
         string? checkedPath = null;
 
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--netrc-file", "my.netrc", Url],
             path =>
             {
@@ -73,8 +88,11 @@ public sealed class CommandLineNetrcOptionTests
                 return true;
             });
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("NetrcFile", "my.netrc", CommandLineParseDiagnostics.Peek(result.Options)?.NetrcFile);
         Assert.AreEqual("my.netrc", result.Options.NetrcFile);
+        Diagnostics.Assert("checked path", "my.netrc", checkedPath);
         Assert.AreEqual("my.netrc", checkedPath);
     }
 
@@ -88,7 +106,7 @@ public sealed class CommandLineNetrcOptionTests
     [DataRow(new[] { "-n", "--netrc-file", "f" }, "--netrc-file", "f")]
     public void Parse_NetrcFileThatDoesNotExist_RefusesWithThreeLines(string[] arguments, string spelledOption, string file)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url], NoPathExists);
+        CommandLineParseResult result = Parse([.. arguments, Url], NoPathExists);
 
         AssertRefused(
             result,
@@ -99,7 +117,7 @@ public sealed class CommandLineNetrcOptionTests
     [TestMethod]
     public void Parse_SilentThenMissingNetrcFile_HidesTheFileLine()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--netrc-file", "nope", Url], NoPathExists);
+        CommandLineParseResult result = Parse(["-s", "--netrc-file", "nope", Url], NoPathExists);
 
         AssertRefused(result, "curl: option --netrc-file: is badly used here");
     }
@@ -107,12 +125,13 @@ public sealed class CommandLineNetrcOptionTests
     [TestMethod]
     public void Parse_NetrcFileGivenFlagLikeFileThatDoesNotExist_RefusesAfterFileNameWarning()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--netrc-file", "-s", Url], NoPathExists);
+        CommandLineParseResult result = Parse(["--netrc-file", "-s", Url], NoPathExists);
 
         AssertRefused(
             result,
             "curl: The file '-s' provided to --netrc-file does not exist",
             "curl: option --netrc-file: is badly used here");
+        Diagnostics.Assert("warning lines", "[\"Warning: The filename argument '-s' looks like a flag.\"]", CommandLineParseDiagnostics.QuoteEach(result.WarningLines));
         CollectionAssert.AreEqual(
             new[] { "Warning: The filename argument '-s' looks like a flag." },
             result.WarningLines.ToArray());
@@ -121,7 +140,7 @@ public sealed class CommandLineNetrcOptionTests
     [TestMethod]
     public void Parse_NoNetrcFile_RefusesTheNoPrefix()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--no-netrc-file", "f", Url], EveryPathExists);
+        CommandLineParseResult result = Parse(["--no-netrc-file", "f", Url], EveryPathExists);
 
         AssertRefused(result, "curl: option --no-netrc-file: the given option cannot be reversed with a --no- prefix");
     }
@@ -129,14 +148,30 @@ public sealed class CommandLineNetrcOptionTests
     [TestMethod]
     public void Parse_NetrcOptionalWithValue_IgnoresTheValue()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--netrc-optional=x", Url], NoPathExists);
+        CommandLineParseResult result = Parse(["--netrc-optional=x", Url], NoPathExists);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("NetrcUse", NetrcUse.Optional, CommandLineParseDiagnostics.Peek(result.Options)?.NetrcUse);
         Assert.AreEqual(NetrcUse.Optional, result.Options.NetrcUse);
     }
 
-    private static void AssertRefused(CommandLineParseResult result, params string[] expectedLinesBeforeTryHelp)
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists)
     {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, pathExists);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertRefused(CommandLineParseResult result, params string[] expectedLinesBeforeTryHelp)
+    {
+        Diagnostics.Assert("accepted", false, result.IsAccepted);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, CommandLineParseDiagnostics.Peek(result.Refusal)?.ExitCode);
+        Diagnostics.Assert(
+            "stderr lines",
+            CommandLineParseDiagnostics.QuoteEach(expectedLinesBeforeTryHelp.Append(CommandLineRefusal.TryHelpLine)),
+            CommandLineParseDiagnostics.QuoteEach(CommandLineParseDiagnostics.Peek(result.Refusal)?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(

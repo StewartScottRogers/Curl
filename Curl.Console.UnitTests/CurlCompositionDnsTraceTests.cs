@@ -1,6 +1,7 @@
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -14,6 +15,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionDnsTraceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("dns")]
     [DataRow("doh")]
@@ -172,10 +177,16 @@ public sealed class CurlCompositionDnsTraceTests
     [TestMethod]
     public void CreateTransports_UnderTraceConfigDns_TracesTheDnsFilterAndPointsTheResolverEvents()
     {
+        Diagnostics.Arrange("traced arguments", "-v --trace-config dns");
+        Diagnostics.Arrange("plain arguments", "-v");
         CurlTransports traced = CurlComposition.CreateTransports(Parse("-v", "--trace-config", "dns"));
         CurlTransports plain = CurlComposition.CreateTransports(Parse("-v"));
 
+        Diagnostics.Act("traced: traces DNS filter", traced.TcpConnector.TracesDnsFilter);
+        Diagnostics.Act("plain: traces DNS filter", plain.TcpConnector.TracesDnsFilter);
+        Diagnostics.Assert("traced: traces DNS filter", true, traced.TcpConnector.TracesDnsFilter);
         Assert.IsTrue(traced.TcpConnector.TracesDnsFilter);
+        Diagnostics.Assert("traced.TcpConnector.ResolverEvents is not null", true, traced.TcpConnector.ResolverEvents is not null);
         Assert.IsNotNull(traced.TcpConnector.ResolverEvents);
         Assert.IsFalse(plain.TcpConnector.TracesDnsFilter);
         Assert.IsNull(plain.TcpConnector.ResolverEvents);
@@ -192,8 +203,11 @@ public sealed class CurlCompositionDnsTraceTests
         // curl -s -v --trace-config happy-eyeballs, tcp and network (BL-1161 Notes).
         List<string> lines = await ConnectAsync("-v", "--trace-config", components);
 
+        Diagnostics.Assert("happy eyeballs connected line present", happyEyeballs, lines.Contains("[HAPPY-EYEBALLS] Connected to 127.0.0.1 (127.0.0.1) port 47110"));
         Assert.AreEqual(happyEyeballs, lines.Contains("[HAPPY-EYEBALLS] Connected to 127.0.0.1 (127.0.0.1) port 47110"));
+        Diagnostics.Assert("happy eyeballs destroy line present", happyEyeballs, lines.Contains("[HAPPY-EYEBALLS] destroy"));
         Assert.AreEqual(happyEyeballs, lines.Contains("[HAPPY-EYEBALLS] destroy"));
+        Diagnostics.Assert("tcp connected line present", tcp, lines.Contains("[TCP] connected on fd=3"));
         Assert.AreEqual(tcp, lines.Contains("[TCP] connected on fd=3"));
         Assert.AreEqual(happyEyeballs || tcp, lines.Any(line => line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) || line.StartsWith("[TCP]", StringComparison.Ordinal)));
     }
@@ -221,6 +235,7 @@ public sealed class CurlCompositionDnsTraceTests
         // curl -s -v --trace-config timer http://127.0.0.1:P/ (BL-1186 Notes): cleared once connected.
         List<string> lines = await ConnectAsync(arguments);
 
+        Diagnostics.Assert("timer cleared line count", 1, lines.Count(line => line == "[TIMER] [HAPPY_EYEBALLS] cleared"));
         Assert.AreEqual(1, lines.Count(line => line == "[TIMER] [HAPPY_EYEBALLS] cleared"));
         Assert.IsGreaterThan(lines.IndexOf("[TIMER] [HAPPY_EYEBALLS] cleared"), lines.IndexOf("Established connection"));
     }
@@ -351,8 +366,9 @@ public sealed class CurlCompositionDnsTraceTests
     private static string[] WithoutConnectAttemptLines(List<string> lines) =>
         [.. lines.Where(line => !line.StartsWith("[HAPPY-EYEBALLS]", StringComparison.Ordinal) && !line.StartsWith("[TCP]", StringComparison.Ordinal) && !line.StartsWith("[TIMER]", StringComparison.Ordinal))];
 
-    private static async Task<List<string>> ConnectAsync(params string[] arguments)
+    private async Task<List<string>> ConnectAsync(params string[] arguments)
     {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://127.0.0.1:47110/")));
         CommandLineOptions options = Parse(arguments);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             options,
@@ -363,8 +379,16 @@ public sealed class CurlCompositionDnsTraceTests
             HttpProxyTunnelOptions.Default);
         LineRecordingEvents events = new();
 
-        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47110, false) { Events = events }, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("connect"))
+        {
+            result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 47110, false) { Events = events }, CancellationToken.None);
+        }
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Lines));
+
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         return events.Lines;
     }

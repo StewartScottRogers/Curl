@@ -52,6 +52,20 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
+    /// Gets or sets how many response headers the transfer has stored before a chunked body's
+    /// trailers, which leave the trailers what is left of
+    /// <see cref="HttpResponseHeadReader.MaximumHeaderCount" /> (<see cref="HttpChunkedDecoder.TrailerLimit" />,
+    /// measured, BL-1448 Notes). 0 by default.
+    /// </summary>
+    internal int HeadersStoredBefore { get; set; }
+
+    /// <summary>
+    /// Gets how many response headers the transfer has stored: <see cref="HeadersStoredBefore" />
+    /// and the chunked body's trailers decoded so far.
+    /// </summary>
+    internal int HeadersStored => HeadersStoredBefore + (decoder?.TrailerCount ?? 0);
+
+    /// <summary>
     /// Gets or sets a value indicating whether <c>--max-filesize</c> was given, so a
     /// Content-Length too large for a signed 64-bit integer is refused with exit 63 as the head
     /// is read (<see cref="FindHeadRefusal" />), as curl 8.21.0 does whether or not the body is
@@ -331,7 +345,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// </summary>
     private async ValueTask CopyChunkedAsync(ReadOnlyMemory<byte> bytes, Stream output, CancellationToken cancellationToken)
     {
-        decoder = new HttpChunkedDecoder();
+        decoder = new HttpChunkedDecoder { TrailerLimit = HttpResponseHeadReader.MaximumHeaderCount - HeadersStoredBefore };
         ReportReceived(bytes);
         byte[] buffer = new byte[ReadSize];
         while (true)

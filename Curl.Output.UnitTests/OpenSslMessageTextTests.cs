@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Output;
 
@@ -9,13 +10,23 @@ namespace Curl.Output;
 [TestClass]
 public sealed class OpenSslMessageTextTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(0x0304, TlsContentType.RecordHeader)]
     [DataRow(0x0304, TlsContentType.InnerContentType)]
     [DataRow(0, TlsContentType.Handshake)]
     public void Line_HeaderInnerTypeOrNoVersion_IsNone(int version, TlsContentType contentType)
     {
-        Assert.IsNull(OpenSslMessageText.Line(Message(version, contentType, [1])));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("version", version);
+        diagnostics.Arrange("content type", contentType);
+
+        string? line = OpenSslMessageText.Line(Message(version, contentType, [1]));
+
+        diagnostics.Act("line", line ?? "(null)");
+        diagnostics.Assert("line", "(null)", line ?? "(null)");
+        Assert.IsNull(line);
     }
 
     [TestMethod]
@@ -25,25 +36,51 @@ public sealed class OpenSslMessageTextTests
     [DataRow(0x0305, "(305)")]
     public void Line_Version_NamedAsCurlNamesIt(int version, string expected)
     {
-        Assert.AreEqual($"{expected} (OUT), TLS handshake, Client hello (1):", OpenSslMessageText.Line(Message(version, TlsContentType.Handshake, [1])));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("version", version);
+        string expectedLine = $"{expected} (OUT), TLS handshake, Client hello (1):";
+
+        string? line = OpenSslMessageText.Line(Message(version, TlsContentType.Handshake, [1]));
+
+        diagnostics.Act("line", line);
+        diagnostics.Diff("line", expectedLine, line ?? string.Empty);
+        Assert.AreEqual(expectedLine, line);
     }
 
     [TestMethod]
     public void Line_VersionOutsideSsl3Family_HasNoRecordTypeAndNoMessageName()
     {
-        Assert.AreEqual("(2) (OUT), , Unknown (1):", OpenSslMessageText.Line(Message(0x0002, TlsContentType.Handshake, [1])));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("version", 0x0002);
+
+        string? line = OpenSslMessageText.Line(Message(0x0002, TlsContentType.Handshake, [1]));
+
+        WriteLine(diagnostics, "(2) (OUT), , Unknown (1):", line);
+        Assert.AreEqual("(2) (OUT), , Unknown (1):", line);
     }
 
     [TestMethod]
     public void Line_ContentTypeZero_HasNoRecordType()
     {
-        Assert.AreEqual("TLSv1.3 (OUT), , Client hello (1):", OpenSslMessageText.Line(Message(0x0304, 0, [1])));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("content type", 0);
+
+        string? line = OpenSslMessageText.Line(Message(0x0304, 0, [1]));
+
+        WriteLine(diagnostics, "TLSv1.3 (OUT), , Client hello (1):", line);
+        Assert.AreEqual("TLSv1.3 (OUT), , Client hello (1):", line);
     }
 
     [TestMethod]
     public void Line_UnnamedContentType_IsTlsUnknown()
     {
-        Assert.AreEqual("TLSv1.3 (OUT), TLS Unknown, Server hello (2):", OpenSslMessageText.Line(Message(0x0304, (TlsContentType)99, [2])));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("content type", 99);
+
+        string? line = OpenSslMessageText.Line(Message(0x0304, (TlsContentType)99, [2]));
+
+        WriteLine(diagnostics, "TLSv1.3 (OUT), TLS Unknown, Server hello (2):", line);
+        Assert.AreEqual("TLSv1.3 (OUT), TLS Unknown, Server hello (2):", line);
     }
 
     [TestMethod]
@@ -56,7 +93,21 @@ public sealed class OpenSslMessageTextTests
     [DataRow(TlsContentType.Alert, new byte[] { 2, 255 }, "TLS alert, unknown (767)")]
     public void Line_Message_NamedAsCurlAndOpenSslNameIt(TlsContentType contentType, byte[] bytes, string expected)
     {
-        Assert.AreEqual($"TLSv1.2 (IN), {expected}:", OpenSslMessageText.Line(Message(0x0303, contentType, bytes) with { Sent = false }));
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("content type", contentType);
+        diagnostics.Bytes("message bytes", bytes);
+        string expectedLine = $"TLSv1.2 (IN), {expected}:";
+
+        string? line = OpenSslMessageText.Line(Message(0x0303, contentType, bytes) with { Sent = false });
+
+        WriteLine(diagnostics, expectedLine, line);
+        Assert.AreEqual(expectedLine, line);
+    }
+
+    private static void WriteLine(TestDiagnostics diagnostics, string expected, string? line)
+    {
+        diagnostics.Act("line", line);
+        diagnostics.Diff("line", expected, line ?? string.Empty);
     }
 
     private static TlsMessageEvent Message(int version, TlsContentType contentType, byte[] bytes)

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -7,11 +9,22 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class MailRequestOptionsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void MailRequestOptions_NothingSet_HoldsCurlsNotGivenValues()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("options", "new MailRequestOptions()");
+
         var options = new MailRequestOptions();
 
+        diagnostics.Act("from", options.From);
+        diagnostics.Act("recipient count", options.Recipients.Count);
+        diagnostics.Act("recipient allow fails", options.RecipientAllowFails);
+        diagnostics.Act("sasl initial response", options.SaslInitialResponse);
+        diagnostics.Assert("from", null, options.From);
+        diagnostics.Assert("recipient count", 0, options.Recipients.Count);
         Assert.IsNull(options.From);
         Assert.IsEmpty(options.Recipients);
         Assert.IsNull(options.Auth);
@@ -28,8 +41,11 @@ public sealed class MailRequestOptionsTests
     [TestMethod]
     public void MailRequestOptions_EveryMemberSet_RoundTripsEveryValue()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         string[] recipients = ["a@example.com", "b@example.com"];
         string[] uploadFlags = ["answered", "flagged"];
+        diagnostics.Arrange("recipients", string.Join(",", recipients));
+        diagnostics.Arrange("upload flags", string.Join(",", uploadFlags));
 
         var options = new MailRequestOptions
         {
@@ -46,6 +62,13 @@ public sealed class MailRequestOptionsTests
             ServiceName = "custom",
         };
 
+        diagnostics.Act("from", options.From);
+        diagnostics.Act("auth", options.Auth);
+        diagnostics.Act("custom command", options.CustomCommand);
+        diagnostics.Act("login options", options.LoginOptions);
+        diagnostics.Act("service name", options.ServiceName);
+        diagnostics.Assert("from", "sender@example.com", options.From);
+        diagnostics.Assert("service name", "custom", options.ServiceName);
         Assert.AreEqual("sender@example.com", options.From);
         Assert.AreSame(recipients, options.Recipients);
         Assert.AreEqual("auth@example.com", options.Auth);
@@ -62,9 +85,19 @@ public sealed class MailRequestOptionsTests
     [TestMethod]
     public void Equals_ForOptionsDifferingOnlyInInitialResponse_ReturnsFalse()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var without = new MailRequestOptions { From = "a@example.com" };
         var with = without with { SaslInitialResponse = true };
+        diagnostics.Arrange("without", without);
+        diagnostics.Arrange("with", with);
 
+        bool differ = !without.Equals(with);
+        bool sameContentEqual = without.Equals(new MailRequestOptions { From = "a@example.com" });
+
+        diagnostics.Act("differ", differ);
+        diagnostics.Act("same content equal", sameContentEqual);
+        diagnostics.Assert("differ", true, differ);
+        diagnostics.Assert("same content equal", true, sameContentEqual);
         Assert.AreNotEqual(without, with);
         Assert.AreEqual(without, new MailRequestOptions { From = "a@example.com" });
     }

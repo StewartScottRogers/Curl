@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Smtp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Smtp;
 
@@ -15,6 +16,11 @@ namespace Curl.Protocol.Smtp;
 public sealed class SmtpProtocolHandlerSaslCancelTests
 {
     private const string Url = "smtp://127.0.0.1:18025/x";
+
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     private const string Greeting = "220 localhost ESMTP\r\n";
 
@@ -44,9 +50,13 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("CRAM-MD5 PLAIN") + BadChallenge + Cancelled + "334 \r\n235 ok\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH CRAM-MD5\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+        Diagnostics.AssertValues("second offer", "PLAIN", string.Join(", ", sasl.Offers[1]));
         CollectionAssert.AreEqual(new[] { "PLAIN" }, sasl.Offers[1]);
+        Diagnostics.AssertValues("challenges handed over", 0, sasl.Challenges.Count);
         Assert.IsEmpty(sasl.Challenges);
     }
 
@@ -58,8 +68,11 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("CRAM-MD5") + BadChallenge + Cancelled + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH CRAM-MD5\r\n*\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\n*\r\n", run.Sent);
+        Diagnostics.AssertResult(AuthenticationCancelled, run.Result);
         Assert.AreEqual(AuthenticationCancelled, run.Result);
+        Diagnostics.AssertValues("second offer", string.Empty, string.Join(", ", sasl.Offers[1]));
         Assert.IsEmpty(sasl.Offers[1]);
     }
 
@@ -73,7 +86,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("CRAM-MD5 PLAIN") + BadChallenge + reply + "334 \r\n235 ok\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH CRAM-MD5\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -84,8 +99,11 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("CRAM-MD5 DIGEST-MD5") + BadChallenge + Cancelled + BadChallenge + Cancelled + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH DIGEST-MD5\r\n*\r\nAUTH CRAM-MD5\r\n*\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "AUTH DIGEST-MD5\r\n*\r\nAUTH CRAM-MD5\r\n*\r\n", run.Sent);
+        Diagnostics.AssertResult(AuthenticationCancelled, run.Result);
         Assert.AreEqual(AuthenticationCancelled, run.Result);
+        Diagnostics.AssertValues("offers count", 3, sasl.Offers.Count);
         Assert.HasCount(3, sasl.Offers);
     }
 
@@ -96,7 +114,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("CRAM-MD5 PLAIN") + BadChallenge + Cancelled + "535 no\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH CRAM-MD5\r\n*\r\nAUTH PLAIN\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\n*\r\nAUTH PLAIN\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
     }
 
@@ -107,7 +127,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("CRAM-MD5 PLAIN") + BadChallenge, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH CRAM-MD5\r\n*\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\n*\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, "response reading failed (errno: 0)"), run.Result);
     }
 
@@ -121,7 +143,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("CRAM-MD5 PLAIN") + challenge + "235 ok\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH CRAM-MD5\r\ndSBkaWdlc3Q=\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH CRAM-MD5\r\ndSBkaWdlc3Q=\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertValues("challenge length handed over", 0, sasl.Challenges.Single().Challenge.Length);
         Assert.IsEmpty(sasl.Challenges.Single().Challenge);
     }
 
@@ -132,7 +156,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("DIGEST-MD5") + "334 bm9uY2U9MQ==\r\n" + BadChallenge + "235 ok\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH DIGEST-MD5\r\nZGlnZXN0\r\n=\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH DIGEST-MD5\r\nZGlnZXN0\r\n=\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertValues("second challenge length handed over", 0, sasl.Challenges[1].Challenge.Length);
         Assert.IsEmpty(sasl.Challenges[1].Challenge);
     }
 
@@ -145,7 +171,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
         SmtpRun run = await RunAsync(
             Offering("NTLM PLAIN") + BadChallenge + BadChallenge + Cancelled + "334 \r\n235 ok\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH NTLM\r\ndHlwZTE=\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH NTLM\r\ndHlwZTE=\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -158,7 +186,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
         SmtpRun run = await RunAsync(
             Offering("GSSAPI PLAIN") + "334 \r\n334 \r\n" + BadChallenge + Cancelled + "334 \r\n235 ok\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n=\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n=\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }
 
@@ -175,7 +205,9 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering(mechanism) + BadChallenge + "235 ok\r\n" + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH " + mechanism + "\r\nbQ==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH " + mechanism + "\r\nbQ==\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertValues("challenge length handed over", 0, sasl.Challenges.Single().Challenge.Length);
         Assert.IsEmpty(sasl.Challenges.Single().Challenge);
     }
 
@@ -187,8 +219,11 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("PLAIN LOGIN") + BadChallenge + Cancelled + HelpReplyAndBye, sasl);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH cram-md5\r\n*\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "AUTH cram-md5\r\n*\r\n", run.Sent);
+        Diagnostics.AssertResult(AuthenticationCancelled, run.Result);
         Assert.AreEqual(AuthenticationCancelled, run.Result);
+        Diagnostics.AssertValues("choices count", 1, sasl.Choices.Count);
         Assert.HasCount(1, sasl.Choices);
     }
 
@@ -202,11 +237,17 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("GSSAPI PLAIN") + "334 \r\n334 \r\n" + Cancelled + "334 \r\n235 ok\r\n" + HelpReplyAndBye, sasl, events);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
         Assert.AreEqual(Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n*\r\nAUTH PLAIN\r\nAHUAcA==\r\n" + HelpAndQuit, run.Sent);
+        Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+        Diagnostics.AssertValues("second offer", "PLAIN", string.Join(", ", sasl.Offers[1]));
         CollectionAssert.AreEqual(new[] { "PLAIN" }, sasl.Offers[1]);
         int reasonAt = events.Transcript.IndexOf("* " + Reason);
+        Diagnostics.Act("cancel reason position in transcript", reasonAt);
+        Diagnostics.Assert("cancel reason position in transcript is at least", 0, reasonAt);
         Assert.IsGreaterThanOrEqualTo(0, reasonAt);
+        Diagnostics.Assert("line after the reason starts with", "> *", SmtpDiagnostics.Show(events.Transcript[reasonAt + 1]));
         Assert.StartsWith("> *", events.Transcript[reasonAt + 1]);
     }
 
@@ -218,16 +259,24 @@ public sealed class SmtpProtocolHandlerSaslCancelTests
 
         SmtpRun run = await RunAsync(Offering("GSSAPI PLAIN") + "334 \r\n334 \r\n" + Cancelled + HelpReplyAndBye, sasl, events);
 
+        Diagnostics.Diff("sent", Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n", run.Sent);
         Assert.AreEqual(Ehlo + "AUTH GSSAPI\r\ndG9rZW4=\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
+        Diagnostics.AssertValues("an info line starts with GSSAPI", false, events.Info.Any(line => line.StartsWith("GSSAPI", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("GSSAPI", StringComparison.Ordinal)));
     }
 
     private static string Offering(string mechanisms) => Greeting + "250-localhost\r\n250 AUTH " + mechanisms + "\r\n";
 
-    private static Task<SmtpRun> RunAsync(string replies, ISaslAuthenticator sasl, ITransferEvents? events = null) =>
-        SmtpRun.ExecuteAsync(
+    private Task<SmtpRun> RunAsync(string replies, ISaslAuthenticator sasl, ITransferEvents? events = null)
+    {
+        Diagnostics.Arrange("sasl authenticator", sasl.GetType().Name);
+        Diagnostics.Arrange("credentials", "u:p");
+        return SmtpRun.ExecuteAsync(
+            Diagnostics,
             new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Credentials = new NetworkCredential("u", "p"), Events = events ?? NoTransferEvents.Instance },
             new ScriptedConnection(Encoding.Latin1.GetBytes(replies)),
             sasl);
+    }
 }

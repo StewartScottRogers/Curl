@@ -27,7 +27,8 @@ parsing, the way `runtests.pl`'s `prepro` does: `UpstreamTestConditionalLines` r
 SHA-256 of a file) and `%strippemfile[]strippemfile%` (a file's PEM blocks); all four read files
 through the delegate the caller passes (`UpstreamCaseRunner` reads the disk). The resulting
 `UpstreamTestFileExpansion` lists upstream variables with no value and instructions it does not
-carry out (`%days`, and the four file instructions when given no reader), left as written so the
+carry out (`%days`, a `%repeat` that would produce more than 16 MiB (ADR-0423), and the four
+file instructions when given no reader), left as written so the
 case can be skipped with a reason;
 `Parse()` hands it to the parser.
 It works on bytes, not on a parsed case, because a `%if` block can wrap whole parts.

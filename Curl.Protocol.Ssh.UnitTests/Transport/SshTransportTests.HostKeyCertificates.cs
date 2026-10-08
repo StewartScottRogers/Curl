@@ -2,6 +2,7 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Transport;
@@ -25,8 +26,20 @@ public sealed partial class SshTransportTests
         };
         ScriptedExchange run = Script("curve25519-sha256", TestHostKey.Certificate(name, TestHostKey.Ed25519(), body));
 
-        SshKeyExchangeResult result = await ExchangeAsync(run);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("certificate defect", defect);
+        diagnostics.Arrange("host key algorithm", name);
 
+        SshKeyExchangeResult result;
+        using (diagnostics.Phase("key exchange"))
+        {
+            result = await ExchangeAsync(run);
+        }
+
+        diagnostics.Act("negotiated server host key", result.Algorithms.ServerHostKey);
+        diagnostics.Bytes("exchange hash", result.ExchangeHash);
+        diagnostics.Assert("server host key", name, result.Algorithms.ServerHostKey);
+        diagnostics.Diff("exchange hash", run.Server.ExchangeHash, result.ExchangeHash);
         Assert.AreEqual(name, result.Algorithms.ServerHostKey);
         CollectionAssert.AreEqual(run.Server.ExchangeHash, result.ExchangeHash);
     }
@@ -46,6 +59,10 @@ public sealed partial class SshTransportTests
             _ => Join(Name(name), String(new byte[32]), UInt32(32), new byte[16]),
         };
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("certificate defect", defect);
+        diagnostics.Bytes("malformed certificate blob", blob);
+
         await AssertKeyExchangeFailsAsync(Script("curve25519-sha256", valid with { Blob = blob }));
     }
 
@@ -63,6 +80,11 @@ public sealed partial class SshTransportTests
             "signature" => valid with { Sign = h => Join(Name(name), String(new byte[63]), [0x01, 0, 0, 0, 7]) },
             _ => valid with { Sign = h => valid.Sign(h)[..^4] },
         };
+
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("defect", defect);
+        diagnostics.Arrange("host key algorithm", name);
+        diagnostics.Bytes("host key blob", broken.Blob);
 
         await AssertKeyExchangeFailsAsync(Script("curve25519-sha256", broken));
     }
@@ -83,6 +105,11 @@ public sealed partial class SshTransportTests
             _ => valid with { Sign = h => [.. valid.Sign(h)[..^5], 0x05, 0, 0, 0, 7] },
         };
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("defect", defect);
+        diagnostics.Arrange("host key algorithm", name);
+        diagnostics.Bytes("host key blob", broken.Blob);
+
         await AssertKeyExchangeFailsAsync(Script("curve25519-sha256", broken));
     }
 
@@ -101,9 +128,17 @@ public sealed partial class SshTransportTests
         SshAlgorithmPreferences preset = platform == "Windows" ? SshAlgorithmPreferences.WindowsReference : SshAlgorithmPreferences.OpenSslReference;
         SshTransport transport = ReferenceTransport(preset, hostKey);
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("platform preset", platform);
+        diagnostics.Arrange("only shared host key", hostKey);
+
         SshTransferException failure = await Assert.ThrowsExactlyAsync<SshTransferException>(
             async () => await transport.NegotiateAlgorithmsAsync(CancellationToken.None));
 
+        diagnostics.Act("exception", failure.GetType().Name + ": " + failure.Message);
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Assert("exit code", CurlExitCode.FailedInit, failure.ExitCode);
+        diagnostics.Assert("message", "Failure establishing ssh session: -5, Unable to exchange encryption keys", failure.Message);
         Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
         Assert.AreEqual("Failure establishing ssh session: -5, Unable to exchange encryption keys", failure.Message);
     }
@@ -113,8 +148,13 @@ public sealed partial class SshTransportTests
     {
         SshTransport transport = ReferenceTransport(SshAlgorithmPreferences.OpenSslReference, "ssh-ed25519-cert-v01@openssh.com");
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset and server host key", "OpenSslReference, ssh-ed25519-cert-v01@openssh.com");
+
         SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
+        diagnostics.Act("server host key", handshake.Algorithms.ServerHostKey);
+        diagnostics.Assert("server host key", "ssh-ed25519-cert-v01@openssh.com", handshake.Algorithms.ServerHostKey);
         Assert.AreEqual("ssh-ed25519-cert-v01@openssh.com", handshake.Algorithms.ServerHostKey);
     }
 
@@ -123,8 +163,13 @@ public sealed partial class SshTransportTests
     {
         SshTransport transport = ReferenceTransport(SshAlgorithmPreferences.WindowsReference, "rsa-sha2-512-cert-v01@openssh.com", "ssh-rsa");
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("preset and server host keys", "WindowsReference, rsa-sha2-512-cert-v01@openssh.com then ssh-rsa");
+
         SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(CancellationToken.None);
 
+        diagnostics.Act("server host key", handshake.Algorithms.ServerHostKey);
+        diagnostics.Assert("server host key", "ssh-rsa", handshake.Algorithms.ServerHostKey);
         Assert.AreEqual("ssh-rsa", handshake.Algorithms.ServerHostKey);
     }
 

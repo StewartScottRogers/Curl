@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Curl.Console.UnitTests\RecordingConnector.cs" Link="Fakes\RecordingConnector.cs" />
+    <Compile Include="..\Curl.Console.UnitTests\RecordingDatagramConnector.cs" Link="Fakes\RecordingDatagramConnector.cs" />
+  </ItemGroup>
+
+</Project>

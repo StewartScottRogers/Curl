@@ -51,10 +51,13 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            WriteEncodingArrange(chunkSize, response, "--tr-encoding");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, TrEncodingGet)))
                 .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { TransferEncoding = true }));
 
+            WriteResult(result);
+            Diagnostics.Assert("body", OneLine(body), OneLine(Latin1(output.ToArray())));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
             Assert.AreEqual(body, Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
@@ -76,10 +79,14 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            WriteEncodingArrange(chunkSize, response, "--tr-encoding");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, TrEncodingGet)))
                 .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { TransferEncoding = true }));
 
+            WriteResult(result);
+            Diagnostics.Assert("error text", message, result.ErrorMessage);
+            Diagnostics.Assert("output length", 0L, output.Length);
             Assert.AreEqual(CurlExitCode.BadContentEncoding, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
@@ -111,10 +118,14 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            WriteEncodingArrange(chunkSize, response, compressed ? "--compressed" : "--tr-encoding");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, expected)))
                 .ExecuteAsync(EncodingContext(output, options));
 
+            WriteResult(result);
+            Diagnostics.Assert("error text", message, result.ErrorMessage);
+            Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -134,10 +145,14 @@ public sealed partial class HttpProtocolHandlerTests
             string expected = options.Compressed
                 ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "TE: gzip\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nConnection: TE\r\n\r\n"
                 : TrEncodingGet;
+            WriteEncodingArrange(chunkSize, response, options.Compressed ? "--tr-encoding --raw --compressed" : "--tr-encoding --raw");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, expected)))
                 .ExecuteAsync(EncodingContext(output, options));
 
+            WriteResult(result);
+            Diagnostics.Bytes("body", output.ToArray());
+            Diagnostics.Assert("body length", Encoded(body).Length, output.Length);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(Encoded(body), Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
@@ -150,9 +165,13 @@ public sealed partial class HttpProtocolHandlerTests
     {
         foreach (int chunkSize in ChunkSizes)
         {
+            WriteEncodingArrange(chunkSize, response, "--tr-encoding --raw");
+
             TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, TrEncodingGet)))
                 .ExecuteAsync(EncodingContext(new MemoryStream(), new HttpRequestOptions { TransferEncoding = true, Raw = true }));
 
+            WriteResult(result);
+            Diagnostics.Assert("error text", message, result.ErrorMessage);
             Assert.AreEqual(CurlExitCode.BadContentEncoding, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
         }
@@ -167,10 +186,14 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            WriteEncodingArrange(chunkSize, "200, Content-Length: 42, Content-Encoding: gzip, Transfer-Encoding: gzip, gzip of gzip of hello", "--tr-encoding --compressed");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize, expected)))
                 .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { TransferEncoding = true, Compressed = true }));
 
+            WriteResult(result);
+            Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
+            Diagnostics.Assert("bytes transferred", 42L, result.BytesTransferred);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(42L, result.BytesTransferred, $"Chunk size {chunkSize}");
@@ -192,13 +215,26 @@ public sealed partial class HttpProtocolHandlerTests
             Output = output,
             Http = new HttpRequestOptions { FollowRedirects = true, TransferEncoding = true },
         };
+        Diagnostics.Arrange("scripted response", "302 Found, Location: /b, Content-Length: 3, Transfer-Encoding: foo, body abc");
+        Diagnostics.Arrange("options", "-L --tr-encoding");
 
         TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 302 Found\r\nLocation: /b\r\nContent-Length: 3\r\nTransfer-Encoding: foo\r\n\r\nabc", 65536)))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("redirect url", "http://127.0.0.1:18180/b", result.Report?.RedirectUrl);
+        Diagnostics.Assert("output length", 0L, output.Length);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("http://127.0.0.1:18180/b", result.Report!.RedirectUrl);
         Assert.AreEqual(0L, output.Length);
+    }
+
+    /// <summary>Writes the ARRANGE lines for one encoded exchange, its response as the test wrote it, placeholders unreplaced.</summary>
+    private void WriteEncodingArrange(int chunkSize, string response, string options)
+    {
+        Diagnostics.Arrange("chunk size", chunkSize);
+        Diagnostics.Arrange("scripted response", OneLine(response));
+        Diagnostics.Arrange("options", options);
     }
 
     /// <summary>

@@ -34,12 +34,18 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(connection);
             OriginAndProxyAuthenticator authenticator = new(null, null, "Basic dTpw");
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("proxy", "http://127.0.0.1:18183, credential u:p");
 
             TransferResult result = await new HttpProtocolHandler(connector, authenticator)
                 .ExecuteAsync(ProxyContext("http://Example.com/a/b?c=d", output, new HttpRequestOptions { ForwardProxy = LoopbackProxy }));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connect target", "127.0.0.1:18183 forward proxy", connector.Targets.Single());
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single(), $"Chunk size {chunkSize}");
             Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
@@ -67,12 +73,18 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello");
             QueueConnector connector = QueueConnector.For(connection);
             MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("url", "ftp://example.com/f.txt via http://127.0.0.1:18332");
 
             TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
                 .ExecuteAsync(ProxyContext("ftp://example.com/f.txt", output, new HttpRequestOptions { ForwardProxy = proxy }));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("output", "hello", Latin1(output.ToArray()));
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget("127.0.0.1", 18332, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single(), $"Chunk size {chunkSize}");
         }
@@ -93,10 +105,15 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, ProxyOkHead + "ok");
             QueueConnector connector = QueueConnector.For(connection);
             HttpRequestOptions options = new() { ForwardProxy = LoopbackProxy, Headers = ["X-A: 1"], ProxyHeaders = ["X-P: 1"] };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("headers", "-H X-A: 1, --proxy-header X-P: 1");
 
             TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
                 .ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
         }
@@ -124,9 +141,15 @@ public sealed partial class HttpProtocolHandlerTests
                 Credentials = new NetworkCredential("a", "b"),
                 Http = new HttpRequestOptions { ForwardProxy = LoopbackProxy },
             };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("url", context.Url);
+            Diagnostics.Arrange("credentials", "origin a:b, proxy u:p");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
         }
@@ -152,12 +175,18 @@ public sealed partial class HttpProtocolHandlerTests
                 ForwardProxy = LoopbackProxy with { Credential = null },
                 Body = new BytesBody("xy"u8.ToArray(), "application/x-www-form-urlencoded"),
             };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("request", "POST xy, origin a:b, proxy without credential");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
                 .ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("proxy credential asked about", null, authenticator.Calls.Single(call => call.Request.IsProxy).Request.Credential);
             Assert.IsNull(authenticator.Calls.Single(call => call.Request.IsProxy).Request.Credential, $"Chunk size {chunkSize}");
         }
     }
@@ -177,9 +206,14 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(connection);
             HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(ProxyKind.Http10, "127.0.0.1", 18183, null) };
             TransferContext context = new() { Url = CurlUrl.Parse("http://example.com/h"), Output = new MemoryStream(), NoBody = true, Http = options };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("proxy", "HTTP/1.0 proxy 127.0.0.1:18183, -I");
 
             TransferResult result = await Handler(connector).ExecuteAsync(context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single(), $"Chunk size {chunkSize}");
@@ -195,9 +229,14 @@ public sealed partial class HttpProtocolHandlerTests
         TurnTakingConnection connection = new(65536, ProxyOkHead + "ok");
         QueueConnector connector = QueueConnector.For(connection);
         HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(ProxyKind.Https, "proxy.example", 443, null) };
+        Diagnostics.Arrange("proxy", "https://proxy.example:443");
 
         TransferResult result = await Handler(connector).ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connect target", "proxy.example:443 with TLS", connector.Targets.Single());
+        Diagnostics.Act("request written", OneLine(connection.Written));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(new ConnectTarget("proxy.example", 443, true) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single());
         Assert.StartsWith("GET http://example.com/ HTTP/1.1\r\n", connection.Written);
@@ -221,9 +260,15 @@ public sealed partial class HttpProtocolHandlerTests
             OriginAndProxyAuthenticator authenticator = new(null, DigestValue, "Basic dTpw");
             MemoryStream output = new();
             TransferContext context = ProxyContext("http://127.0.0.1:18184/a", output, new HttpRequestOptions { ForwardProxy = LoopbackProxy });
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "401 Digest challenge, 200 ok; proxy u:p");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("requests written", OneLine(first + second), OneLine(connection.Written));
+            Diagnostics.Assert("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(first + second, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -257,10 +302,17 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(connection);
             OriginAndProxyAuthenticator authenticator = new(null, null, "Basic dTpw");
             HttpRequestOptions options = new() { ForwardProxy = proxy, ProxyTunnel = proxyTunnel, ProxyHeaders = ["X-P: 1"] };
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("url", url);
+            Diagnostics.Arrange("proxy", $"{kind}, tunnel {proxyTunnel}");
 
             TransferResult result = await new HttpProtocolHandler(connector, authenticator)
                 .ExecuteAsync(ProxyContext(url, new MemoryStream(), options));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
+            Diagnostics.Assert("connect target", $"{host}:{port} tls {useTls}", connector.Targets.Single());
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(new ConnectTarget(host, port, useTls) { Proxy = proxy, PoolScheme = useTls ? "https" : "http" }, connector.Targets.Single(), $"Chunk size {chunkSize}");
@@ -285,10 +337,14 @@ public sealed partial class HttpProtocolHandlerTests
         RecordingTransferEvents events = new();
         HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, "127.0.0.1", 18536, null), ProxyTunnel = proxyTunnel };
         TransferContext context = new() { Url = CurlUrl.Parse("http://example.invalid:8080/"), Output = new MemoryStream(), Http = options, Events = events };
+        Diagnostics.Arrange("proxy", $"{kind}, tunnel {proxyTunnel}");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new TurnTakingConnection(65536, ProxyOkHead + "ok")), new OriginAndProxyAuthenticator(null, null, null))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("last info line", "Connection #0 to host example.invalid:8080 left intact", events.Info[^1]);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("Connection #0 to host example.invalid:8080 left intact", events.Info[^1]);
     }
@@ -301,10 +357,14 @@ public sealed partial class HttpProtocolHandlerTests
     public async Task ExecuteAsync_WithoutProxy_ReportsNoProxyUsed()
     {
         TurnTakingConnection connection = new(int.MaxValue, ProxyOkHead + "ok");
+        Diagnostics.Arrange("proxy", "(none)");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new OriginAndProxyAuthenticator(null, null, null))
             .ExecuteAsync(ProxyContext("http://127.0.0.1:18081/", new MemoryStream(), new HttpRequestOptions()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("proxy used", false, result.Report!.UsedProxy);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsFalse(result.Report!.UsedProxy);
     }
@@ -322,10 +382,15 @@ public sealed partial class HttpProtocolHandlerTests
         const string message = "Failed to connect to 127.0.0.1 port 1 after 0 ms: Could not connect to server";
         QueueConnector connector = new(ConnectResult.Failed(CurlExitCode.CouldntConnect, message));
         HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, "127.0.0.1", 1, null) };
+        Diagnostics.Arrange("proxy", $"{kind} 127.0.0.1:1, connect fails");
 
         TransferResult result = await new HttpProtocolHandler(connector, new OriginAndProxyAuthenticator(null, null, null))
             .ExecuteAsync(ProxyContext("http://example.test/", new MemoryStream(), options));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("error message", message, result.ErrorMessage);
+        Diagnostics.Assert("proxy used", true, result.Report!.UsedProxy);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
         Assert.IsTrue(result.Report!.UsedProxy);
@@ -339,10 +404,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         ScriptedAuthenticator authenticator = new("Basic dTpw", null);
         HttpRequestOptions options = new() { ForwardProxy = new ProxyEndpoint(kind, host, 18183, new NetworkCredential("u", "p")) };
+        Diagnostics.Arrange("proxy", $"{kind} {host}:18183, credential u:p");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(new TurnTakingConnection(65536, ProxyOkHead + "ok")), authenticator)
             .ExecuteAsync(ProxyContext("http://example.com/", new MemoryStream(), options));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("proxy url asked about", expectedUrl, authenticator.Calls.Single(call => call.Request.IsProxy).Request.Url.OriginalString);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(expectedUrl, authenticator.Calls.Single(call => call.Request.IsProxy).Request.Url.OriginalString);
     }

@@ -4,6 +4,7 @@ using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -42,6 +43,12 @@ public sealed class CurlCommandRunnerNetrcTests
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
+    private string StandardOutputText => Encoding.UTF8.GetString(standardOutput.ToArray());
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(true, @"home\.netrc")]
     [DataRow(false, "home/.netrc")]
@@ -52,6 +59,8 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], runsOnWindows);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         AssertSent("nu", "np");
         Assert.AreEqual(string.Empty, StandardErrorText);
@@ -66,8 +75,10 @@ public sealed class CurlCommandRunnerNetrcTests
 
         await RunAsync(["-s", "-S", "-n", Url], runsOnWindows: true);
 
+        string[] expectedPathsRead = [@"home\.netrc"];
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
         AssertSent("dot", "dp");
-        CollectionAssert.AreEqual(new[] { @"home\.netrc" }, dataFiles.PathsRead);
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
     }
 
     [TestMethod]
@@ -78,8 +89,10 @@ public sealed class CurlCommandRunnerNetrcTests
 
         await RunAsync(["-s", "-S", "-n", Url], runsOnWindows: true);
 
+        string[] expectedPathsRead = [@"home\.netrc", @"home\_netrc"];
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
         AssertSent("under", "up");
-        CollectionAssert.AreEqual(new[] { @"home\.netrc", @"home\_netrc" }, dataFiles.PathsRead);
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
     }
 
     [TestMethod]
@@ -89,9 +102,13 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], runsOnWindows: false);
 
+        string[] expectedPathsRead = ["home/.netrc"];
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(NoSuchFileLine), Lf(StandardErrorText));
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(NoSuchFileLine, StandardErrorText);
-        CollectionAssert.AreEqual(new[] { "home/.netrc" }, dataFiles.PathsRead);
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
     }
 
     [TestMethod]
@@ -118,6 +135,9 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], runsOnWindows: true);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(NoSuchFileLine), Lf(StandardErrorText));
+        Diagnostics.Assert("requests made", 0, http.Contexts.Count);
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(NoSuchFileLine, StandardErrorText);
         Assert.IsEmpty(http.Contexts);
@@ -134,6 +154,9 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], runsOnWindows);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(NoSuchFileLine), Lf(StandardErrorText));
+        Diagnostics.Assert("paths read", string.Empty, Joined(dataFiles.PathsRead));
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(NoSuchFileLine, StandardErrorText);
         Assert.IsEmpty(dataFiles.PathsRead);
@@ -148,6 +171,7 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], runsOnWindows: false);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
         Assert.AreEqual(26, exitCode);
     }
 
@@ -161,6 +185,10 @@ public sealed class CurlCommandRunnerNetrcTests
         // request, no progress meter, and no -o file created.
         int exitCode = await RunAsync([.. options, Url]);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(NoSuchFileLine), Lf(StandardErrorText));
+        Diagnostics.Assert("requests made", 0, http.Contexts.Count);
+        Diagnostics.Assert("out.txt written", false, fileSystem.Written.ContainsKey("out.txt"));
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(NoSuchFileLine, StandardErrorText);
         Assert.IsEmpty(http.Contexts);
@@ -172,6 +200,8 @@ public sealed class CurlCommandRunnerNetrcTests
     {
         int exitCode = await RunAsync(["-s", "-S", "-n", Url, Url]);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(NoSuchFileLine + NoSuchFileLine), Lf(StandardErrorText));
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(NoSuchFileLine + NoSuchFileLine, StandardErrorText);
     }
@@ -181,6 +211,10 @@ public sealed class CurlCommandRunnerNetrcTests
     {
         int exitCode = await RunAsync(["-s", "-S", "--netrc-optional", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("requests made", 1, http.Contexts.Count);
+        Diagnostics.Assert("credentials sent", "(none)", SentCredentials());
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.IsNull(Assert.ContainsSingle(http.Contexts).Credentials);
         Assert.AreEqual(string.Empty, StandardErrorText);
@@ -209,6 +243,8 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-u", "a:b", "-n", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("paths read", string.Empty, Joined(dataFiles.PathsRead));
         Assert.AreEqual(0, exitCode);
         AssertSent("a", "b");
         Assert.IsEmpty(dataFiles.PathsRead);
@@ -288,8 +324,12 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", url]);
 
+        string expectedStandardError = "curl: (26) .netrc error: syntax error" + NewLine;
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Diagnostics.Assert("requests made", 0, http.Contexts.Count);
         Assert.AreEqual(26, exitCode);
-        Assert.AreEqual("curl: (26) .netrc error: syntax error" + NewLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
         Assert.IsEmpty(http.Contexts);
     }
 
@@ -300,6 +340,9 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "--netrc-optional", Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("requests made", 1, http.Contexts.Count);
+        Diagnostics.Assert("credentials sent", "(none)", SentCredentials());
         Assert.AreEqual(0, exitCode);
         Assert.IsNull(Assert.ContainsSingle(http.Contexts).Credentials);
     }
@@ -331,8 +374,10 @@ public sealed class CurlCommandRunnerNetrcTests
 
         await RunAsync(["-s", "-S", .. options, Url]);
 
+        string[] expectedPathsRead = ["."];
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
         AssertSent("nu", "np");
-        CollectionAssert.AreEqual(new[] { "." }, dataFiles.PathsRead);
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
     }
 
     [TestMethod]
@@ -341,6 +386,8 @@ public sealed class CurlCommandRunnerNetrcTests
         // curl --netrc-file <a directory> <url>: "curl: (26) .netrc error: no such file".
         int exitCode = await RunAsync(["-s", "-S", "--netrc-file", ".", Url]);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(NoSuchFileLine), Lf(StandardErrorText));
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(NoSuchFileLine, StandardErrorText);
     }
@@ -352,6 +399,7 @@ public sealed class CurlCommandRunnerNetrcTests
 
         await RunAsync(["-s", "-S", "-u", "a:b", Url]);
 
+        Diagnostics.Assert("paths read", string.Empty, Joined(dataFiles.PathsRead));
         AssertSent("a", "b");
         Assert.IsEmpty(dataFiles.PathsRead);
     }
@@ -365,6 +413,9 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", "ftp://127.0.0.1:18505/f"], handler: ftp);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("ftp transfers made", 1, ftp.Contexts.Count);
+        Diagnostics.Assert("credentials sent", "nu:np", SentCredentials(ftp));
         Assert.AreEqual(0, exitCode);
         NetworkCredential credentials = Assert.ContainsSingle(ftp.Contexts).Credentials!;
         Assert.AreEqual("nu", credentials.UserName);
@@ -378,6 +429,8 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", "ftp://127.0.0.1:18505/f"], handler: ftp);
 
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(NoSuchFileLine), Lf(StandardErrorText));
         Assert.AreEqual(26, exitCode);
         Assert.AreEqual(NoSuchFileLine, StandardErrorText);
     }
@@ -388,8 +441,11 @@ public sealed class CurlCommandRunnerNetrcTests
     {
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], OperatingSystem.IsWindows());
 
+        string[] expectedPathsRead = [@"home\.netrc", @"home\_netrc"];
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
         Assert.AreEqual(26, exitCode);
-        CollectionAssert.AreEqual(new[] { @"home\.netrc", @"home\_netrc" }, dataFiles.PathsRead);
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
     }
 
     [TestMethod]
@@ -398,8 +454,11 @@ public sealed class CurlCommandRunnerNetrcTests
     {
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], OperatingSystem.IsWindows());
 
+        string[] expectedPathsRead = ["home/.netrc"];
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Assert("paths read", Joined(expectedPathsRead), Joined(dataFiles.PathsRead));
         Assert.AreEqual(26, exitCode);
-        CollectionAssert.AreEqual(new[] { "home/.netrc" }, dataFiles.PathsRead);
+        CollectionAssert.AreEqual(expectedPathsRead, dataFiles.PathsRead);
     }
 
     [TestMethod]
@@ -411,10 +470,12 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", Url], handler: HttpOver(server));
 
+        string expectedRequest = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18505\r\nAuthorization: Basic bnU6bnA=\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        Diagnostics.Bytes("request sent", server.Written);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("request sent", expectedRequest, Encoding.Latin1.GetString(server.Written));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
-            "GET / HTTP/1.1\r\nHost: 127.0.0.1:18505\r\nAuthorization: Basic bnU6bnA=\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
-            Encoding.Latin1.GetString(server.Written));
+        Assert.AreEqual(expectedRequest, Encoding.Latin1.GetString(server.Written));
     }
 
     [TestMethod]
@@ -432,6 +493,12 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", "-L", Url], handler: HttpOver(server));
 
+        Diagnostics.Bytes("requests sent", server.Written);
+        string[] sentRequests = Encoding.Latin1.GetString(server.Written).Split("GET ", StringSplitOptions.RemoveEmptyEntries);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("requests sent", 2, sentRequests.Length);
+        Diagnostics.Assert("first request carries the netrc credentials", true, sentRequests.Length > 0 && sentRequests[0].Contains("Authorization: Basic bnU6bnA=", StringComparison.Ordinal));
+        Diagnostics.Assert("second request carries credentials", carried, sentRequests.Length > 1 && sentRequests[1].Contains("Authorization:", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         string[] requests = Encoding.Latin1.GetString(server.Written).Split("GET ", StringSplitOptions.RemoveEmptyEntries);
         Assert.HasCount(2, requests);
@@ -450,9 +517,9 @@ public sealed class CurlCommandRunnerNetrcTests
 
         string[] requests = await RunRedirectedToLocalhostAsync(locationTrusted ? ["--location-trusted"] : []);
 
-        Assert.AreEqual(
-            "/b HTTP/1.1\r\nHost: localhost:18505\r\nAuthorization: Basic bHU6bHA=\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
-            requests[1]);
+        string expectedSecondRequest = "/b HTTP/1.1\r\nHost: localhost:18505\r\nAuthorization: Basic bHU6bHA=\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        Diagnostics.Diff("second request after GET", expectedSecondRequest, requests[1]);
+        Assert.AreEqual(expectedSecondRequest, requests[1]);
     }
 
     [TestMethod]
@@ -464,9 +531,9 @@ public sealed class CurlCommandRunnerNetrcTests
 
         string[] requests = await RunRedirectedToLocalhostAsync(["--location-trusted"]);
 
-        Assert.AreEqual(
-            "/b HTTP/1.1\r\nHost: localhost:18505\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
-            requests[1]);
+        string expectedSecondRequest = "/b HTTP/1.1\r\nHost: localhost:18505\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        Diagnostics.Diff("second request after GET", expectedSecondRequest, requests[1]);
+        Assert.AreEqual(expectedSecondRequest, requests[1]);
     }
 
     [TestMethod]
@@ -477,6 +544,8 @@ public sealed class CurlCommandRunnerNetrcTests
 
         string[] requests = await RunRedirectedToLocalhostAsync(["--location-trusted", "-u", "q:r"]);
 
+        Diagnostics.Assert("second request carries the -u credentials", true, requests[1].Contains("Authorization: Basic cTpy\r\n", StringComparison.Ordinal));
+        Diagnostics.Assert("paths read", string.Empty, Joined(dataFiles.PathsRead));
         Assert.Contains("Authorization: Basic cTpy\r\n", requests[1]);
         Assert.IsEmpty(dataFiles.PathsRead);
     }
@@ -490,8 +559,11 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-v", "--netrc-file", ".", Url]);
 
+        string expectedFirstLine = "* Could not find host 127.0.0.1 in the . file; using defaults\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr starts with the could-not-find-host line", true, StandardErrorText.StartsWith(expectedFirstLine, StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
-        Assert.StartsWith("* Could not find host 127.0.0.1 in the . file; using defaults\n", StandardErrorText);
+        Assert.StartsWith(expectedFirstLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -504,8 +576,11 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-v", option, "http://LOCALHOST:18505/"]);
 
+        string expectedFirstLine = "* Could not find host LOCALHOST in the .netrc file; using defaults\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr starts with the could-not-find-host line", true, StandardErrorText.StartsWith(expectedFirstLine, StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
-        Assert.StartsWith("* Could not find host LOCALHOST in the .netrc file; using defaults\n", StandardErrorText);
+        Assert.StartsWith(expectedFirstLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -515,8 +590,11 @@ public sealed class CurlCommandRunnerNetrcTests
         // 2026-10-04): "* Could not find host LOCALHOST in the .netrc file; using defaults", exit 0.
         int exitCode = await RunAsync(["-v", "--netrc-optional", "http://LOCALHOST:18505/"]);
 
+        string expectedFirstLine = "* Could not find host LOCALHOST in the .netrc file; using defaults\n";
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr starts with the could-not-find-host line", true, StandardErrorText.StartsWith(expectedFirstLine, StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
-        Assert.StartsWith("* Could not find host LOCALHOST in the .netrc file; using defaults\n", StandardErrorText);
+        Assert.StartsWith(expectedFirstLine, StandardErrorText);
     }
 
     [TestMethod]
@@ -530,6 +608,8 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync([.. options, Url]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains a could-not-find-host line", false, StandardErrorText.Contains("Could not find host", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         Assert.DoesNotContain("Could not find host", StandardErrorText);
     }
@@ -541,8 +621,12 @@ public sealed class CurlCommandRunnerNetrcTests
         // curl: (1) Protocol "qttp" not supported, not exit 26.
         int exitCode = await RunAsync(["-n", "qttp://x/"]);
 
+        string expectedStandardError = "curl: (1) Protocol \"qttp\" not supported" + NewLine;
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Diagnostics.Assert("paths read", string.Empty, Joined(dataFiles.PathsRead));
         Assert.AreEqual(1, exitCode);
-        Assert.AreEqual("curl: (1) Protocol \"qttp\" not supported" + NewLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
         Assert.IsEmpty(dataFiles.PathsRead);
     }
 
@@ -552,8 +636,11 @@ public sealed class CurlCommandRunnerNetrcTests
         // curl -v -n qttp://x/: * Protocol "qttp" not supported, then the curl: (1) line.
         int exitCode = await RunAsync(["-v", "-n", "QTTP://x/"]);
 
+        string expectedStandardError = "* Protocol \"qttp\" not supported\ncurl: (1) Protocol \"qttp\" not supported" + NewLine;
+        Diagnostics.Assert("exit code", 1, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(1, exitCode);
-        Assert.AreEqual("* Protocol \"qttp\" not supported\ncurl: (1) Protocol \"qttp\" not supported" + NewLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
@@ -563,8 +650,12 @@ public sealed class CurlCommandRunnerNetrcTests
         // (measured 2026-10-07, BL-1447 Notes): the info line, then the curl: (26) line, exit 26.
         int exitCode = await RunAsync(["-v", "-n", Url]);
 
+        string expectedStandardError = "* .netrc error: no such file\n" + NoSuchFileLine;
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Diagnostics.Assert("requests made", 0, http.Contexts.Count);
         Assert.AreEqual(26, exitCode);
-        Assert.AreEqual("* .netrc error: no such file\n" + NoSuchFileLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
         Assert.IsEmpty(http.Contexts);
     }
 
@@ -577,8 +668,12 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-v", "--netrc-file", ".", Url]);
 
+        string expectedStandardError = "* .netrc error: syntax error\ncurl: (26) .netrc error: syntax error" + NewLine;
+        Diagnostics.Assert("exit code", 26, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Diagnostics.Assert("requests made", 0, http.Contexts.Count);
         Assert.AreEqual(26, exitCode);
-        Assert.AreEqual("* .netrc error: syntax error\ncurl: (26) .netrc error: syntax error" + NewLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
         Assert.IsEmpty(http.Contexts);
     }
 
@@ -592,8 +687,11 @@ public sealed class CurlCommandRunnerNetrcTests
 
         int exitCode = await RunAsync(["-s", "-S", "-n", "-L", .. options, Url], handler: HttpOver(server));
 
-        Assert.AreEqual(0, exitCode);
+        Diagnostics.Bytes("requests sent", server.Written);
         string[] requests = Encoding.Latin1.GetString(server.Written).Split("GET ", StringSplitOptions.RemoveEmptyEntries);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("requests sent", 2, requests.Length);
+        Assert.AreEqual(0, exitCode);
         Assert.HasCount(2, requests);
         return requests;
     }
@@ -614,23 +712,61 @@ public sealed class CurlCommandRunnerNetrcTests
 
     private void AssertSent(string user, string password)
     {
+        Diagnostics.Assert("requests made", 1, http.Contexts.Count);
+        Diagnostics.Assert("credentials sent", $"{user}:{password}", SentCredentials());
         NetworkCredential? credentials = Assert.ContainsSingle(http.Contexts).Credentials;
         Assert.IsNotNull(credentials);
         Assert.AreEqual(user, credentials.UserName);
         Assert.AreEqual(password, credentials.Password);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, bool runsOnWindows = false, IProtocolHandler? handler = null) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([handler ?? http])),
-                fileSystem,
-                fileSystem,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows,
-                outputPaths: fileSystem,
-                configFileReader: dataFiles,
-                readEnvironmentVariable: name => environment.GetValueOrDefault(name))
-            .RunAsync(arguments);
+    private string SentCredentials() => SentCredentials(http);
+
+    private static string SentCredentials(RecordingProtocolHandler handler)
+    {
+        NetworkCredential? credentials = handler.Contexts.Count == 1 ? handler.Contexts[0].Credentials : null;
+        return credentials is null ? "(none)" : $"{credentials.UserName}:{credentials.Password}";
+    }
+
+    private static string Joined(IEnumerable<string> paths) => string.Join(", ", paths);
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, bool runsOnWindows = false, IProtocolHandler? handler = null)
+    {
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
+        Diagnostics.Arrange("runs on Windows", runsOnWindows);
+        foreach (KeyValuePair<string, string> variable in environment)
+        {
+            Diagnostics.Arrange($"environment {variable.Key}", variable.Value);
+        }
+
+        foreach (KeyValuePair<string, byte[]> file in dataFiles.Files)
+        {
+            Diagnostics.Arrange($"netrc file {file.Key}", Encoding.UTF8.GetString(file.Value));
+        }
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([handler ?? http])),
+                    fileSystem,
+                    fileSystem,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows,
+                    outputPaths: fileSystem,
+                    configFileReader: dataFiles,
+                    readEnvironmentVariable: name => environment.GetValueOrDefault(name))
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        Diagnostics.Act("paths read", Joined(dataFiles.PathsRead));
+        return exitCode;
+    }
 }

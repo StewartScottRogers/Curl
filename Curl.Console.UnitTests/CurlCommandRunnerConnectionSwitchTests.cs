@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -17,6 +18,10 @@ public sealed class CurlCommandRunnerConnectionSwitchTests
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
     private readonly InMemoryFileSystem outputFiles = new();
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow("--tcp-nodelay", "http")]
@@ -35,12 +40,29 @@ public sealed class CurlCommandRunnerConnectionSwitchTests
 
         int exitCode = await RunAsync(["-s", "-k", argument, scheme + "://127.0.0.1/"], handler);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr", string.Empty, Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.Assert("transfers dispatched", 1, handler.Contexts.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, Encoding.UTF8.GetString(standardError.ToArray()));
         Assert.HasCount(1, handler.Contexts);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler) =>
-        new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false, TerminalColumns.Default)
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, IProtocolHandler handler)
+    {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        Diagnostics.Arrange("protocol handler schemes", string.Join(" ", handler.SupportedSchemes));
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput, standardError, new MemoryStream(), runsOnWindows: false, TerminalColumns.Default)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
+        return exitCode;
+    }
 }

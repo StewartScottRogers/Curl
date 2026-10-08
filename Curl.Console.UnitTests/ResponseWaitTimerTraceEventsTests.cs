@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -9,18 +10,25 @@ namespace Curl.Console;
 [TestClass]
 public sealed class ResponseWaitTimerTraceEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ReportInfo_TheRequestSentLine_IsFollowedByTheWaitLines()
     {
         CallRecordingEvents inner = new();
         ITransferEvents events = new ResponseWaitTimerTraceEvents(inner, ["[TIMER] [TIMEOUT] gives multi timeout in 5000ms"]);
+        Diagnostics.Arrange("wait lines", "[TIMER] [TIMEOUT] gives multi timeout in 5000ms");
+        Diagnostics.Arrange("info lines reported", $"using HTTP/1.x | {ResponseWaitTimerTraceEvents.RequestSentLine}");
 
         events.ReportInfo("using HTTP/1.x");
         events.ReportInfo(ResponseWaitTimerTraceEvents.RequestSentLine);
+        Diagnostics.Act("inner calls", string.Join(" | ", inner.Calls));
 
-        CollectionAssert.AreEqual(
-            new[] { "Info using HTTP/1.x", "Info Request completely sent off", "Info [TIMER] [TIMEOUT] gives multi timeout in 5000ms" },
-            inner.Calls);
+        string[] expected = ["Info using HTTP/1.x", "Info Request completely sent off", "Info [TIMER] [TIMEOUT] gives multi timeout in 5000ms"];
+        Diagnostics.Assert("inner calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     [TestMethod]
@@ -28,6 +36,8 @@ public sealed class ResponseWaitTimerTraceEventsTests
     {
         CallRecordingEvents inner = new();
         ITransferEvents events = new ResponseWaitTimerTraceEvents(inner, []);
+        Diagnostics.Arrange("wait lines", "none");
+        Diagnostics.Arrange("events reported", "every event but info, each once");
 
         events.ReportConnectionOpened(null!);
         events.ReportConnectionReused(null!);
@@ -41,14 +51,15 @@ public sealed class ResponseWaitTimerTraceEventsTests
         events.ReportResponseHeader([3]);
         events.ReportDataSent([4]);
         events.ReportDataReceived([5]);
+        Diagnostics.Act("inner calls", string.Join(" | ", inner.Calls));
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "Opened", "Reused", "Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust",
-                "VerifyResult 18 False", "EarlyData -7", "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
-            },
-            inner.Calls);
+        string[] expected =
+        [
+            "Opened", "Reused", "Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust",
+            "VerifyResult 18 False", "EarlyData -7", "RequestHeader 2", "ResponseHeader 3", "DataSent 4", "DataReceived 5",
+        ];
+        Diagnostics.Assert("inner calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     /// <summary>Records each event it is given as one line naming it and its payload.</summary>

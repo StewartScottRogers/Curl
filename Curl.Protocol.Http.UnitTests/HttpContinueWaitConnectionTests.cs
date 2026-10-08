@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Http.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -18,9 +19,21 @@ public sealed class HttpContinueWaitConnectionTests
 
     private static readonly int[] ChunkSizes = [1, 65536];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
-    public void ContinueWait_NotSet_IsTheMeasuredOneSecond() =>
-        Assert.AreEqual(TimeSpan.FromSeconds(1), new HttpContinueWaitConnection(new ScriptedConnection([], 1)).ContinueWait);
+    public void ContinueWait_NotSet_IsTheMeasuredOneSecond()
+    {
+        Diagnostics.Arrange("--expect100-timeout", "not set");
+
+        TimeSpan wait = new HttpContinueWaitConnection(new ScriptedConnection([], 1)).ContinueWait;
+
+        Diagnostics.Act("continue wait", wait);
+        Diagnostics.Assert("continue wait", TimeSpan.FromSeconds(1), wait);
+        Assert.AreEqual(TimeSpan.FromSeconds(1), wait);
+    }
 
     [TestMethod]
     [DataRow(200, DisplayName = "--expect100-timeout 0.2")]
@@ -31,14 +44,19 @@ public sealed class HttpContinueWaitConnectionTests
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection inner = new(Encoding.Latin1.GetBytes(Final), 65536, 1);
         HttpContinueWaitConnection connection = new(inner) { ContinueWait = TimeSpan.FromMilliseconds(milliseconds) };
+        Diagnostics.Arrange("continue wait ms", milliseconds);
 
         Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
         await time.TimerCreatedAsync(TimeSpan.FromMilliseconds(milliseconds));
         time.Advance(TimeSpan.FromMilliseconds(milliseconds - 1));
+        Diagnostics.Act("completed one millisecond early", wait.IsCompleted);
         Assert.IsFalse(wait.IsCompleted, "The wait ended early.");
         time.Advance(TimeSpan.FromMilliseconds(1));
 
-        Assert.IsTrue(await wait);
+        bool sends = await wait;
+        Diagnostics.Act("sends the body", sends);
+        Diagnostics.Assert("wait ran out", true, connection.WaitRanOut);
+        Assert.IsTrue(sends);
         Assert.IsTrue(connection.WaitRanOut);
     }
 
@@ -51,9 +69,12 @@ public sealed class HttpContinueWaitConnectionTests
         {
             ContinueWait = HttpContinueWaitConnection.LongestTimedWait + TimeSpan.FromMilliseconds(1),
         };
+        Diagnostics.Arrange("continue wait", connection.ContinueWait);
 
         Task<bool> wait = connection.WaitForContinueAsync(time, cancellation.Token).AsTask();
         time.Advance(HttpContinueWaitConnection.LongestTimedWait);
+        Diagnostics.Act("wait completed", wait.IsCompleted);
+        Diagnostics.Assert("timer created", false, time.FirstTimerCreated.IsCompleted);
         Assert.IsFalse(wait.IsCompleted, "The wait ended.");
         Assert.IsFalse(time.FirstTimerCreated.IsCompleted, "A timer was created.");
         await cancellation.CancelAsync();
@@ -66,12 +87,16 @@ public sealed class HttpContinueWaitConnectionTests
     {
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         HttpContinueWaitConnection connection = new(new GatedConnection([], 1, 1)) { ContinueWait = HttpContinueWaitConnection.LongestTimedWait };
+        Diagnostics.Arrange("continue wait", connection.ContinueWait);
 
         Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
         await time.TimerCreatedAsync(HttpContinueWaitConnection.LongestTimedWait);
         time.Advance(HttpContinueWaitConnection.LongestTimedWait);
 
-        Assert.IsTrue(await wait);
+        bool sends = await wait;
+        Diagnostics.Act("sends the body", sends);
+        Diagnostics.Assert("sends the body", true, sends);
+        Assert.IsTrue(sends);
     }
 
     [TestMethod]
@@ -80,28 +105,39 @@ public sealed class HttpContinueWaitConnectionTests
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         GatedConnection inner = new(Encoding.Latin1.GetBytes(Final), 65536, 1);
         HttpContinueWaitConnection connection = new(inner);
+        Diagnostics.Arrange("response after the wait", Visible(Final));
 
         Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
         await time.FirstTimerCreated;
         time.Advance(TimeSpan.FromMilliseconds(999));
+        Diagnostics.Act("completed at 999 ms", wait.IsCompleted);
         Assert.IsFalse(wait.IsCompleted, "The wait ended before one second.");
         time.Advance(TimeSpan.FromMilliseconds(1));
 
-        Assert.IsTrue(await wait);
+        bool sends = await wait;
+        Diagnostics.Act("sends the body", sends);
+        Assert.IsTrue(sends);
         await connection.WriteAsync("x"u8.ToArray(), CancellationToken.None);
-        Assert.AreEqual(Final, await ReadAllAsync(connection));
+        string read = await ReadAllAsync(connection);
+        Diagnostics.Assert("read", Visible(Final), Visible(read));
+        Assert.AreEqual(Final, read);
     }
 
     [TestMethod]
     public async Task WaitForContinueAsync_ContinueArrives_SendsTheBodyAndReplaysIt()
     {
         const string response = "HTTP/1.1 100 Continue\r\n\r\n" + Final;
+        Diagnostics.Arrange("response", Visible(response));
         foreach (int chunkSize in ChunkSizes)
         {
             HttpContinueWaitConnection connection = new(Connection(response, chunkSize));
 
-            Assert.IsTrue(await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None), $"Chunk size {chunkSize}");
-            Assert.AreEqual(response, await ReadAllAsync(connection), $"Chunk size {chunkSize}");
+            bool sends = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+            Diagnostics.Act($"sends the body at chunk size {chunkSize}", sends);
+            Assert.IsTrue(sends, $"Chunk size {chunkSize}");
+            string read = await ReadAllAsync(connection);
+            Diagnostics.Assert($"replayed at chunk size {chunkSize}", Visible(response), Visible(read));
+            Assert.AreEqual(response, read, $"Chunk size {chunkSize}");
         }
     }
 
@@ -112,12 +148,17 @@ public sealed class HttpContinueWaitConnectionTests
     [DataRow("", DisplayName = "Closed at once")]
     public async Task WaitForContinueAsync_AnythingElseArrives_LeavesTheBodyUnsentAndReplaysIt(string response)
     {
+        Diagnostics.Arrange("response", Visible(response));
         foreach (int chunkSize in ChunkSizes)
         {
             HttpContinueWaitConnection connection = new(Connection(response, chunkSize));
 
-            Assert.IsFalse(await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None), $"Chunk size {chunkSize}");
-            Assert.AreEqual(response, await ReadAllAsync(connection), $"Chunk size {chunkSize}");
+            bool sends = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+            Diagnostics.Act($"sends the body at chunk size {chunkSize}", sends);
+            Assert.IsFalse(sends, $"Chunk size {chunkSize}");
+            string read = await ReadAllAsync(connection);
+            Diagnostics.Assert($"replayed at chunk size {chunkSize}", Visible(response), Visible(read));
+            Assert.AreEqual(response, read, $"Chunk size {chunkSize}");
         }
     }
 
@@ -126,9 +167,15 @@ public sealed class HttpContinueWaitConnectionTests
     {
         byte[] response = Encoding.ASCII.GetBytes(new string('H', HttpLineReader.MaximumLineLength + 5));
         HttpContinueWaitConnection connection = new(new ScriptedConnection(response, 65536));
+        Diagnostics.Arrange("line length", response.Length);
 
-        Assert.IsFalse(await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None));
-        Assert.AreEqual(response.Length, (await ReadAllAsync(connection)).Length);
+        bool sends = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+
+        Diagnostics.Act("sends the body", sends);
+        Assert.IsFalse(sends);
+        int replayed = (await ReadAllAsync(connection)).Length;
+        Diagnostics.Assert("replayed length", response.Length, replayed);
+        Assert.AreEqual(response.Length, replayed);
     }
 
     [TestMethod]
@@ -136,9 +183,14 @@ public sealed class HttpContinueWaitConnectionTests
     {
         IOException failure = new("Reset.");
         HttpContinueWaitConnection connection = new(new ScriptedConnection([], 1, null, failure));
+        Diagnostics.Arrange("read failure", failure.Message);
 
-        Assert.IsFalse(await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None));
+        bool sends = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+
+        Diagnostics.Act("sends the body", sends);
+        Assert.IsFalse(sends);
         IOException thrown = await Assert.ThrowsExactlyAsync<IOException>(async () => await connection.ReadAsync(new byte[1], CancellationToken.None));
+        Diagnostics.Assert("next read throws", failure.Message, thrown.Message);
         Assert.AreSame(failure, thrown);
     }
 
@@ -147,19 +199,27 @@ public sealed class HttpContinueWaitConnectionTests
     {
         using CancellationTokenSource cancellation = new();
         HttpContinueWaitConnection connection = new(new GatedConnection([], 1, 1));
+        Diagnostics.Arrange("connection", "gated, nothing arrives");
 
         Task<bool> wait = connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), cancellation.Token).AsTask();
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () => await wait);
+        OperationCanceledException thrown = await Assert.ThrowsAsync<OperationCanceledException>(async () => await wait);
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("cancelled", true, wait.IsCanceled || wait.IsFaulted);
     }
 
     [TestMethod]
     public async Task ReadAsync_WithoutAWait_ReadsTheConnection()
     {
         HttpContinueWaitConnection connection = new(Connection(Final, 65536));
+        Diagnostics.Arrange("response", Visible(Final));
 
-        Assert.AreEqual(Final, await ReadAllAsync(connection));
+        string read = await ReadAllAsync(connection);
+
+        Diagnostics.Act("read", Visible(read));
+        Diagnostics.Assert("read", Visible(Final), Visible(read));
+        Assert.AreEqual(Final, read);
     }
 
     [TestMethod]
@@ -167,11 +227,14 @@ public sealed class HttpContinueWaitConnectionTests
     {
         ScriptedConnection inner = new([], 1);
         HttpContinueWaitConnection connection = new(inner);
+        Diagnostics.Arrange("written", "ab");
 
         await connection.WriteAsync("ab"u8.ToArray(), CancellationToken.None);
         await connection.FlushAsync(CancellationToken.None);
         await connection.DisposeAsync();
 
+        Diagnostics.Act("inner written", Encoding.Latin1.GetString(inner.Written));
+        Diagnostics.Assert("inner disposed", false, inner.IsDisposed);
         Assert.AreEqual(inner.IsSecure, connection.IsSecure);
         Assert.AreEqual(inner.RemoteEndPoint, connection.RemoteEndPoint);
         Assert.AreEqual("ab", Encoding.Latin1.GetString(inner.Written));
@@ -184,12 +247,18 @@ public sealed class HttpContinueWaitConnectionTests
         const string failed = ExpectationFailedReply;
         GatedConnection inner = new(Encoding.Latin1.GetBytes(failed), 65536, 1);
         HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
+        Diagnostics.Arrange("response", Visible(failed));
 
-        Assert.IsTrue(await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None));
+        bool first = await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None);
+        Diagnostics.Act("first send", first);
+        Assert.IsTrue(first);
         Assert.AreEqual(failed, await ReadAllAsync(connection));
 
         Assert.IsTrue(connection.StopsSending);
-        Assert.IsFalse(await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None));
+        bool second = await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None);
+        Diagnostics.Act("second send", second);
+        Diagnostics.Assert("inner written", "a", Encoding.Latin1.GetString(inner.Written));
+        Assert.IsFalse(second);
         Assert.AreEqual("a", Encoding.Latin1.GetString(inner.Written));
     }
 
@@ -200,13 +269,18 @@ public sealed class HttpContinueWaitConnectionTests
     [DataRow("HTTP/1.1 300 Multiple Choices\r\nContent-Length: 0\r\n\r\n", DisplayName = "300, the lowest that stops")]
     public async Task SendUnlessStoppedAsync_300OrAboveArrivesDuringTheWrite_CancelsIt(string failed)
     {
+        Diagnostics.Arrange("response", Visible(failed));
         foreach (int chunkSize in ChunkSizes)
         {
             GatedConnection inner = new(Encoding.Latin1.GetBytes(failed), chunkSize, 1) { StallsWritesOnceReleased = true };
             HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
 
-            Assert.IsTrue(await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None), $"Chunk size {chunkSize}");
-            Assert.IsFalse(await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None), $"Chunk size {chunkSize}");
+            bool first = await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None);
+            bool second = await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None);
+            Diagnostics.Act($"sends at chunk size {chunkSize}", $"{first}, {second}");
+            Diagnostics.Assert($"inner written at chunk size {chunkSize}", "a", Encoding.Latin1.GetString(inner.Written));
+            Assert.IsTrue(first, $"Chunk size {chunkSize}");
+            Assert.IsFalse(second, $"Chunk size {chunkSize}");
             Assert.AreEqual("a", Encoding.Latin1.GetString(inner.Written), $"Chunk size {chunkSize}");
             Assert.AreEqual(failed, await ReadAllAsync(connection), $"Chunk size {chunkSize}");
         }
@@ -220,11 +294,16 @@ public sealed class HttpContinueWaitConnectionTests
     {
         GatedConnection inner = new(Encoding.Latin1.GetBytes(response), 65536, 1);
         HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
+        Diagnostics.Arrange("response", Visible(response));
 
-        Assert.IsTrue(await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None));
+        bool first = await connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None);
+        Assert.IsTrue(first);
         Assert.AreEqual(response, await ReadAllAsync(connection));
-        Assert.IsTrue(await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None));
+        bool second = await connection.SendUnlessStoppedAsync("b"u8.ToArray(), CancellationToken.None);
+        Diagnostics.Act("sends", $"{first}, {second}");
+        Assert.IsTrue(second);
 
+        Diagnostics.Assert("inner written", "ab", Encoding.Latin1.GetString(inner.Written));
         Assert.IsFalse(connection.StopsSending);
         Assert.AreEqual("ab", Encoding.Latin1.GetString(inner.Written));
     }
@@ -236,11 +315,14 @@ public sealed class HttpContinueWaitConnectionTests
         HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
         await inner.WriteAsync("a"u8.ToArray(), CancellationToken.None);
         using CancellationTokenSource cancellation = new();
+        Diagnostics.Arrange("connection", "writes stall once released");
 
         Task<bool> send = connection.SendUnlessStoppedAsync("b"u8.ToArray(), cancellation.Token).AsTask();
         await cancellation.CancelAsync();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => send);
+        OperationCanceledException thrown = await Assert.ThrowsAsync<OperationCanceledException>(() => send);
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("send completed", true, send.IsCompleted);
     }
 
     /// <summary>
@@ -272,4 +354,6 @@ public sealed class HttpContinueWaitConnectionTests
 
         return Encoding.Latin1.GetString(all.ToArray());
     }
+
+    private static string Visible(string text) => text.Replace("\r", "\\r").Replace("\n", "\\n");
 }

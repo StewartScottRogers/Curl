@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -40,6 +41,14 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
 
     private readonly InMemoryFileSystem files = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private string StandardOutputText => Encoding.ASCII.GetString(standardOutput.ToArray());
+
+    private string StandardErrorText => Encoding.ASCII.GetString(standardError.ToArray());
+
     public CurlCommandRunnerSmtpTransferEventTests()
     {
         files.ExistingContent["mail.txt"] = Encoding.ASCII.GetBytes(Message);
@@ -50,13 +59,15 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     {
         int exitCode = await RunAsync(["-sv"], 18030, 53686, Greeting + EhloReply + Transaction);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        string expected = (
             Opened(18030, 53686)
             + Headers("< ", EhloReply)
             + "> MAIL FROM:<a@b> SIZE=22" + HeaderEnd
-            + UploadTail(18030),
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + UploadTail(18030));
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual(expected, Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
     [TestMethod]
@@ -68,8 +79,11 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         // pinned by CurlCompositionSmtpTraceTests.
         int exitCode = await RunAsync(["-sv", "--trace-config", component], 18030, 53686, Greeting + EhloReply + Transaction);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         string[] lines = Encoding.ASCII.GetString(standardError.ToArray()).Split(InfoEnd);
+        Diagnostics.Assert("first 7 lines", "* [SMTP] smtp_setup_connection() -> 0|*   Trying 127.0.0.1:18030...|* Established connection to 127.0.0.1 (127.0.0.1 port 18030) from 127.0.0.1 port 53686 |* [SMTP] state change from STOP to SERVERGREET|< 220 localhost ESMTP|> EHLO client|* [SMTP] state change from SERVERGREET to EHLO", string.Join("|", lines.Take(7).Select(line => line.TrimEnd((char)13))));
+        Diagnostics.Assert("last 4 lines", "* [SMTP] state change from POSTDATA to STOP|* [SMTP] smtp_done(status=0, premature=0) -> 0|* Connection #0 to host 127.0.0.1:18030 left intact|", string.Join("|", lines.TakeLast(4)));
         CollectionAssert.AreEqual(
             (string[])[
                 "* [SMTP] smtp_setup_connection() -> 0",
@@ -89,6 +103,7 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
                 string.Empty,
             ],
             lines.TakeLast(4).ToArray());
+        Diagnostics.Assert("[SMTP] line count", 23, lines.Count(line => line.StartsWith("* [SMTP] ", StringComparison.Ordinal)));
         Assert.AreEqual(23, lines.Count(line => line.StartsWith("* [SMTP] ", StringComparison.Ordinal)));
     }
 
@@ -100,7 +115,9 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     {
         int exitCode = await RunAsync(arguments, 18030, 53686, Greeting + EhloReply + Transaction);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("stderr contains [SMTP]", false, StandardErrorText.Contains("[SMTP]", StringComparison.Ordinal));
         Assert.DoesNotContain("[SMTP]", Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
@@ -112,8 +129,9 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         int exitCode = await RunAsync(
             ["-sv", "-u", "user:secret"], 18029, 53685, Greeting + ehloReply + "334 \r\n235 Authentication successful\r\n" + Transaction);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        string expected = (
             Opened(18029, 53685)
             + Headers("< ", ehloReply)
             + "> AUTH PLAIN" + HeaderEnd
@@ -121,8 +139,9 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
             + "> AHVzZXIAc2VjcmV0" + HeaderEnd
             + "< 235 Authentication successful" + HeaderEnd
             + "> MAIL FROM:<a@b>" + HeaderEnd
-            + UploadTail(18029),
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + UploadTail(18029));
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual(expected, Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
     [TestMethod]
@@ -133,13 +152,16 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
 
         int exitCode = await RunAsync(["-sv", "-u", "user:secret"], 18031, 60797, Greeting + ehloReply);
 
+        Diagnostics.Assert("exit code", 67, exitCode);
         Assert.AreEqual(67, exitCode);
-        Assert.AreEqual(
+        string expected = (
             Opened(18031, 60797)
             + Headers("< ", ehloReply)
             + "* SASL: no auth mechanism was offered or recognized" + InfoEnd
-            + "* closing connection #0" + InfoEnd,
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + "* closing connection #0" + InfoEnd);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual(expected, Encoding.ASCII.GetString(standardError.ToArray()));
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(0, standardOutput.Length);
     }
 
@@ -168,8 +190,9 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         int exitCode = await RunAsync(
             ["-sv", "-k", "--ssl-reqd"], 18027, 53681, Greeting + EhloReply + "220 Ready to start TLS\r\n" + SecureEhloReply + Transaction);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        string expected = (
             Opened(18027, 53681)
             + Headers("< ", EhloReply)
             + "> STARTTLS" + HeaderEnd
@@ -179,8 +202,9 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
             + "> EHLO client" + HeaderEnd
             + Headers("< ", SecureEhloReply)
             + "> MAIL FROM:<a@b> SIZE=22" + HeaderEnd
-            + UploadTail(18027),
-            Encoding.ASCII.GetString(standardError.ToArray()));
+            + UploadTail(18027));
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual(expected, Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
     [TestMethod]
@@ -188,8 +212,9 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     {
         int exitCode = await RunAsync(["-s", "--trace-ascii", "-"], 18028, 53682, Greeting + EhloReply + Transaction);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(
+        string expected = (
             "*   Trying 127.0.0.1:18028...\n"
             + "* Established connection to 127.0.0.1 (127.0.0.1 port 18028) from 127.0.0.1 port 53682 \n"
             + "<= Recv header, 21 bytes (0x15)\n0000: 220 localhost ESMTP\n"
@@ -209,8 +234,10 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
             + "=> Send data, 25 bytes (0x19)\n0000: Subject: hi\n000d: \n000f: Hello\n0016: .\n"
             + "* upload completely sent off: 25 bytes\n"
             + "<= Recv header, 25 bytes (0x19)\n0000: 250 OK message accepted\n"
-            + "* Connection #0 to host 127.0.0.1:18028 left intact\n",
-            Encoding.ASCII.GetString(standardOutput.ToArray()));
+            + "* Connection #0 to host 127.0.0.1:18028 left intact\n");
+        Diagnostics.Diff("stdout", Lf(expected), Lf(StandardOutputText));
+        Assert.AreEqual(expected, Encoding.ASCII.GetString(standardOutput.ToArray()));
+        Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
         Assert.AreEqual(string.Empty, Encoding.ASCII.GetString(standardError.ToArray()));
     }
 
@@ -235,21 +262,34 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         + "< 250 OK message accepted" + HeaderEnd
         + $"* Connection #0 to host 127.0.0.1:{port} left intact" + InfoEnd;
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments, int port, int localPort, string replies)
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments, int port, int localPort, string replies)
     {
         var connector = new ReportingConnector(new ScriptedConnector([Encoding.ASCII.GetBytes(replies)]), localPort);
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("target", "smtp://127.0.0.1:port/client with --mail-from a@b --mail-rcpt c@d -T mail.txt");
+        Diagnostics.Arrange("connector script", Lf(replies));
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    options => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
+                            connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: CurlComposition.TracesSmtp(options)))),
+                    files,
+                    files,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync([.. arguments, "--mail-from", "a@b", "--mail-rcpt", "c@d", "-T", "mail.txt", $"smtp://127.0.0.1:{port}/client"]);
+        }
 
-        return new CurlCommandRunner(
-                options => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(
-                        connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new TrustReportingTlsProvider(), new LoopbackDnsResolver(), tracesSmtp: CurlComposition.TracesSmtp(options)))),
-                files,
-                files,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync([.. arguments, "--mail-from", "a@b", "--mail-rcpt", "c@d", "-T", "mail.txt", $"smtp://127.0.0.1:{port}/client"]);
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
     }
 
     /// <summary>

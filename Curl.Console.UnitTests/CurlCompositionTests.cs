@@ -22,6 +22,7 @@ using Curl.Protocol.Ssh;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -35,17 +36,28 @@ public sealed partial class CurlCompositionTests
 {
     private const string ConnectFailure = "Failed to connect to h:2628 after 0 ms: Could not connect to server";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(true, WriteOutTimeDialect.WindowsCRuntime)]
     [DataRow(false, WriteOutTimeDialect.Glibc)]
     public void WriteOutTimeDialectFor_Platform_IsThatPlatformsCRuntime(bool runsOnWindows, WriteOutTimeDialect expected)
     {
-        Assert.AreEqual(expected, CurlComposition.WriteOutTimeDialectFor(runsOnWindows));
+        Diagnostics.Arrange("runs on windows", runsOnWindows);
+
+        WriteOutTimeDialect actual = CurlComposition.WriteOutTimeDialectFor(runsOnWindows);
+
+        Diagnostics.Act("write-out time dialect", actual);
+        Diagnostics.Assert("write-out time dialect", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void CreateProtocolHandlers_ServesEachSchemeThroughItsHandlerOnce()
     {
+        Diagnostics.Arrange("connect failure scripted into both connectors", ConnectFailure);
         IReadOnlyList<IProtocolHandler> handlers = CurlComposition.CreateProtocolHandlers(
             new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
@@ -85,6 +97,8 @@ public sealed partial class CurlCompositionTests
             ["ftp"] = typeof(RoutingFtpProtocolHandler),
             ["ftps"] = typeof(RoutingFtpProtocolHandler),
         };
+        Diagnostics.Act("scheme to handler type", string.Join(", ", served.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value.Name}")));
+        Diagnostics.Assert("scheme to handler type count", expected.Count, served.Count);
         CollectionAssert.AreEquivalent(expected.ToList(), served.ToList());
         _ = new ProtocolDispatcher(handlers);
     }
@@ -114,16 +128,23 @@ public sealed partial class CurlCompositionTests
         bool useTls,
         string? poolScheme)
     {
+        Diagnostics.Arrange("url", url);
         RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure);
 
         await RunWithFakeConnectorsAsync(url, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
 
-        Assert.AreEqual(new ConnectTarget("h", port, useTls) { PoolScheme = poolScheme }, connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        ConnectTarget expected = new("h", port, useTls) { PoolScheme = poolScheme };
+        ConnectTarget actual = connector.Targets.Single() with { Events = NoTransferEvents.Instance };
+        Diagnostics.Act("connector target", actual);
+        Diagnostics.Assert("connector target", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public async Task CreateRunner_ConnectorFailsToConnect_PrintsExit7LineAndReturns7()
     {
+        Diagnostics.Arrange("url", "dict://h/d:x");
+        Diagnostics.Arrange("scripted connect failure", ConnectFailure);
         RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure);
 
         (int exitCode, string standardErrorText) = await RunWithFakeConnectorsAsync(
@@ -131,6 +152,9 @@ public sealed partial class CurlCompositionTests
             connector,
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard error", standardErrorText.ReplaceLineEndings("\\n"));
+        Diagnostics.Assert("exit code", 7, exitCode);
         Assert.AreEqual(7, exitCode);
         Assert.AreEqual($"curl: (7) {ConnectFailure}{Environment.NewLine}", standardErrorText);
     }
@@ -138,6 +162,7 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public async Task CreateRunner_TftpUrl_ReachesDatagramConnectorAtHostAndPort69()
     {
+        Diagnostics.Arrange("url", "tftp://h/f");
         RecordingDatagramConnector datagramConnector = new(CurlExitCode.CouldntConnect, ConnectFailure);
 
         await RunWithFakeConnectorsAsync(
@@ -145,7 +170,10 @@ public sealed partial class CurlCompositionTests
             new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
             datagramConnector);
 
-        Assert.AreEqual(("h", 69), datagramConnector.Opens.Single());
+        var actual = datagramConnector.Opens.Single();
+        Diagnostics.Act("datagram open", actual);
+        Diagnostics.Assert("datagram open", ("h", 69), actual);
+        Assert.AreEqual(("h", 69), actual);
     }
 
     [TestMethod]
@@ -154,6 +182,8 @@ public sealed partial class CurlCompositionTests
         string path = Path.Combine(Path.GetTempPath(), $"curl-bl068-{Guid.NewGuid():N}.bin");
         byte[] content = [0, 1, 2, 13, 10, 255, (byte)'x'];
         await System.IO.File.WriteAllBytesAsync(path, content);
+        Diagnostics.Arrange("file url of a temporary file named", "curl-bl068-*.bin");
+        Diagnostics.Bytes("file content", content);
 
         try
         {
@@ -165,6 +195,10 @@ public sealed partial class CurlCompositionTests
                 .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: true)
                 .RunAsync([new Uri(path).AbsoluteUri]);
 
+            Diagnostics.Act("exit code", exitCode);
+            Diagnostics.Bytes("standard output", standardOutput.ToArray());
+            Diagnostics.Act("standard error length", standardError.Length);
+            Diagnostics.Assert("exit code", 0, exitCode);
             Assert.AreEqual(0, exitCode);
             CollectionAssert.AreEqual(content, standardOutput.ToArray());
             Assert.AreEqual(0, standardError.Length);
@@ -182,6 +216,8 @@ public sealed partial class CurlCompositionTests
     {
         string? saved = Environment.GetEnvironmentVariable(IpfsGatewayRewriter.GatewayVariableName);
         Environment.SetEnvironmentVariable(IpfsGatewayRewriter.GatewayVariableName, "http://h/?q");
+        Diagnostics.Arrange("gateway variable", "http://h/?q");
+        Diagnostics.Arrange("arguments", "-q ipfs://bafyabc");
 
         try
         {
@@ -193,6 +229,10 @@ public sealed partial class CurlCompositionTests
                 .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: false)
                 .RunAsync(["-q", "ipfs://bafyabc"]);
 
+            string standardErrorText = Encoding.UTF8.GetString(standardError.ToArray());
+            Diagnostics.Act("exit code", exitCode);
+            Diagnostics.Act("standard error", standardErrorText.ReplaceLineEndings("\\n"));
+            Diagnostics.Assert("exit code", 3, exitCode);
             Assert.AreEqual(3, exitCode);
             Assert.StartsWith("curl: malformed target URL", Encoding.UTF8.GetString(standardError.ToArray()));
         }
@@ -203,40 +243,11 @@ public sealed partial class CurlCompositionTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
-    public async Task CreateRunner_WriteOutOutputFile_OpensItOnDisk()
-    {
-        string directory = Path.Combine(Path.GetTempPath(), $"curl-bl280-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        string source = Path.Combine(directory, "source.bin");
-        string target = Path.Combine(directory, "w.txt");
-        await System.IO.File.WriteAllBytesAsync(source, [1]);
-
-        try
-        {
-            using MemoryStream standardOutput = new();
-            using MemoryStream standardError = new();
-            using MemoryStream standardInput = new();
-
-            int exitCode = await CurlComposition
-                .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: true)
-                .RunAsync([new Uri(source).AbsoluteUri, "-w", $"%output{{{target}}}F\\n"]);
-
-            Assert.AreEqual(0, exitCode);
-            string expected = OperatingSystem.IsWindows() ? "F\r\n" : "F\n";
-            Assert.AreEqual(expected, await System.IO.File.ReadAllTextAsync(target));
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
-    }
-
-    [TestMethod]
     public async Task CreateRunner_FileUrlToStandardOutputThatIsNotATerminal_WritesTheProgressMeter()
     {
         string path = Path.Combine(Path.GetTempPath(), $"curl-bl102-{Guid.NewGuid():N}.bin");
         await System.IO.File.WriteAllBytesAsync(path, [1, 2, 3]);
+        Diagnostics.Arrange("file url of a temporary file named", "curl-bl102-*.bin");
 
         try
         {
@@ -248,6 +259,12 @@ public sealed partial class CurlCompositionTests
                 .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal: false)
                 .RunAsync([new Uri(path).AbsoluteUri]);
 
+            string expectedMeter = string.Concat(ProgressMeterLines.HeaderLines(null).Append(ProgressMeterLines.ZeroStatusLine).Select(line => line + Environment.NewLine));
+            string actualMeter = Encoding.UTF8.GetString(standardError.ToArray());
+            Diagnostics.Act("exit code", exitCode);
+            Diagnostics.Act("standard error", actualMeter.ReplaceLineEndings("\\n"));
+            Diagnostics.Assert("exit code", 0, exitCode);
+            Diagnostics.Assert("standard error", expectedMeter.ReplaceLineEndings("\\n"), actualMeter.ReplaceLineEndings("\\n"));
             Assert.AreEqual(0, exitCode);
             Assert.AreEqual(
                 string.Concat(ProgressMeterLines.HeaderLines(null).Append(ProgressMeterLines.ZeroStatusLine).Select(line => line + Environment.NewLine)),
@@ -260,47 +277,14 @@ public sealed partial class CurlCompositionTests
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
-    public async Task CreateRunnerOverConnectors_WriteOutFileOpenerGiven_OpensTheOutputFileOnDisk()
-    {
-        string directory = Path.Combine(Path.GetTempPath(), $"curl-bl1445-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        string source = Path.Combine(directory, "source.bin");
-        string target = Path.Combine(directory, "w.txt");
-        await System.IO.File.WriteAllBytesAsync(source, [1]);
-
-        try
-        {
-            using MemoryStream standardOutput = new();
-            using MemoryStream standardError = new();
-            using MemoryStream standardInput = new();
-
-            int exitCode = await CurlComposition
-                .CreateRunner(
-                    standardOutput,
-                    standardError,
-                    standardInput,
-                    new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
-                    new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
-                    writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: false))
-                .RunAsync([new Uri(source).AbsoluteUri, "-w", $"%output{{{target}}}F\\n"]);
-
-            Assert.AreEqual(0, exitCode);
-            Assert.AreEqual("F\n", await System.IO.File.ReadAllTextAsync(target));
-        }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
-    }
-
-    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task CreateRunnerOverConnectors_WritesProgressMeter_WritesTheMeterOnlyWhenAsked(bool writesProgressMeter)
     {
         string path = Path.Combine(Path.GetTempPath(), $"curl-bl1445-{Guid.NewGuid():N}.bin");
         await System.IO.File.WriteAllBytesAsync(path, [1, 2, 3]);
+        Diagnostics.Arrange("writes progress meter", writesProgressMeter);
+        Diagnostics.Arrange("arguments", "<temporary file url> -o <same name>.out");
 
         try
         {
@@ -322,6 +306,11 @@ public sealed partial class CurlCompositionTests
             string expected = writesProgressMeter
                 ? string.Concat(ProgressMeterLines.HeaderLines(null).Append(ProgressMeterLines.ZeroStatusLine).Select(line => line + Environment.NewLine))
                 : string.Empty;
+            string actual = Encoding.UTF8.GetString(standardError.ToArray());
+            Diagnostics.Act("exit code", exitCode);
+            Diagnostics.Act("standard error", actual.ReplaceLineEndings("\\n"));
+            Diagnostics.Assert("exit code", 0, exitCode);
+            Diagnostics.Assert("standard error", expected.ReplaceLineEndings("\\n"), actual.ReplaceLineEndings("\\n"));
             Assert.AreEqual(expected, Encoding.UTF8.GetString(standardError.ToArray()));
         }
         finally
@@ -334,8 +323,12 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_BothConnectors_ShareOneSystemDnsResolverAndTimeProviderSystem()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
+        Diagnostics.Act("dns resolver type", transports.DnsResolver.GetType().Name);
+        Diagnostics.Act("time provider is TimeProvider.System", ReferenceEquals(TimeProvider.System, transports.TimeProvider));
+        Diagnostics.Assert("dns resolver type", nameof(SystemDnsResolver), transports.DnsResolver.GetType().Name);
         Assert.IsInstanceOfType<SystemDnsResolver>(transports.DnsResolver);
         Assert.AreSame(TimeProvider.System, transports.TimeProvider);
         Assert.AreSame(transports.DnsResolver, CapturedDependency<IDnsResolver>(transports.TcpConnector));
@@ -347,8 +340,12 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_NoTimeProviderGiven_SslStreamTlsProviderTimesOnTimeProviderSystem()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
+        TimeProvider captured = CapturedDependency<TimeProvider>(transports.TlsProvider);
+        Diagnostics.Act("tls provider time provider is TimeProvider.System", ReferenceEquals(TimeProvider.System, captured));
+        Diagnostics.Assert("tls provider time provider is TimeProvider.System", true, ReferenceEquals(TimeProvider.System, captured));
         Assert.AreSame(TimeProvider.System, CapturedDependency<TimeProvider>(transports.TlsProvider));
     }
 
@@ -356,9 +353,12 @@ public sealed partial class CurlCompositionTests
     public void CreateTransports_GivenTimeProvider_SslStreamTlsProviderSharesTheTcpConnectorsTimeProvider()
     {
         TimeProvider timeProvider = new ReplacementTimeProvider();
+        Diagnostics.Arrange("time provider", timeProvider.GetType().Name);
 
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
 
+        Diagnostics.Act("transports time provider is the given one", ReferenceEquals(timeProvider, transports.TimeProvider));
+        Diagnostics.Assert("transports time provider is the given one", true, ReferenceEquals(timeProvider, transports.TimeProvider));
         Assert.AreSame(timeProvider, transports.TimeProvider);
         Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.TcpConnector));
         Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.TlsProvider));
@@ -375,10 +375,13 @@ public sealed partial class CurlCompositionTests
     [DataRow(TlsVersion.Tls11, typeof(HandBuiltTlsProvider))]
     public void CreateTlsProvider_ByTheCeiling_IsTheProviderTheRoutingRuleChooses(TlsVersion maximumVersion, Type expected)
     {
+        Diagnostics.Arrange("maximum version", maximumVersion);
         var options = new TlsClientOptions(MaximumVersion: maximumVersion);
 
         var provider = CurlComposition.CreateTlsProvider(options, TimeProvider.System);
 
+        Diagnostics.Act("provider type", provider.GetType().Name);
+        Diagnostics.Assert("provider type", expected.Name, provider.GetType().Name);
         Assert.IsInstanceOfType(provider, expected);
         Assert.AreSame(options, CapturedDependency<TlsClientOptions>(provider));
     }
@@ -386,8 +389,12 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_WithTlsMax10_UpgradesTheOriginWithTheHandBuiltClientAndTheProxyWithSslStream()
     {
+        Diagnostics.Arrange("arguments", "--tls-max 1.0 https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(Parse("--tls-max", "1.0", "https://example.com/"));
 
+        Diagnostics.Act("origin tls provider type", transports.TlsProvider.GetType().Name);
+        Diagnostics.Act("proxy tls provider type", transports.ProxyTlsProvider.GetType().Name);
+        Diagnostics.Assert("origin tls provider type", nameof(HandBuiltTlsProvider), transports.TlsProvider.GetType().Name);
         Assert.IsInstanceOfType<HandBuiltTlsProvider>(transports.TlsProvider);
         Assert.IsInstanceOfType<SslStreamTlsProvider>(transports.ProxyTlsProvider);
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
@@ -400,8 +407,12 @@ public sealed partial class CurlCompositionTests
     [DataRow("--sigalgs", "ECDSA+SHA256")]
     public void CreateTransports_WithCurvesOrSigalgs_UpgradesTheOriginWithTheHandBuiltClient(string option, string value)
     {
+        Diagnostics.Arrange("arguments", $"{option} {value} https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(Parse(option, value, "https://example.com/"));
 
+        Diagnostics.Act("origin tls provider type", transports.TlsProvider.GetType().Name);
+        Diagnostics.Act("proxy tls provider type", transports.ProxyTlsProvider.GetType().Name);
+        Diagnostics.Assert("origin tls provider type", nameof(HandBuiltTlsProvider), transports.TlsProvider.GetType().Name);
         Assert.IsInstanceOfType<HandBuiltTlsProvider>(transports.TlsProvider);
         Assert.IsInstanceOfType<SslStreamTlsProvider>(transports.ProxyTlsProvider);
     }
@@ -409,8 +420,11 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_TcpConnector_ReceivesTcpDialerAndSecureSslStreamTlsProvider()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
+        Diagnostics.Act("insecure", transports.TlsClientOptions.Insecure);
+        Diagnostics.Assert("insecure", false, transports.TlsClientOptions.Insecure);
         Assert.AreSame(transports.TcpDialer, CapturedDependency<ITcpDialer>(transports.TcpConnector));
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
         Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
@@ -422,10 +436,13 @@ public sealed partial class CurlCompositionTests
     {
         // curl -s -S -k -x https://localhost:18462 https://example.com/ against a self-signed proxy -> exit 60,
         // and the same with --cacert <the proxy's certificate> (curl 8.21.0, 2026-09-27, BL-362).
+        Diagnostics.Arrange("arguments", "-k --cacert x.pem https://example.com/");
         CommandLineOptions options = Parse("-k", "--cacert", "x.pem", "https://example.com/");
 
         CurlTransports transports = CurlComposition.CreateTransports(options);
 
+        Diagnostics.Act("proxy tls client options", transports.ProxyTlsClientOptions);
+        Diagnostics.Assert("proxy tls client options", new TlsClientOptions(), transports.ProxyTlsClientOptions);
         Assert.AreEqual(new TlsClientOptions(), transports.ProxyTlsClientOptions);
         Assert.AreSame(transports.ProxyTlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "_proxyTlsProvider"));
         Assert.AreSame(transports.ProxyTlsClientOptions, CapturedDependency<TlsClientOptions>(transports.ProxyTlsProvider));
@@ -439,8 +456,15 @@ public sealed partial class CurlCompositionTests
         CommandLineOptions options = Parse(
             "--cacert", "x.pem", "--proxy-insecure", "--proxy-cacert", "proxy.pem", "--proxy-capath", "proxy-certs", "https://example.com/");
 
+        Diagnostics.Arrange("arguments", "--cacert x.pem --proxy-insecure --proxy-cacert proxy.pem --proxy-capath proxy-certs https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(options);
 
+        Diagnostics.Act("proxy tls client options", transports.ProxyTlsClientOptions);
+        Diagnostics.Act("target tls client options", transports.TlsClientOptions);
+        Diagnostics.Assert(
+            "proxy tls client options",
+            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem", CaCertificateDirectory: "proxy-certs"),
+            transports.ProxyTlsClientOptions);
         Assert.AreEqual(
             new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem", CaCertificateDirectory: "proxy-certs"),
             transports.ProxyTlsClientOptions);
@@ -455,20 +479,27 @@ public sealed partial class CurlCompositionTests
     public void CreateTransports_GivenTimeProvider_ProxyTlsProviderTimesOnIt()
     {
         TimeProvider timeProvider = new ReplacementTimeProvider();
+        Diagnostics.Arrange("time provider", timeProvider.GetType().Name);
 
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
 
+        bool sameClock = ReferenceEquals(timeProvider, CapturedDependency<TimeProvider>(transports.ProxyTlsProvider));
+        Diagnostics.Act("proxy tls provider uses the given time provider", sameClock);
+        Diagnostics.Assert("proxy tls provider uses the given time provider", true, sameClock);
         Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(transports.ProxyTlsProvider));
     }
 
     [TestMethod]
     public void CreateTransports_InsecureCaCertificateAndTlsv13_SslStreamTlsProviderReceivesMappedOptions()
     {
+        Diagnostics.Arrange("arguments", "-k --cacert x.pem --tlsv1.3 gophers://example.com/");
         CommandLineOptions options = Parse("-k", "--cacert", "x.pem", "--tlsv1.3", "gophers://example.com/");
 
         CurlTransports transports = CurlComposition.CreateTransports(options);
 
         TlsClientOptions expected = new(Insecure: true, MinimumVersion: TlsVersion.Tls13, CaCertificateFile: "x.pem");
+        Diagnostics.Act("tls client options", transports.TlsClientOptions);
+        Diagnostics.Assert("tls client options", expected, transports.TlsClientOptions);
         Assert.AreEqual(expected, transports.TlsClientOptions);
         Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
     }
@@ -476,26 +507,36 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransports_EachCall_BuildsItsOwnResolver()
     {
-        Assert.AreNotSame(
-            CurlComposition.CreateTransports(NoOptions()).DnsResolver,
-            CurlComposition.CreateTransports(NoOptions()).DnsResolver);
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
+        IDnsResolver first = CurlComposition.CreateTransports(NoOptions()).DnsResolver;
+        IDnsResolver second = CurlComposition.CreateTransports(NoOptions()).DnsResolver;
+
+        Diagnostics.Act("resolvers are the same instance", ReferenceEquals(first, second));
+        Diagnostics.Assert("resolvers are the same instance", false, ReferenceEquals(first, second));
+        Assert.AreNotSame(first, second);
     }
 
     [TestMethod]
     public void CreateDispatcher_ProductionTransports_BuildsWithoutADuplicateScheme()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(CurlComposition.CreateTransports(NoOptions()));
 
+        Diagnostics.Act("dispatcher built", dispatcher is not null);
+        Diagnostics.Assert("dispatcher built", true, dispatcher is not null);
         Assert.IsNotNull(dispatcher);
     }
 
     [TestMethod]
     public void CreateTransferDispatch_ProductionTransports_WarnsWithTheProxyTlsProvidersWarnings()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
+        Diagnostics.Act("dispatch warning lines", string.Join(" | ", dispatch.WarningLinesBeforeEachTransfer));
+        Diagnostics.Assert("dispatch warning lines", string.Join(" | ", transports.ProxyTlsProvider.Warnings), string.Join(" | ", dispatch.WarningLinesBeforeEachTransfer));
         Assert.IsNotNull(dispatch.Dispatcher);
         CollectionAssert.AreEqual(transports.ProxyTlsProvider.Warnings.ToArray(), dispatch.WarningLinesBeforeEachTransfer.ToArray());
     }
@@ -503,10 +544,13 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransferDispatch_Cookies_GivesTheRunnerTheRunsCookies()
     {
+        Diagnostics.Arrange("arguments", "-c jar.txt http://example.com/");
         CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-c", "jar.txt", "http://example.com/"))!;
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(CurlComposition.CreateTransports(NoOptions()), cookies);
 
+        Diagnostics.Act("dispatch cookies are the run's cookies", ReferenceEquals(cookies, dispatch.Cookies));
+        Diagnostics.Assert("dispatch cookies are the run's cookies", true, ReferenceEquals(cookies, dispatch.Cookies));
         Assert.AreSame(cookies, dispatch.Cookies);
     }
 
@@ -516,8 +560,11 @@ public sealed partial class CurlCompositionTests
     [DataRow(new[] { "http://example.com/" }, false)]
     public void CreateTransports_PoolingConnector_WaitsForMultiplexingUnderParallelWithoutParallelImmediate(string[] arguments, bool waits)
     {
+        Diagnostics.Arrange("arguments", string.Join(" ", arguments));
         CurlTransports transports = CurlComposition.CreateTransports(Parse(arguments));
 
+        Diagnostics.Act("pooling connector waits for multiplexing", transports.PoolingConnector.WaitsForMultiplexing);
+        Diagnostics.Assert("pooling connector waits for multiplexing", waits, transports.PoolingConnector.WaitsForMultiplexing);
         Assert.AreEqual(waits, transports.PoolingConnector.WaitsForMultiplexing);
     }
 
@@ -525,9 +572,13 @@ public sealed partial class CurlCompositionTests
     public void CreateTransports_PoolingConnector_WrapsTheTcpConnectorOnTheSameClock()
     {
         TimeProvider timeProvider = new ReplacementTimeProvider();
+        Diagnostics.Arrange("time provider", timeProvider.GetType().Name);
 
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions(), timeProvider);
 
+        bool wrapsTcpConnector = ReferenceEquals(transports.TcpConnector, CapturedDependency<IConnector>(transports.PoolingConnector));
+        Diagnostics.Act("pooling connector wraps the tcp connector", wrapsTcpConnector);
+        Diagnostics.Assert("pooling connector wraps the tcp connector", true, wrapsTcpConnector);
         Assert.AreSame(transports.TcpConnector, CapturedDependency<IConnector>(transports.PoolingConnector));
         Assert.AreSame(timeProvider, CapturedDependency<TimeProvider>(CapturedDependency<ConnectionCache>(transports.PoolingConnector)));
     }
@@ -535,6 +586,7 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransferDispatch_ProductionTransports_EveryTcpHandlerReceivesTheOnePoolingConnector()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
@@ -543,6 +595,9 @@ public sealed partial class CurlCompositionTests
         IConnector ftpData = Unrecorded(CapturedDependency<IConnector>(FtpHandlerOf(dispatch), "dataConnector"));
         IConnector[] connectors = [.. handlers.SelectMany(ConnectorsOf).Where(connector => !ReferenceEquals(connector, ftpData))];
         string[] connectingHandlers = [.. handlers.Where(handler => ConnectorsOf(handler).Any()).Select(handler => Unwrapped(handler).GetType().Name).Order()];
+        Diagnostics.Act("connecting handlers", string.Join(", ", connectingHandlers));
+        Diagnostics.Act("connector count", connectors.Length);
+        Diagnostics.Assert("connecting handler count", 15, connectingHandlers.Length);
         CollectionAssert.AreEqual(
             new[] { "DictProtocolHandler", "GopherProtocolHandler", "HttpProtocolHandler", "ImapProtocolHandler", "LdapProtocolHandler", "MqttProtocolHandler", "Pop3ProtocolHandler", "RoutingFtpProtocolHandler", "RtspProtocolHandler", "SmbProtocolHandler", "SmtpProtocolHandler", "SshProtocolHandler", "TelnetProtocolHandler", "TftpProtocolHandler", "WsProtocolHandler" },
             connectingHandlers);
@@ -553,22 +608,28 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateDispatcher_ProductionTransports_HttpHandlerReceivesThePoolingConnector()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(transports);
 
         IProtocolHandler http = CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatcher)["http"];
+        Diagnostics.Act("http handler connector count", ConnectorsOf(http).Count());
+        Diagnostics.Assert("http handler connector is the pooling connector", true, ReferenceEquals(transports.PoolingConnector, ConnectorsOf(http).Single()));
         Assert.AreSame(transports.PoolingConnector, ConnectorsOf(http).Single());
     }
 
     [TestMethod]
     public void CreateTransferDispatch_ProductionTransports_FtpHandlerGetsTheListenerTlsProviderAndResolver()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
         Dictionary<string, IProtocolHandler> handlers = CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatch.Dispatcher);
+        Diagnostics.Act("ftp and ftps share one handler", ReferenceEquals(handlers["ftp"], handlers["ftps"]));
+        Diagnostics.Assert("ftp and ftps share one handler", true, ReferenceEquals(handlers["ftp"], handlers["ftps"]));
         Assert.AreSame(handlers["ftp"], handlers["ftps"]);
         FtpProtocolHandler ftp = FtpHandlerOf(dispatch);
         Assert.IsInstanceOfType<TcpConnectionListener>(CapturedDependency<IConnectionListener>(ftp));
@@ -581,12 +642,15 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransferDispatch_ProductionTransports_FtpDataConnectionsGoThroughThePoolOverAConnectorWithoutTheConnectTimeout()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
         // BL-797: curl 8.21.0 does not hold a passive data connect to --connect-timeout.
         PoolingConnector data = (PoolingConnector)Unrecorded(CapturedDependency<IConnector>(FtpHandlerOf(dispatch), "dataConnector"));
+        Diagnostics.Act("data connector is the main pooling connector", ReferenceEquals(transports.PoolingConnector, data));
+        Diagnostics.Assert("data connector is the main pooling connector", false, ReferenceEquals(transports.PoolingConnector, data));
         Assert.AreNotSame(transports.PoolingConnector, data);
         Assert.AreSame(CapturedDependency<ConnectionCache>(transports.PoolingConnector), CapturedDependency<ConnectionCache>(data));
         IConnector inner = CapturedDependency<IConnector>(data);
@@ -597,6 +661,7 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateDispatcher_ProductionTransports_FtpDataConnectionsGoThroughThePoolOverAConnectorWithoutTheConnectTimeout()
     {
+        Diagnostics.Arrange("arguments", "gophers://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(NoOptions());
 
         ProtocolDispatcher dispatcher = CurlComposition.CreateDispatcher(transports);
@@ -604,6 +669,9 @@ public sealed partial class CurlCompositionTests
         IProtocolHandler routing = Unwrapped(CapturedDependency<Dictionary<string, IProtocolHandler>>(dispatcher)["ftp"]);
         FtpProtocolHandler ftp = (FtpProtocolHandler)CapturedDependency<IProtocolHandler>(routing, "ftpHandler");
         PoolingConnector data = (PoolingConnector)Unrecorded(CapturedDependency<IConnector>(ftp, "dataConnector"));
+        bool sharesCache = ReferenceEquals(CapturedDependency<ConnectionCache>(transports.PoolingConnector), CapturedDependency<ConnectionCache>(data));
+        Diagnostics.Act("data connector shares the connection cache", sharesCache);
+        Diagnostics.Assert("data connector shares the connection cache", true, sharesCache);
         Assert.AreSame(CapturedDependency<ConnectionCache>(transports.PoolingConnector), CapturedDependency<ConnectionCache>(data));
     }
 
@@ -616,11 +684,16 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public async Task CreateRunner_FtpsUrlWithFakeConnectors_ReachesConnectorAtPort990WithTls()
     {
+        Diagnostics.Arrange("url", "ftps://h/f");
         RecordingConnector connector = new(CurlExitCode.CouldntConnect, ConnectFailure);
 
         await RunWithFakeConnectorsAsync("ftps://h/f", connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure));
 
         ConnectTarget target = connector.Targets.Single();
+        Diagnostics.Act("connector target host", target.Host);
+        Diagnostics.Act("connector target port", target.Port);
+        Diagnostics.Act("connector target uses tls", target.UseTls);
+        Diagnostics.Assert("connector target port", 990, target.Port);
         Assert.AreEqual("h", target.Host);
         Assert.AreEqual(990, target.Port);
         Assert.IsTrue(target.UseTls);
@@ -632,6 +705,8 @@ public sealed partial class CurlCompositionTests
         ScriptedConnector server = new(
             [Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"), Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nb")]);
         using MemoryStream standardOutput = new();
+        Diagnostics.Arrange("arguments", "-sS http://h:18233/a http://h:18233/b");
+        Diagnostics.Arrange("scripted responses", "HTTP/1.1 200 OK, Content-Length: 1, body a; then body b");
 
         int exitCode = await new CurlCommandRunner(
                 options => CurlComposition.CreateTransferDispatch(
@@ -644,6 +719,11 @@ public sealed partial class CurlCompositionTests
                 runsOnWindows: false)
             .RunAsync(["-sS", "http://h:18233/a", "http://h:18233/b"]);
 
+        string output = Encoding.Latin1.GetString(standardOutput.ToArray());
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", output);
+        Diagnostics.Act("connects made", server.Targets.Count());
+        Diagnostics.Assert("standard output", "ab", output);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("ab", Encoding.Latin1.GetString(standardOutput.ToArray()));
         Assert.AreEqual(new ConnectTarget("h", 18233, false) { PoolScheme = "http" }, server.Targets.Single());
@@ -652,6 +732,7 @@ public sealed partial class CurlCompositionTests
     [TestMethod]
     public void CreateTransferDispatch_CaPath_WarnsAsThePlatformsCurlBuildDoes()
     {
+        Diagnostics.Arrange("arguments", "--capath . https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(Parse("--capath", ".", "https://example.com/"));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
@@ -661,6 +742,8 @@ public sealed partial class CurlCompositionTests
         string[] expected = OperatingSystem.IsWindows()
             ? ["Warning: ignoring setting the CA path for the proxy, not supported by libcurl with Schannel"]
             : [];
+        Diagnostics.Act("warning lines", string.Join(" | ", dispatch.WarningLinesBeforeEachTransfer));
+        Diagnostics.Assert("warning lines", string.Join(" | ", expected), string.Join(" | ", dispatch.WarningLinesBeforeEachTransfer));
         CollectionAssert.AreEqual(expected, dispatch.WarningLinesBeforeEachTransfer.ToArray());
     }
 
@@ -668,6 +751,7 @@ public sealed partial class CurlCompositionTests
     [OSCondition(OperatingSystems.Windows)]
     public void CreateTransferDispatch_Tls13CiphersOnWindows_WarnsAsTheSchannelBuildDoes()
     {
+        Diagnostics.Arrange("arguments", "--tls13-ciphers BOGUS --proxy-tls13-ciphers BOGUS https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(
             Parse("--tls13-ciphers", "BOGUS", "--proxy-tls13-ciphers", "BOGUS", "https://example.com/"));
 
@@ -679,6 +763,8 @@ public sealed partial class CurlCompositionTests
             "Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel",
             "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel",
         ];
+        Diagnostics.Act("warning lines", string.Join(" | ", dispatch.WarningLinesBeforeEachTransfer));
+        Diagnostics.Assert("warning lines", string.Join(" | ", expected), string.Join(" | ", dispatch.WarningLinesBeforeEachTransfer));
         CollectionAssert.AreEqual(expected, dispatch.WarningLinesBeforeEachTransfer.ToArray());
     }
 
@@ -686,17 +772,21 @@ public sealed partial class CurlCompositionTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void CreateTransferDispatch_Tls13CiphersOffWindows_PrintsNoWarning()
     {
+        Diagnostics.Arrange("arguments", "--tls13-ciphers TLS_AES_128_GCM_SHA256 --proxy-tls13-ciphers TLS_AES_128_GCM_SHA256 https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(
             Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/"));
 
         TransferDispatch dispatch = CurlComposition.CreateTransferDispatch(transports);
 
+        Diagnostics.Act("warning line count", dispatch.WarningLinesBeforeEachTransfer.Count());
+        Diagnostics.Assert("warning line count", 0, dispatch.WarningLinesBeforeEachTransfer.Count());
         Assert.IsEmpty(dispatch.WarningLinesBeforeEachTransfer);
     }
 
     [TestMethod]
     public void WarningLinesBeforeEachTransfer_SchannelBuildWithCaPathAndBothTls13CipherLists_ListsCaPathThenTls13ThenProxyTls13()
     {
+        Diagnostics.Arrange("arguments", "--capath . --proxy-tls13-ciphers B --tls13-ciphers BOGUS https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(
             Parse("--capath", ".", "--proxy-tls13-ciphers", "B", "--tls13-ciphers", "BOGUS", "https://example.com/"));
 
@@ -711,6 +801,8 @@ public sealed partial class CurlCompositionTests
             "Warning: ignoring --tls13-ciphers, not supported by libcurl with Schannel",
             "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel",
         ];
+        Diagnostics.Act("warning lines", string.Join(" | ", lines));
+        Diagnostics.Assert("warning lines", string.Join(" | ", expected), string.Join(" | ", lines));
         CollectionAssert.AreEqual(expected, lines.ToArray());
     }
 
@@ -719,24 +811,33 @@ public sealed partial class CurlCompositionTests
     [DataRow("--proxy-tls13-ciphers", "Warning: ignoring --proxy-tls13-ciphers, not supported by libcurl with Schannel")]
     public void WarningLinesBeforeEachTransfer_SchannelBuildWithOneTls13CipherList_ListsOnlyItsWarning(string option, string expected)
     {
+        Diagnostics.Arrange("arguments", $"{option} BOGUS http://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(Parse(option, "BOGUS", "http://example.com/"));
 
         IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild: true);
 
+        Diagnostics.Act("warning lines", string.Join(" | ", lines));
+        Diagnostics.Assert("warning lines", expected, string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { expected }, lines.ToArray());
     }
 
     [TestMethod]
     public void WarningLinesBeforeEachTransfer_SchannelBuildWithNoIgnoredOption_ListsNothing()
     {
+        Diagnostics.Arrange("arguments", "https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(Parse("https://example.com/"));
 
-        Assert.IsEmpty(CurlComposition.WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild: true));
+        IReadOnlyList<string> lines = CurlComposition.WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild: true);
+
+        Diagnostics.Act("warning line count", lines.Count);
+        Diagnostics.Assert("warning line count", 0, lines.Count);
+        Assert.IsEmpty(lines);
     }
 
     [TestMethod]
     public void WarningLinesBeforeEachTransfer_OpenSslBuildWithBothTls13CipherLists_ListsNothing()
     {
+        Diagnostics.Arrange("arguments", "--tls13-ciphers TLS_AES_128_GCM_SHA256 --proxy-tls13-ciphers TLS_AES_128_GCM_SHA256 https://example.com/");
         CurlTransports transports = CurlComposition.CreateTransports(
             Parse("--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "--proxy-tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/"));
 
@@ -744,12 +845,15 @@ public sealed partial class CurlCompositionTests
             transports with { ProxyTlsProvider = new WarningTlsProvider() },
             matchesSchannelBuild: false);
 
+        Diagnostics.Act("warning line count", lines.Count);
+        Diagnostics.Assert("warning line count", 0, lines.Count);
         Assert.IsEmpty(lines);
     }
 
     [TestMethod]
     public void CreateTransports_CaPathCertKeyAndCiphers_SslStreamTlsProviderReceivesMappedOptions()
     {
+        Diagnostics.Arrange("arguments", "--capath certs --cert c.p12:pw --key k.pem --ciphers AES128-SHA --tls13-ciphers TLS_AES_128_GCM_SHA256 https://example.com/");
         CommandLineOptions options = Parse(
             "--capath", "certs", "--cert", "c.p12:pw", "--key", "k.pem",
             "--ciphers", "AES128-SHA", "--tls13-ciphers", "TLS_AES_128_GCM_SHA256", "https://example.com/");
@@ -762,6 +866,8 @@ public sealed partial class CurlCompositionTests
             PrivateKey: "k.pem",
             Ciphers: "AES128-SHA",
             Tls13Ciphers: "TLS_AES_128_GCM_SHA256");
+        Diagnostics.Act("tls client options", transports.TlsClientOptions);
+        Diagnostics.Assert("tls client options", expected, transports.TlsClientOptions);
         Assert.AreEqual(expected, transports.TlsClientOptions);
         Assert.AreSame(transports.TlsClientOptions, CapturedDependency<TlsClientOptions>(transports.TlsProvider));
     }

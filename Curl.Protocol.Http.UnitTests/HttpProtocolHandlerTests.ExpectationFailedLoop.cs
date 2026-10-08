@@ -42,17 +42,25 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream headerOutput = new();
             HttpRequestOptions options = new() { Headers = ["Expect: 100-continue"], MaxRedirects = maxRedirects, FollowRedirects = followRedirects };
             TransferContext context = CustomExpectUploadContext(options, new MemoryStream(), headerOutput);
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("redirect limit, -L", $"{maxRedirects}, {followRedirects}");
+            Diagnostics.Arrange("scripted connections", $"{connections} x 417 while sending");
 
             TransferResult result = await RunPastEveryWaitAsync(connector, context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.TooManyRedirects, result.ExitCode);
             Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("error message", $"Maximum ({maxRedirects}) redirects followed", result.ErrorMessage ?? "(none)");
             Assert.AreEqual($"Maximum ({maxRedirects}) redirects followed", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connect count", connections, connector.Targets.Count);
             Assert.HasCount(connections, connector.Targets, $"Chunk size {chunkSize}");
             foreach (GatedConnection connection in sent)
             {
                 Assert.AreEqual(CustomExpectPut + BigBody[..FirstPiece], Latin1(connection.Written), $"Chunk size {chunkSize}");
             }
 
+            Diagnostics.Assert("header output length", ExpectationFailedHead.Length * connections, headerOutput.Length);
             Assert.AreEqual(string.Concat(Enumerable.Repeat(ExpectationFailedHead, connections)), Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(54L * connections, result.Report!.HeaderSize, $"Chunk size {chunkSize}");
             Assert.AreEqual(417, result.Report.ResponseCode, $"Chunk size {chunkSize}");
@@ -79,10 +87,18 @@ public sealed partial class HttpProtocolHandlerTests
             TransferContext context = CustomExpectUploadContext(options, output, null);
 
             TransferResult result = await RunPastEveryWaitAsync(QueueConnector.For(first, second, third), context);
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted connections", "417 while sending, 417 while sending, 200 ok");
+            Diagnostics.Arrange("redirect limit", "-1");
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("third written", CustomExpectPut, third.Written);
             Assert.AreEqual(CustomExpectPut, third.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connection count", 3, result.Report!.ConnectionCount);
             Assert.AreEqual(3, result.Report!.ConnectionCount, $"Chunk size {chunkSize}");
             Assert.AreEqual(2, result.Report.RedirectCount, $"Chunk size {chunkSize}");
         }
@@ -108,12 +124,20 @@ public sealed partial class HttpProtocolHandlerTests
             GatedConnection first = FailingWhileSending(ExpectationFailedHead, chunkSize, ExpectingHead.Length);
             TurnTakingConnection second = new(chunkSize, OkHead + "ok");
             QueueConnector connector = QueueConnector.For(first, second);
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("redirect limit", maxRedirects);
+            Diagnostics.Arrange("scripted connections", "417 while sending, 200 ok");
 
             TransferResult result = await RunPastTheWaitAsync(connector, BigBodyOptions() with { MaxRedirects = maxRedirects }, new MemoryStream(), null);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", exitCode, result.ExitCode);
             Assert.AreEqual(exitCode, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connect count", connections, connector.Targets.Count);
             Assert.HasCount(connections, connector.Targets, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connection count", connections, result.Report!.ConnectionCount);
             Assert.AreEqual(connections, result.Report!.ConnectionCount, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("redirect count", redirects, result.Report.RedirectCount);
             Assert.AreEqual(redirects, result.Report.RedirectCount, $"Chunk size {chunkSize}");
         }
     }
@@ -134,21 +158,31 @@ public sealed partial class HttpProtocolHandlerTests
         {
             TurnTakingConnection connection = new(chunkSize, ExpectationFailedHead, OkHead + "ok");
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("redirect limit", maxRedirects);
+            Diagnostics.Arrange("scripted responses", "417, then 200 ok");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(ExpectContext(BigBodyOptions() with { MaxRedirects = maxRedirects }, new MemoryStream(), headerOutput));
 
+            WriteResult(result);
             if (maxRedirects == 0)
             {
+                Diagnostics.Assert("exit code", CurlExitCode.TooManyRedirects, result.ExitCode);
                 Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode, $"Chunk size {chunkSize}");
+                Diagnostics.Assert("error message", "Maximum (0) redirects followed", result.ErrorMessage ?? "(none)");
                 Assert.AreEqual("Maximum (0) redirects followed", result.ErrorMessage, $"Chunk size {chunkSize}");
                 Assert.AreEqual(ExpectingHead, connection.Written, $"Chunk size {chunkSize}");
+                Diagnostics.Diff("header output", ExpectationFailedHead, Latin1(headerOutput.ToArray()));
                 Assert.AreEqual(ExpectationFailedHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
                 Assert.AreEqual(0L, result.Report!.UploadSize, $"Chunk size {chunkSize}");
+                Diagnostics.Assert("redirect count", 0, result.Report.RedirectCount);
                 Assert.AreEqual(0, result.Report.RedirectCount, $"Chunk size {chunkSize}");
             }
             else
             {
+                Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
                 Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+                Diagnostics.Assert("redirect count", 1, result.Report!.RedirectCount);
                 Assert.AreEqual(1, result.Report!.RedirectCount, $"Chunk size {chunkSize}");
             }
         }
@@ -166,11 +200,18 @@ public sealed partial class HttpProtocolHandlerTests
         {
             TurnTakingConnection connection = new(chunkSize, ExpectationFailedHead, OkHead + "ok");
             HttpRequestOptions options = BigBodyOptions() with { MaxRedirects = 3, RedirectsFollowed = 3 };
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("redirect limit, followed before", "3, 3");
+            Diagnostics.Arrange("scripted responses", "417, then 200 ok");
 
             TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(ExpectContext(options, new MemoryStream(), null));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.TooManyRedirects, result.ExitCode);
             Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("error message", "Maximum (3) redirects followed", result.ErrorMessage ?? "(none)");
             Assert.AreEqual("Maximum (3) redirects followed", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("redirect count", 0, result.Report!.RedirectCount);
             Assert.AreEqual(0, result.Report!.RedirectCount, $"Chunk size {chunkSize}");
         }
     }

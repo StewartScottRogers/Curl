@@ -1,3 +1,6 @@
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
+
 namespace Curl.Protocol.Ssh.Scp;
 
 /// <summary>
@@ -7,6 +10,10 @@ namespace Curl.Protocol.Ssh.Scp;
 [TestClass]
 public sealed class ScpHeaderNumberTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("0644", 8, 420L, DisplayName = "octal mode")]
     [DataRow("107777", 8, 36863L, DisplayName = "octal mode with file type bits")]
@@ -21,7 +28,14 @@ public sealed class ScpHeaderNumberTests
     [DataRow("9223372036854775807", 10, long.MaxValue, DisplayName = "largest")]
     public void TryParse_Number_ReadsIt(string text, int radix, long expected)
     {
-        Assert.IsTrue(ScpHeaderNumber.TryParse(text, radix, out long value));
+        Diagnostics.ArrangeText("text", text);
+        Diagnostics.Arrange("radix", radix);
+
+        bool parsed = ScpHeaderNumber.TryParse(text, radix, out long value);
+
+        Diagnostics.Act("parsed, value", $"{parsed}, {value}");
+        Diagnostics.Assert("parsed, value", $"True, {expected}", $"{parsed}, {value}");
+        Assert.IsTrue(parsed);
         Assert.AreEqual(expected, value);
     }
 
@@ -38,7 +52,14 @@ public sealed class ScpHeaderNumberTests
     [DataRow("/", 10, DisplayName = "character below the digits")]
     public void TryParse_NotANumber_ReturnsFalse(string text, int radix)
     {
-        Assert.IsFalse(ScpHeaderNumber.TryParse(text, radix, out long value));
+        Diagnostics.ArrangeText("text", text);
+        Diagnostics.Arrange("radix", radix);
+
+        bool parsed = ScpHeaderNumber.TryParse(text, radix, out long value);
+
+        Diagnostics.Act("parsed, value", $"{parsed}, {value}");
+        Diagnostics.Assert("parsed, value", "False, 0", $"{parsed}, {value}");
+        Assert.IsFalse(parsed);
         Assert.AreEqual(0L, value);
     }
 }

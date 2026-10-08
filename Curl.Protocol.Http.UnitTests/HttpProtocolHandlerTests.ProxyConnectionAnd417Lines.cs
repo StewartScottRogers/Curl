@@ -29,10 +29,14 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "HTTP/1.0 200, Proxy-Connection: Keep-Alive, through a proxy");
 
             await Handler(QueueConnector.For(Connection("HTTP/1.0 200 OK\r\nProxy-Connection: Keep-Alive\r\nContent-Length: 2\r\n\r\nhi", chunkSize)))
                 .ExecuteAsync(EventsContext(ProxiedUrl, events, new HttpRequestOptions { ForwardProxy = ForwardingProxy }));
 
+            WriteEvents("events", events.Events);
+            Diagnostics.Assert("proxy keep-alive line reported", true, events.Info.Contains("HTTP/1.0 proxy connection set to keep alive"));
             CollectionAssert.AreEqual(
                 new[]
                 {
@@ -58,10 +62,14 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "HTTP/1.1 200, Proxy-Connection: close, through a proxy");
 
             await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nProxy-Connection: close\r\nContent-Length: 2\r\n\r\nhi", chunkSize)))
                 .ExecuteAsync(EventsContext(ProxiedUrl, events, new HttpRequestOptions { ForwardProxy = ForwardingProxy }));
 
+            WriteEvents("events", events.Events);
+            Diagnostics.Assert("proxy close line reported", true, events.Info.Contains("HTTP/1.1 proxy connection set close"));
             CollectionAssert.AreEqual(
                 new[]
                 {
@@ -92,9 +100,13 @@ public sealed partial class HttpProtocolHandlerTests
     {
         RecordingTransferEvents events = new();
         HttpRequestOptions options = new() { ForwardProxy = throughProxy ? ForwardingProxy : null };
+        Diagnostics.Arrange("scripted response", OneLine(response));
+        Diagnostics.Arrange("through proxy", throughProxy);
 
         await Handler(QueueConnector.For(Connection(response, 65536))).ExecuteAsync(EventsContext(ProxiedUrl, events, options));
 
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("proxy connection lines", 0, events.Info.Count(line => line.Contains("proxy connection set", StringComparison.Ordinal)));
         CollectionAssert.DoesNotContain(events.Info.ToList(), "HTTP/1.0 proxy connection set to keep alive");
         CollectionAssert.DoesNotContain(events.Info.ToList(), "HTTP/1.1 proxy connection set close");
     }
@@ -111,10 +123,16 @@ public sealed partial class HttpProtocolHandlerTests
         {
             TurnTakingConnection connection = new(chunkSize, ExpectationFailedHead, OkHead + "ok");
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "417 while waiting for 100-continue, then 200 ok");
 
             TransferResult result = await Handler(QueueConnector.For(connection))
                 .ExecuteAsync(ExpectEventsContext(BigBodyOptions(), events));
 
+            WriteResult(result);
+            WriteEvents("events", events.Events);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Assert("request bytes written", (ExpectingHead + ResentHead + BigBody).Length, connection.Written.Length);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ExpectingHead + ResentHead + BigBody, connection.Written, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(
@@ -141,11 +159,15 @@ public sealed partial class HttpProtocolHandlerTests
             GatedConnection first = FailingWhileSending(ExpectationFailedHead, chunkSize, ExpectingHead.Length);
             TurnTakingConnection second = new(chunkSize, OkHead + "ok");
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "417 while sending the body, then 200 ok on a new connection");
 
             await RunPastTheWaitAsync(QueueConnector.For(first, second), ExpectEventsContext(BigBodyOptions(), events));
 
             string[] lines = events.Events.Where(line => line.StartsWith("* ", StringComparison.Ordinal) || line.StartsWith("< ", StringComparison.Ordinal) || line.StartsWith("> ", StringComparison.Ordinal)).ToArray();
+            WriteEvents("verbose lines", lines);
             int start = Array.IndexOf(lines, "< HTTP/1.1 417 Expectation Failed\r\n");
+            Diagnostics.Assert("417 status line found", true, start >= 0);
             Assert.IsGreaterThanOrEqualTo(0, start, string.Join(" | ", lines));
             int resend = Array.FindIndex(lines, start, line => line.StartsWith("> ", StringComparison.Ordinal));
             Assert.IsGreaterThan(start, resend, string.Join(" | ", lines));
@@ -180,9 +202,15 @@ public sealed partial class HttpProtocolHandlerTests
             GatedConnection first = FailingWhileSending(ExpectationFailedHead, chunkSize, ExpectingHead.Length);
             TurnTakingConnection second = new(chunkSize, OkHead + "ok");
             RecordingTransferEvents events = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted responses", "417 while sending the body, then 200 ok on a new connection");
 
             TransferResult result = await RunPastTheWaitAsync(QueueConnector.For(first, second), ExpectEventsContext(BigBodyOptions(), events));
 
+            WriteResult(result);
+            WriteEvents("events", events.Events);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Diagnostics.Assert("resent bytes written", (ResentHead + BigBody).Length, second.Written.Length);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(ResentHead + BigBody, second.Written, $"Chunk size {chunkSize}");
             CollectionAssert.AreEqual(
@@ -206,10 +234,14 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, response);
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("scripted response", OneLine(response));
+        Diagnostics.Arrange("fail mode", fail);
 
         await Handler(QueueConnector.For(connection))
             .ExecuteAsync(ExpectEventsContext(BigBodyOptions() with { Fail = fail }, events));
 
+        WriteEvents("info lines", events.Info);
+        Diagnostics.Assert("got-failure lines", 0, events.Info.Count(line => line.StartsWith("Got HTTP failure 417", StringComparison.Ordinal)));
         CollectionAssert.DoesNotContain(events.Info.ToList(), "Got HTTP failure 417 while waiting for a 100");
         CollectionAssert.DoesNotContain(events.Info.ToList(), "Got HTTP failure 417 while sending data");
     }

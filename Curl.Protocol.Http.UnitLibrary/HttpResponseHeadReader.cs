@@ -17,12 +17,31 @@ namespace Curl.Protocol.Http;
 internal sealed class HttpResponseHeadReader
 {
     /// <summary>
-    /// The number of headers curl 8.21.0 accepts across every head of a response, 1xx heads
-    /// included, a continuation line folding into the header before it: the next header fails
+    /// The number of headers curl 8.21.0 stores in one transfer - every head of its exchanges
+    /// and of the hops <c>-L</c> follows, 1xx heads included, and a chunked body's trailers - a
+    /// continuation line folding into the header before it: the next header fails
     /// with exit 100, <see cref="HttpTransferMessages.TooManyResponseHeaders" />
-    /// (<c>MAX_HTTP_RESP_HEADER_COUNT</c>, <c>lib/headers.c</c>; measured, BL-1431 Notes).
+    /// (<c>MAX_HTTP_RESP_HEADER_COUNT</c>, <c>lib/headers.c</c>; measured, BL-1431 and BL-1448 Notes).
     /// </summary>
     internal const int MaximumHeaderCount = 5000;
+
+    /// <summary>
+    /// Gets how many response headers the transfer stored before this exchange's heads - an
+    /// earlier hop's or a resent request's (<see cref="Abstractions.HttpRequestOptions.ResponseHeadersStored" />) -
+    /// which count toward <see cref="MaximumHeaderCount" /> before any of this exchange's
+    /// (measured, BL-1448 Notes). 0 by default.
+    /// </summary>
+    internal int HeadersStoredBefore { get; init; }
+
+    /// <summary>
+    /// Gives how many response headers the transfer has stored once <paramref name="head" />,
+    /// the final head <see cref="ReadAsync" /> returned, is stored:
+    /// <see cref="HeadersStoredBefore" />, the 1xx heads' headers and the final head's.
+    /// </summary>
+    /// <param name="head">The final head.</param>
+    /// <returns>The count.</returns>
+    internal int HeadersStoredWith(HttpResponseHead head) =>
+        HeadersStoredBefore + informationalHeaderCount + head.Headers.Count;
 
     // The defaults are made once here, in the static constructor, which the compiler does not
     // cache delegates in, so they add no branch to the instance constructor (BL-1354).
@@ -356,12 +375,12 @@ internal sealed class HttpResponseHeadReader
     /// <summary>
     /// Finds the header of a final head curl 8.21.0 refuses: the first that
     /// <see cref="FindRefusal" /> refuses among those within <see cref="MaximumHeaderCount" />,
-    /// counting the 1xx heads' headers before them, or else the first past it, refused with exit
+    /// counting <see cref="HeadersStoredBefore" /> and the 1xx heads' headers before them, or else the first past it, refused with exit
     /// 100 and its lines still reported (<see cref="HttpHeadRefusal.ReportsRefusedHeaderLines" />).
     /// </summary>
     private HttpHeadRefusal? FindRefusalOrTooMany(HttpResponseHead head)
     {
-        int allowed = MaximumHeaderCount - informationalHeaderCount;
+        int allowed = MaximumHeaderCount - HeadersStoredBefore - informationalHeaderCount;
         if (head.Headers.Count <= allowed)
         {
             return FindRefusal(head);
@@ -372,7 +391,7 @@ internal sealed class HttpResponseHeadReader
     }
 
     private static HttpTransferException TooManyHeaders() =>
-        new(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders);
+        new(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders) { InfoLines = [HttpTransferMessages.TooManyResponseHeaders] };
 
     /// <summary>
     /// Determines whether the unfinished line shows the header whose lines are held is whole:
@@ -466,7 +485,7 @@ internal sealed class HttpResponseHeadReader
             }
 
             heldHeaderLines.Add(bytes);
-            if (informationalHeaderCount == MaximumHeaderCount)
+            if (HeadersStoredBefore + informationalHeaderCount == MaximumHeaderCount)
             {
                 throw TooManyHeaders();
             }

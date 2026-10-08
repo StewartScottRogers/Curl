@@ -1,5 +1,6 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -11,6 +12,10 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpAuthUsingLinesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("Basic dTpw", false, HttpAuthSchemes.Basic, false, "Server auth using Basic with user 'u'", DisplayName = "-u u:p")]
     [DataRow("Basic dTpw", false, HttpAuthSchemes.Basic, true, null, DisplayName = "-u u:p with -H Authorization")]
@@ -25,19 +30,31 @@ public sealed class HttpAuthUsingLinesTests
     [DataRow("Other x", false, HttpAuthSchemes.Any, false, null, DisplayName = "Another scheme's value")]
     public void AuthUsing_OriginRequest_WritesCurlsLine(string? authorization, bool answersChallenge, HttpAuthSchemes allowed, bool headerNamesAuthorization, string? expected)
     {
-        Assert.AreEqual(expected, HttpAuthUsingLines.AuthUsing(Request(allowed, new NetworkCredential("u", "p")), authorization, answersChallenge, headerNamesAuthorization));
+        Diagnostics.Arrange("authorization, allowed", $"{authorization ?? "none"}, {allowed}");
+        string? line = HttpAuthUsingLines.AuthUsing(Request(allowed, new NetworkCredential("u", "p")), authorization, answersChallenge, headerNamesAuthorization);
+        Diagnostics.Act("line", line ?? "none");
+        Diagnostics.Assert("line", expected ?? "none", line ?? "none");
+        Assert.AreEqual(expected, line);
     }
 
     [TestMethod]
     public void AuthUsing_DigestWithoutUser_WritesNoLine()
     {
-        Assert.IsNull(HttpAuthUsingLines.AuthUsing(Request(HttpAuthSchemes.Digest, credential: null), null, answersChallenge: false, headerNamesAuthorization: false));
+        Diagnostics.Arrange("allowed, credential", "Digest, none");
+        string? line = HttpAuthUsingLines.AuthUsing(Request(HttpAuthSchemes.Digest, credential: null), null, answersChallenge: false, headerNamesAuthorization: false);
+        Diagnostics.Act("line", line ?? "none");
+        Diagnostics.Assert("line", "none", line ?? "none");
+        Assert.IsNull(line);
     }
 
     [TestMethod]
     public void AuthUsing_BearerWithoutUser_NamesNoUser()
     {
-        Assert.AreEqual("Server auth using Bearer with user ''", HttpAuthUsingLines.AuthUsing(Request(HttpAuthSchemes.Basic, credential: null), "Bearer tok", answersChallenge: false, headerNamesAuthorization: false));
+        Diagnostics.Arrange("authorization, credential", "Bearer tok, none");
+        string? line = HttpAuthUsingLines.AuthUsing(Request(HttpAuthSchemes.Basic, credential: null), "Bearer tok", answersChallenge: false, headerNamesAuthorization: false);
+        Diagnostics.Act("line", line ?? "none");
+        Diagnostics.Assert("line", "Server auth using Bearer with user ''", line);
+        Assert.AreEqual("Server auth using Bearer with user ''", line);
     }
 
     [TestMethod]
@@ -45,7 +62,11 @@ public sealed class HttpAuthUsingLinesTests
     {
         HttpAuthRequest request = Request(HttpAuthSchemes.Basic, new NetworkCredential("ak", "sk")) with { AwsSigV4 = new AwsSigV4Inputs("aws:amz:us-east-1:s3", "127.0.0.1", []) };
 
-        Assert.IsNull(HttpAuthUsingLines.AuthUsing(request, "AWS4-HMAC-SHA256 Credential=ak", answersChallenge: false, headerNamesAuthorization: false));
+        Diagnostics.Arrange("authorization, AWS SigV4 provider", "AWS4-HMAC-SHA256 Credential=ak, aws:amz:us-east-1:s3");
+        string? line = HttpAuthUsingLines.AuthUsing(request, "AWS4-HMAC-SHA256 Credential=ak", answersChallenge: false, headerNamesAuthorization: false);
+        Diagnostics.Act("line", line ?? "none");
+        Diagnostics.Assert("line", "none", line ?? "none");
+        Assert.IsNull(line);
     }
 
     [TestMethod]
@@ -56,7 +77,11 @@ public sealed class HttpAuthUsingLinesTests
     {
         HttpAuthRequest request = Request(allowed, new NetworkCredential("pu", "pp")) with { IsProxy = true };
 
-        Assert.AreEqual(expected, HttpAuthUsingLines.AuthUsing(request, authorization, answersChallenge: false, headerNamesAuthorization));
+        Diagnostics.Arrange("proxy authorization, allowed", $"{authorization ?? "none"}, {allowed}");
+        string? line = HttpAuthUsingLines.AuthUsing(request, authorization, answersChallenge: false, headerNamesAuthorization);
+        Diagnostics.Act("line", line ?? "none");
+        Diagnostics.Assert("line", expected, line);
+        Assert.AreEqual(expected, line);
     }
 
     private static HttpAuthRequest Request(HttpAuthSchemes allowed, NetworkCredential? credential) =>

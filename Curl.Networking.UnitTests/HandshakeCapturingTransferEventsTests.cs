@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Authentication;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -12,6 +13,10 @@ namespace Curl.Networking;
 [TestClass]
 public sealed class HandshakeCapturingTransferEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void EveryReport_IsPassedOnToTheInnerEvents()
     {
@@ -27,6 +32,8 @@ public sealed class HandshakeCapturingTransferEventsTests
             CertificateVerified = true,
         };
         var endPoint = new IPEndPoint(IPAddress.Loopback, 80);
+        Diagnostics.Arrange("handshake", "TLS 1.2, verified, no cipher suite or ALPN");
+        Diagnostics.Arrange("reports", "one of each of the 13 ITransferEvents reports, in order");
 
         capturing.ReportInfo("info");
         capturing.ReportConnectionOpened(new ConnectionOpenedEvent { HostName = "h", RemoteEndPoint = endPoint, LocalEndPoint = endPoint, ConnectionNumber = 0 });
@@ -42,6 +49,13 @@ public sealed class HandshakeCapturingTransferEventsTests
         capturing.ReportDataSent([5]);
         capturing.ReportDataReceived([6]);
 
+        Diagnostics.Act("inner calls", string.Join(" | ", inner.Calls));
+        Diagnostics.Act("captured handshake is the reported one", ReferenceEquals(handshake, capturing.Handshake));
+        Diagnostics.Assert(
+            "inner calls",
+            "info | opened | reused | handshake | tls-data | tls-message | trust | verify 18 True | early-data -36 | request | response | sent | received",
+            string.Join(" | ", inner.Calls));
+        Diagnostics.Assert("captured handshake is the reported one", true, ReferenceEquals(handshake, capturing.Handshake));
         CollectionAssert.AreEqual(
             new[] { "info", "opened", "reused", "handshake", "tls-data", "tls-message", "trust", "verify 18 True", "early-data -36", "request", "response", "sent", "received" },
             inner.Calls);
@@ -52,7 +66,12 @@ public sealed class HandshakeCapturingTransferEventsTests
     public void Handshake_BeforeAnyIsReported_IsNull()
     {
         var capturing = new HandshakeCapturingTransferEvents(new CountingTransferEvents());
+        Diagnostics.Arrange("reports", "none");
 
+        var handshake = capturing.Handshake;
+
+        Diagnostics.Act("handshake is null", handshake is null);
+        Diagnostics.Assert("handshake is null", true, handshake is null);
         Assert.IsNull(capturing.Handshake);
     }
 
@@ -61,7 +80,13 @@ public sealed class HandshakeCapturingTransferEventsTests
     {
         IHandshakeReportingTlsProvider sslStream = new SslStreamTlsProvider(new TlsClientOptions());
         IHandshakeReportingTlsProvider handBuilt = new HandBuiltTlsProvider(new TlsClientOptions(), TimeProvider.System);
+        Diagnostics.Arrange("options", "default TlsClientOptions for both providers");
 
+        Diagnostics.Act("SslStream provider route", sslStream.Route);
+        Diagnostics.Act("hand-built provider route", handBuilt.Route);
+
+        Diagnostics.Assert("SslStream provider route", TlsClientRoute.SslStream, sslStream.Route);
+        Diagnostics.Assert("hand-built provider route", TlsClientRoute.HandBuilt, handBuilt.Route);
         Assert.AreEqual(TlsClientRoute.SslStream, sslStream.Route);
         Assert.AreEqual(TlsClientRoute.HandBuilt, handBuilt.Route);
     }
@@ -71,7 +96,14 @@ public sealed class HandshakeCapturingTransferEventsTests
     {
         IHandshakeReportingTlsProvider sslStream = new SslStreamTlsProvider(new TlsClientOptions());
         IHandshakeReportingTlsProvider handBuilt = new HandBuiltTlsProvider(new TlsClientOptions(MaximumVersion: TlsVersion.Tls11), TimeProvider.System);
+        Diagnostics.Arrange("SslStream provider options", "default");
+        Diagnostics.Arrange("hand-built provider options", "MaximumVersion: Tls11");
 
+        Diagnostics.Act("SslStream provider route reason", sslStream.RouteReason ?? "null");
+        Diagnostics.Act("hand-built provider route reason", handBuilt.RouteReason);
+
+        Diagnostics.Assert("SslStream provider route reason", "null", sslStream.RouteReason ?? "null");
+        Diagnostics.Assert("hand-built provider route reason", "--tls-max caps the versions below TLS 1.2", handBuilt.RouteReason);
         Assert.IsNull(sslStream.RouteReason);
         Assert.AreEqual("--tls-max caps the versions below TLS 1.2", handBuilt.RouteReason);
     }
@@ -81,10 +113,17 @@ public sealed class HandshakeCapturingTransferEventsTests
     {
         var inner = new CountingTransferEvents();
         var capturing = new HandshakeCapturingTransferEvents(inner);
+        Diagnostics.Arrange("reports", "ReportRevocationCheckIncomplete once");
 
+        Diagnostics.Act("incomplete before the report", capturing.RevocationCheckIncomplete);
+        Diagnostics.Assert("incomplete before the report", false, capturing.RevocationCheckIncomplete);
         Assert.IsFalse(capturing.RevocationCheckIncomplete);
         capturing.ReportRevocationCheckIncomplete();
 
+        Diagnostics.Act("incomplete after the report", capturing.RevocationCheckIncomplete);
+        Diagnostics.Act("inner calls", inner.Calls.Count);
+        Diagnostics.Assert("incomplete after the report", true, capturing.RevocationCheckIncomplete);
+        Diagnostics.Assert("inner calls", 0, inner.Calls.Count);
         Assert.IsTrue(capturing.RevocationCheckIncomplete);
         Assert.IsEmpty(inner.Calls);
     }

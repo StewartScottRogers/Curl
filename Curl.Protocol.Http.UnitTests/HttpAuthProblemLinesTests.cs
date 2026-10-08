@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -10,6 +11,10 @@ namespace Curl.Protocol.Http;
 [TestClass]
 public sealed class HttpAuthProblemLinesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(401, false, "Basic dTpw", "WWW-Authenticate", "Basic realm=\"x\"", 1, DisplayName = "Basic refused")]
     [DataRow(401, false, "Bearer tok", "www-authenticate", "bearer, Basic x,\tBEARER\ty", 2, DisplayName = "Bearer, any case, after blanks")]
@@ -26,8 +31,13 @@ public sealed class HttpAuthProblemLinesTests
         HttpStatusLine statusLine = HttpStatusLine.Parse($"HTTP/1.1 {statusCode} X");
         HttpAuthRequest request = new("GET", CurlUrl.Parse("http://127.0.0.1/"), "/", null, null, HttpAuthSchemes.Basic, isProxy);
 
+        Diagnostics.Arrange("status, proxy, authorization", $"{statusCode}, {isProxy}, {authorization ?? "none"}");
+        Diagnostics.Arrange("header", $"{name}: {value}");
+
         List<string> lines = [.. new HttpAuthProblemLines().LinesBefore(request, authorization, statusLine, new HttpResponseHeader(name, value))];
 
+        Diagnostics.Act("lines", string.Join(" | ", lines));
+        Diagnostics.Assert("line count", expected, lines.Count);
         Assert.HasCount(expected, lines);
         Assert.IsTrue(lines.All(line => line == $"{authorization!.Split(' ')[0]} authentication problem, ignoring."));
     }
@@ -52,8 +62,13 @@ public sealed class HttpAuthProblemLinesTests
         HttpStatusLine statusLine = HttpStatusLine.Parse($"HTTP/1.1 {statusCode} X");
         HttpAuthRequest request = new("GET", CurlUrl.Parse("http://127.0.0.1/"), "/", null, null, HttpAuthSchemes.Digest, isProxy);
 
+        Diagnostics.Arrange("status, proxy, authorization", $"{statusCode}, {isProxy}, {authorization ?? "none"}");
+        Diagnostics.Arrange("header", $"{name}: {value}");
+
         List<string> lines = [.. new HttpAuthProblemLines().LinesBefore(request, authorization, statusLine, new HttpResponseHeader(name, value))];
 
+        Diagnostics.Act("lines", string.Join(" | ", lines));
+        Diagnostics.Assert("lines", string.Join(" | ", expected), string.Join(" | ", lines));
         CollectionAssert.AreEqual(expected, lines);
     }
 
@@ -68,6 +83,9 @@ public sealed class HttpAuthProblemLinesTests
         List<string> first = [.. head.LinesBefore(request, "Digest username=\"u\"", statusLine, new HttpResponseHeader("WWW-Authenticate", "Digest realm=\"r\", nonce=\"b\""))];
         List<string> second = [.. head.LinesBefore(request, "Digest username=\"u\"", statusLine, new HttpResponseHeader("WWW-Authenticate", "Digest realm=\"s\", nonce=\"c\""))];
 
+        Diagnostics.Arrange("headers", "two Digest WWW-Authenticate headers in one 401 head");
+        Diagnostics.Act("lines for each header", $"{string.Join(" | ", first)}; {string.Join(" | ", second)}");
+        Diagnostics.Assert("lines for the second header", DigestDuplicate, string.Join(" | ", second));
         CollectionAssert.AreEqual(new[] { DigestProblem }, first);
         CollectionAssert.AreEqual(new[] { DigestDuplicate }, second);
     }

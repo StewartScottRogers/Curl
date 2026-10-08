@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -14,6 +15,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerCustomCommandTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Opening =
         "+OK POP3 ready <1896.697170952@localhost>\r\n"
         + "+OK Capability list follows\r\nUSER\r\nSASL PLAIN LOGIN\r\nSTLS\r\nTOP\r\nUIDL\r\n.\r\n";
@@ -58,8 +64,11 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + id, Mail(custom), Opening, reply + "\r\n", Bye);
 
+        Diagnostics.Diff("sent", Capa + line + "\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + line + "\r\n" + Quit, run.Sent);
+        Diagnostics.AssertValues("run.Output count", 0, run.Output.Count());
         Assert.IsEmpty(run.Output);
+        Diagnostics.AssertResult(TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -74,8 +83,11 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + id, Mail(custom), Opening, reply, Bye);
 
+        Diagnostics.Diff("sent", Capa + line + "\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + line + "\r\n" + Quit, run.Sent);
+        Diagnostics.Diff("output", written, Encoding.Latin1.GetString(run.Output));
         Assert.AreEqual(written, Encoding.Latin1.GetString(run.Output));
+        Diagnostics.AssertResult(TransferResult.Success(written.Length), run.Result);
         Assert.AreEqual(TransferResult.Success(written.Length), run.Result);
     }
 
@@ -92,8 +104,11 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
         // Measured: curl waited until the recorder hung up, then exit 0 with nothing written and no QUIT.
         Pop3Run run = await RunAsync(Url + "1", Mail(custom), Opening, reply + "\r\n");
 
+        Diagnostics.Diff("sent", Capa + line + "\r\n", run.Sent);
         Assert.AreEqual(Capa + line + "\r\n", run.Sent);
+        Diagnostics.AssertValues("run.Output count", 0, run.Output.Count());
         Assert.IsEmpty(run.Output);
+        Diagnostics.AssertResult(TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -106,8 +121,11 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + id, Mail(custom), Opening, reply + "\r\n", Bye);
 
+        Diagnostics.Diff("sent", Capa + line + "\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + line + "\r\n" + Quit, run.Sent);
+        Diagnostics.AssertValues("run.Output count", 0, run.Output.Count());
         Assert.IsEmpty(run.Output);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
     }
 
@@ -116,6 +134,7 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url, Mail("DELE%0A1"), Opening, Bye);
 
+        Diagnostics.Diff("sent", Capa + Quit, run.Sent);
         Assert.AreEqual(Capa + Quit, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"),
@@ -127,7 +146,9 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + "1", Mail(string.Empty), Opening, RetrReply, Bye);
 
+        Diagnostics.Diff("sent", Capa + "RETR 1\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + "RETR 1\r\n" + Quit, run.Sent);
+        Diagnostics.Diff("output", Message, Encoding.Latin1.GetString(run.Output));
         Assert.AreEqual(Message, Encoding.Latin1.GetString(run.Output));
     }
 
@@ -136,8 +157,11 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + "1", new Flags(ListOnly: true), Opening, "+OK 1 133\r\n", Bye);
 
+        Diagnostics.Diff("sent", Capa + "LIST 1\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + "LIST 1\r\n" + Quit, run.Sent);
+        Diagnostics.AssertValues("run.Output count", 0, run.Output.Count());
         Assert.IsEmpty(run.Output);
+        Diagnostics.AssertResult(TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -146,7 +170,9 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + "1", new Flags(ListOnly: true), Opening, "-ERR nope\r\n", Bye);
 
+        Diagnostics.Diff("sent", Capa + "LIST 1\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + "LIST 1\r\n" + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
     }
 
@@ -156,8 +182,11 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
         Pop3Run run = await RunAsync(
             Url, new Flags(ListOnly: true), Opening, "+OK 2 messages (266 octets)\r\n1 133\r\n2 133\r\n.\r\n", Bye);
 
+        Diagnostics.Diff("sent", Capa + "LIST\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + "LIST\r\n" + Quit, run.Sent);
+        Diagnostics.Diff("output", "1 133\r\n2 133\r\n", Encoding.Latin1.GetString(run.Output));
         Assert.AreEqual("1 133\r\n2 133\r\n", Encoding.Latin1.GetString(run.Output));
+        Diagnostics.AssertResult(TransferResult.Success(14), run.Result);
         Assert.AreEqual(TransferResult.Success(14), run.Result);
     }
 
@@ -166,7 +195,9 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url, Mail("TOP 1 0", listOnly: true), Opening, TopReply, Bye);
 
+        Diagnostics.Diff("sent", Capa + "TOP 1 0\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + "TOP 1 0\r\n" + Quit, run.Sent);
+        Diagnostics.Diff("output", Headers, Encoding.Latin1.GetString(run.Output));
         Assert.AreEqual(Headers, Encoding.Latin1.GetString(run.Output));
     }
 
@@ -178,8 +209,11 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + "1", Mail(custom, listOnly: true), Opening, reply, Bye);
 
+        Diagnostics.Diff("sent", Capa + line + "\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + line + "\r\n" + Quit, run.Sent);
+        Diagnostics.AssertValues("run.Output count", 0, run.Output.Count());
         Assert.IsEmpty(run.Output);
+        Diagnostics.AssertResult(TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
@@ -190,7 +224,9 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     {
         Pop3Run run = await RunAsync(Url + id, new Flags(NoBody: true), Opening, reply, Bye);
 
+        Diagnostics.Diff("sent", Capa + line + "\r\n" + Quit, run.Sent);
         Assert.AreEqual(Capa + line + "\r\n" + Quit, run.Sent);
+        Diagnostics.Diff("output", written, Encoding.Latin1.GetString(run.Output));
         Assert.AreEqual(written, Encoding.Latin1.GetString(run.Output));
     }
 
@@ -201,7 +237,7 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
     /// Runs <paramref name="url" /> with <paramref name="flags" />'s <c>-X</c>, <c>-l</c> and
     /// <c>-I</c> against a server that sends each of <paramref name="reads" /> as one read.
     /// </summary>
-    private static async Task<Pop3Run> RunAsync(string url, Flags flags, params string[] reads)
+    private async Task<Pop3Run> RunAsync(string url, Flags flags, params string[] reads)
     {
         var connection = new ScriptedConnection([.. reads.Select(Encoding.Latin1.GetBytes)]);
         using var output = new MemoryStream();
@@ -218,9 +254,14 @@ public sealed class Pop3ProtocolHandlerCustomCommandTests
         var connector = new QueuedConnector(ConnectResult.Connected(connection));
         var tls = new QueuedTlsProvider();
 
+        Diagnostics.ArrangeRun(url, connection.Script);
+        Diagnostics.Arrange("flags", $"custom command {Pop3Diagnostics.Show(flags.Mail?.CustomCommand)}, list only {flags.ListOnly}, no body {flags.NoBody}");
+
         TransferResult result = await new Pop3ProtocolHandler(connector, tls).ExecuteAsync(context);
 
-        return new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        var run = new Pop3Run(result, connection, connector, tls, output.ToArray(), progress);
+        Diagnostics.ActRun(run);
+        return run;
     }
 
     /// <summary>The <c>-X</c> command, <c>-l</c> and <c>-I</c> a run is given.</summary>

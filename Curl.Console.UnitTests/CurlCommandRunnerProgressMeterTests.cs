@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -30,6 +31,10 @@ public sealed class CurlCommandRunnerProgressMeterTests
     private readonly FileProtocolHandler fileHandler =
         new(new InMemoryFileSystem { ReadContent = Encoding.ASCII.GetBytes("0123456789") });
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     [TestMethod]
@@ -37,6 +42,8 @@ public sealed class CurlCommandRunnerProgressMeterTests
     {
         int exitCode = await RunAsync(["-o", "o1", SourceUrl]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(Meter), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(Meter, StandardErrorText);
     }
@@ -45,11 +52,16 @@ public sealed class CurlCommandRunnerProgressMeterTests
     public async Task RunAsync_ContinueAt5_WritesTheResumingLineBeforeTheMeter()
     {
         outputFiles.ExistingContent["o2"] = Encoding.ASCII.GetBytes("01234");
+        Diagnostics.Arrange("existing o2 content", "01234");
 
         int exitCode = await RunAsync(["-C", "5", "-o", "o2", SourceUrl]);
 
+        string expectedStandardError = "** Resuming transfer from byte position 5" + NewLine + Meter;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Diagnostics.Diff("o2 content", "0123456789", Encoding.ASCII.GetString(outputFiles.Written["o2"].ToArray()));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual("** Resuming transfer from byte position 5" + NewLine + Meter, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
         Assert.AreEqual("0123456789", Encoding.ASCII.GetString(outputFiles.Written["o2"].ToArray()));
     }
 
@@ -57,21 +69,29 @@ public sealed class CurlCommandRunnerProgressMeterTests
     public async Task RunAsync_ContinueAtDash_NamesTheOutputFileSizeInTheResumingLine()
     {
         outputFiles.ExistingContent["o2"] = Encoding.ASCII.GetBytes("0123");
+        Diagnostics.Arrange("existing o2 content", "0123");
 
-        await RunAsync(["-C", "-", "-o", "o2", SourceUrl]);
+        int exitCode = await RunAsync(["-C", "-", "-o", "o2", SourceUrl]);
 
-        Assert.AreEqual("** Resuming transfer from byte position 4" + NewLine + Meter, StandardErrorText);
+        string expectedStandardError = "** Resuming transfer from byte position 4" + NewLine + Meter;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
     public async Task RunAsync_ContinueAtDashWithUpload_WritesResumingFromMinusOneBeforeTheMeter()
     {
         outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+        Diagnostics.Arrange("existing f.txt content", "abc");
 
         int exitCode = await RunAsync(["-C", "-", "-T", "f.txt", UploadUrl], handler: RecordingProtocolHandler.WritingPath("http"));
 
+        string expectedStandardError = "** Resuming transfer from byte position -1" + NewLine + Meter;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual("** Resuming transfer from byte position -1" + NewLine + Meter, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
@@ -79,30 +99,40 @@ public sealed class CurlCommandRunnerProgressMeterTests
     {
         outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
         outputFiles.ExistingContent["o3"] = Encoding.ASCII.GetBytes("xyz");
+        Diagnostics.Arrange("existing f.txt content", "abc");
+        Diagnostics.Arrange("existing o3 content", "xyz");
 
         int exitCode = await RunAsync(
             ["-C", "-", "-T", "f.txt", "-o", "o3", UploadUrl],
             handler: RecordingProtocolHandler.WritingPath("http"));
 
+        string expectedStandardError = "** Resuming transfer from byte position -1" + NewLine + Meter;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual("** Resuming transfer from byte position -1" + NewLine + Meter, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
     public async Task RunAsync_ContinueAt0WithUpload_WritesTheMeterWithoutTheResumingLine()
     {
         outputFiles.ExistingContent["f.txt"] = Encoding.ASCII.GetBytes("abc");
+        Diagnostics.Arrange("existing f.txt content", "abc");
 
-        await RunAsync(["-C", "0", "-T", "f.txt", UploadUrl], handler: RecordingProtocolHandler.WritingPath("http"));
+        int exitCode = await RunAsync(["-C", "0", "-T", "f.txt", UploadUrl], handler: RecordingProtocolHandler.WritingPath("http"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(Meter), Lf(StandardErrorText));
         Assert.AreEqual(Meter, StandardErrorText);
     }
 
     [TestMethod]
     public async Task RunAsync_ContinueAt0_WritesTheMeterWithoutTheResumingLine()
     {
-        await RunAsync(["-C", "0", "-o", "o1", SourceUrl]);
+        int exitCode = await RunAsync(["-C", "0", "-o", "o1", SourceUrl]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(Meter), Lf(StandardErrorText));
         Assert.AreEqual(Meter, StandardErrorText);
     }
 
@@ -113,9 +143,12 @@ public sealed class CurlCommandRunnerProgressMeterTests
     public async Task RunAsync_ContinueAt5UnderOptionThatHidesTheMeter_WritesNeitherResumingLineNorMeter(string option)
     {
         outputFiles.ExistingContent["o2"] = Encoding.ASCII.GetBytes("01234");
+        Diagnostics.Arrange("existing o2 content", "01234");
 
         int exitCode = await RunAsync([option, "-C", "5", "-o", "o2", SourceUrl]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
@@ -123,8 +156,10 @@ public sealed class CurlCommandRunnerProgressMeterTests
     [TestMethod]
     public async Task RunAsync_ProgressMeterAfterNoProgressMeter_WritesTheMeter()
     {
-        await RunAsync(["--no-progress-meter", "--progress-meter", "-o", "o1", SourceUrl]);
+        int exitCode = await RunAsync(["--no-progress-meter", "--progress-meter", "-o", "o1", SourceUrl]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(Meter), Lf(StandardErrorText));
         Assert.AreEqual(Meter, StandardErrorText);
     }
 
@@ -132,10 +167,14 @@ public sealed class CurlCommandRunnerProgressMeterTests
     public async Task RunAsync_ProgressBar_WritesNoMeterLines()
     {
         outputFiles.ExistingContent["o2"] = Encoding.ASCII.GetBytes("01234");
+        Diagnostics.Arrange("existing o2 content", "01234");
 
-        await RunAsync(["-#", "-C", "5", "-o", "o2", SourceUrl]);
+        int exitCode = await RunAsync(["-#", "-C", "5", "-o", "o2", SourceUrl]);
 
-        StringAssert.DoesNotMatch(StandardErrorText, new System.Text.RegularExpressions.Regex("% Total|Dload|Resuming"));
+        System.Text.RegularExpressions.Regex forbidden = new("% Total|Dload|Resuming");
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr matches meter or resuming text", false, forbidden.IsMatch(StandardErrorText));
+        StringAssert.DoesNotMatch(StandardErrorText, forbidden);
     }
 
     [TestMethod]
@@ -143,6 +182,9 @@ public sealed class CurlCommandRunnerProgressMeterTests
     {
         int exitCode = await RunAsync([SourceUrl]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "0123456789", Encoding.ASCII.GetString(standardOutput.ToArray()));
+        Diagnostics.Diff("stderr", Lf(Meter), Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("0123456789", Encoding.ASCII.GetString(standardOutput.ToArray()));
         Assert.AreEqual(Meter, StandardErrorText);
@@ -151,25 +193,32 @@ public sealed class CurlCommandRunnerProgressMeterTests
     [TestMethod]
     public async Task RunAsync_StandardOutputIsATerminal_WritesNoMeterForABodyOnStandardOutput()
     {
-        await RunAsync([SourceUrl], standardOutputIsTerminal: true);
+        int exitCode = await RunAsync([SourceUrl], standardOutputIsTerminal: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
     [TestMethod]
     public async Task RunAsync_StandardOutputIsATerminalWithOutputFile_WritesTheMeter()
     {
-        await RunAsync(["-o", "o1", SourceUrl], standardOutputIsTerminal: true);
+        int exitCode = await RunAsync(["-o", "o1", SourceUrl], standardOutputIsTerminal: true);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(Meter), Lf(StandardErrorText));
         Assert.AreEqual(Meter, StandardErrorText);
     }
 
     [TestMethod]
     public async Task RunAsync_TwoUrls_WritesOneMeterForEach()
     {
-        await RunAsync([SourceUrl, SourceUrl, "-o", "o1", "-o", "o2"]);
+        int exitCode = await RunAsync([SourceUrl, SourceUrl, "-o", "o1", "-o", "o2"]);
 
-        Assert.AreEqual(Meter + Meter, StandardErrorText);
+        string expectedStandardError = Meter + Meter;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
@@ -177,42 +226,71 @@ public sealed class CurlCommandRunnerProgressMeterTests
     {
         RecordingProtocolHandler missingSource =
             RecordingProtocolHandler.Failing("file", CurlExitCode.FileCouldntReadFile, "Could not open file /source.txt");
+        Diagnostics.Arrange("handler", "fails with exit 37: Could not open file /source.txt");
 
         int exitCode = await RunAsync(["-o", "o1", SourceUrl], handler: missingSource);
 
+        string expectedStandardError = "curl: (37) Could not open file /source.txt" + NewLine;
+        Diagnostics.Assert("exit code", 37, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
         Assert.AreEqual(37, exitCode);
-        Assert.AreEqual("curl: (37) Could not open file /source.txt" + NewLine, StandardErrorText);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
     }
 
     [TestMethod]
     public async Task RunAsync_RunnerThatDoesNotWriteTheMeter_WritesNothing()
     {
-        await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([fileHandler])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false)
-            .RunAsync(["-o", "o1", SourceUrl]);
+        string[] arguments = ["-o", "o1", SourceUrl];
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("writes progress meter", false);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([fileHandler])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false)
+                .RunAsync(arguments);
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
-    private Task<int> RunAsync(
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(
         IReadOnlyList<string> arguments,
         bool standardOutputIsTerminal = false,
-        IProtocolHandler? handler = null) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([handler ?? fileHandler])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                writesProgressMeter: true,
-                standardOutputIsTerminal: standardOutputIsTerminal)
-            .RunAsync(arguments);
+        IProtocolHandler? handler = null)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("standard output is terminal", standardOutputIsTerminal);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([handler ?? fileHandler])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    writesProgressMeter: true,
+                    standardOutputIsTerminal: standardOutputIsTerminal)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        return exitCode;
+    }
 }

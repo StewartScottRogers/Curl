@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -14,6 +15,11 @@ namespace Curl.Protocol.Imap;
 [TestClass]
 public sealed class ImapProtocolHandlerResponseTests
 {
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "imap://127.0.0.1:18143/";
 
     private const string Greeting = "* OK ready\r\n";
@@ -31,8 +37,12 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         byte[] replies = Latin1(Greeting + CapabilityReply + ListAndLogoutReply);
 
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Greeting + CapabilityReply + ListAndLogoutReply));
         ImapRun run = await ImapRun.ExecuteAsync(Url, new ScriptedConnection([.. replies.Chunk(3)]));
 
+        Report(run);
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -43,6 +53,8 @@ public sealed class ImapProtocolHandlerResponseTests
         // An LF alone ends a line; "xy", "+abc" and "A0011 OK" are none of the three.
         ImapRun run = await RunAsync("xy\n* OK ready\n+abc\r\nA0011 OK\r\n" + CapabilityReply + ListAndLogoutReply);
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -55,6 +67,8 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         ImapRun run = await RunAsync(Greeting + continuation + CapabilityReply);
 
+        Diagnostics.Diff("sent", Capability, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unexpected continuation response"), run.Result);
         Assert.AreEqual(Capability, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unexpected continuation response"),
@@ -66,6 +80,8 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         ImapRun run = await RunAsync("+ hello\r\n");
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unexpected continuation response"), run.Result);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unexpected continuation response"),
@@ -77,6 +93,8 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         ImapRun run = await RunAsync(Greeting + "* CAPABILITY IMAP4rev1\0\r\nA001 OK done\r\n");
 
+        Diagnostics.Diff("sent", Capability, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, "Nul byte in server response line"), run.Result);
         Assert.AreEqual(Capability, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WeirdServerReply, "Nul byte in server response line"),
@@ -93,6 +111,8 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         ImapRun run = await RunAsync(replies);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
+        Diagnostics.Assert("sent contains LOGOUT", false, run.Sent.Contains("LOGOUT", StringComparison.Ordinal));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
         Assert.DoesNotContain("LOGOUT", run.Sent);
     }
@@ -102,8 +122,11 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         var connection = new ScriptedConnection(Latin1(Greeting)) { FailReadsWhenExhausted = true };
 
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Greeting) + " then reads fail");
         ImapRun run = await ImapRun.ExecuteAsync(Url, connection);
 
+        Report(run);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
     }
 
@@ -112,8 +135,12 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         var connection = new ScriptedConnection(Latin1(Greeting)) { WritesBeforeFailure = 0 };
 
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Greeting) + " then writes fail");
         ImapRun run = await ImapRun.ExecuteAsync(Url, connection);
 
+        Report(run);
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
     }
@@ -125,6 +152,8 @@ public sealed class ImapProtocolHandlerResponseTests
         // field grew larger than allowed".
         ImapRun run = await RunAsync("* OK " + new string('x', 65529) + "\r\n");
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"), run.Result);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"),
@@ -137,6 +166,8 @@ public sealed class ImapProtocolHandlerResponseTests
         // GREETING=* OK and 65528 x: 65533 characters and CRLF, exit 0.
         ImapRun run = await RunAsync("* OK " + new string('x', 65528) + "\r\n" + CapabilityReply + ListAndLogoutReply);
 
+        Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -148,6 +179,8 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         ImapRun run = await RunAsync(Greeting + untagged + new string('x', 70000) + "\r\nA001 OK done\r\n");
 
+        Diagnostics.Diff("sent", Capability, run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"), run.Result);
         Assert.AreEqual(Capability, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"),
@@ -159,6 +192,7 @@ public sealed class ImapProtocolHandlerResponseTests
     {
         ImapRun run = await RunAsync(Greeting + "* CAPABILITY {65500}\r\n" + new string('x', 65500) + new string('y', 100) + "\r\nA001 OK done\r\n");
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"), run.Result);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"),
             run.Result);
@@ -166,6 +200,19 @@ public sealed class ImapProtocolHandlerResponseTests
 
     private static byte[] Latin1(string text) => Encoding.Latin1.GetBytes(text);
 
-    private static Task<ImapRun> RunAsync(string replies) =>
-        ImapRun.ExecuteAsync(Url, new ScriptedConnection(Latin1(replies)));
+    private async Task<ImapRun> RunAsync(string replies)
+    {
+        Diagnostics.Arrange("server length", replies.Length);
+        Diagnostics.Arrange("server start", DiagnosticText.Escape(replies.Length <= 200 ? replies : replies[..200]));
+        ImapRun run = await ImapRun.ExecuteAsync(Url, new ScriptedConnection(Latin1(replies)));
+        Report(run);
+        return run;
+    }
+
+    private void Report(ImapRun run)
+    {
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+    }
 }

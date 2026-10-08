@@ -1,6 +1,6 @@
 # ADR-0118 — `Curl.Cryptography.UnitLibrary` hand-builds every primitive the BCL lacks on any CI platform
 
-- **Status:** Accepted
+- **Status:** Accepted. Superseded in part by ADR-0421 (slow vectors are LongRunning, not Integration).
 - **Date:** 2026-09-28
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-669.

@@ -3,6 +3,7 @@ using System.Net.Sockets;
 
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -16,13 +17,22 @@ public sealed class ConnectTunnelVerboseLinesTests
 {
     private const string Establishing = "* Establishing HTTP proxy tunnel to example.test:80";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void ReportReplyHead_ReportsALastLineWithoutALineFeedWhole()
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Bytes("reply head", "HTTP/1.1 407 X\r\nProxy-Authenticate: Basic, basic\tx, Basicx, Digest"u8);
+        Diagnostics.Arrange("status code", 407);
+        Diagnostics.Arrange("authorization sent", "Basic dTpw");
 
         ConnectTunnelVerboseLines.ReportReplyHead(events, "HTTP/1.1 407 X\r\nProxy-Authenticate: Basic, basic\tx, Basicx, Digest"u8, 407, "Basic dTpw");
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript line count", 4, events.Transcript.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -41,9 +51,14 @@ public sealed class ConnectTunnelVerboseLinesTests
     public void ReportReplyHead_ReportsNoProblemWhenTheReplyDoesNotRefuseABasicOrDigestValue(int statusCode, string? authorization)
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("status code", statusCode);
+        Diagnostics.Arrange("authorization sent", authorization ?? "null");
 
         ConnectTunnelVerboseLines.ReportReplyHead(events, "HTTP/1.1 407 X\r\nProxy-Authenticate: Basic\r\nNo colon here\r\n\r\n"u8, statusCode, authorization);
 
+        var anyProblemLine = events.Transcript.Any(line => line.StartsWith("* ", StringComparison.Ordinal));
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("any problem line", false, anyProblemLine);
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* ", StringComparison.Ordinal)));
     }
 
@@ -57,9 +72,14 @@ public sealed class ConnectTunnelVerboseLinesTests
     {
         // Measured (BL-1144): curl 8.21.0 writes "* CONNECT responded chunked" right after the line.
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("status code", statusCode);
+        Diagnostics.Arrange("field", field.TrimEnd('\r', '\n'));
+        Diagnostics.Arrange("chunked line expected", expected);
 
         ConnectTunnelVerboseLines.ReportReplyHead(events, System.Text.Encoding.Latin1.GetBytes($"HTTP/1.1 {statusCode} X\r\n{field}"), statusCode, null);
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("responded chunked line present", expected, events.Transcript.Contains("* CONNECT responded chunked"));
         CollectionAssert.AreEqual(
             expected
                 ? new[] { $"< HTTP/1.1 {statusCode} X", "< " + field.TrimEnd('\r', '\n'), "* CONNECT responded chunked" }
@@ -80,9 +100,14 @@ public sealed class ConnectTunnelVerboseLinesTests
         // Measured (BL-1399): the line comes right after the field's line, before the empty one.
         var events = new RecordingTransferEvents();
         var lines = head.Split("\r\n");
+        Diagnostics.Arrange("head", head.Replace("\r\n", "\\r\\n", StringComparison.Ordinal));
+        Diagnostics.Arrange("status code", statusCode);
+        Diagnostics.Arrange("for CONNECT-UDP", forConnectUdp);
 
         ConnectTunnelVerboseLines.ReportReplyHead(events, System.Text.Encoding.Latin1.GetBytes(head), statusCode, null, digestNonceIsStale: false, forConnectUdp);
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("ignoring line", expected, events.Transcript.Count > 2 ? events.Transcript[2] : "(missing)");
         CollectionAssert.AreEqual(new[] { "< " + lines[0], "< " + lines[1], expected, "< " }, events.Transcript);
     }
 
@@ -92,9 +117,14 @@ public sealed class ConnectTunnelVerboseLinesTests
     public void ReportReplyHead_WritesNoIgnoringLineWhenTheStatusReadsTheBodyFields(int statusCode, bool forConnectUdp)
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("status code", statusCode);
+        Diagnostics.Arrange("for CONNECT-UDP", forConnectUdp);
 
         ConnectTunnelVerboseLines.ReportReplyHead(events, "HTTP/1.1 101 X\r\nContent-Length: 0\r\nX-Length: 1\r\n\r\n"u8, statusCode, null, digestNonceIsStale: false, forConnectUdp);
 
+        var anyIgnoringLine = events.Transcript.Any(line => line.StartsWith("* ", StringComparison.Ordinal));
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("any ignoring line", false, anyIgnoringLine);
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* ", StringComparison.Ordinal)));
     }
 
@@ -102,6 +132,7 @@ public sealed class ConnectTunnelVerboseLinesTests
     public void ReportReplyFailure_FailedReplies_WriteEachFailureMessageAndNothingForAReplyThatDidNotFail()
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("replies", "four failed replies and one 407 that did not fail");
 
         ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Proxy CONNECT aborted"));
         ConnectTunnelVerboseLines.ReportReplyFailure(events, new HttpProxyTunnelReply(407, null));
@@ -109,6 +140,8 @@ public sealed class ConnectTunnelVerboseLinesTests
         ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("Recv failure: Connection was reset"));
         ConnectTunnelVerboseLines.ReportReplyFailure(events, HttpProxyTunnelReply.Failed("CONNECT response too large"));
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript line count", 4, events.Transcript.Count);
         CollectionAssert.AreEqual(
             new[] { "* Proxy CONNECT aborted", "* Unsupported Content-Length value", "* Recv failure: Connection was reset", "* CONNECT response too large" },
             events.Transcript);
@@ -123,11 +156,20 @@ public sealed class ConnectTunnelVerboseLinesTests
         {
             ExceptionAfterScript = new IOException("Unable to read data from the transport connection.", new SocketException((int)SocketError.ConnectionReset)),
         };
-        var reply = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+        Diagnostics.Bytes("scripted reply before the reset", "HTTP/1.1 200 OK\r\n"u8);
+        Diagnostics.Arrange("failure after the script", "IOException wrapping a connection reset");
+        HttpProxyTunnelReply reply;
+        using (Diagnostics.Phase("read reply"))
+        {
+            reply = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+        }
 
         ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, null);
         ConnectTunnelVerboseLines.ReportReplyFailure(events, reply);
 
+        Diagnostics.Act("reply status code", reply.StatusCode);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("last transcript line", "* Proxy CONNECT aborted", events.Transcript[^1]);
         Assert.AreEqual("* Proxy CONNECT aborted", events.Transcript[^1]);
     }
 
@@ -139,9 +181,13 @@ public sealed class ConnectTunnelVerboseLinesTests
     public void ReportChunkedBodyEnd_ReportsWhatCurlWrites(string? failure, string? expected)
     {
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("failure", failure ?? "null");
+        Diagnostics.Arrange("expected line", expected ?? "null");
 
         ConnectTunnelVerboseLines.ReportChunkedBodyEnd(events, failure);
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript line count", expected is null ? 0 : 1, events.Transcript.Count);
         CollectionAssert.AreEqual(expected is null ? Array.Empty<string>() : new[] { expected }, events.Transcript);
     }
 
@@ -153,9 +199,14 @@ public sealed class ConnectTunnelVerboseLinesTests
     {
         var events = new RecordingTransferEvents();
         var request = new HttpAuthRequest("CONNECT", CurlUrl.Parse("http://127.0.0.1:18602/"), "example.test:80", new NetworkCredential("u", "p"), null, HttpAuthSchemes.Digest, IsProxy: true);
+        Diagnostics.Arrange("authorization", authorization ?? "null");
+        Diagnostics.Arrange("answers challenge", answersChallenge);
+        Diagnostics.Arrange("expected scheme line", expected ?? "null");
 
         ConnectTunnelVerboseLines.ReportBeforeConnect(events, request, authorization, answersChallenge);
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript line count", expected is null ? 1 : 2, events.Transcript.Count);
         CollectionAssert.AreEqual(expected is null ? new[] { Establishing } : new[] { expected, Establishing }, events.Transcript);
     }
 
@@ -164,9 +215,13 @@ public sealed class ConnectTunnelVerboseLinesTests
     {
         var events = new RecordingTransferEvents();
         var request = new HttpAuthRequest("CONNECT", CurlUrl.Parse("http://127.0.0.1:18602/"), "example.test:80", null, null, HttpAuthSchemes.Digest, IsProxy: true);
+        Diagnostics.Arrange("credential", "null");
+        Diagnostics.Arrange("schemes", "Digest");
 
         ConnectTunnelVerboseLines.ReportBeforeConnect(events, request, null, answersChallenge: false);
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript line count", 1, events.Transcript.Count);
         CollectionAssert.AreEqual(new[] { Establishing }, events.Transcript);
     }
 
@@ -175,9 +230,13 @@ public sealed class ConnectTunnelVerboseLinesTests
     {
         var events = new RecordingTransferEvents();
         var request = new HttpAuthRequest("CONNECT", CurlUrl.Parse("http://127.0.0.1:18602/"), "example.test:80", null, null, HttpAuthSchemes.Ntlm, IsProxy: true);
+        Diagnostics.Arrange("credential", "null");
+        Diagnostics.Arrange("authorization sent", "NTLM TlRM");
 
         ConnectTunnelVerboseLines.ReportBeforeConnect(events, request, "NTLM TlRM", answersChallenge: false);
 
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("transcript line count", 2, events.Transcript.Count);
         CollectionAssert.AreEqual(new[] { "* Proxy auth using NTLM with user ''", Establishing }, events.Transcript);
     }
 }

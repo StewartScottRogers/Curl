@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -14,6 +15,8 @@ namespace Curl.Protocol.Ftp;
 [TestClass]
 public sealed class FtpProtocolHandlerEpsvDialFallbackTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "ftp://127.0.0.1:18922/f.txt";
 
     private const string LoggedIn =
@@ -33,8 +36,15 @@ public sealed class FtpProtocolHandlerEpsvDialFallbackTests
         // * Connecting to 127.0.0.1 port 40000 / *   Trying 127.0.0.1:40000... /
         // * Failed to connect to 127.0.0.1:18922 via 127.0.0.1:40000 after 2214 ms: Could not connect to server /
         // * Failed EPSV attempt. Disabling EPSV / > PASV, exit 0.
-        Run run = await RunAsync("229 Entering Extended Passive Mode (|||40000|)\r\n" + Pasv + Retrieved);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string replies = "229 Entering Extended Passive Mode (|||40000|)\r\n" + Pasv + Retrieved;
+        diagnostics.ArrangeFtp(Url, replies);
 
+        Run run = await RunAsync(replies);
+
+        diagnostics.ActResult(run.Result);
+        diagnostics.Act("connect targets", run.Connector.Targets.Count);
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 40000, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 40001, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[2]);
@@ -45,7 +55,9 @@ public sealed class FtpProtocolHandlerEpsvDialFallbackTests
             "* Failed EPSV attempt. Disabling EPSV",
             "> PASV\r\n",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.SkipWhile(line => !line.StartsWith("* Connecting", StringComparison.Ordinal)).Take(4).ToArray());
+        string[] actualLines = run.Events.Transcript.SkipWhile(line => !line.StartsWith("* Connecting", StringComparison.Ordinal)).Take(4).ToArray();
+        diagnostics.Diff("transcript", FtpDiagnostics.Escape(string.Join("\n", expected)), FtpDiagnostics.Escape(string.Join("\n", actualLines)));
+        CollectionAssert.AreEqual(expected, actualLines);
         Assert.AreEqual("hello", Encoding.Latin1.GetString(run.Output.ToArray()));
     }
 
@@ -55,8 +67,16 @@ public sealed class FtpProtocolHandlerEpsvDialFallbackTests
         // * Connecting to 127.0.0.1 port 0 / ... /
         // * Failed to connect to 127.0.0.1:18921 via 127.0.0.1:0 after 81 ms: Could not connect to server /
         // * Failed EPSV attempt. Disabling EPSV / > PASV, exit 0 (measured 2026-10-02).
-        Run run = await RunAsync("229 Entering Extended Passive Mode (|||0|)\r\n" + Pasv + Retrieved, dataResults: []);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string replies = "229 Entering Extended Passive Mode (|||0|)\r\n" + Pasv + Retrieved;
+        diagnostics.ArrangeFtp(Url, replies);
+        diagnostics.Arrange("data results", "none");
 
+        Run run = await RunAsync(replies, dataResults: []);
+
+        diagnostics.ActResult(run.Result);
+        diagnostics.Act("connect targets", run.Connector.Targets.Count);
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
         Assert.HasCount(2, run.Connector.Targets);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 40001, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
@@ -67,16 +87,25 @@ public sealed class FtpProtocolHandlerEpsvDialFallbackTests
             "* Failed EPSV attempt. Disabling EPSV",
             "> PASV\r\n",
         ];
-        CollectionAssert.AreEqual(expected, run.Events.Transcript.SkipWhile(line => !line.StartsWith("* Connecting", StringComparison.Ordinal)).Take(4).ToArray());
+        string[] actualLines = run.Events.Transcript.SkipWhile(line => !line.StartsWith("* Connecting", StringComparison.Ordinal)).Take(4).ToArray();
+        diagnostics.Diff("transcript", FtpDiagnostics.Escape(string.Join("\n", expected)), FtpDiagnostics.Escape(string.Join("\n", actualLines)));
+        CollectionAssert.AreEqual(expected, actualLines);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_EpsvDataDialRefused_LogsAWarningForTheFallbackToPasv()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         var log = new RecordingDiagnosticLog(DiagnosticLogLevel.Warning);
+        const string replies = "229 Entering Extended Passive Mode (|||40000|)\r\n" + Pasv + Retrieved;
+        diagnostics.ArrangeFtp(Url, replies);
+        diagnostics.Arrange("log level", DiagnosticLogLevel.Warning);
 
-        Run run = await RunAsync("229 Entering Extended Passive Mode (|||40000|)\r\n" + Pasv + Retrieved, log: log);
+        Run run = await RunAsync(replies, log: log);
 
+        diagnostics.ActResult(run.Result);
+        diagnostics.Act("warnings logged", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
         CollectionAssert.Contains(log.At(DiagnosticLogLevel.Warning), "EPSV data connection failed; falling back to PASV");
     }
@@ -91,13 +120,21 @@ public sealed class FtpProtocolHandlerEpsvDialFallbackTests
         const string dialed = "Failed to connect to ::1:40000 after 2768 ms: Could not connect to server";
         const string shown = "Failed to connect to ::1:18932 via ::1:40000 after 2768 ms: Could not connect to server";
 
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string replies = "229 Entering Extended Passive Mode (|||40000|)\r\n" + Pasv + Retrieved;
+        diagnostics.ArrangeFtp("ftp://[::1]:18932/f.txt", replies);
+        diagnostics.Arrange("dialed", dialed);
+
         Run run = await RunAsync(
-            "229 Entering Extended Passive Mode (|||40000|)\r\n" + Pasv + Retrieved,
+            replies,
             url: "ftp://[::1]:18932/f.txt",
             controlPeer: new IPEndPoint(IPAddress.IPv6Loopback, 18932),
             dataResults: [ConnectResult.Refused(dialed)],
             dialed: dialed);
 
+        diagnostics.ActResult(run.Result);
+        diagnostics.Act("connect targets", run.Connector.Targets.Count);
+        diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, shown), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, shown), run.Result);
         Assert.HasCount(2, run.Connector.Targets);
         Assert.AreEqual("* Failed EPSV attempt, exiting", run.Events.Transcript[^1]);

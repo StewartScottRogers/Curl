@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.File.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.File;
 
@@ -14,6 +15,10 @@ namespace Curl.Protocol.File;
 [TestClass]
 public sealed class FileProtocolHandlerDirectoryListingTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private static readonly string[] EntryNames = ["b.txt", ".hidden", "a.txt", "sub"];
 
     private static CurlUrl DirectoryUrl => CurlUrl.Parse("file:///dir/sub/");
@@ -27,8 +32,15 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     {
         var output = new MemoryStream();
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("entries", string.Join(", ", EntryNames));
+
         var result = await ListAsync(Listing(EntryNames), new TransferContext { Url = DirectoryUrl, Output = output });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("bytes transferred", result.BytesTransferred);
+        Diagnostics.Diff("listing", ExpectedListing, output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(ExpectedListing, output.ToArray());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(16L, result.BytesTransferred);
@@ -42,8 +54,14 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         var fileSystem = Listing(EntryNames);
         var output = new MemoryStream();
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("entries", string.Join(", ", EntryNames));
+
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext { Url = DirectoryUrl, Output = output });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Diff("listing", ExpectedListing, output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(ExpectedListing, output.ToArray());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
@@ -54,8 +72,14 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     {
         var fileSystem = Listing(EntryNames);
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("entries", string.Join(", ", EntryNames));
+
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(new TransferContext { Url = DirectoryUrl, Output = new MemoryStream() });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("listed path count", fileSystem.ListedPaths.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.IsEmpty(fileSystem.ListedPaths);
     }
@@ -67,8 +91,18 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         var output = new MemoryStream();
         var handler = new FileProtocolHandler(fileSystem) { ListsDirectories = false };
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("ListsDirectories", false);
+
         var result = await handler.ExecuteAsync(new TransferContext { Url = DirectoryUrl, Output = output });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("exit code", 37, (int)result.ExitCode);
+        Diagnostics.Assert(
+            "error message",
+            FileTransferMessages.CouldNotOpenForReading("/dir/sub/"),
+            result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.AreEqual(37, (int)result.ExitCode);
         Assert.AreEqual(FileTransferMessages.CouldNotOpenForReading("/dir/sub/"), result.ErrorMessage);
@@ -83,16 +117,26 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         fileSystem.AddDirectory(OsPath);
         var handler = new FileProtocolHandler(fileSystem) { ListsDirectories = true };
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("file system", "directory /dir/sub/, cannot list");
+
         var result = await handler.ExecuteAsync(new TransferContext { Url = DirectoryUrl, Output = new MemoryStream() });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_MissingPathWhenListing_StillReportsExitThirtySeven()
     {
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("file system", "empty");
+
         var result = await ListAsync(new FakeListingFileSystem(), new TransferContext { Url = DirectoryUrl, Output = new MemoryStream() });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.FileCouldntReadFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FileCouldntReadFile, result.ExitCode);
     }
 
@@ -102,10 +146,19 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         var output = new MemoryStream();
         var headers = new MemoryStream();
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("entries", string.Join(", ", EntryNames));
+
         var result = await ListAsync(
             Listing(EntryNames),
             new TransferContext { Url = DirectoryUrl, Output = output, HeaderOutput = headers });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Diff(
+            "headers",
+            "Last-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n\r\n",
+            Encoding.ASCII.GetString(headers.ToArray()));
+        Diagnostics.Diff("listing", ExpectedListing, output.ToArray());
         Assert.AreEqual("Last-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n\r\n", Encoding.ASCII.GetString(headers.ToArray()));
         CollectionAssert.AreEqual(ExpectedListing, output.ToArray());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -120,8 +173,13 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         fileSystem.AddDirectory(OsPath, null, EntryNames);
         var headers = new MemoryStream();
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("timestamp", "unknown");
+
         var result = await ListAsync(fileSystem, new TransferContext { Url = DirectoryUrl, Output = new MemoryStream(), HeaderOutput = headers });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Diff("headers", "\r\n", Encoding.ASCII.GetString(headers.ToArray()));
         Assert.AreEqual("\r\n", Encoding.ASCII.GetString(headers.ToArray()));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.IsNull(result.SourceLastWriteTimeUtc);
@@ -133,11 +191,19 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         var fileSystem = Listing(EntryNames);
         var output = new MemoryStream();
         var headers = new MemoryStream();
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("NoBody", true);
 
         var result = await ListAsync(
             fileSystem,
             new TransferContext { Url = DirectoryUrl, Output = output, HeaderOutput = headers, NoBody = true });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("listed path count", fileSystem.ListedPaths.Count);
+        Diagnostics.Diff(
+            "headers",
+            "Last-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n\r\n",
+            Encoding.ASCII.GetString(headers.ToArray()));
         Assert.AreEqual("Last-Modified: Wed, 24 Jun 2026 12:34:56 GMT\r\n\r\n", Encoding.ASCII.GetString(headers.ToArray()));
         Assert.AreEqual(0L, output.Length);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
@@ -151,8 +217,15 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         fileSystem.AddDirectory(OsPath, FakeFileSystem.DefaultLastWriteTimeUtc, null);
         var events = new RecordingTransferEvents();
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("file system", "directory /dir/sub/, listing fails");
+
         var result = await ListAsync(fileSystem, new TransferContext { Url = DirectoryUrl, Output = new MemoryStream(), Events = events });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("exit code", 26, (int)result.ExitCode);
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual(26, (int)result.ExitCode);
         Assert.AreEqual("Failed to open/read local data from file/application", result.ErrorMessage);
@@ -164,9 +237,15 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     public async Task ExecuteAsync_ListingWithMaxFileSize_WritesUpToTheLimitThenReturnsFilesizeExceeded()
     {
         var output = new MemoryStream();
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("max file size", 5);
 
         var result = await ListAsync(Listing(EntryNames), new TransferContext { Url = DirectoryUrl, Output = output, MaxFileSize = 5 });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Diff("listing", "b.txt", Encoding.ASCII.GetString(output.ToArray()));
+        Diagnostics.Assert("bytes transferred", 5L, result.BytesTransferred);
         Assert.AreEqual("b.txt", Encoding.ASCII.GetString(output.ToArray()));
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual(63, (int)result.ExitCode);
@@ -179,8 +258,14 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     {
         var output = new MemoryStream();
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("max file size", 16);
+
         var result = await ListAsync(Listing(EntryNames), new TransferContext { Url = DirectoryUrl, Output = output, MaxFileSize = 16 });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Diff("listing", ExpectedListing, output.ToArray());
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(ExpectedListing, output.ToArray());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
@@ -188,10 +273,17 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     [TestMethod]
     public async Task ExecuteAsync_ListingToAFailingOutput_ReportsWriteErrorAfterTheWritesThatSucceeded()
     {
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("output", "fails on write 3");
+
         var result = await ListAsync(
             Listing(EntryNames),
             new TransferContext { Url = DirectoryUrl, Output = FaultingStream.FailingOnWrite(3) });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Assert("error message", FileTransferMessages.OutputWriteFailed(5, 0), result.ErrorMessage);
+        Diagnostics.Assert("bytes transferred", 6L, result.BytesTransferred);
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual(FileTransferMessages.OutputWriteFailed(5, 0), result.ErrorMessage);
         Assert.AreEqual(6L, result.BytesTransferred);
@@ -204,8 +296,14 @@ public sealed class FileProtocolHandlerDirectoryListingTests
         var output = new MemoryStream();
         var condition = new TimeCondition(FakeFileSystem.DefaultLastWriteTimeUtc.AddDays(1), TimeConditionKind.IfModifiedSince);
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("time condition", "if modified since one day after the directory timestamp");
+
         var result = await ListAsync(fileSystem, new TransferContext { Url = DirectoryUrl, Output = output, TimeCondition = condition });
 
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("output length", output.Length);
+        Diagnostics.Assert("listed path count", 0, fileSystem.ListedPaths.Count);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(0L, output.Length);
         Assert.IsEmpty(fileSystem.ListedPaths);
@@ -216,8 +314,14 @@ public sealed class FileProtocolHandlerDirectoryListingTests
     {
         var events = new RecordingTransferEvents();
 
+        Diagnostics.Arrange("url", "file:///dir/sub/");
+        Diagnostics.Arrange("entries", string.Join(", ", EntryNames));
+
         var result = await ListAsync(Listing(EntryNames), new TransferContext { Url = DirectoryUrl, Output = new MemoryStream(), Events = events });
 
+        Diagnostics.Act("timestamp", result.SourceLastWriteTimeUtc);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("timestamp", FakeFileSystem.DefaultLastWriteTimeUtc, result.SourceLastWriteTimeUtc);
         Assert.AreEqual(FakeFileSystem.DefaultLastWriteTimeUtc, result.SourceLastWriteTimeUtc);
         CollectionAssert.AreEqual(new[] { "shutting down connection #0" }, events.Info);
     }

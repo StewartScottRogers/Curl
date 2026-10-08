@@ -51,10 +51,14 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             NetworkCredential credential = new("u", "p");
             TransferContext context = new() { Url = CurlUrl.Parse(AuthUrl), Output = output, Credentials = credential };
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", BasicRequest, connection.Written);
             Assert.AreEqual(BasicRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             (HttpAuthRequest request, IReadOnlyList<string> challenges) = authenticator.Calls.Single();
@@ -78,11 +82,15 @@ public sealed partial class HttpProtocolHandlerTests
             ScriptedAuthenticator authenticator = new("Basic dTpw", "Basic dTpw");
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
                 .ExecuteAsync(AuthContext(output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", BasicRequest, connection.Written);
             Assert.AreEqual(BasicRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(basicChallenge, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual("nope", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -106,10 +114,14 @@ public sealed partial class HttpProtocolHandlerTests
             ScriptedAuthenticator authenticator = new(null, DigestValue);
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(AuthContext(output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest + DigestRequest, connection.Written);
             Assert.AreEqual(PlainRequest + DigestRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(ChallengeHead + OkHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -133,12 +145,17 @@ public sealed partial class HttpProtocolHandlerTests
             QueueConnector connector = QueueConnector.For(first, second);
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(connector, new ScriptedAuthenticator(null, DigestValue))
                 .ExecuteAsync(AuthContext(output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("first written", PlainRequest, first.Written);
             Assert.AreEqual(PlainRequest, first.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("second written", DigestRequest, second.Written);
             Assert.AreEqual(DigestRequest, second.Written, $"Chunk size {chunkSize}");
             Assert.IsTrue(first.IsDisposed, $"Chunk size {chunkSize}");
             Assert.IsTrue(second.IsDisposed, $"Chunk size {chunkSize}");
@@ -162,11 +179,15 @@ public sealed partial class HttpProtocolHandlerTests
             ScriptedAuthenticator authenticator = new(null, DigestValue);
             MemoryStream output = new();
             MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator)
                 .ExecuteAsync(AuthContext(output, headerOutput));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest + DigestRequest, connection.Written);
             Assert.AreEqual(PlainRequest + DigestRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(ChallengeHead + RefusedHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual("nope2", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
@@ -189,12 +210,16 @@ public sealed partial class HttpProtocolHandlerTests
             MemoryStream output = new();
             MemoryStream headerOutput = new();
             TransferContext context = AuthContext(output, headerOutput, new HttpRequestOptions { Fail = HttpFailMode.Fail });
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue))
                 .ExecuteAsync(context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
             Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest + DigestRequest, connection.Written);
             Assert.AreEqual(PlainRequest + DigestRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual(ChallengeHead + RefusedHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
             Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
@@ -209,12 +234,16 @@ public sealed partial class HttpProtocolHandlerTests
     {
         TurnTakingConnection connection = new(65536, "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 4\r\n\r\nnope");
         TransferContext context = AuthContext(new MemoryStream(), null, new HttpRequestOptions { Fail = HttpFailMode.Fail });
+        Diagnostics.Arrange("url, fail mode", $"{AuthUrl}, {HttpFailMode.Fail}");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator("Basic dTpw", "Basic dTpw"))
             .ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage);
+        Diagnostics.Diff("connection written", BasicRequest, connection.Written);
         Assert.AreEqual(BasicRequest, connection.Written);
     }
 
@@ -233,10 +262,14 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, head + "nope", OkHead + "ok");
             ScriptedAuthenticator authenticator = new(null, answer);
             MemoryStream output = new();
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(AuthContext(output));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("connection written", PlainRequest, connection.Written);
             Assert.AreEqual(PlainRequest, connection.Written, $"Chunk size {chunkSize}");
             Assert.AreEqual("nope", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Assert.HasCount(calls, authenticator.Calls, $"Chunk size {chunkSize}");
@@ -257,10 +290,13 @@ public sealed partial class HttpProtocolHandlerTests
             TurnTakingConnection connection = new(chunkSize, basicChallenge + "nope", OkHead + "ok");
             MemoryStream output = new();
             TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded") });
+            Diagnostics.Arrange("url, chunk size", $"{AuthUrl}, {chunkSize}");
 
             TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, "Basic dTpw"))
                 .ExecuteAsync(context);
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(
                 "POST /a HTTP/1.1\r\nHost: 127.0.0.1:18183\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n" + FormBody
@@ -282,9 +318,12 @@ public sealed partial class HttpProtocolHandlerTests
         ScriptedAuthenticator authenticator = new(null, DigestValue);
         MemoryStream output = new();
         TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte stream body");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("nope", Latin1(output.ToArray()));
         Assert.HasCount(1, authenticator.Calls);
@@ -298,17 +337,24 @@ public sealed partial class HttpProtocolHandlerTests
             ConnectResult.Connected(first),
             ConnectResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1 port 18183 after 0 ms: Could not connect to server"));
         MemoryStream output = new();
+        Diagnostics.Arrange("url, reconnect", $"{AuthUrl}, fails with CouldntConnect");
 
         TransferResult result = await new HttpProtocolHandler(connector, new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(AuthContext(output));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1 port 18183 after 0 ms: Could not connect to server", result.ErrorMessage);
         Assert.AreEqual(0L, output.Length);
     }
 
-    private static void AssertReport(TransferResult result, int responseCode, int connections, long requestSize, long headerSize, long downloadSize)
+    private void AssertReport(TransferResult result, int responseCode, int connections, long requestSize, long headerSize, long downloadSize)
     {
         TransferReport report = result.Report!;
+        Diagnostics.Assert(
+            "report (code, connects, request, header, download)",
+            $"{responseCode} {connections} {requestSize} {headerSize} {downloadSize}",
+            $"{report.ResponseCode} {report.ConnectionCount} {report.RequestSize} {report.HeaderSize} {report.DownloadSize}");
         Assert.AreEqual(responseCode, report.ResponseCode);
         Assert.AreEqual(connections, report.ConnectionCount);
         Assert.AreEqual(requestSize, report.RequestSize);
@@ -331,9 +377,12 @@ public sealed partial class HttpProtocolHandlerTests
             ConnectResult.Connected(new TurnTakingConnection(65536, OkHead + "ok"), null, peerCertificates: chain));
         ScriptedAuthenticator authenticator = new(null, DigestValue);
         TransferContext context = new() { Url = CurlUrl.Parse("https://127.0.0.1:18183/a"), Output = new MemoryStream() };
+        Diagnostics.Arrange("url, server certificate", $"{context.Url}, {Convert.ToHexString(serverCertificate)}");
 
         TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(context);
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(2, authenticator.Calls.Count);
         CollectionAssert.AreEqual(serverCertificate, authenticator.Calls[1].Request.ServerCertificate.ToArray());
@@ -351,9 +400,12 @@ public sealed partial class HttpProtocolHandlerTests
             ConnectResult.Connected(new TurnTakingConnection(65536, ClosingChallengeHead + "nope"), null, peerCertificates: chain),
             ConnectResult.Connected(new TurnTakingConnection(65536, OkHead + "ok"), null, peerCertificates: chain));
         ScriptedAuthenticator authenticator = new(null, DigestValue);
+        Diagnostics.Arrange("url, peer certificates", $"{AuthUrl}, {chain.Length}");
 
         TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(AuthContext(new MemoryStream()));
 
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(2, authenticator.Calls.Count);
         Assert.IsTrue(authenticator.Calls[1].Request.ServerCertificate.IsEmpty);

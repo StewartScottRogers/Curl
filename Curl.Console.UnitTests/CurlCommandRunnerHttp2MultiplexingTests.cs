@@ -3,6 +3,7 @@ using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -28,6 +29,10 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
 
     private readonly TextWaitingStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task RunAsync_ThreeUrlsToOneOrigin_CarriesThemOnStreamsOneThreeAndFiveOfOneConnection()
     {
@@ -37,8 +42,15 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         await server.To("h").Single().StreamsOpenedAsync(3);
         server.Opened[0].ReleaseResponses();
 
-        Assert.AreEqual(0, await run);
+        int exitCode = await run;
         Http2ServerConnection connection = server.To("h").Single();
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stream ids", "1,3,5", string.Join(",", connection.StreamIds));
+        Diagnostics.Assert(
+            "stdout lines (sorted)",
+            "http://h/1 1|http://h/2 0|http://h/3 0",
+            string.Join("|", Lines(standardOutput.Text).Order(StringComparer.Ordinal)));
+        Assert.AreEqual(0, exitCode);
         CollectionAssert.AreEqual(new[] { 1, 3, 5 }, connection.StreamIds);
         CollectionAssert.AreEquivalent(new[] { "http://h/1 1", "http://h/2 0", "http://h/3 0" }, Lines(standardOutput.Text));
     }
@@ -52,8 +64,13 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         await server.To("h").Single().StreamsOpenedAsync(3);
         server.Opened[0].ReleaseResponses();
 
-        Assert.AreEqual(0, await run);
+        int exitCode = await run;
         string[] lines = Lines(standardError.Text);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("Multiplexed connection found lines", 2, lines.Count(line => line == "* Multiplexed connection found"));
+        Diagnostics.Assert("Reusing existing connection lines", 2, lines.Count(line => line == "* Reusing existing http: connection with host h"));
+        Diagnostics.Assert("left intact lines", 1, lines.Count(line => line == "* Connection #0 to host h:80 left intact"));
+        Assert.AreEqual(0, exitCode);
         Assert.HasCount(2, lines.Where(line => line == "* Multiplexed connection found"));
         Assert.HasCount(2, lines.Where(line => line == "* Reusing existing http: connection with host h"));
         Assert.HasCount(1, lines.Where(line => line == "* Connection #0 to host h:80 left intact"));
@@ -78,7 +95,16 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
         first.ReleaseResponses();
         second.ReleaseResponses();
 
-        Assert.AreEqual(0, await run);
+        int exitCode = await run;
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("first connection stream ids", "1", string.Join(",", first.StreamIds));
+        Diagnostics.Assert("second connection stream ids", "1", string.Join(",", second.StreamIds));
+        Diagnostics.Assert("stderr has MAX_CONCURRENT_STREAMS line", true, Lines(standardError.Text).Contains("* MAX_CONCURRENT_STREAMS reached, skip (1)"));
+        Diagnostics.Assert(
+            "stdout lines (sorted)",
+            "http://h/1 1|http://h/3 1|http://other/2 1",
+            string.Join("|", Lines(standardOutput.Text).Order(StringComparer.Ordinal)));
+        Assert.AreEqual(0, exitCode);
         CollectionAssert.AreEqual(new[] { 1 }, first.StreamIds);
         CollectionAssert.AreEqual(new[] { 1 }, second.StreamIds);
         CollectionAssert.Contains(Lines(standardError.Text), "* MAX_CONCURRENT_STREAMS reached, skip (1)");
@@ -92,11 +118,20 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
 
         int exitCode = await RunAsync(server, ["-Z", "--parallel-immediate", "--http2-prior-knowledge", "-s", "-w", WriteOut, "http://h/1", "http://h/2", "http://h/3"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("connections to h", 3, server.To("h").Length);
+        Diagnostics.Assert("every connection carries stream 1 only", true, server.Opened.All(connection => connection.StreamIds.SequenceEqual([1])));
+        Diagnostics.Assert(
+            "stdout lines (sorted)",
+            "http://h/1 1|http://h/2 1|http://h/3 1",
+            string.Join("|", Lines(standardOutput.Text).Order(StringComparer.Ordinal)));
         Assert.AreEqual(0, exitCode);
         Assert.HasCount(3, server.To("h"));
         Assert.IsTrue(server.Opened.All(connection => connection.StreamIds.SequenceEqual([1])));
         CollectionAssert.AreEquivalent(new[] { "http://h/1 1", "http://h/2 1", "http://h/3 1" }, Lines(standardOutput.Text));
     }
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static string[] Lines(string text) =>
         text.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => line.TrimEnd('\r')).ToArray();
@@ -114,21 +149,34 @@ public sealed class CurlCommandRunnerHttp2MultiplexingTests
     /// <paramref name="server" />'s connections, the pool waiting for multiplexing as the
     /// composition sets it (<see cref="CurlComposition.WaitsForMultiplexing" />).
     /// </summary>
-    private Task<int> RunAsync(Http2ServerConnector server, string[] arguments) =>
-        new CurlCommandRunner(
-                options =>
-                {
-                    PoolingConnector pool = new(server, TimeProvider.System) { WaitsForMultiplexing = CurlComposition.WaitsForMultiplexing(options) };
-                    HttpProtocolHandler http = new(pool, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
-                    return new TransferDispatch(new ProtocolDispatcher([http]), [], connectionPool: pool);
-                },
-                fileSystem,
-                fileSystem,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                parsesAsWindowsBuild: false,
-                writesProgressMeter: false)
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(Http2ServerConnector server, string[] arguments)
+    {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
+        CurlCommandRunner runner = new(
+            options =>
+            {
+                PoolingConnector pool = new(server, TimeProvider.System) { WaitsForMultiplexing = CurlComposition.WaitsForMultiplexing(options) };
+                HttpProtocolHandler http = new(pool, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+                return new TransferDispatch(new ProtocolDispatcher([http]), [], connectionPool: pool);
+            },
+            fileSystem,
+            fileSystem,
+            standardOutput,
+            standardError,
+            new MemoryStream(),
+            runsOnWindows: false,
+            parsesAsWindowsBuild: false,
+            writesProgressMeter: false);
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await runner.RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(standardOutput.Text));
+        Diagnostics.Act("stderr", Lf(standardError.Text));
+        return exitCode;
+    }
 }

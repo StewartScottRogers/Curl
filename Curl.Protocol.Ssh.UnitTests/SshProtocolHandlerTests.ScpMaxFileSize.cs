@@ -26,10 +26,14 @@ public sealed partial class SshProtocolHandlerTests
             Events = events,
             MaxFileSize = 3,
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual("Exceeded the maximum allowed file size (3) with 3 bytes", result.ErrorMessage);
         CollectionAssert.AreEqual("hel"u8.ToArray(), output.ToArray());
@@ -51,10 +55,14 @@ public sealed partial class SshProtocolHandlerTests
             Upload = new MemoryStream(HelloLine),
             MaxFileSize = 1,
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(HelloLine, server.Files["/data/up.txt"]);
     }

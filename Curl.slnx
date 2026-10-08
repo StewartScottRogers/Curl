@@ -49,10 +49,12 @@
   </Folder>
   <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
   <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
+  <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
   <Project Path="Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj" />
   <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
   <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
   <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
+  <Project Path="Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj" />
   <Project Path="Curl.Console.UnitTests/Curl.Console.UnitTests.csproj" />
   <Project Path="Curl.Console/Curl.Console.csproj" />
   <Project Path="Curl.Cookies.UnitLibrary/Curl.Cookies.UnitLibrary.csproj" />
@@ -67,6 +69,7 @@
   <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
   <Project Path="Curl.Kerberos.UnitLibrary/Curl.Kerberos.UnitLibrary.csproj" />
   <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
+  <Project Path="Curl.Networking.IntegrationTests/Curl.Networking.IntegrationTests.csproj" />
   <Project Path="Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj" />
   <Project Path="Curl.Networking.UnitTests/Curl.Networking.UnitTests.csproj" />
   <Project Path="Curl.Ntlm.UnitLibrary/Curl.Ntlm.UnitLibrary.csproj" />

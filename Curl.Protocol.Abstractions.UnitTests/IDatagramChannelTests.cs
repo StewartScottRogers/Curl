@@ -1,4 +1,5 @@
 using System.Net;
+using Curl.Testing;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -9,12 +10,20 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class IDatagramChannelTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void LocalEndPoint_WhenNotOverridden_ReturnsNull()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         IDatagramChannel channel = new MinimalChannel();
+        diagnostics.Arrange("channel", nameof(MinimalChannel));
 
-        Assert.IsNull(channel.LocalEndPoint);
+        var localEndPoint = channel.LocalEndPoint;
+
+        diagnostics.Act("local end point", localEndPoint?.ToString() ?? "null");
+        diagnostics.Assert("local end point is null", true, localEndPoint is null);
+        Assert.IsNull(localEndPoint);
     }
 
     private sealed class MinimalChannel : IDatagramChannel

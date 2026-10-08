@@ -33,6 +33,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunTracedAsync("sftp://files.example/f", KeyLogin());
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | {TracedKeyLogin} | "
             + "* [SSH] [SSH_AUTH_DONE] -> [SSH_SFTP_INIT] | * [SSH] [SSH_SFTP_INIT] -> [SSH_SFTP_REALPATH] | "
@@ -51,6 +52,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunTracedAsync("scp://files.example/f", KeyLogin());
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(
             $"{Start} | {TracedKeyLogin} | * SSH: connection established | * [SSH] [SSH_AUTH_DONE] -> [SSH_STOP] | {Rested} | "
             + "* [SSH] DO phase starts | * [SSH] [SSH_STOP] -> [SSH_SCP_TRANS_INIT] | * [SSH] [SSH_SCP_TRANS_INIT] -> [SSH_SCP_DOWNLOAD_INIT] | "
@@ -68,8 +70,15 @@ public sealed partial class SshProtocolHandlerTests
         TraceSetup setup = KeyLogin();
         TranscriptTransferEvents events = new();
 
-        await HandlerFor(setup, tracesStateMachine: false).ExecuteAsync(TracedContext(url, setup, events));
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("traces state machine", false);
+
+        TransferResult result = await HandlerFor(setup, tracesStateMachine: false).ExecuteAsync(TracedContext(url, setup, events));
         await setup.Server.WhenSessionsEndAsync();
+
+        Diagnostics.Act("result", result);
+        Diagnostics.Act("transcript", string.Join(" | ", events.Transcript));
+        Diagnostics.Assert("[SSH] lines", 0, events.Transcript.Count(line => line.Contains("[SSH]", StringComparison.Ordinal)));
 
         Assert.IsFalse(events.Transcript.Any(line => line.Contains("[SSH]", StringComparison.Ordinal)));
         Assert.IsTrue(events.Transcript.Contains("* SSH: authentication complete"));
@@ -82,6 +91,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(lines, "* [SSH] [SSH_AUTH_PKEY_INIT] -> [SSH_AUTH_PKEY] | " + NoKeyDenied + " | * [SSH] [SSH_AUTH_PKEY] -> [SSH_AUTH_PASS_INIT]");
     }
 
@@ -94,6 +104,7 @@ public sealed partial class SshProtocolHandlerTests
 
         string lines = await RunTracedAsync("sftp://files.example/f", setup);
 
+        AssertCheckedOutcomeDiagnostic();
         StringAssert.Contains(lines, $"* [SSH] [SSH_S_STARTUP] -> [SSH_HOSTKEY] | * SSH: MD5 public key '{md5}'");
         Assert.DoesNotContain("checking knownhosts", lines);
     }
@@ -110,11 +121,16 @@ public sealed partial class SshProtocolHandlerTests
             new Dictionary<string, string> { ["id_test"] = TestUserKeys.RsaPkcs1 });
     }
 
-    private static async Task<string> RunTracedAsync(string url, TraceSetup setup)
+    private async Task<string> RunTracedAsync(string url, TraceSetup setup)
     {
         TranscriptTransferEvents events = new();
-        await HandlerFor(setup, tracesStateMachine: true).ExecuteAsync(TracedContext(url, setup, events));
+        TransferContext context = TracedContext(url, setup, events);
+        ArrangeTransfer(context);
+
+        TransferResult result = await HandlerFor(setup, tracesStateMachine: true).ExecuteAsync(context);
         await setup.Server.WhenSessionsEndAsync();
+
+        ActTransfer(result, context, setup.Server);
         return string.Join(" | ", events.Transcript);
     }
 

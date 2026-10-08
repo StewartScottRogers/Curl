@@ -4,6 +4,7 @@ using Curl.Http2;
 using Curl.Http3;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -23,6 +24,10 @@ public sealed class CurlCommandRunnerHttp3Tests
 
     private static readonly MultiplexedConnectResult QuicRefused = MultiplexedConnectResult.Failed(CurlExitCode.RecvError, QuicRecvError);
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("--http3")]
     [DataRow("--http3-only")]
@@ -33,6 +38,13 @@ public sealed class CurlCommandRunnerHttp3Tests
         ScriptedQuicConnector connector = new(MultiplexedConnectResult.Connected(quic, null), new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-sS", "-i", "-w", "|%{http_version}", option, HttpsUrl);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "HTTP/3 200 \r\ncontent-length: 5\r\n\r\nhello|3", standardOutput);
+        Diagnostics.Assert("QUIC target", new ConnectTarget("localhost", 18443, true) { PoolScheme = "https" }, connector.QuicTargets.Single() with { Events = NoTransferEvents.Instance });
+        Diagnostics.Assert("TCP connects", 0, connector.TcpConnectCount);
+        Diagnostics.Assert("QUIC close code", 0x100L, quic.CloseCode);
+        Diagnostics.Assert("request bytes written on the QUIC stream", true, stream.Written.Length > 0L);
 
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual("HTTP/3 200 \r\ncontent-length: 5\r\n\r\nhello|3", standardOutput);
@@ -54,12 +66,15 @@ public sealed class CurlCommandRunnerHttp3Tests
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-s", "-v", "-i", "--http3-only", "-w", "%{http_version}\n", HttpsUrl);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "HTTP/3 200 \r\ncontent-length: 5\r\ncontent-type: text/html\r\nserver: cloudflare\r\n\r\nhello3\n", standardOutput);
+
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual("HTTP/3 200 \r\ncontent-length: 5\r\ncontent-type: text/html\r\nserver: cloudflare\r\n\r\nhello3\n", standardOutput);
         // The header lines keep their CR LF and Windows' text mode adds a CR before each line
         // feed, so every CR is dropped to compare the same text on every platform.
         string verbose = standardError.Replace("\r", string.Empty, StringComparison.Ordinal);
-        Assert.AreEqual(
+        string expectedVerbose =
             "* using HTTP/3\n"
             + "* [HTTP/3] [0] OPENED stream for https://localhost:18443/q\n"
             + "* [HTTP/3] [0] [:method: GET]\n"
@@ -80,8 +95,11 @@ public sealed class CurlCommandRunnerHttp3Tests
             + "< server: cloudflare\n"
             + "< \n"
             + "{ [5 bytes data]\n"
-            + "* Connection #0 to host localhost:18443 left intact\n",
-            verbose[verbose.IndexOf("* using HTTP/3", StringComparison.Ordinal)..]);
+            + "* Connection #0 to host localhost:18443 left intact\n";
+        string verboseFromUsing = verbose[verbose.IndexOf("* using HTTP/3", StringComparison.Ordinal)..];
+
+        Diagnostics.Diff("verbose stderr", expectedVerbose, verboseFromUsing);
+        Assert.AreEqual(expectedVerbose, verboseFromUsing);
     }
 
     [TestMethod]
@@ -95,6 +113,10 @@ public sealed class CurlCommandRunnerHttp3Tests
 
         (int tracedExitCode, string standardOutput, string tracedLines) = await RunAsync(Http3Connector(), "-s", "-v", "--trace-config", component, "--http3-only", HttpsUrl);
 
+        Diagnostics.Assert("verbose exit code", 0, verboseExitCode);
+        Diagnostics.Assert("traced exit code", 0, tracedExitCode);
+        Diagnostics.Diff("traced stderr against verbose stderr", verboseLines, tracedLines);
+        Diagnostics.Assert("stdout", "hello", standardOutput);
         Assert.AreEqual(0, verboseExitCode, verboseLines);
         Assert.AreEqual(0, tracedExitCode, tracedLines);
         Assert.AreEqual(verboseLines, tracedLines);
@@ -110,6 +132,8 @@ public sealed class CurlCommandRunnerHttp3Tests
     {
         (int exitCode, _, string standardError) = await RunAsync(Http3Connector(), ["-s", .. verbosity, "--http3-only", HttpsUrl]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr mentions [QUIC]", false, standardError.Contains("[QUIC]", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode, standardError);
         Assert.DoesNotContain("[QUIC]", standardError);
     }
@@ -119,6 +143,9 @@ public sealed class CurlCommandRunnerHttp3Tests
     {
         (int exitCode, string standardOutput, string standardError) = await RunAsync(Http3Connector(), "-s", "--trace-config", "quic", "--http3-only", HttpsUrl);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr", string.Empty, standardError);
+        Diagnostics.Assert("stdout", "hello", standardOutput);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual(string.Empty, standardError);
         Assert.AreEqual("hello", standardOutput);
@@ -131,6 +158,12 @@ public sealed class CurlCommandRunnerHttp3Tests
         ScriptedQuicConnector connector = new(QuicRefused, tcp);
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-sS", "--http3", HttpsUrl);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello", standardOutput);
+        Diagnostics.Assert("QUIC attempts", 1, connector.QuicTargets.Count);
+        Diagnostics.Assert("TCP connects", 1, connector.TcpConnectCount);
+        Diagnostics.Bytes("TCP request", tcp.Written);
 
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual("hello", standardOutput);
@@ -146,6 +179,9 @@ public sealed class CurlCommandRunnerHttp3Tests
 
         (int exitCode, _, string standardError) = await RunAsync(connector, "-sS", "--http3", HttpsUrl);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.RecvError, exitCode);
+        Diagnostics.Assert("stderr", $"curl: (56) {QuicRecvError}\n", NormalizedNewLines(standardError));
+
         Assert.AreEqual((int)CurlExitCode.RecvError, exitCode);
         Assert.AreEqual($"curl: (56) {QuicRecvError}\n", NormalizedNewLines(standardError));
     }
@@ -156,6 +192,10 @@ public sealed class CurlCommandRunnerHttp3Tests
         ScriptedQuicConnector connector = new(QuicRefused, new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
 
         (int exitCode, _, string standardError) = await RunAsync(connector, "-sS", "--http3-only", HttpsUrl);
+
+        Diagnostics.Assert("exit code", (int)CurlExitCode.RecvError, exitCode);
+        Diagnostics.Assert("stderr", $"curl: (56) {QuicRecvError}\n", NormalizedNewLines(standardError));
+        Diagnostics.Assert("TCP connects", 0, connector.TcpConnectCount);
 
         Assert.AreEqual((int)CurlExitCode.RecvError, exitCode);
         Assert.AreEqual($"curl: (56) {QuicRecvError}\n", NormalizedNewLines(standardError));
@@ -168,6 +208,11 @@ public sealed class CurlCommandRunnerHttp3Tests
         ScriptedQuicConnector connector = new(QuicRefused, new RecordingConnector(CurlExitCode.CouldntConnect, "unused"));
 
         (int exitCode, _, string standardError) = await RunAsync(connector, "-sS", "--http3-only", "http://localhost:18080/");
+
+        Diagnostics.Assert("exit code", (int)CurlExitCode.UrlMalformat, exitCode);
+        Diagnostics.Assert("stderr", "curl: (3) HTTP/3 requested for non-HTTPS URL\n", NormalizedNewLines(standardError));
+        Diagnostics.Assert("QUIC attempts", 0, connector.QuicTargets.Count);
+        Diagnostics.Assert("TCP connects", 0, connector.TcpConnectCount);
 
         Assert.AreEqual((int)CurlExitCode.UrlMalformat, exitCode);
         Assert.AreEqual("curl: (3) HTTP/3 requested for non-HTTPS URL\n", NormalizedNewLines(standardError));
@@ -185,6 +230,11 @@ public sealed class CurlCommandRunnerHttp3Tests
         ScriptedQuicConnector connector = new(QuicRefused, tcp);
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(connector, "-sS", "--http3", option, url);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout", "hello", standardOutput);
+        Diagnostics.Assert("QUIC attempts", 0, connector.QuicTargets.Count);
+        Diagnostics.Assert("TCP connects", 1, connector.TcpConnectCount);
 
         Assert.AreEqual(0, exitCode, standardError);
         Assert.AreEqual("hello", standardOutput);
@@ -212,7 +262,18 @@ public sealed class CurlCommandRunnerHttp3Tests
         release.SetResult();
         (int exitCode, string standardOutput, string standardError) = await run;
         await pool.DisposeAsync();
+        Diagnostics.Act("exit code", exitCode);
 
+        string[] openedLines = NormalizedNewLines(standardError).Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("QUIC attempts", 1, connector.QuicTargets.Count);
+        Diagnostics.Assert("num_connects lines (sorted)", "0|0|1", string.Join("|", NormalizedNewLines(standardOutput).Split('\n', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal)));
+        Diagnostics.Assert("OPENED lines", 3, openedLines.Count(line => line.Contains("OPENED", StringComparison.Ordinal)));
+        Diagnostics.Assert("Multiplexed connection found lines", 2, openedLines.Count(line => line == "* Multiplexed connection found"));
+        Diagnostics.Assert("Reusing existing connection lines", 2, openedLines.Count(line => line == "* Reusing existing https: connection with host localhost"));
+        Diagnostics.Assert("left intact lines", 1, openedLines.Count(line => line == "* Connection #0 to host localhost:18443 left intact"));
+        Diagnostics.Assert("QUIC close count", 1, quic.CloseCount);
+        Diagnostics.Assert("QUIC close code", 0x100L, quic.CloseCode);
         Assert.AreEqual(0, exitCode, standardError);
         Assert.HasCount(1, connector.QuicTargets, standardError);
         CollectionAssert.AreEquivalent(new[] { "1", "0", "0" }, NormalizedNewLines(standardOutput).Split('\n', StringSplitOptions.RemoveEmptyEntries));
@@ -247,16 +308,24 @@ public sealed class CurlCommandRunnerHttp3Tests
 
     private static string NormalizedNewLines(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
-    private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(IConnector connector, params string[] arguments)
+    private async Task<(int ExitCode, string StandardOutput, string StandardError)> RunAsync(IConnector connector, params string[] arguments)
     {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
         using MemoryStream standardOutput = new();
         using MemoryStream standardError = new();
         using MemoryStream standardInput = new();
 
-        int exitCode = await CurlComposition
-            .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), parsesAsWindowsBuild: false)
-            .RunAsync(arguments);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await CurlComposition
+                .CreateRunner(standardOutput, standardError, standardInput, connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), parsesAsWindowsBuild: false)
+                .RunAsync(arguments);
+        }
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Bytes("stderr", standardError.ToArray());
         return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()), Encoding.Latin1.GetString(standardError.ToArray()));
     }
 }

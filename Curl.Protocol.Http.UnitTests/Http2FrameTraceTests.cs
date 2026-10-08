@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Http2;
 using Curl.Protocol.Http.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Http;
 
@@ -32,18 +33,33 @@ public sealed class Http2FrameTraceTests
         [new Http2Frame(Http2FrameType.Data, Http2FrameFlags.Padded, 1, ReadOnlyMemory<byte>.Empty), "FRAME[DATA, len=0, eos=0, padlen=0]"],
     ];
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DynamicData(nameof(Frames))]
-    public void Describe_DescribesTheFrameAsCurlDoes(Http2Frame frame, string expected) =>
-        Assert.AreEqual(expected, Http2FrameTrace.Describe(frame));
+    public void Describe_DescribesTheFrameAsCurlDoes(Http2Frame frame, string expected)
+    {
+        Diagnostics.Arrange("frame", $"type {frame.Type}, flags {frame.Flags}, stream {frame.StreamId}, {frame.Payload.Length} payload bytes");
+
+        string described = Http2FrameTrace.Describe(frame);
+
+        Diagnostics.Act("description", described);
+        Diagnostics.Assert("description", expected, described);
+        Assert.AreEqual(expected, described);
+    }
 
     [TestMethod]
     public void FrameSent_ReportsTheFrameOnItsStream()
     {
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("frame sent", "WINDOW_UPDATE on stream 1, increment 10420225");
 
         new Http2FrameTrace(events).FrameSent(Http2FrameFactory.CreateWindowUpdate(1, 10420225));
 
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line count", 1, events.Info.Count);
         CollectionAssert.AreEqual(new[] { "[HTTP/2] [1] -> FRAME[WINDOW_UPDATE, incr=10420225]" }, events.Info);
     }
 
@@ -55,7 +71,10 @@ public sealed class Http2FrameTraceTests
 
         trace.FrameSent(Http2FrameFactory.CreateContinuation(1, new byte[3], isEndHeaders: true));
         trace.FrameReceived(Http2FrameFactory.CreateContinuation(1, new byte[3], isEndHeaders: true));
+        Diagnostics.Arrange("frames", "CONTINUATION sent and received on stream 1");
 
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line count", 0, events.Info.Count);
         Assert.IsEmpty(events.Info);
     }
 
@@ -73,7 +92,10 @@ public sealed class Http2FrameTraceTests
         ]));
         trace.FrameReceived(Http2FrameFactory.CreateSettings([new(Http2SettingIdentifier.EnablePush, 0)]));
         trace.FrameReceived(Http2FrameFactory.CreateSettingsAcknowledgement());
+        Diagnostics.Arrange("frames received", "SETTINGS with three values, SETTINGS with ENABLE_PUSH 0, SETTINGS ack");
 
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line count", 7, events.Info.Count);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -96,7 +118,10 @@ public sealed class Http2FrameTraceTests
 
         trace.SessionCreated();
         trace.StreamClosed(3);
+        Diagnostics.Arrange("events", "session created, stream 3 closed");
 
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line count", 2, events.Info.Count);
         CollectionAssert.AreEqual(new[] { "[HTTP/2] [0] created h2 session", "[HTTP/2] [3] CLOSED" }, events.Info);
     }
 
@@ -116,6 +141,9 @@ public sealed class Http2FrameTraceTests
             "[HTTP/2] created session via Upgrade",
             "[HTTP/2] [0] created h2 session (via h1 upgrade)",
         ];
+        Diagnostics.Arrange("events", "upgrade started, session created by upgrade");
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line count", expected.Length, events.Info.Count);
         CollectionAssert.AreEqual(expected, events.Info);
     }
 
@@ -127,8 +155,11 @@ public sealed class Http2FrameTraceTests
     {
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("response line", line.Replace("\r", "\\r").Replace("\n", "\\n"));
         new Http2FrameTrace(events).ResponseLineReported(1, Encoding.Latin1.GetBytes(line));
 
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line", expected, events.Info.FirstOrDefault());
         CollectionAssert.AreEqual(new[] { expected }, events.Info);
     }
 
@@ -137,8 +168,11 @@ public sealed class Http2FrameTraceTests
     {
         RecordingTransferEvents events = new();
 
+        Diagnostics.Arrange("response line", "\\r\\n");
         new Http2FrameTrace(events).ResponseLineReported(1, "\r\n"u8);
 
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Assert("info line count", 0, events.Info.Count);
         Assert.IsEmpty(events.Info);
     }
 }

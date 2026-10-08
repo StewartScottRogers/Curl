@@ -30,6 +30,9 @@ public sealed partial class TcpConnectorTests
     {
         var connector = new TcpConnector(new FakeDnsResolver(), new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
 
+        Diagnostics.Arrange("connector", "built with no SOCKS5 authentication options");
+        Diagnostics.Act("SOCKS5 authentication is the default", ReferenceEquals(Socks5AuthenticationOptions.Default, connector.Socks5Authentication));
+        Diagnostics.Assert("SOCKS5 authentication is the default", true, ReferenceEquals(Socks5AuthenticationOptions.Default, connector.Socks5Authentication));
         Assert.AreSame(Socks5AuthenticationOptions.Default, connector.Socks5Authentication);
     }
 
@@ -52,6 +55,8 @@ public sealed partial class TcpConnectorTests
             withCredential ? new NetworkCredential("u", "p") : null,
             socks5Authentication: new Socks5AuthenticationOptions(allowBasic, allowGssapi));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual((byte[])[.. greeting, .. SentConnectRequest], proxyConnection.Written);
     }
@@ -65,6 +70,8 @@ public sealed partial class TcpConnectorTests
             [0x05, 0x02, 0x01, 0x00, .. Socks5Succeeded],
             new NetworkCredential("u", "p"),
             socks5Authentication: BasicOnly);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
@@ -85,6 +92,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: Socks5AuthenticationOptions.Default);
 
         AssertProxyFailure(result, proxyConnection, "User was rejected by the SOCKS5 server (1 1).");
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x03, 0x00, 0x01, 0x02, 0x01, 0x01, 0x75, 0x01, 0x70 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x03, 0x00, 0x01, 0x02, 0x01, 0x01, 0x75, 0x01, 0x70 }, proxyConnection.Written);
     }
 
@@ -96,6 +104,7 @@ public sealed partial class TcpConnectorTests
         var (result, proxyConnection) = await ConnectThroughSocksAsync(ProxyKind.Socks5, "127.0.0.1", Socks5PicksGssapi, socks5Authentication: BasicOnly);
 
         AssertProxyFailure(result, proxyConnection, "SOCKS5 GSSAPI per-message authentication is not enabled.");
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x01, 0x00 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x01, 0x00 }, proxyConnection.Written);
     }
 
@@ -112,6 +121,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: GssapiOnly);
 
         AssertProxyFailure(result, proxyConnection, "BASIC authentication proposed but not enabled.");
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x02, 0x00, 0x01 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x02, 0x00, 0x01 }, proxyConnection.Written);
     }
 
@@ -129,6 +139,8 @@ public sealed partial class TcpConnectorTests
             "127.0.0.1",
             [.. Socks5PicksGssapi, 0x01, 0x01, 0x00, 0x03, 0xB1, 0xB2, 0xB3, .. GssapiGrantsNoProtection, .. Socks5Succeeded, .. BytesAfterTheHandshake],
             socks5Authentication: GssapiOnly with { SecurityContexts = contexts });
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
@@ -157,6 +169,8 @@ public sealed partial class TcpConnectorTests
             [.. Socks5PicksGssapi, 0x01, 0x01, 0x00, 0x01, 0xB1, .. GssapiGrantsNoProtection, .. Socks5Succeeded],
             socks5Authentication: GssapiOnly with { SecurityContexts = contexts });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(
             new byte[] { 0x01, 0x01, 0x00, 0x01, 0xA1, 0x01, 0x02, 0x00, 0x02 },
@@ -174,7 +188,10 @@ public sealed partial class TcpConnectorTests
             [.. Socks5PicksGssapi, 0x01, 0x02, 0x00, 0x01, 0x00, .. Socks5Succeeded],
             socks5Authentication: GssapiOnly with { SecurityContexts = contexts, GssapiNec = true });
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x01, 0x01, 0x00, 0x01, 0xA1, 0x01, 0x02, 0x00, 0x01, 0x00 }, [.. proxyConnection.Written[4..14]]);
         CollectionAssert.AreEqual(new byte[] { 0x01, 0x01, 0x00, 0x01, 0xA1, 0x01, 0x02, 0x00, 0x01, 0x00 }, proxyConnection.Written[4..14]);
         Assert.IsEmpty(contexts.Wrapped);
     }
@@ -191,6 +208,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: Socks5AuthenticationOptions.Default with { SecurityContexts = contexts, GssapiDelegation = SecurityDelegation.Always });
 
         var request = contexts.Requests.Single();
+        Diagnostics.Assert("security context request", (SecurityMechanism.Kerberos, "rcmd", "socks.example", SecurityDelegation.Always, ProtectionLevel.EncryptAndSign), (request.Mechanism, request.ServiceName, request.HostName, request.Delegation, request.MessageProtection));
         Assert.AreEqual(
             (SecurityMechanism.Kerberos, "rcmd", "socks.example", SecurityDelegation.Always, ProtectionLevel.EncryptAndSign),
             (request.Mechanism, request.ServiceName, request.HostName, request.Delegation, request.MessageProtection));
@@ -215,6 +233,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: GssapiOnly with { SecurityContexts = contexts, UsesSspiTexts = usesSspi, CredentialCacheName = "FILE:/tmp/krb5cc_1000" });
 
         AssertProxyFailure(result, proxyConnection, message);
+        Diagnostics.Diff("bytes sent to proxy", new byte[] { 0x05, 0x02, 0x00, 0x01 }, [.. proxyConnection.Written]);
         CollectionAssert.AreEqual(new byte[] { 0x05, 0x02, 0x00, 0x01 }, proxyConnection.Written);
     }
 
@@ -312,6 +331,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: GssapiOnly with { SecurityContexts = contexts, UsesSspiTexts = usesSspi, CredentialCacheName = "FILE:/tmp/krb5cc_1000" },
             events: events);
 
+        Diagnostics.Diff("last info lines", string.Join("\n", lines), string.Join("\n", events.Info[^lines.Length..]));
         CollectionAssert.AreEqual(lines, events.Info[^lines.Length..]);
     }
 
@@ -327,6 +347,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: Socks5AuthenticationOptions.Default with { UsesSspiTexts = false, CredentialCacheName = "FILE:/tmp/krb5cc_0" },
             events: events);
 
+        Diagnostics.Assert("last info line", "Unable to negotiate SOCKS5 GSS-API context.", events.Info[^1]);
         CollectionAssert.AreEqual(
             new[]
             {
@@ -353,6 +374,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: GssapiOnly with { SecurityContexts = contexts, UsesSspiTexts = usesSspi, GssapiNec = true },
             events: events);
 
+        Diagnostics.Diff("last two info lines", message + "\nUnable to negotiate SOCKS5 GSS-API context.", string.Join("\n", events.Info[^2..]));
         CollectionAssert.AreEqual(new[] { message, "Unable to negotiate SOCKS5 GSS-API context." }, events.Info[^2..]);
     }
 
@@ -369,6 +391,7 @@ public sealed partial class TcpConnectorTests
             socks5Authentication: GssapiOnly with { SecurityContexts = contexts },
             events: events);
 
+        Diagnostics.Assert("GSS-API context lines", 0, events.Info.Count(line => line.Contains("GSS-API context", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.Contains("GSS-API context", StringComparison.Ordinal)));
     }
 }

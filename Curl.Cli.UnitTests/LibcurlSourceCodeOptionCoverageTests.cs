@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -58,14 +60,21 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
         "http2-prior-knowledge", "http3", "http3-only", "proxy-http2",
     ];
 
+    /// <summary>Gets or sets the MSTest context the diagnostics are written to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     public void EveryParsedOption_IsWrittenOrKnownToWriteNothing()
     {
         HashSet<string> listed = [.. Written, .. WritesNothing];
+        Diagnostics.Arrange("listed option count", listed.Count);
 
         string[] unlisted = [.. CommandLineOptionTable.Rows.Select(row => row.LongName).Where(name => !listed.Contains(name))];
+        Diagnostics.Act("unlisted options", CommandLineParseDiagnostics.QuoteEach(unlisted));
 
+        Diagnostics.Assert("unlisted options", CommandLineParseDiagnostics.QuoteEach([]), CommandLineParseDiagnostics.QuoteEach(unlisted));
         Assert.IsEmpty(unlisted, "Options with no --libcurl entry: " + string.Join(", ", unlisted));
     }
 
@@ -74,7 +83,11 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
     {
         string[] listed = [.. Written, .. WritesNothing];
         HashSet<string> parsed = [.. CommandLineOptionTable.Rows.Select(row => row.LongName)];
+        Diagnostics.Arrange("listed entry count", listed.Length);
+        Diagnostics.Act("parsed option count", parsed.Count);
 
+        Diagnostics.Assert("listed entry count", parsed.Count, listed.Length);
+        Diagnostics.Assert("every listed option is parsed", true, listed.All(parsed.Contains));
         Assert.HasCount(parsed.Count, listed);
         Assert.IsTrue(listed.All(parsed.Contains));
     }

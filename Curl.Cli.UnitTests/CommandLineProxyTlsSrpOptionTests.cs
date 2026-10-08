@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -16,11 +17,18 @@ public sealed class CommandLineProxyTlsSrpOptionTests
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NoneOfTheOptions_LeavesThemNotGiven()
     {
-        CommandLineOptions options = OpenSslBuildParser.Parse([Url]).Options!;
+        CommandLineOptions options = Parse([Url]).Options!;
 
+        AssertText("proxy TLS user", null, options.ProxyTlsUser);
+        AssertText("proxy TLS password", null, options.ProxyTlsPassword);
+        AssertText("proxy TLS auth type", null, options.ProxyTlsAuthType);
         Assert.IsNull(options.ProxyTlsUser);
         Assert.IsNull(options.ProxyTlsPassword);
         Assert.IsNull(options.ProxyTlsAuthType);
@@ -29,7 +37,7 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [TestMethod]
     public void Parse_EveryOption_RecordsTheLastValueVerbatimApartFromTheTargetOptions()
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse(
+        CommandLineParseResult result = Parse(
         [
             "--proxy-tlsuser", "u1", "--proxy-tlsuser", "proxyuser",
             "--proxy-tlspassword", "p1", "--proxy-tlspassword", "proxysecret",
@@ -39,6 +47,12 @@ public sealed class CommandLineProxyTlsSrpOptionTests
 
         Assert.IsTrue(result.IsAccepted);
         CommandLineOptions options = result.Options;
+        AssertText("proxy TLS user", "proxyuser", options.ProxyTlsUser);
+        AssertText("proxy TLS password", "proxysecret", options.ProxyTlsPassword);
+        AssertText("proxy TLS auth type", "SRP", options.ProxyTlsAuthType);
+        AssertText("TLS user", null, options.TlsUser);
+        AssertText("TLS password", null, options.TlsPassword);
+        AssertText("TLS auth type", null, options.TlsAuthType);
         Assert.AreEqual("proxyuser", options.ProxyTlsUser);
         Assert.AreEqual("proxysecret", options.ProxyTlsPassword);
         Assert.AreEqual("SRP", options.ProxyTlsAuthType);
@@ -50,9 +64,10 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [TestMethod]
     public void Parse_EmptyProxyTlsUser_IsAccepted()
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse(["--proxy-tlsuser", string.Empty, Url]);
+        CommandLineParseResult result = Parse(["--proxy-tlsuser", string.Empty, Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        AssertText("proxy TLS user", string.Empty, result.Options.ProxyTlsUser);
         Assert.AreEqual(string.Empty, result.Options.ProxyTlsUser);
     }
 
@@ -61,8 +76,9 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [DataRow("--proxy-tlsauthtype")]
     public void Parse_EmptyValue_RefusesAsBlank(string spelledOption)
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, string.Empty, Url]);
+        CommandLineParseResult result = Parse([spelledOption, string.Empty, Url]);
 
+        AssertRefusal([$"curl: option {spelledOption}: blank argument where content is expected", TryHelp], result);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: blank argument where content is expected", TryHelp },
@@ -75,8 +91,9 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [DataRow("SRP ")]
     public void Parse_ProxyTlsAuthTypeOtherThanSrp_RefusesAsUnsupported(string value)
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse(["--proxy-tlsauthtype", value, Url]);
+        CommandLineParseResult result = Parse(["--proxy-tlsauthtype", value, Url]);
 
+        AssertRefusal(["curl: option --proxy-tlsauthtype: the installed libcurl version does not support this", TryHelp], result);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[] { "curl: option --proxy-tlsauthtype: the installed libcurl version does not support this", TryHelp },
@@ -89,8 +106,9 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [DataRow("--no-proxy-tlsauthtype")]
     public void Parse_NegatedOption_CannotBeReversed(string spelledOption)
     {
-        CommandLineParseResult result = OpenSslBuildParser.Parse([spelledOption, Url]);
+        CommandLineParseResult result = Parse([spelledOption, Url]);
 
+        AssertRefusal([$"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix", TryHelp], result);
         CollectionAssert.AreEqual(
             new[] { $"curl: option {spelledOption}: the given option cannot be reversed with a --no- prefix", TryHelp },
             result.Refusal!.StandardErrorLines.ToArray());
@@ -102,12 +120,47 @@ public sealed class CommandLineProxyTlsSrpOptionTests
     [DataRow("## --proxy-tlsauthtype\n")]
     public void AiHelp_ProxyTlsSrpSection_DoesNotSayItIsNotSupported(string heading)
     {
-        Assert.IsTrue(CurlAiHelpText.TryGetMarkdown("proxy", out string markdown));
+        Diagnostics.Arrange("category", "proxy");
+        Diagnostics.Arrange("heading", heading.TrimEnd('\n'));
+
+        bool found = CurlAiHelpText.TryGetMarkdown("proxy", out string markdown);
+        Diagnostics.Act("category found", found);
+        Assert.IsTrue(found);
         int start = markdown.IndexOf(heading, StringComparison.Ordinal);
         int end = markdown.IndexOf("\n## ", start + 1, StringComparison.Ordinal);
         string section = end < 0 ? markdown[start..] : markdown[start..end];
+        Diagnostics.Act("section start", start);
+        Diagnostics.Act("section length", section.Length);
 
+        Diagnostics.Assert(
+            "section says not supported",
+            false,
+            section.Contains("Not supported by this build yet", StringComparison.Ordinal));
         Assert.IsGreaterThanOrEqualTo(0, start);
         Assert.DoesNotContain("Not supported by this build yet", section);
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("build", "OpenSSL");
+        CommandLineParseResult result = OpenSslBuildParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private void AssertText(string label, string? expected, string? actual) =>
+        Diagnostics.Assert(label, Quote(expected), Quote(actual));
+
+    private static string Quote(string? value) => value is null ? "null" : "\"" + value + "\"";
+
+    private void AssertRefusal(string[] expectedLines, CommandLineParseResult result)
+    {
+        CommandLineRefusal? refusal = CommandLineParseDiagnostics.Peek(result.Refusal);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach(expectedLines),
+            CommandLineParseDiagnostics.QuoteEach(refusal?.StandardErrorLines ?? []));
     }
 }

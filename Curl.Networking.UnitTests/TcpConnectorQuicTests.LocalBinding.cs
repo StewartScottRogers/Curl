@@ -21,10 +21,13 @@ public sealed partial class TcpConnectorQuicTests
         // curl --http3-only --interface 127.0.0.1 --local-port 41000-41010: "Local port: 41000".
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var connector = BindingConnector(opener, new LocalBinding("127.0.0.1", "127.0.0.1", null, 41000, 11));
+        Diagnostics.Arrange("local binding", "127.0.0.1, ports 41000-41010");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
         await using var connection = result.Connection!;
+        ActBoundFrom(opener);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual((new IPEndPoint(IPAddress.Loopback, 41000), 11), opener.BoundFrom.Single());
     }
@@ -34,10 +37,13 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var connector = BindingConnector(opener, new LocalBinding(null, null, null, 41000, 3), new FakeDnsResolver(IPAddress.IPv6Loopback));
+        Diagnostics.Arrange("local binding", "ports 41000-41002 only, dialling ::1");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
         await using var connection = result.Connection!;
+        ActBoundFrom(opener);
+        Diagnostics.Assert("bound from", (new IPEndPoint(IPAddress.IPv6Any, 41000), 3), opener.BoundFrom.Single());
         Assert.AreEqual((new IPEndPoint(IPAddress.IPv6Any, 41000), 3), opener.BoundFrom.Single());
     }
 
@@ -45,10 +51,12 @@ public sealed partial class TcpConnectorQuicTests
     public async Task ConnectMultiplexedAsync_WithoutALocalBinding_OpensTheUdpSocketUnbound()
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
+        Diagnostics.Arrange("local binding", "none");
 
-        var result = await Connector(opener, new ManualTimeProvider()).ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(Connector(opener, new ManualTimeProvider()), Target());
 
         await using var connection = result.Connection!;
+        Diagnostics.Assert("bindings", 0, opener.BoundFrom.Count);
         Assert.IsEmpty(opener.BoundFrom);
         Assert.HasCount(1, opener.Opened);
     }
@@ -62,9 +70,11 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = BindingConnector(opener, new LocalBinding("bogus0", null, null, 0, 1));
+        Diagnostics.Arrange("interface", "if!bogus0");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual("Failed to connect to quic.test port 443 after 0 ms: Failed binding local connection end", result.ErrorMessage);
         CollectionAssert.AreEqual(
@@ -89,9 +99,11 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = BindingConnector(opener, new LocalBinding("bogus0", "bogus0", null, 0, 1), new FakeDnsResolver(IPAddress.Loopback) { HostsWithNoAddress = new HashSet<string> { "bogus0" } });
+        Diagnostics.Arrange("interface", "bogus0, neither an interface nor a host");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -111,9 +123,11 @@ public sealed partial class TcpConnectorQuicTests
         // curl --http3-only --local-port 41000-41002 with all three in use: exit 45.
         var opener = new QuicServerChannelOpener { OpenOutcome = _ => throw new LocalBindException(LocalBindFailure.InterfaceFailed) };
         var connector = BindingConnector(opener, new LocalBinding(null, null, null, 41000, 3));
+        Diagnostics.Arrange("local binding", "ports 41000-41002, none binds");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual(CurlExitCode.InterfaceFailed, result.ExitCode);
         Assert.AreEqual("Failed to connect to quic.test port 443 after 0 ms: Failed binding local connection end", result.ErrorMessage);
     }
@@ -123,9 +137,11 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var connector = BindingConnector(opener, new LocalBinding(null, "127.0.0.1", new string('a', LocalBinding.LongestDeviceName + 1), 0, 1));
+        Diagnostics.Arrange("device name length", LocalBinding.LongestDeviceName + 1);
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
+        Diagnostics.Assert("exit code", CurlExitCode.BadFunctionArgument, result.ExitCode);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.ExitCode);
         Assert.AreEqual("Failed to connect to quic.test port 443 after 0 ms: A libcurl function was given a bad argument", result.ErrorMessage);
     }
@@ -138,9 +154,11 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = BindingConnector(opener, new LocalBinding("::1", "::1", null, 0, 1));
+        Diagnostics.Arrange("interface", "::1, dialling 127.0.0.1");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to quic.test port 443 after 0 ms: Could not connect to server", result.ErrorMessage);
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("QUIC connect to", StringComparison.Ordinal)));
@@ -164,10 +182,12 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var events = new RecordingTransferEvents();
         var connector = BindingConnector(opener, new LocalBinding("127.0.0.1", "127.0.0.1", null, 41000, 11));
+        Diagnostics.Arrange("local binding", "127.0.0.1, ports 41000-41010");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(events), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target(events));
 
         await using var connection = result.Connection!;
+        Diagnostics.Assert("has the local port line", true, events.Info.Contains(LocalBindLines.LocalPort(41000)));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -187,14 +207,19 @@ public sealed partial class TcpConnectorQuicTests
         taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         var takenPort = ((IPEndPoint)taken.LocalEndPoint!).Port;
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("port range", "the taken port and the one after it");
 
         await using var channel = OpenFromOrNull(new IPEndPoint(IPAddress.Loopback, takenPort), 2, events);
 
+        Diagnostics.Act("channel opened", channel is not null);
+        Diagnostics.Assert("channel opened (inconclusive when not)", true, channel is not null);
         if (channel is null)
         {
             Assert.Inconclusive($"Port {takenPort + 1}, after the one taken, belongs to another process.");
         }
 
+        Diagnostics.Act("info line count", events.Info.Count);
+        Diagnostics.Assert("bound port is the one after the taken one", true, ((IPEndPoint)channel.LocalEndPoint!).Port == takenPort + 1);
         CollectionAssert.AreEqual(
             new[] { LocalBindLines.PortFailedTryingNext(takenPort), LocalBindLines.LocalPort(takenPort + 1) },
             events.Info.ToArray());
@@ -208,17 +233,25 @@ public sealed partial class TcpConnectorQuicTests
         using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("port range", "only the taken port");
 
-        Assert.ThrowsExactly<LocalBindException>(() => new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), (IPEndPoint)taken.LocalEndPoint!, 1, events));
+        var exception = Assert.ThrowsExactly<LocalBindException>(() => new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), (IPEndPoint)taken.LocalEndPoint!, 1, events));
 
+        Diagnostics.Act("failure", exception.Failure);
         var line = events.Info.Single();
+        Diagnostics.Assert("line starts with bind failed", true, line.StartsWith("bind failed with errno ", StringComparison.Ordinal));
         Assert.StartsWith("bind failed with errno ", line);
     }
 
     [TestMethod]
     public void UdpChannelOpener_OpenFrom_WithNullEvents_ThrowsArgumentNullException()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), new IPEndPoint(IPAddress.Loopback, 0), 1, null!));
+        Diagnostics.Arrange("events", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), new IPEndPoint(IPAddress.Loopback, 0), 1, null!));
+
+        Diagnostics.Act("parameter name", exception.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
@@ -227,10 +260,13 @@ public sealed partial class TcpConnectorQuicTests
         // A bind failure moves on to the next address, as libcurl's does for TCP (BL-600 Notes).
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };
         var connector = BindingConnector(opener, new LocalBinding(null, "127.0.0.1", null, 0, 1), new FakeDnsResolver(IPAddress.IPv6Loopback, IPAddress.Loopback));
+        Diagnostics.Arrange("resolver addresses", "::1 (cannot bind 127.0.0.1), 127.0.0.1");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
         await using var connection = result.Connection!;
+        ActBoundFrom(opener);
+        Diagnostics.Assert("remote end point", new IPEndPoint(IPAddress.Loopback, 443), connection.RemoteEndPoint);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, 443), connection.RemoteEndPoint);
         Assert.AreEqual((new IPEndPoint(IPAddress.Loopback, 0), 1), opener.BoundFrom.Single());
     }
@@ -241,10 +277,13 @@ public sealed partial class TcpConnectorQuicTests
         // libcurl's bindlocal runs for QUIC's socket too: SO_BINDTODEVICE alone, then no address (BL-1077).
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
         var connector = BindingConnector(opener, new LocalBinding("eth0", "eth0", null, 41000, 3));
+        Diagnostics.Arrange("interface", "eth0, whose device binds");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
         await using var connection = result.Connection!;
+        ActBoundFrom(opener);
+        Diagnostics.Assert("device bound to", ("eth0", false), opener.DeviceBoundTo.Single());
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(("eth0", false), opener.DeviceBoundTo.Single());
         Assert.IsEmpty(opener.BoundFrom);
@@ -255,10 +294,13 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
         var connector = BindingConnector(opener, new LocalBinding("eth0", null, null, 0, 1));
+        Diagnostics.Arrange("interface", "if!eth0, whose device binds");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
         await using var connection = result.Connection!;
+        ActBoundFrom(opener);
+        Diagnostics.Assert("device bound to", ("eth0", false), opener.DeviceBoundTo.Single());
         Assert.AreEqual(("eth0", false), opener.DeviceBoundTo.Single());
         Assert.IsEmpty(opener.BoundFrom);
     }
@@ -268,10 +310,13 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
         var connector = BindingConnector(opener, new LocalBinding(null, "127.0.0.1", "eth0", 41000, 2));
+        Diagnostics.Arrange("interface", "ifhost!eth0!127.0.0.1, ports 41000-41001");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
         await using var connection = result.Connection!;
+        ActBoundFrom(opener);
+        Diagnostics.Assert("device bound to", ("eth0", true), opener.DeviceBoundTo.Single());
         Assert.AreEqual(("eth0", true), opener.DeviceBoundTo.Single());
         Assert.AreEqual((new IPEndPoint(IPAddress.Loopback, 41000), 2), opener.BoundFrom.Single());
     }
@@ -281,10 +326,13 @@ public sealed partial class TcpConnectorQuicTests
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server(), DeviceBinds = true };
         var connector = BindingConnector(opener, new LocalBinding(null, null, null, 41000, 1));
+        Diagnostics.Arrange("local binding", "port 41000 only");
 
-        var result = await connector.ConnectMultiplexedAsync(Target(), CancellationToken.None);
+        var result = await ConnectMultiplexedAsync(connector, Target());
 
         await using var connection = result.Connection!;
+        ActBoundFrom(opener);
+        Diagnostics.Assert("device binds", 0, opener.DeviceBoundTo.Count);
         Assert.IsEmpty(opener.DeviceBoundTo);
         Assert.AreEqual((new IPEndPoint(IPAddress.Any, 41000), 1), opener.BoundFrom.Single());
     }
@@ -295,6 +343,7 @@ public sealed partial class TcpConnectorQuicTests
         var devicesAsked = new List<string>();
         var opener = new UdpChannelOpener((_, name) => { devicesAsked.Add(name); return true; });
         var chooserCalls = 0;
+        Diagnostics.Arrange("device", "eth0, which binds alone");
 
         await using var channel = await opener.OpenFromDeviceAsync(
             new IPEndPoint(IPAddress.Loopback, 9),
@@ -305,6 +354,8 @@ public sealed partial class TcpConnectorQuicTests
             NoTransferEvents.Instance,
             CancellationToken.None);
 
+        Diagnostics.Act("devices asked", string.Join(", ", devicesAsked));
+        Diagnostics.Assert("chooser calls", 0, chooserCalls);
         CollectionAssert.AreEqual(new[] { "eth0" }, devicesAsked);
         Assert.AreEqual(0, chooserCalls);
         Assert.AreNotEqual(41000, ((IPEndPoint)channel.LocalEndPoint!).Port);
@@ -315,6 +366,7 @@ public sealed partial class TcpConnectorQuicTests
     public async Task UdpChannelOpener_OpenFromDeviceAsync_ForIfhost_BindsTheChosenLocalEndAfterTheDevice()
     {
         var opener = new UdpChannelOpener((_, _) => true);
+        Diagnostics.Arrange("device", "eth0, then the chosen 127.0.0.1");
 
         await using var channel = await opener.OpenFromDeviceAsync(
             new IPEndPoint(IPAddress.Loopback, 9),
@@ -326,6 +378,8 @@ public sealed partial class TcpConnectorQuicTests
             CancellationToken.None);
 
         var bound = (IPEndPoint)channel.LocalEndPoint!;
+        Diagnostics.Act("bound address", bound.Address);
+        Diagnostics.Assert("bound address", IPAddress.Loopback, bound.Address);
         Assert.AreEqual(IPAddress.Loopback, bound.Address);
         Assert.AreNotEqual(0, bound.Port);
     }
@@ -334,6 +388,7 @@ public sealed partial class TcpConnectorQuicTests
     public async Task UdpChannelOpener_OpenFromDeviceAsync_WhenTheDeviceDoesNotBind_BindsTheChosenLocalEnd()
     {
         var opener = new UdpChannelOpener((_, _) => false);
+        Diagnostics.Arrange("device", "bogus0, which does not bind");
 
         await using var channel = await opener.OpenFromDeviceAsync(
             new IPEndPoint(IPAddress.IPv6Loopback, 9),
@@ -344,6 +399,8 @@ public sealed partial class TcpConnectorQuicTests
             NoTransferEvents.Instance,
             CancellationToken.None);
 
+        Diagnostics.Act("bound address", ((IPEndPoint)channel.LocalEndPoint!).Address);
+        Diagnostics.Assert("bound address", IPAddress.IPv6Loopback, ((IPEndPoint)channel.LocalEndPoint!).Address);
         Assert.AreEqual(IPAddress.IPv6Loopback, ((IPEndPoint)channel.LocalEndPoint!).Address);
     }
 
@@ -354,6 +411,7 @@ public sealed partial class TcpConnectorQuicTests
         taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         var takenEndPoint = (IPEndPoint)taken.LocalEndPoint!;
         var opener = new UdpChannelOpener((_, _) => false);
+        Diagnostics.Arrange("chosen local end", "a port already taken");
 
         var exception = await Assert.ThrowsExactlyAsync<LocalBindException>(async () => await opener.OpenFromDeviceAsync(
             new IPEndPoint(IPAddress.Loopback, 9),
@@ -364,6 +422,8 @@ public sealed partial class TcpConnectorQuicTests
             NoTransferEvents.Instance,
             CancellationToken.None));
 
+        Diagnostics.Act("failure", exception.Failure);
+        Diagnostics.Assert("failure", LocalBindFailure.InterfaceFailed, exception.Failure);
         Assert.AreEqual(LocalBindFailure.InterfaceFailed, exception.Failure);
     }
 
@@ -372,6 +432,7 @@ public sealed partial class TcpConnectorQuicTests
     public async Task UdpChannelOpener_OpenFromDeviceAsync_OnLinuxWithTheLoopbackDevice_BindsItAlone()
     {
         var chooserCalls = 0;
+        Diagnostics.Arrange("device", "lo");
 
         await using var channel = await new UdpChannelOpener().OpenFromDeviceAsync(
             new IPEndPoint(IPAddress.Loopback, 9),
@@ -382,6 +443,8 @@ public sealed partial class TcpConnectorQuicTests
             NoTransferEvents.Instance,
             CancellationToken.None);
 
+        Diagnostics.Act("chooser calls", chooserCalls);
+        Diagnostics.Assert("chooser calls", 0, chooserCalls);
         Assert.AreEqual(0, chooserCalls);
     }
 
@@ -391,11 +454,18 @@ public sealed partial class TcpConnectorQuicTests
         var opener = new UdpChannelOpener();
         var server = new IPEndPoint(IPAddress.Loopback, 9);
         Func<CancellationToken, ValueTask<IPEndPoint>> choose = _ => ValueTask.FromResult(new IPEndPoint(IPAddress.Loopback, 0));
+        Diagnostics.Arrange("null argument", "each of the four in turn");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(null!, "eth0", false, choose, 1, NoTransferEvents.Instance, CancellationToken.None));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, null!, false, choose, 1, NoTransferEvents.Instance, CancellationToken.None));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, "eth0", false, null!, 1, NoTransferEvents.Instance, CancellationToken.None));
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, "eth0", false, choose, 1, null!, CancellationToken.None));
+        var exceptions = new[]
+        {
+            await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(null!, "eth0", false, choose, 1, NoTransferEvents.Instance, CancellationToken.None)),
+            await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, null!, false, choose, 1, NoTransferEvents.Instance, CancellationToken.None)),
+            await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, "eth0", false, null!, 1, NoTransferEvents.Instance, CancellationToken.None)),
+            await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await opener.OpenFromDeviceAsync(server, "eth0", false, choose, 1, null!, CancellationToken.None)),
+        };
+
+        Diagnostics.Act("parameter names", string.Join(", ", exceptions.Select(exception => exception.ParamName)));
+        Diagnostics.Assert("exceptions", 4, exceptions.Length);
     }
 
     [TestMethod]
@@ -404,14 +474,18 @@ public sealed partial class TcpConnectorQuicTests
         using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         var takenPort = ((IPEndPoint)taken.LocalEndPoint!).Port;
+        Diagnostics.Arrange("port range", "the taken port and the one after it");
 
         await using var channel = OpenFromOrNull(new IPEndPoint(IPAddress.Loopback, takenPort), 2);
 
+        Diagnostics.Act("channel opened", channel is not null);
+        Diagnostics.Assert("channel opened (inconclusive when not)", true, channel is not null);
         if (channel is null)
         {
             Assert.Inconclusive($"Port {takenPort + 1}, after the one taken, belongs to another process.");
         }
 
+        Diagnostics.Assert("bound port is the one after the taken one", true, ((IPEndPoint)channel.LocalEndPoint!).Port == takenPort + 1);
         Assert.AreEqual(new IPEndPoint(IPAddress.Loopback, takenPort + 1), channel.LocalEndPoint);
     }
 
@@ -421,9 +495,13 @@ public sealed partial class TcpConnectorQuicTests
         // The one OpenFrom call that returns on every run: the range tests above go inconclusive
         // when another process holds the port after the taken one, leaving OpenFrom's return
         // unreached (BL-1154).
+        Diagnostics.Arrange("local end point", "127.0.0.1, port 0");
+
         await using var channel = new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), new IPEndPoint(IPAddress.Loopback, 0), 1, NoTransferEvents.Instance);
 
         var localEndPoint = (IPEndPoint)channel.LocalEndPoint!;
+        Diagnostics.Act("bound address", localEndPoint.Address);
+        Diagnostics.Assert("bound address", IPAddress.Loopback, localEndPoint.Address);
         Assert.AreEqual(IPAddress.Loopback, localEndPoint.Address);
         Assert.AreNotEqual(0, localEndPoint.Port);
     }
@@ -434,17 +512,28 @@ public sealed partial class TcpConnectorQuicTests
         using var taken = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         taken.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         var takenEndPoint = (IPEndPoint)taken.LocalEndPoint!;
+        Diagnostics.Arrange("port range", "only the taken port");
 
         var exception = Assert.ThrowsExactly<LocalBindException>(() => new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), takenEndPoint, 1, NoTransferEvents.Instance));
 
+        Diagnostics.Act("failure", exception.Failure);
+        Diagnostics.Assert("failure", LocalBindFailure.InterfaceFailed, exception.Failure);
         Assert.AreEqual(LocalBindFailure.InterfaceFailed, exception.Failure);
     }
 
     [TestMethod]
     public void UdpChannelOpener_OpenFrom_WithANullLocalEndPoint_ThrowsArgumentNullException()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), null!, 1, NoTransferEvents.Instance));
+        Diagnostics.Arrange("local end point", "null");
+
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => new UdpChannelOpener().OpenFrom(new IPEndPoint(IPAddress.Loopback, 9), null!, 1, NoTransferEvents.Instance));
+
+        Diagnostics.Act("parameter name", exception.ParamName);
+        Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
     }
+
+    private void ActBoundFrom(QuicServerChannelOpener opener) =>
+        Diagnostics.Act("bound from", string.Join(", ", opener.BoundFrom));
 
     private static IDatagramChannel? OpenFromOrNull(IPEndPoint localEndPoint, int localPortCount, ITransferEvents? events = null)
     {

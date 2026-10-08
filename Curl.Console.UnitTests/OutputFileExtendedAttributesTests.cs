@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -7,6 +9,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class OutputFileExtendedAttributesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("http://u:p@127.0.0.1:18653/a?b#frag", "http://127.0.0.1:18653/a?b#frag")]
     [DataRow("http://u@host/", "http://host/")]
@@ -15,6 +21,14 @@ public sealed class OutputFileExtendedAttributesTests
     [DataRow("http://host/a@b", "http://host/a@b")]
     [DataRow("file:///tmp/a@b", "file:///tmp/a@b")]
     [DataRow("no-scheme@host", "no-scheme@host")]
-    public void WithoutCredentials_RemovesOnlyTheUserInfo(string url, string expected) =>
+    public void WithoutCredentials_RemovesOnlyTheUserInfo(string url, string expected)
+    {
+        Diagnostics.Arrange("url", url);
+
+        string actual = OutputFileExtendedAttributes.WithoutCredentials(url);
+        Diagnostics.Act("url without credentials", actual);
+
+        Diagnostics.Diff("url without credentials", expected, actual);
         Assert.AreEqual(expected, OutputFileExtendedAttributes.WithoutCredentials(url));
+    }
 }

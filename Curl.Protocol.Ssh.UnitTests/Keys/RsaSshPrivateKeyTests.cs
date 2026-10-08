@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Keys;
@@ -20,6 +21,10 @@ public sealed class RsaSshPrivateKeyTests
 
     private static readonly byte[] Data = Encoding.ASCII.GetBytes("session identifier and request");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("rsa-sha2-512", "SHA512")]
     [DataRow("rsa-sha2-256", "SHA256")]
@@ -27,12 +32,17 @@ public sealed class RsaSshPrivateKeyTests
     public void Sign_EachAlgorithm_WritesItsNameAndAPkcs1Signature(string algorithm, string hashName)
     {
         SshPrivateKey key = SshPrivateKeyReader.Read(TestUserKeys.RsaPkcs1, [])!;
+        Diagnostics.Arrange("algorithm", algorithm);
+        Diagnostics.Arrange("hash", hashName);
+        Diagnostics.Bytes("data", Data);
 
         byte[] blob = key.Sign(algorithm, Data);
 
+        Diagnostics.ActBytes("signature blob", blob);
         using RSA rsa = RSA.Create();
         rsa.ImportRSAPrivateKey(PemBody(TestUserKeys.RsaPkcs1), out _);
         byte[] expected = rsa.SignData(Data, new HashAlgorithmName(hashName), RSASignaturePadding.Pkcs1);
+        Diagnostics.AssertBytes("signature blob", Join(Name(algorithm), String(expected)), blob);
         CollectionAssert.AreEqual(Join(Name(algorithm), String(expected)), blob);
     }
 
@@ -40,29 +50,48 @@ public sealed class RsaSshPrivateKeyTests
     public void Sign_RsaSha2256_PinsTheSignatureBlob()
     {
         SshPrivateKey key = SshPrivateKeyReader.Read(TestUserKeys.RsaPkcs1, [])!;
+        Diagnostics.Arrange("algorithm", "rsa-sha2-256");
+        Diagnostics.Bytes("data", Data);
 
         byte[] blob = key.Sign("rsa-sha2-256", Data);
 
+        Diagnostics.ActBytes("signature blob", blob);
+        Diagnostics.AssertBytes("signature blob", Convert.FromHexString(RsaSha2256Blob), blob);
         Assert.AreEqual(RsaSha2256Blob, Convert.ToHexString(blob));
     }
 
     [TestMethod]
     public void SignatureAlgorithms_LibSsh2sOrder()
     {
-        CollectionAssert.AreEqual(new[] { "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa" }, RsaSshPrivateKey.SignatureAlgorithms.ToArray());
+        string[] expected = ["rsa-sha2-512", "rsa-sha2-256", "ssh-rsa"];
+        Diagnostics.Arrange("expected order", string.Join(", ", expected));
+
+        string[] actual = RsaSshPrivateKey.SignatureAlgorithms.ToArray();
+
+        Diagnostics.Act("signature algorithms", string.Join(", ", actual));
+        Diagnostics.Assert("signature algorithms", string.Join(", ", expected), string.Join(", ", actual));
+        CollectionAssert.AreEqual(new[] { "rsa-sha2-512", "rsa-sha2-256", "ssh-rsa" }, actual);
     }
 
     [TestMethod]
     public void FromComponents_ZeroCoefficient_Throws()
     {
-        Assert.ThrowsExactly<CryptographicException>(() => RsaSshPrivateKey.FromComponents([15], [3], [3], [], [3], [5]));
+        Diagnostics.Arrange("components", "n 15, e 3, d 3, coefficient empty, p 3, q 5");
+
+        var failure = Assert.ThrowsExactly<CryptographicException>(() => RsaSshPrivateKey.FromComponents([15], [3], [3], [], [3], [5]));
+
+        Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
     [TestMethod]
     public void FromComponents_ZeroPrivateExponent_EncodesItAsZeroAndTheImportRefusesIt()
     {
+        Diagnostics.Arrange("components", "n 15, e 3, d 00 00, coefficient 2, p 3, q 5");
+
         // The import refuses the key; OpenSSL's refusal is a subclass of CryptographicException.
-        Assert.Throws<CryptographicException>(() => RsaSshPrivateKey.FromComponents([15], [3], [0, 0], [2], [3], [5]));
+        var failure = Assert.Throws<CryptographicException>(() => RsaSshPrivateKey.FromComponents([15], [3], [0, 0], [2], [3], [5]));
+
+        Diagnostics.ActAndAssertThrown($"{nameof(CryptographicException)} or a subclass", failure);
     }
 
     [TestMethod]
@@ -70,7 +99,12 @@ public sealed class RsaSshPrivateKeyTests
     [DataRow(new byte[] { 3 }, new byte[0], DisplayName = "q is zero")]
     public void FromComponents_PrimeOfOneOrLess_ThrowsRatherThanDividingByZero(byte[] prime1, byte[] prime2)
     {
-        Assert.ThrowsExactly<CryptographicException>(() => RsaSshPrivateKey.FromComponents([15], [3], [3], [2], prime1, prime2));
+        Diagnostics.Arrange("p", Convert.ToHexString(prime1));
+        Diagnostics.Arrange("q", Convert.ToHexString(prime2));
+
+        var failure = Assert.ThrowsExactly<CryptographicException>(() => RsaSshPrivateKey.FromComponents([15], [3], [3], [2], prime1, prime2));
+
+        Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
     private static byte[] PemBody(string pem) =>

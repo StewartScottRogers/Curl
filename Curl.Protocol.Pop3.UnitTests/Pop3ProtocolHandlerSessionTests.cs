@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Pop3.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Pop3;
 
@@ -16,6 +17,11 @@ namespace Curl.Protocol.Pop3;
 [TestClass]
 public sealed class Pop3ProtocolHandlerSessionTests
 {
+    /// <summary>Gets or sets the running test's context, which MSTest sets.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Url = "pop3://127.0.0.1:18110/";
 
     private const string Greeting = "+OK POP3 ready <1896.697170952@localhost>\r\n";
@@ -57,9 +63,12 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync(Url, Greeting + CapaReply + ListReply + Bye);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 18110, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Diagnostics.AssertValues("run.Tls.Handshakes count", 0, run.Tls.Handshakes.Count());
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.IsTrue(run.Connection.IsDisposed);
     }
@@ -69,6 +78,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync("pop3://127.0.0.1/", Greeting + CapaReply + ListReply + Bye);
 
+        Diagnostics.Assert("connect target", "127.0.0.1:110 tls False", $"{run.Connector.Targets.Single().Host}:{run.Connector.Targets.Single().Port} tls {run.Connector.Targets.Single().UseTls}");
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 110, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
@@ -80,8 +90,11 @@ public sealed class Pop3ProtocolHandlerSessionTests
         var connector = new QueuedConnector(ConnectResult.Connected(Script(Greeting + CapaReply + ListReply + Bye)));
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Proxy = proxy, Events = events };
 
+        Diagnostics.Arrange("url and proxy", $"{Url} via socks5 proxy:1080");
         TransferResult result = await new Pop3ProtocolHandler(connector, new QueuedTlsProvider()).ExecuteAsync(context);
+        Diagnostics.ActResult(result);
 
+        Diagnostics.Assert("proxy passed", "socks5 proxy:1080", ReferenceEquals(proxy, connector.Targets.Single().Proxy) ? "socks5 proxy:1080" : "another proxy");
         Assert.AreSame(proxy, connector.Targets.Single().Proxy);
         connector.Targets.Single().Events.ReportInfo("from the connector");
         Assert.AreEqual("from the connector", events.Info.Last());
@@ -96,9 +109,12 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // Recorder -Tls: CAPA (no STLS offered), LIST, QUIT, exit 0; here without the port.
         Pop3Run run = await RunAsync("pop3s://127.0.0.1/", Greeting + SecureCapaReply + ListReply + Bye, sslLevel);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 995, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Diagnostics.AssertValues("run.Tls.Handshakes count", 0, run.Tls.Handshakes.Count());
         Assert.IsEmpty(run.Tls.Handshakes);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -107,7 +123,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync("pop3s://127.0.0.1/", Greeting + CapaReply + ListReply + Bye, Required);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -121,6 +139,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // Each measured: exit 8, "Got unexpected pop3-server response", nothing sent.
         Pop3Run run = await RunAsync(Url, greeting + "\r\n");
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.WeirdServerReply, "Got unexpected pop3-server response"),
@@ -136,7 +155,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync(Url, greeting + CapaReply + ListReply + Bye);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -150,6 +171,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync(Url, replies);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
     }
 
@@ -158,9 +180,11 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { FailReadsWhenExhausted = true };
 
-        Pop3Run run = await Pop3Run.ExecuteAsync(Url, connection);
+        Pop3Run run = await Pop3Run.ExecuteAsync(Diagnostics, Url, connection);
 
+        Diagnostics.Diff("sent", Capa, run.Sent);
         Assert.AreEqual(Capa, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RecvError, ResponseReadingFailed), run.Result);
     }
 
@@ -169,9 +193,11 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting)) { WritesBeforeFailure = 0 };
 
-        Pop3Run run = await Pop3Run.ExecuteAsync(Url, connection);
+        Pop3Run run = await Pop3Run.ExecuteAsync(Diagnostics, Url, connection);
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), run.Result);
         Assert.AreEqual(1, connection.ReadCount);
     }
@@ -184,13 +210,16 @@ public sealed class Pop3ProtocolHandlerSessionTests
         var secured = Script(SecureCapaReply + ListReply + Bye);
 
         Pop3Run run = await Pop3Run.ExecuteAsync(
+            Diagnostics,
             Url,
             new ScriptedConnection([.. replies.Chunk(3)]),
             Required,
             ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Capa + Stls, run.Sent);
         Assert.AreEqual(Capa + Stls, run.Sent);
         Assert.AreEqual(Capa + List + Quit, Encoding.Latin1.GetString(secured.Sent));
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -202,7 +231,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // Measured: CAPA, -ERR, then LIST and QUIT, exit 0.
         Pop3Run run = await RunAsync(Url, Greeting + "-ERR no\r\n" + ListReply + Bye, sslLevel);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -216,7 +247,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // Each measured: exit 64, "STLS not supported.", nothing sent after CAPA.
         Pop3Run run = await RunAsync(Url, Greeting + capaReply, Required);
 
+        Diagnostics.Diff("sent", Capa, run.Sent);
         Assert.AreEqual(Capa, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.UseSslFailed, "STLS not supported."), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STLS not supported."), run.Result);
     }
 
@@ -225,7 +258,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync(Url, Greeting + "+OK\r\nUSER\r\n.\r\n" + ListReply + Bye, Try);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -235,8 +270,11 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // --ssl, STLS=-ERR not now: CAPA, STLS, then LIST and QUIT, exit 0.
         Pop3Run run = await RunAsync(Url, Greeting + CapaReply + "-ERR not now\r\n" + ListReply + Bye, Try);
 
+        Diagnostics.Diff("sent", Capa + Stls + List + Quit, run.Sent);
         Assert.AreEqual(Capa + Stls + List + Quit, run.Sent);
+        Diagnostics.AssertValues("run.Tls.Handshakes count", 0, run.Tls.Handshakes.Count());
         Assert.IsEmpty(run.Tls.Handshakes);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -248,7 +286,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // Each measured: exit 64, "STARTTLS denied", no QUIT.
         Pop3Run run = await RunAsync(Url, Greeting + CapaReply + stlsReply + "\r\n", Required);
 
+        Diagnostics.Diff("sent", Capa + Stls, run.Sent);
         Assert.AreEqual(Capa + Stls, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS denied"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UseSslFailed, "STARTTLS denied"), run.Result);
     }
 
@@ -258,16 +298,20 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // curl --ssl-reqd -k: CAPA, STLS, +OK, the handshake, CAPA again over TLS, LIST, QUIT.
         var secured = Script(SecureCapaReply + ListReply + Bye);
         Pop3Run run = await Pop3Run.ExecuteAsync(
+            Diagnostics,
             Url,
             Script(Greeting + CapaReply + StlsAccepted),
             Required,
             ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Capa + Stls, run.Sent);
         Assert.AreEqual(Capa + Stls, run.Sent);
         Assert.AreEqual(Capa + List + Quit, Encoding.Latin1.GetString(secured.Sent));
+        Diagnostics.AssertValues("run.Tls.Handshakes.Single().Plaintext is run.Connection", true, ReferenceEquals(run.Connection, run.Tls.Handshakes.Single().Plaintext));
         Assert.AreSame(run.Connection, run.Tls.Handshakes.Single().Plaintext);
         Assert.AreEqual("127.0.0.1", run.Tls.Handshakes.Single().TargetHost);
         Assert.IsTrue(secured.IsDisposed);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -283,12 +327,15 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // Each measured but the last: curl sent STLS.
         var secured = Script(SecureCapaReply + ListReply + Bye);
         Pop3Run run = await Pop3Run.ExecuteAsync(
+            Diagnostics,
             Url,
             Script(Greeting + capaReply + StlsAccepted),
             Required,
             ConnectResult.Connected(secured));
 
+        Diagnostics.Diff("sent", Capa + Stls, run.Sent);
         Assert.AreEqual(Capa + Stls, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -297,12 +344,14 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         var secured = Script(SecureCapaReply + ListReply + Bye);
         Pop3Run run = await Pop3Run.ExecuteAsync(
+            Diagnostics,
             Url,
             Script(Greeting + CapaReply + StlsAccepted),
             Try,
             ConnectResult.Connected(secured));
 
         Assert.AreEqual(Capa + List + Quit, Encoding.Latin1.GetString(secured.Sent));
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -311,12 +360,15 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         // curl --ssl-reqd without -k: exit 60 from the handshake after STLS's +OK, no QUIT.
         Pop3Run run = await Pop3Run.ExecuteAsync(
+            Diagnostics,
             Url,
             Script(Greeting + CapaReply + StlsAccepted),
             Required,
             ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "schannel: untrusted"));
 
+        Diagnostics.Diff("sent", Capa + Stls, run.Sent);
         Assert.AreEqual(Capa + Stls, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.PeerFailedVerification, "schannel: untrusted"), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PeerFailedVerification, "schannel: untrusted"), run.Result);
     }
 
@@ -327,6 +379,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // field grew larger than allowed".
         Pop3Run run = await RunAsync(Url, "+OK " + new string('x', 65530) + "\r\n");
 
+        Diagnostics.Diff("sent", string.Empty, run.Sent);
         Assert.AreEqual(string.Empty, run.Sent);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.TooLarge, "A value or data field grew larger than allowed"),
@@ -339,7 +392,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
         // GREETING=+OK and 65529 x: 65533 characters and CRLF, exit 0.
         Pop3Run run = await RunAsync(Url, "+OK " + new string('x', 65529) + "\r\n" + CapaReply + ListReply + Bye);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -351,7 +406,9 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync(Url, Greeting + CapaReply + ListReply + quitReply);
 
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -360,6 +417,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
     {
         Pop3Run run = await RunAsync(Url, Greeting + CapaReply + ListReply + "+OK " + new string('x', 70000) + "\r\n");
 
+        Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
     }
 
@@ -369,8 +427,11 @@ public sealed class Pop3ProtocolHandlerSessionTests
         var connector = new QueuedConnector(ConnectResult.Refused("Failed to connect to 127.0.0.1 port 18110"));
         var handler = new Pop3ProtocolHandler(connector, new QueuedTlsProvider());
 
+        Diagnostics.Arrange("url and connect result", Url + ", refused");
         TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null });
+        Diagnostics.ActResult(result);
 
+        Diagnostics.Assert("exit code and refused", "CouldntConnect, True", $"{result.ExitCode}, {result.IsConnectionRefused}");
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect to 127.0.0.1 port 18110", result.ErrorMessage);
         Assert.IsTrue(result.IsConnectionRefused);
@@ -379,24 +440,33 @@ public sealed class Pop3ProtocolHandlerSessionTests
     [TestMethod]
     public void SupportedSchemes_ArePop3AndPop3s()
     {
+        Diagnostics.Arrange("handler", "a POP3 handler with no connections");
         var handler = new Pop3ProtocolHandler(new QueuedConnector(), new QueuedTlsProvider());
+        Diagnostics.Act("supported schemes", string.Join(" ", handler.SupportedSchemes));
 
+        Diagnostics.Assert("supported schemes", "pop3 pop3s", string.Join(" ", handler.SupportedSchemes));
         CollectionAssert.AreEqual(new[] { "pop3", "pop3s" }, handler.SupportedSchemes.ToArray());
     }
 
     [TestMethod]
     public void Constructor_NullArgument_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => new Pop3ProtocolHandler(null!, new QueuedTlsProvider()));
-        Assert.ThrowsExactly<ArgumentNullException>(() => new Pop3ProtocolHandler(new QueuedConnector(), null!));
+        Diagnostics.Arrange("arguments", "a null connector, then a null TLS provider");
+        ArgumentNullException connectorMissing = Assert.ThrowsExactly<ArgumentNullException>(() => new Pop3ProtocolHandler(null!, new QueuedTlsProvider()));
+        ArgumentNullException tlsMissing = Assert.ThrowsExactly<ArgumentNullException>(() => new Pop3ProtocolHandler(new QueuedConnector(), null!));
+        Diagnostics.Act("parameters named", $"{connectorMissing.ParamName}, {tlsMissing.ParamName}");
+        Diagnostics.Assert("exception", "ArgumentNullException twice", $"{connectorMissing.GetType().Name}, {tlsMissing.GetType().Name}");
     }
 
     [TestMethod]
     public async Task ExecuteAsync_NullContext_Throws()
     {
         var handler = new Pop3ProtocolHandler(new QueuedConnector(), new QueuedTlsProvider());
+        Diagnostics.Arrange("context", "(null)");
+        Diagnostics.Act("execute", "called with a null context");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        ArgumentNullException thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        Diagnostics.Assert("exception", "ArgumentNullException for context", $"{thrown.GetType().Name} for {thrown.ParamName}");
     }
 
     /// <summary>
@@ -411,6 +481,6 @@ public sealed class Pop3ProtocolHandlerSessionTests
         return new([.. reads.Where(read => read.Length > 0).Select(Encoding.Latin1.GetBytes)]);
     }
 
-    private static Task<Pop3Run> RunAsync(string url, string replies, TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
-        Pop3Run.ExecuteAsync(url, Script(replies), sslLevel);
+    private Task<Pop3Run> RunAsync(string url, string replies, TransportSecurityLevel sslLevel = TransportSecurityLevel.None) =>
+        Pop3Run.ExecuteAsync(Diagnostics, url, Script(replies), sslLevel);
 }

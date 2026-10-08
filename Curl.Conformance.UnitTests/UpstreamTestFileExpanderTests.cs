@@ -9,7 +9,7 @@ namespace Curl.Conformance;
 /// <c>subchars</c> and <c>subbase64</c> in <c>testutil.pm</c>).
 /// </summary>
 [TestClass]
-public sealed class UpstreamTestFileExpanderTests
+public sealed partial class UpstreamTestFileExpanderTests
 {
     private static readonly Dictionary<string, string> NoVariables = [];
 

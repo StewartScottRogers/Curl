@@ -132,6 +132,56 @@ public sealed class SchannelCommonNameCheckTests
         Assert.IsFalse(SchannelCommonNameCheck.CommonNameMatches(certificate, "wrong.example"));
     }
 
+    [TestMethod]
+    public void CommonNameMatches_WithAnIssuedCertificateWhoseSubjectNamesTheHost_IsTrue()
+    {
+        using var certificate = CreateIssuedCertificate("CN=localhost", "CN=Test Authority");
+
+        Diagnostics.Arrange("subject, issuer, alternative names, host", "CN=localhost, CN=Test Authority, none, localhost");
+
+        var matches = SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", true, matches);
+
+        Assert.IsTrue(matches);
+    }
+
+    [TestMethod]
+    public void CommonNameMatches_WithAnIssuedCertificateWhoseIssuerNamesTheHost_IsFalse()
+    {
+        using var certificate = CreateIssuedCertificate("CN=other.example", "CN=localhost");
+
+        Diagnostics.Arrange("subject, issuer, alternative names, host", "CN=other.example, CN=localhost, none, localhost");
+
+        var matches = SchannelCommonNameCheck.CommonNameMatches(certificate, "localhost");
+
+        Diagnostics.Act("matches", matches);
+        Diagnostics.Assert("matches", false, matches);
+
+        Assert.IsFalse(matches);
+    }
+
+    // A leaf with no subjectAltName, signed by a separate certificate authority, so its
+    // issuer name differs from its subject name (AF-0031, AF-0037).
+    private static X509Certificate2 CreateIssuedCertificate(string subject, string issuer)
+    {
+        using var authorityKey = ECDsa.Create();
+        var authorityRequest = new CertificateRequest(issuer, authorityKey, HashAlgorithmName.SHA256);
+        authorityRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+        authorityRequest.CertificateExtensions.Add(
+            new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.DigitalSignature, critical: true));
+        using var authority = authorityRequest.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(2));
+
+        using var leafKey = ECDsa.Create();
+        var leafRequest = new CertificateRequest(subject, leafKey, HashAlgorithmName.SHA256);
+        return leafRequest.Create(
+            authority,
+            DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(1),
+            [1, 2, 3, 4, 5, 6, 7, 8]);
+    }
+
     private static X509Certificate2 CreateCertificate(string subject, Action<SubjectAlternativeNameBuilder>? addNames)
     {
         using var key = ECDsa.Create();

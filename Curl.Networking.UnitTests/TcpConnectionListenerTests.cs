@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Networking;
 
@@ -15,12 +16,21 @@ public sealed class TcpConnectionListenerTests
 {
     private static readonly ListenTarget AnyLoopbackPort = new(IPAddress.Loopback, 0, 0);
 
+    /// <summary>Gets or sets the test's context, which carries its diagnostics (BL-1457).</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ListenAsync_WithNullTarget_ThrowsArgumentNullException()
     {
+        Diagnostics.Arrange("target", "null");
+
         var exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(
             async () => await new TcpConnectionListener().ListenAsync(null!, CancellationToken.None));
 
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("parameter name", "target", exception.ParamName);
         Assert.AreEqual("target", exception.ParamName);
     }
 
@@ -29,49 +39,29 @@ public sealed class TcpConnectionListenerTests
     {
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
+        Diagnostics.Arrange("cancelled", "before listening");
 
-        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+        var exception = await Assert.ThrowsExactlyAsync<OperationCanceledException>(
             async () => await new TcpConnectionListener().ListenAsync(AnyLoopbackPort, cancellation.Token));
+
+        Diagnostics.Act("exception", exception.GetType().Name);
+        Diagnostics.Assert("exception", nameof(OperationCanceledException), exception.GetType().Name);
     }
 
     [TestMethod]
     public async Task ListenAsync_OnLoopbackPortZero_ReturnsAPendingConnectionOnANonZeroLoopbackPort()
     {
-        var listened = await new TcpConnectionListener().ListenAsync(AnyLoopbackPort, CancellationToken.None);
+        Diagnostics.Arrange("target", "127.0.0.1, port 0");
 
+        var listened = await ListenAsync(new TcpConnectionListener(), AnyLoopbackPort);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, listened.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, listened.ExitCode);
         Assert.IsNull(listened.ErrorMessage);
         await using var pending = listened.PendingConnection!;
         var listening = (IPEndPoint)pending.LocalEndPoint;
         Assert.AreEqual(IPAddress.Loopback, listening.Address);
         Assert.AreNotEqual(0, listening.Port);
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task ListenAsync_OnLoopbackPortZero_AcceptsTheClientThatConnectsAndKeepsItOpenAfterDispose()
-    {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var listened = await new TcpConnectionListener().ListenAsync(AnyLoopbackPort, cancellation.Token);
-        var pending = listened.PendingConnection!;
-        var listening = (IPEndPoint)pending.LocalEndPoint;
-        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-        await client.ConnectAsync(listening, cancellation.Token);
-        var accepted = await pending.AcceptAsync(cancellation.Token);
-        await pending.DisposeAsync();
-
-        Assert.AreEqual(CurlExitCode.Ok, accepted.ExitCode);
-        await using var connection = accepted.Connection!;
-        Assert.IsFalse(connection.IsSecure);
-        Assert.AreEqual(listening, connection.LocalEndPoint);
-        Assert.AreEqual(listening, accepted.LocalEndPoint);
-        Assert.AreEqual(client.LocalEndPoint, connection.RemoteEndPoint);
-        await connection.WriteAsync(new byte[] { 42 }, cancellation.Token);
-        await connection.FlushAsync(cancellation.Token);
-        var received = new byte[1];
-        await client.ReceiveAsync(received, cancellation.Token);
-        Assert.AreEqual(42, received[0]);
     }
 
     [TestMethod]
@@ -84,10 +74,12 @@ public sealed class TcpConnectionListenerTests
         held.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         held.Listen(1);
         var heldPort = ((IPEndPoint)held.LocalEndPoint!).Port;
+        Diagnostics.Arrange("port range", "only a port held listening");
 
-        var listened = await new TcpConnectionListener().ListenAsync(
-            new ListenTarget(IPAddress.Loopback, heldPort, heldPort), CancellationToken.None);
+        var listened = await ListenAsync(new TcpConnectionListener(), new ListenTarget(IPAddress.Loopback, heldPort, heldPort));
 
+        Diagnostics.Act("error message", listened.ErrorMessage);
+        Diagnostics.Assert("exit code", CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual("bind() failed, ran out of ports", listened.ErrorMessage);
         Assert.IsNull(listened.PendingConnection);
@@ -100,13 +92,16 @@ public sealed class TcpConnectionListenerTests
         held.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         held.Listen(1);
         var heldPort = ((IPEndPoint)held.LocalEndPoint!).Port;
+        Diagnostics.Arrange("port range", "a port held listening and up to 64 after it");
 
         // Up to 64 ports after the held one, so a port another process holds is skipped too.
-        var listened = await new TcpConnectionListener().ListenAsync(
-            new ListenTarget(IPAddress.Loopback, heldPort, Math.Min(heldPort + 64, 65535)), CancellationToken.None);
+        var listened = await ListenAsync(
+            new TcpConnectionListener(), new ListenTarget(IPAddress.Loopback, heldPort, Math.Min(heldPort + 64, 65535)));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, listened.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, listened.ExitCode);
         await using var pending = listened.PendingConnection!;
+        Diagnostics.Act("ports past the held one", ((IPEndPoint)pending.LocalEndPoint).Port - heldPort);
         Assert.IsTrue(((IPEndPoint)pending.LocalEndPoint).Port > heldPort);
     }
 
@@ -121,10 +116,13 @@ public sealed class TcpConnectionListenerTests
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         var expected = Assert.ThrowsExactly<SocketException>(() => socket.Bind(new IPEndPoint(IPAddress.Parse("192.0.2.1"), 0)));
         socket.Dispose();
+        Diagnostics.Arrange("address", "192.0.2.1, ports 0-5");
 
-        var listened = await new TcpConnectionListener().ListenAsync(
-            new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 5), CancellationToken.None);
+        var listened = await ListenAsync(new TcpConnectionListener(), new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 5));
 
+        // The reason is the platform's own words, so only whether the line starts as curl's does is written.
+        Diagnostics.Assert("exit code", CurlExitCode.FtpPortFailed, listened.ExitCode);
+        Diagnostics.Assert("starts with the non-local line", true, listened.ErrorMessage?.StartsWith("bind(port=0) on non-local address failed: ", StringComparison.Ordinal));
         Assert.AreEqual(SocketError.AddressNotAvailable, expected.SocketErrorCode);
         Assert.AreEqual(CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(
@@ -137,9 +135,12 @@ public sealed class TcpConnectionListenerTests
     [OSCondition(OperatingSystems.Windows)]
     public async Task ListenAsync_OnAnAddressThatIsNotLocal_OnWindows_GivesCurlsWinsockWording()
     {
-        var listened = await new TcpConnectionListener().ListenAsync(
-            new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 0), CancellationToken.None);
+        Diagnostics.Arrange("address", "192.0.2.1, port 0");
 
+        var listened = await ListenAsync(new TcpConnectionListener(), new ListenTarget(IPAddress.Parse("192.0.2.1"), 0, 0));
+
+        Diagnostics.Act("error message", listened.ErrorMessage);
+        Diagnostics.Assert("error message", "bind(port=0) on non-local address failed: Address not available", listened.ErrorMessage);
         Assert.AreEqual("bind(port=0) on non-local address failed: Address not available", listened.ErrorMessage);
     }
 
@@ -158,9 +159,11 @@ public sealed class TcpConnectionListenerTests
                 return bound;
             },
         };
+        Diagnostics.Arrange("opened socket", "already bound");
 
-        var listened = await listener.ListenAsync(new ListenTarget(IPAddress.Loopback, 0, 0), CancellationToken.None);
+        var listened = await ListenAsync(listener, new ListenTarget(IPAddress.Loopback, 0, 0));
 
+        Diagnostics.Assert("exit code", CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(CurlExitCode.FtpPortFailed, listened.ExitCode);
         StringAssert.StartsWith(listened.ErrorMessage, "bind(port=0) failed: ");
         Assert.IsNull(listened.PendingConnection);
@@ -171,9 +174,11 @@ public sealed class TcpConnectionListenerTests
     {
         var failure = new SocketException((int)SocketError.AddressFamilyNotSupported);
         var listener = new TcpConnectionListener { OpenSocket = _ => throw failure };
+        Diagnostics.Arrange("socket open failure", SocketError.AddressFamilyNotSupported);
 
-        var listened = await listener.ListenAsync(AnyLoopbackPort, CancellationToken.None);
+        var listened = await ListenAsync(listener, AnyLoopbackPort);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(
             "socket failure: " + ConnectFailureReason.Describe(failure, OperatingSystem.IsWindows()),
@@ -191,9 +196,11 @@ public sealed class TcpConnectionListenerTests
             OpenSocket = family => opened = new Socket(family, SocketType.Stream, ProtocolType.Tcp),
             StartListening = _ => throw failure,
         };
+        Diagnostics.Arrange("listen failure", SocketError.TooManyOpenSockets);
 
-        var listened = await listener.ListenAsync(AnyLoopbackPort, CancellationToken.None);
+        var listened = await ListenAsync(listener, AnyLoopbackPort);
 
+        Diagnostics.Assert("exit code", CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(CurlExitCode.FtpPortFailed, listened.ExitCode);
         Assert.AreEqual(
             "socket failure: " + ConnectFailureReason.Describe(failure, OperatingSystem.IsWindows()),
@@ -205,14 +212,17 @@ public sealed class TcpConnectionListenerTests
     public async Task DisposeAsync_ReleasesThePortSoItCanBeBoundAgain()
     {
         var listener = new TcpConnectionListener();
-        var first = await listener.ListenAsync(AnyLoopbackPort, CancellationToken.None);
+        var first = await ListenAsync(listener, AnyLoopbackPort);
         var port = ((IPEndPoint)first.PendingConnection!.LocalEndPoint).Port;
+        Diagnostics.Arrange("port", "the one the first listen bound, then released");
 
         await first.PendingConnection.DisposeAsync();
-        var second = await listener.ListenAsync(new ListenTarget(IPAddress.Loopback, port, port), CancellationToken.None);
+        var second = await ListenAsync(listener, new ListenTarget(IPAddress.Loopback, port, port));
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, second.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
         await using var pending = second.PendingConnection!;
+        Diagnostics.Assert("same port", true, ((IPEndPoint)pending.LocalEndPoint).Port == port);
         Assert.AreEqual(port, ((IPEndPoint)pending.LocalEndPoint).Port);
     }
 
@@ -224,11 +234,31 @@ public sealed class TcpConnectionListenerTests
     public void BindFailureMessage_MovesOnForAPortInUseOrNotPermittedAndTellsANonLocalAddressApart(SocketError error, string? expectedBeforeReason)
     {
         var exception = new SocketException((int)error);
+        Diagnostics.Arrange("socket error", error);
 
         var message = TcpConnectionListener.BindFailureMessage(exception, 40000);
 
+        // The reason after the prefix is the platform's own words, so only the prefix is written.
+        Diagnostics.Act("message is null", message is null);
+        Diagnostics.Assert("prefix", expectedBeforeReason, message?[..Math.Min(expectedBeforeReason?.Length ?? 0, message.Length)]);
         Assert.AreEqual(
             expectedBeforeReason is null ? null : expectedBeforeReason + ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows()),
             message);
+    }
+
+    /// <summary>
+    /// Listens on <paramref name="target" /> as the tests did directly, timing the bind and listen
+    /// as one PHASE and writing the exit code as ACT.
+    /// </summary>
+    private async Task<ListenResult> ListenAsync(TcpConnectionListener listener, ListenTarget target)
+    {
+        ListenResult listened;
+        using (Diagnostics.Phase("bind and listen"))
+        {
+            listened = await listener.ListenAsync(target, CancellationToken.None);
+        }
+
+        Diagnostics.Act("exit code", listened.ExitCode);
+        return listened;
     }
 }

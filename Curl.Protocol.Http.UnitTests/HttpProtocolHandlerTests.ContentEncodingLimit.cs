@@ -32,12 +32,17 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            Diagnostics.Arrange("response, option, chunk size", $"{OneLine(response)}, {option}, {chunkSize}");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize)))
                 .ExecuteAsync(CompressedContext(output, option));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.BadContentEncoding, result.ExitCode);
             Assert.AreEqual(CurlExitCode.BadContentEncoding, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("error message", TooManyContentCodings, result.ErrorMessage ?? "(none)");
             Assert.AreEqual(TooManyContentCodings, result.ErrorMessage, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("output length", 0L, output.Length);
             Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
         }
     }
@@ -54,11 +59,15 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
+            Diagnostics.Arrange("response, option, chunk size", $"{OneLine(response)}, {option}, {chunkSize}");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize)))
                 .ExecuteAsync(CompressedContext(output, option));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}: {result.ErrorMessage}");
+            Diagnostics.Diff("output", body, Latin1(output.ToArray()));
             Assert.AreEqual(body, Latin1(output.ToArray()), $"Chunk size {chunkSize}");
         }
     }
@@ -75,10 +84,15 @@ public sealed partial class HttpProtocolHandlerTests
     {
         foreach (int chunkSize in ChunkSizes)
         {
+            Diagnostics.Arrange("response, option, chunk size", $"{OneLine(response)}, {option}, {chunkSize}");
+
             TransferResult result = await Handler(QueueConnector.For(Connection(response, chunkSize)))
                 .ExecuteAsync(CompressedContext(new MemoryStream(), option));
 
+            WriteResult(result);
+            Diagnostics.Assert("exit code", exitCode, result.ExitCode);
             Assert.AreEqual(exitCode, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("error message", message, result.ErrorMessage ?? "(none)");
             Assert.AreEqual(message, result.ErrorMessage, $"Chunk size {chunkSize}");
         }
     }

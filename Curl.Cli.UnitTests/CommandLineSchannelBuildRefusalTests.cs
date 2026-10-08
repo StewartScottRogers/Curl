@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -15,6 +16,24 @@ public sealed class CommandLineSchannelBuildRefusalTests
 {
     private const string Url = "http://127.0.0.1:1/";
     private const string NotSupported = "the installed libcurl version does not support this";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<IReadOnlyList<string>, CommandLineParseResult> parse)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = parse(arguments);
+        Diagnostics.ActParse(result);
+        if (result.IsAccepted)
+        {
+            Diagnostics.Act("acts as windows schannel build", result.Options.ActsAsWindowsSchannelBuild);
+            Diagnostics.Act("proxy http2", result.Options.ProxyHttp2);
+        }
+
+        return result;
+    }
 
     [TestMethod]
     [DataRow("--http2")]
@@ -77,9 +96,19 @@ public sealed class CommandLineSchannelBuildRefusalTests
     {
         RecordingDataFileReader reader = new();
         reader.Files["k.txt"] = "tlsuser = x\n"u8.ToArray();
+        Diagnostics.Bytes("k.txt", reader.Files["k.txt"]);
 
-        CommandLineParseResult result = CommandLineParser.Parse(["-K", "k.txt", Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, reader, isWindows: true);
+        CommandLineParseResult result = Parse(["-K", "k.txt", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, reader, isWindows: true));
 
+        Diagnostics.AssertRefusal(
+            result,
+            CurlExitCode.FailedInit,
+            [
+                "curl: k.txt:1 config file option 'tlsuser' the installed libcurl version does ",
+                "curl: not support this",
+                $"curl: option -K: {NotSupported}",
+                CommandLineRefusal.TryHelpLine,
+            ]);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(
             new[]
@@ -97,7 +126,9 @@ public sealed class CommandLineSchannelBuildRefusalTests
     [DataRow("--http3-only")]
     public void Parse_HttpVersionOnTheOpenSslBuild_IsAccepted(string spelling)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", spelling, Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false);
+        CommandLineParseResult result = ParseAsOpenSslBuild(["-s", spelling, Url]);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.ActsAsWindowsSchannelBuild);
@@ -108,6 +139,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
     {
         CommandLineParseResult result = ParseAsOpenSslBuild(["--proxy-http2", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+
         Assert.IsTrue(result.IsAccepted);
         Assert.IsTrue(result.Options.ProxyHttp2);
     }
@@ -117,6 +150,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
     {
         CommandLineParseResult result = ParseAsOpenSslBuild(["--proxy-http2", "--no-proxy-http2", Url]);
 
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.ProxyHttp2);
     }
@@ -125,6 +160,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
     public void Parse_NoProxyOption_LeavesProxyHttp2Off()
     {
         CommandLineParseResult result = ParseAsOpenSslBuild([Url]);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
 
         Assert.IsTrue(result.IsAccepted);
         Assert.IsFalse(result.Options.ProxyHttp2);
@@ -143,7 +180,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
     [DataRow(false)]
     public void Parse_ProxyHttp3OnEitherBuild_IsRefusedAsNotSupported(bool isWindows)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "--proxy-http3", Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows);
+        Diagnostics.Arrange("is windows", isWindows);
+        CommandLineParseResult result = Parse(["-s", "--proxy-http3", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows));
 
         AssertRefused(result, $"curl: option --proxy-http3: {NotSupported}");
     }
@@ -153,6 +191,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
     {
         string section = AiHelpSection("## --proxy-http3\n");
 
+        Diagnostics.Assert("section says not supported", true, section.Contains("- Not supported by this build yet: curl refuses it with exit 2.", StringComparison.Ordinal));
+        Diagnostics.Assert("section says windows refuses", false, section.Contains("On Windows: refused", StringComparison.Ordinal));
         StringAssert.Contains(section, "- Not supported by this build yet: curl refuses it with exit 2.");
         Assert.DoesNotContain("On Windows: refused", section);
     }
@@ -160,13 +200,15 @@ public sealed class CommandLineSchannelBuildRefusalTests
     [TestMethod]
     public void Parse_DefaultConfigFileSearchOverloadAsTheWindowsBuild_RefusesHttp3()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["-q", "--http3", Url],
-            _ => false,
-            ConsolePasswordPrompt.ForProcessConsole,
-            new RecordingDataFileReader(),
-            new DefaultConfigFileSearch(_ => null, isWindows: true, null, null),
-            isWindows: true);
+            parsed => CommandLineParser.Parse(
+                parsed,
+                _ => false,
+                ConsolePasswordPrompt.ForProcessConsole,
+                new RecordingDataFileReader(),
+                new DefaultConfigFileSearch(_ => null, isWindows: true, null, null),
+                isWindows: true));
 
         AssertRefused(result, $"curl: option --http3: {NotSupported}");
     }
@@ -182,6 +224,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
     {
         string section = AiHelpSection(heading);
 
+        Diagnostics.Assert("section says windows refuses", true, section.Contains("- On Windows: refused with exit 2 (`the installed libcurl version does not support this`)", StringComparison.Ordinal));
         StringAssert.Contains(section, "- On Windows: refused with exit 2 (`the installed libcurl version does not support this`)");
     }
 
@@ -192,26 +235,33 @@ public sealed class CommandLineSchannelBuildRefusalTests
     {
         string section = AiHelpSection(heading);
 
+        Diagnostics.Assert("section says windows refuses", false, section.Contains("On Windows: refused", StringComparison.Ordinal));
         Assert.DoesNotContain("On Windows: refused", section);
     }
 
-    private static string AiHelpSection(string heading)
+    private string AiHelpSection(string heading)
     {
+        Diagnostics.Arrange("ai help category", "all");
+        Diagnostics.Arrange("heading", heading.ReplaceLineEndings("\\n"));
         Assert.IsTrue(CurlAiHelpText.TryGetMarkdown("all", out string markdown));
         int start = markdown.IndexOf(heading, StringComparison.Ordinal);
+        Diagnostics.Act("heading index", start);
         Assert.IsGreaterThanOrEqualTo(0, start);
         int end = markdown.IndexOf("\n## ", start + 1, StringComparison.Ordinal);
-        return end < 0 ? markdown[start..] : markdown[start..end];
+        string section = end < 0 ? markdown[start..] : markdown[start..end];
+        Diagnostics.Act("section", section.ReplaceLineEndings("\\n"));
+        return section;
     }
 
-    private static CommandLineParseResult ParseAsWindowsBuild(IReadOnlyList<string> arguments) =>
-        CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: true);
+    private CommandLineParseResult ParseAsWindowsBuild(IReadOnlyList<string> arguments) =>
+        Parse(arguments, parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: true));
 
-    private static CommandLineParseResult ParseAsOpenSslBuild(IReadOnlyList<string> arguments) =>
-        CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false);
+    private CommandLineParseResult ParseAsOpenSslBuild(IReadOnlyList<string> arguments) =>
+        Parse(arguments, parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false));
 
-    private static void AssertRefused(CommandLineParseResult result, string optionLine)
+    private void AssertRefused(CommandLineParseResult result, string optionLine)
     {
+        Diagnostics.AssertRefusal(result, CurlExitCode.FailedInit, [optionLine, CommandLineRefusal.TryHelpLine]);
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { optionLine, CommandLineRefusal.TryHelpLine }, result.Refusal.StandardErrorLines.ToArray());

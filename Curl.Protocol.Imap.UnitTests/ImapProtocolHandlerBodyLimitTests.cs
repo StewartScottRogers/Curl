@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -41,6 +42,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
 
     private const string WeirdServerReply = "Weird server reply";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public async Task ExecuteAsync_NoBodyOnAUidFetch_FailsWithExit8AtTheLiteralWithoutLogout()
     {
@@ -48,8 +54,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
         // bytes, { [100 bytes data], shutting down connection #0; no LOGOUT sent.
         BodyRun run = await RunAsync(Context(Host + "INBOX;UID=1", noBody: true), Opening + SelectReply + FetchReply + LogoutReply);
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, WeirdServerReply), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, WeirdServerReply), run.Result);
+        Diagnostics.Diff("output", string.Empty, run.Output);
         Assert.AreEqual(string.Empty, run.Output);
         CollectionAssert.AreEqual(
             (string[])["< * 1 FETCH (UID 1 BODY[] {100}\r\n", "* Found 100 bytes to download", "{ 100", ShuttingDown],
@@ -63,8 +72,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
         // line, { [35 bytes data], shutting down connection #0; LOGOUT sent, not shown.
         BodyRun run = await RunAsync(Context(Host, noBody: true), Opening + ListReply + "* BYE\r\nA003 OK LOGOUT completed\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, WeirdServerReply), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, WeirdServerReply), run.Result);
+        Diagnostics.Diff("output", string.Empty, run.Output);
         Assert.AreEqual(string.Empty, run.Output);
         CollectionAssert.AreEqual(
             (string[])["< " + ListLine, "{ 35", ShuttingDown],
@@ -80,8 +92,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
             Context(Host + "INBOX?ALL", noBody: true),
             Opening + SelectReply + "* SEARCH 1 2\r\nA003 OK SEARCH completed\r\n" + LogoutReply);
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 SEARCH ALL\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 SEARCH ALL\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.WeirdServerReply, WeirdServerReply), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, WeirdServerReply), run.Result);
+        Diagnostics.Diff("output", string.Empty, run.Output);
         Assert.AreEqual(string.Empty, run.Output);
         CollectionAssert.AreEqual(
             (string[])["< * SEARCH 1 2\r\n", "{ 14", ShuttingDown],
@@ -96,8 +111,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
         const string Exceeded = "Exceeded the maximum allowed file size (3) with 3 bytes";
         BodyRun run = await RunAsync(Context(Host + "INBOX;UID=1", maxFileSize: 3), Opening + SelectReply + FetchReply + LogoutReply);
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.FilesizeExceeded, Exceeded, 3), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, Exceeded, 3), run.Result);
+        Diagnostics.Diff("output", "Fro", run.Output);
         Assert.AreEqual("Fro", run.Output);
         CollectionAssert.AreEqual(
             (string[])["* Found 100 bytes to download", "{ 100", "* " + Exceeded, ShuttingDown],
@@ -112,8 +130,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
         const string Exceeded = "Exceeded the maximum allowed file size (40) with 40 bytes";
         BodyRun run = await RunAsync(Context(Host, maxFileSize: 40), Opening + ListReply + "* BYE\r\nA003 OK LOGOUT completed\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.FilesizeExceeded, Exceeded, 40), run.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, Exceeded, 40), run.Result);
+        Diagnostics.Diff("output", "* LIST (\\HasNoChildren) \"/\" INBOX\r\n* LIS", run.Output);
         Assert.AreEqual("* LIST (\\HasNoChildren) \"/\" INBOX\r\n* LIS", run.Output);
         CollectionAssert.AreEqual(
             (string[])["{ 34", "* " + Exceeded, ShuttingDown],
@@ -127,8 +148,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
             Context(Host + "INBOX", maxFileSize: 32, customCommand: "FETCH 1 BODY[]"),
             Opening + SelectReply + FetchReply + LogoutReply);
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 FETCH 1 BODY[]\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 FETCH 1 BODY[]\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, run.Result.ExitCode);
+        Diagnostics.Diff("output", "* 1 FETCH (UID 1 BODY[] {100}\r\nF", run.Output);
         Assert.AreEqual("* 1 FETCH (UID 1 BODY[] {100}\r\nF", run.Output);
     }
 
@@ -140,8 +164,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
     {
         BodyRun run = await RunAsync(Context(Host + "INBOX;UID=1", maxFileSize: maxFileSize), Opening + SelectReply + FetchReply + LogoutReply);
 
+        Diagnostics.Diff("sent", SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\nA004 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(SentThroughSelect + "A003 UID FETCH 1 BODY[]\r\nA004 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("result", TransferResult.Success(100), run.Result);
         Assert.AreEqual(TransferResult.Success(100), run.Result);
+        Diagnostics.Diff("output", Message, run.Output);
         Assert.AreEqual(Message, run.Output);
     }
 
@@ -152,8 +179,11 @@ public sealed class ImapProtocolHandlerBodyLimitTests
 
         BodyRun run = await RunAsync(context, Opening + "+ Ready\r\nA002 OK APPEND completed\r\n* BYE\r\nA003 OK LOGOUT completed\r\n");
 
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\nA002 APPEND INBOX {4}\r\nhi\r\n\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 APPEND INBOX {4}\r\nhi\r\n\r\nA003 LOGOUT\r\n", run.Sent);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
+        Diagnostics.Diff("output", string.Empty, run.Output);
         Assert.AreEqual(string.Empty, run.Output);
     }
 
@@ -169,10 +199,18 @@ public sealed class ImapProtocolHandlerBodyLimitTests
             Mail = customCommand is null ? null : new MailRequestOptions { CustomCommand = customCommand },
         };
 
-    private static async Task<BodyRun> RunAsync(TransferContext context, string replies)
+    private async Task<BodyRun> RunAsync(TransferContext context, string replies)
     {
+        Diagnostics.Arrange("url", context.Url);
+        Diagnostics.Arrange("server", DiagnosticText.Escape(replies));
+        Diagnostics.Arrange("no body", context.NoBody);
+        Diagnostics.Arrange("max file size", context.MaxFileSize);
         ImapRun run = await ImapRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)));
         string output = Encoding.Latin1.GetString(((MemoryStream)context.Output).ToArray());
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        Diagnostics.Act("output", DiagnosticText.Escape(output));
+        Diagnostics.Act("transcript", DiagnosticText.Lines(((RecordingTransferEvents)context.Events).Transcript));
         return new BodyRun(run.Result, run.Sent, output, (RecordingTransferEvents)context.Events);
     }
 

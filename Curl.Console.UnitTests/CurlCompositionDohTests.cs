@@ -4,6 +4,7 @@ using System.Text;
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -18,6 +19,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionDohTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string DohUrl = "https://127.0.0.1:48711/dns-query";
 
     // The measured A answer: ID 0, flags 0x8180, one question for example.test A IN, one answer
@@ -33,26 +38,37 @@ public sealed class CurlCompositionDohTests
     [TestMethod]
     public void CreateDnsResolver_WithDohUrl_IsTheDohResolver()
     {
-        Assert.IsInstanceOfType<DohDnsResolver>(CreateDnsResolver("--doh-url", DohUrl));
+        IDnsResolver resolver = CreateDnsResolver("--doh-url", DohUrl);
+
+        Diagnostics.Assert("resolver type", nameof(DohDnsResolver), resolver.GetType().Name);
+        Assert.IsInstanceOfType<DohDnsResolver>(resolver);
     }
 
     [TestMethod]
     public void CreateDnsResolver_WithDohUrlAndDnsServers_AsksTheDohServer()
     {
-        Assert.IsInstanceOfType<DohDnsResolver>(CreateDnsResolver("--dns-servers", "192.0.2.1", "--doh-url", DohUrl));
+        IDnsResolver resolver = CreateDnsResolver("--dns-servers", "192.0.2.1", "--doh-url", DohUrl);
+
+        Diagnostics.Assert("resolver type", nameof(DohDnsResolver), resolver.GetType().Name);
+        Assert.IsInstanceOfType<DohDnsResolver>(resolver);
     }
 
     [TestMethod]
     public void CreateDnsResolver_WithAnEmptyDohUrlLast_IsTheSystemResolver()
     {
-        Assert.IsInstanceOfType<SystemDnsResolver>(CreateDnsResolver("--doh-url", DohUrl, "--doh-url", ""));
+        IDnsResolver resolver = CreateDnsResolver("--doh-url", DohUrl, "--doh-url", "");
+
+        Diagnostics.Assert("resolver type", nameof(SystemDnsResolver), resolver.GetType().Name);
+        Assert.IsInstanceOfType<SystemDnsResolver>(resolver);
     }
 
     [TestMethod]
     public void CreateTransports_WithDohUrl_SharesTheDohResolverBetweenBothConnectors()
     {
         CurlTransports transports = CurlComposition.CreateTransports(Parse("--doh-url", DohUrl));
+        Diagnostics.Act("resolver type", transports.DnsResolver.GetType().Name);
 
+        Diagnostics.Assert("resolver type", nameof(DohDnsResolver), transports.DnsResolver.GetType().Name);
         Assert.IsInstanceOfType<DohDnsResolver>(transports.DnsResolver);
     }
 
@@ -68,13 +84,20 @@ public sealed class CurlCompositionDohTests
 
         ConnectResult result = await ConnectAsync(DohUrl, dohServer, webServer, events, "--doh-insecure");
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("dohServer.Targets count", 2, dohServer.Targets.Count);
         Assert.HasCount(2, dohServer.Targets);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 48711, true), dohServer.Targets[0] with { PoolScheme = null });
+        Diagnostics.Assert("dohServer.Targets[0].PoolScheme", "https", dohServer.Targets[0].PoolScheme);
         Assert.AreEqual("https", dohServer.Targets[0].PoolScheme);
+        Diagnostics.Diff("DoH requests", MeasuredPost(0x01) + MeasuredPost(0x1C), Encoding.Latin1.GetString(dohServer.Written));
         Assert.AreEqual(MeasuredPost(0x01) + MeasuredPost(0x1C), Encoding.Latin1.GetString(dohServer.Written));
+        Diagnostics.Assert("webServer.Targets count", 1, webServer.Targets.Count);
         Assert.HasCount(1, webServer.Targets);
+        Diagnostics.Assert("webServer.Targets[0].Host", "127.0.0.1", webServer.Targets[0].Host);
         Assert.AreEqual("127.0.0.1", webServer.Targets[0].Host);
+        Diagnostics.Assert("webServer.Targets[0].Port", 48712, webServer.Targets[0].Port);
         Assert.AreEqual(48712, webServer.Targets[0].Port);
         CollectionAssert.AreEqual(
             new[] { "Host example.test:48712 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", "  Trying 127.0.0.1:48712..." },
@@ -96,6 +119,7 @@ public sealed class CurlCompositionDohTests
 
         ConnectResult result = await ConnectAsync(DohUrl, dohServer, new ScriptedConnector([]), events, "--doh-insecure", "-v", "--trace-config", component);
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
         CollectionAssert.AreEqual(
             new[]
@@ -137,6 +161,7 @@ public sealed class CurlCompositionDohTests
 
         await ConnectAsync(DohUrl, dohServer, new ScriptedConnector([]), events, "--doh-insecure", "-v", "--trace-config", "tls,http/1");
 
+        Diagnostics.Assert("[DNS] line present", false, events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal)));
         Assert.IsFalse(events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal)));
     }
 
@@ -150,9 +175,13 @@ public sealed class CurlCompositionDohTests
 
         ConnectResult result = await ConnectAsync(DohUrl, dohServer, webServer, new RecordingEvents(), "--doh-insecure", "-4");
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("dohServer.Targets count", 1, dohServer.Targets.Count);
         Assert.HasCount(1, dohServer.Targets);
+        Diagnostics.Diff("DoH requests", MeasuredPost(0x01), Encoding.Latin1.GetString(dohServer.Written));
         Assert.AreEqual(MeasuredPost(0x01), Encoding.Latin1.GetString(dohServer.Written));
+        Diagnostics.Assert("webServer.Targets[0].Host", "127.0.0.1", webServer.Targets[0].Host);
         Assert.AreEqual("127.0.0.1", webServer.Targets[0].Host);
     }
 
@@ -167,8 +196,11 @@ public sealed class CurlCompositionDohTests
         ConnectResult result = await ConnectAsync(
             DohUrl, dohServer, webServer, new RecordingEvents(), "--doh-insecure", "--resolve", "example.test:48712:192.0.2.7");
 
+        Diagnostics.Assert("result.Connection is not null", true, result.Connection is not null);
         Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("dohServer.Targets count", 0, dohServer.Targets.Count);
         Assert.IsEmpty(dohServer.Targets);
+        Diagnostics.Assert("webServer.Targets[0].Host", "192.0.2.7", webServer.Targets[0].Host);
         Assert.AreEqual("192.0.2.7", webServer.Targets[0].Host);
     }
 
@@ -182,9 +214,12 @@ public sealed class CurlCompositionDohTests
 
         ConnectResult result = await ConnectAsync("bogus", dohServer, webServer, new RecordingEvents());
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Diagnostics.Assert("result.ErrorMessage", "Could not resolve host: example.test", result.ErrorMessage);
         Assert.AreEqual("Could not resolve host: example.test", result.ErrorMessage);
         Assert.AreEqual(new ConnectTarget("bogus", 80, false), dohServer.Targets[0] with { PoolScheme = null });
+        Diagnostics.Assert("webServer.Targets count", 0, webServer.Targets.Count);
         Assert.IsEmpty(webServer.Targets);
     }
 
@@ -197,21 +232,35 @@ public sealed class CurlCompositionDohTests
 
         ConnectResult result = await ConnectAsync("ftp://127.0.0.1:48711/", dohServer, webServer, new RecordingEvents());
 
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Diagnostics.Assert("dohServer.Targets count", 0, dohServer.Targets.Count);
         Assert.IsEmpty(dohServer.Targets);
+        Diagnostics.Assert("webServer.Targets count", 0, webServer.Targets.Count);
         Assert.IsEmpty(webServer.Targets);
     }
 
     [TestMethod]
     public void CreateDohResolver_WithAUrlThatDoesNotParse_ResolvesNothing()
     {
-        Assert.IsInstanceOfType<UnusableDohUrlResolver>(CurlComposition.CreateDohResolver("http://[bad/", new ScriptedConnector([]), AddressFamily.Unspecified));
+        Diagnostics.Arrange("DoH URL", "http://[bad/");
+        IDnsResolver resolver = CurlComposition.CreateDohResolver("http://[bad/", new ScriptedConnector([]), AddressFamily.Unspecified);
+        Diagnostics.Act("resolver type", resolver.GetType().Name);
+
+        Diagnostics.Assert("resolver type", nameof(UnusableDohUrlResolver), resolver.GetType().Name);
+        Assert.IsInstanceOfType<UnusableDohUrlResolver>(resolver);
     }
 
     [TestMethod]
     public async Task UnusableDohUrlResolver_ResolvesEveryNameToNoAddress()
     {
-        Assert.IsEmpty(await new UnusableDohUrlResolver().ResolveAsync("example.test", CancellationToken.None));
+        Diagnostics.Arrange("name", "example.test");
+
+        var addresses = await new UnusableDohUrlResolver().ResolveAsync("example.test", CancellationToken.None);
+        Diagnostics.Act("addresses", string.Join(", ", addresses));
+
+        Diagnostics.Assert("address count", 0, addresses.Count);
+        Assert.IsEmpty(addresses);
     }
 
     [TestMethod]
@@ -222,6 +271,11 @@ public sealed class CurlCompositionDohTests
     [DataRow("bogus", "http://bogus/")]
     public void DohUrlOf_MakesTheUrlCurlAsks(string value, string expected)
     {
+        Diagnostics.Arrange("value", value);
+        Uri? url = CurlComposition.DohUrlOf(value);
+        Diagnostics.Act("DoH URL", url);
+
+        Diagnostics.Assert("DoH URL", new Uri(expected), url);
         Assert.AreEqual(new Uri(expected), CurlComposition.DohUrlOf(value));
     }
 
@@ -231,6 +285,11 @@ public sealed class CurlCompositionDohTests
     [DataRow("://")]
     public void DohUrlOf_ANonHttpOrUnparsableValue_IsNone(string value)
     {
+        Diagnostics.Arrange("value", value);
+        Uri? url = CurlComposition.DohUrlOf(value);
+        Diagnostics.Act("DoH URL", url?.ToString() ?? "(none)");
+
+        Diagnostics.Assert("DoH URL is none", true, url is null);
         Assert.IsNull(CurlComposition.DohUrlOf(value));
     }
 
@@ -239,9 +298,14 @@ public sealed class CurlCompositionDohTests
     {
         TlsClientOptions dohOnly = TlsClientOptionsMapping.DohFromCommandLine(Parse("--doh-insecure", "--doh-cert-status"));
         TlsClientOptions transferOnly = TlsClientOptionsMapping.DohFromCommandLine(Parse("-k", "--cert-status"));
+        Diagnostics.Act("DoH-only options", dohOnly);
+        Diagnostics.Act("transfer-only options", transferOnly);
 
+        Diagnostics.Assert("DoH-only insecure", true, dohOnly.Insecure);
         Assert.IsTrue(dohOnly.Insecure);
+        Diagnostics.Assert("DoH-only requires certificate status", true, dohOnly.RequireCertificateStatus);
         Assert.IsTrue(dohOnly.RequireCertificateStatus);
+        Diagnostics.Assert("transferOnly", new TlsClientOptions(), transferOnly);
         Assert.AreEqual(new TlsClientOptions(), transferOnly);
     }
 
@@ -260,7 +324,9 @@ public sealed class CurlCompositionDohTests
             "--ssl-auto-client-cert",
             "--cert", "client.pem",
             "--tlsv1.3"));
+        Diagnostics.Act("DoH options", options);
 
+        Diagnostics.Assert("DoH CA file", "root.pem", options.CaCertificateFile);
         Assert.AreEqual(
             new TlsClientOptions(
                 CaCertificateFile: "root.pem",
@@ -278,7 +344,11 @@ public sealed class CurlCompositionDohTests
     {
         TcpConnector connector = CurlComposition.CreateDohConnector(
             Parse("--http2", "--resolve", "x:1:192.0.2.1", "--doh-url", DohUrl), new TcpDialer(), TimeProvider.System);
+        Diagnostics.Act("ALPN offer", string.Join(", ", connector.HttpOverTlsApplicationProtocols.ToArray()));
+        Diagnostics.Act("Unix socket", connector.UnixSocket?.ToString() ?? "(none)");
 
+        Diagnostics.Assert("ALPN offer", string.Join(", ", HttpApplicationProtocols.Http11Only.ToArray()), string.Join(", ", connector.HttpOverTlsApplicationProtocols.ToArray()));
+        Diagnostics.Assert("Unix socket is none", true, connector.UnixSocket is null);
         CollectionAssert.AreEqual(HttpApplicationProtocols.Http11Only.ToArray(), connector.HttpOverTlsApplicationProtocols.ToArray());
         Assert.IsNull(connector.UnixSocket);
     }
@@ -292,8 +362,12 @@ public sealed class CurlCompositionDohTests
         + "\r\n"
         + "\0\0\u0001\0\0\u0001\0\0\0\0\0\0\u0007example\u0004test\0\0" + (char)queryType + "\0\u0001";
 
-    private static IDnsResolver CreateDnsResolver(params string[] arguments) =>
-        CurlComposition.CreateDnsResolver(Parse(arguments), TimeProvider.System, new TcpDialer());
+    private IDnsResolver CreateDnsResolver(params string[] arguments)
+    {
+        IDnsResolver resolver = CurlComposition.CreateDnsResolver(Parse(arguments), TimeProvider.System, new TcpDialer());
+        Diagnostics.Act("resolver type", resolver.GetType().Name);
+        return resolver;
+    }
 
     /// <summary>
     /// Builds the DoH resolver the composition makes of <paramref name="dohUrl" /> over
@@ -301,7 +375,7 @@ public sealed class CurlCompositionDohTests
     /// <paramref name="arguments" /> over that resolver and <paramref name="webServer" />, then connects to
     /// <c>example.test:48712</c> as the measured transfer does.
     /// </summary>
-    private static async Task<ConnectResult> ConnectAsync(
+    private async Task<ConnectResult> ConnectAsync(
         string dohUrl,
         ScriptedConnector dohServer,
         ScriptedConnector webServer,
@@ -319,11 +393,23 @@ public sealed class CurlCompositionDohTests
             HttpProxyTunnelOptions.Default,
             resolverEvents: resolverEvents);
 
-        return await connector.ConnectAsync(new ConnectTarget("example.test", 48712, false) { Events = events }, CancellationToken.None);
+        ConnectResult result;
+        using (Diagnostics.Phase("connect"))
+        {
+            result = await connector.ConnectAsync(new ConnectTarget("example.test", 48712, false) { Events = events }, CancellationToken.None);
+        }
+
+        Diagnostics.Act("exit code", result.ExitCode);
+        Diagnostics.Act("error message", result.ErrorMessage);
+        Diagnostics.Act("info lines", string.Join(" | ", events.Info));
+        Diagnostics.Bytes("DoH requests", dohServer.Written);
+        Diagnostics.Act("web targets", string.Join(", ", webServer.Targets.Select(target => $"{target.Host}:{target.Port}")));
+        return result;
     }
 
-    private static CommandLineOptions Parse(params string[] arguments)
+    private CommandLineOptions Parse(params string[] arguments)
     {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://example.test:48712/")));
         CommandLineParseResult parsed = OpenSslBuildParser.Parse([.. arguments, "http://example.test:48712/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;

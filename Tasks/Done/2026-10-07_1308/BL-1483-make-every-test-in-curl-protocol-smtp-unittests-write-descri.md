@@ -1,0 +1,48 @@
+---
+id: BL-1483
+title: Make every test in Curl.Protocol.Smtp.UnitTests write descriptive diagnostic output
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: [BL-1457]
+touches: [Curl.Protocol.Smtp.UnitTests]
+requirement: none
+created: 2026-10-04
+completed: 2026-10-07
+---
+# BL-1483 — Make every test in Curl.Protocol.Smtp.UnitTests write descriptive diagnostic output
+
+## Goal
+
+Every test in `Curl.Protocol.Smtp.UnitTests` writes, through BL-1457's shared `TestDiagnostics` helper, the Arrange inputs that matter, its Act result and its assertion context (expected against actual, first differing byte or character), plus `PHASE` timings where it has distinct phases, so an AI reading a failed or slow test's log can debug it or understand its time without re-running it; no test's logic or assertions change.
+
+## Context
+
+- Stewart's request, plan approved 2026-10-04: every unit test writes enough descriptive console output that an AI reading a failed or slow test's log can debug it without re-running it; slow budget 3 seconds per test. One task per test project; this one is `Curl.Protocol.Smtp.UnitTests`, which tests `Curl.Protocol.Smtp.UnitLibrary`.
+- BL-1457 links the root `TestDiagnostics.cs` into every test project and writes each test's `START`, `END ... (arrange <a>, act <b>, assert <c>)` and `SLOW:` lines itself. The line format (`ARRANGE`, `ACT`, `ASSERT`, `BYTES`, `DIFF`, `PHASE`) and how a test calls the helper are in `Documentation/Wiki/Test-Diagnostics.md` and BL-1457's ADR; follow them and add no prefix of your own.
+- Size, counted 2026-10-04 by matching `[TestMethod]`, `[TestMethod(` and `[DataTestMethod]` in the project's `.cs` files: 221 test methods in 17 files, with 150 `[DataRow(` lines. Solution-wide, 21 test files reference `TestContext` (mostly for its `CancellationToken`) and only 3, all in `Curl.Console.UnitTests`, write any output today.
+- What matters here: the URL, `--mail-from` and `--mail-rcpt` options, each command and reply in the scripted dialogue (`Fakes/QueuedConnector.cs` is the natural place to write it), SASL steps through `FakeSaslAuthenticator`, the message body sent as `BYTES`, and the `CurlExitCode` with its error text.
+- Output only. No test method, data row, assertion or arrange step is removed, weakened or changed in what it tests. A shared fake or helper in this project may write the lines for the tests that use it, as long as each test's `END` line counts them.
+- Keep the log readable: large payloads go through `BYTES` (which caps itself), never a loop printing thousands of lines. Nothing printed may make a test depend on the operating system.
+
+## Acceptance criteria
+
+- [x] `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test it runs (as many `END` lines as the run's total test count), and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints nothing: every test wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in `Curl.Protocol.Smtp.UnitTests` (excluding `obj`) the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Protocol.Smtp.UnitTests -warnaserror` is clean and `dotnet test Curl.Protocol.Smtp.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Protocol.Smtp.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+
+## Notes
+
+- Sized for one run: 221 test methods in 17 files.
+- Shared lines: the new `Fakes/SmtpDiagnostics.cs` and the `TestDiagnostics` overloads of `SmtpRun.ExecuteAsync` write each run's ARRANGE (URL, ssl level, `--mail-from`, `--mail-rcpt`, custom command, upload, server replies, handshakes) and ACT (result with exit code and error text, commands sent, connect targets, handshakes) lines; `ScriptedConnection.Script` exposes the scripted replies. Each test writes its own ASSERT or DIFF lines before its assertions.
+- Counts before and after (Select-String -AllMatches, excluding obj): `Assert.` 427 -> 427, `[TestMethod` 221 -> 221, `[DataRow(` 150 -> 150. Test run: 327 total (no test method or data row added or removed, so unchanged), 320 passed, 7 skipped by OS condition; 320 `END` lines, none with arrange, act or assert 0.
+- Slow tests: none printed a `SLOW:` line (whole run 1.3 s), so no follow-up task.
+- The throw tests (`Constructor_NullArgument_Throws` and the like) write their ASSERT line, naming the expected exception, before the call, because no diagnostic call goes inside an `Assert.Throws*` lambda.
+
+## Log
+
+- 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every Curl.Protocol.Smtp.UnitTests test writes ARRANGE, ACT and ASSERT or DIFF lines

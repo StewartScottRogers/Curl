@@ -1,3 +1,4 @@
+using Curl.Testing;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ldap.Fakes;
 
@@ -26,7 +27,12 @@ public sealed partial class LdapProtocolHandlerTests
     {
         var connector = new RecordingConnector(ConnectResult.Connected(new ScriptedConnection()));
 
-        Assert.ThrowsExactly<ArgumentNullException>(() => new LdapProtocolHandler(connector, LdapDialect.WinLdap, null!));
+        Diagnostics.Arrange("logon token source", null);
+
+        ArgumentNullException thrown = Assert.ThrowsExactly<ArgumentNullException>(() => new LdapProtocolHandler(connector, LdapDialect.WinLdap, null!));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name + ": " + thrown.ParamName);
+        Diagnostics.Assert("exception type", typeof(ArgumentNullException), thrown.GetType());
     }
 
     [TestMethod]
@@ -44,6 +50,8 @@ public sealed partial class LdapProtocolHandlerTests
             BindReply(4, 0),
             Sealed(0, Done(5)));
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Assert("disposed tokens", 1, tokens.Disposed);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Sealed(0, Search(5)), Sealed(1, Unbind(6)))), sent);
         CollectionAssert.AreEqual(new[] { (LdapLogonPackage.Negotiate, "ldap/127.0.0.1") }, tokens.Starts.ToArray());
@@ -66,6 +74,7 @@ public sealed partial class LdapProtocolHandlerTests
             BindReply(5, 0),
             Sealed(0, Done(6)));
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3), SicilyNegotiateBind(4), SicilyResponseBind(5), Sealed(0, Search(6)), Sealed(1, Unbind(7)))), sent);
         CollectionAssert.AreEqual(new[] { (LdapLogonPackage.Ntlm, "ldap/127.0.0.1") }, tokens.Starts.ToArray());
@@ -87,6 +96,7 @@ public sealed partial class LdapProtocolHandlerTests
             BindReply(4, 0),
             Sealed(0, Done(5)));
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Sealed(0, Search(5)), Sealed(1, Unbind(6)))), sent);
     }
@@ -105,6 +115,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(5),
             BindReply(6, 0x35));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Unwilling To Perform"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Unwilling To Perform"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), CapabilitiesSearch(4), MechanismsSearch(5), SpnegoBind(6), Unbind(7))), sent);
     }
@@ -123,6 +134,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(7),
             BindReply(8, 0x31));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Invalid Credentials"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Invalid Credentials"), result);
         CollectionAssert.AreEqual(
             Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3), SicilyNegotiateBind(4), CapabilitiesSearch(5), MechanismsSearch(6), CapabilitiesSearch(7), SicilyNegotiateBind(8), Unbind(9))),
@@ -145,6 +157,7 @@ public sealed partial class LdapProtocolHandlerTests
             SicilyChallenge(9),
             BindReply(10, 0x31));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Invalid Credentials"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Invalid Credentials"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Unbind(11)), sent[^Hex.Bytes(Unbind(11)).Length..]);
     }
@@ -156,9 +169,11 @@ public sealed partial class LdapProtocolHandlerTests
     public async Task ExecuteAsync_WinLdapServerClosesWhileTheFirstAttemptReadsTheRootDse_FailsWith38Timeout(int answered)
     {
         string[] replies = [.. new[] { Done(1), Done(2) }.Take(answered)];
+        Diagnostics.Arrange("answered", answered);
 
         (TransferResult result, byte[] sent) = await RunLogonAsync(new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate), replies);
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join([.. new[] { CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3) }.Take(answered + 1)])), sent);
     }
@@ -173,6 +188,8 @@ public sealed partial class LdapProtocolHandlerTests
 
         (TransferResult result, byte[] sent) = await RunLogonAsync(new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate), replies);
 
+        Diagnostics.Arrange("reply", reply);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3))), sent);
     }
@@ -188,6 +205,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(2),
             BindReply(3, 0x31));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Server Down"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Server Down"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), CapabilitiesSearch(4))), sent);
     }
@@ -205,6 +223,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(4),
             Done(5));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), CapabilitiesSearch(4), MechanismsSearch(5), SpnegoBind(6))), sent);
     }
@@ -221,6 +240,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(5),
             Done(6));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         CollectionAssert.AreEqual(
             Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3), CapabilitiesSearch(4), MechanismsSearch(5), CapabilitiesSearch(6), Unbind(7))),
@@ -238,6 +258,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(3),
             Done(4));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3), MechanismsSearch(4), Unbind(5))), sent);
     }
@@ -256,6 +277,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(7),
             SicilyChallenge(8));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Unbind(9)), sent[^Hex.Bytes(Unbind(9)).Length..]);
     }
@@ -274,6 +296,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(5),
             SpnegoChallenge(6));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), CapabilitiesSearch(4), MechanismsSearch(5), SpnegoBind(6), Unbind(7))), sent);
     }
@@ -292,6 +315,7 @@ public sealed partial class LdapProtocolHandlerTests
             Done(5),
             BindReply(6, 0));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), CapabilitiesSearch(4), MechanismsSearch(5), SpnegoBind(6), Unbind(7))), sent);
     }
@@ -315,6 +339,9 @@ public sealed partial class LdapProtocolHandlerTests
             SpnegoChallenge(7),
             "30 10 02 01 08 61 0b 0a 01 00 04 00 04 00 87 02 ab cd");
 
+        Diagnostics.Arrange("tokens to authenticate", tokensToAuthenticate);
+        Diagnostics.Bytes("third challenge", tokens.Challenges[2]);
+        Diagnostics.Assert("result", completes ? TransferResult.Success(0) : TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"), result);
         CollectionAssert.AreEqual(Hex.Bytes("ab cd"), tokens.Challenges[2]);
         Assert.AreEqual(
             completes ? TransferResult.Success(0) : TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Local Error"),
@@ -330,6 +357,7 @@ public sealed partial class LdapProtocolHandlerTests
             "30 1c 02 01 02 64 17 04 00 30 13 30 11 04 01 78 31 0c 04 0a 47 53 53 2d 53 50 4e 45 47 4f",
             Done(2));
 
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3))), sent);
     }
@@ -345,6 +373,8 @@ public sealed partial class LdapProtocolHandlerTests
 
         (TransferResult result, byte[] sent) = await RunLogonAsync(new FakeLogonTokenSource(2, NtlmNegotiate, NtlmAuthenticate), replies);
 
+        Diagnostics.Arrange("challenged", challenged);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
         string requests = Join(CapabilitiesSearch(1), MechanismsSearch(2), CapabilitiesSearch(3), SicilyNegotiateBind(4));
         CollectionAssert.AreEqual(Hex.Bytes(challenged ? Join(requests, SicilyResponseBind(5)) : requests), sent);
@@ -364,6 +394,8 @@ public sealed partial class LdapProtocolHandlerTests
             Sealed(0, Done(5)));
 
         byte[] search = Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4)));
+        Diagnostics.Bytes("sealed search header", sent[search.Length..(search.Length + 20)]);
+        Diagnostics.Diff("sealed search header", Hex.Bytes($"00 00 00 4d {FakeLogonTokenSource.Signature(0)}"), sent[search.Length..(search.Length + 20)]);
         CollectionAssert.AreEqual(Hex.Bytes($"00 00 00 4d {FakeLogonTokenSource.Signature(0)}"), sent[search.Length..(search.Length + 20)]);
     }
 
@@ -380,6 +412,7 @@ public sealed partial class LdapProtocolHandlerTests
             Sealed(0, Join("30 10 02 01 06 64 0b 04 03 6e 3d 78 30 04 30 02 04 00", Done(6))));
 
         // The entry's "DN: n=x" and two line ends: eight bytes written.
+        Diagnostics.Assert("result", TransferResult.Success(8), result);
         Assert.AreEqual(TransferResult.Success(8), result);
         CollectionAssert.AreEqual(Hex.Bytes(Sealed(1, Unbind(7))), sent[^Hex.Bytes(Sealed(1, Unbind(7))).Length..]);
     }
@@ -397,6 +430,7 @@ public sealed partial class LdapProtocolHandlerTests
             Sealed(0, string.Empty).TrimEnd(),
             Sealed(1, Done(5)));
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
@@ -418,6 +452,8 @@ public sealed partial class LdapProtocolHandlerTests
             BindReply(4, 0),
             reply);
 
+        Diagnostics.Arrange("reply", reply);
+        Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: Server Down"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapSearchFailed, "LDAP remote: Server Down"), result);
         CollectionAssert.AreEqual(Hex.Bytes(Join(CapabilitiesSearch(1), MechanismsSearch(2), SpnegoBind(3), SpnegoAuthenticateBind(4), Sealed(0, Search(5)))), sent);
     }
@@ -438,6 +474,7 @@ public sealed partial class LdapProtocolHandlerTests
             sealedDone[6..20],
             sealedDone[21..]);
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
         Assert.AreEqual(TransferResult.Success(0), result);
     }
 
@@ -459,6 +496,9 @@ public sealed partial class LdapProtocolHandlerTests
             BindReply(7, 0),
             Sealed(0, Done(8)));
 
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Assert("token starts", 2, tokens.Starts.Count);
+        Diagnostics.Assert("disposed tokens", 2, tokens.Disposed);
         Assert.AreEqual(TransferResult.Success(0), result);
         Assert.AreEqual(2, tokens.Starts.Count);
         Assert.AreEqual(2, tokens.Disposed);
@@ -473,17 +513,24 @@ public sealed partial class LdapProtocolHandlerTests
         TransferResult result = await new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), LdapDialect.OpenLdap, tokens)
             .ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", null));
 
+        Diagnostics.Act("result", result);
+        Diagnostics.Assert("result", TransferResult.Success(0), result);
+        Diagnostics.Assert("token starts", 0, tokens.Starts.Count);
         Assert.AreEqual(TransferResult.Success(0), result);
         Assert.IsEmpty(tokens.Starts);
     }
 
-    private static async Task<(TransferResult Result, byte[] Sent)> RunLogonAsync(FakeLogonTokenSource tokens, params string[] replies)
+    private async Task<(TransferResult Result, byte[] Sent)> RunLogonAsync(FakeLogonTokenSource tokens, params string[] replies)
     {
         var connection = new ScriptedConnection([.. replies.Select(Hex.Bytes)]);
         var handler = new LdapProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)), LdapDialect.WinLdap, tokens);
+        Diagnostics.Arrange("dialect", LdapDialect.WinLdap);
+        Diagnostics.Arrange("replies", string.Join(" | ", replies));
 
         TransferResult result = await handler.ExecuteAsync(Context("ldap://127.0.0.1:18389/dc=example", null));
 
+        Diagnostics.Act("result", result);
+        Diagnostics.Bytes("sent", connection.Sent);
         return (result, connection.Sent);
     }
 

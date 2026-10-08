@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -17,6 +18,10 @@ public sealed class CurlCommandRunnerEndPointTests
     private const string EndPointsTemplate = "%{local_ip} %{local_port} %{remote_ip} %{remote_port}\\n";
 
     private static readonly IPEndPoint FailingDatagramServer = new(IPAddress.Loopback, 1);
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     public async Task RunAsync_FtpDownload_ReportsTheControlConnectionsEndPoints()
@@ -35,6 +40,8 @@ public sealed class CurlCommandRunnerEndPointTests
 
         (int exitCode, string output) = await RunAsync("ftp://127.0.0.1:47515/f.txt", connector, FailingDatagramConnector());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("output", "hello127.0.0.1 64513 127.0.0.1 47515\n", output);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello127.0.0.1 64513 127.0.0.1 47515\n", output);
     }
@@ -48,6 +55,8 @@ public sealed class CurlCommandRunnerEndPointTests
 
         (int exitCode, string output) = await RunAsync("dict://127.0.0.1:47516/d:word", connector, FailingDatagramConnector());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("output", "220 hi\r\n127.0.0.1 64515 127.0.0.1 47516\n", output);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("220 hi\r\n127.0.0.1 64515 127.0.0.1 47516\n", output);
     }
@@ -61,6 +70,8 @@ public sealed class CurlCommandRunnerEndPointTests
 
         (int exitCode, string output) = await RunAsync("tftp://127.0.0.1:47519/f", new EndPointScriptedConnector(), datagramConnector);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("output", "hi 0 127.0.0.1 47519\n", output);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi 0 127.0.0.1 47519\n", output);
     }
@@ -71,6 +82,8 @@ public sealed class CurlCommandRunnerEndPointTests
         // curl -s -w "..." ftp://127.0.0.1:47518/f against a closed port exited 7 and printed " -1  -1".
         (int exitCode, string output) = await RunAsync("ftp://127.0.0.1:47518/f", new EndPointScriptedConnector(), FailingDatagramConnector());
 
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Diagnostics.Assert("output", " -1  -1\n", output);
         Assert.AreEqual(7, exitCode);
         Assert.AreEqual(" -1  -1\n", output);
     }
@@ -83,6 +96,8 @@ public sealed class CurlCommandRunnerEndPointTests
 
         (int exitCode, string output) = await RunAsync("http://127.0.0.1:18227/", connector, FailingDatagramConnector());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("output", "hi127.0.0.1 62095 127.0.0.1 18227\n", output);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi127.0.0.1 62095 127.0.0.1 18227\n", output);
     }
@@ -105,6 +120,8 @@ public sealed class CurlCommandRunnerEndPointTests
             connector,
             FailingDatagramConnector());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("output", "hi[/tmp/a-socket-path-long-enough-to-be-cut-by-c|-1||-1|1]", output);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hi[/tmp/a-socket-path-long-enough-to-be-cut-by-c|-1||-1|1]", output);
     }
@@ -119,6 +136,8 @@ public sealed class CurlCommandRunnerEndPointTests
             new EndPointScriptedConnector(),
             FailingDatagramConnector());
 
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Diagnostics.Assert("output", "[|-1||-1|0]", output);
         Assert.AreEqual(7, exitCode);
         Assert.AreEqual("[|-1||-1|0]", output);
     }
@@ -135,6 +154,8 @@ public sealed class CurlCommandRunnerEndPointTests
             connector,
             FailingDatagramConnector());
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("output", "220 a\r\n127.0.0.1 64515 127.0.0.1 47516\n220 b\r\n127.0.0.1 64516 127.0.0.1 47517\n", output);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("220 a\r\n127.0.0.1 64515 127.0.0.1 47516\n220 b\r\n127.0.0.1 64516 127.0.0.1 47517\n", output);
     }
@@ -146,23 +167,31 @@ public sealed class CurlCommandRunnerEndPointTests
     private static RecordingDatagramConnector FailingDatagramConnector() =>
         new(CurlExitCode.CouldntConnect, $"Failed to connect to {FailingDatagramServer}");
 
-    private static Task<(int ExitCode, string Output)> RunAsync(string url, IConnector connector, IDatagramConnector datagramConnector) =>
+    private Task<(int ExitCode, string Output)> RunAsync(string url, IConnector connector, IDatagramConnector datagramConnector) =>
         RunAsync(["-s", "-w", EndPointsTemplate, url], connector, datagramConnector);
 
-    private static async Task<(int ExitCode, string Output)> RunAsync(string[] arguments, IConnector connector, IDatagramConnector datagramConnector)
+    private async Task<(int ExitCode, string Output)> RunAsync(string[] arguments, IConnector connector, IDatagramConnector datagramConnector)
     {
+        Diagnostics.Arrange("command line", string.Join(" ", arguments));
         using MemoryStream standardOutput = new();
 
-        int exitCode = await new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher(
-                    CurlComposition.CreateProtocolHandlers(connector, datagramConnector, new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
-                new InMemoryFileSystem(),
-                new InMemoryFileSystem(),
-                standardOutput,
-                new MemoryStream(),
-                new MemoryStream(),
-                runsOnWindows: false)
-            .RunAsync(arguments);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher(
+                        CurlComposition.CreateProtocolHandlers(connector, datagramConnector, new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                    new InMemoryFileSystem(),
+                    new InMemoryFileSystem(),
+                    standardOutput,
+                    new MemoryStream(),
+                    new MemoryStream(),
+                    runsOnWindows: false)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
 
         return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()));
     }

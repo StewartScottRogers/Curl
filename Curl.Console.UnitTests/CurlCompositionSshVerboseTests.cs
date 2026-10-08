@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -19,6 +20,10 @@ public sealed class CurlCompositionSshVerboseTests
 {
     private const string User = "tester";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private const string Password = "secret";
 
     private const string Url = "sftp://127.0.0.1:2222/data/hello.txt";
@@ -36,12 +41,19 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_SftpDownloadWithAPassword_WritesCurlsVerboseLines()
     {
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("user", User);
+
         using TemporaryFiles files = new();
         string key = files.PathOf("id_missing");
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             Server(), ["-v", "-sS", "-k", "--key", key, "-u", $"{User}:{Password}", Url]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard output", "hello world", standardOutput);
         Assert.AreEqual(
             Start
             + "* SSH: no knownhosts file configured\n"
@@ -60,12 +72,18 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_SftpDownloadWithAPublicKey_WritesCurlsVerboseLines()
     {
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("user", User);
+
         using TemporaryFiles files = new();
         (string key, string publicKey) = files.UserKeys();
 
         (int exitCode, _, string standardError) = await RunAsync(
             Server(authorizesTheTestKey: true), ["-v", "-sS", "-k", "--key", key, "--pubkey", publicKey, "-u", $"{User}:", Url]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(
             Start
             + "* SSH: no knownhosts file configured\n"
@@ -83,12 +101,18 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_ScpDownload_WritesCurlsVerboseLinesWithTheConnectionEstablished()
     {
+        Diagnostics.Arrange("url", "scp://127.0.0.1:2222/data/hello.txt");
+
         using TemporaryFiles files = new();
         (string key, string publicKey) = files.UserKeys();
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             Server(authorizesTheTestKey: true), ["-v", "-sS", "-k", "--key", key, "--pubkey", publicKey, "-u", $"{User}:", "scp://127.0.0.1:2222/data/hello.txt"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard output", "hello world", standardOutput);
         Assert.AreEqual(
             Start
             + "* SSH: no knownhosts file configured\n"
@@ -108,13 +132,20 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_HostKeyMismatch_WritesTheCheckAndClosesTheConnectionAsMeasured()
     {
+        Diagnostics.Arrange("url", Url);
+
         using TemporaryFiles files = new();
         string otherKey = TestUserKeys.RsaPublicKeyFile.Split(' ')[1];
+        Diagnostics.Arrange("known hosts entry", "[127.0.0.1]:2222 ssh-rsa " + otherKey);
         string knownHosts = files.Write("known_hosts", $"[127.0.0.1]:2222 ssh-rsa {otherKey}\n");
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             Server(), ["-v", "-sS", "--knownhosts", knownHosts, "-u", $"{User}:{Password}", Url]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("exit code", 60, exitCode);
         Assert.AreEqual(
             Start
             + $"* SSH: found host '127.0.0.1' in '{knownHosts}'\n"
@@ -135,12 +166,19 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_SftpTraceAscii_WritesTheLinesAndTheReceivedDataAsMeasured()
     {
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("trace option", "--trace-ascii -");
+
         using TemporaryFiles files = new();
         (string key, string publicKey) = files.UserKeys();
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             Server(authorizesTheTestKey: true), ["--trace-ascii", "-", "-sS", "-k", "--key", key, "--pubkey", publicKey, "-u", $"{User}:", Url]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output line count", standardOutput.Split('\n').Length);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard error", string.Empty, standardError);
         Assert.AreEqual(
             Start
             + "* SSH: no knownhosts file configured\n"
@@ -163,6 +201,10 @@ public sealed class CurlCompositionSshVerboseTests
     [DataRow("scp", "* SSH: connection established\n", DisplayName = "scp")]
     public async Task CreateRunner_UploadWithAPublicKey_WritesTheSentDataAndTheUploadSentOffAsMeasured(string scheme, string established)
     {
+        Diagnostics.Arrange("scheme", scheme);
+        Diagnostics.Arrange("expected connection line", established);
+        Diagnostics.Arrange("upload source file name", "up.txt");
+
         using TemporaryFiles files = new();
         (string key, string publicKey) = files.UserKeys();
         string source = files.Write("up.txt", "hello upload\n");
@@ -170,6 +212,10 @@ public sealed class CurlCompositionSshVerboseTests
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             Server(authorizesTheTestKey: true), ["-v", "-sS", "-k", "--key", key, "--pubkey", publicKey, "-u", $"{User}:", "-T", source, $"{scheme}://127.0.0.1:2222/data/up.txt"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard output", string.Empty, standardOutput);
         Assert.AreEqual(
             Start
             + "* SSH: no knownhosts file configured\n"
@@ -192,6 +238,10 @@ public sealed class CurlCompositionSshVerboseTests
     [DataRow("scp", "* SSH: connection established\n", DisplayName = "scp")]
     public async Task CreateRunner_UploadTraceAscii_WritesTheSentDataAsMeasured(string scheme, string established)
     {
+        Diagnostics.Arrange("scheme", scheme);
+        Diagnostics.Arrange("expected connection line", established);
+        Diagnostics.Arrange("upload source file name", "up.txt");
+
         using TemporaryFiles files = new();
         (string key, string publicKey) = files.UserKeys();
         string source = files.Write("up.txt", "hello upload\n");
@@ -199,6 +249,10 @@ public sealed class CurlCompositionSshVerboseTests
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             Server(authorizesTheTestKey: true), ["--trace-ascii", "-", "-sS", "-k", "--key", key, "--pubkey", publicKey, "-u", $"{User}:", "-T", source, $"{scheme}://127.0.0.1:2222/data/up.txt"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output line count", standardOutput.Split('\n').Length);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard error", string.Empty, standardError);
         Assert.AreEqual(
             Start
             + "* SSH: no knownhosts file configured\n"
@@ -220,14 +274,21 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_ScpDownloadWithKeyboardInteractive_WritesTheAgentThenTheMethodAsMeasured()
     {
+        Diagnostics.Arrange("url", "scp://127.0.0.1:2222/data/hello.txt");
+
         using TemporaryFiles files = new();
         string key = files.PathOf("id_missing");
         InMemorySshServer server = new(User, Password) { OffersKeyboardInteractive = true };
+        Diagnostics.Arrange("offers keyboard interactive", server.OffersKeyboardInteractive);
         server.Files["/data/hello.txt"] = "hello world"u8.ToArray();
 
         (int exitCode, string standardOutput, string standardError) = await RunWithoutAgentAsync(
             server, ["-v", "-sS", "-k", "--key", key, "-u", $"{User}:{Password}", "scp://127.0.0.1:2222/data/hello.txt"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard output", "hello world", standardOutput);
         Assert.AreEqual(
             Start
             + "* SSH: no knownhosts file configured\n"
@@ -249,12 +310,19 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_ScpFileShort_WritesTheFailureAndClosesTheConnectionAsMeasured()
     {
+        Diagnostics.Arrange("url", "scp://127.0.0.1:2222/data/x");
+        Diagnostics.Arrange("scp file short by", 5);
+
         using TemporaryFiles files = new();
         string key = files.PathOf("id_missing");
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             ShortFileServer(), ["-v", "-sS", "-k", "--key", key, "-u", $"{User}:{Password}", "scp://127.0.0.1:2222/data/x"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output", standardOutput);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard output", "01234", standardOutput);
         StringAssert.EndsWith(
             standardError,
             "* SSH: authentication complete\n"
@@ -270,12 +338,19 @@ public sealed class CurlCompositionSshVerboseTests
     [TestMethod]
     public async Task CreateRunner_ScpFileShortTraceAscii_WritesTheChannelsEndAsEmptyDataAsMeasured()
     {
+        Diagnostics.Arrange("url", "scp://127.0.0.1:2222/data/x");
+        Diagnostics.Arrange("scp file short by", 5);
+
         using TemporaryFiles files = new();
         string key = files.PathOf("id_missing");
 
         (int exitCode, string standardOutput, string standardError) = await RunAsync(
             ShortFileServer(), ["--trace-ascii", "-", "-sS", "-k", "--key", key, "-u", $"{User}:{Password}", "scp://127.0.0.1:2222/data/x"]);
 
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("standard output line count", standardOutput.Split('\n').Length);
+        Diagnostics.Act("standard error line count", standardError.Split('\n').Length);
+        Diagnostics.Assert("standard error", "curl: (18) end of response with 5 bytes missing\n", standardError);
         StringAssert.EndsWith(
             standardOutput,
             "* SSH: connection established\n"

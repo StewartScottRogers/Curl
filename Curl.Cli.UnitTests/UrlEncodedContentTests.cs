@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -8,35 +10,64 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class UrlEncodedContentTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Escape_UnreservedBytes_KeepsThem()
     {
-        string escaped = UrlEncodedContent.Escape("AZaz09-._~"u8);
+        byte[] content = "AZaz09-._~"u8.ToArray();
+        ArrangeContent(content);
 
+        string escaped = UrlEncodedContent.Escape(content);
+
+        Diagnostics.Act("escaped", "\"" + escaped + "\"");
+        Diagnostics.Diff("escaped", "AZaz09-._~", escaped);
         Assert.AreEqual("AZaz09-._~", escaped);
     }
 
     [TestMethod]
     public void Escape_Space_WritesPlus()
     {
-        string escaped = UrlEncodedContent.Escape("a b"u8);
+        byte[] content = "a b"u8.ToArray();
+        ArrangeContent(content);
 
+        string escaped = UrlEncodedContent.Escape(content);
+
+        Diagnostics.Act("escaped", "\"" + escaped + "\"");
+        Diagnostics.Diff("escaped", "a+b", escaped);
         Assert.AreEqual("a+b", escaped);
     }
 
     [TestMethod]
     public void Escape_ReservedAndControlBytes_WritesUpperCaseHex()
     {
-        string escaped = UrlEncodedContent.Escape([(byte)'&', (byte)'=', (byte)'*', (byte)'+', 0x0D, 0x0A, 0x00, 0xE9, 0xFF]);
+        byte[] content = [(byte)'&', (byte)'=', (byte)'*', (byte)'+', 0x0D, 0x0A, 0x00, 0xE9, 0xFF];
+        ArrangeContent(content);
 
+        string escaped = UrlEncodedContent.Escape(content);
+
+        Diagnostics.Act("escaped", "\"" + escaped + "\"");
+        Diagnostics.Diff("escaped", "%26%3D%2A%2B%0D%0A%00%E9%FF", escaped);
         Assert.AreEqual("%26%3D%2A%2B%0D%0A%00%E9%FF", escaped);
     }
 
     [TestMethod]
     public void Escape_Empty_IsEmpty()
     {
+        ArrangeContent([]);
+
         string escaped = UrlEncodedContent.Escape([]);
 
+        Diagnostics.Act("escaped", "\"" + escaped + "\"");
+        Diagnostics.Diff("escaped", string.Empty, escaped);
         Assert.AreEqual(string.Empty, escaped);
+    }
+
+    private void ArrangeContent(byte[] content)
+    {
+        Diagnostics.Arrange("content length", content.Length);
+        Diagnostics.Bytes("content", content);
     }
 }

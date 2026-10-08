@@ -4,6 +4,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -37,16 +38,30 @@ public sealed class CurlCommandRunnerUploadTests
         files.UnreadablePaths.Add("nosuchfile");
     }
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
+
+    private string StandardOutputText => Encoding.UTF8.GetString(standardOutput.ToArray());
+
     [TestMethod]
     public async Task RunAsync_TwoUploadsAndTwoDirectoryUrls_SendsEachFileToItsOwnUrlInOrder()
     {
         int exitCode = await RunAsync("-T", "a", "-T", "b", "http://h/1/", "http://h/2/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("dispatched count", 2, dispatched.Count);
         Assert.HasCount(2, dispatched);
+        Diagnostics.Assert("first URL", "http://h/1/a", dispatched[0].Url);
         Assert.AreEqual("http://h/1/a", dispatched[0].Url);
+        Diagnostics.Diff("first upload", Encoding.ASCII.GetBytes("A"), dispatched[0].Upload);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("A"), dispatched[0].Upload);
+        Diagnostics.Assert("second URL", "http://h/2/b", dispatched[1].Url);
         Assert.AreEqual("http://h/2/b", dispatched[1].Url);
+        Diagnostics.Diff("second upload", Encoding.ASCII.GetBytes("B"), dispatched[1].Upload);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("B"), dispatched[1].Upload);
     }
 
@@ -55,7 +70,9 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunAsync("http://h/1/", "-T", "a", "http://h/2/", "-T", "b");
 
+        Diagnostics.Assert("first URL", "http://h/1/a", dispatched[0].Url);
         Assert.AreEqual("http://h/1/a", dispatched[0].Url);
+        Diagnostics.Assert("second URL", "http://h/2/b", dispatched[1].Url);
         Assert.AreEqual("http://h/2/b", dispatched[1].Url);
     }
 
@@ -64,7 +81,9 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunAsync("-T", "a", "http://h/1/", "http://h/2/");
 
+        Diagnostics.Assert("second URL", "http://h/2/", dispatched[1].Url);
         Assert.AreEqual("http://h/2/", dispatched[1].Url);
+        Diagnostics.Assert("second upload is null", true, dispatched[1].Upload is null);
         Assert.IsNull(dispatched[1].Upload);
     }
 
@@ -75,9 +94,13 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-T", uploadFile, "http://h/d/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("dispatched URL", "http://h/d/", dispatched.Single().Url);
         Assert.AreEqual("http://h/d/", dispatched.Single().Url);
+        Diagnostics.Diff("upload", new byte[] { 1, 2, 3 }, dispatched.Single().Upload);
         CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, dispatched.Single().Upload);
+        Diagnostics.Assert("read paths", string.Empty, string.Join(", ", files.ReadPaths));
         Assert.IsEmpty(files.ReadPaths);
     }
 
@@ -86,8 +109,11 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunAsync("-T", string.Empty, "-T", "a", "http://h/1/", "http://h/2/");
 
+        Diagnostics.Assert("first URL", "http://h/1/", dispatched[0].Url);
         Assert.AreEqual("http://h/1/", dispatched[0].Url);
+        Diagnostics.Assert("first upload is null", true, dispatched[0].Upload is null);
         Assert.IsNull(dispatched[0].Upload);
+        Diagnostics.Assert("second URL", "http://h/2/a", dispatched[1].Url);
         Assert.AreEqual("http://h/2/a", dispatched[1].Url);
     }
 
@@ -96,9 +122,16 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-T", "nosuchfile", "http://h/d ir/");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.UrlMalformat, exitCode);
         Assert.AreEqual((int)CurlExitCode.UrlMalformat, exitCode);
+        Diagnostics.Assert("read paths", string.Empty, string.Join(", ", files.ReadPaths));
         Assert.IsEmpty(files.ReadPaths);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
         Assert.IsEmpty(dispatched);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: (3) URL using bad/illegal format or missing URL\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             $"curl: (3) URL using bad/illegal format or missing URL{NewLine}",
             Encoding.UTF8.GetString(standardError.ToArray()));
@@ -109,8 +142,11 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunWithWarningLinesAsync("-s", "-T", "a", "-w", "[%{url_effective}]", "http://h/d ir/");
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Normalized(StandardErrorText));
         Assert.AreEqual(string.Empty, Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.Diff("stdout", "[]", Normalized(StandardOutputText));
         Assert.AreEqual("[]", Encoding.UTF8.GetString(standardOutput.ToArray()));
     }
 
@@ -119,8 +155,16 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-T", "nosuchfile", "-T", "a", "http://h/d/", "http://h/2/");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.ReadError, exitCode);
         Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
         Assert.IsEmpty(dispatched);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: cannot open 'nosuchfile'\n"
+            + CommandLineRefusal.TryHelpLine + "\n"
+            + $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: cannot open 'nosuchfile'" + NewLine
             + CommandLineRefusal.TryHelpLine + NewLine
@@ -133,10 +177,16 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-s", "-T", "nosuchfile", "-w", "%{url_effective}", "http://h/d/");
 
+        Diagnostics.Assert("exit code", 26, exitCode);
         Assert.AreEqual(26, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: cannot open 'nosuchfile'\n" + CommandLineRefusal.TryHelpLine + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: cannot open 'nosuchfile'" + NewLine + CommandLineRefusal.TryHelpLine + NewLine,
             Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.Diff("stdout", "http://h/d/nosuchfile", Normalized(StandardOutputText));
         Assert.AreEqual("http://h/d/nosuchfile", Encoding.UTF8.GetString(standardOutput.ToArray()));
     }
 
@@ -145,6 +195,10 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunWithWarningLinesAsync("-T", "nosuchfile", "http://h/d/");
 
+        Diagnostics.Assert(
+            "stderr starts with the warning then the cannot-open line",
+            true,
+            StandardErrorText.StartsWith("Warning: w" + NewLine + "curl: cannot open 'nosuchfile'", StringComparison.Ordinal));
         StringAssert.StartsWith(
             Encoding.UTF8.GetString(standardError.ToArray()),
             "Warning: w" + NewLine + "curl: cannot open 'nosuchfile'");
@@ -157,7 +211,9 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunAsync("-T", "local.txt", "-w", "%{url_effective}", url);
 
+        Diagnostics.Assert("dispatched URL", expected, dispatched.Single().Url);
         Assert.AreEqual(expected, dispatched.Single().Url);
+        Diagnostics.Diff("stdout", expected, Normalized(StandardOutputText));
         Assert.AreEqual(expected, Encoding.UTF8.GetString(standardOutput.ToArray()));
     }
 
@@ -166,8 +222,11 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-T", "a", "-o", "out", "http://h/1/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("upload", Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
+        Diagnostics.Assert("out was written", true, files.Written.ContainsKey("out"));
         Assert.IsTrue(files.Written.ContainsKey("out"));
     }
 
@@ -176,6 +235,7 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunAsync("-T", "a", "-F", "x=y", "http://h/1/");
 
+        Diagnostics.Diff("upload", Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
     }
 
@@ -184,6 +244,7 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunAsync("-T", "a", "-D", "headers", "http://h/1/");
 
+        Diagnostics.Diff("upload", Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("A"), dispatched.Single().Upload);
     }
 
@@ -192,11 +253,17 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-T", "{local.txt,sub/in.txt}", "http://h/g/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("dispatched count", 2, dispatched.Count);
         Assert.HasCount(2, dispatched);
+        Diagnostics.Assert("first URL", "http://h/g/local.txt", dispatched[0].Url);
         Assert.AreEqual("http://h/g/local.txt", dispatched[0].Url);
+        Diagnostics.Diff("first upload", Encoding.ASCII.GetBytes("local"), dispatched[0].Upload);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("local"), dispatched[0].Upload);
+        Diagnostics.Assert("second URL", "http://h/g/in.txt", dispatched[1].Url);
         Assert.AreEqual("http://h/g/in.txt", dispatched[1].Url);
+        Diagnostics.Diff("second upload", Encoding.ASCII.GetBytes("in"), dispatched[1].Upload);
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("in"), dispatched[1].Upload);
     }
 
@@ -205,6 +272,10 @@ public sealed class CurlCommandRunnerUploadTests
     {
         await RunAsync("-T", "{local.txt,sub/in.txt}", "http://h/{x,y}/");
 
+        Diagnostics.Diff(
+            "dispatched URLs",
+            "http://h/x/local.txt\nhttp://h/y/local.txt\nhttp://h/x/in.txt\nhttp://h/y/in.txt",
+            string.Join("\n", dispatched.Select(transfer => transfer.Url)));
         CollectionAssert.AreEqual(
             new[] { "http://h/x/local.txt", "http://h/y/local.txt", "http://h/x/in.txt", "http://h/y/in.txt" },
             dispatched.Select(transfer => transfer.Url).ToArray());
@@ -215,9 +286,16 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-T", "f[3-1].txt", "http://h/g/");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.UrlMalformat, exitCode);
         Assert.AreEqual((int)CurlExitCode.UrlMalformat, exitCode);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
         Assert.IsEmpty(dispatched);
+        Diagnostics.Assert("read paths", string.Empty, string.Join(", ", files.ReadPaths));
         Assert.IsEmpty(files.ReadPaths);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: (3) bad range in position 7:\nf[3-1].txt\n      ^\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: (3) bad range in position 7:" + NewLine + "f[3-1].txt" + NewLine + "      ^" + NewLine,
             Encoding.UTF8.GetString(standardError.ToArray()));
@@ -227,12 +305,20 @@ public sealed class CurlCommandRunnerUploadTests
     public async Task RunAsync_GlobOffUploadGlob_TriesTheOneLiteralFile()
     {
         files.UnreadablePaths.Add("{local.txt,sub/in.txt}");
+        Diagnostics.Arrange("unreadable paths added", "{local.txt,sub/in.txt}");
 
         int exitCode = await RunAsync("-g", "-T", "{local.txt,sub/in.txt}", "http://h/g/");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.ReadError, exitCode);
         Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
         Assert.IsEmpty(dispatched);
+        Diagnostics.Assert("read paths", "{local.txt,sub/in.txt}", string.Join(", ", files.ReadPaths));
         CollectionAssert.AreEqual(new[] { "{local.txt,sub/in.txt}" }, files.ReadPaths.ToArray());
+        Diagnostics.Assert(
+            "stderr starts with the cannot-open line",
+            true,
+            StandardErrorText.StartsWith("curl: cannot open '{local.txt,sub/in.txt}'" + NewLine, StringComparison.Ordinal));
         StringAssert.StartsWith(
             Encoding.UTF8.GetString(standardError.ToArray()),
             "curl: cannot open '{local.txt,sub/in.txt}'" + NewLine);
@@ -245,13 +331,22 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-T", "{nosuchfile,local.txt}", "-w", "%{url_effective} %{exitcode}\\n", url);
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.ReadError, exitCode);
         Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Diagnostics.Assert("dispatched count", 0, dispatched.Count);
         Assert.IsEmpty(dispatched);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: cannot open 'nosuchfile'\n"
+            + CommandLineRefusal.TryHelpLine + "\n"
+            + $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: cannot open 'nosuchfile'" + NewLine
             + CommandLineRefusal.TryHelpLine + NewLine
             + $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}{NewLine}",
             Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.Diff("stdout", $"{url}nosuchfile 26\n", Normalized(StandardOutputText));
         Assert.AreEqual($"{url}nosuchfile 26\n", Encoding.UTF8.GetString(standardOutput.ToArray()));
     }
 
@@ -261,13 +356,25 @@ public sealed class CurlCommandRunnerUploadTests
         int exitCode = await RunAsync(
             "-T", "{local.txt,nosuchfile,sub/in.txt}", "-w", "%{url_effective} %{exitcode}\\n", "http://h/g/");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.ReadError, exitCode);
         Assert.AreEqual((int)CurlExitCode.ReadError, exitCode);
+        Diagnostics.Assert("dispatched URL", "http://h/g/local.txt", dispatched.Single().Url);
         Assert.AreEqual("http://h/g/local.txt", dispatched.Single().Url);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: cannot open 'nosuchfile'\n"
+            + CommandLineRefusal.TryHelpLine + "\n"
+            + $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: cannot open 'nosuchfile'" + NewLine
             + CommandLineRefusal.TryHelpLine + NewLine
             + $"curl: (26) {MultipartFormBodyBuilder.OpenFailedMessage}{NewLine}",
             Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.Diff(
+            "stdout",
+            "http://h/g/local.txt 0\nhttp://h/g/nosuchfile 26\n",
+            Normalized(StandardOutputText));
         Assert.AreEqual(
             "http://h/g/local.txt 0\nhttp://h/g/nosuchfile 26\n",
             Encoding.UTF8.GetString(standardOutput.ToArray()));
@@ -279,14 +386,27 @@ public sealed class CurlCommandRunnerUploadTests
         int exitCode = await RunAsync(
             "-T", "{local.txt,nosuchfile,sub/in.txt}", "-w", "%{url_effective} %{exitcode} %{errormsg}\\n", "http://down/g/");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.CouldntConnect, exitCode);
         Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
+        Diagnostics.Assert("dispatched URL", "http://down/g/local.txt", dispatched.Single().Url);
         Assert.AreEqual("http://down/g/local.txt", dispatched.Single().Url);
+        Diagnostics.Diff(
+            "stderr",
+            $"curl: (7) {DownMessage}\n"
+            + "curl: cannot open 'nosuchfile'\n"
+            + CommandLineRefusal.TryHelpLine + "\n"
+            + "curl: (7) Could not connect to server\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             $"curl: (7) {DownMessage}{NewLine}"
             + "curl: cannot open 'nosuchfile'" + NewLine
             + CommandLineRefusal.TryHelpLine + NewLine
             + $"curl: (7) Could not connect to server{NewLine}",
             Encoding.UTF8.GetString(standardError.ToArray()));
+        Diagnostics.Diff(
+            "stdout",
+            $"http://down/g/local.txt 7 {DownMessage}\nhttp://down/g/nosuchfile 7 Could not connect to server\n",
+            Normalized(StandardOutputText));
         Assert.AreEqual(
             $"http://down/g/local.txt 7 {DownMessage}\nhttp://down/g/nosuchfile 7 Could not connect to server\n",
             Encoding.UTF8.GetString(standardOutput.ToArray()));
@@ -297,8 +417,14 @@ public sealed class CurlCommandRunnerUploadTests
     {
         int exitCode = await RunAsync("-s", "-T", "local.txt", "-T", "nosuchfile", "http://down/a/", "http://h/b/", "http://h/c/");
 
+        Diagnostics.Assert("exit code", (int)CurlExitCode.CouldntConnect, exitCode);
         Assert.AreEqual((int)CurlExitCode.CouldntConnect, exitCode);
+        Diagnostics.Assert("dispatched URL", "http://down/a/local.txt", dispatched.Single().Url);
         Assert.AreEqual("http://down/a/local.txt", dispatched.Single().Url);
+        Diagnostics.Diff(
+            "stderr",
+            "curl: cannot open 'nosuchfile'\n" + CommandLineRefusal.TryHelpLine + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "curl: cannot open 'nosuchfile'" + NewLine + CommandLineRefusal.TryHelpLine + NewLine,
             Encoding.UTF8.GetString(standardError.ToArray()));
@@ -326,8 +452,14 @@ public sealed class CurlCommandRunnerUploadTests
     private static string UrlText(CurlUrl url) =>
         $"{url.Scheme}://{url.Host}{url.AbsolutePath}";
 
-    private Task<int> RunAsync(params string[] arguments) =>
-        new CurlCommandRunner(
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private Task<int> RunAsync(params string[] arguments)
+    {
+        Diagnostics.Arrange("warning lines before each transfer", "(none)");
+
+        return RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([CreateHandler()])),
                 files,
                 files,
@@ -335,17 +467,46 @@ public sealed class CurlCommandRunnerUploadTests
                 standardError,
                 standardInput,
                 runsOnWindows: false,
-                formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => "b"))
-            .RunAsync(arguments);
+                formBodyBuilder: new MultipartFormBodyBuilder(files, Encoding.UTF8, () => "b")),
+            arguments);
+    }
 
-    private Task<int> RunWithWarningLinesAsync(params string[] arguments) =>
-        new CurlCommandRunner(
+    private Task<int> RunWithWarningLinesAsync(params string[] arguments)
+    {
+        Diagnostics.Arrange("warning lines before each transfer", "Warning: w");
+
+        return RunWithDiagnosticsAsync(
+            new CurlCommandRunner(
                 _ => new TransferDispatch(new ProtocolDispatcher([CreateHandler()]), ["Warning: w"]),
                 files,
                 files,
                 standardOutput,
                 standardError,
                 standardInput,
-                runsOnWindows: false)
-            .RunAsync(arguments);
+                runsOnWindows: false),
+            arguments);
+    }
+
+    private async Task<int> RunWithDiagnosticsAsync(CurlCommandRunner runner, string[] arguments)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange(
+            "handler behaviour",
+            "http records each URL and upload; host down fails with exit 7, any other host succeeds with 0 bytes");
+        Diagnostics.Arrange("existing files", string.Join(", ", files.ExistingContent.Keys.Order(StringComparer.Ordinal)));
+        Diagnostics.Arrange("unreadable paths", string.Join(", ", files.UnreadablePaths.Order(StringComparer.Ordinal)));
+        Diagnostics.Bytes("stdin", standardInput.ToArray());
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await runner.RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Act("stderr", Normalized(StandardErrorText));
+        Diagnostics.Act("dispatched URLs", string.Join(", ", dispatched.Select(transfer => transfer.Url)));
+        return exitCode;
+    }
 }

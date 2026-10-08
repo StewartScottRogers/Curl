@@ -8,7 +8,7 @@ namespace Curl.Conformance;
 /// of curl's <c>docs/tests/FILEFORMAT.md</c> at <c>curl-8_21_0</c>.
 /// </summary>
 [TestClass]
-public sealed class UpstreamTestCaseParserTests
+public sealed partial class UpstreamTestCaseParserTests
 {
     public TestContext TestContext { get; set; } = null!;
 

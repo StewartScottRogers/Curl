@@ -1,9 +1,7 @@
-using System.Net;
-using System.Net.Sockets;
-
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -15,10 +13,18 @@ namespace Curl.Console;
 [TestClass]
 public sealed class CurlCompositionDnsServersTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void CreateDnsResolver_WithoutACaresOption_IsTheSystemResolver()
     {
-        Assert.IsInstanceOfType<SystemDnsResolver>(CurlComposition.CreateDnsResolver(Parse(), TimeProvider.System, new TcpDialer()));
+        IDnsResolver resolver = CurlComposition.CreateDnsResolver(Parse(), TimeProvider.System, new TcpDialer());
+        Diagnostics.Act("resolver type", resolver.GetType().Name);
+
+        Diagnostics.Assert("resolver type", nameof(SystemDnsResolver), resolver.GetType().Name);
+        Assert.IsInstanceOfType<SystemDnsResolver>(resolver);
     }
 
     [TestMethod]
@@ -28,7 +34,11 @@ public sealed class CurlCompositionDnsServersTests
     [DataRow("--dns-ipv6-addr", "::1")]
     public void CreateDnsResolver_WithACaresOption_IsTheHandBuiltResolver(string option, string value)
     {
-        Assert.IsInstanceOfType<DnsServerResolver>(CurlComposition.CreateDnsResolver(Parse(option, value), TimeProvider.System, new TcpDialer()));
+        IDnsResolver resolver = CurlComposition.CreateDnsResolver(Parse(option, value), TimeProvider.System, new TcpDialer());
+        Diagnostics.Act("resolver type", resolver.GetType().Name);
+
+        Diagnostics.Assert("resolver type", nameof(DnsServerResolver), resolver.GetType().Name);
+        Assert.IsInstanceOfType<DnsServerResolver>(resolver);
     }
 
     [TestMethod]
@@ -38,57 +48,31 @@ public sealed class CurlCompositionDnsServersTests
         // the system resolver has no such failure, so the exit shows which resolver ran. Nothing is sent.
         CurlTransports transports = CurlComposition.CreateTransports(Parse("--dns-servers", "bogus"));
 
-        ConnectResult tcp = await transports.TcpConnector.ConnectAsync(new ConnectTarget("bl694.example", 80, false), CancellationToken.None);
-        DatagramOpenResult udp = await transports.UdpDatagramConnector.OpenAsync("bl694.example", 69, CancellationToken.None);
+        ConnectResult tcp;
+        DatagramOpenResult udp;
+        using (Diagnostics.Phase("connect and open"))
+        {
+            tcp = await transports.TcpConnector.ConnectAsync(new ConnectTarget("bl694.example", 80, false), CancellationToken.None);
+            udp = await transports.UdpDatagramConnector.OpenAsync("bl694.example", 69, CancellationToken.None);
+        }
 
+        Diagnostics.Act("TCP exit code", tcp.ExitCode);
+        Diagnostics.Act("TCP error message", tcp.ErrorMessage);
+        Diagnostics.Act("UDP exit code", udp.ExitCode);
+
+        Diagnostics.Assert("resolver type", nameof(DnsServerResolver), transports.DnsResolver.GetType().Name);
         Assert.IsInstanceOfType<DnsServerResolver>(transports.DnsResolver);
+        Diagnostics.Assert("TCP exit code", CurlExitCode.BadFunctionArgument, tcp.ExitCode);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, tcp.ExitCode);
+        Diagnostics.Assert("TCP error message", "Error 43 resolving bl694.example:80", tcp.ErrorMessage);
         Assert.AreEqual("Error 43 resolving bl694.example:80", tcp.ErrorMessage);
+        Diagnostics.Assert("UDP exit code", CurlExitCode.BadFunctionArgument, udp.ExitCode);
         Assert.AreEqual(CurlExitCode.BadFunctionArgument, udp.ExitCode);
     }
 
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task CreateTransports_WithDnsServersOnLoopback_ConnectsToTheAddressTheServerAnswered()
+    private CommandLineOptions Parse(params string[] arguments)
     {
-        using UdpClient dnsServer = new(new IPEndPoint(IPAddress.Loopback, 0));
-        using TcpListener webServer = new(IPAddress.Loopback, 0);
-        webServer.Start();
-        int dnsPort = ((IPEndPoint)dnsServer.Client.LocalEndPoint!).Port;
-        int webPort = ((IPEndPoint)webServer.LocalEndpoint).Port;
-        Task answering = AnswerOneQueryAsync(dnsServer);
-        CurlTransports transports = CurlComposition.CreateTransports(Parse("-4", "--dns-servers", $"127.0.0.1:{dnsPort}"));
-
-        ConnectResult result = await transports.TcpConnector.ConnectAsync(new ConnectTarget("bl694.example", webPort, false), CancellationToken.None);
-
-        await answering;
-        Assert.IsNotNull(result.Connection, result.ErrorMessage);
-        await result.Connection.DisposeAsync();
-    }
-
-    /// <summary>Answers one A query with 127.0.0.1: the query's header and question, flags 0x8180, one record.</summary>
-    private static async Task AnswerOneQueryAsync(UdpClient dnsServer)
-    {
-        UdpReceiveResult received = await dnsServer.ReceiveAsync();
-        byte[] query = received.Buffer;
-        int questionEnd = 12;
-        while (query[questionEnd] != 0)
-        {
-            questionEnd += 1 + query[questionEnd];
-        }
-
-        questionEnd += 5;
-        byte[] reply = [.. query.AsSpan(0, questionEnd), 0xC0, 0x0C, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 127, 0, 0, 1];
-        reply[2] = 0x81;
-        reply[3] = 0x80;
-        reply[7] = 1;
-        reply[10] = 0;
-        reply[11] = 0;
-        await dnsServer.SendAsync(reply, received.RemoteEndPoint);
-    }
-
-    private static CommandLineOptions Parse(params string[] arguments)
-    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://bl694.example/")));
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://bl694.example/"], _ => true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;

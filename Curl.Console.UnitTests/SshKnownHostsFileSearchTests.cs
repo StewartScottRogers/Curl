@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -16,24 +18,32 @@ public sealed class SshKnownHostsFileSearchTests
         ["APPDATA"] = "a",
     };
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void CandidatePaths_OnWindows_TriesCurlHomeHomeUserProfileAppDataThenApplicationData()
     {
-        SshKnownHostsFileSearch search = new(name => EveryVariable.GetValueOrDefault(name), runsOnWindows: true, "account");
+        SshKnownHostsFileSearch search = Search(runsOnWindows: true, "account");
+        string[] candidates = search.CandidatePaths().ToArray();
+        Diagnostics.Act("candidates", string.Join(" | ", candidates));
 
-        CollectionAssert.AreEqual(
-            new[] { @"c\.ssh/known_hosts", @"h\.ssh/known_hosts", @"u\.ssh/known_hosts", @"a\.ssh/known_hosts", @"u\Application Data\.ssh/known_hosts" },
-            search.CandidatePaths().ToArray());
+        string[] expected = [@"c\.ssh/known_hosts", @"h\.ssh/known_hosts", @"u\.ssh/known_hosts", @"a\.ssh/known_hosts", @"u\Application Data\.ssh/known_hosts"];
+        Diagnostics.Assert("candidates", string.Join(" | ", expected), string.Join(" | ", candidates));
+        CollectionAssert.AreEqual(expected, candidates);
     }
 
     [TestMethod]
     public void CandidatePaths_OffWindows_TriesCurlHomeHomeThenTheAccountHome()
     {
-        SshKnownHostsFileSearch search = new(name => EveryVariable.GetValueOrDefault(name), runsOnWindows: false, "account");
+        SshKnownHostsFileSearch search = Search(runsOnWindows: false, "account");
+        string[] candidates = search.CandidatePaths().ToArray();
+        Diagnostics.Act("candidates", string.Join(" | ", candidates));
 
-        CollectionAssert.AreEqual(
-            new[] { "c/.ssh/known_hosts", "h/.ssh/known_hosts", "account/.ssh/known_hosts" },
-            search.CandidatePaths().ToArray());
+        string[] expected = ["c/.ssh/known_hosts", "h/.ssh/known_hosts", "account/.ssh/known_hosts"];
+        Diagnostics.Assert("candidates", string.Join(" | ", expected), string.Join(" | ", candidates));
+        CollectionAssert.AreEqual(expected, candidates);
     }
 
     [TestMethod]
@@ -41,8 +51,13 @@ public sealed class SshKnownHostsFileSearchTests
     [DataRow("")]
     public void CandidatePaths_EmptyVariablesAndNoAccountHome_ListNothing(string? accountHomeDirectory)
     {
+        Diagnostics.Arrange("variables", "every one empty");
+        Diagnostics.Arrange("account home", accountHomeDirectory ?? "null");
         SshKnownHostsFileSearch search = new(_ => string.Empty, runsOnWindows: false, accountHomeDirectory);
+        string[] candidates = search.CandidatePaths().ToArray();
+        Diagnostics.Act("candidate count", candidates.Length);
 
+        Diagnostics.Assert("candidate count", 0, candidates.Length);
         Assert.IsEmpty(search.CandidatePaths());
     }
 
@@ -52,8 +67,19 @@ public sealed class SshKnownHostsFileSearchTests
         InMemoryDataFileReader reader = new();
         reader.Files["h/.ssh/known_hosts"] = [];
         reader.Files["account/.ssh/known_hosts"] = [];
-        SshKnownHostsFileSearch search = new(name => EveryVariable.GetValueOrDefault(name), runsOnWindows: false, "account");
+        Diagnostics.Arrange("readable files", "h/.ssh/known_hosts, account/.ssh/known_hosts");
+        SshKnownHostsFileSearch search = Search(runsOnWindows: false, "account");
+        string? found = search.Find(reader);
+        Diagnostics.Act("found", found ?? "null");
 
-        Assert.AreEqual("h/.ssh/known_hosts", search.Find(reader));
+        Diagnostics.Assert("found", "h/.ssh/known_hosts", found ?? "null");
+        Assert.AreEqual("h/.ssh/known_hosts", found);
+    }
+
+    private SshKnownHostsFileSearch Search(bool runsOnWindows, string accountHomeDirectory)
+    {
+        Diagnostics.Arrange("variables", string.Join(", ", EveryVariable.Select(pair => $"{pair.Key}={pair.Value}")));
+        Diagnostics.Arrange("runs on Windows / account home", $"{runsOnWindows} / {accountHomeDirectory}");
+        return new(name => EveryVariable.GetValueOrDefault(name), runsOnWindows, accountHomeDirectory);
     }
 }

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Curl.Testing;
 using static Curl.Tls.HandshakeDriver;
 
 namespace Curl.Tls;
@@ -11,6 +12,10 @@ namespace Curl.Tls;
 [TestClass]
 public sealed class Tls13ClientHandshakeTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow((ushort)0x1301)]
     [DataRow((ushort)0x1302)]
@@ -19,9 +24,16 @@ public sealed class Tls13ClientHandshakeTests
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { CipherSuite = (ushort)cipherSuite };
         using Tls13ClientHandshake client = Client(DefaultSettings with { CipherSuites = [(ushort)cipherSuite] });
+        Diagnostics.Arrange("cipher suite", $"0x{cipherSuite:x4}");
 
-        Tls13HandshakeOutput output = Run(client, server);
+        Tls13HandshakeOutput output = RunTimed(client, server);
 
+        WriteOutput(output);
+        Diagnostics.Act("negotiated cipher suite", client.CipherSuite is null ? "none" : $"0x{client.CipherSuite.Code:x4}");
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Assert("cipher suite", cipherSuite, (int?)client.CipherSuite?.Code);
+        Diagnostics.Diff("server application traffic secret", server.ServerApplicationTrafficSecret, output.SecretsInstalled[0].Secret);
+        Diagnostics.Diff("client application traffic secret", server.ClientApplicationTrafficSecret, output.SecretsInstalled[1].Secret);
         Assert.IsNull(output.Failure);
         Assert.IsTrue(output.IsComplete);
         Assert.AreEqual(cipherSuite, client.CipherSuite!.Code);
@@ -49,9 +61,12 @@ public sealed class Tls13ClientHandshakeTests
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { Group = (ushort)group };
         using Tls13ClientHandshake client = Client(DefaultSettings with { SupportedGroups = [(ushort)group], KeyShareGroups = [(ushort)group] });
+        Diagnostics.Arrange("group (supported and key share)", $"0x{group:x4}");
 
-        Tls13HandshakeOutput output = Run(client, server);
+        Tls13HandshakeOutput output = RunTimed(client, server);
 
+        WriteOutput(output);
+        AssertGroup(group, client);
         Assert.IsTrue(output.IsComplete);
         Assert.AreEqual<ushort?>((ushort)group, client.NegotiatedGroup);
     }
@@ -70,9 +85,14 @@ public sealed class Tls13ClientHandshakeTests
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { Group = (ushort)group, CipherSuite = 0x1302 };
         using Tls13ClientHandshake client = Client(DefaultSettings with { SupportedGroups = [TlsNamedGroup.X25519, (ushort)group] });
+        Diagnostics.Arrange("client groups", $"x25519, 0x{group:x4}");
+        Diagnostics.Arrange("server group", $"0x{group:x4} (forces a HelloRetryRequest)");
 
-        Tls13HandshakeOutput output = Run(client, server);
+        Tls13HandshakeOutput output = RunTimed(client, server);
 
+        WriteOutput(output);
+        Diagnostics.Act("server sent a HelloRetryRequest", server.SentHelloRetryRequest);
+        AssertGroup(group, client);
         Assert.IsTrue(output.IsComplete);
         Assert.AreEqual<ushort?>((ushort)group, client.NegotiatedGroup);
     }
@@ -89,9 +109,15 @@ public sealed class Tls13ClientHandshakeTests
             SupportedGroups = ClientHelloProfile.OpenSsl.SupportedGroups,
             KeyShareGroups = ClientHelloProfile.OpenSsl.KeyShareGroups,
         });
+        Diagnostics.Arrange("client groups", "OpenSSL profile");
+        Diagnostics.Arrange("server group", $"0x{group:x4}");
 
-        Tls13HandshakeOutput output = Run(client, server);
+        Tls13HandshakeOutput output = RunTimed(client, server);
 
+        WriteOutput(output);
+        Diagnostics.Act("server sent a HelloRetryRequest", server.SentHelloRetryRequest);
+        AssertGroup(group, client);
+        Diagnostics.Assert("HelloRetryRequest sent", retried, server.SentHelloRetryRequest);
         Assert.IsTrue(output.IsComplete);
         Assert.AreEqual<ushort?>((ushort)group, client.NegotiatedGroup);
         Assert.AreEqual(retried, server.SentHelloRetryRequest);
@@ -103,23 +129,42 @@ public sealed class Tls13ClientHandshakeTests
         byte[] cookie = [1, 2, 3, 4];
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { Group = TlsNamedGroup.Secp256r1, RetryCookie = cookie };
         using Tls13ClientHandshake client = Client();
-        TestServerFlight retry = server.Answer(client.Start().BytesToSend[0].Bytes);
-
-        byte[] secondHello = client.Receive(TlsEncryptionLevel.Initial, retry.ServerHello).BytesToSend[0].Bytes;
+        Diagnostics.Bytes("retry cookie", cookie);
+        Diagnostics.Arrange("server group", "secp256r1 (forces a HelloRetryRequest)");
+        TestServerFlight retry;
+        byte[] secondHello;
+        using (Diagnostics.Phase("first flight and HelloRetryRequest"))
+        {
+            retry = server.Answer(client.Start().BytesToSend[0].Bytes);
+            secondHello = client.Receive(TlsEncryptionLevel.Initial, retry.ServerHello).BytesToSend[0].Bytes;
+        }
 
         ClientHello hello = ClientHello.Decode(HandshakeMessageReader.Read(secondHello).Message!.Body).Value;
         TlsExtension echoed = hello.Extensions.Single(extension => extension.Type == TlsExtensionType.Cookie);
+        Diagnostics.Bytes("second ClientHello", secondHello);
+        Diagnostics.Act("echoed cookie extension length", echoed.Data.Length);
+        Diagnostics.Diff("echoed cookie", cookie, CookieExtension.Decode(echoed.Data).Value);
         CollectionAssert.AreEqual(cookie, CookieExtension.Decode(echoed.Data).Value);
-        Assert.IsTrue(Run2(client, server, secondHello).IsComplete);
+        bool complete;
+        using (Diagnostics.Phase("second flight"))
+        {
+            complete = Run2(client, server, secondHello).IsComplete;
+        }
+
+        Diagnostics.Assert("complete", true, complete);
+        Assert.IsTrue(complete);
     }
 
     [TestMethod]
     public void ClientHelloOffersTheRenegotiationScsvAfterTheTls13SuitesWhenAsked()
     {
         using Tls13ClientHandshake client = Client(DefaultSettings with { CipherSuites = [0x1302, 0x1303, 0x1301], OfferEmptyRenegotiationInfoScsv = true });
+        Diagnostics.Arrange("cipher suites", "0x1302, 0x1303, 0x1301; OfferEmptyRenegotiationInfoScsv = true");
 
         ClientHello hello = ClientHello.Decode(HandshakeMessageReader.Read(client.Start().BytesToSend[0].Bytes).Message!.Body).Value;
 
+        Diagnostics.Act("offered cipher suites", Suites(hello));
+        Diagnostics.Assert("offered cipher suites", "0x1302, 0x1303, 0x1301, 0x00ff", Suites(hello));
         CollectionAssert.AreEqual(new ushort[] { 0x1302, 0x1303, 0x1301, 0x00ff }, hello.CipherSuites.ToArray());
     }
 
@@ -128,9 +173,13 @@ public sealed class Tls13ClientHandshakeTests
     {
         Tls12ClientSettings lower = Tls12PipeDriver.DefaultSettings with { CipherSuites = [0xc02f, Tls12CipherSuite.EmptyRenegotiationInfoScsv] };
         using Tls13ClientHandshake client = Client(DefaultSettings with { CipherSuites = [0x1301], OfferEmptyRenegotiationInfoScsv = true, LowerVersions = lower });
+        Diagnostics.Arrange("TLS 1.3 cipher suites", "0x1301; OfferEmptyRenegotiationInfoScsv = true");
+        Diagnostics.Arrange("lower-version cipher suites", "0xc02f, 0x00ff");
 
         ClientHello hello = ClientHello.Decode(HandshakeMessageReader.Read(client.Start().BytesToSend[0].Bytes).Message!.Body).Value;
 
+        Diagnostics.Act("offered cipher suites", Suites(hello));
+        Diagnostics.Assert("offered cipher suites", "0x1301, 0xc02f, 0x00ff", Suites(hello));
         CollectionAssert.AreEqual(new ushort[] { 0x1301, 0xc02f, 0x00ff }, hello.CipherSuites.ToArray());
     }
 
@@ -141,11 +190,20 @@ public sealed class Tls13ClientHandshakeTests
         byte[] firstHello = client.Start().BytesToSend[0].Bytes;
         byte[] retry = new ServerHello(0x0303, ServerHello.HelloRetryRequestRandom.ToArray(), [], 0x1301, 0,
             [SupportedVersionsExtension.EncodeSelected(0x0304), CookieExtension.Encode([9])]).Encode();
+        Diagnostics.Arrange("HelloRetryRequest", "cookie [9] only, no key_share");
+        Diagnostics.Bytes("HelloRetryRequest", retry);
 
         Tls13HandshakeOutput output = client.Receive(TlsEncryptionLevel.Initial, retry);
 
         ClientHello first = ClientHello.Decode(HandshakeMessageReader.Read(firstHello).Message!.Body).Value;
         ClientHello second = ClientHello.Decode(HandshakeMessageReader.Read(output.BytesToSend[0].Bytes).Message!.Body).Value;
+        Diagnostics.Act("first hello extensions", first.Extensions.Count);
+        Diagnostics.Act("second hello extensions", second.Extensions.Count);
+        Diagnostics.Diff(
+            "key_share",
+            first.Extensions.Single(extension => extension.Type == TlsExtensionType.KeyShare).Data,
+            second.Extensions.Single(extension => extension.Type == TlsExtensionType.KeyShare).Data);
+        Diagnostics.Assert("second hello extensions", first.Extensions.Count + 1, second.Extensions.Count);
         CollectionAssert.AreEqual(
             first.Extensions.Single(extension => extension.Type == TlsExtensionType.KeyShare).Data,
             second.Extensions.Single(extension => extension.Type == TlsExtensionType.KeyShare).Data);
@@ -207,9 +265,13 @@ public sealed class Tls13ClientHandshakeTests
         };
         Tls13TestServer server = new(credential);
         using Tls13ClientHandshake client = Client(DefaultSettings with { SignatureAlgorithms = [credential.Scheme] });
+        Diagnostics.Arrange("server credential", $"{name}, scheme 0x{credential.Scheme:x4}");
+        Diagnostics.Arrange("server flight", "CertificateVerify tampered");
 
-        Tls13HandshakeOutput output = Run(client, server, replaceFlight: flight => Tamper(flight, HandshakeType.CertificateVerify));
+        Tls13HandshakeOutput output = RunTimed(client, server, replaceFlight: flight => Tamper(flight, HandshakeType.CertificateVerify));
 
+        WriteOutput(output);
+        Diagnostics.Assert("alert", TlsAlertDescription.DecryptError, output.Failure?.Alert);
         Assert.AreEqual(TlsAlertDescription.DecryptError, output.Failure!.Alert);
     }
 
@@ -218,8 +280,17 @@ public sealed class Tls13ClientHandshakeTests
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { ApplicationProtocol = "http/1.1" };
         using Tls13ClientHandshake client = Client(DefaultSettings with { ApplicationProtocols = ["h2", "http/1.1"] });
+        Diagnostics.Arrange("client ALPN", "h2, http/1.1");
+        Diagnostics.Arrange("server ALPN", "http/1.1");
 
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        Diagnostics.Act("application protocol", client.ApplicationProtocol ?? "none");
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Assert("application protocol", "http/1.1", client.ApplicationProtocol);
+        Diagnostics.Assert("server QUIC transport parameters", "null", client.ServerQuicTransportParameters is null ? "null" : "present");
+        Assert.IsTrue(output.IsComplete);
         Assert.AreEqual("http/1.1", client.ApplicationProtocol);
         Assert.IsNull(client.ServerQuicTransportParameters);
     }
@@ -230,8 +301,15 @@ public sealed class Tls13ClientHandshakeTests
         byte[] parameters = [0x04, 0x01, 0x20];
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { QuicTransportParameters = parameters };
         using Tls13ClientHandshake client = Client(DefaultSettings with { FixedExtensions = [QuicTransportParametersExtension.Encode([0x05, 0x01, 0x10])] });
+        Diagnostics.Bytes("server QUIC transport parameters", parameters);
+        Diagnostics.Arrange("client", "offers QUIC transport parameters 05 01 10");
 
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Diff("server QUIC transport parameters", parameters, client.ServerQuicTransportParameters ?? []);
+        Assert.IsTrue(output.IsComplete);
         CollectionAssert.AreEqual(parameters, client.ServerQuicTransportParameters);
     }
 
@@ -243,8 +321,17 @@ public sealed class Tls13ClientHandshakeTests
         RecordingCertificateVerifier verifier = new();
         TlsExtension statusRequest = StatusRequestExtension.EncodeOcspRequest(new OcspStatusRequest([], []));
         using Tls13ClientHandshake client = Client(DefaultSettings with { FixedExtensions = [statusRequest] }, verifier);
+        Diagnostics.Bytes("stapled OCSP response", ocspResponse);
+        Diagnostics.Arrange("client", "status_request sent as a fixed extension");
 
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        Diagnostics.Act("chains presented to the verifier", verifier.Presented.Count);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Diff("OCSP response presented", ocspResponse, verifier.Presented.Count == 0 ? [] : verifier.Presented[0].OcspResponse ?? []);
+        Diagnostics.Assert("host name presented", "localhost", verifier.Presented.Count == 0 ? null : verifier.Presented[0].HostName);
+        Assert.IsTrue(output.IsComplete);
         CollectionAssert.AreEqual(ocspResponse, verifier.Presented[0].OcspResponse);
         Assert.AreEqual("localhost", verifier.Presented[0].HostName);
     }
@@ -254,8 +341,13 @@ public sealed class Tls13ClientHandshakeTests
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519());
         using Tls13ClientHandshake client = Client(DefaultSettings with { SendLegacySessionId = true });
+        Diagnostics.Arrange("settings", "SendLegacySessionId = true");
 
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Assert.IsTrue(output.IsComplete);
     }
 
     [TestMethod]
@@ -267,8 +359,17 @@ public sealed class Tls13ClientHandshakeTests
         {
             ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
         });
+        Diagnostics.Arrange("client certificate", "ECDSA P-256");
+        Diagnostics.Arrange("server", "requests a client certificate");
 
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        WriteClientCertificate(client, server);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Assert("client certificate sent", true, client.ClientCertificateSent);
+        Diagnostics.Assert("certificates the server received", 1, server.ClientCertificates.Count);
+        Assert.IsTrue(output.IsComplete);
         Assert.IsTrue(client.ClientCertificateRequested);
         Assert.IsTrue(client.ClientCertificateSent);
         Assert.HasCount(1, server.ClientCertificates);
@@ -298,9 +399,17 @@ public sealed class Tls13ClientHandshakeTests
         {
             ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
         });
+        Diagnostics.Arrange("client credential", $"{credential}, scheme 0x{clientCredential.Scheme:x4}");
 
         // The server checks the CertificateVerify against the certificate's key with TlsCertificatePublicKey.
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        WriteClientCertificate(client, server);
+        Diagnostics.Act("client CertificateVerify scheme", server.ClientCertificateVerifyScheme);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Assert("client CertificateVerify scheme", clientCredential.Scheme, server.ClientCertificateVerifyScheme);
+        Assert.IsTrue(output.IsComplete);
         Assert.IsTrue(client.ClientCertificateSent);
         CollectionAssert.AreEqual(clientCredential.Certificate, server.ClientCertificates[0]);
         Assert.AreEqual(clientCredential.Scheme, server.ClientCertificateVerifyScheme);
@@ -311,8 +420,16 @@ public sealed class Tls13ClientHandshakeTests
     {
         Tls13TestServer server = new(TestServerCredential.Ed25519()) { RequestClientCertificate = true };
         using Tls13ClientHandshake client = Client();
+        Diagnostics.Arrange("client certificate", "none");
+        Diagnostics.Arrange("server", "requests a client certificate");
 
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        WriteClientCertificate(client, server);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Assert("client certificate sent", false, client.ClientCertificateSent);
+        Assert.IsTrue(output.IsComplete);
         Assert.IsTrue(client.ClientCertificateRequested);
         Assert.IsFalse(client.ClientCertificateSent);
         Assert.IsEmpty(server.ClientCertificates);
@@ -327,8 +444,16 @@ public sealed class Tls13ClientHandshakeTests
         {
             ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
         });
+        Diagnostics.Arrange("client certificate", "Ed25519");
+        Diagnostics.Arrange("server requested schemes", "rsa_pss_rsae_sha256 only");
 
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Tls13HandshakeOutput output = RunTimed(client, server);
+
+        WriteOutput(output);
+        WriteClientCertificate(client, server);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Assert("client certificate sent", false, client.ClientCertificateSent);
+        Assert.IsTrue(output.IsComplete);
         Assert.IsFalse(client.ClientCertificateSent);
     }
 
@@ -343,11 +468,23 @@ public sealed class Tls13ClientHandshakeTests
             ExtensionOrder = [.. Tls13ClientSettings.DefaultExtensionOrder, TlsExtensionType.PostHandshakeAuth],
             ClientCertificate = new TlsClientCertificate([clientCredential.Certificate], clientCredential.SigningKey),
         });
-        Assert.IsTrue(Run(client, server).IsComplete);
+        Diagnostics.Arrange("client", "offers post_handshake_auth with an RSA certificate");
+        bool complete = RunTimed(client, server).IsComplete;
+        Diagnostics.Assert("handshake complete", true, complete);
+        Assert.IsTrue(complete);
         byte[] request = server.CreatePostHandshakeCertificateRequest([5, 5]);
+        Diagnostics.Bytes("post-handshake CertificateRequest", request);
 
-        Tls13HandshakeOutput answer = client.Receive(TlsEncryptionLevel.Application, request);
+        Tls13HandshakeOutput answer;
+        using (Diagnostics.Phase("post-handshake answer"))
+        {
+            answer = client.Receive(TlsEncryptionLevel.Application, request);
+        }
 
+        WriteOutput(answer);
+        Diagnostics.Act("secrets installed", answer.SecretsInstalled.Count);
+        Diagnostics.Act("flights to send", answer.BytesToSend.Count);
+        Diagnostics.Assert("answer level", TlsEncryptionLevel.Application, answer.BytesToSend.Count == 0 ? null : answer.BytesToSend[0].Level);
         Assert.IsTrue(answer.IsComplete);
         Assert.IsNull(answer.Failure);
         Assert.IsEmpty(answer.SecretsInstalled);
@@ -358,20 +495,27 @@ public sealed class Tls13ClientHandshakeTests
     }
 
     /// <summary>Completes a handshake whose client offers only <paramref name="credential" />'s scheme, which the default settings do not offer.</summary>
-    private static void AssertCompletesOfferingIt(TestServerCredential credential) =>
+    private void AssertCompletesOfferingIt(TestServerCredential credential) =>
         AssertCompletes(credential, DefaultSettings with { SignatureAlgorithms = [credential.Scheme] });
 
-    private static void AssertCompletes(TestServerCredential credential, Tls13ClientSettings? settings = null)
+    private void AssertCompletes(TestServerCredential credential, Tls13ClientSettings? settings = null)
     {
         Tls13TestServer server = new(credential);
         using Tls13ClientHandshake client = Client(settings);
+        Diagnostics.Arrange("server signature scheme", $"0x{credential.Scheme:x4}");
+        Diagnostics.Arrange("client signature algorithms", settings is null ? "default" : string.Join(", ", settings.SignatureAlgorithms.Select(scheme => $"0x{scheme:x4}")));
 
-        Tls13HandshakeOutput output = Run(client, server);
+        Tls13HandshakeOutput output = RunTimed(client, server);
 
+        WriteOutput(output);
+        Diagnostics.Assert("complete", true, output.IsComplete);
+        Diagnostics.Diff("server leaf certificate", credential.Certificate, client.ServerCertificates.Count == 0 ? [] : client.ServerCertificates[0]);
         Assert.IsNull(output.Failure);
         Assert.IsTrue(output.IsComplete);
         CollectionAssert.AreEqual(credential.Certificate, client.ServerCertificates[0]);
     }
+
+    private static string Suites(ClientHello hello) => string.Join(", ", hello.CipherSuites.Select(suite => $"0x{suite:x4}"));
 
     private static Tls13HandshakeOutput Run2(Tls13ClientHandshake client, Tls13TestServer server, byte[] secondHello)
     {
@@ -380,5 +524,32 @@ public sealed class Tls13ClientHandshakeTests
         Tls13HandshakeOutput output = client.Receive(TlsEncryptionLevel.Handshake, flight.Handshake);
         server.ReceiveClientFlight(output.BytesToSend[0].Bytes);
         return output;
+    }
+
+    private Tls13HandshakeOutput RunTimed(Tls13ClientHandshake client, Tls13TestServer server, Func<List<byte[]>, List<byte[]>>? replaceFlight = null)
+    {
+        using (Diagnostics.Phase("handshake"))
+        {
+            return Run(client, server, replaceFlight: replaceFlight);
+        }
+    }
+
+    private void AssertGroup(int group, Tls13ClientHandshake client)
+    {
+        Diagnostics.Act("negotiated group", client.NegotiatedGroup is { } negotiated ? $"0x{negotiated:x4}" : "none");
+        Diagnostics.Assert("negotiated group", (ushort)group, client.NegotiatedGroup);
+    }
+
+    private void WriteOutput(Tls13HandshakeOutput output)
+    {
+        Diagnostics.Act("complete", output.IsComplete);
+        Diagnostics.Act("failure alert", output.Failure?.Alert.ToString() ?? "none");
+    }
+
+    private void WriteClientCertificate(Tls13ClientHandshake client, Tls13TestServer server)
+    {
+        Diagnostics.Act("client certificate requested", client.ClientCertificateRequested);
+        Diagnostics.Act("client certificate sent", client.ClientCertificateSent);
+        Diagnostics.Act("certificates the server received", server.ClientCertificates.Count);
     }
 }

@@ -36,6 +36,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(RevocationListOptions(root, ListFrom(root)), OpenSslBuild), leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -49,6 +50,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(RevocationListOptions(root, ListFrom(root, leaf)), OpenSslBuild), leaf);
 
+        Diagnostics.Assert("error message", "SSL certificate OpenSSL verify result: certificate revoked (23)", result.Result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: certificate revoked (23)", result.Result.ErrorMessage);
         Assert.IsTrue(result.PlaintextDisposed);
@@ -64,6 +66,7 @@ public sealed partial class SslStreamTlsProviderTests
         var result = await HandshakeWithServerCertificateAsync(
             new SslStreamTlsProvider(RevocationListOptions(root, ListFrom(other)), OpenSslBuild), leaf);
 
+        Diagnostics.Assert("error message", "SSL certificate OpenSSL verify result: unable to get certificate CRL (3)", result.Result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.Result.ExitCode);
         Assert.AreEqual("SSL certificate OpenSSL verify result: unable to get certificate CRL (3)", result.Result.ErrorMessage);
     }
@@ -74,10 +77,13 @@ public sealed partial class SslStreamTlsProviderTests
         using var root = CreateListSigningRoot();
         var listFile = WriteCaFile("garbage.crl", "not a crl\n");
         var plaintext = new FakeConnection();
+        var options = RevocationListOptions(root, listFile);
 
-        var result = await new SslStreamTlsProvider(RevocationListOptions(root, listFile), OpenSslBuild)
+        var result = await new SslStreamTlsProvider(options, OpenSslBuild)
             .AuthenticateAsClientAsync(plaintext, CertificateHost, CancellationToken.None);
 
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SslCrlBadfile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslCrlBadfile, result.ExitCode);
         Assert.AreEqual($"error loading CRL file: {listFile}", result.ErrorMessage);
     }
@@ -86,10 +92,12 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithAGarbageListFileAndInsecureInTheOpenSslBuild_Succeeds()
     {
         var listFile = WriteCaFile("garbage.crl", "not a crl\n");
+        Diagnostics.Arrange("CRL file", "<test folder>/garbage.crl, not a list");
 
         var (result, _) = await HandshakeAsync(
             new TlsClientOptions(Insecure: true, CertificateRevocationListFile: listFile), CertificateHost, SslProtocols.Tls12, OpenSslBuild);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
         await result.Connection!.DisposeAsync();
     }
@@ -100,9 +108,11 @@ public sealed partial class SslStreamTlsProviderTests
         using var root = CreateListSigningRoot();
         using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         var options = RevocationListOptions(root, ListFrom(root, leaf)) with { SkipRevocationCheck = true };
+        Diagnostics.Arrange("revocation check", "skipped, Schannel build");
 
         var result = await HandshakeWithServerCertificateAsync(new SslStreamTlsProvider(options, SchannelBuild), leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -113,9 +123,11 @@ public sealed partial class SslStreamTlsProviderTests
         using var root = CreateListSigningRoot();
         using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         var options = RevocationListOptions(root, WriteCaFile("garbage.crl", "not a crl\n")) with { SkipRevocationCheck = true };
+        Diagnostics.Arrange("revocation check", "skipped, Schannel build");
 
         var result = await HandshakeWithServerCertificateAsync(new SslStreamTlsProvider(options, SchannelBuild), leaf);
 
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.Result.ExitCode, result.Result.ErrorMessage);
         await result.Result.Connection!.DisposeAsync();
     }
@@ -124,8 +136,12 @@ public sealed partial class SslStreamTlsProviderTests
     private static X509Certificate2 CreateListSigningRoot() =>
         CertificateRevocationListTests.CreateAuthority("CN=BL609 Test Root", RSA.Create(2048));
 
-    private TlsClientOptions RevocationListOptions(X509Certificate2 root, string listFile) =>
-        new(CaCertificateFile: WriteCaFile("root.pem", root.ExportCertificatePem()), CertificateRevocationListFile: listFile);
+    private TlsClientOptions RevocationListOptions(X509Certificate2 root, string listFile)
+    {
+        Diagnostics.Arrange("CA file", $"holding {root.Subject} {root.Thumbprint}");
+        Diagnostics.Arrange("CRL file", Path.GetFileName(listFile));
+        return new(CaCertificateFile: WriteCaFile("root.pem", root.ExportCertificatePem()), CertificateRevocationListFile: listFile);
+    }
 
     private string ListFrom(X509Certificate2 authority, X509Certificate2? revoked = null)
     {

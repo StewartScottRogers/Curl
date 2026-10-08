@@ -9,8 +9,9 @@ namespace Curl.Protocol.Smb;
 /// </summary>
 internal static class SmbReadResponse
 {
-    // sizeof(struct smb_header) + 14: through the data offset word.
-    private const int MinimumLength = SmbMessageHeader.Length + 14;
+    // Through the data offset word: one byte past curl's sizeof(struct smb_header) + 14,
+    // which reads the word's high byte from its receive buffer past the reply (BL-1665).
+    private const int MinimumLength = DataOffsetOffset + sizeof(ushort);
 
     private const int DataLengthOffset = SmbMessageHeader.Length + 11;
     private const int DataOffsetOffset = SmbMessageHeader.Length + 13;

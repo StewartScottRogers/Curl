@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -27,6 +29,10 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
 
     private ITlsProvider tlsProvider = new PassThroughTlsProvider();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("tcp")]
     [DataRow("network")]
@@ -35,26 +41,29 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         // curl -s -v --trace-config tcp http://127.0.0.1:47195/ (BL-1195 Notes).
         int exitCode = await RunAsync("-v", "--trace-config", components, "http://127.0.0.1:47195/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "* Established connection to 127.0.0.1 (127.0.0.1 port 47195) from 127.0.0.1 port 50000 ",
-                "* [TCP] query ALPN",
-                "* using HTTP/1.x",
-                "* [TCP] send(len=79) -> 0, 79",
-                "> GET / HTTP/1.1",
-                "> Host: 127.0.0.1:47195",
-                "> User-Agent: curl/8.21.0",
-                "> Accept: */*",
-                "> ",
-                "* Request completely sent off",
-                "* [TCP] recv(len=102400) -> 0, 40",
-                "< HTTP/1.1 200 OK",
-                "< Content-Length: 2",
-                "< ",
-            },
-            TransferLines());
+        string[] expectedLines =
+        [
+            "* Established connection to 127.0.0.1 (127.0.0.1 port 47195) from 127.0.0.1 port 50000 ",
+            "* [TCP] query ALPN",
+            "* using HTTP/1.x",
+            "* [TCP] send(len=79) -> 0, 79",
+            "> GET / HTTP/1.1",
+            "> Host: 127.0.0.1:47195",
+            "> User-Agent: curl/8.21.0",
+            "> Accept: */*",
+            "> ",
+            "* Request completely sent off",
+            "* [TCP] recv(len=102400) -> 0, 40",
+            "< HTTP/1.1 200 OK",
+            "< Content-Length: 2",
+            "< ",
+        ];
+        string[] actualLines = TransferLines();
+
+        Diagnostics.Diff("trace lines", string.Join('\n', expectedLines), string.Join('\n', actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -63,27 +72,30 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         // curl -s -v --trace-config tcp -x http://127.0.0.1:18533 http://example.invalid/ (BL-1253 Notes).
         int exitCode = await RunAsync("-v", "--trace-config", "tcp", "-x", "http://127.0.0.1:47195", "http://example.invalid/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "* Established connection to 127.0.0.1 (127.0.0.1 port 47195) from 127.0.0.1 port 50000 ",
-                "* [TCP] query ALPN",
-                "* using HTTP/1.x",
-                "* [TCP] send(len=131) -> 0, 131",
-                "> GET http://example.invalid/ HTTP/1.1",
-                "> Host: example.invalid",
-                "> User-Agent: curl/8.21.0",
-                "> Accept: */*",
-                "> Proxy-Connection: Keep-Alive",
-                "> ",
-                "* Request completely sent off",
-                "* [TCP] recv(len=102400) -> 0, 40",
-                "< HTTP/1.1 200 OK",
-                "< Content-Length: 2",
-                "< ",
-            },
-            TransferLines());
+        string[] expectedLines =
+        [
+            "* Established connection to 127.0.0.1 (127.0.0.1 port 47195) from 127.0.0.1 port 50000 ",
+            "* [TCP] query ALPN",
+            "* using HTTP/1.x",
+            "* [TCP] send(len=131) -> 0, 131",
+            "> GET http://example.invalid/ HTTP/1.1",
+            "> Host: example.invalid",
+            "> User-Agent: curl/8.21.0",
+            "> Accept: */*",
+            "> Proxy-Connection: Keep-Alive",
+            "> ",
+            "* Request completely sent off",
+            "* [TCP] recv(len=102400) -> 0, 40",
+            "< HTTP/1.1 200 OK",
+            "< Content-Length: 2",
+            "< ",
+        ];
+        string[] actualLines = TransferLines();
+
+        Diagnostics.Diff("trace lines", string.Join('\n', expectedLines), string.Join('\n', actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -92,12 +104,15 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         // curl -s -v --trace-config tcp --haproxy-protocol http://127.0.0.1:18531/ (BL-1253 Notes).
         int exitCode = await RunAsync("-v", "--trace-config", "tcp", "--haproxy-protocol", "http://127.0.0.1:47195/");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         List<string> lines = StandardErrorLines();
         int established = lines.FindIndex(line => line.StartsWith("* Established connection", StringComparison.Ordinal));
-        CollectionAssert.AreEqual(
-            new[] { "* [TCP] send(len=44) -> 0, 44", lines[established], "* [TCP] query ALPN", "* using HTTP/1.x", "* [TCP] send(len=79) -> 0, 79" },
-            lines.Skip(established - 1).Take(5).ToArray());
+        Diagnostics.Assert("established connection line index", true, established >= 1);
+        string[] expectedLines = ["* [TCP] send(len=44) -> 0, 44", lines[established], "* [TCP] query ALPN", "* using HTTP/1.x", "* [TCP] send(len=79) -> 0, 79"];
+        string[] actualLines = lines.Skip(established - 1).Take(5).ToArray();
+        Diagnostics.Diff("trace lines around the established connection", string.Join('\n', expectedLines), string.Join('\n', actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -111,9 +126,9 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
         List<string> lines = StandardErrorLines();
         string[] tcpLines = [.. lines.Where(line => line.Contains("* [TCP] ", StringComparison.Ordinal) && !line.Contains("fd=", StringComparison.Ordinal) && !line.Contains("local address", StringComparison.Ordinal))
             .Select(line => line[line.IndexOf("[TCP]", StringComparison.Ordinal)..])];
-        CollectionAssert.AreEqual(
-            new[] { "[TCP] query ALPN", "[TCP] send(len=79) -> 0, 79", "[TCP] recv(len=102400) -> 0, 40" },
-            tcpLines);
+        string[] expectedLines = ["[TCP] query ALPN", "[TCP] send(len=79) -> 0, 79", "[TCP] recv(len=102400) -> 0, 40"];
+        Diagnostics.Diff("tcp lines", string.Join('\n', expectedLines), string.Join('\n', tcpLines));
+        CollectionAssert.AreEqual(expectedLines, tcpLines);
     }
 
     [TestMethod]
@@ -124,6 +139,7 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
     {
         await RunAsync([.. arguments, "http://127.0.0.1:47195/"]);
 
+        Diagnostics.Assert("any [TCP] line", false, StandardErrorLines().Any(line => line.Contains("[TCP]", StringComparison.Ordinal)));
         Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("[TCP]", StringComparison.Ordinal)));
     }
 
@@ -146,30 +162,33 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
 
         int exitCode = await RunAsync("-v", "--trace-config", components, "ftp://127.0.0.1:18601/a.txt");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "* [TCP] recv(len=900) -> 0, 20", "< 220 Recorder ready",
-                "* [TCP] send(len=16) -> 0, 16", "> USER anonymous",
-                "* [TCP] recv(len=900) -> 0, 23", "< 331 Password required",
-                "* [TCP] send(len=22) -> 0, 22", "> PASS ftp@example.com",
-                "* [TCP] recv(len=900) -> 0, 15", "< 230 Logged in",
-                "* [TCP] send(len=5) -> 0, 5", "> PWD",
-                "* [TCP] recv(len=900) -> 0, 30", "< 257 \"/\" is current directory",
-                "* [TCP] send(len=6) -> 0, 6", "> EPSV",
-                "* [TCP] recv(len=900) -> 0, 48", "< 229 Entering Extended Passive Mode (|||59271|)",
-                "* [TCP] send(len=8) -> 0, 8", "> TYPE I",
-                "* [TCP] recv(len=900) -> 0, 14", "< 200 Type set",
-                "* [TCP] send(len=12) -> 0, 12", "> SIZE a.txt",
-                "* [TCP] recv(len=900) -> 0, 7", "< 213 5",
-                "* [TCP] send(len=12) -> 0, 12", "> RETR a.txt",
-                "* [TCP] recv(len=900) -> 0, 41", "< 150 Opening BINARY mode data connection",
-                "* [TCP-1] recv(len=5) -> 0, 5",
-                "* [TCP] recv(len=900) -> 0, 23", "< 226 Transfer complete",
-            },
-            StandardErrorLines().Where(line => line.StartsWith("> ", StringComparison.Ordinal) || line.StartsWith("< ", StringComparison.Ordinal)
-                || line.Contains("] send(len=", StringComparison.Ordinal) || line.Contains("] recv(len=", StringComparison.Ordinal)).ToArray());
+        string[] expectedLines =
+        [
+            "* [TCP] recv(len=900) -> 0, 20", "< 220 Recorder ready",
+            "* [TCP] send(len=16) -> 0, 16", "> USER anonymous",
+            "* [TCP] recv(len=900) -> 0, 23", "< 331 Password required",
+            "* [TCP] send(len=22) -> 0, 22", "> PASS ftp@example.com",
+            "* [TCP] recv(len=900) -> 0, 15", "< 230 Logged in",
+            "* [TCP] send(len=5) -> 0, 5", "> PWD",
+            "* [TCP] recv(len=900) -> 0, 30", "< 257 \"/\" is current directory",
+            "* [TCP] send(len=6) -> 0, 6", "> EPSV",
+            "* [TCP] recv(len=900) -> 0, 48", "< 229 Entering Extended Passive Mode (|||59271|)",
+            "* [TCP] send(len=8) -> 0, 8", "> TYPE I",
+            "* [TCP] recv(len=900) -> 0, 14", "< 200 Type set",
+            "* [TCP] send(len=12) -> 0, 12", "> SIZE a.txt",
+            "* [TCP] recv(len=900) -> 0, 7", "< 213 5",
+            "* [TCP] send(len=12) -> 0, 12", "> RETR a.txt",
+            "* [TCP] recv(len=900) -> 0, 41", "< 150 Opening BINARY mode data connection",
+            "* [TCP-1] recv(len=5) -> 0, 5",
+            "* [TCP] recv(len=900) -> 0, 23", "< 226 Transfer complete",
+        ];
+        string[] actualLines = StandardErrorLines().Where(line => line.StartsWith("> ", StringComparison.Ordinal) || line.StartsWith("< ", StringComparison.Ordinal)
+            || line.Contains("] send(len=", StringComparison.Ordinal) || line.Contains("] recv(len=", StringComparison.Ordinal)).ToArray();
+
+        Diagnostics.Diff("trace lines", string.Join('\n', expectedLines), string.Join('\n', actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     [TestMethod]
@@ -188,27 +207,30 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
 
         int exitCode = await RunAsync([.. arguments, "https://127.0.0.1:47195/"]);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        CollectionAssert.AreEqual(
-            new[]
-            {
-                "[TCP] send(len=429) -> 0, 429",
-                "[TCP] recv(len=4096) -> 0, 81",
-                "[TCP] recv(len=4096) -> 0, 1175",
-                "[TCP] send(len=158) -> 0, 158",
-                "[TCP] recv(len=4096) -> 0, 51",
-                "[TCP] send(len=79) -> 0, 79",
-                "> GET / HTTP/1.1",
-                "> Accept: */*",
-                "[TCP] recv(len=103424) -> 0, 40",
-                "< HTTP/1.1 200 OK",
-                "< ",
-            },
-            StandardErrorLines()
-                .Select(line => line.Contains("[TCP] ", StringComparison.Ordinal) ? line[line.IndexOf("[TCP] ", StringComparison.Ordinal)..] : Regex.Replace(line, @"^.*] (?=[<>] )", ""))
-                .Where(line => (line.StartsWith("[TCP] ", StringComparison.Ordinal) && line.Contains("(len=", StringComparison.Ordinal)) || (line.Contains("ALPN", StringComparison.Ordinal) && !line.Contains("[SSL] ", StringComparison.Ordinal))
-                    || line is "> GET / HTTP/1.1" or "> Accept: */*" or "< HTTP/1.1 200 OK" or "< ")
-                .ToArray());
+        string[] expectedLines =
+        [
+            "[TCP] send(len=429) -> 0, 429",
+            "[TCP] recv(len=4096) -> 0, 81",
+            "[TCP] recv(len=4096) -> 0, 1175",
+            "[TCP] send(len=158) -> 0, 158",
+            "[TCP] recv(len=4096) -> 0, 51",
+            "[TCP] send(len=79) -> 0, 79",
+            "> GET / HTTP/1.1",
+            "> Accept: */*",
+            "[TCP] recv(len=103424) -> 0, 40",
+            "< HTTP/1.1 200 OK",
+            "< ",
+        ];
+        string[] actualLines = StandardErrorLines()
+            .Select(line => line.Contains("[TCP] ", StringComparison.Ordinal) ? line[line.IndexOf("[TCP] ", StringComparison.Ordinal)..] : Regex.Replace(line, @"^.*] (?=[<>] )", ""))
+            .Where(line => (line.StartsWith("[TCP] ", StringComparison.Ordinal) && line.Contains("(len=", StringComparison.Ordinal)) || (line.Contains("ALPN", StringComparison.Ordinal) && !line.Contains("[SSL] ", StringComparison.Ordinal))
+                || line is "> GET / HTTP/1.1" or "> Accept: */*" or "< HTTP/1.1 200 OK" or "< ")
+            .ToArray();
+
+        Diagnostics.Diff("trace lines", string.Join('\n', expectedLines), string.Join('\n', actualLines));
+        CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
     // The lines from Established connection to the response's blank line, every other component's
@@ -233,6 +255,10 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
     private async Task<int> RunAsync(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(["-s", .. arguments], _ => true);
+        Diagnostics.Arrange("arguments", "-s " + string.Join(' ', arguments));
+        Diagnostics.Arrange("scripted server read lengths", string.Join(", ", serverReads.Select(read => read.Length.ToString(CultureInfo.InvariantCulture))));
+        Diagnostics.Arrange("tls provider", tlsProvider.GetType().Name);
+        Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             parsed.Options,
@@ -243,18 +269,26 @@ public sealed class CurlCommandRunnerTcpIoTraceTests
             HttpProxyTunnelOptions.Default);
         InMemoryFileSystem files = new();
 
-        return await new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
-                    [],
-                    loadResolveEntries: connector.LoadResolveEntries),
-                files,
-                files,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(["-s", .. arguments]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        [],
+                        loadResolveEntries: connector.LoadResolveEntries),
+                    files,
+                    files,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(["-s", .. arguments]);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", string.Join('\n', StandardErrorLines()));
+        return exitCode;
     }
 
     /// <summary>

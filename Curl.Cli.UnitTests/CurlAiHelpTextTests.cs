@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -11,13 +13,21 @@ public sealed class CurlAiHelpTextTests
 {
     private static readonly string AllMarkdown = Markdown("all");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(null)]
     [DataRow("")]
     public void TryGetMarkdown_NoSubject_PrintsTheIndex(string? subject)
     {
-        string index = Markdown(subject);
+        string index = WrittenMarkdown(subject);
 
+        AssertHas("starts with the title", index.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.21.0 reimplemented in C#", StringComparison.Ordinal));
+        AssertContains("\n## Categories\n", index);
+        AssertContains("\n## Most-used options\n", index);
+        AssertHas("ends with the run line", index.EndsWith("Run `curl --ai-help <category>` for one category's options in full, or `curl --ai-help all` for every option, the exit codes and the `--write-out` variables.\n", StringComparison.Ordinal));
         Assert.StartsWith("# curl --ai-help\n\nThis `curl` is curl 8.21.0 reimplemented in C#", index);
         Assert.Contains("\n## Categories\n", index);
         Assert.Contains("\n## Most-used options\n", index);
@@ -27,10 +37,11 @@ public sealed class CurlAiHelpTextTests
     [TestMethod]
     public void TryGetMarkdown_NoSubject_ListsEveryCategoryWithTheCommandThatExpandsIt()
     {
-        string index = Markdown(null);
+        string index = WrittenMarkdown(null);
 
         foreach ((string name, string description) in Categories())
         {
+            AssertContains($"\n- `{name}`: {description}. Run `curl --ai-help {name}`\n", index);
             Assert.Contains($"\n- `{name}`: {description}. Run `curl --ai-help {name}`\n", index);
         }
     }
@@ -38,9 +49,14 @@ public sealed class CurlAiHelpTextTests
     [TestMethod]
     public void TryGetMarkdown_NoSubject_ListsTwentyOptionsWithTheirShortFormArgumentAndSummary()
     {
-        string index = Markdown(null);
+        string index = WrittenMarkdown(null);
         string[] mostUsed = [.. SectionLines(index, "## Most-used options").Where(line => line.StartsWith("- `--", StringComparison.Ordinal))];
+        Diagnostics.Act("most-used lines", CommandLineParseDiagnostics.QuoteEach(mostUsed));
 
+        Diagnostics.Assert("most-used count", 20, mostUsed.Length);
+        Diagnostics.Assert("first most-used line", "- `--request <method>` (`-X`): Specify request method to use", mostUsed.FirstOrDefault());
+        AssertHas("lists --json", mostUsed.Contains("- `--json <data>`: HTTP POST JSON"));
+        AssertHas("lists --user-agent", mostUsed.Contains("- `--user-agent <name>` (`-A`): Send User-Agent \\<name> to server"));
         Assert.HasCount(20, mostUsed);
         Assert.AreEqual("- `--request <method>` (`-X`): Specify request method to use", mostUsed[0]);
         CollectionAssert.Contains(mostUsed, "- `--json <data>`: HTTP POST JSON");
@@ -52,22 +68,29 @@ public sealed class CurlAiHelpTextTests
     [DataRow("HTTP")]
     public void TryGetMarkdown_Category_PrintsItsHeadingAndASectionForEachOfItsOptions(string subject)
     {
-        string http = Markdown(subject);
+        string http = WrittenMarkdown(subject);
 
+        AssertHas("starts with the http heading", http.StartsWith("# http: HTTP and HTTPS protocol\n\n## --", StringComparison.Ordinal));
         Assert.StartsWith("# http: HTTP and HTTPS protocol\n\n## --", http);
         foreach (string longName in HelpLongNames("http"))
         {
+            AssertContains($"\n## --{longName}\n", http);
             Assert.Contains($"\n## --{longName}\n", http);
         }
 
+        AssertHas("has no --ftp-pasv section", !http.Contains("\n## --ftp-pasv\n", StringComparison.Ordinal));
         Assert.DoesNotContain("\n## --ftp-pasv\n", http);
     }
 
     [TestMethod]
     public void TryGetMarkdown_OptionSection_GivesItsFactsSummaryAndManualText()
     {
-        string section = OptionSection(Markdown("http"), "data");
+        string section = WrittenOptionSection(WrittenMarkdown("http"), "data");
 
+        const string ExpectedStart = "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nHTTP POST data.\n\n"
+            + "(HTTP MQTT) Send the specified data in a POST request to the HTTP server, in the same way that a browser does";
+        Diagnostics.Diff("section start", ExpectedStart, section[..Math.Min(section.Length, ExpectedStart.Length)]);
+        AssertContains("\n\nExamples:\n\n```\ncurl -d \"name=curl\" https://example.com\ncurl -d \"name=curl\" -d \"tool=cmdline\" https://example.com\ncurl -d @filename https://example.com\n```\n\n", section);
         Assert.StartsWith(
             "## --data\n\n- Short form: `-d`\n- Argument: `<data>`\n- Repeat: yes, each use adds to the ones before it\n\nHTTP POST data.\n\n"
             + "(HTTP MQTT) Send the specified data in a POST request to the HTTP server, in the same way that a browser does",
@@ -93,6 +116,9 @@ public sealed class CurlAiHelpTextTests
     [DataRow("verbose", "- Argument: none")]
     public void TryGetMarkdown_OptionSection_CarriesTheFact(string longName, string factLine)
     {
+        string section = WrittenOptionSection(WrittenAllMarkdown(), longName);
+
+        AssertContains($"\n{factLine}\n", section);
         Assert.Contains($"\n{factLine}\n", OptionSection(AllMarkdown, longName));
     }
 
@@ -101,8 +127,13 @@ public sealed class CurlAiHelpTextTests
     [DataRow("log-file", "<file>", "Write Curl's own diagnostic log, not curl's -v, to this file instead of standard error; at info level unless --log-level says otherwise.")]
     public void TryGetMarkdown_CurlOwnDiagnosticLogOption_IsDocumentedUnderCurlButNotInHelp(string longName, string argument, string description)
     {
-        string section = OptionSection(Markdown("curl"), longName);
+        string section = WrittenOptionSection(WrittenMarkdown("curl"), longName);
 
+        AssertHas("starts with its facts", section.StartsWith($"## --{longName}\n\n- Short form: none\n- Argument: `{argument}`\n", StringComparison.Ordinal));
+        AssertContains($"\n\n{description}\n", section);
+        AssertHas("section is in --ai-help all", AllMarkdown.Contains(section, StringComparison.Ordinal));
+        AssertHas("not listed by --help all", !HelpLongNames("all").Contains(longName));
+        AssertHas("not in the manual", !string.Join('\n', CurlManual.Lines()).Contains($"--{longName}", StringComparison.Ordinal));
         Assert.StartsWith($"## --{longName}\n\n- Short form: none\n- Argument: `{argument}`\n", section);
         Assert.Contains($"\n\n{description}\n", section);
         Assert.Contains(section, AllMarkdown);
@@ -116,6 +147,9 @@ public sealed class CurlAiHelpTextTests
     [DataRow("data", "- Also accepted as:")]
     public void TryGetMarkdown_OptionSection_LeavesOutAFactThatDoesNotApply(string longName, string factLine)
     {
+        string section = WrittenOptionSection(WrittenAllMarkdown(), longName);
+
+        AssertHas($"leaves out \"{factLine}\"", !section.Contains($"\n{factLine}", StringComparison.Ordinal));
         Assert.DoesNotContain($"\n{factLine}", OptionSection(AllMarkdown, longName));
     }
 
@@ -123,8 +157,11 @@ public sealed class CurlAiHelpTextTests
     public void TryGetMarkdown_TlsEarlyData_DescribesItAsHonoured()
     {
         // BL-1105: the hand-built TLS client sends the request as 0-RTT early data on a resumed session.
-        string section = OptionSection(AllMarkdown, "tls-earlydata");
+        string section = WrittenOptionSection(WrittenAllMarkdown(), "tls-earlydata");
 
+        AssertHas("does not say it is not supported", !section.Contains("\n- Not supported by this build yet", StringComparison.Ordinal));
+        AssertContains("\n- Turn off with: `--no-tls-earlydata`\n", section);
+        AssertContains("early data", section);
         Assert.DoesNotContain("\n- Not supported by this build yet", section);
         Assert.Contains("\n- Turn off with: `--no-tls-earlydata`\n", section);
         Assert.Contains("early data", section);
@@ -135,18 +172,29 @@ public sealed class CurlAiHelpTextTests
     {
         string unparsed = HelpLongNames("all")
             .First(name => !name.StartsWith("no-", StringComparison.Ordinal) && !CommandLineOptionTable.Rows.Any(row => row.LongName == name));
+        Diagnostics.Arrange("first unparsed option", "--" + unparsed);
+        string section = WrittenOptionSection(WrittenAllMarkdown(), unparsed);
 
+        AssertContains("\n- Not supported by this build yet: curl refuses it with exit 2.\n", section);
         Assert.Contains("\n- Not supported by this build yet: curl refuses it with exit 2.\n", OptionSection(AllMarkdown, unparsed));
     }
 
     [TestMethod]
     public void TryGetMarkdown_All_PrintsEveryCategoryThenExitCodesAndWriteOutVariables()
     {
+        string all = WrittenAllMarkdown();
         foreach ((string name, string description) in Categories())
         {
+            AssertContains($"# {name}: {description}\n\n## --", all);
             Assert.Contains($"# {name}: {description}\n\n## --", AllMarkdown);
         }
 
+        AssertContains("\n# Exit codes\n\nThere are a bunch of different error codes", all);
+        AssertContains("\n- `0`\n\n  Success. The operation completed successfully according to the instructions.\n", all);
+        AssertContains("\n- `100`\n\n  A value or data field grew larger than allowed.\n", all);
+        AssertContains("\n# --write-out variables\n\nUse each as `%{name}` in the `--write-out` format.\n\n- `certs`\n\n  Output the certificate chain with details.", all);
+        AssertHas("ends with xfer_id", all.EndsWith("\n- `xfer_id`\n\n  The numerical identifier of the last transfer done. -1 if no transfer has been started yet for the handle. The transfer id is unique among all transfers performed using the same connection cache. (Added in 8.2.0)\n", StringComparison.Ordinal));
+        Diagnostics.Diff("ALL against all", all, WrittenMarkdown("ALL"));
         Assert.Contains("\n# Exit codes\n\nThere are a bunch of different error codes", AllMarkdown);
         Assert.Contains("\n- `0`\n\n  Success. The operation completed successfully according to the instructions.\n", AllMarkdown);
         Assert.Contains("\n- `100`\n\n  A value or data field grew larger than allowed.\n", AllMarkdown);
@@ -159,6 +207,13 @@ public sealed class CurlAiHelpTextTests
     public void TryGetMarkdown_All_PlacesEveryParsedOptionUnderACategory()
     {
         // An option added to CommandLineOptionTable fails here until --ai-help documents it.
+        string all = WrittenAllMarkdown();
+        Diagnostics.Arrange("parsed options", CommandLineOptionTable.Rows.Count());
+        string[] unplaced = [.. CommandLineOptionTable.Rows
+            .Where(row => !all.Contains($"\n## --{row.LongName}\n", StringComparison.Ordinal) && !all.Contains($"`--{row.LongName}`", StringComparison.Ordinal))
+            .Select(row => "--" + row.LongName)];
+        Diagnostics.Act("options with no place", CommandLineParseDiagnostics.QuoteEach(unplaced));
+        Diagnostics.Assert("options with no place", CommandLineParseDiagnostics.QuoteEach([]), CommandLineParseDiagnostics.QuoteEach(unplaced));
         foreach (CommandLineOption row in CommandLineOptionTable.Rows)
         {
             Assert.IsTrue(
@@ -170,7 +225,11 @@ public sealed class CurlAiHelpTextTests
     [TestMethod]
     public void TryGetMarkdown_All_IsUnwrappedMarkdownWithLineFeedsOnly()
     {
-        string[] lines = AllMarkdown.Split('\n');
+        string[] lines = WrittenAllMarkdown().Split('\n');
+        Diagnostics.Act("line count", lines.Length);
+        Diagnostics.Assert("lines with a tab", 0, lines.Count(line => line.Contains('\t', StringComparison.Ordinal)));
+        Diagnostics.Assert("lines with a carriage return", 0, lines.Count(line => line.Contains('\r', StringComparison.Ordinal)));
+        Diagnostics.Assert("last line", "\"\"", "\"" + lines[^1] + "\"");
         bool inCode = false;
         foreach (string line in lines)
         {
@@ -180,6 +239,7 @@ public sealed class CurlAiHelpTextTests
             Assert.IsTrue(inCode || line == "```" || !line.TrimStart().Contains("  ", StringComparison.Ordinal), line);
         }
 
+        Diagnostics.Assert("code fence left open", false, inCode);
         Assert.IsFalse(inCode, "A code fence is left open.");
         Assert.AreEqual(string.Empty, lines[^1]);
     }
@@ -190,13 +250,26 @@ public sealed class CurlAiHelpTextTests
     [DataRow("-v")]
     public void TryGetMarkdown_UnknownCategory_ReturnsFalse(string subject)
     {
-        Assert.IsFalse(CurlAiHelpText.TryGetMarkdown(subject, out string markdown));
+        Diagnostics.Arrange("subject", "\"" + subject + "\"");
+        bool found = CurlAiHelpText.TryGetMarkdown(subject, out string markdown);
+        Diagnostics.Act("found", found);
+        Diagnostics.Act("markdown", "\"" + markdown + "\"");
+
+        Diagnostics.Assert("found", false, found);
+        Diagnostics.Assert("markdown", "\"\"", "\"" + markdown + "\"");
+        Assert.IsFalse(CurlAiHelpText.TryGetMarkdown(subject, out markdown));
         Assert.AreEqual(string.Empty, markdown);
     }
 
     [TestMethod]
     public void UnknownCategoryLines_AreWhatHelpPrintsForAnUnknownCategory()
     {
+        Diagnostics.Arrange("help subject", "bogus");
+        string[] help = [.. CurlHelpText.Lines("bogus", CurlHelpText.DefaultColumns)];
+        string[] aiHelp = [.. CurlAiHelpText.UnknownCategoryLines()];
+        Diagnostics.Act("unknown category lines", CommandLineParseDiagnostics.QuoteEach(aiHelp));
+
+        Diagnostics.Assert("unknown category lines", CommandLineParseDiagnostics.QuoteEach(help), CommandLineParseDiagnostics.QuoteEach(aiHelp));
         CollectionAssert.AreEqual(CurlHelpText.Lines("bogus", CurlHelpText.DefaultColumns).ToArray(), CurlAiHelpText.UnknownCategoryLines().ToArray());
     }
 
@@ -227,4 +300,36 @@ public sealed class CurlAiHelpTextTests
         int end = markdown.IndexOf("\n#", start + 1, StringComparison.Ordinal);
         return markdown[start..(end + 1)];
     }
+
+    /// <summary>Returns <see cref="Markdown"/> for <paramref name="subject"/>, writing the subject and the Markdown as diagnostics.</summary>
+    private string WrittenMarkdown(string? subject)
+    {
+        Diagnostics.Arrange("subject", subject is null ? "null" : "\"" + subject + "\"");
+        string markdown = Markdown(subject);
+        Diagnostics.Act("markdown length", markdown.Length);
+        Diagnostics.Bytes("markdown", System.Text.Encoding.UTF8.GetBytes(markdown));
+        return markdown;
+    }
+
+    /// <summary>Returns <c>--ai-help all</c>, built once for the class, writing it as diagnostics.</summary>
+    private string WrittenAllMarkdown()
+    {
+        Diagnostics.Arrange("subject", "\"all\"");
+        Diagnostics.Act("markdown length", AllMarkdown.Length);
+        return AllMarkdown;
+    }
+
+    /// <summary>Returns <see cref="OptionSection"/>, writing the option and its section as diagnostics.</summary>
+    private string WrittenOptionSection(string markdown, string longName)
+    {
+        Diagnostics.Arrange("option", "--" + longName);
+        string section = OptionSection(markdown, longName);
+        Diagnostics.Act("section", section);
+        return section;
+    }
+
+    private void AssertContains(string expected, string text) =>
+        Diagnostics.Assert($"contains \"{expected.Replace("\n", "\\n", StringComparison.Ordinal)}\"", true, text.Contains(expected, StringComparison.Ordinal));
+
+    private void AssertHas(string label, bool actual) => Diagnostics.Assert(label, true, actual);
 }

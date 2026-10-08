@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -9,6 +11,9 @@ namespace Curl.Cli;
 [TestClass]
 public sealed class LibcurlSourceCodeOptionTests
 {
+    /// <summary>Gets or sets the MSTest context the diagnostics are written to.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
     private const string Url = "http://127.0.0.1:47653/f.txt";
 
     private const string Top =
@@ -127,7 +132,12 @@ public sealed class LibcurlSourceCodeOptionTests
     [DataRow("-I|ftp://127.0.0.1:1/", FtpStart + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n" + Agent + PassiveIp + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + KeepAlive)]
     public void Generate_OptionWithoutVariables_WritesCurlsLinesByteForByte(string arguments, string transfer)
     {
-        Assert.AreEqual(Top + Init + transfer + Perform + End, GenerateFor(arguments));
+        string expected = Top + Init + transfer + Perform + End;
+
+        string source = GenerateFor(arguments);
+
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
@@ -156,7 +166,12 @@ public sealed class LibcurlSourceCodeOptionTests
     [DataRow("-I|-f|-H|X: 1|-X|HEAD|-u|u:p|-b|jar.txt|-A||" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X: 1\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n  curl_easy_setopt(curl, CURLOPT_USERPWD, \"u:p\");\n  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"jar.txt\");\n" + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"HEAD\");\n" + KeepAlive, Slist1Free)]
     public void Generate_OptionWithVariables_DeclaresFillsAndFreesThemAsCurlDoes(string arguments, string declarations, string initialisations, string transfer, string cleanups)
     {
-        Assert.AreEqual(Top + declarations + "\n" + initialisations + Init + transfer + Perform + cleanups + End, GenerateFor(arguments));
+        string expected = Top + declarations + "\n" + initialisations + Init + transfer + Perform + cleanups + End;
+
+        string source = GenerateFor(arguments);
+
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
@@ -165,7 +180,7 @@ public sealed class LibcurlSourceCodeOptionTests
         string arguments = "-X|PUT|-H|X-A: 1|-d|a=1|-u|user:pass|-L|-e|http://ref/|-A|agent/1|-b|a=1|-c|jar.txt|--compressed|-f|-o|out.txt|-i"
             + "|--connect-timeout|5|-m|10|--resolve|h:47653:127.0.0.1|--connect-to|h:47653:127.0.0.1:47653|-4|http://h:47653/f.txt";
 
-        Assert.AreEqual(
+        string expected =
             Top
             + Slist1 + "  struct curl_slist *slist2;\n  struct curl_slist *slist3;\n"
             + "\n"
@@ -196,8 +211,12 @@ public sealed class LibcurlSourceCodeOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist3);\n"
             + Perform
             + Slist1Free + Slist2Free + Slist3Free
-            + End,
-            GenerateFor(arguments));
+            + End;
+
+        string source = GenerateFor(arguments);
+
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
@@ -206,7 +225,7 @@ public sealed class LibcurlSourceCodeOptionTests
         string arguments = "-F|n=v|-H|X: 1|-b|a=1|-b|jar|-c|j|-L|-e|r;auto|--compressed|-f|-u|u:p|-A|ag|-X|POST"
             + "|--connect-timeout|3|-m|4|-6|--resolve|h:1:127.0.0.1|--connect-to|h:1:127.0.0.1:1|http://127.0.0.1:1/";
 
-        Assert.AreEqual(
+        string expected =
             Top
             + Mime1 + Slist1 + "  struct curl_slist *slist2;\n  struct curl_slist *slist3;\n"
             + "\n"
@@ -244,8 +263,12 @@ public sealed class LibcurlSourceCodeOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist3);\n"
             + Perform
             + Mime1Free + Slist1Free + Slist2Free + Slist3Free
-            + End,
-            GenerateFor(arguments));
+            + End;
+
+        string source = GenerateFor(arguments);
+
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
@@ -254,7 +277,7 @@ public sealed class LibcurlSourceCodeOptionTests
         string arguments = "-L|-e|r;auto|-b|a=1|-b|jar|-c|j|--compressed|-H|X: 1|-d|a|-X|P|-u|u:p|-f|--connect-timeout|1|-m|2"
             + "|--resolve|h:1:127.0.0.1|--connect-to|::127.0.0.1:1|-4|-A|ag|ftp://127.0.0.1:1/";
 
-        Assert.AreEqual(
+        string expected =
             Top
             + Slist1 + "  struct curl_slist *slist2;\n  struct curl_slist *slist3;\n"
             + "\n"
@@ -281,19 +304,27 @@ public sealed class LibcurlSourceCodeOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist3);\n"
             + Perform
             + Slist1Free + Slist2Free + Slist3Free
-            + End,
-            GenerateFor(arguments));
+            + End;
+
+        string source = GenerateFor(arguments);
+
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
     public void Generate_TwoGroups_NumbersTheListsAcrossTransfersAndFreesThemAtTheEnd()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["-s", "-H", "X: 1", Url, "--next", "-s", "-H", "Y: 2", "--resolve", "h:47653:127.0.0.1", Url]);
+        string[] arguments = ["-s", "-H", "X: 1", Url, "--next", "-s", "-H", "Y: 2", "--resolve", "h:47653:127.0.0.1", Url];
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
 
         string source = LibcurlSourceCode.Generate([(result.Groups[0], Url), (result.Groups[1], Url)]);
+        Diagnostics.Act("source", source);
 
         string performAndCleanup = Perform[..Perform.IndexOf("  curl_easy_cleanup", StringComparison.Ordinal)];
-        Assert.AreEqual(
+        string expected =
             Top
             + Slist1 + "  struct curl_slist *slist2;\n  struct curl_slist *slist3;\n"
             + "\n"
@@ -307,14 +338,19 @@ public sealed class LibcurlSourceCodeOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist3);\n"
             + Perform
             + Slist1Free + Slist2Free + Slist3Free
-            + End,
-            source);
+            + End;
+
+        Diagnostics.Diff("source", expected, source);
+        Assert.AreEqual(expected, source);
     }
 
     [TestMethod]
     public void Generate_GetWithData_WritesNoPostFields()
     {
-        Assert.DoesNotContain("CURLOPT_POSTFIELDS", GenerateFor("-G|-d|a=1|" + Url));
+        string source = GenerateFor("-G|-d|a=1|" + Url);
+
+        Diagnostics.Assert("contains CURLOPT_POSTFIELDS", false, source.Contains("CURLOPT_POSTFIELDS", StringComparison.Ordinal));
+        Assert.DoesNotContain("CURLOPT_POSTFIELDS", source);
     }
 
     [TestMethod]
@@ -323,13 +359,26 @@ public sealed class LibcurlSourceCodeOptionTests
     [DataRow(new byte[] { 0x01, 0x41, 0x01, 0x47 }, "\"\\001A\\x01G\"")]
     public void QuoteCBytes_ByteBeforeAHexDigit_IsWrittenInOctal(byte[] bytes, string expected)
     {
-        Assert.AreEqual(expected, LibcurlSourceCode.QuoteCBytes(bytes));
+        Diagnostics.Arrange("bytes", Convert.ToHexString(bytes));
+
+        string quoted = LibcurlSourceCode.QuoteCBytes(bytes);
+        Diagnostics.Act("quoted", quoted);
+
+        Diagnostics.Diff("quoted", expected, quoted);
+        Assert.AreEqual(expected, quoted);
     }
 
-    private static string GenerateFor(string arguments)
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
+    /// <summary>Parses <paramref name="arguments"/> (bar-separated, after <c>-s</c>) and returns the C source generated for the last one as the URL, writing the arguments and the source as diagnostics.</summary>
+    private string GenerateFor(string arguments)
     {
         string[] parts = arguments.Split('|');
-        CommandLineOptions options = CommandLineParser.Parse(["-s", .. parts]).Options!;
-        return LibcurlSourceCode.Generate([(options, parts[^1])]);
+        string[] full = ["-s", .. parts];
+        Diagnostics.ArrangeArguments(full);
+        CommandLineOptions options = CommandLineParser.Parse(full).Options!;
+        string source = LibcurlSourceCode.Generate([(options, parts[^1])]);
+        Diagnostics.Act("source", source);
+        return source;
     }
 }

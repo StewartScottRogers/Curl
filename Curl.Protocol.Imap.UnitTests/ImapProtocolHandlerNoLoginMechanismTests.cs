@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Imap.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Imap;
 
@@ -26,6 +27,11 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
 
     private const string Closing = "* closing connection #0";
 
+    /// <summary>Gets or sets the running test's context, which carries its diagnostics.</summary>
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("IMAP4rev1 LOGINDISABLED AUTH=FOO", "user", null, null, Offered, DisplayName = "-u, LOGINDISABLED AUTH=FOO")]
     [DataRow(DefaultCapabilities, null, "tok", null, Overlap, DisplayName = "--oauth2-bearer against AUTH=PLAIN AUTH=LOGIN")]
@@ -42,6 +48,9 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
     {
         (ImapRun run, RecordingTransferEvents events) = await RunAsync(capabilities, user, bearerToken, loginOptions);
 
+        Diagnostics.Assert("exit code", CurlExitCode.LoginDenied, run.Result.ExitCode);
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\n", run.Sent);
+        Diagnostics.Assert("last two lines", expectedLine + " | " + Closing, string.Join(" | ", events.Transcript.TakeLast(2)));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual("A001 CAPABILITY\r\n", run.Sent);
         CollectionAssert.AreEqual((string[])[expectedLine, Closing], events.Transcript.TakeLast(2).ToArray());
@@ -57,6 +66,8 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
         (ImapRun run, RecordingTransferEvents events) = await RunAsync(capabilities, "user", null, loginOptions);
 
         string[] notBuiltIn = [.. new[] { first, second }.OfType<string>().Select(mechanism => "* SASL: " + mechanism + " not builtin")];
+        Diagnostics.Assert("exit code", CurlExitCode.LoginDenied, run.Result.ExitCode);
+        Diagnostics.Assert("not built in", DiagnosticText.Lines(notBuiltIn), DiagnosticText.Lines(events.Transcript.Where(line => line.EndsWith(" not builtin", StringComparison.Ordinal))));
         Assert.AreEqual(CurlExitCode.LoginDenied, run.Result.ExitCode);
         CollectionAssert.AreEqual(
             (string[])["< A001 OK done\r\n", "* SASL: no auth mechanism offered could be selected", .. notBuiltIn, Closing],
@@ -85,6 +96,9 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
         (ImapRun run, RecordingTransferEvents events) = await RunAsync(capabilities, user, bearerToken, loginOptions);
 
         string[] reasonLines = [.. reasons.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(reason => "* SASL: " + reason)];
+        Diagnostics.Assert("exit code", CurlExitCode.LoginDenied, run.Result.ExitCode);
+        Diagnostics.Diff("sent", "A001 CAPABILITY\r\n", run.Sent);
+        Diagnostics.Assert("reason lines", DiagnosticText.Lines(reasonLines), DiagnosticText.Lines(events.Transcript.Where(line => line.StartsWith("* SASL: ", StringComparison.Ordinal) && !line.Contains("no auth mechanism offered could be selected", StringComparison.Ordinal))));
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual("A001 CAPABILITY\r\n", run.Sent);
         CollectionAssert.AreEqual(
@@ -100,8 +114,15 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
         var context = Context("user", null, null, out RecordingTransferEvents events);
         string replies = Greeting + Caps(capabilities) + "A002 OK LOGIN completed\r\nA003 OK LIST completed\r\n* BYE bye\r\nA004 OK LOGOUT completed\r\n";
 
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("server", DiagnosticText.Escape(replies));
+
         ImapRun run = await ImapRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), new FakeSaslAuthenticator("PLAIN", null));
 
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, run.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, run.Result.ExitCode);
         StringAssert.StartsWith(run.Sent, "A001 CAPABILITY\r\nA002 LOGIN user secret\r\n");
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* SASL:", StringComparison.Ordinal)));
@@ -113,8 +134,15 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
         var context = Context("user", null, null, out RecordingTransferEvents events);
         string replies = Greeting + Caps(DefaultCapabilities) + "A002 NO denied\r\n";
 
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("server", DiagnosticText.Escape(replies));
+
         ImapRun run = await ImapRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(replies)), new FakeSaslAuthenticator("PLAIN", null));
 
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
+        Diagnostics.Assert("exit code", CurlExitCode.LoginDenied, run.Result.ExitCode);
+        Diagnostics.Assert("last transcript line", Closing, events.Transcript[^1]);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), run.Result);
         Assert.AreEqual(Closing, events.Transcript[^1]);
         Assert.IsFalse(events.Transcript.Any(line => line.StartsWith("* SASL:", StringComparison.Ordinal)));
@@ -144,12 +172,20 @@ public sealed class ImapProtocolHandlerNoLoginMechanismTests
     /// Runs a login against <paramref name="capabilities" /> with an authenticator that, as
     /// curl's does, can use <c>PLAIN</c> for a user and <c>XOAUTH2</c> for a bearer token.
     /// </summary>
-    private static async Task<(ImapRun Run, RecordingTransferEvents Events)> RunAsync(
+    private async Task<(ImapRun Run, RecordingTransferEvents Events)> RunAsync(
         string capabilities, string? user, string? bearerToken, string? loginOptions)
     {
         var context = Context(user, bearerToken, loginOptions, out RecordingTransferEvents events);
         var sasl = new FakeSaslAuthenticator(bearerToken is null ? "PLAIN" : "XOAUTH2", null);
+        Diagnostics.Arrange("url", Url);
+        Diagnostics.Arrange("server", DiagnosticText.Escape(Greeting + Caps(capabilities)));
+        Diagnostics.Arrange("user", user);
+        Diagnostics.Arrange("bearer token", bearerToken);
+        Diagnostics.Arrange("login options", loginOptions);
         ImapRun run = await ImapRun.ExecuteAsync(context, new ScriptedConnection(Encoding.Latin1.GetBytes(Greeting + Caps(capabilities))), sasl);
+        Diagnostics.Act("result", DiagnosticText.Result(run.Result));
+        Diagnostics.Act("sent", DiagnosticText.Escape(run.Sent));
+        Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
         return (run, events);
     }
 }

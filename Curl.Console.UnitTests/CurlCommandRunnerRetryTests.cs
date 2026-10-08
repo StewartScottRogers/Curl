@@ -3,6 +3,7 @@ using Curl.Authentication;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -43,15 +44,29 @@ public sealed class CurlCommandRunnerRetryTests
     private readonly InMemoryFileSystem outputFiles = new();
     private readonly ImmediateTimerTimeProvider clock = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
 
     private string StandardOutputText => Encoding.Latin1.GetString(standardOutput.ToArray());
+
+    private string WaitsText => string.Join(", ", clock.Waits.Select(wait => (long)wait.TotalMilliseconds));
+
+    private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private string WrittenText(string name) => Encoding.Latin1.GetString(outputFiles.Written[name].ToArray());
 
     [TestMethod]
     public async Task RunAsync_RetryAfterServiceUnavailable_WarnsWaitsAndSucceedsOnTheSecondAttempt()
     {
         int exitCode = await RunAsync([Busy, Ok], "--retry", "1", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(RetryWarningLine), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", "busyhello", StandardOutputText);
+        Diagnostics.Assert("waits (ms)", "1000", WaitsText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(RetryWarningLine, StandardErrorText);
         Assert.AreEqual("busyhello", StandardOutputText);
@@ -63,6 +78,9 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([Busy, Ok], "--retry", "1", "-o", "out.txt", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("out.txt content", "hello", WrittenText("out.txt"));
+        Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello", Encoding.Latin1.GetString(outputFiles.Written["out.txt"].ToArray()));
         Assert.AreEqual(0, standardOutput.Length);
@@ -73,6 +91,8 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([Busy, Busy], "-sS", "-f", "--retry", "1", Url);
 
+        Diagnostics.Assert("exit code", 22, exitCode);
+        Diagnostics.Diff("stderr", Lf(ServiceUnavailableLine + ServiceUnavailableLine), Lf(StandardErrorText));
         Assert.AreEqual(22, exitCode);
         Assert.AreEqual(ServiceUnavailableLine + ServiceUnavailableLine, StandardErrorText);
     }
@@ -82,6 +102,8 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([Busy, Ok], "-s", "--retry", "1", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", string.Empty, Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
@@ -91,6 +113,19 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([Busy, Busy], writesProgressMeter: true, "-f", "--retry", "1", "-o", "out.txt", Url);
 
+        Diagnostics.Assert("exit code", 22, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            Lf(
+                ProgressMeterLines.FirstHeaderLine + NewLine
+                + ProgressMeterLines.SecondHeaderLine + NewLine
+                + ProgressMeterLines.ZeroStatusLine + NewLine
+                + ServiceUnavailableLine
+                + RetryWarningLine
+                + ProgressMeterLines.ZeroStatusLine + NewLine
+                + ServiceUnavailableLine),
+            Lf(StandardErrorText));
+        Diagnostics.Assert("out.txt written", false, outputFiles.Written.ContainsKey("out.txt"));
         Assert.AreEqual(22, exitCode);
         Assert.AreEqual(
             ProgressMeterLines.FirstHeaderLine + NewLine
@@ -109,6 +144,13 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([BusyForLong, Ok], "--retry", "1", "--retry-max-time", "10", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "Warning: The Retry-After: time would make this command line exceed the maximum \nWarning: allowed time for retries.\n",
+            Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", "busy", StandardOutputText);
+        Diagnostics.Assert("wait count", 0, clock.Waits.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
             "Warning: The Retry-After: time would make this command line exceed the maximum " + NewLine
@@ -124,6 +166,8 @@ public sealed class CurlCommandRunnerRetryTests
         // curl -s --retry 2 --retry-delay 1 -w '%{num_retries}' against 503, 503, 200 (BL-513 Notes).
         int exitCode = await RunAsync([EmptyBusy, EmptyBusy, OkOk], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{num_retries}", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "ok2", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("ok2", StandardOutputText);
     }
@@ -134,6 +178,8 @@ public sealed class CurlCommandRunnerRetryTests
         // curl -s --retry 2 --retry-delay 1 -w '%{num_retries}' against three 503s (BL-513 Notes).
         int exitCode = await RunAsync([EmptyBusy, EmptyBusy, EmptyBusy], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{num_retries}", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "2", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("2", StandardOutputText);
     }
@@ -143,6 +189,8 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([EmptyBusy, EmptyBusy, OkOk], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{json}", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stdout contains num_retries 2", true, StandardOutputText.Contains("\"num_redirects\":0,\"num_retries\":2,", StringComparison.Ordinal));
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardOutputText, "\"num_redirects\":0,\"num_retries\":2,");
     }
@@ -154,6 +202,8 @@ public sealed class CurlCommandRunnerRetryTests
         // each closing its connection, printed "2 2" (BL-799 Notes).
         int exitCode = await RunAsync([EmptyBusy, EmptyBusy, EmptyOk], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "2 2\n", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("2 2\n", StandardOutputText);
     }
@@ -164,6 +214,8 @@ public sealed class CurlCommandRunnerRetryTests
         // The same against three 503s printed "2 2" (BL-799 Notes).
         int exitCode = await RunAsync([EmptyBusy, EmptyBusy, EmptyBusy], "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "2 2\n", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("2 2\n", StandardOutputText);
     }
@@ -176,6 +228,8 @@ public sealed class CurlCommandRunnerRetryTests
             [EmptyBusy, EmptyBusy, EmptyOk, EmptyOk],
             "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url, Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "2 2\n3 3\n", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("2 2\n3 3\n", StandardOutputText);
     }
@@ -188,6 +242,8 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(server, writesProgressMeter: false, "-s", "--retry", "2", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}\\n", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "2 0\n", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("2 0\n", StandardOutputText);
     }
@@ -203,6 +259,8 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(handler, writesProgressMeter: false, "-s", "--retry", "1", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "1 1", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("1 1", StandardOutputText);
     }
@@ -218,6 +276,8 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(handler, writesProgressMeter: false, "-s", "--retry", "1", "--retry-delay", "1", "-w", "%{xfer_id} %{conn_id}", "ftp://127.0.0.1:18241/a");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "1 1", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("1 1", StandardOutputText);
     }
@@ -227,6 +287,8 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([EmptyBusy], "-s", "-w", "%{num_retries}", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "0", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("0", StandardOutputText);
     }
@@ -236,6 +298,9 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([Ok], "-sS", "--limit-rate", "2", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", "hello", StandardOutputText);
+        Diagnostics.Assert("waits (ms)", "1000, 1000", WaitsText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello", StandardOutputText);
         CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
@@ -246,6 +311,9 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([Ok], "-sS", "--limit-rate", "0", "-o", "out.txt", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("out.txt content", "hello", WrittenText("out.txt"));
+        Diagnostics.Assert("wait count", 0, clock.Waits.Count);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual("hello", Encoding.Latin1.GetString(outputFiles.Written["out.txt"].ToArray()));
         Assert.AreEqual(0, clock.Waits.Count);
@@ -256,8 +324,12 @@ public sealed class CurlCommandRunnerRetryTests
     {
         int exitCode = await RunAsync([Busy, Ok], "-s", "--retry", "1", "--log-level", "warning", "--log-file", "x.log", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         string log = Encoding.UTF8.GetString(outputFiles.Written["x.log"].ToArray());
+        Diagnostics.Act("log", Lf(log));
+        Diagnostics.Assert("log contains the retry line", true, log.Contains("] [warning] [retry] attempt 1 failed (HttpError); retrying in 1000 ms, 1 retries left" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Assert("log contains [info]", false, log.Contains("[info]", StringComparison.Ordinal));
         StringAssert.Contains(log, "] [warning] [retry] attempt 1 failed (HttpError); retrying in 1000 ms, 1 retries left" + NewLine);
         Assert.IsFalse(log.Contains("[info]", StringComparison.Ordinal), log);
     }
@@ -270,6 +342,10 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains the keeping note", true, StandardErrorText.Contains(EndOfResponseLine + AllErrorsRetryWarningLine + "Note: Keeping 5 bytes" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Assert("second request has Range 5-", true, SecondRequest(server).Contains("\r\nRange: bytes=5-\r\n", StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "hello56789", OutputFileText);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardErrorText, EndOfResponseLine + AllErrorsRetryWarningLine + "Note: Keeping 5 bytes" + NewLine);
         StringAssert.Contains(SecondRequest(server), "\r\nRange: bytes=5-\r\n");
@@ -283,6 +359,10 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains the throwing note", true, StandardErrorText.Contains(AllErrorsRetryWarningLine + "Note: Throwing away 5 bytes" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Assert("second request has Range", false, SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "0123456789", OutputFileText);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardErrorText, AllErrorsRetryWarningLine + "Note: Throwing away 5 bytes" + NewLine);
         Assert.IsFalse(SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
@@ -296,6 +376,9 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-C", "-"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains Note:", false, StandardErrorText.Contains("Note:", StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "0123456789", OutputFileText);
         Assert.AreEqual(0, exitCode);
         Assert.IsFalse(StandardErrorText.Contains("Note:", StringComparison.Ordinal), StandardErrorText);
         Assert.AreEqual("0123456789", OutputFileText);
@@ -308,6 +391,11 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains the throwing note", true, StandardErrorText.Contains(AllErrorsRetryWarningLine + "Note: Throwing away 5 bytes" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Assert("stderr contains Keeping", false, StandardErrorText.Contains("Keeping", StringComparison.Ordinal));
+        Diagnostics.Assert("second request has Range", false, SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "0123456789", OutputFileText);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardErrorText, AllErrorsRetryWarningLine + "Note: Throwing away 5 bytes" + NewLine);
         Assert.IsFalse(StandardErrorText.Contains("Keeping", StringComparison.Ordinal), StandardErrorText);
@@ -324,6 +412,9 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(server, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-", option, value));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains the throwing note", true, StandardErrorText.Contains("Note: Throwing away 5 bytes" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "0123456789", OutputFileText);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardErrorText, "Note: Throwing away 5 bytes" + NewLine);
         Assert.AreEqual("0123456789", OutputFileText);
@@ -338,6 +429,9 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(handler, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains the throwing note", true, StandardErrorText.Contains("Note: Throwing away 5 bytes" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "hello", OutputFileText);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardErrorText, "Note: Throwing away 5 bytes" + NewLine);
         Assert.AreEqual("hello", OutputFileText);
@@ -352,6 +446,9 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(handler, writesProgressMeter: false, ResumingRetryArguments("-v", "-C", "-"));
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains the keeping note", true, StandardErrorText.Contains("Note: Keeping 5 bytes" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "hellohello", OutputFileText);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardErrorText, "Note: Keeping 5 bytes" + NewLine);
         Assert.AreEqual("hellohello", OutputFileText);
@@ -368,6 +465,9 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(handler, writesProgressMeter: false, "-v", "-C", "-", "--no-progress-meter", "--retry", "2", "--retry-all-errors", "-o", "out.txt", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("keeping notes", 2, StandardErrorText.Split("Note: Keeping 5 bytes").Length - 1);
+        Diagnostics.Diff("out.txt content", "hellohellohello", OutputFileText);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(2, StandardErrorText.Split("Note: Keeping 5 bytes").Length - 1, StandardErrorText);
         Assert.AreEqual("hellohellohello", OutputFileText);
@@ -389,6 +489,9 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(handler, writesProgressMeter: false, "-v", "-C", "-", "--no-progress-meter", "--retry", "1", "--retry-all-errors", "-o", "out.txt", $"{scheme}://127.0.0.1:18241/a");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains the throwing note", true, StandardErrorText.Contains("Note: Throwing away 5 bytes" + NewLine, StringComparison.Ordinal));
+        Diagnostics.Diff("out.txt content", "hello", OutputFileText);
         Assert.AreEqual(0, exitCode);
         StringAssert.Contains(StandardErrorText, "Note: Throwing away 5 bytes" + NewLine);
         Assert.AreEqual("hello", OutputFileText);
@@ -401,6 +504,10 @@ public sealed class CurlCommandRunnerRetryTests
 
         int exitCode = await RunAsync(server, writesProgressMeter: false, "-v", "-C", "-", "--no-progress-meter", "--retry", "1", "--retry-all-errors", "--retry-delay", "1", Url);
 
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr contains Note:", false, StandardErrorText.Contains("Note:", StringComparison.Ordinal));
+        Diagnostics.Assert("second request has Range", false, SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
+        Diagnostics.Diff("stdout", "hello0123456789", StandardOutputText);
         Assert.AreEqual(0, exitCode);
         Assert.IsFalse(StandardErrorText.Contains("Note:", StringComparison.Ordinal), StandardErrorText);
         Assert.IsFalse(SecondRequest(server).Contains("Range:", StringComparison.Ordinal));
@@ -486,16 +593,32 @@ public sealed class CurlCommandRunnerRetryTests
     /// <summary>
     /// Runs <paramref name="arguments" /> with <paramref name="handler" />, on <see cref="clock" />.
     /// </summary>
-    private Task<int> RunAsync(IProtocolHandler handler, bool writesProgressMeter, params string[] arguments) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([handler])),
-                outputFiles,
-                outputFiles,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                writesProgressMeter: writesProgressMeter,
-                timeProvider: clock)
-            .RunAsync(arguments);
+    private async Task<int> RunAsync(IProtocolHandler handler, bool writesProgressMeter, params string[] arguments)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("handler", $"{handler.GetType().Name} for {string.Join(", ", handler.SupportedSchemes)} on a clock whose every wait passes at once");
+        Diagnostics.Arrange("progress meter", writesProgressMeter);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([handler])),
+                    outputFiles,
+                    outputFiles,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    writesProgressMeter: writesProgressMeter,
+                    timeProvider: clock)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stdout", Lf(StandardOutputText));
+        Diagnostics.Act("stderr", Lf(StandardErrorText));
+        Diagnostics.Act("waits (ms)", WaitsText);
+        Diagnostics.Act("files written", string.Join(", ", outputFiles.Written.Keys.Order(StringComparer.Ordinal)));
+        return exitCode;
+    }
 }

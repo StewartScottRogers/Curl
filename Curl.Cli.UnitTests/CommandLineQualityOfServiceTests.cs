@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Cli;
 
@@ -14,12 +15,18 @@ public sealed class CommandLineQualityOfServiceTests
 
     private const string TryHelp = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void Parse_NeitherOption_LeavesBothZero()
     {
-        CommandLineParseResult result = CommandLineParser.Parse([Url]);
+        CommandLineParseResult result = Parse([Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("ip type of service", 0, result.Options.IpTypeOfService);
+        Diagnostics.Assert("vlan priority", 0, result.Options.VlanPriority);
         Assert.AreEqual(0, result.Options.IpTypeOfService);
         Assert.AreEqual(0, result.Options.VlanPriority);
     }
@@ -57,9 +64,10 @@ public sealed class CommandLineQualityOfServiceTests
     [DataRow("THROUGHPUT", 0x08)]
     public void Parse_IpTosName_RecordsItsByte(string name, int expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ip-tos", name, Url]);
+        CommandLineParseResult result = Parse(["--ip-tos", name, Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("ip type of service", $"0x{expected:x2}", $"0x{result.Options.IpTypeOfService:x2}");
         Assert.AreEqual(expected, result.Options.IpTypeOfService);
     }
 
@@ -70,9 +78,10 @@ public sealed class CommandLineQualityOfServiceTests
     [DataRow("255", 255)]
     public void Parse_IpTosNumber_RecordsIt(string value, int expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--ip-tos", value, Url]);
+        CommandLineParseResult result = Parse(["--ip-tos", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("ip type of service", expected, result.Options.IpTypeOfService);
         Assert.AreEqual(expected, result.Options.IpTypeOfService);
     }
 
@@ -83,19 +92,22 @@ public sealed class CommandLineQualityOfServiceTests
     [DataRow("3", 3)]
     public void Parse_VlanPriority_RecordsIt(string value, int expected)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(["--vlan-priority", value, Url]);
+        CommandLineParseResult result = Parse(["--vlan-priority", value, Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("vlan priority", expected, result.Options.VlanPriority);
         Assert.AreEqual(expected, result.Options.VlanPriority);
     }
 
     [TestMethod]
     public void Parse_EachOptionTwice_LastOneWins()
     {
-        CommandLineParseResult result = CommandLineParser.Parse(
+        CommandLineParseResult result = Parse(
             ["--ip-tos", "CS1", "--vlan-priority", "3", "--ip-tos=EF", "--vlan-priority=5", Url]);
 
         Assert.IsTrue(result.IsAccepted);
+        Diagnostics.Assert("ip type of service", "0xb8", $"0x{result.Options.IpTypeOfService:x2}");
+        Diagnostics.Assert("vlan priority", 5, result.Options.VlanPriority);
         Assert.AreEqual(0xb8, result.Options.IpTypeOfService);
         Assert.AreEqual(5, result.Options.VlanPriority);
     }
@@ -116,10 +128,24 @@ public sealed class CommandLineQualityOfServiceTests
     [DataRow("--vlan-priority", "-1", "expected a positive numerical parameter")]
     public void Parse_BadValue_RefusedAsCurlRefusesIt(string option, string value, string reason)
     {
-        CommandLineParseResult result = CommandLineParser.Parse([option, value, Url]);
+        CommandLineParseResult result = Parse([option, value, Url]);
 
+        CommandLineRefusal? refusal = CommandLineParseDiagnostics.Peek(result.Refusal);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, refusal?.ExitCode);
+        Diagnostics.Assert(
+            "stderr",
+            CommandLineParseDiagnostics.QuoteEach([$"curl: option {option}: {reason}", TryHelp]),
+            CommandLineParseDiagnostics.QuoteEach(refusal?.StandardErrorLines ?? []));
         Assert.IsFalse(result.IsAccepted);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         CollectionAssert.AreEqual(new[] { $"curl: option {option}: {reason}", TryHelp }, result.Refusal.StandardErrorLines.ToArray());
+    }
+
+    private CommandLineParseResult Parse(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.ArrangeArguments(arguments);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        Diagnostics.ActParse(result);
+        return result;
     }
 }

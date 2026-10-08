@@ -3,6 +3,7 @@ using Curl.Cli;
 using Curl.Core;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -25,6 +26,10 @@ public sealed class CurlCommandRunnerSocksQueryAlpnTraceTests
 
     private readonly MemoryStream standardError = new();
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("socks")]
     [DataRow("proxy")]
@@ -33,11 +38,15 @@ public sealed class CurlCommandRunnerSocksQueryAlpnTraceTests
         // curl -s -v --trace-config socks -x socks5h://127.0.0.1:18611 http://example.test/a (BL-1246 Notes).
         int exitCode = await RunAsync("-v", "--trace-config", components, "-x", "socks5h://127.0.0.1:18611", "http://example.test/a");
 
+        Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         List<string> lines = StandardErrorLines();
         int established = lines.FindIndex(line => line.StartsWith("* Established connection", StringComparison.Ordinal));
+        Diagnostics.Assert("Established connection line found after the first line", true, established > 0);
         Assert.IsTrue(established > 0);
+        Diagnostics.Diff("line after Established connection", "* [SOCKS] query ALPN", LineAt(lines, established + 1));
         Assert.AreEqual("* [SOCKS] query ALPN", lines[established + 1]);
+        Diagnostics.Diff("second line after Established connection", "* using HTTP/1.x", LineAt(lines, established + 2));
         Assert.AreEqual("* using HTTP/1.x", lines[established + 2]);
     }
 
@@ -46,7 +55,10 @@ public sealed class CurlCommandRunnerSocksQueryAlpnTraceTests
     {
         await RunAsync("-v", "--trace-config", "all", "-x", "socks5h://127.0.0.1:18611", "http://example.test/a");
 
+        int socksQueries = StandardErrorLines().Count(line => line.EndsWith("[SOCKS] query ALPN", StringComparison.Ordinal));
+        Diagnostics.Assert("[SOCKS] query ALPN lines", 1, socksQueries);
         Assert.AreEqual(1, StandardErrorLines().Count(line => line.EndsWith("[SOCKS] query ALPN", StringComparison.Ordinal)));
+        Diagnostics.Assert("any [TCP] query ALPN line", false, StandardErrorLines().Any(line => line.EndsWith("[TCP] query ALPN", StringComparison.Ordinal)));
         Assert.IsFalse(StandardErrorLines().Any(line => line.EndsWith("[TCP] query ALPN", StringComparison.Ordinal)));
     }
 
@@ -60,8 +72,12 @@ public sealed class CurlCommandRunnerSocksQueryAlpnTraceTests
         // [TCP] send lines but no query ALPN line (BL-1246 Notes).
         await RunAsync([.. arguments, "-x", "socks5h://127.0.0.1:18611", "http://example.test/a"]);
 
+        Diagnostics.Assert("any query ALPN line", false, StandardErrorLines().Any(line => line.Contains("query ALPN", StringComparison.Ordinal)));
         Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("query ALPN", StringComparison.Ordinal)));
     }
+
+    private static string LineAt(List<string> lines, int index) =>
+        index >= 0 && index < lines.Count ? lines[index] : "(no such line)";
 
     private List<string> StandardErrorLines() =>
         [.. Encoding.ASCII.GetString(standardError.ToArray())
@@ -76,6 +92,7 @@ public sealed class CurlCommandRunnerSocksQueryAlpnTraceTests
     private async Task<int> RunAsync(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(["-s", .. arguments], _ => true);
+        Diagnostics.Assert("command line accepted", true, parsed.IsAccepted);
         Assert.IsTrue(parsed.IsAccepted);
         TcpConnector connector = CurlComposition.CreateTcpConnector(
             parsed.Options,
@@ -85,18 +102,30 @@ public sealed class CurlCommandRunnerSocksQueryAlpnTraceTests
             TimeProvider.System,
             HttpProxyTunnelOptions.Default);
         InMemoryFileSystem files = new();
+        Diagnostics.Arrange("arguments", "-s " + string.Join(' ', arguments));
+        Diagnostics.Bytes("scripted SOCKS5 method reply", Socks5NoAuthentication);
+        Diagnostics.Bytes("scripted SOCKS5 grant", Socks5Granted);
+        Diagnostics.Bytes("scripted HTTP response", Response);
 
-        return await new CurlCommandRunner(
-                _ => new TransferDispatch(
-                    new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
-                    [],
-                    loadResolveEntries: connector.LoadResolveEntries),
-                files,
-                files,
-                new MemoryStream(),
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: true)
-            .RunAsync(["-s", .. arguments]);
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(
+                        new ProtocolDispatcher(CurlComposition.CreateProtocolHandlers(connector, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver())),
+                        [],
+                        loadResolveEntries: connector.LoadResolveEntries),
+                    files,
+                    files,
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true)
+                .RunAsync(["-s", .. arguments]);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Act("stderr", string.Join("\n", StandardErrorLines()));
+        return exitCode;
     }
 }

@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -8,6 +10,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class UrlEffectiveTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("HTTP://LocalHost:1", "http://LocalHost:1/")]
     [DataRow("http://localhost:1/a/../b", "http://localhost:1/b")]
@@ -22,8 +28,9 @@ public sealed class UrlEffectiveTests
     [DataRow("http://localhost:1/%7e", "http://localhost:1/%7e")]
     public void Normalize_Url_LowersTheSchemeAndRemovesDotSegments(string url, string expected)
     {
-        string effectiveUrl = UrlEffective.Normalize(url, pathAsIs: false);
+        string effectiveUrl = Normalize(url, pathAsIs: false);
 
+        Diagnostics.Assert("effective URL", expected, effectiveUrl);
         Assert.AreEqual(expected, effectiveUrl);
     }
 
@@ -31,8 +38,9 @@ public sealed class UrlEffectiveTests
     [TestMethod]
     public void Normalize_PathAsIs_KeepsTheDotSegments()
     {
-        string effectiveUrl = UrlEffective.Normalize("HTTP://localhost:1/a/../b", pathAsIs: true);
+        string effectiveUrl = Normalize("HTTP://localhost:1/a/../b", pathAsIs: true);
 
+        Diagnostics.Assert("effective URL", "http://localhost:1/a/../b", effectiveUrl);
         Assert.AreEqual("http://localhost:1/a/../b", effectiveUrl);
     }
 
@@ -40,8 +48,9 @@ public sealed class UrlEffectiveTests
     [TestMethod]
     public void Normalize_FileUrl_PrintsItsPathAfterTwoSlashes()
     {
-        string effectiveUrl = UrlEffective.Normalize("FILE://localhost/tmp/d/../f", pathAsIs: false);
+        string effectiveUrl = Normalize("FILE://localhost/tmp/d/../f", pathAsIs: false);
 
+        Diagnostics.Assert("effective URL", "file:///tmp/f", effectiveUrl);
         Assert.AreEqual("file:///tmp/f", effectiveUrl);
     }
 
@@ -55,8 +64,9 @@ public sealed class UrlEffectiveTests
     [DataRow("file://localhost/C:/Windows/./win.ini")]
     public void Normalize_FileUrlWithDriveLetterOnWindows_PrintsTheDriveRightAfterTwoSlashes(string url)
     {
-        string effectiveUrl = UrlEffective.Normalize(url, pathAsIs: false);
+        string effectiveUrl = Normalize(url, pathAsIs: false);
 
+        Diagnostics.Assert("effective URL", "file://C:/Windows/win.ini", effectiveUrl);
         Assert.AreEqual("file://C:/Windows/win.ini", effectiveUrl);
     }
 
@@ -66,8 +76,9 @@ public sealed class UrlEffectiveTests
     [DataRow("http:/localhost:1/a/../b")]
     public void Normalize_UrlWithGuessedSchemeOrOneSlash_PrintsTheSchemeAndTwoSlashes(string url)
     {
-        string effectiveUrl = UrlEffective.Normalize(url, pathAsIs: false);
+        string effectiveUrl = Normalize(url, pathAsIs: false);
 
+        Diagnostics.Assert("effective URL", "http://localhost:1/b", effectiveUrl);
         Assert.AreEqual("http://localhost:1/b", effectiveUrl);
     }
 
@@ -78,8 +89,17 @@ public sealed class UrlEffectiveTests
     [DataRow("http:////localhost:1/a")]
     public void Normalize_UrlCurlRejects_ReturnsItUnchanged(string url)
     {
-        string effectiveUrl = UrlEffective.Normalize(url, pathAsIs: false);
+        string effectiveUrl = Normalize(url, pathAsIs: false);
 
+        Diagnostics.Assert("effective URL", url, effectiveUrl);
         Assert.AreEqual(url, effectiveUrl);
+    }
+
+    private string Normalize(string url, bool pathAsIs)
+    {
+        Diagnostics.Arrange("URL / path as is", $"{url} / {pathAsIs}");
+        string effectiveUrl = UrlEffective.Normalize(url, pathAsIs);
+        Diagnostics.Act("effective URL", effectiveUrl);
+        return effectiveUrl;
     }
 }

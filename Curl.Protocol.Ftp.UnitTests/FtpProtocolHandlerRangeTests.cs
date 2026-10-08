@@ -1,5 +1,6 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp.Fakes;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ftp;
 
@@ -40,13 +41,20 @@ public sealed class FtpProtocolHandlerRangeTests
     /// <summary>What curl 8.21.0 sent for <c>curl -I ftp://127.0.0.1:port/dir/f.txt</c>.</summary>
     private const string HeadSent = SizeSentForHead + "REST 0\r\nQUIT\r\n";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task ExecuteAsync_BoundedRangeFromZero_ReadsTheRangeThenSendsAbor()
     {
-        // curl -r 0-4: no REST for offset 0, five bytes kept, then ABOR and QUIT.
-        FtpRun run = await RunAsync(Sized + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 4) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "0-4");
 
-        Assert.AreEqual(SizeSent + "RETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
+        // curl -r 0-4: no REST for offset 0, five bytes kept, then ABOR and QUIT.
+        FtpRun run = await RunAsync(diagnostics, Sized + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 4) });
+
+        string expectedSent = SizeSent + "RETR f.txt\r\nABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("01234", run.OutputText);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
@@ -54,10 +62,15 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_BoundedRangeFromAnOffset_SendsRestThenAbor()
     {
-        // curl -r 3-4.
-        FtpRun run = await RunAsync(Sized + Restarting + Opened + NotImplemented + Bye, "3456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(3, 4) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "3-4");
 
-        Assert.AreEqual(SizeSent + "REST 3\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
+        // curl -r 3-4.
+        FtpRun run = await RunAsync(diagnostics, Sized + Restarting + Opened + NotImplemented + Bye, "3456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(3, 4) });
+
+        string expectedSent = SizeSent + "REST 3\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("34", run.OutputText);
         Assert.AreEqual(TransferResult.Success(2), run.Result);
     }
@@ -65,10 +78,15 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_FromOffsetRange_SendsRestAndNoAbor()
     {
-        // curl -r 5-.
-        FtpRun run = await RunAsync(Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.FromOffset(5) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "5-");
 
-        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
+        // curl -r 5-.
+        FtpRun run = await RunAsync(diagnostics, Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.FromOffset(5) });
+
+        string expectedSent = SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("56789", run.OutputText);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
@@ -76,10 +94,15 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_SuffixRange_RestartsAtSizeLessTheSuffixThenSendsAbor()
     {
-        // curl -r -3: REST 7 from SIZE 10.
-        FtpRun run = await RunAsync(Sized + Restarting + Opened + NotImplemented + Bye, "789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Suffix(3) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "-3");
 
-        Assert.AreEqual(SizeSent + "REST 7\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
+        // curl -r -3: REST 7 from SIZE 10.
+        FtpRun run = await RunAsync(diagnostics, Sized + Restarting + Opened + NotImplemented + Bye, "789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Suffix(3) });
+
+        string expectedSent = SizeSent + "REST 7\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("789", run.OutputText);
         Assert.AreEqual(TransferResult.Success(3), run.Result);
     }
@@ -87,23 +110,34 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_SuffixAsLongAsTheFile_SendsRestZero()
     {
-        // curl -r -10 on the ten-byte file: the offset resolves to 0 and REST 0 is still sent.
-        FtpRun run = await RunAsync(Sized + Restarting + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Suffix(10) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "-10");
 
-        Assert.AreEqual(SizeSent + "REST 0\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
+        // curl -r -10 on the ten-byte file: the offset resolves to 0 and REST 0 is still sent.
+        FtpRun run = await RunAsync(diagnostics, Sized + Restarting + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Suffix(10) });
+
+        string expectedSent = SizeSent + "REST 0\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(10), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_SuffixWithoutSize_SendsTheNegativeRestAndKeepsTheSuffixLength()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "-3, SIZE refused");
+
         // curl -r -3 when SIZE is refused: REST -3; the recorder served from 0, curl kept three bytes.
         FtpRun run = await RunAsync(
+            diagnostics,
             InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n502 No\r\n" + Restarting + Opened + NotImplemented + Bye,
             "0123456789",
             c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Suffix(3) });
 
-        Assert.AreEqual(SizeSent + "REST -3\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
+        string expectedSent = SizeSent + "REST -3\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("012", run.OutputText);
         Assert.AreEqual(TransferResult.Success(3), run.Result);
     }
@@ -111,10 +145,15 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_BoundedRangePastTheEnd_ReadsToTheEndThenSendsAbor()
     {
-        // curl -r 0-20 on the ten-byte file.
-        FtpRun run = await RunAsync(Sized + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 20) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "0-20");
 
-        Assert.AreEqual(SizeSent + "RETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
+        // curl -r 0-20 on the ten-byte file.
+        FtpRun run = await RunAsync(diagnostics, Sized + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 20) });
+
+        string expectedSent = SizeSent + "RETR f.txt\r\nABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("0123456789", run.OutputText);
         Assert.AreEqual(TransferResult.Success(10), run.Result);
     }
@@ -122,62 +161,91 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_BoundedRangeWithTransferNotOk_DoesNotCheckTheReply()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "3-4, 451 after the data");
+
         // curl -r 3-4 with 451 after the data: exit 0.
         FtpRun run = await RunAsync(
+            diagnostics,
             Sized + Restarting + "150 Opening BINARY mode data connection\r\n451 bad\r\n" + NotImplemented + Bye,
             "3456789",
             c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(3, 4) });
 
-        Assert.AreEqual(SizeSent + "REST 3\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n", run.Sent);
+        string expectedSent = SizeSent + "REST 3\r\nRETR f.txt\r\nABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(2), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_FromOffsetRangeWithTransferNotOk_FailsWithExit18()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "5-, 451 after the data");
+
         // curl -r 5- with 451 after the data.
         FtpRun run = await RunAsync(
+            diagnostics,
             Sized + Restarting + "150 Opening BINARY mode data connection\r\n451 bad\r\n" + Bye,
             "56789",
             c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.FromOffset(5) });
 
-        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
+        string expectedSent = SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "server did not report OK, got 451", 5), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_BoundedRangeCutShort_FailsWithExit18AndBytesMissing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "0-14, SIZE 20, ten bytes served");
+
         // curl -r 0-14 with SIZE 20 and ten bytes served: no ABOR, no QUIT.
         FtpRun run = await RunAsync(
+            diagnostics,
             InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n213 20\r\n" + Opened + Bye,
             "0123456789",
             c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 14) });
 
-        Assert.AreEqual(SizeSent + "RETR f.txt\r\n", run.Sent);
+        string expectedSent = SizeSent + "RETR f.txt\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "end of response with 5 bytes missing", 10), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeCutShort_FailsWithExit18AndBytesRemaining()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", 5);
+
         // curl -C 5 with SIZE 20 and five bytes served from the offset.
         FtpRun run = await RunAsync(
+            diagnostics,
             InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n213 20\r\n" + Restarting + Opened + Bye,
             "56789",
             c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5 });
 
-        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\n", run.Sent);
+        string expectedSent = SizeSent + "REST 5\r\nRETR f.txt\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.PartialFile, "transfer closed with 10 bytes remaining to read", 5), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeFrom_SendsRestAndWritesTheRest()
     {
-        // curl -C 5, and curl -C - -o a file already holding five bytes.
-        FtpRun run = await RunAsync(Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5 });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", 5);
 
-        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
+        // curl -C 5, and curl -C - -o a file already holding five bytes.
+        FtpRun run = await RunAsync(diagnostics, Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5 });
+
+        string expectedSent = SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("56789", run.OutputText);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
@@ -185,62 +253,92 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_ResumeFromZero_SendsNoRest()
     {
-        // curl -C - -o a file that does not exist yet.
-        FtpRun run = await RunAsync(Sized + Opened + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 0 });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", 0);
 
-        Assert.AreEqual(SizeSent + "RETR f.txt\r\nQUIT\r\n", run.Sent);
+        // curl -C - -o a file that does not exist yet.
+        FtpRun run = await RunAsync(diagnostics, Sized + Opened + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 0 });
+
+        string expectedSent = SizeSent + "RETR f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(10), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeWithoutSize_SendsRestAnyway()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", "5, SIZE refused");
+
         // curl -C 5 when SIZE is refused.
         FtpRun run = await RunAsync(
+            diagnostics,
             InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n502 No\r\n" + Restarting + Opened + Bye,
             "56789",
             c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5 });
 
-        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
+        string expectedSent = SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeAtTheEnd_QuitsWithoutRetrieving()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", 10);
+
         // curl -C 10 on the ten-byte file: "File already completely downloaded", exit 0.
         var events = new RecordingTransferEvents();
-        FtpRun run = await RunAsync(Sized + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 10, Events = events });
+        FtpRun run = await RunAsync(diagnostics, Sized + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 10, Events = events });
 
-        Assert.AreEqual(SizeSent + "QUIT\r\n", run.Sent);
+        string expectedSent = SizeSent + "QUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
+        diagnostics.Assert("informational messages contain", "File already completely downloaded", string.Join("|", events.Info));
         Assert.Contains("File already completely downloaded", events.Info);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeWithSizeRefused_ReportsSizeUnsupportedAndRestarts()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", "5, SIZE answered 502");
+
         // curl -C 5 with SIZE answered 502: "ftp server does not support SIZE", then REST 5 (550 is exit 78).
         var events = new RecordingTransferEvents();
         FtpRun run = await RunAsync(
+            diagnostics,
             InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n502 No\r\n" + Restarting + Opened + Bye,
             "56789",
             c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5, Events = events });
 
-        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
+        string expectedSent = SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
         int unsupported = events.Info.IndexOf("ftp server does not support SIZE");
+        diagnostics.Assert("index of the SIZE-unsupported message", ">= 0", unsupported);
         Assert.IsGreaterThanOrEqualTo(0, unsupported);
+        diagnostics.Assert("message after it", "Instructs server to resume from offset 5", events.Info[unsupported + 1]);
         Assert.AreEqual("Instructs server to resume from offset 5", events.Info[unsupported + 1]);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumeWithSize_DoesNotReportSizeUnsupported()
     {
-        var events = new RecordingTransferEvents();
-        FtpRun run = await RunAsync(Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5, Events = events });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", 5);
 
+        var events = new RecordingTransferEvents();
+        FtpRun run = await RunAsync(diagnostics, Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5, Events = events });
+
+        diagnostics.Assert("result", TransferResult.Success(5), run.Result);
         Assert.AreEqual(TransferResult.Success(5), run.Result);
+        diagnostics.Assert("informational messages", "(none of the SIZE or completed notices)", string.Join("|", events.Info));
         Assert.DoesNotContain("ftp server does not support SIZE", events.Info);
         Assert.DoesNotContain("File already completely downloaded", events.Info);
     }
@@ -248,96 +346,147 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_BoundedRangeAtTheEnd_SendsAborAndQuitsWithoutRetrieving()
     {
-        // curl -r 10-12 on the ten-byte file.
-        FtpRun run = await RunAsync(Sized + NotImplemented + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(10, 12) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "10-12");
 
-        Assert.AreEqual(SizeSent + "ABOR\r\nQUIT\r\n", run.Sent);
+        // curl -r 10-12 on the ten-byte file.
+        FtpRun run = await RunAsync(diagnostics, Sized + NotImplemented + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(10, 12) });
+
+        string expectedSent = SizeSent + "ABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ResumePastTheSize_FailsWithExit36()
     {
-        // curl -C 20 on the ten-byte file.
-        FtpRun run = await RunAsync(Sized + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 20 });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", 20);
 
-        Assert.AreEqual(SizeSent + "QUIT\r\n", run.Sent);
+        // curl -C 20 on the ten-byte file.
+        FtpRun run = await RunAsync(diagnostics, Sized + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 20 });
+
+        string expectedSent = SizeSent + "QUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (20) was beyond file size (10)"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_SuffixLongerThanTheSize_SendsAborAndFailsWithExit36()
     {
-        // curl -r -20 on the ten-byte file.
-        FtpRun run = await RunAsync(Sized + NotImplemented + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Suffix(20) });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "-20");
 
-        Assert.AreEqual(SizeSent + "ABOR\r\nQUIT\r\n", run.Sent);
+        // curl -r -20 on the ten-byte file.
+        FtpRun run = await RunAsync(diagnostics, Sized + NotImplemented + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Suffix(20) });
+
+        string expectedSent = SizeSent + "ABOR\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (-20) was beyond file size (10)"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RestRefused_FailsWithExit31AndNoQuit()
     {
-        // curl -C 5 with REST answered 502 No.
-        FtpRun run = await RunAsync(Sized + "502 No\r\n" + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5 });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("resume from", "5, REST answered 502");
 
-        Assert.AreEqual(SizeSent + "REST 5\r\n", run.Sent);
+        // curl -C 5 with REST answered 502 No.
+        FtpRun run = await RunAsync(diagnostics, Sized + "502 No\r\n" + Bye, "", c => new TransferContext { Url = c.Url, Output = c.Output, ResumeFrom = 5 });
+
+        string expectedSent = SizeSent + "REST 5\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpCouldntUseRest, "Could not use REST"), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RangeAndResumeFrom_TheRangeWins()
     {
-        FtpRun run = await RunAsync(Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.FromOffset(5), ResumeFrom = 2 });
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range and resume from", "5- and 2");
 
-        Assert.AreEqual(SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n", run.Sent);
+        FtpRun run = await RunAsync(diagnostics, Sized + Restarting + Opened + Bye, "56789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.FromOffset(5), ResumeFrom = 2 });
+
+        string expectedSent = SizeSent + "REST 5\r\nRETR f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_RangeOnADirectoryListing_IsIgnored()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string replies = InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n" + Opened + Bye;
+        diagnostics.ArrangeFtp("ftp://127.0.0.1:18321/dir/", replies, "a\r\nb\r\n");
+        diagnostics.Arrange("range", "0-1");
+
         FtpRun run = await FtpRun.ExecuteAsync(
             "ftp://127.0.0.1:18321/dir/",
-            InDirectory + "229 Entering Extended Passive Mode (|||61744|)\r\n200 Type set\r\n" + Opened + Bye,
+            replies,
             "a\r\nb\r\n",
             c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 1) });
+        diagnostics.ActRun(run);
 
-        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nEPSV\r\nTYPE A\r\nLIST\r\nQUIT\r\n", run.Sent);
+        string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nEPSV\r\nTYPE A\r\nLIST\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("a\r\nb\r\n", run.OutputText);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_BoundedRange_ReportsTheRangeAsTheExpectedSize()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("range", "0-4");
+
         var progress = new RecordingProgress();
 
-        await RunAsync(Sized + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 4), Progress = progress });
+        FtpRun run = await RunAsync(diagnostics, Sized + Opened + NotImplemented + Bye, "0123456789", c => new TransferContext { Url = c.Url, Output = c.Output, Range = ByteRange.Bounded(0, 4), Progress = progress });
 
+        diagnostics.Assert("downloaded progress", "(5, 5)", string.Join("|", progress.Downloaded));
         CollectionAssert.AreEqual(new[] { (5L, (long?)5) }, progress.Downloaded);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeadOnAFile_WritesCurlsHeaderLinesWithoutADataConnection()
     {
-        // curl -I: MDTM, TYPE I, SIZE, REST 0 and QUIT, no EPSV.
-        FtpRun run = await RunHeadAsync(InDirectory + "213 20260927123456\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
 
+        // curl -I: MDTM, TYPE I, SIZE, REST 0 and QUIT, no EPSV.
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + "213 20260927123456\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye);
+
+        diagnostics.DiffSent(HeadSent, run.Sent);
         Assert.AreEqual(HeadSent, run.Sent);
-        Assert.AreEqual(LastModified + "Content-Length: 10\r\nAccept-ranges: bytes\r\n", run.OutputText);
+        string expectedOutput = LastModified + "Content-Length: 10\r\nAccept-ranges: bytes\r\n";
+        diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
+        Assert.AreEqual(expectedOutput, run.OutputText);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
+        diagnostics.Assert("connections opened", 1, run.Connector.Targets.Count);
         Assert.HasCount(1, run.Connector.Targets);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeadOnADirectory_SendsOnlyQuit()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string replies = InDirectory + Bye;
+        diagnostics.ArrangeFtp("ftp://127.0.0.1:18321/dir/", replies, string.Empty);
+        diagnostics.Arrange("head", true);
+
         FtpRun run = await FtpRun.ExecuteAsync(
             "ftp://127.0.0.1:18321/dir/",
-            InDirectory + Bye,
+            replies,
             "",
             c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output });
+        diagnostics.ActRun(run);
 
-        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nQUIT\r\n", run.Sent);
+        string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual("", run.OutputText);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -348,47 +497,75 @@ public sealed class FtpProtocolHandlerRangeTests
     [DataRow("213 20261399999999", DisplayName = "MDTM with an impossible timestamp")]
     public async Task ExecuteAsync_HeadWithoutAModificationTime_LeavesOutLastModified(string mdtmReply)
     {
-        FtpRun run = await RunHeadAsync(InDirectory + mdtmReply + "\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("MDTM reply", mdtmReply);
 
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + mdtmReply + "\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye);
+
+        diagnostics.DiffSent(HeadSent, run.Sent);
         Assert.AreEqual(HeadSent, run.Sent);
-        Assert.AreEqual("Content-Length: 10\r\nAccept-ranges: bytes\r\n", run.OutputText);
+        string expectedOutput = "Content-Length: 10\r\nAccept-ranges: bytes\r\n";
+        diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
+        Assert.AreEqual(expectedOutput, run.OutputText);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeadWithFractionalSeconds_KeepsTheWholeSeconds()
     {
-        FtpRun run = await RunHeadAsync(InDirectory + "213 20260927123456.789\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("MDTM reply", "213 20260927123456.789");
 
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + "213 20260927123456.789\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye);
+
+        diagnostics.Assert("output starts with", FtpDiagnostics.Escape(LastModified), FtpDiagnostics.Escape(run.OutputText));
         Assert.StartsWith(LastModified, run.OutputText);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeadWithoutSize_LeavesOutContentLength()
     {
-        FtpRun run = await RunHeadAsync(InDirectory + "213 20260927123456\r\n200 Type set\r\n502 No\r\n" + Restarting + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("SIZE reply", "502 No");
 
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + "213 20260927123456\r\n200 Type set\r\n502 No\r\n" + Restarting + Bye);
+
+        diagnostics.DiffSent(HeadSent, run.Sent);
         Assert.AreEqual(HeadSent, run.Sent);
-        Assert.AreEqual(LastModified + "Accept-ranges: bytes\r\n", run.OutputText);
+        string expectedOutput = LastModified + "Accept-ranges: bytes\r\n";
+        diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
+        Assert.AreEqual(expectedOutput, run.OutputText);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeadWithRestRefused_LeavesOutAcceptRanges()
     {
-        FtpRun run = await RunHeadAsync(InDirectory + "213 20260927123456\r\n200 Type set\r\n213 10\r\n502 No\r\n" + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("REST reply", "502 No");
 
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + "213 20260927123456\r\n200 Type set\r\n213 10\r\n502 No\r\n" + Bye);
+
+        diagnostics.DiffSent(HeadSent, run.Sent);
         Assert.AreEqual(HeadSent, run.Sent);
-        Assert.AreEqual(LastModified + "Content-Length: 10\r\n", run.OutputText);
+        string expectedOutput = LastModified + "Content-Length: 10\r\n";
+        diagnostics.Diff("output", FtpDiagnostics.Escape(expectedOutput), FtpDiagnostics.Escape(run.OutputText));
+        Assert.AreEqual(expectedOutput, run.OutputText);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_HeadOnAMissingFile_FailsWithExit78AfterLastModified()
     {
-        FtpRun run = await RunHeadAsync(InDirectory + "213 20260927123456\r\n200 Type set\r\n550 No such file\r\n" + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("SIZE reply", "550 No such file");
 
-        Assert.AreEqual(SizeSentForHead + "QUIT\r\n", run.Sent);
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + "213 20260927123456\r\n200 Type set\r\n550 No such file\r\n" + Bye);
+
+        string expectedSent = SizeSentForHead + "QUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        diagnostics.Diff("output", FtpDiagnostics.Escape(LastModified), FtpDiagnostics.Escape(run.OutputText));
         Assert.AreEqual(LastModified, run.OutputText);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteFileNotFound, "The file does not exist"), run.Result);
     }
@@ -396,9 +573,15 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_HeadWithTypeRefused_FailsWithExit17()
     {
-        FtpRun run = await RunHeadAsync(InDirectory + "213 20260927123456\r\n504 No\r\n" + Bye);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("TYPE reply", "504 No");
 
-        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nMDTM f.txt\r\nTYPE I\r\nQUIT\r\n", run.Sent);
+        FtpRun run = await RunHeadAsync(diagnostics, InDirectory + "213 20260927123456\r\n504 No\r\n" + Bye);
+
+        string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nMDTM f.txt\r\nTYPE I\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        diagnostics.Diff("output", FtpDiagnostics.Escape(LastModified), FtpDiagnostics.Escape(run.OutputText));
         Assert.AreEqual(LastModified, run.OutputText);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FtpCouldntSetType, "Could not set desired mode"), run.Result);
     }
@@ -406,13 +589,21 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_HeadWithoutHeaderOutput_WritesNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string replies = InDirectory + "213 20260927123456\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye;
+        diagnostics.ArrangeFtp(Url, replies, string.Empty);
+        diagnostics.Arrange("head without header output", true);
+
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
-            InDirectory + "213 20260927123456\r\n200 Type set\r\n213 10\r\n" + Restarting + Bye,
+            replies,
             "",
             c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true });
+        diagnostics.ActRun(run);
 
+        diagnostics.DiffSent(HeadSent, run.Sent);
         Assert.AreEqual(HeadSent, run.Sent);
+        diagnostics.Diff("output", string.Empty, run.OutputText);
         Assert.AreEqual("", run.OutputText);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
     }
@@ -420,19 +611,32 @@ public sealed class FtpProtocolHandlerRangeTests
     [TestMethod]
     public async Task ExecuteAsync_HeadWhenTheHeaderOutputRefuses_FailsWithExit23()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string replies = InDirectory + "213 20260927123456\r\n" + Bye;
+        diagnostics.ArrangeFtp(Url, replies, string.Empty);
+        diagnostics.Arrange("header output", "refuses writes with IOException(full)");
+
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
-            InDirectory + "213 20260927123456\r\n" + Bye,
+            replies,
             "",
             c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = new WriteRefusingStream(new IOException("full")) });
+        diagnostics.ActRun(run);
 
-        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nMDTM f.txt\r\nQUIT\r\n", run.Sent);
+        string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nMDTM f.txt\r\nQUIT\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.WriteError, "client returned ERROR on write of 46 bytes"), run.Result);
     }
 
-    private static Task<FtpRun> RunAsync(string replies, string data, Func<TransferContext, TransferContext> adjust) =>
-        FtpRun.ExecuteAsync(Url, replies, data, adjust);
+    private static async Task<FtpRun> RunAsync(TestDiagnostics diagnostics, string replies, string data, Func<TransferContext, TransferContext> adjust)
+    {
+        diagnostics.ArrangeFtp(Url, replies, data);
+        FtpRun run = await FtpRun.ExecuteAsync(Url, replies, data, adjust);
+        diagnostics.ActRun(run);
+        return run;
+    }
 
-    private static Task<FtpRun> RunHeadAsync(string replies) =>
-        FtpRun.ExecuteAsync(Url, replies, "", c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output });
+    private static Task<FtpRun> RunHeadAsync(TestDiagnostics diagnostics, string replies) =>
+        RunAsync(diagnostics, replies, "", c => new TransferContext { Url = c.Url, Output = c.Output, NoBody = true, HeaderOutput = c.Output });
 }

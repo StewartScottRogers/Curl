@@ -43,6 +43,12 @@ internal static class HttpTransferMessages
     internal const string HeaderWithoutColon = "Header without colon";
 
     /// <summary>
+    /// The exit 8 message for an HTTP/1.x status line whose status code has four or more
+    /// digits, such as <c>HTTP/1.1 1000 X</c> (curl 8.21.0, measured for BL-1662).
+    /// </summary>
+    internal const string InvalidStatusLine = "Invalid status line";
+
+    /// <summary>
     /// The exit 8 message for a head line holding a NUL byte (curl 8.21.0, <c>lib/http.c</c>).
     /// </summary>
     internal const string NulByteInHeader = "Nul byte in header";

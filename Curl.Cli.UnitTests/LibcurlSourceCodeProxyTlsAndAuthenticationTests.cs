@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -33,6 +35,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     private const string Socks = "  curl_easy_setopt(curl, CURLOPT_PROXY, \"p:1080\");\n  curl_easy_setopt(curl, CURLOPT_PROXYTYPE, (long)CURLPROXY_SOCKS5);\n";
     private const string Credentials = "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"a:b\");\n";
     private const string Indent = "                                           ";
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow("-k", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);\n" + Tls + KeepAlive)]
@@ -82,7 +88,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("--no-alpn", Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_SSL_ENABLE_ALPN, 0L);\n" + KeepAlive)]
     public void Generate_TlsOption_WritesCurlsLines(string arguments, string transfer)
     {
-        Assert.AreEqual(transfer, TransferLinesFor(arguments + "|" + Url));
+        string actual = TransferLinesFor(arguments + "|" + Url);
+
+        Diagnostics.Diff("transfer lines", transfer, actual);
+        Assert.AreEqual(transfer, actual);
     }
 
     [TestMethod]
@@ -131,7 +140,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("--proxy-cert|pc:pp|--proxy-key|pkcs11:x", Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_PROXY_KEYPASSWD, \"pp\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLCERT, \"pc\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEY, \"pkcs11:x\");\n  curl_easy_setopt(curl, CURLOPT_PROXY_SSLKEYTYPE, \"ENG\");\n" + Tls + KeepAlive)]
     public void Generate_ProxyOption_WritesCurlsLines(string arguments, string transfer)
     {
-        Assert.AreEqual(transfer, TransferLinesFor(arguments + "|" + Url));
+        string actual = TransferLinesFor(arguments + "|" + Url);
+
+        Diagnostics.Diff("transfer lines", transfer, actual);
+        Assert.AreEqual(transfer, actual);
     }
 
     [TestMethod]
@@ -160,7 +172,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("--location-trusted|--no-location|-u|a:b", Start + Credentials + Agent + "  curl_easy_setopt(curl, CURLOPT_UNRESTRICTED_AUTH, 1L);\n" + MaxRedirs + Tls + KeepAlive)]
     public void Generate_AuthenticationOption_WritesCurlsLines(string arguments, string transfer)
     {
-        Assert.AreEqual(transfer, TransferLinesFor(arguments + "|" + Url));
+        string actual = TransferLinesFor(arguments + "|" + Url);
+
+        Diagnostics.Diff("transfer lines", transfer, actual);
+        Assert.AreEqual(transfer, actual);
     }
 
     [TestMethod]
@@ -230,7 +245,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
             + "  curl_easy_setopt(curl, CURLOPT_SASL_AUTHZID, \"z\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_SASL_IR, 1L);\n";
 
-        Assert.AreEqual(expected, TransferLinesFor(arguments));
+        string actual = TransferLinesFor(arguments);
+
+        Diagnostics.Diff("transfer lines", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -267,7 +285,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
             + KeepAlive
             + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist3);\n";
 
-        Assert.AreEqual(expected, TransferLinesFor(arguments));
+        string actual = TransferLinesFor(arguments);
+
+        Diagnostics.Diff("transfer lines", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -282,7 +303,10 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     [DataRow("-x|http://p:1|--proxy-header|X: 1|--oauth2-bearer|t|--ntlm|-u|a:b|-k|--cert|c|ftp://127.0.0.1:1/", "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n  curl_easy_setopt(curl, CURLOPT_URL, \"ftp://127.0.0.1:1/\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n  curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, \"t\");\n  curl_easy_setopt(curl, CURLOPT_PROXY, \"http://p:1\");\n" + Credentials + "  curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_NTLM |\n" + Indent + "(long)CURLAUTH_NONE |\n" + Indent + "64UL);\n" + Agent + "  curl_easy_setopt(curl, CURLOPT_FTP_SKIP_PASV_IP, 1L);\n  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c\");\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);\n" + Tls + KeepAlive)]
     public void Generate_OptionsTogether_WriteCurlsLinesInCurlsOrder(string arguments, string transfer)
     {
-        Assert.AreEqual(transfer, TransferLinesFor(arguments));
+        string actual = TransferLinesFor(arguments);
+
+        Diagnostics.Diff("transfer lines", transfer, actual);
+        Assert.AreEqual(transfer, actual);
     }
 
     [TestMethod]
@@ -290,6 +314,8 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     {
         string source = GenerateFor("--cert|a\\\\b:pw|--proxy-header|X: 1|-x|http://p:1|ftp://127.0.0.1:1/");
 
+        Diagnostics.Assert("contains slist", false, source.Contains("slist", StringComparison.Ordinal));
+        Diagnostics.Assert("contains certificate line", true, source.Contains("  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\\\\b\");\n", StringComparison.Ordinal));
         Assert.DoesNotContain("slist", source);
         Assert.Contains("  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"a\\\\b\");\n", source);
     }
@@ -299,19 +325,31 @@ public sealed class LibcurlSourceCodeProxyTlsAndAuthenticationTests
     {
         string source = GenerateFor("--proxy-header|X-A: 1|-x|http://p:3128|" + Url);
 
-        Assert.Contains("  CURL *curl;\n  struct curl_slist *slist1;\n\n  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X-A: 1\");\n\n  curl = curl_easy_init();\n", source);
-        Assert.Contains(Agent + "  curl_easy_setopt(curl, CURLOPT_PROXYHEADER, slist1);\n" + MaxRedirs + HeaderOpt, source);
-        Assert.Contains("  curl = NULL;\n  curl_slist_free_all(slist1);\n  slist1 = NULL;\n", source);
+        const string Declared = "  CURL *curl;\n  struct curl_slist *slist1;\n\n  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X-A: 1\");\n\n  curl = curl_easy_init();\n";
+        const string Used = Agent + "  curl_easy_setopt(curl, CURLOPT_PROXYHEADER, slist1);\n" + MaxRedirs + HeaderOpt;
+        const string Freed = "  curl = NULL;\n  curl_slist_free_all(slist1);\n  slist1 = NULL;\n";
+
+        Diagnostics.Assert("contains declaration and fill", true, source.Contains(Declared, StringComparison.Ordinal));
+        Diagnostics.Assert("contains proxy header option", true, source.Contains(Used, StringComparison.Ordinal));
+        Diagnostics.Assert("contains free", true, source.Contains(Freed, StringComparison.Ordinal));
+        Assert.Contains(Declared, source);
+        Assert.Contains(Used, source);
+        Assert.Contains(Freed, source);
     }
 
-    private static string GenerateFor(string arguments)
+    /// <summary>Parses <paramref name="arguments"/> (separated by <c>|</c>, after <c>-s</c>), generates the libcurl source for its last element as the URL, and writes both.</summary>
+    private string GenerateFor(string arguments)
     {
         string[] parts = arguments.Split('|');
-        CommandLineOptions options = CommandLineParser.Parse(["-s", .. parts], _ => true).Options!;
-        return LibcurlSourceCode.Generate([(options, parts[^1])]);
+        string[] parsedArguments = ["-s", .. parts];
+        Diagnostics.ArrangeArguments(parsedArguments);
+        CommandLineOptions options = CommandLineParser.Parse(parsedArguments, _ => true).Options!;
+        string source = LibcurlSourceCode.Generate([(options, parts[^1])]);
+        Diagnostics.Act("source", source);
+        return source;
     }
 
-    private static string TransferLinesFor(string arguments)
+    private string TransferLinesFor(string arguments)
     {
         string source = GenerateFor(arguments);
         int start = source.IndexOf("  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE", StringComparison.Ordinal);

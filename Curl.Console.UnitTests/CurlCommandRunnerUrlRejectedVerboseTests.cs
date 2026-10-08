@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Core;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -20,6 +21,10 @@ public sealed class CurlCommandRunnerUrlRejectedVerboseTests
     private readonly InMemoryFileSystem fileSystem = new();
     private readonly RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     private string StandardOutputText => Encoding.UTF8.GetString(standardOutput.ToArray());
 
     private string StandardErrorText => Encoding.UTF8.GetString(standardError.ToArray());
@@ -30,8 +35,11 @@ public sealed class CurlCommandRunnerUrlRejectedVerboseTests
         // curl -v "http://h/a b" -> * URL rejected: Malformed input to a URL function, then curl: (3) ..., exit 3.
         int exitCode = await RunAsync(["-v", "http://h/a b"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        Diagnostics.Assert("handler call count", 0, http.Contexts.Count);
         Assert.IsEmpty(http.Contexts);
+        Diagnostics.Diff("stderr", "* " + MalformedLine + "\n" + "curl: (3) " + MalformedLine + "\n", Normalized(StandardErrorText));
         Assert.AreEqual("* " + MalformedLine + "\n" + "curl: (3) " + MalformedLine + NewLine, StandardErrorText);
     }
 
@@ -41,7 +49,9 @@ public sealed class CurlCommandRunnerUrlRejectedVerboseTests
         // curl -sv "http://h/a b" -> only * URL rejected: Malformed input to a URL function, exit 3.
         int exitCode = await RunAsync(["-sv", "http://h/a b"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        Diagnostics.Diff("stderr", "* " + MalformedLine + "\n", Normalized(StandardErrorText));
         Assert.AreEqual("* " + MalformedLine + "\n", StandardErrorText);
     }
 
@@ -51,9 +61,16 @@ public sealed class CurlCommandRunnerUrlRejectedVerboseTests
     [DataRow(new[] { "-v", "--disallow-username-in-url", "http://u@127.0.0.1/" }, 67, "Credentials was passed in the URL when prohibited", DisplayName = "user in the URL when prohibited")]
     public async Task RunAsync_WithVerboseAndARejectedUrl_WritesTheReasonAsAnInfoLine(string[] arguments, int expectedExitCode, string reason)
     {
+        Diagnostics.Arrange("expected rejection reason", reason);
+
         int exitCode = await RunAsync(arguments);
 
+        Diagnostics.Assert("exit code", expectedExitCode, exitCode);
         Assert.AreEqual(expectedExitCode, exitCode);
+        Diagnostics.Diff(
+            "stderr",
+            "* URL rejected: " + reason + "\n" + $"curl: ({expectedExitCode}) URL rejected: " + reason + "\n",
+            Normalized(StandardErrorText));
         Assert.AreEqual(
             "* URL rejected: " + reason + "\n" + $"curl: ({expectedExitCode}) URL rejected: " + reason + NewLine,
             StandardErrorText);
@@ -65,20 +82,39 @@ public sealed class CurlCommandRunnerUrlRejectedVerboseTests
         // curl --trace-ascii - "http://h/a b" -> stdout the 50 bytes below, stderr curl: (3) ..., exit 3.
         int exitCode = await RunAsync(["--trace-ascii", "-", "http://h/a b"]);
 
+        Diagnostics.Assert("exit code", 3, exitCode);
         Assert.AreEqual(3, exitCode);
+        Diagnostics.Diff("stdout", "* " + MalformedLine + "\n", Normalized(StandardOutputText));
         Assert.AreEqual("* " + MalformedLine + "\n", StandardOutputText);
+        Diagnostics.Diff("stderr", "curl: (3) " + MalformedLine + "\n", Normalized(StandardErrorText));
         Assert.AreEqual("curl: (3) " + MalformedLine + NewLine, StandardErrorText);
     }
 
-    private Task<int> RunAsync(IReadOnlyList<string> arguments) =>
-        new CurlCommandRunner(
-                _ => new TransferDispatch(new ProtocolDispatcher([http])),
-                fileSystem,
-                fileSystem,
-                standardOutput,
-                standardError,
-                new MemoryStream(),
-                runsOnWindows: false,
-                outputPaths: fileSystem)
-            .RunAsync(arguments);
+    private static string Normalized(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private async Task<int> RunAsync(IReadOnlyList<string> arguments)
+    {
+        Diagnostics.Arrange("arguments", string.Join(' ', arguments));
+        Diagnostics.Arrange("handler behaviour", "http writes the URL path and succeeds");
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher([http])),
+                    fileSystem,
+                    fileSystem,
+                    standardOutput,
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: false,
+                    outputPaths: fileSystem)
+                .RunAsync(arguments);
+        }
+
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Diagnostics.Act("stderr", Normalized(StandardErrorText));
+        return exitCode;
+    }
 }

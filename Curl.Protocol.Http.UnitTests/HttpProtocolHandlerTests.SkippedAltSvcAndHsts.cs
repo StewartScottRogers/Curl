@@ -103,20 +103,27 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>Runs one exchange whose 200 response carries <paramref name="header" />, and gives its events.</summary>
-    private static async Task<RecordingTransferEvents> SkipExchangeAsync(string url, string header, HttpRequestOptions? options)
+    private async Task<RecordingTransferEvents> SkipExchangeAsync(string url, string header, HttpRequestOptions? options)
     {
         RecordingTransferEvents events = new();
+        Diagnostics.Arrange("url", url);
+        Diagnostics.Arrange("scripted response", $"200, {header}, Content-Length: 0");
+        Diagnostics.Arrange("stores", $"alt-svc {(options?.AltSvcStore is null ? "none" : "scripted")}, hsts {(options?.HstsStore is null ? "none" : "scripted")}");
 
         TransferResult result = await Handler(QueueConnector.For(Connection($"HTTP/1.1 200 OK\r\n{header}\r\nContent-Length: 0\r\n\r\n", 65536)))
             .ExecuteAsync(CookieContext(url, options, events));
 
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         return events;
     }
 
-    private static void AssertJustBefore(RecordingTransferEvents events, string line, string headerLine)
+    private void AssertJustBefore(RecordingTransferEvents events, string line, string headerLine)
     {
         int at = events.Events.IndexOf(line);
+        Diagnostics.Assert("line just before the header line", OneLine(line + " | " + headerLine), at < 0 ? "(line missing)" : OneLine(string.Join(" | ", events.Events.Skip(at).Take(2))));
         Assert.IsGreaterThanOrEqualTo(0, at, $"No '{line}' in {string.Join(" | ", events.Events)}");
         Assert.AreEqual(headerLine, events.Events[at + 1]);
     }

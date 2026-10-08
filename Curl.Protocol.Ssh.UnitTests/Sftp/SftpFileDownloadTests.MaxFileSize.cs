@@ -1,5 +1,7 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Protocol.Ssh.Keys;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -20,7 +22,9 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadCappedAsync(script, 3);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3), outcome.Result);
+        Diagnostics.AssertBytes("output", Bytes("hel"), outcome.Output);
         CollectionAssert.AreEqual(Bytes("hel"), outcome.Output);
         CollectionAssert.AreEqual(Requests(outcome)[^1], SftpServerScript.CloseRequest(4), "the handle is still closed");
     }
@@ -34,8 +38,11 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadCappedAsync(script, 40000);
 
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (40000) with 40000 bytes", 40000), outcome.Result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (40000) with 40000 bytes", 40000), outcome.Result);
+        Diagnostics.AssertBytes("output", (byte[])[.. first, .. second[..10000]], outcome.Output);
         CollectionAssert.AreEqual((byte[])[.. first, .. second[..10000]], outcome.Output);
+        Diagnostics.AssertProgress(new[] { (30000L, (long?)null), (40000L, (long?)null) }, outcome.Progress);
         CollectionAssert.AreEqual(new[] { (30000L, (long?)null), (40000L, (long?)null) }, outcome.Progress);
         CollectionAssert.AreEqual(Requests(outcome)[^1], SftpServerScript.CloseRequest(18), "the handle is still closed");
     }
@@ -51,17 +58,20 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadCappedAsync(script, maxFileSize);
 
+        Diagnostics.AssertResult(TransferResult.Success(6), outcome.Result);
         Assert.AreEqual(TransferResult.Success(6), outcome.Result);
+        Diagnostics.AssertBytes("output", Bytes(HelloLine), outcome.Output);
         CollectionAssert.AreEqual(Bytes(HelloLine), outcome.Output);
     }
 
-    private static async Task<Outcome> DownloadCappedAsync(SftpServerScript script, long? maxFileSize)
-    {
-        ScriptedConnection connection = new(script.Bytes);
-        MemoryStream output = new();
-        RecordingProgress progress = new();
-        TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
-            .DownloadAsync("/f", Mode0644, output, progress, CancellationToken.None, maxFileSize: maxFileSize);
-        return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
-    }
+    private Task<Outcome> DownloadCappedAsync(SftpServerScript script, long? maxFileSize) =>
+        RecordAsync(script, "/f", "max file size " + (maxFileSize?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(none)"), async () =>
+        {
+            ScriptedConnection connection = new(script.Bytes);
+            MemoryStream output = new();
+            RecordingProgress progress = new();
+            TransferResult result = await new SftpFileDownload(SftpSessionTests.Transport(connection))
+                .DownloadAsync("/f", Mode0644, output, progress, CancellationToken.None, maxFileSize: maxFileSize);
+            return new Outcome(result, output.ToArray(), progress.Reports, connection.Written);
+        });
 }

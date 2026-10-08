@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
@@ -7,9 +9,12 @@ namespace Curl.Protocol.Abstractions;
 [TestClass]
 public sealed class ITransferEventsTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void ReportTlsMessage_NotOverridden_ReportsTheBytesAsTlsData()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var sink = new TlsDataRecordingEvents();
         TlsMessageEvent message = new()
         {
@@ -18,9 +23,15 @@ public sealed class ITransferEventsTests
             Sent = true,
             Bytes = new byte[] { 1, 0, 0 },
         };
+        diagnostics.Arrange("message ContentType", message.ContentType);
+        diagnostics.Bytes("message bytes", new byte[] { 1, 0, 0 });
 
         ((ITransferEvents)sink).ReportTlsMessage(message);
 
+        diagnostics.Act("Sent", sink.Sent);
+        diagnostics.Bytes("recorded bytes", sink.Bytes!);
+        diagnostics.Diff("recorded bytes", new byte[] { 1, 0, 0 }, sink.Bytes!);
+        diagnostics.Assert("Sent", true, sink.Sent);
         CollectionAssert.AreEqual(new byte[] { 1, 0, 0 }, sink.Bytes);
         Assert.IsTrue(sink.Sent);
         Assert.AreEqual(0x0304, message.ProtocolVersion);
@@ -30,6 +41,7 @@ public sealed class ITransferEventsTests
     [TestMethod]
     public void ReportTlsTrust_NotOverridden_DoesNothing()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var sink = new TlsDataRecordingEvents();
         TlsTrustEvent trust = new()
         {
@@ -38,9 +50,12 @@ public sealed class ITransferEventsTests
             CaCertificateFile = "/f.pem",
             CaCertificateDirectory = "/d",
         };
+        diagnostics.Arrange("trust", "VerifiesPeer, blob, /f.pem, /d");
 
         ((ITransferEvents)sink).ReportTlsTrust(trust);
 
+        diagnostics.Act("recorded bytes", sink.Bytes);
+        diagnostics.Assert("recorded bytes", null, sink.Bytes);
         Assert.IsNull(sink.Bytes);
         Assert.IsTrue(trust.VerifiesPeer && trust.HasCaCertificateBlob);
         Assert.AreEqual("/f.pem", trust.CaCertificateFile);
@@ -50,28 +65,43 @@ public sealed class ITransferEventsTests
     [TestMethod]
     public void ReportCertificateVerifyResult_NotOverridden_DoesNothing()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var sink = new TlsDataRecordingEvents();
+        diagnostics.Arrange("call", "ReportCertificateVerifyResult(18, isProxy: true)");
 
         ((ITransferEvents)sink).ReportCertificateVerifyResult(18, isProxy: true);
 
+        diagnostics.Act("recorded bytes", sink.Bytes);
+        diagnostics.Assert("recorded bytes", null, sink.Bytes);
         Assert.IsNull(sink.Bytes);
     }
 
     [TestMethod]
     public void ReportTlsEarlyData_NotOverridden_DoesNothing()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         var sink = new TlsDataRecordingEvents();
+        diagnostics.Arrange("call", "ReportTlsEarlyData(36)");
 
         ((ITransferEvents)sink).ReportTlsEarlyData(36);
 
+        diagnostics.Act("recorded bytes", sink.Bytes);
+        diagnostics.Assert("recorded bytes", null, sink.Bytes);
         Assert.IsNull(sink.Bytes);
     }
 
     [TestMethod]
     public void TlsTrustEvent_OnlyVerificationGiven_HasNoTrustAnchorSource()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("trust", "VerifiesPeer = false");
+
         TlsTrustEvent trust = new() { VerifiesPeer = false };
 
+        diagnostics.Act("HasCaCertificateBlob", trust.HasCaCertificateBlob);
+        diagnostics.Act("CaCertificateFile", trust.CaCertificateFile);
+        diagnostics.Act("CaCertificateDirectory", trust.CaCertificateDirectory);
+        diagnostics.Assert("HasCaCertificateBlob", false, trust.HasCaCertificateBlob);
         Assert.IsFalse(trust.HasCaCertificateBlob);
         Assert.IsNull(trust.CaCertificateFile);
         Assert.IsNull(trust.CaCertificateDirectory);

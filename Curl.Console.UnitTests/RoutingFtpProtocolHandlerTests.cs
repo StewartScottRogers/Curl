@@ -2,6 +2,7 @@ using System.Text;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ftp;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Console;
@@ -14,6 +15,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class RoutingFtpProtocolHandlerTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(ProxyKind.Http)]
     [DataRow(ProxyKind.Http10)]
@@ -24,7 +29,9 @@ public sealed class RoutingFtpProtocolHandlerTests
         TransferContext context = ContextWith(new HttpRequestOptions { ForwardProxy = ProxyOf(kind) });
 
         TransferResult result = await new RoutingFtpProtocolHandler(http, ftp).ExecuteAsync(context);
+        ActRun(http, ftp, result);
 
+        Diagnostics.Assert("http / ftp handler calls", "1 / 0", $"{http.Contexts.Count} / {ftp.Contexts.Count}");
         Assert.IsTrue(result.IsSuccess);
         Assert.AreSame(context, http.Contexts.Single());
         Assert.IsEmpty(ftp.Contexts);
@@ -38,6 +45,7 @@ public sealed class RoutingFtpProtocolHandlerTests
     public async Task ExecuteAsync_ProxyThatIsNotForwardedThrough_IsPerformedByTheFtpHandler(ProxyKind kind, bool proxyTunnel)
     {
         TransferContext context = ContextWith(new HttpRequestOptions { ForwardProxy = ProxyOf(kind), ProxyTunnel = proxyTunnel });
+        Diagnostics.Arrange("proxy tunnel", proxyTunnel);
 
         AssertPerformedByTheFtpHandler(context, await ExecuteWithRecordingHandlersAsync(context));
     }
@@ -75,13 +83,22 @@ public sealed class RoutingFtpProtocolHandlerTests
             Output = output,
         };
         RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
+        Diagnostics.Arrange("url", "ftp://127.0.0.1/file.txt");
+        Diagnostics.Arrange("control replies", ControlReplies.ReplaceLineEndings("\n"));
+        Diagnostics.Arrange("data connection serves", "hello");
 
         TransferResult result = await new RoutingFtpProtocolHandler(http, new FtpProtocolHandler(server)).ExecuteAsync(context);
+        Diagnostics.Act("exit code", (int)result.ExitCode);
+        Diagnostics.Act("output", Encoding.Latin1.GetString(output.ToArray()));
+        Diagnostics.ActWritten(server);
+        Diagnostics.Act("ports", string.Join(", ", server.Targets.Select(target => target.Port)));
 
+        const string ExpectedCommands = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nEPSV\r\nTYPE I\r\nSIZE file.txt\r\nRETR file.txt\r\nQUIT\r\n";
+        Diagnostics.AssertWritten(ExpectedCommands, server);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("hello", Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(
-            "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nEPSV\r\nTYPE I\r\nSIZE file.txt\r\nRETR file.txt\r\nQUIT\r\n",
+            ExpectedCommands,
             Encoding.Latin1.GetString(server.Written));
         Assert.AreEqual(21, server.Targets[0].Port);
         Assert.AreEqual(61744, server.Targets[1].Port);
@@ -98,6 +115,7 @@ public sealed class RoutingFtpProtocolHandlerTests
             Output = new MemoryStream(),
             Http = new HttpRequestOptions { ForwardProxy = ProxyOf(ProxyKind.Http) },
         };
+        ArrangeContext(context);
 
         AssertPerformedByTheFtpHandler(context, await ExecuteWithRecordingHandlersAsync(context));
     }
@@ -108,36 +126,59 @@ public sealed class RoutingFtpProtocolHandlerTests
         RoutingFtpProtocolHandler handler = new(
             RecordingProtocolHandler.WritingPath("http"),
             new FtpProtocolHandler(new ScriptedConnector([]), new TcpConnectionListener(), new PassThroughTlsProvider()));
+        Diagnostics.Arrange("handlers", "recording http, real ftp");
+        string schemes = string.Join(",", handler.SupportedSchemes);
+        Diagnostics.Act("supported schemes", schemes);
 
+        Diagnostics.Assert("supported schemes", "ftp,ftps", schemes);
         CollectionAssert.AreEqual(new[] { "ftp", "ftps" }, handler.SupportedSchemes.ToArray());
     }
 
-    private static async Task<(RecordingProtocolHandler Http, RecordingProtocolHandler Ftp, TransferResult Result)> ExecuteWithRecordingHandlersAsync(TransferContext context)
+    private async Task<(RecordingProtocolHandler Http, RecordingProtocolHandler Ftp, TransferResult Result)> ExecuteWithRecordingHandlersAsync(TransferContext context)
     {
         RecordingProtocolHandler http = RecordingProtocolHandler.WritingPath("http");
         RecordingProtocolHandler ftp = RecordingProtocolHandler.WritingPath("ftp");
 
         TransferResult result = await new RoutingFtpProtocolHandler(http, ftp).ExecuteAsync(context);
+        ActRun(http, ftp, result);
 
         return (http, ftp, result);
     }
 
-    private static void AssertPerformedByTheFtpHandler(
+    private void AssertPerformedByTheFtpHandler(
         TransferContext context,
         (RecordingProtocolHandler Http, RecordingProtocolHandler Ftp, TransferResult Result) run)
     {
+        Diagnostics.Assert("http / ftp handler calls", "0 / 1", $"{run.Http.Contexts.Count} / {run.Ftp.Contexts.Count}");
         Assert.IsTrue(run.Result.IsSuccess);
         Assert.AreSame(context, run.Ftp.Contexts.Single());
         Assert.IsEmpty(run.Http.Contexts);
     }
 
+    private void ActRun(RecordingProtocolHandler http, RecordingProtocolHandler ftp, TransferResult result)
+    {
+        Diagnostics.Act("exit code", (int)result.ExitCode);
+        Diagnostics.Act("http / ftp handler calls", $"{http.Contexts.Count} / {ftp.Contexts.Count}");
+    }
+
     private static ProxyEndpoint ProxyOf(ProxyKind kind) => new(kind, "127.0.0.1", 1, null);
 
-    private static TransferContext ContextWith(HttpRequestOptions? http) =>
-        new()
+    private TransferContext ContextWith(HttpRequestOptions? http)
+    {
+        TransferContext context = new()
         {
             Url = CurlUrl.Parse("ftp://example.com/f.txt"),
             Output = new MemoryStream(),
             Http = http,
         };
+        ArrangeContext(context);
+        return context;
+    }
+
+    private void ArrangeContext(TransferContext context)
+    {
+        Diagnostics.Arrange("url", context.Url.OriginalString);
+        Diagnostics.Arrange("http options", context.Http is null ? "none" : "given");
+        Diagnostics.Arrange("forward proxy", context.Http?.ForwardProxy?.Kind.ToString() ?? "none");
+    }
 }
