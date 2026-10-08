@@ -17,6 +17,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunThroughProxyRecordingLinesAsync("sftp://files.example/f", new ProxyEndpoint(ProxyKind.Https, "proxy.example", 443, null));
 
+        AssertStartsWithDiagnostic("verbose lines", $"* SSH: libssh2 cryptography backend: OpenSSL | {UserThenHttpsProxy}* SSH: no knownhosts file configured", lines);
         StringAssert.StartsWith(lines, $"* SSH: libssh2 cryptography backend: OpenSSL | {UserThenHttpsProxy}* SSH: no knownhosts file configured");
     }
 
@@ -25,6 +26,7 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunThroughProxyRecordingLinesAsync("scp://files.example/f", new ProxyEndpoint(ProxyKind.Https, "proxy.example", 443, null));
 
+        AssertStartsWithDiagnostic("verbose lines", $"* SSH: libssh2 cryptography backend: OpenSSL | {UserThenHttpsProxy}* SSH: no knownhosts file configured", lines);
         StringAssert.StartsWith(lines, $"* SSH: libssh2 cryptography backend: OpenSSL | {UserThenHttpsProxy}* SSH: no knownhosts file configured");
     }
 
@@ -35,6 +37,8 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunThroughProxyRecordingLinesAsync("sftp://files.example/f", new ProxyEndpoint(kind, "proxy.example", 1080, null));
 
+        AssertStartsWithDiagnostic("verbose lines", $"{Start} | * SSH: no knownhosts file configured", lines);
+        Diagnostics.Assert("mentions HTTPS proxy", false, lines.Contains("HTTPS proxy", StringComparison.Ordinal));
         StringAssert.StartsWith(lines, $"{Start} | * SSH: no knownhosts file configured");
         StringAssert.DoesNotMatch(lines, new System.Text.RegularExpressions.Regex("HTTPS proxy"));
     }
@@ -44,11 +48,13 @@ public sealed partial class SshProtocolHandlerTests
     {
         string lines = await RunThroughProxyRecordingLinesAsync("scp://files.example/f", proxy: null);
 
+        AssertStartsWithDiagnostic("verbose lines", $"{Start} | * SSH: no knownhosts file configured", lines);
+        Diagnostics.Assert("mentions HTTPS proxy", false, lines.Contains("HTTPS proxy", StringComparison.Ordinal));
         StringAssert.StartsWith(lines, $"{Start} | * SSH: no knownhosts file configured");
         StringAssert.DoesNotMatch(lines, new System.Text.RegularExpressions.Regex("HTTPS proxy"));
     }
 
-    private static async Task<string> RunThroughProxyRecordingLinesAsync(string url, ProxyEndpoint? proxy)
+    private async Task<string> RunThroughProxyRecordingLinesAsync(string url, ProxyEndpoint? proxy)
     {
         InMemorySshServer server = ServerWithAFile();
         TranscriptTransferEvents events = new();
@@ -60,9 +66,16 @@ public sealed partial class SshProtocolHandlerTests
             Proxy = proxy,
             Events = events,
         };
+        ArrangeTransfer(context);
 
-        await Handler(server, files: null, agent: null).ExecuteAsync(context);
+        TransferResult result = await Handler(server, files: null, agent: null).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
+
+        ActTransfer(result, context, server);
         return string.Join(" | ", events.Transcript);
     }
+
+    // The ASSERT line for a StringAssert.StartsWith: the expected prefix against as much of the lines.
+    private void AssertStartsWithDiagnostic(string label, string expectedPrefix, string lines) =>
+        AssertTextDiagnostic(label, expectedPrefix, lines[..Math.Min(lines.Length, expectedPrefix.Length)]);
 }

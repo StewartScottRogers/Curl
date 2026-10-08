@@ -6,7 +6,9 @@ using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.KeyExchange;
+using Curl.Protocol.Ssh.Keys;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Protocol.Ssh.Sftp;
 
 namespace Curl.Protocol.Ssh;
 
@@ -37,7 +39,10 @@ public sealed partial class SshProtocolHandlerTests
     public void SupportedSchemes_AreExactlyScpAndSftp()
     {
         SshProtocolHandler handler = Handler(Server());
+        Diagnostics.Arrange("handler", "in-memory server, OpenSSL reference preferences");
 
+        Diagnostics.Act("supported schemes", string.Join(",", handler.SupportedSchemes));
+        Diagnostics.Assert("supported schemes", "scp,sftp", string.Join(",", handler.SupportedSchemes.Order(StringComparer.Ordinal)));
         CollectionAssert.AreEquivalent(new[] { "scp", "sftp" }, handler.SupportedSchemes.ToArray());
     }
 
@@ -94,7 +99,9 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}{path}");
 
+        Diagnostics.AssertResult(TransferResult.Success(expected.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        Diagnostics.AssertBytes("output", expected, outcome.Output);
         CollectionAssert.AreEqual(expected, outcome.Output);
         CollectionAssert.Contains(server.Events.ToList(), "sftp 11 /home/fake/");
     }
@@ -119,6 +126,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: preferences);
 
+        Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result, platform);
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
@@ -149,6 +157,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: SshAlgorithmPreferences.OpenSslReference);
 
+        Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result);
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
@@ -163,6 +172,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: SshAlgorithmPreferences.Full);
 
+        Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result);
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
@@ -178,6 +188,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"scp://{Host}/data/large.bin", preferences: preferences);
 
+        Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result, platform);
         CollectionAssert.AreEqual(large, outcome.Output);
         AssertEvents(
@@ -194,6 +205,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/~/notes.txt");
 
+        Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
         CollectionAssert.AreEqual(Hello, outcome.Output);
     }
@@ -206,6 +218,7 @@ public sealed partial class SshProtocolHandlerTests
 
         await RunAsync(server, $"scp://{Host}:2222/f");
 
+        Diagnostics.Assert("port", 2222, server.Targets[0].Port);
         Assert.AreEqual(2222, server.Targets[0].Port);
     }
 
@@ -243,10 +256,14 @@ public sealed partial class SshProtocolHandlerTests
             Upload = new MemoryStream(Hello),
             CreateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(Hello.Length, result.Report!.UploadSize);
         CollectionAssert.AreEqual(Hello, server.Files["/data/up.txt"]);
@@ -267,10 +284,14 @@ public sealed partial class SshProtocolHandlerTests
             Credentials = new NetworkCredential(User, Password),
             Upload = new UnseekableStream(Hello),
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.UploadFailed, "SCP requires a known file size for upload"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UploadFailed, "SCP requires a known file size for upload"), result);
         CollectionAssert.DoesNotContain(server.Events.ToArray(), "channel open session");
         CollectionAssert.Contains(server.Events.ToArray(), "disconnect 11 Shutdown");
@@ -341,6 +362,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, new NetworkCredential(User, string.Empty), files: new() { ["id_test"] = TestUserKeys.RsaPkcs1 });
 
+        Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
         CollectionAssert.Contains(server.Events.ToArray(), $"auth publickey {User} ok");
     }
@@ -355,6 +377,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, new NetworkCredential(User, string.Empty), files: new() { ["id_test"] = TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"] });
 
+        Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
         CollectionAssert.Contains(server.Events.ToArray(), $"auth publickey {User} ok");
     }
@@ -395,6 +418,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"scp://{Host}/f", options);
 
+        Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
     }
 
@@ -407,6 +431,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, files: new() { ["known_hosts"] = server.KnownHostsLine(Host) });
 
+        Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
         Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
     }
 
@@ -442,8 +467,15 @@ public sealed partial class SshProtocolHandlerTests
     {
         SshProtocolHandler handler = new(new RefusingConnector(), new InMemoryKeyFileSystem(new Dictionary<string, string>()), SshAlgorithmPreferences.OpenSslReference, Encoding.UTF8);
 
+        Diagnostics.Arrange("connector", "refuses with \"Failed to connect\"");
+        Diagnostics.Arrange("url", $"sftp://{Host}/f");
+
         TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse($"sftp://{Host}/f"), Output = new MemoryStream() });
 
+        Diagnostics.Act("result", result);
+        Diagnostics.Act("connection refused", result.IsConnectionRefused);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("connection refused", true, result.IsConnectionRefused);
         Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
         Assert.AreEqual("Failed to connect", result.ErrorMessage);
         Assert.IsTrue(result.IsConnectionRefused);
@@ -457,8 +489,14 @@ public sealed partial class SshProtocolHandlerTests
     {
         SshProtocolHandler handler = new(new ResettingConnector(Encoding.ASCII.GetBytes(sentBeforeTheReset)), new InMemoryKeyFileSystem(new Dictionary<string, string>()), SshAlgorithmPreferences.WindowsReference, Encoding.UTF8);
 
+        Diagnostics.Arrange("url", $"{scheme}://{Host}/f");
+        Diagnostics.Bytes("sent before the reset", Encoding.ASCII.GetBytes(sentBeforeTheReset));
+
         TransferResult result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse($"{scheme}://{Host}/f"), Output = new MemoryStream(), Credentials = new NetworkCredential(User, Password) });
 
+        Diagnostics.Act("result", result);
+        Diagnostics.Assert("exit code", CurlExitCode.FailedInit, result.ExitCode);
+        AssertTextDiagnostic("error", $"Failure establishing ssh session: {expectedReason}", result.ErrorMessage);
         Assert.AreEqual(CurlExitCode.FailedInit, result.ExitCode);
         Assert.AreEqual($"Failure establishing ssh session: {expectedReason}", result.ErrorMessage);
     }
@@ -477,10 +515,14 @@ public sealed partial class SshProtocolHandlerTests
             Credentials = new NetworkCredential(User, Password),
             QuoteCommands = ["rm /data/old", "pwd", "+rm /data/never", "-rmdir /data/d"],
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.AssertResult(TransferResult.Success(Hello.Length), result);
         Assert.AreEqual(TransferResult.Success(Hello.Length), result);
         Assert.AreEqual("257 \"/data/hello.txt\" is current directory.\n", Encoding.UTF8.GetString(header.ToArray()));
         AssertEvents(
@@ -502,9 +544,12 @@ public sealed partial class SshProtocolHandlerTests
             Credentials = new NetworkCredential(User, Password),
             QuoteCommands = ["foo bar"],
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
 
+        ActTransfer(result, context, server);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.QuoteError, "Unknown SFTP command"), result);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, "Unknown SFTP command"), result);
     }
 
@@ -512,8 +557,12 @@ public sealed partial class SshProtocolHandlerTests
     public async Task ExecuteAsync_NullContext_Throws()
     {
         SshProtocolHandler handler = Handler(Server());
+        Diagnostics.Arrange("context", "(null)");
 
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+        ArgumentNullException thrown = await Assert.ThrowsExactlyAsync<ArgumentNullException>(async () => await handler.ExecuteAsync(null!));
+
+        Diagnostics.Act("thrown", thrown.GetType().Name);
+        Diagnostics.Assert("thrown", nameof(ArgumentNullException), thrown.GetType().Name);
     }
 
     [TestMethod]
@@ -530,10 +579,14 @@ public sealed partial class SshProtocolHandlerTests
             Upload = new MemoryStream(Hello),
             ResumeFrom = negativeResume ? -1 : null,
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(Hello.Length, result.Report!.UploadSize);
         CollectionAssert.AreEqual(Hello, server.Files["/data/up.txt"]);
@@ -558,10 +611,14 @@ public sealed partial class SshProtocolHandlerTests
             Append = true,
             FtpCreateDirectories = true,
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.Contains("sftp 17 /data/up.txt", server.Events, "-C - asks the remote size");
         CollectionAssert.AreEqual(Hello, server.Files["/data/up.txt"], "the in-memory server writes at the offset sent, 0 under -a");
@@ -578,9 +635,12 @@ public sealed partial class SshProtocolHandlerTests
         IFileSystem? fileSystem = missing == 1 ? null : new InMemoryKeyFileSystem(new Dictionary<string, string>());
         SshAlgorithmPreferences? preferences = missing == 2 ? null : SshAlgorithmPreferences.OpenSslReference;
         Encoding? encoding = missing == 3 ? null : Encoding.UTF8;
+        Diagnostics.Arrange("missing argument", name);
 
         ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => new SshProtocolHandler(connector!, fileSystem!, preferences!, encoding!));
 
+        Diagnostics.Act("parameter name", exception.ParamName);
+        Diagnostics.Assert("parameter name", name, exception.ParamName);
         Assert.AreEqual(name, exception.ParamName);
     }
 
@@ -598,7 +658,7 @@ public sealed partial class SshProtocolHandlerTests
             Environment.GetEnvironmentVariable,
             agent ?? new UnreachableSshAgent());
 
-    private static async Task<Outcome> RunAsync(
+    private async Task<Outcome> RunAsync(
         InMemorySshServer server,
         string url,
         SshOptions? options = null,
@@ -616,21 +676,39 @@ public sealed partial class SshProtocolHandlerTests
             Ssh = options,
             ListOnly = listOnly,
         };
+        ArrangeTransfer(context);
+        Diagnostics.Arrange("preferences", preferences is null ? "OpenSSL reference" : string.Join(",", preferences.KeyExchange));
 
-        TransferResult result = await Handler(server, files, preferences).ExecuteAsync(context);
-        await server.WhenSessionsEndAsync();
+        TransferResult result;
+        using (Diagnostics.Phase("transfer"))
+        {
+            result = await Handler(server, files, preferences).ExecuteAsync(context);
+        }
+
+        using (Diagnostics.Phase("session end"))
+        {
+            await server.WhenSessionsEndAsync();
+        }
+
+        ActTransfer(result, context, server);
         return new Outcome(result, output.ToArray());
     }
 
-    private static void AssertFailure(Outcome outcome, CurlExitCode exitCode, string message)
+    private void AssertFailure(Outcome outcome, CurlExitCode exitCode, string message)
     {
+        Diagnostics.Assert("exit code", exitCode, outcome.Result.ExitCode);
         Assert.AreEqual(exitCode, outcome.Result.ExitCode);
+        AssertTextDiagnostic("error", message, outcome.Result.ErrorMessage);
         Assert.AreEqual(message, outcome.Result.ErrorMessage);
+        Diagnostics.Assert("output length", 0, outcome.Output.Length);
         Assert.IsEmpty(outcome.Output);
     }
 
-    private static void AssertEvents(InMemorySshServer server, params string[] expected) =>
+    private void AssertEvents(InMemorySshServer server, params string[] expected)
+    {
+        AssertTextDiagnostic("server events", string.Join(" | ", expected), string.Join(" | ", server.Events));
         Assert.AreEqual(string.Join(" | ", expected), string.Join(" | ", server.Events));
+    }
 
     private sealed record Outcome(TransferResult Result, byte[] Output);
 

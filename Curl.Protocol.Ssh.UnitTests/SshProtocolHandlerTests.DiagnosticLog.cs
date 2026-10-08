@@ -30,6 +30,7 @@ public sealed partial class SshProtocolHandlerTests
             new SshOptions { KnownHostsPath = "known_hosts" },
             new Dictionary<string, string> { ["known_hosts"] = server.KnownHostsLine(Host) });
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.AreEqual(TransferResult.Success(Hello.Length), result);
         string[] info = log.At(DiagnosticLogLevel.Info);
         Assert.AreEqual("server identification: " + InMemorySshServer.Identification, info[0]);
@@ -51,6 +52,7 @@ public sealed partial class SshProtocolHandlerTests
 
         await RunLoggingAsync(ServerWithAFile(), "sftp://files.example/f", log);
 
+        AssertCheckedOutcomeDiagnostic();
         CollectionAssert.Contains(log.At(DiagnosticLogLevel.Warning), "host key accepted unchecked: no known_hosts file (--insecure)");
         Assert.IsEmpty(log.At(DiagnosticLogLevel.Info));
     }
@@ -63,6 +65,7 @@ public sealed partial class SshProtocolHandlerTests
 
         await RunLoggingAsync(server, "sftp://files.example/f", log, new SshOptions { HostPublicKeySha256 = server.HostKeySha256 });
 
+        AssertCheckedOutcomeDiagnostic();
         CollectionAssert.Contains(log.At(DiagnosticLogLevel.Info), "host key accepted: it matches the fingerprint given");
     }
 
@@ -77,6 +80,7 @@ public sealed partial class SshProtocolHandlerTests
         await RunLoggingAsync(server, "sftp://files.example/f", log, credentials: new NetworkCredential(User, "wrong"), agent: new InMemorySshAgent().Add(TestUserKeys.RsaPkcs1, "k1"));
 
         string[] messages = [.. log.Lines.Select(line => $"{line.Level} {line.Message}")];
+        AssertCheckedOutcomeDiagnostic();
         int refused = Array.IndexOf(messages, "Warning password did not authenticate the user");
         int accepted = Array.IndexOf(messages, "Info authenticated with publickey (ssh-agent)");
         Assert.IsGreaterThanOrEqualTo(0, refused);
@@ -91,6 +95,7 @@ public sealed partial class SshProtocolHandlerTests
 
         await RunLoggingAsync(ServerWithAFile(), "sftp://files.example/missing.txt", log);
 
+        AssertCheckedOutcomeDiagnostic();
         CollectionAssert.AreEqual(
             new[] { "failed with RemoteFileNotFound (78): Could not open remote file for reading: No such file or directory" },
             log.At(DiagnosticLogLevel.Error));
@@ -104,6 +109,7 @@ public sealed partial class SshProtocolHandlerTests
 
         await RunLoggingAsync(ServerWithAFile(), "scp://files.example/f", log, new SshOptions { KnownHostsPath = "known_hosts" });
 
+        AssertCheckedOutcomeDiagnostic();
         CollectionAssert.AreEqual(
             new[] { "failed with PeerFailedVerification (60): SSL peer certificate or SSH remote key was not OK" },
             log.At(DiagnosticLogLevel.Error));
@@ -117,6 +123,7 @@ public sealed partial class SshProtocolHandlerTests
         await RunLoggingAsync(ServerWithAFile(), "sftp://files.example/missing.txt", log);
 
         string[] verbose = log.At(DiagnosticLogLevel.Verbose);
+        AssertCheckedOutcomeDiagnostic();
         CollectionAssert.Contains(verbose, "sent SSH message 20");
         CollectionAssert.Contains(verbose, "received SSH message 20");
         CollectionAssert.Contains(verbose, "trying authentication with password");
@@ -134,6 +141,7 @@ public sealed partial class SshProtocolHandlerTests
 
         await RunLoggingAsync(ServerWithAFile(), "scp://files.example/f", log);
 
+        AssertCheckedOutcomeDiagnostic();
         CollectionAssert.Contains(log.At(DiagnosticLogLevel.Verbose), "channel request exec scp -pf '/f': started");
         CollectionAssert.Contains(log.At(DiagnosticLogLevel.Info), "scp download of /f started");
     }
@@ -147,6 +155,7 @@ public sealed partial class SshProtocolHandlerTests
 
         TransferResult result = await RunLoggingAsync(server, "sftp://files.example/f", log, credentials: new NetworkCredential(User, LoggedSecret));
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.IsTrue(result.IsSuccess);
         Assert.IsFalse(log.Lines.Any(line => line.Message.Contains(LoggedSecret, StringComparison.Ordinal)));
     }
@@ -168,6 +177,7 @@ public sealed partial class SshProtocolHandlerTests
             new Dictionary<string, string> { ["id_test"] = keyFile },
             new NetworkCredential(User, string.Empty));
 
+        AssertCheckedOutcomeDiagnostic();
         Assert.IsTrue(result.IsSuccess);
         CollectionAssert.Contains(log.At(DiagnosticLogLevel.Info), "authenticated with publickey");
         string[] keyLines = [.. keyFile.Split('\n').Select(line => line.Trim()).Where(line => line.Length >= 16 && !line.StartsWith("-----", StringComparison.Ordinal))];
@@ -179,7 +189,7 @@ public sealed partial class SshProtocolHandlerTests
         }
     }
 
-    private static async Task<TransferResult> RunLoggingAsync(
+    private async Task<TransferResult> RunLoggingAsync(
         InMemorySshServer server,
         string url,
         RecordingDiagnosticLog log,
@@ -196,9 +206,14 @@ public sealed partial class SshProtocolHandlerTests
             Ssh = options,
             DiagnosticLog = log,
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server, files, agent: agent).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
+
+        ActTransfer(result, context, server);
+        checkedOutcome = string.Join(" | ", log.Lines.Select(line => $"{line.Level} {line.Message}"));
+        Diagnostics.Act("log lines", checkedOutcome);
         return result;
     }
 }

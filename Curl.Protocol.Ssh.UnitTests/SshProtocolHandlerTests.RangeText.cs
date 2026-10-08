@@ -24,10 +24,14 @@ public sealed partial class SshProtocolHandlerTests
             Credentials = new NetworkCredential(User, Password),
             RangeText = "5-2",
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         CollectionAssert.AreEqual(HelloLine, output.ToArray());
     }
@@ -45,10 +49,14 @@ public sealed partial class SshProtocolHandlerTests
             Credentials = new NetworkCredential(User, Password),
             RangeText = "5-2",
         };
+        ArrangeTransfer(context);
 
         TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
+        ActTransfer(result, context, server);
+
+        Diagnostics.Assert("exit code", CurlExitCode.RangeError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RangeError, result.ExitCode);
         Assert.AreEqual("Bad range: start offset larger than end offset", result.ErrorMessage);
         Assert.IsEmpty(output.ToArray());
