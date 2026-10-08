@@ -3,8 +3,8 @@ id: AF-0063
 title: small-get peak working set is 2.017x curl's (just over the 2x threshold)
 auditor: performance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: performance:Curl.Console:small-get:memory-heavier-than-curl
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
