@@ -1,0 +1,7 @@
+{
+  "version": "8.21.0",
+  "tag": "curl-8_21_0",
+  "url": "https://github.com/curl/curl/releases/download/curl-8_21_0/curl-8.21.0.tar.gz",
+  "sha256": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+  "fetched": "2026-10-01"
+}

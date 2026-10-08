@@ -1,0 +1,300 @@
+{
+  "generated": "2026-10-09T15:00:00Z",
+  "target": "8.21.0",
+  "newest": "8.22.0",
+  "latest": {
+    "stamp": "2026-10-06_0900",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e86",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.22.0",
+    "areas": {
+      "options": {
+        "x": 246,
+        "y": 260
+      },
+      "writeout": {
+        "x": 60,
+        "y": 62
+      }
+    },
+    "overall": {
+      "x": 306,
+      "y": 322
+    },
+    "newest": {
+      "x": 304,
+      "y": 326
+    }
+  },
+  "history": [
+    {
+      "stamp": "2026-10-01_0900",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e81",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.21.0",
+      "areas": {
+        "options": {
+          "x": 241,
+          "y": 260
+        },
+        "writeout": {
+          "x": 60,
+          "y": 62
+        }
+      },
+      "overall": {
+        "x": 301,
+        "y": 322
+      },
+      "newest": {
+        "x": 299,
+        "y": 326
+      }
+    },
+    {
+      "stamp": "2026-10-02_0900",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e82",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.21.0",
+      "areas": {
+        "options": {
+          "x": 242,
+          "y": 260
+        },
+        "writeout": {
+          "x": 60,
+          "y": 62
+        }
+      },
+      "overall": {
+        "x": 302,
+        "y": 322
+      },
+      "newest": {
+        "x": 300,
+        "y": 326
+      }
+    },
+    {
+      "stamp": "2026-10-03_0900",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e83",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.21.0",
+      "areas": {
+        "options": {
+          "x": 243,
+          "y": 260
+        },
+        "writeout": {
+          "x": 60,
+          "y": 62
+        }
+      },
+      "overall": {
+        "x": 303,
+        "y": 322
+      },
+      "newest": {
+        "x": 301,
+        "y": 326
+      }
+    },
+    {
+      "stamp": "2026-10-04_0900",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e84",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.21.0",
+      "areas": {
+        "options": {
+          "x": 244,
+          "y": 260
+        },
+        "writeout": {
+          "x": 60,
+          "y": 62
+        }
+      },
+      "overall": {
+        "x": 304,
+        "y": 322
+      },
+      "newest": {
+        "x": 302,
+        "y": 326
+      }
+    },
+    {
+      "stamp": "2026-10-05_0900",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e85",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 245,
+          "y": 260
+        },
+        "writeout": {
+          "x": 60,
+          "y": 62
+        }
+      },
+      "overall": {
+        "x": 305,
+        "y": 322
+      },
+      "newest": {
+        "x": 303,
+        "y": 326
+      }
+    },
+    {
+      "stamp": "2026-10-06_0900",
+      "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e86",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 246,
+          "y": 260
+        },
+        "writeout": {
+          "x": 60,
+          "y": 62
+        }
+      },
+      "overall": {
+        "x": 306,
+        "y": 322
+      },
+      "newest": {
+        "x": 304,
+        "y": 326
+      }
+    }
+  ],
+  "open": [
+    {
+      "id": "GF-0002",
+      "title": "POST body is sent twice after a redirect",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": "7.10",
+      "suggestion": "Send the request body once per request in Curl.Protocol.Http.UnitLibrary.\nKeep \"303\" handling as it is; see docs\\example.",
+      "items": 3,
+      "tasks": [
+        "BL-1801",
+        "BL-1805"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0002-post-body-is-sent-twice-after-a-redirect.md"
+    },
+    {
+      "id": "GF-0001",
+      "title": "Encrypted Client Hello options are missing",
+      "area": "options",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": "8.8.0",
+      "suggestion": "Parse --ech and its four argument forms in Curl.Console and pass them to the TLS layer.",
+      "items": 2,
+      "tasks": [
+        "BL-1800"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0001-encrypted-client-hello-options-are-missing.md"
+    },
+    {
+      "id": "GF-0005",
+      "title": "The mqtts scheme is missing",
+      "area": "protocols",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": "8.21.0",
+      "suggestion": "Add MQTT over TLS to Curl.Protocol.Mqtt.UnitLibrary.",
+      "items": 1,
+      "tasks": [
+        "BL-1802"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0005-the-mqtts-scheme-is-missing.md"
+    },
+    {
+      "id": "GF-0003",
+      "title": "The time_example write-out variable is missing",
+      "area": "writeout",
+      "severity": "High",
+      "scope": "newest",
+      "introducedIn": "8.22.0",
+      "suggestion": "Add %{time_example} to the write-out variables.",
+      "items": 1,
+      "tasks": [],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0003-the-time-example-write-out-variable-is-missing.md"
+    },
+    {
+      "id": "GF-0004",
+      "title": "The new --retry argument form differs",
+      "area": "options",
+      "severity": "Medium",
+      "scope": "newest",
+      "introducedIn": "8.22.0",
+      "suggestion": "Accept the new --retry argument form.",
+      "items": 1,
+      "tasks": [],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0004-the-new-retry-argument-form-differs.md"
+    },
+    {
+      "id": "GF-0006",
+      "title": "A help line is worded differently",
+      "area": "options",
+      "severity": "Low",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Reword the help line.",
+      "items": 1,
+      "tasks": [],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0006-a-help-line-is-worded-differently.md"
+    }
+  ],
+  "closed": [
+    {
+      "id": "GF-0007",
+      "title": "The strerror text for exit 101 differs",
+      "area": "exitcodes",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": "8.12.0",
+      "suggestion": "Copy curl's strerror text for exit 101.",
+      "items": 1,
+      "tasks": [
+        "BL-1803"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0007-the-strerror-text-for-exit-101-differs.md"
+    }
+  ],
+  "regressions": [
+    {
+      "id": "GF-0002",
+      "title": "POST body is sent twice after a redirect",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": "7.10",
+      "suggestion": "Send the request body once per request in Curl.Protocol.Http.UnitLibrary.\nKeep \"303\" handling as it is; see docs\\example.",
+      "items": 3,
+      "tasks": [
+        "BL-1801",
+        "BL-1805"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0002-post-body-is-sent-twice-after-a-redirect.md"
+    }
+  ],
+  "release": {
+    "version": "8.22.0",
+    "newGaps": 2
+  }
+}

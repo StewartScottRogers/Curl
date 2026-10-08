@@ -1,0 +1,62 @@
+[
+  {
+    "stamp": "2026-10-01_0900",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e81",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.21.0",
+    "areas": { "options": { "x": 241, "y": 260 }, "writeout": { "x": 60, "y": 62 } },
+    "overall": { "x": 301, "y": 322 },
+    "newest": { "x": 299, "y": 326 }
+  },
+  {
+    "stamp": "2026-10-02_0900",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e82",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.21.0",
+    "areas": { "options": { "x": 242, "y": 260 }, "writeout": { "x": 60, "y": 62 } },
+    "overall": { "x": 302, "y": 322 },
+    "newest": { "x": 300, "y": 326 }
+  },
+  {
+    "stamp": "2026-10-03_0900",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e83",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.21.0",
+    "areas": { "options": { "x": 243, "y": 260 }, "writeout": { "x": 60, "y": 62 } },
+    "overall": { "x": 303, "y": 322 },
+    "newest": { "x": 301, "y": 326 }
+  },
+  {
+    "stamp": "2026-10-04_0900",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e84",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.21.0",
+    "areas": { "options": { "x": 244, "y": 260 }, "writeout": { "x": 60, "y": 62 } },
+    "overall": { "x": 304, "y": 322 },
+    "newest": { "x": 302, "y": 326 }
+  },
+  {
+    "stamp": "2026-10-05_0900",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e85",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.22.0",
+    "areas": { "options": { "x": 245, "y": 260 }, "writeout": { "x": 60, "y": 62 } },
+    "overall": { "x": 305, "y": 322 },
+    "newest": { "x": 303, "y": 326 }
+  },
+  {
+    "stamp": "2026-10-06_0900",
+    "commit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e86",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.22.0",
+    "areas": { "options": { "x": 246, "y": 260 }, "writeout": { "x": 60, "y": 62 } },
+    "overall": { "x": 306, "y": 322 },
+    "newest": { "x": 304, "y": 326 }
+  }
+]
