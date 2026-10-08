@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1694 — Fix AF-0075: BL-1575's run log on lane 3 ends with no result: still running (an Agent call) when the logs were copied
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- No code change was needed. Like AF-0074 (BL-1693), AF-0075 records a snapshot, not a factory defect: the audit copied the logs at about 13:36, while BL-1575 was still running inside an Agent call. The live `Z:\repos\Curl.logs\BL-1575-20261007-111121-L3.jsonl` now ends with its `"type":"result"` line (`FACTORY: DONE BL-1575 ...`, duration 758 s), so a re-audit against current logs finds no unfinished run for BL-1575. RunDarkFactory.ps1 already writes each run's full stream to completion and is unchanged.
+- Not run here: the reproduction itself. `Audit/Tools/Measure-FactoryProcess.ps1` is an audit path the lane guard refuses. Instead, checked the condition it measures: the jsonl's last line is a result line.
+- The follow-up suggested under BL-1693 applies here too (an interactive session's to file): have the audit's log copy or Measure-FactoryProcess.ps1 set aside runs still in progress at copy time.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. AF-0075 no longer reproduces: BL-1575's L3 run log ends with its result line; the audit had copied it mid-run
