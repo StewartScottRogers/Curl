@@ -4715,6 +4715,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # loop above stopped watching, so file it now (BL-1031).
     Invoke-CiWatch -Branch $branch -Final
     Remove-CiWatch
+    # Those tasks were pushed from the ci-watch worktree; pull them here too, or the board
+    # below still says nothing is ready and -Continuous leaves them waiting for the next
+    # shift Stewart starts (AF-0090: three CI-fix tasks waited 5 hours).
+    if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
     $reasons = @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)
     # -Continuous: while the board still has ready work, the next shift starts itself, so
     # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
