@@ -142,6 +142,64 @@ public sealed class TlsAdversarialTests
     }
 
     [TestMethod]
+    public void Alpn_EmptyProtocolList_IsDecodeError()
+    {
+        byte[] data = [0x00, 0x00];
+        Diagnostics.Bytes("data", data);
+
+        TlsAlertDescription? alert = ApplicationLayerProtocolNegotiationExtension.Decode(data).Alert;
+        Diagnostics.Act("alert", alert);
+
+        Assert.AreEqual(TlsAlertDescription.DecodeError, alert);
+    }
+
+    [TestMethod]
+    public void Alpn_EmptyProtocolName_IsDecodeError()
+    {
+        byte[] data = [0x00, 0x01, 0x00];
+        Diagnostics.Bytes("data", data);
+
+        TlsAlertDescription? alert = ApplicationLayerProtocolNegotiationExtension.Decode(data).Alert;
+        Diagnostics.Act("alert", alert);
+
+        Assert.AreEqual(TlsAlertDescription.DecodeError, alert);
+    }
+
+    [TestMethod]
+    public void Alpn_EmptyProtocolNameAfterAValidOne_IsDecodeError()
+    {
+        byte[] data = [0x00, 0x04, 0x02, (byte)'h', (byte)'2', 0x00];
+        Diagnostics.Bytes("data", data);
+
+        TlsAlertDescription? alert = ApplicationLayerProtocolNegotiationExtension.Decode(data).Alert;
+        Diagnostics.Act("alert", alert);
+
+        Assert.AreEqual(TlsAlertDescription.DecodeError, alert);
+    }
+
+    [TestMethod]
+    public void Alpn_EncodeOfAnEmptyList_ThrowsArgumentException()
+    {
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => ApplicationLayerProtocolNegotiationExtension.Encode([]));
+        Diagnostics.Act("message", exception.Message);
+
+        Assert.AreEqual("protocols", exception.ParamName);
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(256)]
+    public void Alpn_EncodeOfANameOutsideOneTo255Bytes_ThrowsArgumentException(int length)
+    {
+        string name = new('a', length);
+
+        ArgumentException exception = Assert.ThrowsExactly<ArgumentException>(() => ApplicationLayerProtocolNegotiationExtension.Encode(["h2", name]));
+        Diagnostics.Act("message", exception.Message);
+
+        Assert.AreEqual("protocols", exception.ParamName);
+    }
+
+    [TestMethod]
     [DataRow("example.com.")]
     [DataRow("192.0.2.1")]
     [DataRow("xn--bcher-kva.example")]
