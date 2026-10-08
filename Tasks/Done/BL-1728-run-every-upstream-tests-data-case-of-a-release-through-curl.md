@@ -9,7 +9,7 @@ touches: [Gap/Tools/Measure-UpstreamCases.cs, Gap/Tools/Directory.Build.props, G
 model: opus
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1728 — Run every upstream tests/data case of a release through Curl with Gap/Tools/Measure-UpstreamCases.cs
 
@@ -68,15 +68,17 @@ Retargeting (BL-1748) changes it.
 
 ## Acceptance criteria
 
-- [ ] `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- <8.21.0 cache>/tests/data <temp>/raw.json` finishes on Windows and writes one entry per `test*` file. Its passed count is recorded in this task's Notes, and is not below the number of cases listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` on the same commit.
-- [ ] The same command with a third argument `1,2,3` writes exactly those three cases.
-- [ ] The app builds with no warnings, and building it changes no file outside `Gap/Tools/`.
-- [ ] `dotnet build` of the solution and `dotnet test --filter "TestCategory!=Integration"` still pass, so the app's folder does not leak into the solution build.
-- [ ] The header comment states the inputs, the output shape, the parallelism and the `%VERSION` limit.
+- [x] `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- <8.21.0 cache>/tests/data <temp>/raw.json` finishes on Windows and writes one entry per `test*` file. Its passed count is recorded in this task's Notes, and is not below the number of cases listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` on the same commit.
+- [x] The same command with a third argument `1,2,3` writes exactly those three cases.
+- [x] The app builds with no warnings, and building it changes no file outside `Gap/Tools/`.
+- [x] `dotnet build` of the solution and `dotnet test --filter "TestCategory!=Integration"` still pass, so the app's folder does not leak into the solution build.
+- [x] The header comment states the inputs, the output shape, the parallelism and the `%VERSION` limit.
 
 ## Notes
 
 - 2026-10-08 (lane 3): No public route into Curl.Console exists. The in-process wiring that UpstreamConformanceTests.RunCurlAsync copies uses CurlComposition.CreateRunner and DiskWriteOutFileOpener, and both are internal. Program is internal too, and Curl.Console has no public type at all; the test project reaches them only through InternalsVisibleTo. As the Context directs, nothing was widened. BL-1750 was filed for the smallest public seam (one public static in-process run method), and this task now depends on it. Once BL-1750 is Done, wire Measure-UpstreamCases.cs through that method in place of CurlComposition.
+- 2026-10-08 (lane 1): Wired through BL-1750's public `InProcessCurl.RunAsync`; no internal type used. `Gap/Tools/` got its own Directory.Build.props/.targets/.Packages.props copied from `.github/gource/` (comments kept, reworded for this folder). Full 8.21.0 run on Windows at d3a63ba8: 2013 cases, Passed 560, Failed 161, Skipped 1292, about 10 s. PassingUpstreamCases.txt lists 559 cases and every one passed. With `1,2,3` the output holds exactly cases 1, 2 and 3.
+- 2026-10-08 (lane 1): Decision - the app sets curl's working folder to its log folder for the run. The first full run left a file named `%` in the checkout, because some cases write output relative to curl's working folder (upstream runs them from tests/). With the log folder as the working folder, those files are deleted with it. Also, a case whose harness throws is recorded as Failed with the exception, so one bad case cannot stop the run.
 
 ## Log
 
@@ -84,3 +86,4 @@ Retargeting (BL-1748) changes it.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Waits on BL-1750: Curl.Console has no public in-process entry point, and the app may not use InternalsVisibleTo
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Measure-UpstreamCases.cs runs every upstream tests/data case of a release through Curl in process and writes each outcome as JSON (8.21.0: 560 passed of 2013)
