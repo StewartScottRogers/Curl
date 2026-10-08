@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
 completed:
@@ -46,7 +46,27 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-07 (lane 9) diagnosis: the cause is not in `Curl.Console` and not specific to
+  `--interface`. `HttpProtocolHandler.WithFirstAuthorizationFailure`
+  (`Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs`, ~line 327) replaces the message of
+  *any* failed transfer with the first line the authenticator reported while making the first
+  `Authorization` value (ADR-0344, BL-955). Curl makes the Negotiate context before connecting;
+  curl makes it only once connected, so a connect failure never meets it. Measured with Git's
+  curl 8.21.0: `curl --negotiate -sS http://127.0.0.1:50998/` (nothing listening) gives
+  `curl: (7) Failed to connect to 127.0.0.1:50998 after N ms: Could not connect to server`;
+  Curl gives `curl: (7) InitializeSecurityContext failed: SEC_E_NO_CREDENTIALS ...`. Same for
+  `--interface @f.txt --negotiate` (exit 45).
+- Planned fix: in `WithFirstAuthorizationFailure`, keep the result's own message when the
+  transfer failed before a connection opened (the failure `ConnectAndExchangeAsync` returns
+  for `connect.Connection is null`, and `FailBeforeConnecting`). Mark those results (e.g. a
+  flag on the plan/result, or check the report's connect stage) and add unit tests in
+  `Curl.Protocol.Http.UnitTests` for a refused connect and a local-bind failure with
+  `--negotiate` and a failing context, keeping BL-955's 401 test as is.
+- Needs `Curl.Protocol.Http.UnitLibrary` and `Curl.Protocol.Http.UnitTests`, added to
+  `touches`; BL-1609 (in Doing) holds them, so this task went back to Backlog until it is done.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Fix is in Curl.Protocol.Http.UnitLibrary (HttpProtocolHandler.WithFirstAuthorizationFailure), which BL-1609 in Doing touches; resume once BL-1609 is Done
