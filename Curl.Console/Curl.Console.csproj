@@ -45,6 +45,21 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    ILC imports ncrypt, Secur32, ADVAPI32, CRYPT32 and IPHLPAPI statically, so Windows maps them
+    (and NTASN1, msvcrt and more behind them) at startup even for a plain http:// GET, which calls
+    none of them: about 0.9 MB of peak working set. Delay-loading maps each one on its first call
+    instead - a TLS handshake, Negotiate, an interface lookup (BL-1682, AF-0063, ADR-0431).
+  -->
+  <Target Name="DelayLoadDllsPlainTransfersNeverCall"
+          AfterTargets="SetupOSSpecificProps"
+          Condition=" $(RuntimeIdentifier.StartsWith('win')) ">
+    <ItemGroup>
+      <LinkerArg Include="delayimp.lib" />
+      <LinkerArg Include="/DELAYLOAD:ncrypt.dll;/DELAYLOAD:Secur32.dll;/DELAYLOAD:ADVAPI32.dll;/DELAYLOAD:CRYPT32.dll;/DELAYLOAD:IPHLPAPI.DLL" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Console.IntegrationTests" />
     <InternalsVisibleTo Include="Curl.Console.UnitTests" />
