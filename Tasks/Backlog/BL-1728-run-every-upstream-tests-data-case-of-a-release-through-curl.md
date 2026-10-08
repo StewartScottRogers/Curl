@@ -4,7 +4,7 @@ title: Run every upstream tests/data case of a release through Curl with Gap/Too
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1721]
+depends-on: [BL-1721, BL-1750]
 touches: [Gap/Tools/Measure-UpstreamCases.cs, Gap/Tools/Directory.Build.props, Gap/Tools/Directory.Build.targets, Gap/Tools/Directory.Packages.props]
 model: opus
 requirement: none
@@ -76,7 +76,10 @@ Retargeting (BL-1748) changes it.
 
 ## Notes
 
+- 2026-10-08 (lane 3): No public route into Curl.Console exists. The in-process wiring that UpstreamConformanceTests.RunCurlAsync copies uses CurlComposition.CreateRunner and DiskWriteOutFileOpener, and both are internal. Program is internal too, and Curl.Console has no public type at all; the test project reaches them only through InternalsVisibleTo. As the Context directs, nothing was widened. BL-1750 was filed for the smallest public seam (one public static in-process run method), and this task now depends on it. Once BL-1750 is Done, wire Measure-UpstreamCases.cs through that method in place of CurlComposition.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Backlog. Waits on BL-1750: Curl.Console has no public in-process entry point, and the app may not use InternalsVisibleTo
