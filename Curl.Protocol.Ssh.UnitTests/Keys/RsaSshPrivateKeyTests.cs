@@ -107,6 +107,44 @@ public sealed class RsaSshPrivateKeyTests
         Diagnostics.ActAndAssertThrown(nameof(CryptographicException), failure);
     }
 
+    [TestMethod]
+    public void FromComponents_TheSixOpenSshIntegers_SignsAsTheFullPkcs1Key()
+    {
+        using RSA full = RSA.Create();
+        full.ImportRSAPrivateKey(PemBody(TestUserKeys.RsaPkcs1), out _);
+        RSAParameters expected = full.ExportParameters(includePrivateParameters: true);
+        Diagnostics.Arrange("key", "the test RSA key without its CRT exponents dP and dQ");
+        Diagnostics.Bytes("data", Data);
+
+        // A wrong derived dP or dQ gives a wrong CRT signature wherever RSA trusts the CRT values.
+        RsaSshPrivateKey key = RsaSshPrivateKey.FromComponents(
+            expected.Modulus, expected.Exponent, expected.D, expected.InverseQ, expected.P, expected.Q);
+        byte[] blob = key.Sign("rsa-sha2-256", Data);
+
+        Diagnostics.ActBytes("signature blob", blob);
+        Diagnostics.AssertBytes("signature blob", Convert.FromHexString(RsaSha2256Blob), blob);
+        Assert.AreEqual(RsaSha2256Blob, Convert.ToHexString(blob));
+    }
+
+    [TestMethod]
+    public void FromComponents_TheSixOpenSshIntegers_DerivesDpAsDModPMinusOneAndDqAsDModQMinusOne()
+    {
+        using RSA full = RSA.Create();
+        full.ImportRSAPrivateKey(PemBody(TestUserKeys.RsaPkcs1), out _);
+        RSAParameters expected = full.ExportParameters(includePrivateParameters: true);
+        byte[] expectedEncoding = full.ExportRSAPrivateKey();
+        Diagnostics.Bytes("expected dP", expected.DP!);
+        Diagnostics.Bytes("expected dQ", expected.DQ!);
+
+        // The encoding before import: Windows' RSA recomputes dP and dQ when it imports a key.
+        byte[] actual = RsaSshPrivateKey.FromComponents(
+            expected.Modulus, expected.Exponent, expected.D, expected.InverseQ, expected.P, expected.Q).Pkcs1Encoding;
+
+        Diagnostics.ActBytes("PKCS #1 encoding", actual);
+        Diagnostics.AssertBytes("PKCS #1 encoding", expectedEncoding, actual);
+        CollectionAssert.AreEqual(expectedEncoding, actual);
+    }
+
     private static byte[] PemBody(string pem) =>
         Convert.FromBase64String(string.Concat(pem.Split('\n').Select(line => line.Trim()).Where(line => line.Length > 0 && !line.StartsWith('-'))));
 }

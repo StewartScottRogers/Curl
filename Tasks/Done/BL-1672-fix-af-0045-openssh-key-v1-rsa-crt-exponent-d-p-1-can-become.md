@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitLibrary]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1672 — Fix AF-0045: openssh-key-v1 RSA CRT exponent `d % (p - 1)` can become `d % (p + 1)` with no test failing
 
@@ -41,12 +41,29 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured first: a test that builds the test RSA key from its six openssh-key-v1
+  integers and checks its `rsa-sha2-256` signature (or the exported `DP`) does NOT kill
+  the mutant on Windows - CNG recomputes dP and dQ on import, so the wrong exponent never
+  reaches a signature there. The defect still matters on platforms that trust the CRT values.
+- So `RsaSshPrivateKey` now keeps `Pkcs1Encoding`, the DER it was imported from, and
+  `FromComponents_TheSixOpenSshIntegers_DerivesDpAsDModPMinusOneAndDqAsDModQMinusOne`
+  compares it byte for byte with the full key's `ExportRSAPrivateKey()`. Also added
+  `FromComponents_TheSixOpenSshIntegers_SignsAsTheFullPkcs1Key` (end to end).
+- Line 99 (`d % (p - 1)`) stays at line 99 inside `FromComponents`, so the finding's
+  `-Site ...:99:-1 -Member FromComponents` still names it. Verified by hand: with the
+  line mutated to `p + 1` the new test fails ("Element at index 3 do not match"); restored,
+  all 1809 Ssh tests pass. A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`
+  (audit path guard), so the scripted reproduction is left to the re-audit.
+- Measure-CodeQuality not run (time budget): the change adds one auto-property and a
+  constructor argument, both reached by the new tests.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A test now pins the openssh-key-v1 RSA CRT exponents FromComponents derives, killing the d % (p + 1) mutant
