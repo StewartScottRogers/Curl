@@ -32,3 +32,4 @@ A `tftp://` download that receives an option acknowledgement after it has starte
 ## Log
 
 - 2026-10-07: Created by BL-1520.
+- 2026-10-07: Backlog -> Doing.
