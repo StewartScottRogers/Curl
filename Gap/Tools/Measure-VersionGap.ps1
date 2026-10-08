@@ -151,7 +151,7 @@ function Get-CannedAnswers([string] $Path) {
 }
 
 function Get-LiveAnswers([string] $CandidatePath, [string] $ReferencePath, [string] $ReleaseVersion) {
-    . (Join-Path $PSScriptRoot 'Invoke-GapProbe.ps1')
+    . (Join-Path $PSScriptRoot 'GapProbeFunctions.ps1')
     $candidatePath = Get-GapCandidateCurl -Path $CandidatePath
     $found = Get-GapReferenceCurl -TargetVersion $ReleaseVersion -Path $ReferencePath
     $read = {
@@ -307,6 +307,10 @@ function Invoke-SelfTest {
         Report ($measurement.reference -like 'curl 9.9.9 *' -and $null -eq $measurement.PSObject.Properties['referenceFallback']) 'a matched reference is named with no fallback'
         $c = $measurement.counts
         Report ($c.y -eq ($c.match + $c.gap + $c.unmeasured) -and $c.x -eq $c.match -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($measurement.items).Count) 'counts add up'
+
+        # Live path with an explicit Curl.Console outside this script's repository: the stand-in must be the binary that runs (BL-1747).
+        $live = Get-LiveAnswers (Join-Path $PSScriptRoot 'Fixtures/probe/Write-ProbeEcho.ps1') $null '9.9.9'
+        Report ($live.Candidate.VersionLine -like '*Arguments*') 'an explicit -Candidate is the binary the live answers come from'
 
         Invoke-VersionGap $upstream '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results-docs.json') $null $null | Out-Null
         $docs = [System.IO.File]::ReadAllText((Join-Path $out 'protocols.json')) | ConvertFrom-Json
