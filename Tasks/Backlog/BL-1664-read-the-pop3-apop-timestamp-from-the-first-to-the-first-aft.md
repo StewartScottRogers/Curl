@@ -1,5 +1,5 @@
 ---
-id: BL-1662
+id: BL-1664
 title: Read the POP3 APOP timestamp from the first < to the first > after it, as curl does
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1662 — Read the POP3 APOP timestamp from the first < to the first > after it, as curl does
+# BL-1664 — Read the POP3 APOP timestamp from the first < to the first > after it, as curl does
 
 ## Goal
 

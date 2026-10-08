@@ -39,11 +39,11 @@ All new tests are in `Curl.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerAdversaria
 - **Malformed input**: `ExecuteAsync_StatusLineOkFollowedByLetters_CountsAsOkAndWritesTheBody` (`+OKAY`, measured exit 0); `ExecuteAsync_StatusLineNearlyOkOrErr_FailsWithExit8AndStillQuits` (`+ok`, `-ERRx`, measured exit 8); `ExecuteAsync_LowerCaseErrLine_IsNotAStatusLineSoTheHangUpIsExit56WithoutQuit` (`-err no`, measured exit 56); `ExecuteAsync_MalformedApopTimestamp_LogsInAsCurlDoes` (`<@>`, `+OK<a@b>`, `<nohost>`, `<a@b`, `a@b>`, each digest measured).
 - **Invalid partitions**: `ExecuteAsync_CrlfSmuggledThroughTheUrlPath_SendsNoSecondCommandAndFailsWithExit3` (`%0d%0a`, `%0a` in the path) and `ExecuteAsync_CrlfSmuggledThroughTheCustomCommand_SendsNoSecondCommandAndFailsWithExit3` (raw and escaped CRLF/LF in `-X`): no second command reaches the wire, exit 3, as the existing measured control-character cases.
 - **State and concurrency**: `ExecuteAsync_OneHandlerRunTwiceInARow_GivesTheSecondRunTheSameAnswerAsTheFirst` and `ExecuteAsync_OneHandlerOnSixteenTasksAtOnce_GivesEveryTransferItsOwnMessage` (one handler instance, 16 concurrent transfers on their own connections).
-- **Defect found**: BL-1662 (High) - the APOP timestamp is taken only when the greeting ends in `>`, and then runs to the end of the line; curl takes `<` to the first `>`. With `+OK hi <a@b> trailing` Curl sends `USER`/`PASS` (the password in the clear) where curl sends `APOP`; with `+OK <a@b> <c@d>` it sends the wrong digest. Those three greetings are not pinned here (no failing test committed); their tests land with the fix.
+- **Defect found**: BL-1664 (High) - the APOP timestamp is taken only when the greeting ends in `>`, and then runs to the end of the line; curl takes `<` to the first `>`. With `+OK hi <a@b> trailing` Curl sends `USER`/`PASS` (the password in the clear) where curl sends `APOP`; with `+OK <a@b> <c@d>` it sends the wrong digest. Those three greetings are not pinned here (no failing test committed); their tests land with the fix.
 - Test count: 317 before (312 passed, 5 skipped), 345 after (340 passed, 5 skipped). No input over 1 MiB, so no Integration tests.
 
 ## Log
 
 - 2026-10-06: Created.
 - 2026-10-07: Backlog -> Doing.
-- 2026-10-07: Doing -> Done. 28 adversarial tests added (317 -> 345); APOP timestamp defect filed as BL-1662
+- 2026-10-07: Doing -> Done. 28 adversarial tests added (317 -> 345); APOP timestamp defect filed as BL-1664
