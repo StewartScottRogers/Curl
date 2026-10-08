@@ -4,7 +4,7 @@ title: Fix AF-0063: small-get peak working set is 2.017x curl's (just over the 2
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1715]
 touches: [Curl.Console]
 requirement: none
 created: 2026-10-08
@@ -73,9 +73,15 @@ The finding closes only when a later re-audit by the performance auditor confirm
   path (the runner's startup and the HTTP handler's static tables) with the same
   QueryWorkingSet page count.
 
+- 2026-10-07, lane 2: split. Filed BL-1715 (lazy per-scheme protocol handlers, the first ~370 KB
+  BL-1682's Notes measured) and made this task depend on it. After BL-1715 is Done, this task
+  re-measures and trims the remaining ~0.5 MB on the HTTP path (runner startup, HTTP handler
+  static tables) with the QueryWorkingSet page count, until the median is at most 2x curl's.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Measured, not fixed: startup touches 5 MB of the AOT image; lazy protocol handlers save only 2.6% (see Notes); needs lazy handlers plus HTTP-path trimming, more than this run's budget
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Waits on BL-1715 (lazy per-scheme protocol handlers); then trim the remaining ~0.5 MB on the HTTP path
