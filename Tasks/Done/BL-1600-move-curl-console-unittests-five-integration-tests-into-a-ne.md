@@ -8,7 +8,7 @@ depends-on: [BL-1597]
 touches: [Curl.Console.UnitTests, Curl.Console.IntegrationTests, Curl.Console, Curl.slnx]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1600 — Move Curl.Console.UnitTests' five Integration tests into a new Curl.Console.IntegrationTests project
 
@@ -33,16 +33,23 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj` exists, matches the template's shape, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Console.UnitTests`; `Curl.Console/Curl.Console.csproj` has `InternalsVisibleTo` for it.
-- [ ] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Console.UnitTests --include=*.cs` finds nothing, and every `[TestMethod]` in `Curl.Console.IntegrationTests` carries `[TestCategory("Integration")]`.
-- [ ] `dotnet build -warnaserror` at the repository root is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `dotnet test Curl.Console.IntegrationTests --filter "TestCategory=Integration"` runs the five tests named in Context; on Windows the three not limited by `OSCondition` pass and the two xattr tests are skipped by their condition. Notes record the runner's summary line.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line and 100% branch coverage for `Curl.Console`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
+- [x] `Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj` exists, matches the template's shape, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Console.UnitTests`; `Curl.Console/Curl.Console.csproj` has `InternalsVisibleTo` for it.
+- [x] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Console.UnitTests --include=*.cs` finds nothing, and every `[TestMethod]` in `Curl.Console.IntegrationTests` carries `[TestCategory("Integration")]`.
+- [x] `dotnet build -warnaserror` at the repository root is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet test Curl.Console.IntegrationTests --filter "TestCategory=Integration"` runs the five tests named in Context; on Windows the three not limited by `OSCondition` pass and the two xattr tests are skipped by their condition. Notes record the runner's summary line.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` reports 100% line and 100% branch coverage for `Curl.Console`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
 
 ## Notes
+
+- Shared fakes: linked, not copied - the new csproj compiles `..\Curl.Console.UnitTests\RecordingConnector.cs` and `RecordingDatagramConnector.cs` as `Fakes\*.cs`; both are self-contained (only `Curl.Protocol.Abstractions`, reached through `Curl.Console`). No reference to `Curl.Console.UnitTests`, so no second `CS0436`.
+- `ConnectFailure` is copied as a private constant into `CurlCompositionIntegrationTests`; it stays in `CurlCompositionTests`, where many tests use it. `AnswerOneQueryAsync` moved (nothing else used it); `Parse` is duplicated because the remaining DNS tests still use it. The now-unused `System.Net`/`System.Net.Sockets` usings left `CurlCompositionDnsServersTests.cs`; `NativeExtendedAttributeWriterTests`' class doc comment now names only the Windows case and points at its Integration twin.
+- Integration run (Windows): `Passed!  - Failed: 0, Passed: 3, Skipped: 2, Total: 5` - the two xattr tests skipped by their `OSCondition`.
+- Fast run: green, no failing test project. `dotnet build -warnaserror`: 0 warnings, 0 errors.
+- Coverage: `Measure-CodeQuality.ps1 -Library Curl.Console` after the move: Curl.Console 100% line, 100% branch, 1030 members, 0 failing, worst CRAP 10. No separate before run: the measurement takes only `TestCategory!=Integration` tests, which never included these five, so the before figures are the same by construction (the task's own Context says so).
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Curl.Console's five Integration tests run from the new Curl.Console.IntegrationTests project; Curl.Console.UnitTests holds none
