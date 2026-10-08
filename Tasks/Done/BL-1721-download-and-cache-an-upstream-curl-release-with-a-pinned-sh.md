@@ -76,6 +76,7 @@ temporary baselines folder (add a `-BaselinesDirectory` parameter, default
 - `-ArchivePath` always hashes and checks the archive, even when the cache is complete, so a wrong local archive still throws; a download run returns at once when `.complete` holds the pinned hash.
 - An incomplete version folder (no `.complete`, or a different hash in it) is deleted and re-extracted with `--strip-components 1`.
 - Windows PowerShell 5.1 has no `$PSScriptRoot` while binding parameter defaults, so `-BaselinesDirectory` is defaulted in the body.
+- `.gitignore`'s `[Rr]elease/` rule matches `Gap/Tools/Fixtures/release/`, so its five files were added with `git add -f`; once tracked they stay tracked, and `.gitignore` (outside this task's `touches`) is left alone. A new fixture file there needs `git add -f` too.
 - Real run 2026-10-08: curl-8.21.0.tar.gz from the GitHub release, SHA-256 d9b327997999045a24cda50f3983e69e51c516bd8be6ef9842fc7f99135e33bb; 2013 `tests/data/test*` files; the second run returns in 0.35 s.
 
 ## Log
