@@ -3,8 +3,8 @@ id: AF-0060
 title: HttpChunkedDecoder.AppendToTrailerLine: the trailer line limit 'Length + 1 >= MaximumTrailerLineLength' can become > with no test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpChunkedDecoder.cs:AppendToTrailerLine-ge:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpChunkedDecoder.cs:221:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
