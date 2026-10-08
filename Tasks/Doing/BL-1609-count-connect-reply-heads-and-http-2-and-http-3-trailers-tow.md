@@ -72,3 +72,4 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 - 2026-10-07: Doing -> Backlog. CONNECT measured (heads count, exit 100, last < X-H2000; Notes); left: count CONNECT heads and HTTP/2-3 trailers in Http/Networking/Abstractions, tests, Measure-CodeQuality
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Code and tests written, uncommitted (shift stash): ConnectResult.ConnectReplyHeadersStored, HttpProxyTunnelReply.HeaderCount, TcpConnector/PoolingConnector pass it, handler seeds HeadersStoredBefore and cuts HTTP/2-3 trailers (StoredLengthOf); 3 test projects green. Left: full build + fast tests, Measure-CodeQuality on 3 libraries, ADR for trailer counting, commit
+- 2026-10-07: Backlog -> Doing.
