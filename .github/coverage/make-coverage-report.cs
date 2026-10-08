@@ -119,6 +119,7 @@ static class Report
               h1 { margin:0 0 4px; font-size:26px; } h2 { margin:32px 0 8px; font-size:19px; }
               p.meta { margin:0; color:var(--muted); }
               a { color:inherit; }
+              nav.site { margin-bottom:12px; color:var(--muted); font-size:14px; }
               .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:20px; }
               .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
               .card .n { font-size:28px; font-weight:600; } .card .l { color:var(--muted); font-size:13px; }
@@ -135,6 +136,7 @@ static class Report
             </head>
             <body>
             <main>
+            <nav class="site"><a href="../">Gource</a> · <a href="../board/">Board</a> · <a href="../gaps/">Gaps</a></nav>
             <h1>Curl coverage</h1>
             <p class="meta">Measured {{H(measured)}}{{commitLink}} on Windows by <code>Measure-CodeQuality.ps1</code>. Every library is held to
             {{Pct(lineGate)}} line and {{Pct(branchGate)}} branch coverage, cyclomatic complexity of at most {{I(g, "complexity")}} and a CRAP score of at most {{D(g, "crap").ToString(Inv)}}.</p>

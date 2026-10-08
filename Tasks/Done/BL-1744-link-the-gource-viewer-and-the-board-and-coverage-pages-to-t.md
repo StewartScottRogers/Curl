@@ -9,7 +9,7 @@ touches: [.github/gource/site/index.html, .github/board/site/index.html, .github
 model: sonnet
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1744 — Link the Gource viewer and the board and coverage pages to the gap dashboard
 
@@ -47,14 +47,20 @@ Relative links work both on Pages and under `.github/gource/serve.cs` previews.
 
 ## Acceptance criteria
 
-- [ ] `.github/gource/site/index.html` has links to `board/`, `coverage/` and `gaps/` in its button row.
-- [ ] `.github/board/site/index.html` has links to `../`, `../coverage/` and `../gaps/` outside `nav.tabs`, and its `Tasks` and `Audit` tabs work as before: opening `?tree=../fixtures/tree.json` and `#audit` under `serve.cs` still shows both panels.
-- [ ] `dotnet run --file .github/coverage/make-coverage-report.cs -- <a coverage JSON> <out dir> <sha>` writes an `index.html` containing links to `../`, `../board/` and `../gaps/`. Use the JSON `Measure-CodeQuality.ps1 -JsonPath` writes, or an existing fixture if the generator's folder has one.
-- [ ] No page gains an external script, stylesheet or font.
+- [x] `.github/gource/site/index.html` has links to `board/`, `coverage/` and `gaps/` in its button row.
+- [x] `.github/board/site/index.html` has links to `../`, `../coverage/` and `../gaps/` outside `nav.tabs`, and its `Tasks` and `Audit` tabs work as before: opening `?tree=../fixtures/tree.json` and `#audit` under `serve.cs` still shows both panels.
+- [x] `dotnet run --file .github/coverage/make-coverage-report.cs -- <a coverage JSON> <out dir> <sha>` writes an `index.html` containing links to `../`, `../board/` and `../gaps/`. Use the JSON `Measure-CodeQuality.ps1 -JsonPath` writes, or an existing fixture if the generator's folder has one.
+- [x] No page gains an external script, stylesheet or font.
 
 ## Notes
+
+- Viewer: `Board`, `Coverage`, `Gaps` buttons (`a.btn`) added before `GitHub` in the control row.
+- Board: a `span.site-links` (Gource · Coverage · Gaps, pushed right with `margin-left: auto`) inside `<header>`, outside `nav.tabs`; the tabs' markup and script are untouched, so `?tree=` and `#audit` behave as before (checked by reading: no script selects header links).
+- Coverage: the generator writes `<nav class="site">` (Gource · Board · Gaps) above the `h1`. Checked with `dotnet run --file .github/coverage/make-coverage-report.cs -- <minimal JSON> <dir> abc1234`: exit 0, the nav with `../`, `../board/`, `../gaps/` is in `index.html`. No fixture exists in the generator's folder, so a minimal JSON in a temp folder was used.
+- No external script, stylesheet or font added to any page.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Gource viewer, board and coverage report link to each other and to the gap dashboard
