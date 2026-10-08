@@ -9,7 +9,7 @@ touches: [Gap/Gap.shproj, Gap/Gap.projitems, Gap/README.md, Curl.slnx]
 model: sonnet
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1719 — Create the Gap shared project with a folder-map README and list it in Curl.slnx
 
@@ -61,14 +61,18 @@ folder holds the project files and this map.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Gap.shproj` and `Gap/Gap.projitems` exist. The `ProjectGuid` in the first equals the `SharedGUID` in the second, the glob is recursive, and both project files are excluded from it, as in `Audit/Audit.projitems`.
-- [ ] `Curl.slnx` lists `<Project Path="Gap/Gap.shproj" />` directly after `Audit/Audit.shproj`, with no solution folder around it, and its header comment names `Gap` among the shared projects.
-- [ ] `Gap/README.md` holds the opening paragraph citing ADR-0433 and the folder-map table above, with every row marked planned and its task ID.
-- [ ] `dotnet build Curl.slnx` succeeds with no new warnings, and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Gap/Gap.shproj` and `Gap/Gap.projitems` exist. The `ProjectGuid` in the first equals the `SharedGUID` in the second, the glob is recursive, and both project files are excluded from it, as in `Audit/Audit.projitems`.
+- [x] `Curl.slnx` lists `<Project Path="Gap/Gap.shproj" />` directly after `Audit/Audit.shproj`, with no solution folder around it, and its header comment names `Gap` among the shared projects.
+- [x] `Gap/README.md` holds the opening paragraph citing ADR-0433 and the folder-map table above, with every row marked planned and its task ID.
+- [x] `dotnet build Curl.slnx` succeeds with no new warnings, and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- The lane audit guard refuses any read of the audit office folder, so its `.projitems` could not be copied. `Gap.shproj` copies `Tasks/Tasks.shproj`; `Gap.projitems` writes the recursive take-every-file glob (`***`) with both project files excluded, as the task describes, and explains why the glob is load-bearing for this office. Default taken: the README table keeps the task's nine rows, each "Built by" cell `planned, BL-####`.
+- GUID {8AD9ABE3-ECE3-4DD6-A9F6-C0D86B3C82DF} is both `ProjectGuid` and `SharedGUID`. Build: 0 warnings, 0 errors; fast tests green.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Gap shared project, README folder map and Curl.slnx entry added; build clean, fast tests green
