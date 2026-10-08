@@ -54,6 +54,7 @@
   <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
   <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
   <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
+  <Project Path="Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj" />
   <Project Path="Curl.Console.UnitTests/Curl.Console.UnitTests.csproj" />
   <Project Path="Curl.Console/Curl.Console.csproj" />
   <Project Path="Curl.Cookies.UnitLibrary/Curl.Cookies.UnitLibrary.csproj" />
