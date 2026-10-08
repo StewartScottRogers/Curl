@@ -75,3 +75,4 @@ each rule above, plus a pass and a failure, and the matching fake `tests/data` f
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
