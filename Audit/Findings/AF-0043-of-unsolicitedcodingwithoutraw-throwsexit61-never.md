@@ -3,8 +3,8 @@ id: AF-0043
 title: Of_UnsolicitedCodingWithoutRaw_ThrowsExit61 never checks exit code 61
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
 key: quality:Curl.Protocol.Http.UnitTests/HttpResponseBodyFramingTests.cs:Of_UnsolicitedCodingWithoutRaw_ThrowsExit61:name-lies
 reproduction: none
 task: BL-1670
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0043 - Of_UnsolicitedCodingWithoutRaw_ThrowsExit61 never checks exit code 61
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Protocol.Http.UnitTests/HttpResponseBodyFramingTests.cs
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the Select-String reproduction: HttpResponseBodyFramingTests.cs:50 Of_UnsolicitedCodingWithoutRaw_ThrowsExit61() => Assert.ThrowsExactly<HttpTransferException>(...). The body never checks ExitCode 61 (BadContentEncoding).
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the Select-String. HttpResponseBodyFramingTests.cs:70-79 now ends with 'Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode);', and BadContentEncoding is exit 61.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.

@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | not re-audited | Ran the reproduction: small-get curl medianPeakWorkingSetBytes read 0 (it exited before the first memory sample) and the candidate read 9326592. A ratio against 0 cannot be formed, so the 2.017x claim can be neither confirmed nor refuted.
+
 ## Log
 
 - 2026-10-07: filed proposed.

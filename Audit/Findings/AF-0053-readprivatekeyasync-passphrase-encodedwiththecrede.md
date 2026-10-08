@@ -3,8 +3,8 @@ id: AF-0053
 title: ReadPrivateKeyAsync_Passphrase_EncodedWithTheCredentialEncoding uses an ASCII passphrase and only IsNotNull, so it cannot tell which encoding was used
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
 key: quality:Curl.Protocol.Ssh.UnitTests/Keys/SshUserKeySourceTests.cs:ReadPrivateKeyAsync_Passphrase_EncodedWithTheCredentialEncoding:name-lies
 reproduction: none
 task: BL-1680
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0053 - ReadPrivateKeyAsync_Passphrase_EncodedWithTheCredentialEncoding uses an ASCII passphrase and only IsNotNull, so it cannot tell which encoding was used
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Protocol.Ssh.UnitTests/Keys/SshUserKeySourceTests.cs,Cu
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the Select-String. The test now uses TestUserKeys.PassphraseWhoseUtf16BytesAreSecret with a UTF-16 (Encoding.Unicode) source. After Assert.IsNotNull(key) it does CollectionAssert.AreEqual(expected, key.PublicKey.Blob) (SshUserKeySourceTests.cs:111-125), so the wrong encoding would fail.
+
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.

@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The count of '(planned' in Audit/Instructions/Report-Format.md is 0; Test-Path Audit/Tools/Write-AuditFindings.ps1 is True. The tools are no longer called planned.
+
 ## Log
 
 - 2026-10-07: filed proposed.

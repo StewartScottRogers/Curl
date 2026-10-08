@@ -42,6 +42,8 @@ Select-String -Path Curl.Cli.UnitLibrary/README.md -SimpleMatch 'does not yet pa
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Select-String for 'does not yet pass on' in Curl.Cli.UnitLibrary/README.md found nothing; TransferContextFactory.cs:164 'MaxFileSize = options.MaxFileSize,' is still there. The false README sentence is gone.
+
 ## Log
 
 - 2026-10-07: filed proposed.

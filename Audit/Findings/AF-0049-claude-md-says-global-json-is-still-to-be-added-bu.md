@@ -43,6 +43,7 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the reproduction. Select-String still returns CLAUDE.md's line '- .NET Software Development Kit 10 (see `global.json` once added). Target framework: ...', and Test-Path global.json returns True. The document still says global.json is yet to be added although it exists.
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Select-String for 'global.json. once added' in CLAUDE.md returned no line; Test-Path global.json returned True. CLAUDE.md now says global.json pins SDK 10.0.401 with rollForward latestFeature, which matches the file.
 
 ## Log
 

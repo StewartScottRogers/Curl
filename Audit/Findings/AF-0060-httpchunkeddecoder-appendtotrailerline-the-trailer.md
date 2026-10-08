@@ -3,8 +3,8 @@ id: AF-0060
 title: HttpChunkedDecoder.AppendToTrailerLine: the trailer line limit 'Length + 1 >= MaximumTrailerLineLength' can become > with no test failing
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpChunkedDecoder.cs:AppendToTrailerLine-ge:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpChunkedDecoder.cs:221:>=
 task: BL-1703
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: mechanical
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0060 - HttpChunkedDecoder.AppendToTrailerLine: the trailer line limit 'Length + 1 >= MaximumTrailerLineLength' can become > with no test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the -Site command: killed at HttpChunkedDecoder.cs:221 ('trailerLine.Length + 1 >= MaximumTrailerLineLength' -> '>'). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

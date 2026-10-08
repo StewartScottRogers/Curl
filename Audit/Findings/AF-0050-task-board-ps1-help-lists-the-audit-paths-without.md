@@ -43,6 +43,7 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'path \(Au
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the reproduction. It matches task-board.ps1:19 'path (Audit, Audit/..., .claude/agents/audit-*), is never offered' and task-board.ps1:209 "'.github/workflows/ci.yml',". The help still lists only the three audit-path forms, while Test-AuditPath (lines 205-216) also treats the four guard files (.claude/hooks/guard-audit-paths.ps1, .claude/settings.json, .github/workflows/ci.yml, .claude/skills/task-board/task-board.ps1) as audit paths.
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The pattern for the old help text 'path (Audit, Audit/..., .claude/agents/audit-*)' no longer matches. Only the code line task-board.ps1:212 '.github/workflows/ci.yml', matched. The help (lines 18-22) now lists all four guard files: .claude/hooks/guard-audit-paths.ps1, .claude/settings.json, .github/workflows/ci.yml and .claude/skills/task-board/task-board.ps1.
 
 ## Log
 
