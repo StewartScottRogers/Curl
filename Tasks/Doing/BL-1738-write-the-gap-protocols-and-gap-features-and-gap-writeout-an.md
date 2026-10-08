@@ -61,3 +61,4 @@ Agents use `model: haiku` and `tools: Read, Grep, Glob, Bash`. Each body names
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
