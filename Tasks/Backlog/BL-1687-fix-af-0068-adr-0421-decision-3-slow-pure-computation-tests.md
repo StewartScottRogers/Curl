@@ -4,7 +4,7 @@ title: Fix AF-0068: ADR-0421 decision 3 (slow pure-computation tests become Long
 priority: Normal
 assignee: Claude
 pipeline: docs
-depends-on: []
+depends-on: [BL-1604]
 touches: [Documentation]
 requirement: none
 created: 2026-10-08
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+- 2026-10-07: The reproduction counts `TestCategory("LongRunning")` in `*.UnitTests`; only retagging the four Curl.Cryptography.UnitTests tests (BL-1604, in Doing on another lane, touching Curl.Cryptography.UnitTests) changes it. This task touches only Documentation, so it waits on BL-1604 and then verifies the reproduction gives 4.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Waits on BL-1604 (retags the four Curl.Cryptography.UnitTests slow tests LongRunning), which the reproduction needs
