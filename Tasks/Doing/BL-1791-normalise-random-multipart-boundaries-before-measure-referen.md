@@ -30,3 +30,4 @@ BL-1730's real run on 8.21.0 cases 1-80 reported test9, test39 and test44 as "re
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
