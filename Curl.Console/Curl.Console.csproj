@@ -24,6 +24,14 @@
     -->
     <PublishAot Condition=" '$(PublishAot)' == '' ">true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!--
+      A smaller native binary costs less to scan on each launch under Windows Defender's
+      on-access scanning (AF-0048). Together these take curl.exe from 17.0 MB to 13.7 MB;
+      the hand-built crypto and a loopback TLS GET stay within 5% of their speed, and
+      curl never prints a stack trace, so no output changes (BL-1749, ADR-0434).
+    -->
+    <OptimizationPreference>Size</OptimizationPreference>
+    <StackTraceSupport>false</StackTraceSupport>
     <!-- The source-generated LibraryImport marshalling of NativeExtendedAttributeWriter (ADR-0320). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
