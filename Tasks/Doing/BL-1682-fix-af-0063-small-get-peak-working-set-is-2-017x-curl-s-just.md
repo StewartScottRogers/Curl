@@ -85,3 +85,4 @@ The finding closes only when a later re-audit by the performance auditor confirm
 - 2026-10-07: Doing -> Backlog. Measured, not fixed: startup touches 5 MB of the AOT image; lazy protocol handlers save only 2.6% (see Notes); needs lazy handlers plus HTTP-path trimming, more than this run's budget
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Waits on BL-1715 (lazy per-scheme protocol handlers); then trim the remaining ~0.5 MB on the HTTP path
+- 2026-10-07: Backlog -> Doing.
