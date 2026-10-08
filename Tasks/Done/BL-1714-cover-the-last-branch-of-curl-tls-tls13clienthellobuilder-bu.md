@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1714 — Cover the last branch of Curl.Tls Tls13ClientHelloBuilder.BuildOptionalExtension
 
@@ -24,12 +24,16 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports no failing member in `Tls13ClientHelloBuilder`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary` reports no failing member in `Tls13ClientHelloBuilder`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The missed branch was the `_` arm for a type below `status_request` (5) other than `server_name` (0): the compiler splits the switch's code points at 5, and no test listed a fixed extension with code 1 to 4. `Tls13ClientHelloBuilderTests.AFixedExtensionBelowStatusRequestGoesAtItsPlaceInTheOrder` (a fixed `max_fragment_length`, code 1) covers it.
+- Full branch coverage then left the method failing on complexity (14 > 10), so `status_request` and `post_handshake_auth` moved to `BuildStatusOrPostHandshakeAuthExtension`, the chained-switch style the builder already uses. `Measure-CodeQuality.ps1 -Library Curl.Tls.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. BuildOptionalExtension fully covered; Curl.Tls has no failing member
