@@ -44,6 +44,22 @@ public sealed class SshZlibDecompressorTests
     }
 
     [TestMethod]
+    public void Decompress_HeaderAskingForAPresetDictionary_ThrowsInvalidDataExceptionNotZLibException()
+    {
+        // AF-0062: 78 20 sets FDICT, which the BCL inflater refuses with its internal
+        // ZLibException, an IOException, rather than an InvalidDataException.
+        SshZlibDecompressor decompressor = new();
+        Diagnostics.Arrange("packet", "78 20 12 61 64 62 66 61");
+
+        InvalidDataException exception = Assert.ThrowsExactly<InvalidDataException>(() => decompressor.Decompress([0x78, 0x20, 0x12, 0x61, 0x64, 0x62, 0x66, 0x61]));
+
+        Diagnostics.Act("exception", exception.Message);
+        Diagnostics.Diff("exception", "The SSH packet is not a valid continuation of the zlib stream.", exception.Message);
+        Assert.AreEqual("The SSH packet is not a valid continuation of the zlib stream.", exception.Message);
+        Assert.IsInstanceOfType<IOException>(exception.InnerException);
+    }
+
+    [TestMethod]
     public void Decompress_BytesThatCompleteNoPayloadByte_Throws()
     {
         SshZlibDecompressor decompressor = new();

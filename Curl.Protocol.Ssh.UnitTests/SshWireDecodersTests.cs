@@ -76,6 +76,20 @@ public sealed class SshWireDecodersTests
     }
 
     [TestMethod]
+    public void TryInflatePayload_HeaderAskingForAPresetDictionary_ReturnsFalse()
+    {
+        // The fuzzer's saved input ssh-1.bin from AF-0062: its header 78 20 sets FDICT.
+        byte[] bytes = Convert.FromHexString(
+            "78201261646266616563e7e0e4e2e6e1e5e31760606050492e2d2a4b35323535b4d42dce48343235d3494d4ec900b375f3328b4b0a8c4ccd181818248a8b33745353c00a758a8a13210a20721a89a9c5864616bac925453ac91989c919894606ba05f93995564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe246551");
+        ArrangeBytes("zlib header with FDICT set (AF-0062)", bytes);
+
+        bool inflated = SshWireDecoders.TryInflatePayload(bytes);
+
+        AssertResult("TryInflatePayload", false, inflated);
+        Assert.IsFalse(inflated);
+    }
+
+    [TestMethod]
     public void TryDecodeKexInit_WholeKexInit_ReturnsTrue()
     {
         ArrangeBytes("empty SSH_MSG_KEXINIT", EmptyKexInit);

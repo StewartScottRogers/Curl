@@ -43,7 +43,7 @@ internal sealed class SshZlibDecompressor
         input.Position = 0;
         using MemoryStream payload = new();
         int read;
-        while ((read = inflater.Read(block)) > 0)
+        while ((read = ReadInflated()) > 0)
         {
             payload.Write(block, 0, read);
             if (payload.Length > MaximumPayloadLength)
@@ -53,5 +53,24 @@ internal sealed class SshZlibDecompressor
         }
 
         return payload.Length > 0 ? payload.ToArray() : throw new InvalidDataException("The SSH packet inflates to no payload.");
+    }
+
+    /// <summary>
+    /// Reads the inflater's next block, turning the BCL's internal <c>ZLibException</c> - an
+    /// <see cref="IOException" /> it throws for a header asking for a preset dictionary, among
+    /// others - into the <see cref="InvalidDataException" /> every other corrupt stream raises.
+    /// </summary>
+    /// <returns>The number of bytes read into the block; 0 once the piece is spent.</returns>
+    /// <exception cref="InvalidDataException">The bytes are not a valid continuation of the stream.</exception>
+    private int ReadInflated()
+    {
+        try
+        {
+            return inflater.Read(block);
+        }
+        catch (IOException exception)
+        {
+            throw new InvalidDataException("The SSH packet is not a valid continuation of the zlib stream.", exception);
+        }
     }
 }
