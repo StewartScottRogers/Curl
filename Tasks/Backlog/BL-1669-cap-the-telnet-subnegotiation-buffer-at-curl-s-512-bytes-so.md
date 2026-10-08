@@ -1,5 +1,5 @@
 ---
-id: BL-1665
+id: BL-1669
 title: Cap the telnet subnegotiation buffer at curl's 512 bytes so a server sending SB without SE cannot grow memory without limit
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1665 — Cap the telnet subnegotiation buffer at curl's 512 bytes so a server sending SB without SE cannot grow memory without limit
+# BL-1669 — Cap the telnet subnegotiation buffer at curl's 512 bytes so a server sending SB without SE cannot grow memory without limit
 
 ## Goal
 

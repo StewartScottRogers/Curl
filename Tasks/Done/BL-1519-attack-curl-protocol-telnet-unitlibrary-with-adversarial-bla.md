@@ -40,7 +40,7 @@ All new tests are in `Curl.Protocol.Telnet.UnitTests/TelnetProtocolHandlerAdvers
 - **Invalid partitions** (server replies in states that do not expect them) - `ExecuteAsync_DoForAnUnknownOptionRepeated_IsRefusedEachTime`, `ExecuteAsync_DisableForAnOptionNeverEnabled_IsNotAnswered` (3 rows), `ExecuteAsync_ServerRefusesEveryOffer_SendsNothingMore`, `ExecuteAsync_TerminalTypeSubnegotiationBeforeAnyNegotiation_IsAnsweredWithoutOffers`.
 - **State and concurrency** - `ExecuteAsync_MixedStreamOneBytePerRead_WritesWhatTheWholeReadWrites`, `ExecuteAsync_MixedStreamSplitAtEveryOffset_WritesWhatTheWholeReadWrites`, `ExecuteAsync_MixedStreamInRandomPieces_WritesWhatTheWholeReadWrites` (seeded `Random(1519)`, 50 rounds), `ExecuteAsync_NegotiationSplitOneBytePerRead_IsAnsweredOnceThenOffers`, `ExecuteAsync_ServerTogglesEchoAHundredTimes_AnswersEachToggleOnceAndOffersOnce` (negotiation loop stays bounded), `ExecuteAsync_ServerRepeatsDoBinaryAfterAgreeing_IsNotAnsweredAgain`, `ExecuteAsync_OneHandlerRunsManySessionsAtOnce_EachMatchesASessionRunAlone` (32 sessions on one handler), `ExecuteAsync_SameHandlerRunTwiceInARow_StartsTheSecondSessionAfresh`. Time and cancellation are already covered by `TelnetProtocolHandlerMaxTimeTests` and `ExecuteAsync_Cancelled_Throws`.
 
-Defects found: **BL-1665** (High) - `TelnetReceiver` keeps every subnegotiation byte with no limit, so a server sending `IAC SB` without `IAC SE` grows memory without bound; curl caps its buffer at 512 bytes. No test was committed for it (it lands with the fix). No input over 1 MiB, so nothing is `Integration`.
+Defects found: **BL-1669** (High) - `TelnetReceiver` keeps every subnegotiation byte with no limit, so a server sending `IAC SB` without `IAC SE` grows memory without bound; curl caps its buffer at 512 bytes. No test was committed for it (it lands with the fix). No input over 1 MiB, so nothing is `Integration`.
 
 Test count (`dotnet test Curl.Protocol.Telnet.UnitTests --filter "TestCategory!=Integration"`): 229 before (226 passed, 3 skipped off-Windows), 271 after (268 passed, same 3 skipped).
 
@@ -48,4 +48,4 @@ Test count (`dotnet test Curl.Protocol.Telnet.UnitTests --filter "TestCategory!=
 
 - 2026-10-06: Created.
 - 2026-10-07: Backlog -> Doing.
-- 2026-10-07: Doing -> Done. Telnet handler attacked in 42 new adversarial tests across all four families; SB-without-SE unbounded buffer filed as BL-1665
+- 2026-10-07: Doing -> Done. Telnet handler attacked in 42 new adversarial tests across all four families; SB-without-SE unbounded buffer filed as BL-1669
