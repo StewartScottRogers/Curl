@@ -84,3 +84,4 @@ to end with the report block.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
