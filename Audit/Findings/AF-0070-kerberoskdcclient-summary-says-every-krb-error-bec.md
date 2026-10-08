@@ -42,6 +42,8 @@ Select-String -Path Curl.Kerberos.UnitLibrary/KerberosKdcClient.cs -SimpleMatch 
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The reproduction still finds KerberosKdcClient.cs:186 'if (error.ErrorCode != KerberosErrorMessage.PreAuthenticationRequired)', but the class summary (lines 13-16) now reads 'Every KRB-ERROR becomes a KerberosKdcException, except the KDC_ERR_PREAUTH_REQUIRED answering the first AS-REQ, which instead sends a second AS-REQ with PA-ENC-TIMESTAMP ...'. The doc and the code agree.
+
 ## Log
 
 - 2026-10-07: filed proposed.

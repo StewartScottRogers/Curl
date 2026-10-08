@@ -3,8 +3,8 @@ id: AF-0062
 title: Hostile zlib-compressed SSH payload throws ZLibException out of SshZlibDecompressor.Decompress and SshWireDecoders.TryInflatePayload instead of a refusal
 auditor: security
 severity: Critical
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
 key: security:Curl.Protocol.Ssh.UnitLibrary/Compression/SshZlibDecompressor.cs:SshZlibDecompressor.Decompress:fuzz-crash
 reproduction: none
 task: BL-1681
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0062 - Hostile zlib-compressed SSH payload throws ZLibException out of SshZlibDecompressor.Decompress and SshWireDecoders.TryInflatePayload instead of a refusal
 
@@ -42,7 +42,10 @@ dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target ssh --iterations 200000 --seed 2
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target ssh --iterations 200000 --seed 264985340 --out <scratch>\fuzz-ssh-af0062 from the audited tree root: 'ssh: iterations 200000, inputs/s 21912, crashes 0, hangs 0, saved 0', exit code 0. No ZLibException or other exception escaped SshZlibDecompressor.Decompress or SshWireDecoders.TryInflatePayload. A further 1,000,000-input ssh run (seed 1158) and the method's 200,000-input run (seed 70867401) also saved nothing.
+
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.

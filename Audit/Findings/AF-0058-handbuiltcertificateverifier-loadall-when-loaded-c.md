@@ -3,8 +3,8 @@ id: AF-0058
 title: HandBuiltCertificateVerifier.LoadAll: 'when (loaded.Count > 0)' can become >= 0 with no test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs:LoadAll-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs:82:>
 task: BL-1701
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: mechanical
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0058 - HandBuiltCertificateVerifier.LoadAll: 'when (loaded.Count > 0)' can become >= 0 with no test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the -Site command: killed at HandBuiltCertificateVerifier.cs:82 ('when (loaded.Count > 0)' -> '>= 0'). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

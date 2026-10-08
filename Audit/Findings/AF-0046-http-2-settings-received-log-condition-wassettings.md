@@ -3,8 +3,8 @@ id: AF-0046
 title: HTTP/2 'SETTINGS received' log condition `!wasSettingsReceived && Frames.IsPeerSettingsReceived` can become || with no test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/Http2Session.cs:LogPeerConnectionFrames-and:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/Http2Session.cs:432:&&
 task: BL-1673
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: mechanical
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0046 - HTTP/2 'SETTINGS received' log condition `!wasSettingsReceived && Frames.IsPeerSettingsReceived` can become || with no test failing
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_1336.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction: resolvedLine 432, outcome survived. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the -Site command: killed at Http2Session.cs:432 ('!wasSettingsReceived && Frames.IsPeerSettingsReceived' -> '||'). Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

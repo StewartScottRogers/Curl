@@ -45,6 +45,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: yes | Seed-0 mutation run: CertificateRevocationListFile.cs:116 `<` to `<=` survived.
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | CertificateRevocationListFile.cs:117 now reads 'list.NextUpdate <= now'. By hand, same method as AF-0006: the reverse mutant '<=' -> '<' is killed by Refusal_AtTheListsExpiryMoment_HasExpired, so the expiry boundary is now pinned.
 - 2026-10-07 | 2026-10-07_1336.md | not re-audited | Ran the -Site reproduction: outcome site-missing, so no mutant ran. DateRefusal now reads 'return list.NextUpdate <= now ? ...' (CertificateRevocationListFile.cs:117, with a comment citing OpenSSL's X509_cmp_time), so the '<' site no longer exists. Not re-audited.
+- 2026-10-08 | 2026-10-08_0748.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null. DateRefusal now reads 'return list.NextUpdate <= now ? ... : null;' at CertificateRevocationListFile.cs:117, so the '<' site is gone. As extra evidence, -Site ...CertificateRevocationListFile.cs:117:<= (back to '<') was killed. Under the method a site-missing outcome is reported as not re-audited.
 
 ## Log
 

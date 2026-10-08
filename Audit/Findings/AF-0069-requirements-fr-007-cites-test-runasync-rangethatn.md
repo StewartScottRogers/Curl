@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The count is still 0: the test does not exist. But FR-007 (Requirements.md:40) no longer cites it. It now cites CurlCommandRunnerRangeTextHandOffTests.RunAsync_SilentVerboseFileRangeThatNamesNoRange_ShutsDownTheConnectionAndExits33 and CurlCommandRunnerTransferOptionTests.RunAsync_HttpRangeThatNamesNoRange_DispatchesTheTextAsTyped, and both exist (CurlCommandRunnerRangeTextHandOffTests.cs:39, CurlCommandRunnerTransferOptionTests.cs:75).
+
 ## Log
 
 - 2026-10-07: filed proposed.

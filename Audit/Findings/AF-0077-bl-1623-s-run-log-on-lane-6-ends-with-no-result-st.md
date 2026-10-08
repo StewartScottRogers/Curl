@@ -3,8 +3,8 @@ id: AF-0077
 title: BL-1623's run log on lane 6 ends with no result: still writing tests when the logs were copied
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
 key: process:logs:BL-1623:unfinished-run
 reproduction: none
 task: BL-1696
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0077 - BL-1623's run log on lane 6 ends with no result: still writing tests when the logs were copied
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the reproduction: unfinishedRuns is empty. DarkFactory-20261007-111121-L6.log shows BL-1623 claimed 13:32:58, commit 13:45:43, end 13:45:53 (57 turns, 12.8 min), pushed and DONE 13:58:02; its run log ends with a success result.
+
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
