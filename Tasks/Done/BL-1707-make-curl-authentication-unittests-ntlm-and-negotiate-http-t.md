@@ -8,7 +8,7 @@ depends-on: [BL-1457, BL-1706]
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1707 — Make Curl.Authentication.UnitTests NTLM and Negotiate HTTP tests write descriptive diagnostic output
 
@@ -35,17 +35,22 @@ Every test in the files named below writes, through BL-1457's shared `TestDiagno
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test in this task's files, and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints no line for a test in this task's files: each wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in this task's files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean and `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Authentication.UnitTests/` and this task file.
-- [ ] Notes list every test in this task's files that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test in this task's files, and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints no line for a test in this task's files: each wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in this task's files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean and `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Authentication.UnitTests/` and this task file.
+- [x] Notes list every test in this task's files that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 81 test methods in the files above.
+- Before -> after (`Assert.`, `[TestMethod`, `[DataRow(`), unchanged in every file: NegotiateHttpAuthenticatorTests 63/34/30; NtlmHttpAuthenticatorTests 45/20/19; NtlmHttpAuthenticatorTests.VerboseLines 18/13/14; NtlmInNegotiateTests 5/5/4; NegotiateEmptyChallengeMessageTests 23/7/14; NegotiateFailureLinesTests 2/2/8. Run total 819 before and after (815 passed, 4 skipped by OSCondition).
+- All 134 `END` lines of these five classes (81 methods with data rows expanded) show non-zero arrange, act and assert counts.
+- Exception tests now keep the exception `Assert.ThrowsExactly(Async)` returns, to print its message; what they assert is unchanged. `TestContext` is declared once for the partial `NtlmHttpAuthenticatorTests`. No helper fake changed.
+- SLOW: none of these tests printed a `SLOW:` line; no follow-up filed.
 
 ## Log
 
 - 2026-10-07: Created, split from BL-1458.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every NTLM and Negotiate HTTP test writes ARRANGE, ACT and ASSERT/DIFF lines through TestDiagnostics

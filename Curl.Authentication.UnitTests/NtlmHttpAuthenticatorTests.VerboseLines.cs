@@ -1,6 +1,7 @@
 using System.Net;
 using Curl.Ntlm;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -20,16 +21,30 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(true, DisplayName = "SSPI")]
     public async Task CreateAuthorizationAsync_BareNtlmAfterType3_ReportsHandshakeRejectedThenProblem(bool matchesSspiBuild)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("matches SSPI build", matchesSspiBuild);
+        diagnostics.Arrange("value sent", SentType3);
+        diagnostics.Arrange("server challenge", "NTLM");
+
         List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild, SentType3, sentBeforeAnyChallenge: false, "NTLM");
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Diff("verbose lines", "NTLM handshake rejected | NTLM authentication problem, ignoring.", string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { "NTLM handshake rejected", "NTLM authentication problem, ignoring." }, lines);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_BareNtlmAfterType1AnsweringAChallenge_ReportsInternalErrorThenProblem()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("matches SSPI build", true);
+        diagnostics.Arrange("value sent", SentType1);
+        diagnostics.Arrange("server challenge", "NTLM");
+
         List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild: true, SentType1, sentBeforeAnyChallenge: false, "NTLM");
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Diff("verbose lines", "NTLM handshake failure (internal error) | NTLM authentication problem, ignoring.", string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { "NTLM handshake failure (internal error)", "NTLM authentication problem, ignoring." }, lines);
     }
 
@@ -38,26 +53,45 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow("Basic realm=\"r\"", DisplayName = "No NTLM challenge after Type 3")]
     public async Task CreateAuthorizationAsync_NonBareChallengeAfterType3_ReportsNothing(string challenge)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("value sent", SentType3);
+        diagnostics.Arrange("server challenge", challenge);
+
         List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild: false, SentType3, sentBeforeAnyChallenge: false, challenge);
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Assert("verbose line count", 0, lines.Count);
         Assert.IsEmpty(lines);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_NoNtlmChallengeAfterType1AnsweringAChallenge_ReportsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("value sent", SentType1);
+        diagnostics.Arrange("server challenge", "Basic realm=\"r\"");
+
         List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: false, "Basic realm=\"r\"");
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Assert("verbose line count", 0, lines.Count);
         Assert.IsEmpty(lines);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_BareNtlmToType1SentBeforeAnyChallenge_ReportsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("value sent", SentType1);
+        diagnostics.Arrange("sent before any challenge", true);
+        diagnostics.Arrange("server challenge", "NTLM");
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1)));
 
         List<string> lines = await LinesAsync(contexts, matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: true, "NTLM");
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Assert("verbose line count", 0, lines.Count);
         Assert.IsEmpty(lines);
     }
 
@@ -66,32 +100,53 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(true, DisplayName = "SSPI")]
     public async Task CreateAuthorizationAsync_ChallengeNotBase64_ReportsProblemAlone(bool matchesSspiBuild)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("matches SSPI build", matchesSspiBuild);
+        diagnostics.Arrange("value sent", SentType1);
+        diagnostics.Arrange("server challenge", "NTLM @@@notbase64");
+
         List<string> lines = await LinesAsync(new ScriptedSecurityContextFactory(), matchesSspiBuild, SentType1, sentBeforeAnyChallenge: true, "NTLM @@@notbase64");
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Diff("verbose lines", "NTLM authentication problem, ignoring.", string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { "NTLM authentication problem, ignoring." }, lines);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_Type2CurlsOwnNtlmCannotRead_ReportsBadType2ThenProblem()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("value sent", SentType1);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Arrange("scripted statuses", "ContinueNeeded, MalformedToken");
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
 
         List<string> lines = await LinesAsync(contexts, matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: true, Type2Challenge);
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Diff("verbose lines", "NTLM handshake failure (bad type-2 message) | NTLM authentication problem, ignoring.", string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { "NTLM handshake failure (bad type-2 message)", "NTLM authentication problem, ignoring." }, lines);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_Type2Answered_ReportsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("value sent", SentType1);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Bytes("scripted Type 1", Type1);
+        diagnostics.Bytes("scripted Type 3", [1, 2, 3]);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.Completed, [1, 2, 3])));
 
         List<string> lines = await LinesAsync(contexts, matchesSspiBuild: true, SentType1, sentBeforeAnyChallenge: true, Type2Challenge);
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Assert("verbose line count", 0, lines.Count);
         Assert.IsEmpty(lines);
     }
 
@@ -108,6 +163,11 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(SecurityContextStatus.Refused, "0x8009030c", DisplayName = "SEC_E_LOGON_DENIED")]
     public async Task CreateAuthorizationAsync_SspiRefusesType2_ReportsType3FailureBeforeExit94(SecurityContextStatus status, string code)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("scripted status", status);
+        diagnostics.Arrange("expected code", code);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(status, [])));
@@ -117,6 +177,10 @@ public sealed partial class NtlmHttpAuthenticatorTests
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(events), SentType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Act("verbose lines", string.Join(" | ", events.Info));
+        diagnostics.Assert("exit code", CurlExitCode.AuthError, failure.ExitCode);
+        diagnostics.Diff("verbose lines", $"NTLM handshake failure (type-3 message): Status={code}\n", string.Join(" | ", events.Info));
         Assert.AreEqual(CurlExitCode.AuthError, failure.ExitCode);
         CollectionAssert.AreEqual(new[] { $"NTLM handshake failure (type-3 message): Status={code}\n" }, events.Info);
     }
@@ -124,15 +188,23 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_Type3TooLargeForCurlsOwnNtlm_ReportsNothingBeforeExit100()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("matches SSPI build", false);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        diagnostics.Arrange("scripted statuses", "ContinueNeeded, Refused");
+        diagnostics.Bytes("scripted Type 1", Type1);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.Refused, [])));
         RecordingInfoEvents events = new();
         NtlmHttpAuthenticator authenticator = new(contexts, matchesSspiBuild: false);
 
-        await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+        var failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(events), SentType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Act("verbose lines", string.Join(" | ", events.Info));
+        diagnostics.Assert("verbose line count", 0, events.Info.Count);
         Assert.IsEmpty(events.Info);
     }
 
@@ -147,8 +219,16 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(40, 8, 56, DisplayName = "Target info offset inside the header")]
     public async Task CreateAuthorizationAsync_Type2TargetInfoOutOfRange_ReportsTargetInfoThenBadType2(int offset, int length, int messageLength)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("target info offset", offset);
+        diagnostics.Arrange("target info length", length);
+        diagnostics.Arrange("message length", messageLength);
+
         List<string> lines = await LinesAsync(new HandBuiltNtlmContexts(), matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: true, ChallengeWithTargetInformationAt(offset, length, messageLength));
 
+        string expected = "NTLM handshake failure (bad type-2 message). Target Info Offset Len is set incorrect by the peer | NTLM handshake failure (bad type-2 message) | NTLM authentication problem, ignoring.";
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Diff("verbose lines", expected, string.Join(" | ", lines));
         CollectionAssert.AreEqual(
             new[]
             {
@@ -168,24 +248,36 @@ public sealed partial class NtlmHttpAuthenticatorTests
     [DataRow(false, DisplayName = "Wrong signature")]
     public async Task CreateAuthorizationAsync_Type2TooShortOrWrongSignature_ReportsBadType2Alone(bool tooShort)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("too short", tooShort);
         byte[] measured = Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.MeasuredChallenge);
         byte[] challenge = tooShort ? measured[..(NtlmChallengeMessage.MinimumLength - 1)] : measured;
         challenge[0] = tooShort ? challenge[0] : (byte)'X';
+        diagnostics.Bytes("server challenge", challenge);
 
         List<string> lines = await LinesAsync(new HandBuiltNtlmContexts(), matchesSspiBuild: false, SentType1, sentBeforeAnyChallenge: true, "NTLM " + Convert.ToBase64String(challenge));
 
+        diagnostics.Act("verbose lines", string.Join(" | ", lines));
+        diagnostics.Diff("verbose lines", "NTLM handshake failure (bad type-2 message) | NTLM authentication problem, ignoring.", string.Join(" | ", lines));
         CollectionAssert.AreEqual(new[] { "NTLM handshake failure (bad type-2 message)", "NTLM authentication problem, ignoring." }, lines);
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_Type2TargetInfoOutOfRangeWithSspi_ReportsOnlyTheType3Failure()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("matches SSPI build", true);
+        diagnostics.Arrange("target info", "offset 48, length 16, message length 48");
         RecordingInfoEvents events = new();
         NtlmHttpAuthenticator authenticator = new(new HandBuiltNtlmContexts(), matchesSspiBuild: true);
 
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(events), SentType1, sentBeforeAnyChallenge: true, [ChallengeWithTargetInformationAt(48, 16, 48)], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Act("verbose lines", string.Join(" | ", events.Info));
+        diagnostics.Assert("exit code", CurlExitCode.AuthError, failure.ExitCode);
+        diagnostics.Diff("verbose lines", "NTLM handshake failure (type-3 message): Status=0x80090308\n", string.Join(" | ", events.Info));
         Assert.AreEqual(CurlExitCode.AuthError, failure.ExitCode);
         CollectionAssert.AreEqual(new[] { "NTLM handshake failure (type-3 message): Status=0x80090308\n" }, events.Info);
     }

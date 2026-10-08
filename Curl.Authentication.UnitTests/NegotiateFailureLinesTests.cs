@@ -1,4 +1,5 @@
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -9,6 +10,8 @@ namespace Curl.Authentication;
 [TestClass]
 public sealed class NegotiateFailureLinesTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(SecurityContextStatus.NoCredentials, "InitializeSecurityContext failed: SEC_E_NO_CREDENTIALS (0x8009030e) - No credentials are available in the security package")]
     [DataRow(SecurityContextStatus.NoMechanism, "InitializeSecurityContext failed: SEC_E_SECPKG_NOT_FOUND (0x80090305) - The requested security package does not exist")]
@@ -16,6 +19,14 @@ public sealed class NegotiateFailureLinesTests
     [DataRow(SecurityContextStatus.MalformedToken, "InitializeSecurityContext failed: SEC_E_INVALID_TOKEN (0x80090308) - The token supplied to the function is invalid")]
     public void For_SspiWording_NamesTheSspiStatus(SecurityContextStatus status, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("status", status);
+        diagnostics.Arrange("words as SSPI", true);
+
+        string line = NegotiateFailureLines.For(status, wordsAsSspi: true);
+
+        diagnostics.Act("line", line);
+        diagnostics.Diff("line", expected, line);
         Assert.AreEqual(expected, NegotiateFailureLines.For(status, wordsAsSspi: true));
     }
 
@@ -26,6 +37,14 @@ public sealed class NegotiateFailureLinesTests
     [DataRow(SecurityContextStatus.MalformedToken, "gss_init_sec_context() failed: Invalid token was supplied. ")]
     public void For_GssApiWording_GivesTheGssApiMessages(SecurityContextStatus status, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("status", status);
+        diagnostics.Arrange("words as SSPI", false);
+
+        string line = NegotiateFailureLines.For(status, wordsAsSspi: false);
+
+        diagnostics.Act("line", line);
+        diagnostics.Diff("line", expected, line);
         Assert.AreEqual(expected, NegotiateFailureLines.For(status, wordsAsSspi: false));
     }
 }
