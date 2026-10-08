@@ -39,3 +39,4 @@ BL-1281 changed `RunDarkFactory.ps1`: a failed claim push is traced as `race` (a
 ## Log
 
 - 2026-10-02: Created.
+- 2026-10-08: Backlog -> Doing.

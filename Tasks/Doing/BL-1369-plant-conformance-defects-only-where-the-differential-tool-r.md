@@ -34,3 +34,4 @@ Every planted conformance defect is reachable by the conformance auditor's gener
 ## Log
 
 - 2026-10-03: Created.
+- 2026-10-08: Backlog -> Doing.

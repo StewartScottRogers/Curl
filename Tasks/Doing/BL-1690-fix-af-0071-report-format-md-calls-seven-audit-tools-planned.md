@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. The fix edits an audit-office file, which lanes may not touch (ADR-0267); marked lane: no for an interactive session on the audit branch
+- 2026-10-08: Backlog -> Doing.
