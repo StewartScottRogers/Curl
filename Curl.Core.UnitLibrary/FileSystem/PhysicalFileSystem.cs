@@ -152,32 +152,30 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// <remarks>
     /// Every exception <see cref="FileOpenFailure.IsOpenFailure(Exception)" /> names, such as
     /// the <see cref="FileNotFoundException" /> of a missing file, is reported as
-    /// <see langword="false" />, with the error code
-    /// <see cref="FileOpenFailure.Win32ErrorCodeOf(Exception)" /> reads from it. A time
-    /// <see cref="DateTime" /> cannot hold, past year 9999 or before year 1, and every time
-    /// off Windows, is set by <see cref="NativeFileTimeSetter" /> with the operating system's
-    /// own call, so off Windows <paramref name="errorCode" /> is <c>utimes</c>'s <c>errno</c>, which
-    /// curl's POSIX build prints with <c>strerror</c> (BL-1433).
+    /// <see langword="false" /> and <see cref="FileTimeFailedStep.Open" />, with the error code
+    /// <see cref="FileOpenFailure.Win32ErrorCodeOf(Exception)" /> reads from it. Every time is
+    /// set by <see cref="NativeFileTimeSetter" /> with the operating system's own call, which
+    /// opens the file and stamps it in two steps on Windows, so a refused time is
+    /// <see cref="FileTimeFailedStep.SetTime" /> with <c>SetFileTime</c>'s error code (BL-1453);
+    /// off Windows <paramref name="errorCode" /> is <c>utimes</c>'s <c>errno</c>, which curl's
+    /// POSIX build prints with <c>strerror</c> (BL-1433).
     /// </remarks>
-    public bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode)
+    public bool TrySetLastWriteUnixSeconds(string path, long unixSeconds, out int errorCode, out FileTimeFailedStep failedStep)
     {
+        bool set;
         try
         {
-            if (NativeFileTimeSetter.IsNeededFor(unixSeconds))
-            {
-                return NativeFileTimeSetter.TrySetLastWriteUnixSeconds(path, unixSeconds, out errorCode);
-            }
-
-            File.SetLastWriteTimeUtc(path, DateTimeOffset.FromUnixTimeSeconds(unixSeconds).UtcDateTime);
+            set = NativeFileTimeSetter.TrySetLastWriteUnixSeconds(path, unixSeconds, out errorCode);
         }
         catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
         {
             errorCode = FileOpenFailure.Win32ErrorCodeOf(exception);
+            failedStep = FileTimeFailedStep.Open;
             return false;
         }
 
-        errorCode = 0;
-        return true;
+        failedStep = set ? FileTimeFailedStep.None : FileTimeFailedStep.SetTime;
+        return set;
     }
 
     /// <summary>
