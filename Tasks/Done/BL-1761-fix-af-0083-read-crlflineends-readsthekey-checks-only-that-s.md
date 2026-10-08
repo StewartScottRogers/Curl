@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1761 — Fix AF-0083: Read_CrLfLineEnds_ReadsTheKey checks only that some key came back, not that it is the RSA key in the file
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts what `Read_RsaKeyInEachFormat_ReadsTheKeyOfItsPublicKeyFile` asserts: an `RsaSshPrivateKey` of type `ssh-rsa` whose public blob equals `TestUserKeys.RsaPublicKeyFile`'s. A CR left in the base64 or DER would now change the blob and fail it. Name kept, so the finding's reproduction still finds it.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. CRLF test now compares the RSA public key blob and type with TestUserKeys.RsaPublicKeyFile

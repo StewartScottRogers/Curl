@@ -294,13 +294,16 @@ public sealed class SshPrivateKeyReaderTests
     public void Read_CrLfLineEnds_ReadsTheKey()
     {
         string text = TestUserKeys.RsaPkcs1.Replace("\n", "\r\n", StringComparison.Ordinal);
+        byte[] expected = SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob;
         Diagnostics.ArrangeText("key file", text);
 
         SshPrivateKey? key = SshPrivateKeyReader.Read(text, []);
 
         Diagnostics.ActKey(key);
-        Diagnostics.Assert("key read", true, key is not null);
-        Assert.IsNotNull(key);
+        Diagnostics.AssertBytes("public key blob", expected, key?.PublicKeyBlob);
+        Assert.IsInstanceOfType<RsaSshPrivateKey>(key);
+        Assert.AreEqual("ssh-rsa", key.KeyType);
+        CollectionAssert.AreEqual(expected, key.PublicKeyBlob);
     }
 
     [TestMethod]
