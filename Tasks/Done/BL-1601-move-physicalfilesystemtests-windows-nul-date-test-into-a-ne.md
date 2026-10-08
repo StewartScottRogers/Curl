@@ -8,7 +8,7 @@ depends-on: [BL-1597]
 touches: [Curl.Core.UnitTests, Curl.Core.IntegrationTests, Curl.slnx]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1601 — Move PhysicalFileSystemTests' Windows NUL date test into a new Curl.Core.IntegrationTests project
 
@@ -29,16 +29,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Core.IntegrationTests/Curl.Core.IntegrationTests.csproj` exists, matches the template's shape, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Core.UnitLibrary`.
-- [ ] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Core.UnitTests --include=*.cs` finds nothing, every `[TestMethod]` in `Curl.Core.IntegrationTests` carries `[TestCategory("Integration")]`, and `PhysicalFileSystemTests`' class doc comment says where the NUL pin lives.
-- [ ] `dotnet build -warnaserror` at the repository root is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `dotnet test Curl.Core.IntegrationTests --filter "TestCategory=Integration"` runs `OpenForReadAsync_WindowsNullDevice_ReportsCurlsMeasuredLastModifiedDate` and it passes on Windows.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Core.UnitLibrary`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
+- [x] `Curl.Core.IntegrationTests/Curl.Core.IntegrationTests.csproj` exists, matches the template's shape, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Core.UnitLibrary`.
+- [x] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Core.UnitTests --include=*.cs` finds nothing, every `[TestMethod]` in `Curl.Core.IntegrationTests` carries `[TestCategory("Integration")]`, and `PhysicalFileSystemTests`' class doc comment says where the NUL pin lives.
+- [x] `dotnet build -warnaserror` at the repository root is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet test Curl.Core.IntegrationTests --filter "TestCategory=Integration"` runs `OpenForReadAsync_WindowsNullDevice_ReportsCurlsMeasuredLastModifiedDate` and it passes on Windows.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Core.UnitLibrary`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
 
 ## Notes
+
+- Nothing from `Curl.Testing` beyond the shared `TestDiagnostics` (linked by `Directory.Build.props`) was needed, so no `Compile Link` and no reference to `Curl.Core.UnitTests`. `ActResult` was copied; the original stays because 20-odd unit tests still call it.
+- Coverage of `Curl.Core.UnitLibrary` (Measure-CodeQuality -Library, 2026-10-07 20:19): after the move 100% line, 100% branch, 577 members, 0 failing, worst CRAP 10. Before is the same by construction: coverage is measured from the `TestCategory!=Integration` run, which already excluded this test, so the fast tests that run are unchanged; not re-measured to save the 30-minute run.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. NUL date pin moved to new Curl.Core.IntegrationTests; build clean, fast tests green, Core coverage 100/100
