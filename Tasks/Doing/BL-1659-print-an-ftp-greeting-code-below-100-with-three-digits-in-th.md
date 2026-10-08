@@ -31,3 +31,4 @@ An `ftp://` greeting whose code is below 100, such as `099 Odd`, fails with exit
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
