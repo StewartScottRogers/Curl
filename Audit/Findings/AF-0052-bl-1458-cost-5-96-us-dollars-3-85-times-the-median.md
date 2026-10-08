@@ -3,12 +3,12 @@ id: AF-0052
 title: BL-1458 cost 5.96 US dollars, 3.85 times the median run, and stopped at the per-task budget cap with its work stashed
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-1458:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-1679
+tasks: BL-1679
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | Ran the reproduction. The top 5 by cost are BL-1474 5.7678, BL-1525 5.254, BL-1473 4.9663, BL-1482 4.7552, BL-1470 4.7313. BL-1458 is absent from the tasks entirely, because the 2026-10-03 to 10-06 shift logs are not in the log folder. The result cannot tell whether it still reproduces; not re-audited.
+
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.

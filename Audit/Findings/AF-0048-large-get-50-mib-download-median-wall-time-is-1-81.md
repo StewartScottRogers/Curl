@@ -3,12 +3,12 @@ id: AF-0048
 title: large-get (50 MiB download) median wall time is 1.81x curl's
 auditor: performance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: performance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:large-get:slower-than-curl
 reproduction: none
-task: none
-tasks:
+task: BL-1675
+tasks: BL-1675
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction with 20 iterations: large-get curl median 195.5 ms, Curl median 263.0 ms, a ratio of 1.35x. That is over the 1.25x Medium threshold, so the slowdown still reproduces, though the 1.81x in the finding was not matched on this run. Cause is the whole-body MemoryStream in HttpResponseBodyReader.CopyFramedAsync (lines 327-347).
+
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.

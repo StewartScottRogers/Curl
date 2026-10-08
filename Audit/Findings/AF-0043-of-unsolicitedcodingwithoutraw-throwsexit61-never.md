@@ -3,12 +3,12 @@ id: AF-0043
 title: Of_UnsolicitedCodingWithoutRaw_ThrowsExit61 never checks exit code 61
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitTests/HttpResponseBodyFramingTests.cs:Of_UnsolicitedCodingWithoutRaw_ThrowsExit61:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-1670
+tasks: BL-1670
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
@@ -42,6 +42,9 @@ Select-String -Path Curl.Protocol.Http.UnitTests/HttpResponseBodyFramingTests.cs
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the Select-String reproduction: HttpResponseBodyFramingTests.cs:50 Of_UnsolicitedCodingWithoutRaw_ThrowsExit61() => Assert.ThrowsExactly<HttpTransferException>(...). The body never checks ExitCode 61 (BadContentEncoding).
+
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.

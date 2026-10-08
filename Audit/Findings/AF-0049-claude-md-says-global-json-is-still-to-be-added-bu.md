@@ -3,12 +3,12 @@ id: AF-0049
 title: CLAUDE.md says global.json is still to be added, but it exists
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:global.json:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-1676
+tasks: BL-1676
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
@@ -42,6 +42,9 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the reproduction. Select-String still returns CLAUDE.md's line '- .NET Software Development Kit 10 (see `global.json` once added). Target framework: ...', and Test-Path global.json returns True. The document still says global.json is yet to be added although it exists.
+
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.

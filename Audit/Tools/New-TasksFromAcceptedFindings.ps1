@@ -132,10 +132,11 @@ function Get-LatestReaudit([string]$Text) {
 
 function Get-ReopenReaudit($Finding, [object[]]$HistoryTasks) {
     # The re-audit that reopens a finding whose tasks are all Done, or $null: the finding's latest
-    # Re-audits line is its own auditor's "reproduces: yes", dated after the last task was completed.
+    # Re-audits line is its own auditor's "reproduces: yes" (or the runner's "reproduces: yes
+    # (runner rerun on clean commit)"), dated after the last task was completed.
     # A set-aside or "not re-audited" latest line reopens nothing.
     $latest = Get-LatestReaudit $Finding.Text
-    if (-not $latest -or -not $latest.Own -or $latest.Verdict -ne 'reproduces: yes') { return $null }
+    if (-not $latest -or -not $latest.Own -or $latest.Verdict -notlike 'reproduces: yes*') { return $null }
     $completed = @($HistoryTasks | ForEach-Object { $_.Completed } | Sort-Object)
     if (-not $completed.Count -or -not $completed[-1] -or $latest.Date -le $completed[-1]) { return $null }
     return $latest

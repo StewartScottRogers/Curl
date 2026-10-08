@@ -3,8 +3,8 @@ id: AF-0010
 title: Cryptography tests EncryptCbc_EmptySource_WritesNothing and Constructor_56ByteKey_IsAccepted (Blowfish, Cast128, Camellia, ChaCha20, Rc4) have no assertion
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_1336.md: the reproduction no longer reproduces.
 key: quality:Curl.Cryptography.UnitTests/BlowfishTests.cs:EncryptCbc_EmptySource_WritesNothing:no-assertion
 reproduction: none
 task: BL-1266
@@ -13,9 +13,9 @@ found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-07
+closed-how: reliable-reaudit
+closed-by: 2026-10-07_1336.md
 ---
 # AF-0010 - Cryptography tests EncryptCbc_EmptySource_WritesNothing and Constructor_56ByteKey_IsAccepted (Blowfish, Cast128, Camellia, ChaCha20, Rc4) have no assertion
 
@@ -46,8 +46,10 @@ Select-String -Path Curl.Cryptography.UnitTests/BlowfishTests.cs -Pattern 'Encry
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Blowfish, Cast128 and Camellia EncryptCbc_EmptySource_WritesNothing assert Assert.AreEqual("A5A5A5A5A5A5A5A5", ...); Blowfish Constructor_56ByteKey_IsAccepted asserts CollectionAssert. ChaCha20 and Rc4 have no tests of those names.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | EncryptCbc_EmptySource_WritesNothing and Constructor_56ByteKey_IsAccepted now assert (Assert.AreEqual and CollectionAssert). Cast128 and Camellia also assert. ChaCha20 and Rc4 have no tests with those names.
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction and read the tests: BlowfishTests.EncryptCbc_EmptySource_WritesNothing now ends with Assert.AreEqual("A5A5A5A5A5A5A5A5", Convert.ToHexString(buffer)), and Constructor_56ByteKey_IsAccepted asserts AreNotEqual(plaintext, ciphertext) and AreEqual(plaintext, decrypted). The Cast128 and Camellia twins also assert the buffer. Find-WeakTests.ps1 flags none of these tests in Blowfish, Cast128, Camellia, ChaCha20 or Rc4 as no-assertion.
+- 2026-10-07 | 2026-10-07_1336.md | reproduces: no | Ran the Select-String reproduction and read the bodies. BlowfishTests, Cast128Tests and CamelliaTests EncryptCbc_EmptySource_WritesNothing and ChaCha20Tests ApplyKeyStream_EmptySource_WritesNothing now end in Assert.AreEqual("A5A5A5A5A5A5A5A5", ...). Blowfish Constructor_56ByteKey_IsAccepted and Rc4 Constructor_OneOr256ByteKey_IsAccepted assert a round trip with CollectionAssert. The -Context 0,6 window ends before the assertion, so the bodies were read in full.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_1336.md: the reproduction no longer reproduces.
