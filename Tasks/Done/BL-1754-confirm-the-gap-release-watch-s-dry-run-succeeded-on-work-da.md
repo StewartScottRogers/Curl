@@ -8,7 +8,7 @@ depends-on: [BL-1753]
 touches: [.github/workflows/gap-release-watch.yml]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1754 — Confirm the Gap release watch's dry run succeeded on work/dark-factory after the BL-1753 fix
 
@@ -31,13 +31,21 @@ push starts a fresh dry run (file another confirmation task for it).
 
 ## Acceptance criteria
 
-- [ ] `gh run list --workflow gap-release-watch.yml --branch work/dark-factory --limit 1` shows the latest run, for a commit at or after BL-1753's fix, as `success`.
-- [ ] That run's log prints the latest curl version, the recorded version and whether it is newer, and either "no new curl release" or the dry run's "would" lines.
-- [ ] The run's URL is recorded under this task's Notes.
+- [x] `gh run list --workflow gap-release-watch.yml --branch work/dark-factory --limit 1` shows the latest run, for a commit at or after BL-1753's fix, as `success`.
+- [x] That run's log prints the latest curl version, the recorded version and whether it is newer, and either "no new curl release" or the dry run's "would" lines.
+- [x] The run's URL is recorded under this task's Notes.
 
 ## Notes
+
+- Run: https://github.com/StewartScottRogers/Curl/actions/runs/37821595354 - push on
+  `work/dark-factory` at 125db3af0 (after BL-1753's fix badd759e2), conclusion `success`.
+- Log: "latest: 8.22.0 (curl-8_22_0), recorded in Gap/Baselines/target.json: 8.21.0,
+  newer: True", then the dry run's "would" lines (Compare-UpstreamReleases.ps1 -To 8.22.0,
+  Write-GapFindings.ps1, newest.json, commit and push gap, publish gaps/data.json).
+- No workflow change was needed; no code changed, so no build or test was run for this task.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Dry run 37821595354 succeeded on 125db3af0
