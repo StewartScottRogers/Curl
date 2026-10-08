@@ -1,5 +1,5 @@
 ---
-id: BL-1751
+id: BL-1752
 title: Restore the gitignored release fixtures of Measure-OptionGap.ps1 and Measure-WriteOutGap.ps1 self-tests
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-08
 completed:
 ---
-# BL-1751 — Restore the gitignored release fixtures of Measure-OptionGap.ps1 and Measure-WriteOutGap.ps1 self-tests
+# BL-1752 — Restore the gitignored release fixtures of Measure-OptionGap.ps1 and Measure-WriteOutGap.ps1 self-tests
 
 ## Goal
 

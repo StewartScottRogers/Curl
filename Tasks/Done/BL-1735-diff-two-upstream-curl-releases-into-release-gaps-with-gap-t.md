@@ -86,7 +86,7 @@ self-test runs with `-ArchivePath`-style local inputs and needs no network.
   writes on the first fetch of 8.22.0 (no task in Doing names it).
 - The fixtures under `Gap/Tools/Fixtures/releases` are ignored by `.gitignore`
   (`[Rr]eleases/`) and added with `git add -f`. The same rule ignores the options and
-  writeout self-test fixtures, which were never committed: filed BL-1751.
+  writeout self-test fixtures, which were never committed: filed BL-1752.
 
 ## Log
 
