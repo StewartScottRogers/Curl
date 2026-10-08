@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
 completed:
@@ -46,7 +46,34 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-07 measured with `Record-CurlExchange.ps1` against Git's curl 8.21.0 (Schannel): curl
+  refuses at the setup of each transfer that uploads a `-T` file, not per option group, naming
+  PUT first and the selected method second: `-d`/`--json` give `POST (-d, --data)`, `-G -d` and
+  `--no-head` give `GET (-G, --get)`, `-I` gives `HEAD (-I, --head)`, `-F` gives
+  `multipart formpost (-F, --form)`; nothing is sent and the exit is 2; `-s` drops the line.
+  `-I -d x -T f` still gives the earlier POST-and-HEAD line. `-T "" -T f -d a=1 URL1 URL2` POSTs
+  URL1 and then refuses URL2. Curl's Debug build now gives the same stderr, request and exit for
+  all of these (12 command lines) and for the finding's reproduction.
+- Fix: `SelectedHttpMethod.Put` and its curl name, `CommandLineOptions.HttpMethodBeforeUpload`,
+  `CommandLineWarning.PutRequestedWith`, and a per-URL check in `CurlCommandRunner.TransferEachUrlAsync`.
+- `touches` widened to `Curl.Cli.UnitLibrary` and `Curl.Cli.UnitTests`, where the warning text and
+  the method enum live (the finding names `SelectedHttpMethod.cs` as the cause); no task in Doing
+  on `origin/work/dark-factory` named either.
+- 2026-10-07, back to Backlog: the fix (Curl.Cli and the `CurlCommandRunner` check, with
+  `CommandLineUploadRequestMethodTests` in Curl.Cli.UnitTests, 21 passing) builds clean, but
+  `Curl.Console.UnitTests/CurlCommandRunnerUploadTests.RunAsync_UploadWithForm_SendsTheFile` pins the
+  old behaviour (`-T a -F x=y` sends the file) and now fails, and `Curl.Console.UnitTests` is held by
+  BL-1596 (in Doing). `touches` now names it. The code was left uncommitted for the shift to stash.
+  What is left, once BL-1596 is Done:
+  1. Turn that test into the refusal curl gives: the multipart-formpost warning, nothing dispatched, exit 2.
+  2. Add runner tests for `-d a=1 -T f` (warning, nothing sent, exit 2), `-s` (no stderr, exit 2) and
+     `-T "" -T f -d a=1 URL1 URL2` (URL1 posted, then the warning, exit 2), covering both new
+     branches in `TransferEachUrlAsync` and `RefuseUploadRequestMethodAsync`.
+  3. Under `-Z -d a=1 -T f URL` curl writes only the warning; Curl also draws the combined meter's
+     header and two empty status lines after it. Make it draw none when no transfer started.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Needs Curl.Console.UnitTests, held by BL-1596 (Doing): a test there pins the old -T -F behaviour; fix is ready, see Notes for what is left.
