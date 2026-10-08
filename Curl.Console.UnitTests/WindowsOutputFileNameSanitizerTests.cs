@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -8,6 +10,10 @@ namespace Curl.Console;
 [TestClass]
 public sealed class WindowsOutputFileNameSanitizerTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow("a:b.txt", "a_b.txt", DisplayName = "SanitizeRemoteName_Colon_BecomesUnderscore")]
     [DataRow("a*b.txt", "a_b.txt", DisplayName = "SanitizeRemoteName_Asterisk_BecomesUnderscore")]
@@ -20,6 +26,12 @@ public sealed class WindowsOutputFileNameSanitizerTests
     [DataRow("a.con", "a.con", DisplayName = "SanitizeRemoteName_ReservedExtension_IsKept")]
     [DataRow("nul%20", "nul%20", DisplayName = "SanitizeRemoteName_ReservedNameWithMore_IsKept")]
     [DataRow("CON%3Ax", "CON%3Ax", DisplayName = "SanitizeRemoteName_EncodedColon_IsKept")]
-    public void SanitizeRemoteName_MeasuredName_IsRewrittenAsCurlDoes(string fileName, string expected) =>
+    public void SanitizeRemoteName_MeasuredName_IsRewrittenAsCurlDoes(string fileName, string expected)
+    {
+        Diagnostics.Arrange("remote name", fileName);
+        Diagnostics.Act("sanitized name", WindowsOutputFileNameSanitizer.SanitizeRemoteName(fileName));
+
+        Diagnostics.Assert("sanitized name", expected, WindowsOutputFileNameSanitizer.SanitizeRemoteName(fileName));
         Assert.AreEqual(expected, WindowsOutputFileNameSanitizer.SanitizeRemoteName(fileName));
+    }
 }
