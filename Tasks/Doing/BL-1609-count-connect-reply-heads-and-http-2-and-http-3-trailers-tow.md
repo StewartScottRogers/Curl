@@ -46,3 +46,4 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Unstarted: run budget too small for the two real-curl measurements (CONNECT proxy, HTTP/2 trailers), the change across Http, Networking and Abstractions, and Measure-CodeQuality; plan in Notes
+- 2026-10-07: Backlog -> Doing.
