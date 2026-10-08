@@ -258,6 +258,7 @@ The rest, by area:
 | `protocols` | `needs-server:<protocol>` | `unmeasured` | The scheme probe needs a server the probe cannot stand up. |
 | `features` | `debug-build-only` | `excluded` | The feature appears only in a debug build (`Debug`, `TrackMemory`). |
 | `writeout` | `needs-server:<protocol>` | `unmeasured` | The variable has a value only after a transfer to a server the probe cannot stand up. |
+| | `no-reference` | `unmeasured` | The `:value` facet, when no reference names the targeted version: the documents give no value to compare. |
 | `exitcodes` | `source-not-found` | `unmeasured` | `CurlExitCode` or `CurlEasyErrorText.cs` could not be read as source text. |
 | | `obsolete-code` | `excluded` | Upstream marks the code obsolete and never returns it. |
 | `environment` | `needs-server:<protocol>` | `unmeasured` | The variable acts only on a transfer to a server the probe cannot stand up. |
