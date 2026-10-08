@@ -80,3 +80,4 @@ The finding closes only when a later re-audit by the performance auditor confirm
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Fix written (64 KiB receives, 16 KiB writes), tests green, left in the shift stash; the reproduction is the audit office's performance script, which no lane may run, so it is lane: no for an interactive session to measure and finish
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Backlog. Transfer fixed in a7c6bb900 (1.67x to 1.40x); the rest is launch cost tracking binary size, now BL-1749; re-measure interactively once it is Done
