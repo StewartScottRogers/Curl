@@ -71,3 +71,4 @@ Commit both 8.21.0 inventories.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
