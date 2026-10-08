@@ -1,0 +1,234 @@
+# Watches curl's releases and records a new release's gaps on the gap branch (ADR-0433
+# decisions 6, 7 and 8; BL-1736).
+#
+# Triggers:
+#   * schedule          - weekly, Monday 06:41 UTC. A scheduled run uses the copy of this
+#                         file on master, so the weekly watch only takes effect once this file
+#                         is merged there.
+#   * workflow_dispatch - by hand. The optional `version` input (for example 8.22.0) forces a
+#                         diff against that release even when it is not newer than the last
+#                         one recorded.
+#   * push              - to work/dark-factory, only when this file changes: a dry run that
+#                         does steps 1 to 3 and prints what steps 4 to 6 would do, with no
+#                         commit and no push. It is how GitHub validates the file before it
+#                         reaches master.
+#
+# Steps:
+#   1. Check out the repository, take origin/gap (or create gap from origin/master when it
+#      does not exist) and merge origin/master into it, so the Gap/Tools scripts and the
+#      inventories are current.
+#   2. Read curl's latest release tag (curl-8_22_0) and turn it into a version (8.22.0).
+#   3. Compare it, as numbers ([version], so 8.10.0 is above 8.9.0), with the version in
+#      Gap/Baselines/newest.json (target.json's when newest.json does not exist yet). Not
+#      newer and no `version` input: print "no new curl release" and stop.
+#   4. Gap/Tools/Compare-UpstreamReleases.ps1 -To <version> diffs the release against the
+#      targeted one; Gap/Tools/Write-GapFindings.ps1 -ReleaseDiff turns the diff into
+#      `scope: newest` findings; Gap/Baselines/newest.json records the version, tag,
+#      publish date and check time.
+#   5. Commit Gap/ as "gap: curl <version> released, <n> new gaps" and push gap, without
+#      force, three tries.
+#   6. Gap/Tools/Export-GapDashboardData.ps1 writes the dashboard data, published as
+#      gaps/data.json on the gource branch the way gource.yml's board-page job publishes
+#      board/index.html (sparse, blob-less clone, no force, three tries, skipped when only the
+#      "generated" stamp differs), then a Pages build is requested. A push made with
+#      GITHUB_TOKEN starts no workflow run and no Pages build, so the push to gap in step 5
+#      does not start gource.yml's gaps-page job: this workflow publishes the data itself.
+#
+# It runs in concurrency group gource-gaps, the same as gource.yml's gaps-page job, so the
+# two never push gaps/ at once. It uses no action but actions/checkout, never opens a pull
+# request and never force-pushes; gap reaches master through the pull request an
+# interactive gap analysis run opens (BL-1741). A ::notice:: line names the version and the
+# count of new gaps in the run's summary.
+name: Gap release watch
+
+on:
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'curl version to diff against the target (for example 8.22.0); empty means the latest release, only when it is new'
+        required: false
+        default: ''
+  push:
+    branches: [work/dark-factory]
+    paths: [.github/workflows/gap-release-watch.yml]
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: gource-gaps
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DRY_RUN: ${{ github.event_name == 'push' }}
+      FORCED_VERSION: ${{ github.event.inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Step 1: gap, current with master.
+      - name: Bring the gap branch up to date with master
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --quiet origin master
+          git fetch --quiet origin gap 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            git checkout -q -B gap origin/gap
+          } else {
+            Write-Output 'no gap branch yet; creating it from origin/master'
+            git checkout -q -B gap origin/master
+          }
+          git merge --no-edit -q origin/master
+          if ($LASTEXITCODE -ne 0) { throw 'merging origin/master into gap failed' }
+          exit 0
+
+      # Steps 2 and 3: the latest release, compared as a number with the last one recorded.
+      - name: Decide whether curl has a new release
+        id: decide
+        run: |
+          if ($env:FORCED_VERSION) {
+            $version = $env:FORCED_VERSION.Trim()
+            $tag = 'curl-' + $version.Replace('.', '_')
+          } else {
+            $tag = gh api repos/curl/curl/releases/latest --jq .tag_name
+            if ($LASTEXITCODE -ne 0 -or -not $tag) { throw 'could not read curl''s latest release' }
+            $version = $tag.Trim() -replace '^curl-', '' -replace '_', '.'
+            $tag = $tag.Trim()
+          }
+          $published = gh api "repos/curl/curl/releases/tags/$tag" --jq .published_at
+          if ($LASTEXITCODE -ne 0) { $published = ''; $global:LASTEXITCODE = 0 }
+          $newestPath = 'Gap/Baselines/newest.json'
+          $recordedPath = if (Test-Path $newestPath) { $newestPath } else { 'Gap/Baselines/target.json' }
+          $recorded = (Get-Content -Raw $recordedPath | ConvertFrom-Json).version
+          $isNewer = [version]$version -gt [version]$recorded
+          Write-Output "latest: $version ($tag), recorded in ${recordedPath}: $recorded, newer: $isNewer"
+          if (-not $isNewer -and -not $env:FORCED_VERSION) {
+            Write-Output 'no new curl release'
+            "run=no" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+          "run=yes" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "published=$published" >> $env:GITHUB_OUTPUT
+          exit 0
+
+      - name: Print what a real run would do (dry run)
+        if: steps.decide.outputs.run == 'yes' && env.DRY_RUN == 'true'
+        env:
+          VERSION: ${{ steps.decide.outputs.version }}
+        run: |
+          Write-Output "dry run: would run Gap/Tools/Compare-UpstreamReleases.ps1 -To $env:VERSION"
+          Write-Output "dry run: would run Gap/Tools/Write-GapFindings.ps1 -RunDirectory <temp> -Stamp <UTC yyyy-MM-dd_HHmm> -ReleaseDiff <temp>/measurements/release-$env:VERSION.json"
+          Write-Output "dry run: would write Gap/Baselines/newest.json for $env:VERSION"
+          Write-Output "dry run: would commit Gap/ as 'gap: curl $env:VERSION released, <n> new gaps' and push gap without force"
+          Write-Output 'dry run: would run Gap/Tools/Export-GapDashboardData.ps1 and publish gaps/data.json on gource, then request a Pages build'
+          Write-Output "::notice::dry run: curl $env:VERSION would be diffed against the target"
+
+      # Step 4: diff the release, write its findings, record it as the newest.
+      - name: Diff the release and write its gaps
+        id: diff
+        if: steps.decide.outputs.run == 'yes' && env.DRY_RUN != 'true'
+        env:
+          VERSION: ${{ steps.decide.outputs.version }}
+          TAG: ${{ steps.decide.outputs.tag }}
+          PUBLISHED: ${{ steps.decide.outputs.published }}
+        run: |
+          $now = (Get-Date).ToUniversalTime()
+          $stamp = $now.ToString('yyyy-MM-dd_HHmm')
+          $run = Join-Path $env:RUNNER_TEMP "gap-release-$stamp"
+          $measurements = Join-Path $run 'measurements'
+          New-Item -ItemType Directory -Force $measurements | Out-Null
+          $diff = Join-Path $measurements "release-$env:VERSION.json"
+          ./Gap/Tools/Compare-UpstreamReleases.ps1 -To $env:VERSION -OutFile $diff
+          if (-not (Test-Path $diff)) { throw 'Compare-UpstreamReleases.ps1 wrote no release diff' }
+          $summary = ./Gap/Tools/Write-GapFindings.ps1 -RunDirectory $run -Stamp $stamp -ReleaseDiff $diff
+          $summary | Write-Output
+          $count = 0
+          $match = [regex]::Match(($summary -join "`n"), ': (\d+) new,')
+          if ($match.Success) { $count = [int]$match.Groups[1].Value }
+          $newest = [ordered]@{
+            version = $env:VERSION
+            tag = $env:TAG
+            published = $env:PUBLISHED
+            checked = $now.ToString('yyyy-MM-ddTHH:mm:ssZ')
+          }
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'Gap/Baselines/newest.json'), (($newest | ConvertTo-Json) + "`n"))
+          "count=$count" >> $env:GITHUB_OUTPUT
+          exit 0
+
+      # Step 5: commit Gap/ and push gap, without force.
+      - name: Commit and push the gap branch
+        if: steps.decide.outputs.run == 'yes' && env.DRY_RUN != 'true'
+        env:
+          VERSION: ${{ steps.decide.outputs.version }}
+          COUNT: ${{ steps.diff.outputs.count }}
+        run: |
+          git add Gap
+          git commit -q -m "gap: curl $env:VERSION released, $env:COUNT new gaps"
+          if ($LASTEXITCODE -ne 0) { throw 'nothing to commit under Gap/' }
+          foreach ($try in 1..3) {
+            git push -q origin HEAD:refs/heads/gap
+            if ($LASTEXITCODE -eq 0) {
+              Write-Output "::notice::curl $env:VERSION released: $env:COUNT new gaps"
+              exit 0
+            }
+            git fetch --quiet origin gap
+            git merge --no-edit -q origin/gap
+            if ($LASTEXITCODE -ne 0) { throw 'merging the gap branch that moved meanwhile failed' }
+          }
+          throw 'push to gap kept being refused'
+
+      # Step 6: publish the dashboard data onto gource, without force, and ask for Pages.
+      - name: Publish the dashboard data to the gource branch
+        id: publish
+        if: steps.decide.outputs.run == 'yes' && env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          source="$RUNNER_TEMP/gaps-data/data.json"
+          pwsh -NoProfile -File Gap/Tools/Export-GapDashboardData.ps1 -OutFile "$source"
+          url="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          target=gaps/data.json
+          for try in 1 2 3; do
+            dir="$RUNNER_TEMP/gaps-$try"
+            # Sparse and blob-less: the branch also holds hundreds of MB of video this job never needs.
+            git clone -q --depth 1 --filter=blob:none --sparse --branch gource "$url" "$dir" \
+              || { echo 'no gource branch to publish onto'; exit 1; }
+            git -C "$dir" sparse-checkout set gaps
+            # data.json differs on every export in its "generated" stamp alone.
+            if [ -f "$dir/$target" ] && cmp -s <(grep -v '"generated"' "$source") <(grep -v '"generated"' "$dir/$target"); then
+              echo "$target on gource is already this file; nothing to publish"
+              exit 0
+            fi
+            mkdir -p "$dir/gaps"
+            cp "$source" "$dir/$target"
+            git -C "$dir" config user.name 'github-actions[bot]'
+            git -C "$dir" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git -C "$dir" add "$target"
+            git -C "$dir" commit -q -m "chore(gaps): data.json $(date -u +%Y-%m-%dT%H:%MZ)"
+            if git -C "$dir" push -q origin gource; then
+              echo "published=yes" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo 'push to gource kept being refused'
+          exit 1
+
+      - name: Rebuild GitHub Pages
+        if: steps.publish.outputs.published == 'yes'
+        shell: bash
+        run: gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" --silent
