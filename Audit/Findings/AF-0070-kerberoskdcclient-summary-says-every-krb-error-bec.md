@@ -3,8 +3,8 @@ id: AF-0070
 title: KerberosKdcClient summary says every KRB-ERROR becomes a KerberosKdcException; KDC_ERR_PREAUTH_REQUIRED does not
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Kerberos.UnitLibrary/KerberosKdcClient.cs:KerberosKdcClient:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Kerberos.UnitLibrary/KerberosKdcClient.cs -SimpleMatch 
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
