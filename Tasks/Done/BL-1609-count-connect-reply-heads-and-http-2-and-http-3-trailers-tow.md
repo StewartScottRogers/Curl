@@ -8,7 +8,7 @@ depends-on: [BL-1448]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: FR-067
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1609 — Count CONNECT reply heads and HTTP/2 and HTTP/3 trailers toward curl's 5000 response header limit
 
@@ -25,9 +25,9 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 
 ## Acceptance criteria
 
-- [ ] A test pins the measured exit code, header output and last `<` line for a CONNECT reply of 3000 headers followed by a final head of 3000 headers, or Notes record the measurement showing curl does not count CONNECT heads.
-- [ ] A test pins the measured behaviour for HTTP/2 trailers that take the count past 5000, or Notes record the measurement showing curl does not count them.
-- [ ] `Measure-CodeQuality.ps1 -Library` naming every library changed reports no failing member.
+- [x] A test pins the measured exit code, header output and last `<` line for a CONNECT reply of 3000 headers followed by a final head of 3000 headers, or Notes record the measurement showing curl does not count CONNECT heads.
+- [x] A test pins the measured behaviour for HTTP/2 trailers that take the count past 5000, or Notes record the measurement showing curl does not count them.
+- [x] `Measure-CodeQuality.ps1 -Library` naming every library changed reports no failing member.
 
 ## Notes
 
@@ -62,6 +62,13 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
   change across three libraries and the Measure-CodeQuality run.
 - Returned to Backlog unstarted: this run's budget could not cover two real-curl measurements, the
   change across three libraries and a Measure-CodeQuality run.
+- Finished (lane 1): applied lane 6's shift stash `a9c150b6` by diff (`git diff ^1 stash | git apply --3way`,
+  the new test file from `^3`); it applied cleanly. Tests: `ExecuteAsync_TunnelReplyOf3000Headers_FailsWithTooLargeAtTheTransfers5001stHeader`
+  pins the measured CONNECT case (header output through `X-H1999: v`, exit 100); the HTTP/2 trailer tests pin
+  the 5001st trailer failing and the 5000th succeeding, by source since h2 cannot be measured here (ADR-0432).
+  Measure-CodeQuality first flagged `HttpProtocolHandler.ExecuteAsync` at complexity 12 (not changed by this
+  diff); extracting `CreateFirstProxyAuthorizationAsync` brought it to 10. Re-run: 0 failing members across
+  Http, Networking and Abstractions, all at 100% line and branch.
 
 ## Log
 
@@ -75,3 +82,4 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Unstarted: lane 9 found a clean worktree and no access to the earlier lane's shift stash holding the written code (ConnectResult.ConnectReplyHeadersStored etc.); the run's budget could not cover rewriting it across three libraries plus Measure-CodeQuality. Next run: apply that stash by hash first
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. CONNECT reply heads and HTTP/2-3 trailers count toward curl's 5000 response headers, the 5001st failing with exit 100
