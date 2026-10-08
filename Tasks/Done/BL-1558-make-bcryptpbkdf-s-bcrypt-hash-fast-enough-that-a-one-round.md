@@ -30,6 +30,28 @@ completed: 2026-10-07
 
 ## Notes
 
+- Cause: the build, not the algorithm. The tests run the Debug assembly, whose
+  `DebuggableAttribute` disables JIT optimization, so ADR-0400's masked S-box scan ran at
+  about 600 ms per bcrypt hash against 33 ms in Release (measured with a throwaway
+  `dotnet run bench.cs` outside the repo). `AggressiveOptimization` on the hot methods
+  does not override that attribute (measured, no gain).
+- Fix (ADR-0426, decided by Claude under Stewart's delegation):
+  `Curl.Cryptography.UnitLibrary.csproj` sets `<Optimize>true</Optimize>`. One hash in
+  Debug is now about 42 ms. No source change; the constant-time scan is kept. An
+  AVX-512 scan was tried and dropped: 44 ms vs 42 ms on this machine.
+- `BcryptPbkdfTests`, criterion command, before -> after `PHASE derive`:
+  GoGoldenVector0 5799 -> 1140 ms, GoGoldenVector1 1407 -> 418 ms, GoGoldenVector2
+  11259 -> 1320 ms, OneRoundMaximumLengthKey 10810 -> 2158 ms; `PHASE hash` 371 -> 285 ms.
+  No `SLOW:` line after. In a whole `Curl.Cryptography.UnitTests` run beside other lanes'
+  builds, the 32-block test once took 3492 ms, just over the 3 s budget: its 32 hashes
+  are about 1.4 s of CPU, and the rest is contention.
+- "A few milliseconds, as OpenSSH's C" is not reachable without table-indexed look-ups,
+  which ADR-0400 ruled out for the passphrase leak (AF-0017); the constant-time scan's
+  floor is about 30 ms per hash.
+- Gates: `dotnet build -warnaserror` clean; all 33 fast test projects pass (Cryptography
+  1445); Measure-CodeQuality on Curl.Cryptography.UnitLibrary: 100% line, 100% branch,
+  max complexity 10, 0 failing members.
+
 ## Log
 
 - 2026-10-07: Created.
