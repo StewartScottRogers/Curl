@@ -1,0 +1,3732 @@
+{
+  "area": "options",
+  "version": "8.22.0",
+  "sources": [
+    "docs/cmdline-opts/*.md"
+  ],
+  "items": [
+    {
+      "key": "options:--abstract-unix-socket",
+      "name": "--abstract-unix-socket",
+      "introducedIn": "7.53.0",
+      "attributes": {
+        "short": null,
+        "arg": "<path>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--alt-svc",
+      "name": "--alt-svc",
+      "introducedIn": "7.64.1",
+      "attributes": {
+        "short": null,
+        "arg": "<filename>",
+        "protocols": [
+          "HTTPS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--anyauth",
+      "name": "--anyauth",
+      "introducedIn": "7.10.6",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--append",
+      "name": "--append",
+      "introducedIn": "4.8",
+      "attributes": {
+        "short": "-a",
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "SFTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--aws-sigv4",
+      "name": "--aws-sigv4",
+      "introducedIn": "7.75.0",
+      "attributes": {
+        "short": null,
+        "arg": "<provider1[:prvdr2[:reg[:srv]]]>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--basic",
+      "name": "--basic",
+      "introducedIn": "7.10.6",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ca-native",
+      "name": "--ca-native",
+      "introducedIn": "8.2.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--cacert",
+      "name": "--cacert",
+      "introducedIn": "7.5",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--capath",
+      "name": "--capath",
+      "introducedIn": "7.9.8",
+      "attributes": {
+        "short": null,
+        "arg": "<dir>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--cert",
+      "name": "--cert",
+      "introducedIn": "5.0",
+      "attributes": {
+        "short": "-E",
+        "arg": "<certificate[:password]>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--cert-status",
+      "name": "--cert-status",
+      "introducedIn": "7.41.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--cert-type",
+      "name": "--cert-type",
+      "introducedIn": "7.9.3",
+      "attributes": {
+        "short": null,
+        "arg": "<type>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ciphers",
+      "name": "--ciphers",
+      "introducedIn": "7.9",
+      "attributes": {
+        "short": null,
+        "arg": "<list>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--compressed",
+      "name": "--compressed",
+      "introducedIn": "7.10",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--compressed-ssh",
+      "name": "--compressed-ssh",
+      "introducedIn": "7.56.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "SCP",
+          "SFTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--config",
+      "name": "--config",
+      "introducedIn": "4.10",
+      "attributes": {
+        "short": "-K",
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--connect-timeout",
+      "name": "--connect-timeout",
+      "introducedIn": "7.7",
+      "attributes": {
+        "short": null,
+        "arg": "<seconds>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--connect-to",
+      "name": "--connect-to",
+      "introducedIn": "7.49.0",
+      "attributes": {
+        "short": null,
+        "arg": "<HOST1:PORT1:HOST2:PORT2>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--continue-at",
+      "name": "--continue-at",
+      "introducedIn": "4.8",
+      "attributes": {
+        "short": "-C",
+        "arg": "<offset>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--cookie",
+      "name": "--cookie",
+      "introducedIn": "4.9",
+      "attributes": {
+        "short": "-b",
+        "arg": "<data|filename>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--cookie-jar",
+      "name": "--cookie-jar",
+      "introducedIn": "7.9",
+      "attributes": {
+        "short": "-c",
+        "arg": "<filename>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--create-dirs",
+      "name": "--create-dirs",
+      "introducedIn": "7.10.3",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--create-file-mode",
+      "name": "--create-file-mode",
+      "introducedIn": "7.75.0",
+      "attributes": {
+        "short": null,
+        "arg": "<mode>",
+        "protocols": [
+          "SFTP",
+          "SCP",
+          "FILE"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--crlf",
+      "name": "--crlf",
+      "introducedIn": "5.7",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "SMTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--crlfile",
+      "name": "--crlfile",
+      "introducedIn": "7.19.7",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--curves",
+      "name": "--curves",
+      "introducedIn": "7.73.0",
+      "attributes": {
+        "short": null,
+        "arg": "<list>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--data",
+      "name": "--data",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-d",
+        "arg": "<data>",
+        "protocols": [
+          "HTTP",
+          "MQTT"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--data-ascii",
+      "name": "--data-ascii",
+      "introducedIn": "7.2",
+      "attributes": {
+        "short": null,
+        "arg": "<data>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--data-binary",
+      "name": "--data-binary",
+      "introducedIn": "7.2",
+      "attributes": {
+        "short": null,
+        "arg": "<data>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--data-raw",
+      "name": "--data-raw",
+      "introducedIn": "7.43.0",
+      "attributes": {
+        "short": null,
+        "arg": "<data>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--data-urlencode",
+      "name": "--data-urlencode",
+      "introducedIn": "7.18.0",
+      "attributes": {
+        "short": null,
+        "arg": "<data>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--delegation",
+      "name": "--delegation",
+      "introducedIn": "7.22.0",
+      "attributes": {
+        "short": null,
+        "arg": "<LEVEL>",
+        "protocols": [
+          "GSS/kerberos"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--digest",
+      "name": "--digest",
+      "introducedIn": "7.10.6",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--disable",
+      "name": "--disable",
+      "introducedIn": "5.0",
+      "attributes": {
+        "short": "-q",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--disable-eprt",
+      "name": "--disable-eprt",
+      "introducedIn": "7.10.5",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--disable-epsv",
+      "name": "--disable-epsv",
+      "introducedIn": "7.9.2",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--disallow-username-in-url",
+      "name": "--disallow-username-in-url",
+      "introducedIn": "7.61.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--dns-interface",
+      "name": "--dns-interface",
+      "introducedIn": "7.33.0",
+      "attributes": {
+        "short": null,
+        "arg": "<interface>",
+        "protocols": [
+          "DNS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--dns-ipv4-addr",
+      "name": "--dns-ipv4-addr",
+      "introducedIn": "7.33.0",
+      "attributes": {
+        "short": null,
+        "arg": "<address>",
+        "protocols": [
+          "DNS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--dns-ipv6-addr",
+      "name": "--dns-ipv6-addr",
+      "introducedIn": "7.33.0",
+      "attributes": {
+        "short": null,
+        "arg": "<address>",
+        "protocols": [
+          "DNS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--dns-servers",
+      "name": "--dns-servers",
+      "introducedIn": "7.33.0",
+      "attributes": {
+        "short": null,
+        "arg": "<addresses>",
+        "protocols": [
+          "DNS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--doh-cert-status",
+      "name": "--doh-cert-status",
+      "introducedIn": "7.76.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "DNS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--doh-insecure",
+      "name": "--doh-insecure",
+      "introducedIn": "7.76.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "DNS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--doh-url",
+      "name": "--doh-url",
+      "introducedIn": "7.62.0",
+      "attributes": {
+        "short": null,
+        "arg": "<URL>",
+        "protocols": [
+          "DNS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--dump-ca-embed",
+      "name": "--dump-ca-embed",
+      "introducedIn": "8.10.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--dump-header",
+      "name": "--dump-header",
+      "introducedIn": "5.7",
+      "attributes": {
+        "short": "-D",
+        "arg": "<filename>",
+        "protocols": [
+          "HTTP",
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ech",
+      "name": "--ech",
+      "introducedIn": "8.8.0",
+      "attributes": {
+        "short": null,
+        "arg": "<config>",
+        "protocols": [
+          "HTTPS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--egd-file",
+      "name": "--egd-file",
+      "introducedIn": "7.7",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--engine",
+      "name": "--engine",
+      "introducedIn": "7.9.3",
+      "attributes": {
+        "short": null,
+        "arg": "<name>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--etag-compare",
+      "name": "--etag-compare",
+      "introducedIn": "7.68.0",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--etag-save",
+      "name": "--etag-save",
+      "introducedIn": "7.68.0",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--expect100-timeout",
+      "name": "--expect100-timeout",
+      "introducedIn": "7.47.0",
+      "attributes": {
+        "short": null,
+        "arg": "<seconds>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--fail",
+      "name": "--fail",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-f",
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--fail-early",
+      "name": "--fail-early",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--fail-with-body",
+      "name": "--fail-with-body",
+      "introducedIn": "7.76.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--false-start",
+      "name": "--false-start",
+      "introducedIn": "7.42.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--follow",
+      "name": "--follow",
+      "introducedIn": "8.16.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--form",
+      "name": "--form",
+      "introducedIn": "5.0",
+      "attributes": {
+        "short": "-F",
+        "arg": "<name=content>",
+        "protocols": [
+          "HTTP",
+          "SMTP",
+          "IMAP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--form-escape",
+      "name": "--form-escape",
+      "introducedIn": "7.81.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP",
+          "IMAP",
+          "SMTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--form-string",
+      "name": "--form-string",
+      "introducedIn": "7.13.2",
+      "attributes": {
+        "short": null,
+        "arg": "<name=string>",
+        "protocols": [
+          "HTTP",
+          "SMTP",
+          "IMAP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ftp-account",
+      "name": "--ftp-account",
+      "introducedIn": "7.13.0",
+      "attributes": {
+        "short": null,
+        "arg": "<data>",
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ftp-alternative-to-user",
+      "name": "--ftp-alternative-to-user",
+      "introducedIn": "7.15.5",
+      "attributes": {
+        "short": null,
+        "arg": "<command>",
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ftp-create-dirs",
+      "name": "--ftp-create-dirs",
+      "introducedIn": "7.10.7",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "SFTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ftp-method",
+      "name": "--ftp-method",
+      "introducedIn": "7.15.1",
+      "attributes": {
+        "short": null,
+        "arg": "<method>",
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ftp-pasv",
+      "name": "--ftp-pasv",
+      "introducedIn": "7.11.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ftp-port",
+      "name": "--ftp-port",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-P",
+        "arg": "<address>",
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ftp-pret",
+      "name": "--ftp-pret",
+      "introducedIn": "7.20.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ftp-skip-pasv-ip",
+      "name": "--ftp-skip-pasv-ip",
+      "introducedIn": "7.15.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ftp-ssl-ccc",
+      "name": "--ftp-ssl-ccc",
+      "introducedIn": "7.16.1",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ftp-ssl-ccc-mode",
+      "name": "--ftp-ssl-ccc-mode",
+      "introducedIn": "7.16.2",
+      "attributes": {
+        "short": null,
+        "arg": "<active/passive>",
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ftp-ssl-control",
+      "name": "--ftp-ssl-control",
+      "introducedIn": "7.16.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--get",
+      "name": "--get",
+      "introducedIn": "7.8.1",
+      "attributes": {
+        "short": "-G",
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--globoff",
+      "name": "--globoff",
+      "introducedIn": "7.6",
+      "attributes": {
+        "short": "-g",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--happy-eyeballs-timeout-ms",
+      "name": "--happy-eyeballs-timeout-ms",
+      "introducedIn": "7.59.0",
+      "attributes": {
+        "short": null,
+        "arg": "<ms>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--haproxy-clientip",
+      "name": "--haproxy-clientip",
+      "introducedIn": "8.2.0",
+      "attributes": {
+        "short": null,
+        "arg": "<ip>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--haproxy-protocol",
+      "name": "--haproxy-protocol",
+      "introducedIn": "7.60.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--head",
+      "name": "--head",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-I",
+        "arg": null,
+        "protocols": [
+          "HTTP",
+          "FTP",
+          "FILE"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--header",
+      "name": "--header",
+      "introducedIn": "5.0",
+      "attributes": {
+        "short": "-H",
+        "arg": "<header/@file>",
+        "protocols": [
+          "HTTP",
+          "IMAP",
+          "SMTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--help",
+      "name": "--help",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-h",
+        "arg": "<subject>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--hostpubmd5",
+      "name": "--hostpubmd5",
+      "introducedIn": "7.17.1",
+      "attributes": {
+        "short": null,
+        "arg": "<md5>",
+        "protocols": [
+          "SFTP",
+          "SCP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--hostpubsha256",
+      "name": "--hostpubsha256",
+      "introducedIn": "7.80.0",
+      "attributes": {
+        "short": null,
+        "arg": "<sha256>",
+        "protocols": [
+          "SFTP",
+          "SCP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--hsts",
+      "name": "--hsts",
+      "introducedIn": "7.74.0",
+      "attributes": {
+        "short": null,
+        "arg": "<filename>",
+        "protocols": [
+          "HTTPS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--http0.9",
+      "name": "--http0.9",
+      "introducedIn": "7.64.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--http1.0",
+      "name": "--http1.0",
+      "introducedIn": "7.9.1",
+      "attributes": {
+        "short": "-0",
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--http1.1",
+      "name": "--http1.1",
+      "introducedIn": "7.33.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--http2",
+      "name": "--http2",
+      "introducedIn": "7.33.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--http2-prior-knowledge",
+      "name": "--http2-prior-knowledge",
+      "introducedIn": "7.49.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--http3",
+      "name": "--http3",
+      "introducedIn": "7.66.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--http3-only",
+      "name": "--http3-only",
+      "introducedIn": "7.88.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--httpsig-algo",
+      "name": "--httpsig-algo",
+      "introducedIn": "8.22.0",
+      "attributes": {
+        "short": null,
+        "arg": "<algorithm>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--httpsig-headers",
+      "name": "--httpsig-headers",
+      "introducedIn": "8.22.0",
+      "attributes": {
+        "short": null,
+        "arg": "<components>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--httpsig-key",
+      "name": "--httpsig-key",
+      "introducedIn": "8.22.0",
+      "attributes": {
+        "short": null,
+        "arg": "<key/file>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--httpsig-keyid",
+      "name": "--httpsig-keyid",
+      "introducedIn": "8.22.0",
+      "attributes": {
+        "short": null,
+        "arg": "<id>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ignore-content-length",
+      "name": "--ignore-content-length",
+      "introducedIn": "7.14.1",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--insecure",
+      "name": "--insecure",
+      "introducedIn": "7.10",
+      "attributes": {
+        "short": "-k",
+        "arg": null,
+        "protocols": [
+          "TLS",
+          "SFTP",
+          "SCP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--interface",
+      "name": "--interface",
+      "introducedIn": "7.3",
+      "attributes": {
+        "short": null,
+        "arg": "<name>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ip-tos",
+      "name": "--ip-tos",
+      "introducedIn": "8.9.0",
+      "attributes": {
+        "short": null,
+        "arg": "<string>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ipfs-gateway",
+      "name": "--ipfs-gateway",
+      "introducedIn": "8.4.0",
+      "attributes": {
+        "short": null,
+        "arg": "<URL>",
+        "protocols": [
+          "IPFS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ipv4",
+      "name": "--ipv4",
+      "introducedIn": "7.10.8",
+      "attributes": {
+        "short": "-4",
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ipv6",
+      "name": "--ipv6",
+      "introducedIn": "7.10.8",
+      "attributes": {
+        "short": "-6",
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--json",
+      "name": "--json",
+      "introducedIn": "7.82.0",
+      "attributes": {
+        "short": null,
+        "arg": "<data>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--junk-session-cookies",
+      "name": "--junk-session-cookies",
+      "introducedIn": "7.9.7",
+      "attributes": {
+        "short": "-j",
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--keepalive-cnt",
+      "name": "--keepalive-cnt",
+      "introducedIn": "8.9.0",
+      "attributes": {
+        "short": null,
+        "arg": "<integer>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--keepalive-time",
+      "name": "--keepalive-time",
+      "introducedIn": "7.18.0",
+      "attributes": {
+        "short": null,
+        "arg": "<seconds>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--key",
+      "name": "--key",
+      "introducedIn": "7.9.3",
+      "attributes": {
+        "short": null,
+        "arg": "<key>",
+        "protocols": [
+          "TLS",
+          "SCP",
+          "SFTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--key-type",
+      "name": "--key-type",
+      "introducedIn": "7.9.3",
+      "attributes": {
+        "short": null,
+        "arg": "<type>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--knownhosts",
+      "name": "--knownhosts",
+      "introducedIn": "8.17.0",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [
+          "SCP",
+          "SFTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--krb",
+      "name": "--krb",
+      "introducedIn": "7.3",
+      "attributes": {
+        "short": null,
+        "arg": "<level>",
+        "protocols": [
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--libcurl",
+      "name": "--libcurl",
+      "introducedIn": "7.16.1",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--limit-rate",
+      "name": "--limit-rate",
+      "introducedIn": "7.10",
+      "attributes": {
+        "short": null,
+        "arg": "<speed>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--list-only",
+      "name": "--list-only",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-l",
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "POP3",
+          "SFTP",
+          "FILE"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--local-port",
+      "name": "--local-port",
+      "introducedIn": "7.15.2",
+      "attributes": {
+        "short": null,
+        "arg": "<range>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--location",
+      "name": "--location",
+      "introducedIn": "4.9",
+      "attributes": {
+        "short": "-L",
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--location-trusted",
+      "name": "--location-trusted",
+      "introducedIn": "7.10.4",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--login-options",
+      "name": "--login-options",
+      "introducedIn": "7.34.0",
+      "attributes": {
+        "short": null,
+        "arg": "<options>",
+        "protocols": [
+          "IMAP",
+          "LDAP",
+          "POP3",
+          "SMTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--mail-auth",
+      "name": "--mail-auth",
+      "introducedIn": "7.25.0",
+      "attributes": {
+        "short": null,
+        "arg": "<address>",
+        "protocols": [
+          "SMTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--mail-from",
+      "name": "--mail-from",
+      "introducedIn": "7.20.0",
+      "attributes": {
+        "short": null,
+        "arg": "<address>",
+        "protocols": [
+          "SMTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--mail-rcpt",
+      "name": "--mail-rcpt",
+      "introducedIn": "7.20.0",
+      "attributes": {
+        "short": null,
+        "arg": "<address>",
+        "protocols": [
+          "SMTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--mail-rcpt-allowfails",
+      "name": "--mail-rcpt-allowfails",
+      "introducedIn": "7.69.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "SMTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--manual",
+      "name": "--manual",
+      "introducedIn": "5.2",
+      "attributes": {
+        "short": "-M",
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--max-filesize",
+      "name": "--max-filesize",
+      "introducedIn": "7.10.8",
+      "attributes": {
+        "short": null,
+        "arg": "<bytes>",
+        "protocols": [
+          "FTP",
+          "HTTP",
+          "MQTT"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--max-redirs",
+      "name": "--max-redirs",
+      "introducedIn": "7.5",
+      "attributes": {
+        "short": null,
+        "arg": "<num>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--max-time",
+      "name": "--max-time",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-m",
+        "arg": "<seconds>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--metalink",
+      "name": "--metalink",
+      "introducedIn": "7.27.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--mptcp",
+      "name": "--mptcp",
+      "introducedIn": "8.9.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--negotiate",
+      "name": "--negotiate",
+      "introducedIn": "7.10.6",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--netrc",
+      "name": "--netrc",
+      "introducedIn": "4.6",
+      "attributes": {
+        "short": "-n",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--netrc-file",
+      "name": "--netrc-file",
+      "introducedIn": "7.21.5",
+      "attributes": {
+        "short": null,
+        "arg": "<filename>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--netrc-optional",
+      "name": "--netrc-optional",
+      "introducedIn": "7.9.8",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--next",
+      "name": "--next",
+      "introducedIn": "7.36.0",
+      "attributes": {
+        "short": "-:",
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--no-alpn",
+      "name": "--no-alpn",
+      "introducedIn": "7.36.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTPS"
+        ],
+        "boolean": true,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--no-buffer",
+      "name": "--no-buffer",
+      "introducedIn": "6.5",
+      "attributes": {
+        "short": "-N",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--no-clobber",
+      "name": "--no-clobber",
+      "introducedIn": "7.83.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--no-keepalive",
+      "name": "--no-keepalive",
+      "introducedIn": "7.18.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--no-npn",
+      "name": "--no-npn",
+      "introducedIn": "7.36.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTPS"
+        ],
+        "boolean": true,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--no-progress-meter",
+      "name": "--no-progress-meter",
+      "introducedIn": "7.67.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--no-sessionid",
+      "name": "--no-sessionid",
+      "introducedIn": "7.16.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--noproxy",
+      "name": "--noproxy",
+      "introducedIn": "7.19.4",
+      "attributes": {
+        "short": null,
+        "arg": "<no-proxy-list>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ntlm",
+      "name": "--ntlm",
+      "introducedIn": "7.10.6",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ntlm-wb",
+      "name": "--ntlm-wb",
+      "introducedIn": "7.22.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--oauth2-bearer",
+      "name": "--oauth2-bearer",
+      "introducedIn": "7.33.0",
+      "attributes": {
+        "short": null,
+        "arg": "<token>",
+        "protocols": [
+          "IMAP",
+          "LDAP",
+          "POP3",
+          "SMTP",
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--out-null",
+      "name": "--out-null",
+      "introducedIn": "8.16.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--output",
+      "name": "--output",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-o",
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--output-dir",
+      "name": "--output-dir",
+      "introducedIn": "7.73.0",
+      "attributes": {
+        "short": null,
+        "arg": "<dir>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--parallel",
+      "name": "--parallel",
+      "introducedIn": "7.66.0",
+      "attributes": {
+        "short": "-Z",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--parallel-immediate",
+      "name": "--parallel-immediate",
+      "introducedIn": "7.68.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--parallel-max",
+      "name": "--parallel-max",
+      "introducedIn": "7.66.0",
+      "attributes": {
+        "short": null,
+        "arg": "<num>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--parallel-max-host",
+      "name": "--parallel-max-host",
+      "introducedIn": "8.16.0",
+      "attributes": {
+        "short": null,
+        "arg": "<num>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--pass",
+      "name": "--pass",
+      "introducedIn": "7.9.3",
+      "attributes": {
+        "short": null,
+        "arg": "<phrase>",
+        "protocols": [
+          "TLS",
+          "SCP",
+          "SFTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--path-as-is",
+      "name": "--path-as-is",
+      "introducedIn": "7.42.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--pinnedpubkey",
+      "name": "--pinnedpubkey",
+      "introducedIn": "7.39.0",
+      "attributes": {
+        "short": null,
+        "arg": "<hashes>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--post301",
+      "name": "--post301",
+      "introducedIn": "7.17.1",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--post302",
+      "name": "--post302",
+      "introducedIn": "7.19.1",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--post303",
+      "name": "--post303",
+      "introducedIn": "7.26.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--preproxy",
+      "name": "--preproxy",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<[protocol://]host[:port]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--progress-bar",
+      "name": "--progress-bar",
+      "introducedIn": "5.10",
+      "attributes": {
+        "short": "-#",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proto",
+      "name": "--proto",
+      "introducedIn": "7.21.0",
+      "attributes": {
+        "short": null,
+        "arg": "<protocols>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proto-default",
+      "name": "--proto-default",
+      "introducedIn": "7.45.0",
+      "attributes": {
+        "short": null,
+        "arg": "<protocol>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proto-redir",
+      "name": "--proto-redir",
+      "introducedIn": "7.21.0",
+      "attributes": {
+        "short": null,
+        "arg": "<protocols>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy",
+      "name": "--proxy",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-x",
+        "arg": "<[protocol://]host[:port]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-anyauth",
+      "name": "--proxy-anyauth",
+      "introducedIn": "7.13.2",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-basic",
+      "name": "--proxy-basic",
+      "introducedIn": "7.12.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-ca-native",
+      "name": "--proxy-ca-native",
+      "introducedIn": "8.2.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-cacert",
+      "name": "--proxy-cacert",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-capath",
+      "name": "--proxy-capath",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<dir>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-cert",
+      "name": "--proxy-cert",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<cert[:passwd]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-cert-type",
+      "name": "--proxy-cert-type",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<type>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-ciphers",
+      "name": "--proxy-ciphers",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<list>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-crlfile",
+      "name": "--proxy-crlfile",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-digest",
+      "name": "--proxy-digest",
+      "introducedIn": "7.12.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-header",
+      "name": "--proxy-header",
+      "introducedIn": "7.37.0",
+      "attributes": {
+        "short": null,
+        "arg": "<header/@file>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-http2",
+      "name": "--proxy-http2",
+      "introducedIn": "8.1.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-http3",
+      "name": "--proxy-http3",
+      "introducedIn": "8.21.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-insecure",
+      "name": "--proxy-insecure",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-key",
+      "name": "--proxy-key",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<key>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-key-type",
+      "name": "--proxy-key-type",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<type>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-negotiate",
+      "name": "--proxy-negotiate",
+      "introducedIn": "7.17.1",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-ntlm",
+      "name": "--proxy-ntlm",
+      "introducedIn": "7.10.7",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-pass",
+      "name": "--proxy-pass",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<phrase>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-pinnedpubkey",
+      "name": "--proxy-pinnedpubkey",
+      "introducedIn": "7.59.0",
+      "attributes": {
+        "short": null,
+        "arg": "<hashes>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-service-name",
+      "name": "--proxy-service-name",
+      "introducedIn": "7.43.0",
+      "attributes": {
+        "short": null,
+        "arg": "<name>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-ssl-allow-beast",
+      "name": "--proxy-ssl-allow-beast",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-ssl-auto-client-cert",
+      "name": "--proxy-ssl-auto-client-cert",
+      "introducedIn": "7.77.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--proxy-tls13-ciphers",
+      "name": "--proxy-tls13-ciphers",
+      "introducedIn": "7.61.0",
+      "attributes": {
+        "short": null,
+        "arg": "<list>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-tlsauthtype",
+      "name": "--proxy-tlsauthtype",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<type>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-tlspassword",
+      "name": "--proxy-tlspassword",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<string>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-tlsuser",
+      "name": "--proxy-tlsuser",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": "<name>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-tlsv1",
+      "name": "--proxy-tlsv1",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy-user",
+      "name": "--proxy-user",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-U",
+        "arg": "<user:password>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxy1.0",
+      "name": "--proxy1.0",
+      "introducedIn": "7.19.4",
+      "attributes": {
+        "short": null,
+        "arg": "<host[:port]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--proxytunnel",
+      "name": "--proxytunnel",
+      "introducedIn": "7.3",
+      "attributes": {
+        "short": "-p",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--pubkey",
+      "name": "--pubkey",
+      "introducedIn": "7.16.2",
+      "attributes": {
+        "short": null,
+        "arg": "<key>",
+        "protocols": [
+          "SFTP",
+          "SCP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--quote",
+      "name": "--quote",
+      "introducedIn": "5.3",
+      "attributes": {
+        "short": "-Q",
+        "arg": "<command>",
+        "protocols": [
+          "FTP",
+          "SFTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--random-file",
+      "name": "--random-file",
+      "introducedIn": "7.7",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--range",
+      "name": "--range",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-r",
+        "arg": "<range>",
+        "protocols": [
+          "HTTP",
+          "FTP",
+          "SFTP",
+          "FILE"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--rate",
+      "name": "--rate",
+      "introducedIn": "7.84.0",
+      "attributes": {
+        "short": null,
+        "arg": "<max request rate>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--raw",
+      "name": "--raw",
+      "introducedIn": "7.16.2",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--referer",
+      "name": "--referer",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-e",
+        "arg": "<URL>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--remote-header-name",
+      "name": "--remote-header-name",
+      "introducedIn": "7.20.0",
+      "attributes": {
+        "short": "-J",
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--remote-name",
+      "name": "--remote-name",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-O",
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--remote-name-all",
+      "name": "--remote-name-all",
+      "introducedIn": "7.19.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--remote-time",
+      "name": "--remote-time",
+      "introducedIn": "7.9",
+      "attributes": {
+        "short": "-R",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--remove-on-error",
+      "name": "--remove-on-error",
+      "introducedIn": "7.83.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--request",
+      "name": "--request",
+      "introducedIn": "6.0",
+      "attributes": {
+        "short": "-X",
+        "arg": "<method>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--request-target",
+      "name": "--request-target",
+      "introducedIn": "7.55.0",
+      "attributes": {
+        "short": null,
+        "arg": "<path>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--resolve",
+      "name": "--resolve",
+      "introducedIn": "7.21.3",
+      "attributes": {
+        "short": null,
+        "arg": "<[+]host:port:addr[,addr]...>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--retry",
+      "name": "--retry",
+      "introducedIn": "7.12.3",
+      "attributes": {
+        "short": null,
+        "arg": "<num>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--retry-all-errors",
+      "name": "--retry-all-errors",
+      "introducedIn": "7.71.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--retry-connrefused",
+      "name": "--retry-connrefused",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--retry-delay",
+      "name": "--retry-delay",
+      "introducedIn": "7.12.3",
+      "attributes": {
+        "short": null,
+        "arg": "<seconds>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--retry-max-time",
+      "name": "--retry-max-time",
+      "introducedIn": "7.12.3",
+      "attributes": {
+        "short": null,
+        "arg": "<seconds>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--sasl-authzid",
+      "name": "--sasl-authzid",
+      "introducedIn": "7.66.0",
+      "attributes": {
+        "short": null,
+        "arg": "<identity>",
+        "protocols": [
+          "LDAP",
+          "IMAP",
+          "POP3",
+          "SMTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--sasl-ir",
+      "name": "--sasl-ir",
+      "introducedIn": "7.31.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "LDAP",
+          "IMAP",
+          "POP3",
+          "SMTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--service-name",
+      "name": "--service-name",
+      "introducedIn": "7.43.0",
+      "attributes": {
+        "short": null,
+        "arg": "<name>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--show-error",
+      "name": "--show-error",
+      "introducedIn": "5.9",
+      "attributes": {
+        "short": "-S",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--show-headers",
+      "name": "--show-headers",
+      "introducedIn": "4.8",
+      "attributes": {
+        "short": "-i",
+        "arg": null,
+        "protocols": [
+          "HTTP",
+          "FTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--sigalgs",
+      "name": "--sigalgs",
+      "introducedIn": "8.14.0",
+      "attributes": {
+        "short": null,
+        "arg": "<list>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--silent",
+      "name": "--silent",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-s",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--skip-existing",
+      "name": "--skip-existing",
+      "introducedIn": "8.10.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--socks4",
+      "name": "--socks4",
+      "introducedIn": "7.15.2",
+      "attributes": {
+        "short": null,
+        "arg": "<host[:port]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--socks4a",
+      "name": "--socks4a",
+      "introducedIn": "7.18.0",
+      "attributes": {
+        "short": null,
+        "arg": "<host[:port]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--socks5",
+      "name": "--socks5",
+      "introducedIn": "7.18.0",
+      "attributes": {
+        "short": null,
+        "arg": "<host[:port]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--socks5-basic",
+      "name": "--socks5-basic",
+      "introducedIn": "7.55.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--socks5-gssapi",
+      "name": "--socks5-gssapi",
+      "introducedIn": "7.55.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "GSS/kerberos"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--socks5-gssapi-nec",
+      "name": "--socks5-gssapi-nec",
+      "introducedIn": "7.19.4",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "GSS/kerberos"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--socks5-gssapi-service",
+      "name": "--socks5-gssapi-service",
+      "introducedIn": "7.19.4",
+      "attributes": {
+        "short": null,
+        "arg": "<name>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--socks5-hostname",
+      "name": "--socks5-hostname",
+      "introducedIn": "7.18.0",
+      "attributes": {
+        "short": null,
+        "arg": "<host[:port]>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--speed-limit",
+      "name": "--speed-limit",
+      "introducedIn": "4.7",
+      "attributes": {
+        "short": "-Y",
+        "arg": "<speed>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--speed-time",
+      "name": "--speed-time",
+      "introducedIn": "4.7",
+      "attributes": {
+        "short": "-y",
+        "arg": "<seconds>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--ssl",
+      "name": "--ssl",
+      "introducedIn": "7.20.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "IMAP",
+          "POP3",
+          "SMTP",
+          "LDAP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ssl-allow-beast",
+      "name": "--ssl-allow-beast",
+      "introducedIn": "7.25.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ssl-auto-client-cert",
+      "name": "--ssl-auto-client-cert",
+      "introducedIn": "7.77.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ssl-no-revoke",
+      "name": "--ssl-no-revoke",
+      "introducedIn": "7.44.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ssl-reqd",
+      "name": "--ssl-reqd",
+      "introducedIn": "7.20.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "IMAP",
+          "POP3",
+          "SMTP",
+          "LDAP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ssl-revoke-best-effort",
+      "name": "--ssl-revoke-best-effort",
+      "introducedIn": "7.70.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--ssl-sessions",
+      "name": "--ssl-sessions",
+      "introducedIn": "8.12.0",
+      "attributes": {
+        "short": null,
+        "arg": "<filename>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--sslv2",
+      "name": "--sslv2",
+      "introducedIn": "5.9",
+      "attributes": {
+        "short": "-2",
+        "arg": null,
+        "protocols": [
+          "SSL"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--sslv3",
+      "name": "--sslv3",
+      "introducedIn": "5.9",
+      "attributes": {
+        "short": "-3",
+        "arg": null,
+        "protocols": [
+          "SSL"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--stderr",
+      "name": "--stderr",
+      "introducedIn": "6.2",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--styled-output",
+      "name": "--styled-output",
+      "introducedIn": "7.61.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--suppress-connect-headers",
+      "name": "--suppress-connect-headers",
+      "introducedIn": "7.54.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--tcp-fastopen",
+      "name": "--tcp-fastopen",
+      "introducedIn": "7.49.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--tcp-nodelay",
+      "name": "--tcp-nodelay",
+      "introducedIn": "7.11.2",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--telnet-option",
+      "name": "--telnet-option",
+      "introducedIn": "7.7",
+      "attributes": {
+        "short": "-t",
+        "arg": "<opt=val>",
+        "protocols": [
+          "TELNET"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tftp-blksize",
+      "name": "--tftp-blksize",
+      "introducedIn": "7.20.0",
+      "attributes": {
+        "short": null,
+        "arg": "<value>",
+        "protocols": [
+          "TFTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tftp-no-options",
+      "name": "--tftp-no-options",
+      "introducedIn": "7.48.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TFTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--time-cond",
+      "name": "--time-cond",
+      "introducedIn": "5.8",
+      "attributes": {
+        "short": "-z",
+        "arg": "<time>",
+        "protocols": [
+          "HTTP",
+          "FTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tls-earlydata",
+      "name": "--tls-earlydata",
+      "introducedIn": "8.11.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--tls-max",
+      "name": "--tls-max",
+      "introducedIn": "7.54.0",
+      "attributes": {
+        "short": null,
+        "arg": "<VERSION>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tls13-ciphers",
+      "name": "--tls13-ciphers",
+      "introducedIn": "7.61.0",
+      "attributes": {
+        "short": null,
+        "arg": "<list>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlsauthtype",
+      "name": "--tlsauthtype",
+      "introducedIn": "7.21.4",
+      "attributes": {
+        "short": null,
+        "arg": "<type>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlspassword",
+      "name": "--tlspassword",
+      "introducedIn": "7.21.4",
+      "attributes": {
+        "short": null,
+        "arg": "<string>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlsuser",
+      "name": "--tlsuser",
+      "introducedIn": "7.21.4",
+      "attributes": {
+        "short": null,
+        "arg": "<name>",
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlsv1",
+      "name": "--tlsv1",
+      "introducedIn": "7.9.2",
+      "attributes": {
+        "short": "-1",
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlsv1.0",
+      "name": "--tlsv1.0",
+      "introducedIn": "7.34.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlsv1.1",
+      "name": "--tlsv1.1",
+      "introducedIn": "7.34.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlsv1.2",
+      "name": "--tlsv1.2",
+      "introducedIn": "7.34.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tlsv1.3",
+      "name": "--tlsv1.3",
+      "introducedIn": "7.52.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "TLS"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--tr-encoding",
+      "name": "--tr-encoding",
+      "introducedIn": "7.21.6",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--trace",
+      "name": "--trace",
+      "introducedIn": "7.9.7",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--trace-ascii",
+      "name": "--trace-ascii",
+      "introducedIn": "7.9.7",
+      "attributes": {
+        "short": null,
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--trace-config",
+      "name": "--trace-config",
+      "introducedIn": "8.3.0",
+      "attributes": {
+        "short": null,
+        "arg": "<string>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--trace-ids",
+      "name": "--trace-ids",
+      "introducedIn": "8.2.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--trace-time",
+      "name": "--trace-time",
+      "introducedIn": "7.14.0",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--unix-socket",
+      "name": "--unix-socket",
+      "introducedIn": "7.40.0",
+      "attributes": {
+        "short": null,
+        "arg": "<path>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--upload-file",
+      "name": "--upload-file",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-T",
+        "arg": "<file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--upload-flags",
+      "name": "--upload-flags",
+      "introducedIn": "8.13.0",
+      "attributes": {
+        "short": null,
+        "arg": "<flags>",
+        "protocols": [
+          "IMAP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--url",
+      "name": "--url",
+      "introducedIn": "7.5",
+      "attributes": {
+        "short": null,
+        "arg": "<url/file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--url-query",
+      "name": "--url-query",
+      "introducedIn": "7.87.0",
+      "attributes": {
+        "short": null,
+        "arg": "<data>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--use-ascii",
+      "name": "--use-ascii",
+      "introducedIn": "5.0",
+      "attributes": {
+        "short": "-B",
+        "arg": null,
+        "protocols": [
+          "FTP",
+          "LDAP",
+          "TFTP"
+        ],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--user",
+      "name": "--user",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-u",
+        "arg": "<user:password>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--user-agent",
+      "name": "--user-agent",
+      "introducedIn": "4.5.1",
+      "attributes": {
+        "short": "-A",
+        "arg": "<name>",
+        "protocols": [
+          "HTTP"
+        ],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--variable",
+      "name": "--variable",
+      "introducedIn": "8.3.0",
+      "attributes": {
+        "short": null,
+        "arg": "<[%]name=text/@file>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--verbose",
+      "name": "--verbose",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-v",
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    },
+    {
+      "key": "options:--version",
+      "name": "--version",
+      "introducedIn": "4.0",
+      "attributes": {
+        "short": "-V",
+        "arg": null,
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--vlan-priority",
+      "name": "--vlan-priority",
+      "introducedIn": "8.9.0",
+      "attributes": {
+        "short": null,
+        "arg": "<priority>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--write-out",
+      "name": "--write-out",
+      "introducedIn": "6.5",
+      "attributes": {
+        "short": "-w",
+        "arg": "<format>",
+        "protocols": [],
+        "boolean": false,
+        "noForm": false
+      }
+    },
+    {
+      "key": "options:--xattr",
+      "name": "--xattr",
+      "introducedIn": "7.21.3",
+      "attributes": {
+        "short": null,
+        "arg": null,
+        "protocols": [],
+        "boolean": true,
+        "noForm": true
+      }
+    }
+  ]
+}

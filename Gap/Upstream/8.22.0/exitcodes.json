@@ -1,0 +1,3047 @@
+{
+  "area": "exitcodes",
+  "version": "8.22.0",
+  "sources": [
+    "docs/libcurl/libcurl-errors.md",
+    "docs/cmdline-opts/_EXITCODES.md",
+    "lib/strerror.c"
+  ],
+  "items": [
+    {
+      "key": "exitcodes:0",
+      "name": "CURLE_OK",
+      "introducedIn": null,
+      "attributes": {
+        "number": 0,
+        "curleName": "CURLE_OK",
+        "strerror": "No error",
+        "exitText": "Success. The operation completed successfully according to the instructions."
+      }
+    },
+    {
+      "key": "exitcodes:0:man",
+      "name": "CURLE_OK",
+      "introducedIn": null,
+      "attributes": {
+        "number": 0,
+        "curleName": "CURLE_OK",
+        "strerror": "No error",
+        "exitText": "Success. The operation completed successfully according to the instructions."
+      }
+    },
+    {
+      "key": "exitcodes:0:strerror",
+      "name": "CURLE_OK",
+      "introducedIn": null,
+      "attributes": {
+        "number": 0,
+        "curleName": "CURLE_OK",
+        "strerror": "No error",
+        "exitText": "Success. The operation completed successfully according to the instructions."
+      }
+    },
+    {
+      "key": "exitcodes:1",
+      "name": "CURLE_UNSUPPORTED_PROTOCOL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 1,
+        "curleName": "CURLE_UNSUPPORTED_PROTOCOL",
+        "strerror": "Unsupported protocol",
+        "exitText": "Unsupported protocol. This build of curl has no support for this protocol."
+      }
+    },
+    {
+      "key": "exitcodes:10",
+      "name": "CURLE_FTP_ACCEPT_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 10,
+        "curleName": "CURLE_FTP_ACCEPT_FAILED",
+        "strerror": "FTP: The server failed to connect to data port",
+        "exitText": "FTP accept failed. While waiting for the server to connect back when an active FTP session is used, an error code was sent over the control connection or similar."
+      }
+    },
+    {
+      "key": "exitcodes:100",
+      "name": "CURLE_TOO_LARGE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 100,
+        "curleName": "CURLE_TOO_LARGE",
+        "strerror": "A value or data field grew larger than allowed",
+        "exitText": "A value or data field grew larger than allowed."
+      }
+    },
+    {
+      "key": "exitcodes:100:man",
+      "name": "CURLE_TOO_LARGE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 100,
+        "curleName": "CURLE_TOO_LARGE",
+        "strerror": "A value or data field grew larger than allowed",
+        "exitText": "A value or data field grew larger than allowed."
+      }
+    },
+    {
+      "key": "exitcodes:100:strerror",
+      "name": "CURLE_TOO_LARGE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 100,
+        "curleName": "CURLE_TOO_LARGE",
+        "strerror": "A value or data field grew larger than allowed",
+        "exitText": "A value or data field grew larger than allowed."
+      }
+    },
+    {
+      "key": "exitcodes:101",
+      "name": "CURLE_ECH_REQUIRED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 101,
+        "curleName": "CURLE_ECH_REQUIRED",
+        "strerror": "ECH attempted but failed",
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:101:strerror",
+      "name": "CURLE_ECH_REQUIRED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 101,
+        "curleName": "CURLE_ECH_REQUIRED",
+        "strerror": "ECH attempted but failed",
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:10:man",
+      "name": "CURLE_FTP_ACCEPT_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 10,
+        "curleName": "CURLE_FTP_ACCEPT_FAILED",
+        "strerror": "FTP: The server failed to connect to data port",
+        "exitText": "FTP accept failed. While waiting for the server to connect back when an active FTP session is used, an error code was sent over the control connection or similar."
+      }
+    },
+    {
+      "key": "exitcodes:10:strerror",
+      "name": "CURLE_FTP_ACCEPT_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 10,
+        "curleName": "CURLE_FTP_ACCEPT_FAILED",
+        "strerror": "FTP: The server failed to connect to data port",
+        "exitText": "FTP accept failed. While waiting for the server to connect back when an active FTP session is used, an error code was sent over the control connection or similar."
+      }
+    },
+    {
+      "key": "exitcodes:11",
+      "name": "CURLE_FTP_WEIRD_PASS_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 11,
+        "curleName": "CURLE_FTP_WEIRD_PASS_REPLY",
+        "strerror": "FTP: unknown PASS reply",
+        "exitText": "FTP weird PASS reply. curl could not parse the reply sent to the PASS request."
+      }
+    },
+    {
+      "key": "exitcodes:11:man",
+      "name": "CURLE_FTP_WEIRD_PASS_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 11,
+        "curleName": "CURLE_FTP_WEIRD_PASS_REPLY",
+        "strerror": "FTP: unknown PASS reply",
+        "exitText": "FTP weird PASS reply. curl could not parse the reply sent to the PASS request."
+      }
+    },
+    {
+      "key": "exitcodes:11:strerror",
+      "name": "CURLE_FTP_WEIRD_PASS_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 11,
+        "curleName": "CURLE_FTP_WEIRD_PASS_REPLY",
+        "strerror": "FTP: unknown PASS reply",
+        "exitText": "FTP weird PASS reply. curl could not parse the reply sent to the PASS request."
+      }
+    },
+    {
+      "key": "exitcodes:12",
+      "name": "CURLE_FTP_ACCEPT_TIMEOUT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 12,
+        "curleName": "CURLE_FTP_ACCEPT_TIMEOUT",
+        "strerror": "FTP: Accepting server connect has timed out",
+        "exitText": "During an active FTP session while waiting for the server to connect back to curl, the timeout expired."
+      }
+    },
+    {
+      "key": "exitcodes:12:man",
+      "name": "CURLE_FTP_ACCEPT_TIMEOUT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 12,
+        "curleName": "CURLE_FTP_ACCEPT_TIMEOUT",
+        "strerror": "FTP: Accepting server connect has timed out",
+        "exitText": "During an active FTP session while waiting for the server to connect back to curl, the timeout expired."
+      }
+    },
+    {
+      "key": "exitcodes:12:strerror",
+      "name": "CURLE_FTP_ACCEPT_TIMEOUT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 12,
+        "curleName": "CURLE_FTP_ACCEPT_TIMEOUT",
+        "strerror": "FTP: Accepting server connect has timed out",
+        "exitText": "During an active FTP session while waiting for the server to connect back to curl, the timeout expired."
+      }
+    },
+    {
+      "key": "exitcodes:13",
+      "name": "CURLE_FTP_WEIRD_PASV_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 13,
+        "curleName": "CURLE_FTP_WEIRD_PASV_REPLY",
+        "strerror": "FTP: unknown PASV reply",
+        "exitText": "FTP weird PASV reply, curl could not parse the reply sent to the PASV request."
+      }
+    },
+    {
+      "key": "exitcodes:13:man",
+      "name": "CURLE_FTP_WEIRD_PASV_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 13,
+        "curleName": "CURLE_FTP_WEIRD_PASV_REPLY",
+        "strerror": "FTP: unknown PASV reply",
+        "exitText": "FTP weird PASV reply, curl could not parse the reply sent to the PASV request."
+      }
+    },
+    {
+      "key": "exitcodes:13:strerror",
+      "name": "CURLE_FTP_WEIRD_PASV_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 13,
+        "curleName": "CURLE_FTP_WEIRD_PASV_REPLY",
+        "strerror": "FTP: unknown PASV reply",
+        "exitText": "FTP weird PASV reply, curl could not parse the reply sent to the PASV request."
+      }
+    },
+    {
+      "key": "exitcodes:14",
+      "name": "CURLE_FTP_WEIRD_227_FORMAT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 14,
+        "curleName": "CURLE_FTP_WEIRD_227_FORMAT",
+        "strerror": "FTP: unknown 227 response format",
+        "exitText": "FTP weird 227 format. curl could not parse the 227-line the server sent."
+      }
+    },
+    {
+      "key": "exitcodes:14:man",
+      "name": "CURLE_FTP_WEIRD_227_FORMAT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 14,
+        "curleName": "CURLE_FTP_WEIRD_227_FORMAT",
+        "strerror": "FTP: unknown 227 response format",
+        "exitText": "FTP weird 227 format. curl could not parse the 227-line the server sent."
+      }
+    },
+    {
+      "key": "exitcodes:14:strerror",
+      "name": "CURLE_FTP_WEIRD_227_FORMAT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 14,
+        "curleName": "CURLE_FTP_WEIRD_227_FORMAT",
+        "strerror": "FTP: unknown 227 response format",
+        "exitText": "FTP weird 227 format. curl could not parse the 227-line the server sent."
+      }
+    },
+    {
+      "key": "exitcodes:15",
+      "name": "CURLE_FTP_CANT_GET_HOST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 15,
+        "curleName": "CURLE_FTP_CANT_GET_HOST",
+        "strerror": "FTP: cannot figure out the host in the PASV response",
+        "exitText": "FTP cannot use host. Could not resolve the host IP we got in the 227-line."
+      }
+    },
+    {
+      "key": "exitcodes:15:man",
+      "name": "CURLE_FTP_CANT_GET_HOST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 15,
+        "curleName": "CURLE_FTP_CANT_GET_HOST",
+        "strerror": "FTP: cannot figure out the host in the PASV response",
+        "exitText": "FTP cannot use host. Could not resolve the host IP we got in the 227-line."
+      }
+    },
+    {
+      "key": "exitcodes:15:strerror",
+      "name": "CURLE_FTP_CANT_GET_HOST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 15,
+        "curleName": "CURLE_FTP_CANT_GET_HOST",
+        "strerror": "FTP: cannot figure out the host in the PASV response",
+        "exitText": "FTP cannot use host. Could not resolve the host IP we got in the 227-line."
+      }
+    },
+    {
+      "key": "exitcodes:16",
+      "name": "CURLE_HTTP2",
+      "introducedIn": null,
+      "attributes": {
+        "number": 16,
+        "curleName": "CURLE_HTTP2",
+        "strerror": "Error in the HTTP2 framing layer",
+        "exitText": "HTTP/2 error. A problem was detected in the HTTP2 framing layer. This is somewhat generic and can be one out of several problems, see the error message for details."
+      }
+    },
+    {
+      "key": "exitcodes:16:man",
+      "name": "CURLE_HTTP2",
+      "introducedIn": null,
+      "attributes": {
+        "number": 16,
+        "curleName": "CURLE_HTTP2",
+        "strerror": "Error in the HTTP2 framing layer",
+        "exitText": "HTTP/2 error. A problem was detected in the HTTP2 framing layer. This is somewhat generic and can be one out of several problems, see the error message for details."
+      }
+    },
+    {
+      "key": "exitcodes:16:strerror",
+      "name": "CURLE_HTTP2",
+      "introducedIn": null,
+      "attributes": {
+        "number": 16,
+        "curleName": "CURLE_HTTP2",
+        "strerror": "Error in the HTTP2 framing layer",
+        "exitText": "HTTP/2 error. A problem was detected in the HTTP2 framing layer. This is somewhat generic and can be one out of several problems, see the error message for details."
+      }
+    },
+    {
+      "key": "exitcodes:17",
+      "name": "CURLE_FTP_COULDNT_SET_TYPE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 17,
+        "curleName": "CURLE_FTP_COULDNT_SET_TYPE",
+        "strerror": "FTP: could not set file type",
+        "exitText": "FTP could not set binary. Could not change transfer method to binary."
+      }
+    },
+    {
+      "key": "exitcodes:17:man",
+      "name": "CURLE_FTP_COULDNT_SET_TYPE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 17,
+        "curleName": "CURLE_FTP_COULDNT_SET_TYPE",
+        "strerror": "FTP: could not set file type",
+        "exitText": "FTP could not set binary. Could not change transfer method to binary."
+      }
+    },
+    {
+      "key": "exitcodes:17:strerror",
+      "name": "CURLE_FTP_COULDNT_SET_TYPE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 17,
+        "curleName": "CURLE_FTP_COULDNT_SET_TYPE",
+        "strerror": "FTP: could not set file type",
+        "exitText": "FTP could not set binary. Could not change transfer method to binary."
+      }
+    },
+    {
+      "key": "exitcodes:18",
+      "name": "CURLE_PARTIAL_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 18,
+        "curleName": "CURLE_PARTIAL_FILE",
+        "strerror": "Transferred a partial file",
+        "exitText": "Partial file. Only a part of the file was transferred."
+      }
+    },
+    {
+      "key": "exitcodes:18:man",
+      "name": "CURLE_PARTIAL_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 18,
+        "curleName": "CURLE_PARTIAL_FILE",
+        "strerror": "Transferred a partial file",
+        "exitText": "Partial file. Only a part of the file was transferred."
+      }
+    },
+    {
+      "key": "exitcodes:18:strerror",
+      "name": "CURLE_PARTIAL_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 18,
+        "curleName": "CURLE_PARTIAL_FILE",
+        "strerror": "Transferred a partial file",
+        "exitText": "Partial file. Only a part of the file was transferred."
+      }
+    },
+    {
+      "key": "exitcodes:19",
+      "name": "CURLE_FTP_COULDNT_RETR_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 19,
+        "curleName": "CURLE_FTP_COULDNT_RETR_FILE",
+        "strerror": "FTP: could not retrieve (RETR failed) the specified file",
+        "exitText": "FTP could not download/access the given file, the RETR (or similar) command failed."
+      }
+    },
+    {
+      "key": "exitcodes:19:man",
+      "name": "CURLE_FTP_COULDNT_RETR_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 19,
+        "curleName": "CURLE_FTP_COULDNT_RETR_FILE",
+        "strerror": "FTP: could not retrieve (RETR failed) the specified file",
+        "exitText": "FTP could not download/access the given file, the RETR (or similar) command failed."
+      }
+    },
+    {
+      "key": "exitcodes:19:strerror",
+      "name": "CURLE_FTP_COULDNT_RETR_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 19,
+        "curleName": "CURLE_FTP_COULDNT_RETR_FILE",
+        "strerror": "FTP: could not retrieve (RETR failed) the specified file",
+        "exitText": "FTP could not download/access the given file, the RETR (or similar) command failed."
+      }
+    },
+    {
+      "key": "exitcodes:1:man",
+      "name": "CURLE_UNSUPPORTED_PROTOCOL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 1,
+        "curleName": "CURLE_UNSUPPORTED_PROTOCOL",
+        "strerror": "Unsupported protocol",
+        "exitText": "Unsupported protocol. This build of curl has no support for this protocol."
+      }
+    },
+    {
+      "key": "exitcodes:1:strerror",
+      "name": "CURLE_UNSUPPORTED_PROTOCOL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 1,
+        "curleName": "CURLE_UNSUPPORTED_PROTOCOL",
+        "strerror": "Unsupported protocol",
+        "exitText": "Unsupported protocol. This build of curl has no support for this protocol."
+      }
+    },
+    {
+      "key": "exitcodes:2",
+      "name": "CURLE_FAILED_INIT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 2,
+        "curleName": "CURLE_FAILED_INIT",
+        "strerror": "Failed initialization",
+        "exitText": "Failed to initialize."
+      }
+    },
+    {
+      "key": "exitcodes:20",
+      "name": "CURLE_OBSOLETE20",
+      "introducedIn": null,
+      "attributes": {
+        "number": 20,
+        "curleName": "CURLE_OBSOLETE20",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:21",
+      "name": "CURLE_QUOTE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 21,
+        "curleName": "CURLE_QUOTE_ERROR",
+        "strerror": "Quote command returned error",
+        "exitText": "FTP quote error. A quote command returned error from the server."
+      }
+    },
+    {
+      "key": "exitcodes:21:man",
+      "name": "CURLE_QUOTE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 21,
+        "curleName": "CURLE_QUOTE_ERROR",
+        "strerror": "Quote command returned error",
+        "exitText": "FTP quote error. A quote command returned error from the server."
+      }
+    },
+    {
+      "key": "exitcodes:21:strerror",
+      "name": "CURLE_QUOTE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 21,
+        "curleName": "CURLE_QUOTE_ERROR",
+        "strerror": "Quote command returned error",
+        "exitText": "FTP quote error. A quote command returned error from the server."
+      }
+    },
+    {
+      "key": "exitcodes:22",
+      "name": "CURLE_HTTP_RETURNED_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 22,
+        "curleName": "CURLE_HTTP_RETURNED_ERROR",
+        "strerror": "HTTP response code said error",
+        "exitText": "HTTP page not retrieved. The requested URL was not found or returned another error with the HTTP error code being 400 or above. This return code only appears if --fail is used."
+      }
+    },
+    {
+      "key": "exitcodes:22:man",
+      "name": "CURLE_HTTP_RETURNED_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 22,
+        "curleName": "CURLE_HTTP_RETURNED_ERROR",
+        "strerror": "HTTP response code said error",
+        "exitText": "HTTP page not retrieved. The requested URL was not found or returned another error with the HTTP error code being 400 or above. This return code only appears if --fail is used."
+      }
+    },
+    {
+      "key": "exitcodes:22:strerror",
+      "name": "CURLE_HTTP_RETURNED_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 22,
+        "curleName": "CURLE_HTTP_RETURNED_ERROR",
+        "strerror": "HTTP response code said error",
+        "exitText": "HTTP page not retrieved. The requested URL was not found or returned another error with the HTTP error code being 400 or above. This return code only appears if --fail is used."
+      }
+    },
+    {
+      "key": "exitcodes:23",
+      "name": "CURLE_WRITE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 23,
+        "curleName": "CURLE_WRITE_ERROR",
+        "strerror": "Failed writing received data to disk/application",
+        "exitText": "Write error. curl could not write data to a local file system or similar."
+      }
+    },
+    {
+      "key": "exitcodes:23:man",
+      "name": "CURLE_WRITE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 23,
+        "curleName": "CURLE_WRITE_ERROR",
+        "strerror": "Failed writing received data to disk/application",
+        "exitText": "Write error. curl could not write data to a local file system or similar."
+      }
+    },
+    {
+      "key": "exitcodes:23:strerror",
+      "name": "CURLE_WRITE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 23,
+        "curleName": "CURLE_WRITE_ERROR",
+        "strerror": "Failed writing received data to disk/application",
+        "exitText": "Write error. curl could not write data to a local file system or similar."
+      }
+    },
+    {
+      "key": "exitcodes:24",
+      "name": "CURLE_OBSOLETE24",
+      "introducedIn": null,
+      "attributes": {
+        "number": 24,
+        "curleName": "CURLE_OBSOLETE24",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:25",
+      "name": "CURLE_UPLOAD_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 25,
+        "curleName": "CURLE_UPLOAD_FAILED",
+        "strerror": "Upload failed (at start/before it took off)",
+        "exitText": "Failed starting the upload. For FTP, the server typically denied the STOR command."
+      }
+    },
+    {
+      "key": "exitcodes:25:man",
+      "name": "CURLE_UPLOAD_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 25,
+        "curleName": "CURLE_UPLOAD_FAILED",
+        "strerror": "Upload failed (at start/before it took off)",
+        "exitText": "Failed starting the upload. For FTP, the server typically denied the STOR command."
+      }
+    },
+    {
+      "key": "exitcodes:25:strerror",
+      "name": "CURLE_UPLOAD_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 25,
+        "curleName": "CURLE_UPLOAD_FAILED",
+        "strerror": "Upload failed (at start/before it took off)",
+        "exitText": "Failed starting the upload. For FTP, the server typically denied the STOR command."
+      }
+    },
+    {
+      "key": "exitcodes:26",
+      "name": "CURLE_READ_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 26,
+        "curleName": "CURLE_READ_ERROR",
+        "strerror": "Failed to open/read local data from file/application",
+        "exitText": "Read error. Various reading problems."
+      }
+    },
+    {
+      "key": "exitcodes:26:man",
+      "name": "CURLE_READ_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 26,
+        "curleName": "CURLE_READ_ERROR",
+        "strerror": "Failed to open/read local data from file/application",
+        "exitText": "Read error. Various reading problems."
+      }
+    },
+    {
+      "key": "exitcodes:26:strerror",
+      "name": "CURLE_READ_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 26,
+        "curleName": "CURLE_READ_ERROR",
+        "strerror": "Failed to open/read local data from file/application",
+        "exitText": "Read error. Various reading problems."
+      }
+    },
+    {
+      "key": "exitcodes:27",
+      "name": "CURLE_OUT_OF_MEMORY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 27,
+        "curleName": "CURLE_OUT_OF_MEMORY",
+        "strerror": "Out of memory",
+        "exitText": "Out of memory. A memory allocation request failed."
+      }
+    },
+    {
+      "key": "exitcodes:27:man",
+      "name": "CURLE_OUT_OF_MEMORY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 27,
+        "curleName": "CURLE_OUT_OF_MEMORY",
+        "strerror": "Out of memory",
+        "exitText": "Out of memory. A memory allocation request failed."
+      }
+    },
+    {
+      "key": "exitcodes:27:strerror",
+      "name": "CURLE_OUT_OF_MEMORY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 27,
+        "curleName": "CURLE_OUT_OF_MEMORY",
+        "strerror": "Out of memory",
+        "exitText": "Out of memory. A memory allocation request failed."
+      }
+    },
+    {
+      "key": "exitcodes:28",
+      "name": "CURLE_OPERATION_TIMEDOUT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 28,
+        "curleName": "CURLE_OPERATION_TIMEDOUT",
+        "strerror": "Timeout was reached",
+        "exitText": "Operation timeout. The specified time-out period was reached according to the conditions."
+      }
+    },
+    {
+      "key": "exitcodes:28:man",
+      "name": "CURLE_OPERATION_TIMEDOUT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 28,
+        "curleName": "CURLE_OPERATION_TIMEDOUT",
+        "strerror": "Timeout was reached",
+        "exitText": "Operation timeout. The specified time-out period was reached according to the conditions."
+      }
+    },
+    {
+      "key": "exitcodes:28:strerror",
+      "name": "CURLE_OPERATION_TIMEDOUT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 28,
+        "curleName": "CURLE_OPERATION_TIMEDOUT",
+        "strerror": "Timeout was reached",
+        "exitText": "Operation timeout. The specified time-out period was reached according to the conditions."
+      }
+    },
+    {
+      "key": "exitcodes:29",
+      "name": "CURLE_OBSOLETE29",
+      "introducedIn": null,
+      "attributes": {
+        "number": 29,
+        "curleName": "CURLE_OBSOLETE29",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:2:man",
+      "name": "CURLE_FAILED_INIT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 2,
+        "curleName": "CURLE_FAILED_INIT",
+        "strerror": "Failed initialization",
+        "exitText": "Failed to initialize."
+      }
+    },
+    {
+      "key": "exitcodes:2:strerror",
+      "name": "CURLE_FAILED_INIT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 2,
+        "curleName": "CURLE_FAILED_INIT",
+        "strerror": "Failed initialization",
+        "exitText": "Failed to initialize."
+      }
+    },
+    {
+      "key": "exitcodes:3",
+      "name": "CURLE_URL_MALFORMAT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 3,
+        "curleName": "CURLE_URL_MALFORMAT",
+        "strerror": "URL using bad/illegal format or missing URL",
+        "exitText": "URL malformed. The syntax was not correct."
+      }
+    },
+    {
+      "key": "exitcodes:30",
+      "name": "CURLE_FTP_PORT_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 30,
+        "curleName": "CURLE_FTP_PORT_FAILED",
+        "strerror": "FTP: command PORT failed",
+        "exitText": "FTP PORT failed. The PORT command failed. Not all FTP servers support the PORT command, try doing a transfer using PASV instead."
+      }
+    },
+    {
+      "key": "exitcodes:30:man",
+      "name": "CURLE_FTP_PORT_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 30,
+        "curleName": "CURLE_FTP_PORT_FAILED",
+        "strerror": "FTP: command PORT failed",
+        "exitText": "FTP PORT failed. The PORT command failed. Not all FTP servers support the PORT command, try doing a transfer using PASV instead."
+      }
+    },
+    {
+      "key": "exitcodes:30:strerror",
+      "name": "CURLE_FTP_PORT_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 30,
+        "curleName": "CURLE_FTP_PORT_FAILED",
+        "strerror": "FTP: command PORT failed",
+        "exitText": "FTP PORT failed. The PORT command failed. Not all FTP servers support the PORT command, try doing a transfer using PASV instead."
+      }
+    },
+    {
+      "key": "exitcodes:31",
+      "name": "CURLE_FTP_COULDNT_USE_REST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 31,
+        "curleName": "CURLE_FTP_COULDNT_USE_REST",
+        "strerror": "FTP: command REST failed",
+        "exitText": "FTP could not use REST. The REST command failed. This command is used for resumed FTP transfers."
+      }
+    },
+    {
+      "key": "exitcodes:31:man",
+      "name": "CURLE_FTP_COULDNT_USE_REST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 31,
+        "curleName": "CURLE_FTP_COULDNT_USE_REST",
+        "strerror": "FTP: command REST failed",
+        "exitText": "FTP could not use REST. The REST command failed. This command is used for resumed FTP transfers."
+      }
+    },
+    {
+      "key": "exitcodes:31:strerror",
+      "name": "CURLE_FTP_COULDNT_USE_REST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 31,
+        "curleName": "CURLE_FTP_COULDNT_USE_REST",
+        "strerror": "FTP: command REST failed",
+        "exitText": "FTP could not use REST. The REST command failed. This command is used for resumed FTP transfers."
+      }
+    },
+    {
+      "key": "exitcodes:32",
+      "name": "CURLE_OBSOLETE32",
+      "introducedIn": null,
+      "attributes": {
+        "number": 32,
+        "curleName": "CURLE_OBSOLETE32",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:33",
+      "name": "CURLE_RANGE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 33,
+        "curleName": "CURLE_RANGE_ERROR",
+        "strerror": "Requested range was not delivered by the server",
+        "exitText": "HTTP range error. The range \"command\" did not work."
+      }
+    },
+    {
+      "key": "exitcodes:33:man",
+      "name": "CURLE_RANGE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 33,
+        "curleName": "CURLE_RANGE_ERROR",
+        "strerror": "Requested range was not delivered by the server",
+        "exitText": "HTTP range error. The range \"command\" did not work."
+      }
+    },
+    {
+      "key": "exitcodes:33:strerror",
+      "name": "CURLE_RANGE_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 33,
+        "curleName": "CURLE_RANGE_ERROR",
+        "strerror": "Requested range was not delivered by the server",
+        "exitText": "HTTP range error. The range \"command\" did not work."
+      }
+    },
+    {
+      "key": "exitcodes:34",
+      "name": "CURLE_OBSOLETE34",
+      "introducedIn": null,
+      "attributes": {
+        "number": 34,
+        "curleName": "CURLE_OBSOLETE34",
+        "strerror": null,
+        "exitText": "HTTP post error. Internal post-request generation error."
+      }
+    },
+    {
+      "key": "exitcodes:34:man",
+      "name": "CURLE_OBSOLETE34",
+      "introducedIn": null,
+      "attributes": {
+        "number": 34,
+        "curleName": "CURLE_OBSOLETE34",
+        "strerror": null,
+        "exitText": "HTTP post error. Internal post-request generation error."
+      }
+    },
+    {
+      "key": "exitcodes:35",
+      "name": "CURLE_SSL_CONNECT_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 35,
+        "curleName": "CURLE_SSL_CONNECT_ERROR",
+        "strerror": "SSL connect error",
+        "exitText": "SSL connect error. The SSL handshaking failed."
+      }
+    },
+    {
+      "key": "exitcodes:35:man",
+      "name": "CURLE_SSL_CONNECT_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 35,
+        "curleName": "CURLE_SSL_CONNECT_ERROR",
+        "strerror": "SSL connect error",
+        "exitText": "SSL connect error. The SSL handshaking failed."
+      }
+    },
+    {
+      "key": "exitcodes:35:strerror",
+      "name": "CURLE_SSL_CONNECT_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 35,
+        "curleName": "CURLE_SSL_CONNECT_ERROR",
+        "strerror": "SSL connect error",
+        "exitText": "SSL connect error. The SSL handshaking failed."
+      }
+    },
+    {
+      "key": "exitcodes:36",
+      "name": "CURLE_BAD_DOWNLOAD_RESUME",
+      "introducedIn": null,
+      "attributes": {
+        "number": 36,
+        "curleName": "CURLE_BAD_DOWNLOAD_RESUME",
+        "strerror": "Could not resume download",
+        "exitText": "Bad download resume. Could not continue an earlier aborted download."
+      }
+    },
+    {
+      "key": "exitcodes:36:man",
+      "name": "CURLE_BAD_DOWNLOAD_RESUME",
+      "introducedIn": null,
+      "attributes": {
+        "number": 36,
+        "curleName": "CURLE_BAD_DOWNLOAD_RESUME",
+        "strerror": "Could not resume download",
+        "exitText": "Bad download resume. Could not continue an earlier aborted download."
+      }
+    },
+    {
+      "key": "exitcodes:36:strerror",
+      "name": "CURLE_BAD_DOWNLOAD_RESUME",
+      "introducedIn": null,
+      "attributes": {
+        "number": 36,
+        "curleName": "CURLE_BAD_DOWNLOAD_RESUME",
+        "strerror": "Could not resume download",
+        "exitText": "Bad download resume. Could not continue an earlier aborted download."
+      }
+    },
+    {
+      "key": "exitcodes:37",
+      "name": "CURLE_FILE_COULDNT_READ_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 37,
+        "curleName": "CURLE_FILE_COULDNT_READ_FILE",
+        "strerror": "Could not read a file:// file",
+        "exitText": "FILE could not read file. Failed to open the file. Permissions?"
+      }
+    },
+    {
+      "key": "exitcodes:37:man",
+      "name": "CURLE_FILE_COULDNT_READ_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 37,
+        "curleName": "CURLE_FILE_COULDNT_READ_FILE",
+        "strerror": "Could not read a file:// file",
+        "exitText": "FILE could not read file. Failed to open the file. Permissions?"
+      }
+    },
+    {
+      "key": "exitcodes:37:strerror",
+      "name": "CURLE_FILE_COULDNT_READ_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 37,
+        "curleName": "CURLE_FILE_COULDNT_READ_FILE",
+        "strerror": "Could not read a file:// file",
+        "exitText": "FILE could not read file. Failed to open the file. Permissions?"
+      }
+    },
+    {
+      "key": "exitcodes:38",
+      "name": "CURLE_LDAP_CANNOT_BIND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 38,
+        "curleName": "CURLE_LDAP_CANNOT_BIND",
+        "strerror": "LDAP: cannot bind",
+        "exitText": "LDAP cannot bind. LDAP bind operation failed."
+      }
+    },
+    {
+      "key": "exitcodes:38:man",
+      "name": "CURLE_LDAP_CANNOT_BIND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 38,
+        "curleName": "CURLE_LDAP_CANNOT_BIND",
+        "strerror": "LDAP: cannot bind",
+        "exitText": "LDAP cannot bind. LDAP bind operation failed."
+      }
+    },
+    {
+      "key": "exitcodes:38:strerror",
+      "name": "CURLE_LDAP_CANNOT_BIND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 38,
+        "curleName": "CURLE_LDAP_CANNOT_BIND",
+        "strerror": "LDAP: cannot bind",
+        "exitText": "LDAP cannot bind. LDAP bind operation failed."
+      }
+    },
+    {
+      "key": "exitcodes:39",
+      "name": "CURLE_LDAP_SEARCH_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 39,
+        "curleName": "CURLE_LDAP_SEARCH_FAILED",
+        "strerror": "LDAP: search failed",
+        "exitText": "LDAP search failed."
+      }
+    },
+    {
+      "key": "exitcodes:39:man",
+      "name": "CURLE_LDAP_SEARCH_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 39,
+        "curleName": "CURLE_LDAP_SEARCH_FAILED",
+        "strerror": "LDAP: search failed",
+        "exitText": "LDAP search failed."
+      }
+    },
+    {
+      "key": "exitcodes:39:strerror",
+      "name": "CURLE_LDAP_SEARCH_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 39,
+        "curleName": "CURLE_LDAP_SEARCH_FAILED",
+        "strerror": "LDAP: search failed",
+        "exitText": "LDAP search failed."
+      }
+    },
+    {
+      "key": "exitcodes:3:man",
+      "name": "CURLE_URL_MALFORMAT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 3,
+        "curleName": "CURLE_URL_MALFORMAT",
+        "strerror": "URL using bad/illegal format or missing URL",
+        "exitText": "URL malformed. The syntax was not correct."
+      }
+    },
+    {
+      "key": "exitcodes:3:strerror",
+      "name": "CURLE_URL_MALFORMAT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 3,
+        "curleName": "CURLE_URL_MALFORMAT",
+        "strerror": "URL using bad/illegal format or missing URL",
+        "exitText": "URL malformed. The syntax was not correct."
+      }
+    },
+    {
+      "key": "exitcodes:4",
+      "name": "CURLE_NOT_BUILT_IN",
+      "introducedIn": null,
+      "attributes": {
+        "number": 4,
+        "curleName": "CURLE_NOT_BUILT_IN",
+        "strerror": "A requested feature, protocol or option was not found built-in in this libcurl due to a build-time decision.",
+        "exitText": "A feature or option that was needed to perform the desired request was not enabled or was explicitly disabled at build-time. To make curl able to do this, you probably need another build of libcurl."
+      }
+    },
+    {
+      "key": "exitcodes:40",
+      "name": "CURLE_OBSOLETE40",
+      "introducedIn": null,
+      "attributes": {
+        "number": 40,
+        "curleName": "CURLE_OBSOLETE40",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:41",
+      "name": "CURLE_OBSOLETE41",
+      "introducedIn": null,
+      "attributes": {
+        "number": 41,
+        "curleName": "CURLE_OBSOLETE41",
+        "strerror": null,
+        "exitText": "Function not found. A required LDAP function was not found."
+      }
+    },
+    {
+      "key": "exitcodes:41:man",
+      "name": "CURLE_OBSOLETE41",
+      "introducedIn": null,
+      "attributes": {
+        "number": 41,
+        "curleName": "CURLE_OBSOLETE41",
+        "strerror": null,
+        "exitText": "Function not found. A required LDAP function was not found."
+      }
+    },
+    {
+      "key": "exitcodes:42",
+      "name": "CURLE_ABORTED_BY_CALLBACK",
+      "introducedIn": null,
+      "attributes": {
+        "number": 42,
+        "curleName": "CURLE_ABORTED_BY_CALLBACK",
+        "strerror": "Operation was aborted by an application callback",
+        "exitText": "Aborted by callback. An application told curl to abort the operation."
+      }
+    },
+    {
+      "key": "exitcodes:42:man",
+      "name": "CURLE_ABORTED_BY_CALLBACK",
+      "introducedIn": null,
+      "attributes": {
+        "number": 42,
+        "curleName": "CURLE_ABORTED_BY_CALLBACK",
+        "strerror": "Operation was aborted by an application callback",
+        "exitText": "Aborted by callback. An application told curl to abort the operation."
+      }
+    },
+    {
+      "key": "exitcodes:42:strerror",
+      "name": "CURLE_ABORTED_BY_CALLBACK",
+      "introducedIn": null,
+      "attributes": {
+        "number": 42,
+        "curleName": "CURLE_ABORTED_BY_CALLBACK",
+        "strerror": "Operation was aborted by an application callback",
+        "exitText": "Aborted by callback. An application told curl to abort the operation."
+      }
+    },
+    {
+      "key": "exitcodes:43",
+      "name": "CURLE_BAD_FUNCTION_ARGUMENT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 43,
+        "curleName": "CURLE_BAD_FUNCTION_ARGUMENT",
+        "strerror": "A libcurl function was given a bad argument",
+        "exitText": "Internal error. A function was called with a bad parameter."
+      }
+    },
+    {
+      "key": "exitcodes:43:man",
+      "name": "CURLE_BAD_FUNCTION_ARGUMENT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 43,
+        "curleName": "CURLE_BAD_FUNCTION_ARGUMENT",
+        "strerror": "A libcurl function was given a bad argument",
+        "exitText": "Internal error. A function was called with a bad parameter."
+      }
+    },
+    {
+      "key": "exitcodes:43:strerror",
+      "name": "CURLE_BAD_FUNCTION_ARGUMENT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 43,
+        "curleName": "CURLE_BAD_FUNCTION_ARGUMENT",
+        "strerror": "A libcurl function was given a bad argument",
+        "exitText": "Internal error. A function was called with a bad parameter."
+      }
+    },
+    {
+      "key": "exitcodes:44",
+      "name": "CURLE_OBSOLETE44",
+      "introducedIn": null,
+      "attributes": {
+        "number": 44,
+        "curleName": "CURLE_OBSOLETE44",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:45",
+      "name": "CURLE_INTERFACE_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 45,
+        "curleName": "CURLE_INTERFACE_FAILED",
+        "strerror": "Failed binding local connection end",
+        "exitText": "Interface error. A specified outgoing interface could not be used."
+      }
+    },
+    {
+      "key": "exitcodes:45:man",
+      "name": "CURLE_INTERFACE_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 45,
+        "curleName": "CURLE_INTERFACE_FAILED",
+        "strerror": "Failed binding local connection end",
+        "exitText": "Interface error. A specified outgoing interface could not be used."
+      }
+    },
+    {
+      "key": "exitcodes:45:strerror",
+      "name": "CURLE_INTERFACE_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 45,
+        "curleName": "CURLE_INTERFACE_FAILED",
+        "strerror": "Failed binding local connection end",
+        "exitText": "Interface error. A specified outgoing interface could not be used."
+      }
+    },
+    {
+      "key": "exitcodes:46",
+      "name": "CURLE_OBSOLETE46",
+      "introducedIn": null,
+      "attributes": {
+        "number": 46,
+        "curleName": "CURLE_OBSOLETE46",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:47",
+      "name": "CURLE_TOO_MANY_REDIRECTS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 47,
+        "curleName": "CURLE_TOO_MANY_REDIRECTS",
+        "strerror": "Number of redirects hit maximum amount",
+        "exitText": "Too many redirects. When following redirects, curl hit the maximum amount."
+      }
+    },
+    {
+      "key": "exitcodes:47:man",
+      "name": "CURLE_TOO_MANY_REDIRECTS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 47,
+        "curleName": "CURLE_TOO_MANY_REDIRECTS",
+        "strerror": "Number of redirects hit maximum amount",
+        "exitText": "Too many redirects. When following redirects, curl hit the maximum amount."
+      }
+    },
+    {
+      "key": "exitcodes:47:strerror",
+      "name": "CURLE_TOO_MANY_REDIRECTS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 47,
+        "curleName": "CURLE_TOO_MANY_REDIRECTS",
+        "strerror": "Number of redirects hit maximum amount",
+        "exitText": "Too many redirects. When following redirects, curl hit the maximum amount."
+      }
+    },
+    {
+      "key": "exitcodes:48",
+      "name": "CURLE_UNKNOWN_OPTION",
+      "introducedIn": null,
+      "attributes": {
+        "number": 48,
+        "curleName": "CURLE_UNKNOWN_OPTION",
+        "strerror": "An unknown option was passed in to libcurl",
+        "exitText": "Unknown option specified to libcurl. This indicates that you passed a weird option to curl that was passed on to libcurl and rejected. Read up in the manual."
+      }
+    },
+    {
+      "key": "exitcodes:48:man",
+      "name": "CURLE_UNKNOWN_OPTION",
+      "introducedIn": null,
+      "attributes": {
+        "number": 48,
+        "curleName": "CURLE_UNKNOWN_OPTION",
+        "strerror": "An unknown option was passed in to libcurl",
+        "exitText": "Unknown option specified to libcurl. This indicates that you passed a weird option to curl that was passed on to libcurl and rejected. Read up in the manual."
+      }
+    },
+    {
+      "key": "exitcodes:48:strerror",
+      "name": "CURLE_UNKNOWN_OPTION",
+      "introducedIn": null,
+      "attributes": {
+        "number": 48,
+        "curleName": "CURLE_UNKNOWN_OPTION",
+        "strerror": "An unknown option was passed in to libcurl",
+        "exitText": "Unknown option specified to libcurl. This indicates that you passed a weird option to curl that was passed on to libcurl and rejected. Read up in the manual."
+      }
+    },
+    {
+      "key": "exitcodes:49",
+      "name": "CURLE_SETOPT_OPTION_SYNTAX",
+      "introducedIn": null,
+      "attributes": {
+        "number": 49,
+        "curleName": "CURLE_SETOPT_OPTION_SYNTAX",
+        "strerror": "Malformed option provided in a setopt",
+        "exitText": "Malformed telnet option."
+      }
+    },
+    {
+      "key": "exitcodes:49:man",
+      "name": "CURLE_SETOPT_OPTION_SYNTAX",
+      "introducedIn": null,
+      "attributes": {
+        "number": 49,
+        "curleName": "CURLE_SETOPT_OPTION_SYNTAX",
+        "strerror": "Malformed option provided in a setopt",
+        "exitText": "Malformed telnet option."
+      }
+    },
+    {
+      "key": "exitcodes:49:strerror",
+      "name": "CURLE_SETOPT_OPTION_SYNTAX",
+      "introducedIn": null,
+      "attributes": {
+        "number": 49,
+        "curleName": "CURLE_SETOPT_OPTION_SYNTAX",
+        "strerror": "Malformed option provided in a setopt",
+        "exitText": "Malformed telnet option."
+      }
+    },
+    {
+      "key": "exitcodes:4:man",
+      "name": "CURLE_NOT_BUILT_IN",
+      "introducedIn": null,
+      "attributes": {
+        "number": 4,
+        "curleName": "CURLE_NOT_BUILT_IN",
+        "strerror": "A requested feature, protocol or option was not found built-in in this libcurl due to a build-time decision.",
+        "exitText": "A feature or option that was needed to perform the desired request was not enabled or was explicitly disabled at build-time. To make curl able to do this, you probably need another build of libcurl."
+      }
+    },
+    {
+      "key": "exitcodes:4:strerror",
+      "name": "CURLE_NOT_BUILT_IN",
+      "introducedIn": null,
+      "attributes": {
+        "number": 4,
+        "curleName": "CURLE_NOT_BUILT_IN",
+        "strerror": "A requested feature, protocol or option was not found built-in in this libcurl due to a build-time decision.",
+        "exitText": "A feature or option that was needed to perform the desired request was not enabled or was explicitly disabled at build-time. To make curl able to do this, you probably need another build of libcurl."
+      }
+    },
+    {
+      "key": "exitcodes:5",
+      "name": "CURLE_COULDNT_RESOLVE_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 5,
+        "curleName": "CURLE_COULDNT_RESOLVE_PROXY",
+        "strerror": "Could not resolve proxy name",
+        "exitText": "Could not resolve proxy. The given proxy host could not be resolved."
+      }
+    },
+    {
+      "key": "exitcodes:50",
+      "name": "CURLE_OBSOLETE50",
+      "introducedIn": null,
+      "attributes": {
+        "number": 50,
+        "curleName": "CURLE_OBSOLETE50",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:51",
+      "name": "CURLE_OBSOLETE51",
+      "introducedIn": null,
+      "attributes": {
+        "number": 51,
+        "curleName": "CURLE_OBSOLETE51",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:52",
+      "name": "CURLE_GOT_NOTHING",
+      "introducedIn": null,
+      "attributes": {
+        "number": 52,
+        "curleName": "CURLE_GOT_NOTHING",
+        "strerror": "Server returned nothing (no headers, no data)",
+        "exitText": "The server did not reply anything, which here is considered an error."
+      }
+    },
+    {
+      "key": "exitcodes:52:man",
+      "name": "CURLE_GOT_NOTHING",
+      "introducedIn": null,
+      "attributes": {
+        "number": 52,
+        "curleName": "CURLE_GOT_NOTHING",
+        "strerror": "Server returned nothing (no headers, no data)",
+        "exitText": "The server did not reply anything, which here is considered an error."
+      }
+    },
+    {
+      "key": "exitcodes:52:strerror",
+      "name": "CURLE_GOT_NOTHING",
+      "introducedIn": null,
+      "attributes": {
+        "number": 52,
+        "curleName": "CURLE_GOT_NOTHING",
+        "strerror": "Server returned nothing (no headers, no data)",
+        "exitText": "The server did not reply anything, which here is considered an error."
+      }
+    },
+    {
+      "key": "exitcodes:53",
+      "name": "CURLE_SSL_ENGINE_NOTFOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 53,
+        "curleName": "CURLE_SSL_ENGINE_NOTFOUND",
+        "strerror": "SSL crypto engine not found",
+        "exitText": "SSL crypto engine not found."
+      }
+    },
+    {
+      "key": "exitcodes:53:man",
+      "name": "CURLE_SSL_ENGINE_NOTFOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 53,
+        "curleName": "CURLE_SSL_ENGINE_NOTFOUND",
+        "strerror": "SSL crypto engine not found",
+        "exitText": "SSL crypto engine not found."
+      }
+    },
+    {
+      "key": "exitcodes:53:strerror",
+      "name": "CURLE_SSL_ENGINE_NOTFOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 53,
+        "curleName": "CURLE_SSL_ENGINE_NOTFOUND",
+        "strerror": "SSL crypto engine not found",
+        "exitText": "SSL crypto engine not found."
+      }
+    },
+    {
+      "key": "exitcodes:54",
+      "name": "CURLE_SSL_ENGINE_SETFAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 54,
+        "curleName": "CURLE_SSL_ENGINE_SETFAILED",
+        "strerror": "Can not set SSL crypto engine as default",
+        "exitText": "Cannot set SSL crypto engine as default."
+      }
+    },
+    {
+      "key": "exitcodes:54:man",
+      "name": "CURLE_SSL_ENGINE_SETFAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 54,
+        "curleName": "CURLE_SSL_ENGINE_SETFAILED",
+        "strerror": "Can not set SSL crypto engine as default",
+        "exitText": "Cannot set SSL crypto engine as default."
+      }
+    },
+    {
+      "key": "exitcodes:54:strerror",
+      "name": "CURLE_SSL_ENGINE_SETFAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 54,
+        "curleName": "CURLE_SSL_ENGINE_SETFAILED",
+        "strerror": "Can not set SSL crypto engine as default",
+        "exitText": "Cannot set SSL crypto engine as default."
+      }
+    },
+    {
+      "key": "exitcodes:55",
+      "name": "CURLE_SEND_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 55,
+        "curleName": "CURLE_SEND_ERROR",
+        "strerror": "Failed sending data to the peer",
+        "exitText": "Failed sending network data."
+      }
+    },
+    {
+      "key": "exitcodes:55:man",
+      "name": "CURLE_SEND_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 55,
+        "curleName": "CURLE_SEND_ERROR",
+        "strerror": "Failed sending data to the peer",
+        "exitText": "Failed sending network data."
+      }
+    },
+    {
+      "key": "exitcodes:55:strerror",
+      "name": "CURLE_SEND_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 55,
+        "curleName": "CURLE_SEND_ERROR",
+        "strerror": "Failed sending data to the peer",
+        "exitText": "Failed sending network data."
+      }
+    },
+    {
+      "key": "exitcodes:56",
+      "name": "CURLE_RECV_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 56,
+        "curleName": "CURLE_RECV_ERROR",
+        "strerror": "Failure when receiving data from the peer",
+        "exitText": "Failure in receiving network data."
+      }
+    },
+    {
+      "key": "exitcodes:56:man",
+      "name": "CURLE_RECV_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 56,
+        "curleName": "CURLE_RECV_ERROR",
+        "strerror": "Failure when receiving data from the peer",
+        "exitText": "Failure in receiving network data."
+      }
+    },
+    {
+      "key": "exitcodes:56:strerror",
+      "name": "CURLE_RECV_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 56,
+        "curleName": "CURLE_RECV_ERROR",
+        "strerror": "Failure when receiving data from the peer",
+        "exitText": "Failure in receiving network data."
+      }
+    },
+    {
+      "key": "exitcodes:57",
+      "name": "CURLE_OBSOLETE57",
+      "introducedIn": null,
+      "attributes": {
+        "number": 57,
+        "curleName": "CURLE_OBSOLETE57",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:58",
+      "name": "CURLE_SSL_CERTPROBLEM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 58,
+        "curleName": "CURLE_SSL_CERTPROBLEM",
+        "strerror": "Problem with the local SSL certificate",
+        "exitText": "Problem with the local certificate."
+      }
+    },
+    {
+      "key": "exitcodes:58:man",
+      "name": "CURLE_SSL_CERTPROBLEM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 58,
+        "curleName": "CURLE_SSL_CERTPROBLEM",
+        "strerror": "Problem with the local SSL certificate",
+        "exitText": "Problem with the local certificate."
+      }
+    },
+    {
+      "key": "exitcodes:58:strerror",
+      "name": "CURLE_SSL_CERTPROBLEM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 58,
+        "curleName": "CURLE_SSL_CERTPROBLEM",
+        "strerror": "Problem with the local SSL certificate",
+        "exitText": "Problem with the local certificate."
+      }
+    },
+    {
+      "key": "exitcodes:59",
+      "name": "CURLE_SSL_CIPHER",
+      "introducedIn": null,
+      "attributes": {
+        "number": 59,
+        "curleName": "CURLE_SSL_CIPHER",
+        "strerror": "Could not use specified SSL cipher",
+        "exitText": "Could not use specified SSL cipher."
+      }
+    },
+    {
+      "key": "exitcodes:59:man",
+      "name": "CURLE_SSL_CIPHER",
+      "introducedIn": null,
+      "attributes": {
+        "number": 59,
+        "curleName": "CURLE_SSL_CIPHER",
+        "strerror": "Could not use specified SSL cipher",
+        "exitText": "Could not use specified SSL cipher."
+      }
+    },
+    {
+      "key": "exitcodes:59:strerror",
+      "name": "CURLE_SSL_CIPHER",
+      "introducedIn": null,
+      "attributes": {
+        "number": 59,
+        "curleName": "CURLE_SSL_CIPHER",
+        "strerror": "Could not use specified SSL cipher",
+        "exitText": "Could not use specified SSL cipher."
+      }
+    },
+    {
+      "key": "exitcodes:5:man",
+      "name": "CURLE_COULDNT_RESOLVE_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 5,
+        "curleName": "CURLE_COULDNT_RESOLVE_PROXY",
+        "strerror": "Could not resolve proxy name",
+        "exitText": "Could not resolve proxy. The given proxy host could not be resolved."
+      }
+    },
+    {
+      "key": "exitcodes:5:strerror",
+      "name": "CURLE_COULDNT_RESOLVE_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 5,
+        "curleName": "CURLE_COULDNT_RESOLVE_PROXY",
+        "strerror": "Could not resolve proxy name",
+        "exitText": "Could not resolve proxy. The given proxy host could not be resolved."
+      }
+    },
+    {
+      "key": "exitcodes:6",
+      "name": "CURLE_COULDNT_RESOLVE_HOST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 6,
+        "curleName": "CURLE_COULDNT_RESOLVE_HOST",
+        "strerror": "Could not resolve hostname",
+        "exitText": "Could not resolve host. The given remote host could not be resolved."
+      }
+    },
+    {
+      "key": "exitcodes:60",
+      "name": "CURLE_PEER_FAILED_VERIFICATION",
+      "introducedIn": null,
+      "attributes": {
+        "number": 60,
+        "curleName": "CURLE_PEER_FAILED_VERIFICATION",
+        "strerror": "SSL peer certificate or SSH remote key was not OK",
+        "exitText": "Peer certificate cannot be authenticated with known CA certificates."
+      }
+    },
+    {
+      "key": "exitcodes:60:man",
+      "name": "CURLE_PEER_FAILED_VERIFICATION",
+      "introducedIn": null,
+      "attributes": {
+        "number": 60,
+        "curleName": "CURLE_PEER_FAILED_VERIFICATION",
+        "strerror": "SSL peer certificate or SSH remote key was not OK",
+        "exitText": "Peer certificate cannot be authenticated with known CA certificates."
+      }
+    },
+    {
+      "key": "exitcodes:60:strerror",
+      "name": "CURLE_PEER_FAILED_VERIFICATION",
+      "introducedIn": null,
+      "attributes": {
+        "number": 60,
+        "curleName": "CURLE_PEER_FAILED_VERIFICATION",
+        "strerror": "SSL peer certificate or SSH remote key was not OK",
+        "exitText": "Peer certificate cannot be authenticated with known CA certificates."
+      }
+    },
+    {
+      "key": "exitcodes:61",
+      "name": "CURLE_BAD_CONTENT_ENCODING",
+      "introducedIn": null,
+      "attributes": {
+        "number": 61,
+        "curleName": "CURLE_BAD_CONTENT_ENCODING",
+        "strerror": "Unrecognized or bad HTTP Content or Transfer-Encoding",
+        "exitText": "Unrecognized transfer encoding."
+      }
+    },
+    {
+      "key": "exitcodes:61:man",
+      "name": "CURLE_BAD_CONTENT_ENCODING",
+      "introducedIn": null,
+      "attributes": {
+        "number": 61,
+        "curleName": "CURLE_BAD_CONTENT_ENCODING",
+        "strerror": "Unrecognized or bad HTTP Content or Transfer-Encoding",
+        "exitText": "Unrecognized transfer encoding."
+      }
+    },
+    {
+      "key": "exitcodes:61:strerror",
+      "name": "CURLE_BAD_CONTENT_ENCODING",
+      "introducedIn": null,
+      "attributes": {
+        "number": 61,
+        "curleName": "CURLE_BAD_CONTENT_ENCODING",
+        "strerror": "Unrecognized or bad HTTP Content or Transfer-Encoding",
+        "exitText": "Unrecognized transfer encoding."
+      }
+    },
+    {
+      "key": "exitcodes:62",
+      "name": "CURLE_OBSOLETE62",
+      "introducedIn": null,
+      "attributes": {
+        "number": 62,
+        "curleName": "CURLE_OBSOLETE62",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:63",
+      "name": "CURLE_FILESIZE_EXCEEDED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 63,
+        "curleName": "CURLE_FILESIZE_EXCEEDED",
+        "strerror": "Maximum file size exceeded",
+        "exitText": "Maximum file size exceeded."
+      }
+    },
+    {
+      "key": "exitcodes:63:man",
+      "name": "CURLE_FILESIZE_EXCEEDED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 63,
+        "curleName": "CURLE_FILESIZE_EXCEEDED",
+        "strerror": "Maximum file size exceeded",
+        "exitText": "Maximum file size exceeded."
+      }
+    },
+    {
+      "key": "exitcodes:63:strerror",
+      "name": "CURLE_FILESIZE_EXCEEDED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 63,
+        "curleName": "CURLE_FILESIZE_EXCEEDED",
+        "strerror": "Maximum file size exceeded",
+        "exitText": "Maximum file size exceeded."
+      }
+    },
+    {
+      "key": "exitcodes:64",
+      "name": "CURLE_USE_SSL_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 64,
+        "curleName": "CURLE_USE_SSL_FAILED",
+        "strerror": "Requested SSL level failed",
+        "exitText": "Requested FTP SSL level failed."
+      }
+    },
+    {
+      "key": "exitcodes:64:man",
+      "name": "CURLE_USE_SSL_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 64,
+        "curleName": "CURLE_USE_SSL_FAILED",
+        "strerror": "Requested SSL level failed",
+        "exitText": "Requested FTP SSL level failed."
+      }
+    },
+    {
+      "key": "exitcodes:64:strerror",
+      "name": "CURLE_USE_SSL_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 64,
+        "curleName": "CURLE_USE_SSL_FAILED",
+        "strerror": "Requested SSL level failed",
+        "exitText": "Requested FTP SSL level failed."
+      }
+    },
+    {
+      "key": "exitcodes:65",
+      "name": "CURLE_SEND_FAIL_REWIND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 65,
+        "curleName": "CURLE_SEND_FAIL_REWIND",
+        "strerror": "Send failed since rewinding of the data stream failed",
+        "exitText": "Sending the data requires a rewind that failed."
+      }
+    },
+    {
+      "key": "exitcodes:65:man",
+      "name": "CURLE_SEND_FAIL_REWIND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 65,
+        "curleName": "CURLE_SEND_FAIL_REWIND",
+        "strerror": "Send failed since rewinding of the data stream failed",
+        "exitText": "Sending the data requires a rewind that failed."
+      }
+    },
+    {
+      "key": "exitcodes:65:strerror",
+      "name": "CURLE_SEND_FAIL_REWIND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 65,
+        "curleName": "CURLE_SEND_FAIL_REWIND",
+        "strerror": "Send failed since rewinding of the data stream failed",
+        "exitText": "Sending the data requires a rewind that failed."
+      }
+    },
+    {
+      "key": "exitcodes:66",
+      "name": "CURLE_SSL_ENGINE_INITFAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 66,
+        "curleName": "CURLE_SSL_ENGINE_INITFAILED",
+        "strerror": "Failed to initialize SSL crypto engine",
+        "exitText": "Failed to initialize SSL Engine."
+      }
+    },
+    {
+      "key": "exitcodes:66:man",
+      "name": "CURLE_SSL_ENGINE_INITFAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 66,
+        "curleName": "CURLE_SSL_ENGINE_INITFAILED",
+        "strerror": "Failed to initialize SSL crypto engine",
+        "exitText": "Failed to initialize SSL Engine."
+      }
+    },
+    {
+      "key": "exitcodes:66:strerror",
+      "name": "CURLE_SSL_ENGINE_INITFAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 66,
+        "curleName": "CURLE_SSL_ENGINE_INITFAILED",
+        "strerror": "Failed to initialize SSL crypto engine",
+        "exitText": "Failed to initialize SSL Engine."
+      }
+    },
+    {
+      "key": "exitcodes:67",
+      "name": "CURLE_LOGIN_DENIED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 67,
+        "curleName": "CURLE_LOGIN_DENIED",
+        "strerror": "Login denied",
+        "exitText": "The username, password, or similar was not accepted and curl failed to log in."
+      }
+    },
+    {
+      "key": "exitcodes:67:man",
+      "name": "CURLE_LOGIN_DENIED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 67,
+        "curleName": "CURLE_LOGIN_DENIED",
+        "strerror": "Login denied",
+        "exitText": "The username, password, or similar was not accepted and curl failed to log in."
+      }
+    },
+    {
+      "key": "exitcodes:67:strerror",
+      "name": "CURLE_LOGIN_DENIED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 67,
+        "curleName": "CURLE_LOGIN_DENIED",
+        "strerror": "Login denied",
+        "exitText": "The username, password, or similar was not accepted and curl failed to log in."
+      }
+    },
+    {
+      "key": "exitcodes:68",
+      "name": "CURLE_TFTP_NOTFOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 68,
+        "curleName": "CURLE_TFTP_NOTFOUND",
+        "strerror": "TFTP: File Not Found",
+        "exitText": "File not found on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:68:man",
+      "name": "CURLE_TFTP_NOTFOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 68,
+        "curleName": "CURLE_TFTP_NOTFOUND",
+        "strerror": "TFTP: File Not Found",
+        "exitText": "File not found on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:68:strerror",
+      "name": "CURLE_TFTP_NOTFOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 68,
+        "curleName": "CURLE_TFTP_NOTFOUND",
+        "strerror": "TFTP: File Not Found",
+        "exitText": "File not found on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:69",
+      "name": "CURLE_TFTP_PERM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 69,
+        "curleName": "CURLE_TFTP_PERM",
+        "strerror": "TFTP: Access Violation",
+        "exitText": "Permission problem on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:69:man",
+      "name": "CURLE_TFTP_PERM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 69,
+        "curleName": "CURLE_TFTP_PERM",
+        "strerror": "TFTP: Access Violation",
+        "exitText": "Permission problem on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:69:strerror",
+      "name": "CURLE_TFTP_PERM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 69,
+        "curleName": "CURLE_TFTP_PERM",
+        "strerror": "TFTP: Access Violation",
+        "exitText": "Permission problem on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:6:man",
+      "name": "CURLE_COULDNT_RESOLVE_HOST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 6,
+        "curleName": "CURLE_COULDNT_RESOLVE_HOST",
+        "strerror": "Could not resolve hostname",
+        "exitText": "Could not resolve host. The given remote host could not be resolved."
+      }
+    },
+    {
+      "key": "exitcodes:6:strerror",
+      "name": "CURLE_COULDNT_RESOLVE_HOST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 6,
+        "curleName": "CURLE_COULDNT_RESOLVE_HOST",
+        "strerror": "Could not resolve hostname",
+        "exitText": "Could not resolve host. The given remote host could not be resolved."
+      }
+    },
+    {
+      "key": "exitcodes:7",
+      "name": "CURLE_COULDNT_CONNECT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 7,
+        "curleName": "CURLE_COULDNT_CONNECT",
+        "strerror": "Could not connect to server",
+        "exitText": "Failed to connect to host."
+      }
+    },
+    {
+      "key": "exitcodes:70",
+      "name": "CURLE_REMOTE_DISK_FULL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 70,
+        "curleName": "CURLE_REMOTE_DISK_FULL",
+        "strerror": "Disk full or allocation exceeded",
+        "exitText": "Out of disk space on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:70:man",
+      "name": "CURLE_REMOTE_DISK_FULL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 70,
+        "curleName": "CURLE_REMOTE_DISK_FULL",
+        "strerror": "Disk full or allocation exceeded",
+        "exitText": "Out of disk space on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:70:strerror",
+      "name": "CURLE_REMOTE_DISK_FULL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 70,
+        "curleName": "CURLE_REMOTE_DISK_FULL",
+        "strerror": "Disk full or allocation exceeded",
+        "exitText": "Out of disk space on TFTP server."
+      }
+    },
+    {
+      "key": "exitcodes:71",
+      "name": "CURLE_TFTP_ILLEGAL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 71,
+        "curleName": "CURLE_TFTP_ILLEGAL",
+        "strerror": "TFTP: Illegal operation",
+        "exitText": "Illegal TFTP operation."
+      }
+    },
+    {
+      "key": "exitcodes:71:man",
+      "name": "CURLE_TFTP_ILLEGAL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 71,
+        "curleName": "CURLE_TFTP_ILLEGAL",
+        "strerror": "TFTP: Illegal operation",
+        "exitText": "Illegal TFTP operation."
+      }
+    },
+    {
+      "key": "exitcodes:71:strerror",
+      "name": "CURLE_TFTP_ILLEGAL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 71,
+        "curleName": "CURLE_TFTP_ILLEGAL",
+        "strerror": "TFTP: Illegal operation",
+        "exitText": "Illegal TFTP operation."
+      }
+    },
+    {
+      "key": "exitcodes:72",
+      "name": "CURLE_TFTP_UNKNOWNID",
+      "introducedIn": null,
+      "attributes": {
+        "number": 72,
+        "curleName": "CURLE_TFTP_UNKNOWNID",
+        "strerror": "TFTP: Unknown transfer ID",
+        "exitText": "Unknown TFTP transfer ID."
+      }
+    },
+    {
+      "key": "exitcodes:72:man",
+      "name": "CURLE_TFTP_UNKNOWNID",
+      "introducedIn": null,
+      "attributes": {
+        "number": 72,
+        "curleName": "CURLE_TFTP_UNKNOWNID",
+        "strerror": "TFTP: Unknown transfer ID",
+        "exitText": "Unknown TFTP transfer ID."
+      }
+    },
+    {
+      "key": "exitcodes:72:strerror",
+      "name": "CURLE_TFTP_UNKNOWNID",
+      "introducedIn": null,
+      "attributes": {
+        "number": 72,
+        "curleName": "CURLE_TFTP_UNKNOWNID",
+        "strerror": "TFTP: Unknown transfer ID",
+        "exitText": "Unknown TFTP transfer ID."
+      }
+    },
+    {
+      "key": "exitcodes:73",
+      "name": "CURLE_REMOTE_FILE_EXISTS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 73,
+        "curleName": "CURLE_REMOTE_FILE_EXISTS",
+        "strerror": "Remote file already exists",
+        "exitText": "File already exists (TFTP)."
+      }
+    },
+    {
+      "key": "exitcodes:73:man",
+      "name": "CURLE_REMOTE_FILE_EXISTS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 73,
+        "curleName": "CURLE_REMOTE_FILE_EXISTS",
+        "strerror": "Remote file already exists",
+        "exitText": "File already exists (TFTP)."
+      }
+    },
+    {
+      "key": "exitcodes:73:strerror",
+      "name": "CURLE_REMOTE_FILE_EXISTS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 73,
+        "curleName": "CURLE_REMOTE_FILE_EXISTS",
+        "strerror": "Remote file already exists",
+        "exitText": "File already exists (TFTP)."
+      }
+    },
+    {
+      "key": "exitcodes:74",
+      "name": "CURLE_TFTP_NOSUCHUSER",
+      "introducedIn": null,
+      "attributes": {
+        "number": 74,
+        "curleName": "CURLE_TFTP_NOSUCHUSER",
+        "strerror": "TFTP: No such user",
+        "exitText": "No such user (TFTP)."
+      }
+    },
+    {
+      "key": "exitcodes:74:man",
+      "name": "CURLE_TFTP_NOSUCHUSER",
+      "introducedIn": null,
+      "attributes": {
+        "number": 74,
+        "curleName": "CURLE_TFTP_NOSUCHUSER",
+        "strerror": "TFTP: No such user",
+        "exitText": "No such user (TFTP)."
+      }
+    },
+    {
+      "key": "exitcodes:74:strerror",
+      "name": "CURLE_TFTP_NOSUCHUSER",
+      "introducedIn": null,
+      "attributes": {
+        "number": 74,
+        "curleName": "CURLE_TFTP_NOSUCHUSER",
+        "strerror": "TFTP: No such user",
+        "exitText": "No such user (TFTP)."
+      }
+    },
+    {
+      "key": "exitcodes:75",
+      "name": "CURLE_OBSOLETE75",
+      "introducedIn": null,
+      "attributes": {
+        "number": 75,
+        "curleName": "CURLE_OBSOLETE75",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:76",
+      "name": "CURLE_OBSOLETE76",
+      "introducedIn": null,
+      "attributes": {
+        "number": 76,
+        "curleName": "CURLE_OBSOLETE76",
+        "strerror": null,
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:77",
+      "name": "CURLE_SSL_CACERT_BADFILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 77,
+        "curleName": "CURLE_SSL_CACERT_BADFILE",
+        "strerror": "Problem with the SSL CA cert (path? access rights?)",
+        "exitText": "Problem reading the SSL CA cert (path? access rights?)."
+      }
+    },
+    {
+      "key": "exitcodes:77:man",
+      "name": "CURLE_SSL_CACERT_BADFILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 77,
+        "curleName": "CURLE_SSL_CACERT_BADFILE",
+        "strerror": "Problem with the SSL CA cert (path? access rights?)",
+        "exitText": "Problem reading the SSL CA cert (path? access rights?)."
+      }
+    },
+    {
+      "key": "exitcodes:77:strerror",
+      "name": "CURLE_SSL_CACERT_BADFILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 77,
+        "curleName": "CURLE_SSL_CACERT_BADFILE",
+        "strerror": "Problem with the SSL CA cert (path? access rights?)",
+        "exitText": "Problem reading the SSL CA cert (path? access rights?)."
+      }
+    },
+    {
+      "key": "exitcodes:78",
+      "name": "CURLE_REMOTE_FILE_NOT_FOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 78,
+        "curleName": "CURLE_REMOTE_FILE_NOT_FOUND",
+        "strerror": "Remote file not found",
+        "exitText": "The resource referenced in the URL does not exist."
+      }
+    },
+    {
+      "key": "exitcodes:78:man",
+      "name": "CURLE_REMOTE_FILE_NOT_FOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 78,
+        "curleName": "CURLE_REMOTE_FILE_NOT_FOUND",
+        "strerror": "Remote file not found",
+        "exitText": "The resource referenced in the URL does not exist."
+      }
+    },
+    {
+      "key": "exitcodes:78:strerror",
+      "name": "CURLE_REMOTE_FILE_NOT_FOUND",
+      "introducedIn": null,
+      "attributes": {
+        "number": 78,
+        "curleName": "CURLE_REMOTE_FILE_NOT_FOUND",
+        "strerror": "Remote file not found",
+        "exitText": "The resource referenced in the URL does not exist."
+      }
+    },
+    {
+      "key": "exitcodes:79",
+      "name": "CURLE_SSH",
+      "introducedIn": null,
+      "attributes": {
+        "number": 79,
+        "curleName": "CURLE_SSH",
+        "strerror": "Error in the SSH layer",
+        "exitText": "An unspecified error occurred during the SSH session."
+      }
+    },
+    {
+      "key": "exitcodes:79:man",
+      "name": "CURLE_SSH",
+      "introducedIn": null,
+      "attributes": {
+        "number": 79,
+        "curleName": "CURLE_SSH",
+        "strerror": "Error in the SSH layer",
+        "exitText": "An unspecified error occurred during the SSH session."
+      }
+    },
+    {
+      "key": "exitcodes:79:strerror",
+      "name": "CURLE_SSH",
+      "introducedIn": null,
+      "attributes": {
+        "number": 79,
+        "curleName": "CURLE_SSH",
+        "strerror": "Error in the SSH layer",
+        "exitText": "An unspecified error occurred during the SSH session."
+      }
+    },
+    {
+      "key": "exitcodes:7:man",
+      "name": "CURLE_COULDNT_CONNECT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 7,
+        "curleName": "CURLE_COULDNT_CONNECT",
+        "strerror": "Could not connect to server",
+        "exitText": "Failed to connect to host."
+      }
+    },
+    {
+      "key": "exitcodes:7:strerror",
+      "name": "CURLE_COULDNT_CONNECT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 7,
+        "curleName": "CURLE_COULDNT_CONNECT",
+        "strerror": "Could not connect to server",
+        "exitText": "Failed to connect to host."
+      }
+    },
+    {
+      "key": "exitcodes:8",
+      "name": "CURLE_WEIRD_SERVER_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 8,
+        "curleName": "CURLE_WEIRD_SERVER_REPLY",
+        "strerror": "Weird server reply",
+        "exitText": "Weird server reply. The server sent data curl could not parse."
+      }
+    },
+    {
+      "key": "exitcodes:80",
+      "name": "CURLE_SSL_SHUTDOWN_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 80,
+        "curleName": "CURLE_SSL_SHUTDOWN_FAILED",
+        "strerror": "Failed to shut down the SSL connection",
+        "exitText": "Failed to shut down the SSL connection."
+      }
+    },
+    {
+      "key": "exitcodes:80:man",
+      "name": "CURLE_SSL_SHUTDOWN_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 80,
+        "curleName": "CURLE_SSL_SHUTDOWN_FAILED",
+        "strerror": "Failed to shut down the SSL connection",
+        "exitText": "Failed to shut down the SSL connection."
+      }
+    },
+    {
+      "key": "exitcodes:80:strerror",
+      "name": "CURLE_SSL_SHUTDOWN_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 80,
+        "curleName": "CURLE_SSL_SHUTDOWN_FAILED",
+        "strerror": "Failed to shut down the SSL connection",
+        "exitText": "Failed to shut down the SSL connection."
+      }
+    },
+    {
+      "key": "exitcodes:81",
+      "name": "CURLE_AGAIN",
+      "introducedIn": null,
+      "attributes": {
+        "number": 81,
+        "curleName": "CURLE_AGAIN",
+        "strerror": "Socket not ready for send/recv",
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:81:strerror",
+      "name": "CURLE_AGAIN",
+      "introducedIn": null,
+      "attributes": {
+        "number": 81,
+        "curleName": "CURLE_AGAIN",
+        "strerror": "Socket not ready for send/recv",
+        "exitText": null
+      }
+    },
+    {
+      "key": "exitcodes:82",
+      "name": "CURLE_SSL_CRL_BADFILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 82,
+        "curleName": "CURLE_SSL_CRL_BADFILE",
+        "strerror": "Failed to load CRL file (path? access rights?, format?)",
+        "exitText": "Could not load CRL file, missing or wrong format (added in 7.19.0)."
+      }
+    },
+    {
+      "key": "exitcodes:82:man",
+      "name": "CURLE_SSL_CRL_BADFILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 82,
+        "curleName": "CURLE_SSL_CRL_BADFILE",
+        "strerror": "Failed to load CRL file (path? access rights?, format?)",
+        "exitText": "Could not load CRL file, missing or wrong format (added in 7.19.0)."
+      }
+    },
+    {
+      "key": "exitcodes:82:strerror",
+      "name": "CURLE_SSL_CRL_BADFILE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 82,
+        "curleName": "CURLE_SSL_CRL_BADFILE",
+        "strerror": "Failed to load CRL file (path? access rights?, format?)",
+        "exitText": "Could not load CRL file, missing or wrong format (added in 7.19.0)."
+      }
+    },
+    {
+      "key": "exitcodes:83",
+      "name": "CURLE_SSL_ISSUER_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 83,
+        "curleName": "CURLE_SSL_ISSUER_ERROR",
+        "strerror": "Issuer check against peer certificate failed",
+        "exitText": "Issuer check failed (added in 7.19.0)."
+      }
+    },
+    {
+      "key": "exitcodes:83:man",
+      "name": "CURLE_SSL_ISSUER_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 83,
+        "curleName": "CURLE_SSL_ISSUER_ERROR",
+        "strerror": "Issuer check against peer certificate failed",
+        "exitText": "Issuer check failed (added in 7.19.0)."
+      }
+    },
+    {
+      "key": "exitcodes:83:strerror",
+      "name": "CURLE_SSL_ISSUER_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 83,
+        "curleName": "CURLE_SSL_ISSUER_ERROR",
+        "strerror": "Issuer check against peer certificate failed",
+        "exitText": "Issuer check failed (added in 7.19.0)."
+      }
+    },
+    {
+      "key": "exitcodes:84",
+      "name": "CURLE_FTP_PRET_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 84,
+        "curleName": "CURLE_FTP_PRET_FAILED",
+        "strerror": "FTP: The server did not accept the PRET command.",
+        "exitText": "The FTP PRET command failed."
+      }
+    },
+    {
+      "key": "exitcodes:84:man",
+      "name": "CURLE_FTP_PRET_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 84,
+        "curleName": "CURLE_FTP_PRET_FAILED",
+        "strerror": "FTP: The server did not accept the PRET command.",
+        "exitText": "The FTP PRET command failed."
+      }
+    },
+    {
+      "key": "exitcodes:84:strerror",
+      "name": "CURLE_FTP_PRET_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 84,
+        "curleName": "CURLE_FTP_PRET_FAILED",
+        "strerror": "FTP: The server did not accept the PRET command.",
+        "exitText": "The FTP PRET command failed."
+      }
+    },
+    {
+      "key": "exitcodes:85",
+      "name": "CURLE_RTSP_CSEQ_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 85,
+        "curleName": "CURLE_RTSP_CSEQ_ERROR",
+        "strerror": "RTSP CSeq mismatch or invalid CSeq",
+        "exitText": "Mismatch of RTSP CSeq numbers."
+      }
+    },
+    {
+      "key": "exitcodes:85:man",
+      "name": "CURLE_RTSP_CSEQ_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 85,
+        "curleName": "CURLE_RTSP_CSEQ_ERROR",
+        "strerror": "RTSP CSeq mismatch or invalid CSeq",
+        "exitText": "Mismatch of RTSP CSeq numbers."
+      }
+    },
+    {
+      "key": "exitcodes:85:strerror",
+      "name": "CURLE_RTSP_CSEQ_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 85,
+        "curleName": "CURLE_RTSP_CSEQ_ERROR",
+        "strerror": "RTSP CSeq mismatch or invalid CSeq",
+        "exitText": "Mismatch of RTSP CSeq numbers."
+      }
+    },
+    {
+      "key": "exitcodes:86",
+      "name": "CURLE_RTSP_SESSION_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 86,
+        "curleName": "CURLE_RTSP_SESSION_ERROR",
+        "strerror": "RTSP session error",
+        "exitText": "Mismatch of RTSP Session Identifiers."
+      }
+    },
+    {
+      "key": "exitcodes:86:man",
+      "name": "CURLE_RTSP_SESSION_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 86,
+        "curleName": "CURLE_RTSP_SESSION_ERROR",
+        "strerror": "RTSP session error",
+        "exitText": "Mismatch of RTSP Session Identifiers."
+      }
+    },
+    {
+      "key": "exitcodes:86:strerror",
+      "name": "CURLE_RTSP_SESSION_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 86,
+        "curleName": "CURLE_RTSP_SESSION_ERROR",
+        "strerror": "RTSP session error",
+        "exitText": "Mismatch of RTSP Session Identifiers."
+      }
+    },
+    {
+      "key": "exitcodes:87",
+      "name": "CURLE_FTP_BAD_FILE_LIST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 87,
+        "curleName": "CURLE_FTP_BAD_FILE_LIST",
+        "strerror": "Unable to parse FTP file list",
+        "exitText": "Unable to parse FTP file list."
+      }
+    },
+    {
+      "key": "exitcodes:87:man",
+      "name": "CURLE_FTP_BAD_FILE_LIST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 87,
+        "curleName": "CURLE_FTP_BAD_FILE_LIST",
+        "strerror": "Unable to parse FTP file list",
+        "exitText": "Unable to parse FTP file list."
+      }
+    },
+    {
+      "key": "exitcodes:87:strerror",
+      "name": "CURLE_FTP_BAD_FILE_LIST",
+      "introducedIn": null,
+      "attributes": {
+        "number": 87,
+        "curleName": "CURLE_FTP_BAD_FILE_LIST",
+        "strerror": "Unable to parse FTP file list",
+        "exitText": "Unable to parse FTP file list."
+      }
+    },
+    {
+      "key": "exitcodes:88",
+      "name": "CURLE_CHUNK_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 88,
+        "curleName": "CURLE_CHUNK_FAILED",
+        "strerror": "Chunk callback failed",
+        "exitText": "FTP chunk callback reported error."
+      }
+    },
+    {
+      "key": "exitcodes:88:man",
+      "name": "CURLE_CHUNK_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 88,
+        "curleName": "CURLE_CHUNK_FAILED",
+        "strerror": "Chunk callback failed",
+        "exitText": "FTP chunk callback reported error."
+      }
+    },
+    {
+      "key": "exitcodes:88:strerror",
+      "name": "CURLE_CHUNK_FAILED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 88,
+        "curleName": "CURLE_CHUNK_FAILED",
+        "strerror": "Chunk callback failed",
+        "exitText": "FTP chunk callback reported error."
+      }
+    },
+    {
+      "key": "exitcodes:89",
+      "name": "CURLE_NO_CONNECTION_AVAILABLE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 89,
+        "curleName": "CURLE_NO_CONNECTION_AVAILABLE",
+        "strerror": "The max connection limit is reached",
+        "exitText": "No connection available, the session is queued."
+      }
+    },
+    {
+      "key": "exitcodes:89:man",
+      "name": "CURLE_NO_CONNECTION_AVAILABLE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 89,
+        "curleName": "CURLE_NO_CONNECTION_AVAILABLE",
+        "strerror": "The max connection limit is reached",
+        "exitText": "No connection available, the session is queued."
+      }
+    },
+    {
+      "key": "exitcodes:89:strerror",
+      "name": "CURLE_NO_CONNECTION_AVAILABLE",
+      "introducedIn": null,
+      "attributes": {
+        "number": 89,
+        "curleName": "CURLE_NO_CONNECTION_AVAILABLE",
+        "strerror": "The max connection limit is reached",
+        "exitText": "No connection available, the session is queued."
+      }
+    },
+    {
+      "key": "exitcodes:8:man",
+      "name": "CURLE_WEIRD_SERVER_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 8,
+        "curleName": "CURLE_WEIRD_SERVER_REPLY",
+        "strerror": "Weird server reply",
+        "exitText": "Weird server reply. The server sent data curl could not parse."
+      }
+    },
+    {
+      "key": "exitcodes:8:strerror",
+      "name": "CURLE_WEIRD_SERVER_REPLY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 8,
+        "curleName": "CURLE_WEIRD_SERVER_REPLY",
+        "strerror": "Weird server reply",
+        "exitText": "Weird server reply. The server sent data curl could not parse."
+      }
+    },
+    {
+      "key": "exitcodes:9",
+      "name": "CURLE_REMOTE_ACCESS_DENIED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 9,
+        "curleName": "CURLE_REMOTE_ACCESS_DENIED",
+        "strerror": "Access denied to remote resource",
+        "exitText": "FTP access denied. The server denied login or denied access to the particular resource or directory you wanted to reach. Most often you tried to change to a directory that does not exist on the server."
+      }
+    },
+    {
+      "key": "exitcodes:90",
+      "name": "CURLE_SSL_PINNEDPUBKEYNOTMATCH",
+      "introducedIn": null,
+      "attributes": {
+        "number": 90,
+        "curleName": "CURLE_SSL_PINNEDPUBKEYNOTMATCH",
+        "strerror": "SSL public key does not match pinned public key",
+        "exitText": "SSL public key does not match pinned public key."
+      }
+    },
+    {
+      "key": "exitcodes:90:man",
+      "name": "CURLE_SSL_PINNEDPUBKEYNOTMATCH",
+      "introducedIn": null,
+      "attributes": {
+        "number": 90,
+        "curleName": "CURLE_SSL_PINNEDPUBKEYNOTMATCH",
+        "strerror": "SSL public key does not match pinned public key",
+        "exitText": "SSL public key does not match pinned public key."
+      }
+    },
+    {
+      "key": "exitcodes:90:strerror",
+      "name": "CURLE_SSL_PINNEDPUBKEYNOTMATCH",
+      "introducedIn": null,
+      "attributes": {
+        "number": 90,
+        "curleName": "CURLE_SSL_PINNEDPUBKEYNOTMATCH",
+        "strerror": "SSL public key does not match pinned public key",
+        "exitText": "SSL public key does not match pinned public key."
+      }
+    },
+    {
+      "key": "exitcodes:91",
+      "name": "CURLE_SSL_INVALIDCERTSTATUS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 91,
+        "curleName": "CURLE_SSL_INVALIDCERTSTATUS",
+        "strerror": "SSL server certificate status verification FAILED",
+        "exitText": "Invalid SSL certificate status."
+      }
+    },
+    {
+      "key": "exitcodes:91:man",
+      "name": "CURLE_SSL_INVALIDCERTSTATUS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 91,
+        "curleName": "CURLE_SSL_INVALIDCERTSTATUS",
+        "strerror": "SSL server certificate status verification FAILED",
+        "exitText": "Invalid SSL certificate status."
+      }
+    },
+    {
+      "key": "exitcodes:91:strerror",
+      "name": "CURLE_SSL_INVALIDCERTSTATUS",
+      "introducedIn": null,
+      "attributes": {
+        "number": 91,
+        "curleName": "CURLE_SSL_INVALIDCERTSTATUS",
+        "strerror": "SSL server certificate status verification FAILED",
+        "exitText": "Invalid SSL certificate status."
+      }
+    },
+    {
+      "key": "exitcodes:92",
+      "name": "CURLE_HTTP2_STREAM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 92,
+        "curleName": "CURLE_HTTP2_STREAM",
+        "strerror": "Stream error in the HTTP/2 framing layer",
+        "exitText": "Stream error in HTTP/2 framing layer."
+      }
+    },
+    {
+      "key": "exitcodes:92:man",
+      "name": "CURLE_HTTP2_STREAM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 92,
+        "curleName": "CURLE_HTTP2_STREAM",
+        "strerror": "Stream error in the HTTP/2 framing layer",
+        "exitText": "Stream error in HTTP/2 framing layer."
+      }
+    },
+    {
+      "key": "exitcodes:92:strerror",
+      "name": "CURLE_HTTP2_STREAM",
+      "introducedIn": null,
+      "attributes": {
+        "number": 92,
+        "curleName": "CURLE_HTTP2_STREAM",
+        "strerror": "Stream error in the HTTP/2 framing layer",
+        "exitText": "Stream error in HTTP/2 framing layer."
+      }
+    },
+    {
+      "key": "exitcodes:93",
+      "name": "CURLE_RECURSIVE_API_CALL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 93,
+        "curleName": "CURLE_RECURSIVE_API_CALL",
+        "strerror": "API function called from within callback",
+        "exitText": "An API function was called from inside a callback."
+      }
+    },
+    {
+      "key": "exitcodes:93:man",
+      "name": "CURLE_RECURSIVE_API_CALL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 93,
+        "curleName": "CURLE_RECURSIVE_API_CALL",
+        "strerror": "API function called from within callback",
+        "exitText": "An API function was called from inside a callback."
+      }
+    },
+    {
+      "key": "exitcodes:93:strerror",
+      "name": "CURLE_RECURSIVE_API_CALL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 93,
+        "curleName": "CURLE_RECURSIVE_API_CALL",
+        "strerror": "API function called from within callback",
+        "exitText": "An API function was called from inside a callback."
+      }
+    },
+    {
+      "key": "exitcodes:94",
+      "name": "CURLE_AUTH_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 94,
+        "curleName": "CURLE_AUTH_ERROR",
+        "strerror": "An authentication function returned an error",
+        "exitText": "An authentication function returned an error."
+      }
+    },
+    {
+      "key": "exitcodes:94:man",
+      "name": "CURLE_AUTH_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 94,
+        "curleName": "CURLE_AUTH_ERROR",
+        "strerror": "An authentication function returned an error",
+        "exitText": "An authentication function returned an error."
+      }
+    },
+    {
+      "key": "exitcodes:94:strerror",
+      "name": "CURLE_AUTH_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 94,
+        "curleName": "CURLE_AUTH_ERROR",
+        "strerror": "An authentication function returned an error",
+        "exitText": "An authentication function returned an error."
+      }
+    },
+    {
+      "key": "exitcodes:95",
+      "name": "CURLE_HTTP3",
+      "introducedIn": null,
+      "attributes": {
+        "number": 95,
+        "curleName": "CURLE_HTTP3",
+        "strerror": "HTTP/3 error",
+        "exitText": "A problem was detected in the HTTP/3 layer. This is somewhat generic and can be one out of several problems, see the error message for details."
+      }
+    },
+    {
+      "key": "exitcodes:95:man",
+      "name": "CURLE_HTTP3",
+      "introducedIn": null,
+      "attributes": {
+        "number": 95,
+        "curleName": "CURLE_HTTP3",
+        "strerror": "HTTP/3 error",
+        "exitText": "A problem was detected in the HTTP/3 layer. This is somewhat generic and can be one out of several problems, see the error message for details."
+      }
+    },
+    {
+      "key": "exitcodes:95:strerror",
+      "name": "CURLE_HTTP3",
+      "introducedIn": null,
+      "attributes": {
+        "number": 95,
+        "curleName": "CURLE_HTTP3",
+        "strerror": "HTTP/3 error",
+        "exitText": "A problem was detected in the HTTP/3 layer. This is somewhat generic and can be one out of several problems, see the error message for details."
+      }
+    },
+    {
+      "key": "exitcodes:96",
+      "name": "CURLE_QUIC_CONNECT_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 96,
+        "curleName": "CURLE_QUIC_CONNECT_ERROR",
+        "strerror": "QUIC connection error",
+        "exitText": "QUIC connection error. This error may be caused by an SSL library error. QUIC is the protocol used for HTTP/3 transfers."
+      }
+    },
+    {
+      "key": "exitcodes:96:man",
+      "name": "CURLE_QUIC_CONNECT_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 96,
+        "curleName": "CURLE_QUIC_CONNECT_ERROR",
+        "strerror": "QUIC connection error",
+        "exitText": "QUIC connection error. This error may be caused by an SSL library error. QUIC is the protocol used for HTTP/3 transfers."
+      }
+    },
+    {
+      "key": "exitcodes:96:strerror",
+      "name": "CURLE_QUIC_CONNECT_ERROR",
+      "introducedIn": null,
+      "attributes": {
+        "number": 96,
+        "curleName": "CURLE_QUIC_CONNECT_ERROR",
+        "strerror": "QUIC connection error",
+        "exitText": "QUIC connection error. This error may be caused by an SSL library error. QUIC is the protocol used for HTTP/3 transfers."
+      }
+    },
+    {
+      "key": "exitcodes:97",
+      "name": "CURLE_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 97,
+        "curleName": "CURLE_PROXY",
+        "strerror": "proxy handshake error",
+        "exitText": "Proxy handshake error."
+      }
+    },
+    {
+      "key": "exitcodes:97:man",
+      "name": "CURLE_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 97,
+        "curleName": "CURLE_PROXY",
+        "strerror": "proxy handshake error",
+        "exitText": "Proxy handshake error."
+      }
+    },
+    {
+      "key": "exitcodes:97:strerror",
+      "name": "CURLE_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "number": 97,
+        "curleName": "CURLE_PROXY",
+        "strerror": "proxy handshake error",
+        "exitText": "Proxy handshake error."
+      }
+    },
+    {
+      "key": "exitcodes:98",
+      "name": "CURLE_SSL_CLIENTCERT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 98,
+        "curleName": "CURLE_SSL_CLIENTCERT",
+        "strerror": "SSL Client Certificate required",
+        "exitText": "A client-side certificate is required to complete the TLS handshake."
+      }
+    },
+    {
+      "key": "exitcodes:98:man",
+      "name": "CURLE_SSL_CLIENTCERT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 98,
+        "curleName": "CURLE_SSL_CLIENTCERT",
+        "strerror": "SSL Client Certificate required",
+        "exitText": "A client-side certificate is required to complete the TLS handshake."
+      }
+    },
+    {
+      "key": "exitcodes:98:strerror",
+      "name": "CURLE_SSL_CLIENTCERT",
+      "introducedIn": null,
+      "attributes": {
+        "number": 98,
+        "curleName": "CURLE_SSL_CLIENTCERT",
+        "strerror": "SSL Client Certificate required",
+        "exitText": "A client-side certificate is required to complete the TLS handshake."
+      }
+    },
+    {
+      "key": "exitcodes:99",
+      "name": "CURLE_UNRECOVERABLE_POLL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 99,
+        "curleName": "CURLE_UNRECOVERABLE_POLL",
+        "strerror": "Unrecoverable error in select/poll",
+        "exitText": "Poll or select returned fatal error."
+      }
+    },
+    {
+      "key": "exitcodes:99:man",
+      "name": "CURLE_UNRECOVERABLE_POLL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 99,
+        "curleName": "CURLE_UNRECOVERABLE_POLL",
+        "strerror": "Unrecoverable error in select/poll",
+        "exitText": "Poll or select returned fatal error."
+      }
+    },
+    {
+      "key": "exitcodes:99:strerror",
+      "name": "CURLE_UNRECOVERABLE_POLL",
+      "introducedIn": null,
+      "attributes": {
+        "number": 99,
+        "curleName": "CURLE_UNRECOVERABLE_POLL",
+        "strerror": "Unrecoverable error in select/poll",
+        "exitText": "Poll or select returned fatal error."
+      }
+    },
+    {
+      "key": "exitcodes:9:man",
+      "name": "CURLE_REMOTE_ACCESS_DENIED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 9,
+        "curleName": "CURLE_REMOTE_ACCESS_DENIED",
+        "strerror": "Access denied to remote resource",
+        "exitText": "FTP access denied. The server denied login or denied access to the particular resource or directory you wanted to reach. Most often you tried to change to a directory that does not exist on the server."
+      }
+    },
+    {
+      "key": "exitcodes:9:strerror",
+      "name": "CURLE_REMOTE_ACCESS_DENIED",
+      "introducedIn": null,
+      "attributes": {
+        "number": 9,
+        "curleName": "CURLE_REMOTE_ACCESS_DENIED",
+        "strerror": "Access denied to remote resource",
+        "exitText": "FTP access denied. The server denied login or denied access to the particular resource or directory you wanted to reach. Most often you tried to change to a directory that does not exist on the server."
+      }
+    }
+  ]
+}

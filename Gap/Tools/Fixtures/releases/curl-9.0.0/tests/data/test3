@@ -1,0 +1,12 @@
+<testcase>
+<info>
+<keywords>
+FTP
+</keywords>
+</info>
+<client>
+<name>
+removed in 9.1.0
+</name>
+</client>
+</testcase>
