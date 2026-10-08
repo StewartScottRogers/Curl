@@ -75,6 +75,19 @@ public sealed class DohResponseReaderTests
     }
 
     [TestMethod]
+    public async Task ReadBodyAsync_WithANulByteInAChunkExtension_ReadsTheWholeSizeLine()
+    {
+        // curl's chunk parser skips every byte after the size up to the LF, a NUL among them,
+        // so the size line runs on past the NUL to its end (AF-0059).
+        var chunked = Encoding.Latin1.GetBytes("7;name=a\0b\r\n").Concat(Body).Concat("\r\n0\r\n\r\n"u8.ToArray()).ToArray();
+
+        var body = await ReadAsync(Head("HTTP/1.1 200 OK", "Transfer-Encoding: chunked"), chunked);
+
+        Diagnostics.Diff("body", Body, body);
+        CollectionAssert.AreEqual(Body, body);
+    }
+
+    [TestMethod]
     public async Task ReadBodyAsync_WithTransferEncodingNotChunkedAndAContentLength_ReadsTheContentLength()
     {
         var body = await ReadAsync(Head("HTTP/1.1 200 OK", "Content-Length: 7", "Transfer-Encoding: identity"), Body);
