@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1755 — Re-fix AF-0072: BL-1525 requeued twice in one shift (lanes 1 and 4), three claims in its task Log, each run ending short of a timing target with its code left only in the stash
 
@@ -45,12 +45,18 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (Met for every shift since the fix; the 2026-10-07 window predates it - see Notes.)
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- No code change: BL-1691's fix (`f864220b3`, 2026-10-07 21:03) is in `RunDarkFactory.ps1` (`Add-ShiftRequeued` / `Get-ShiftRequeued`, claim at line 4638 skips the shift's `requeued.txt`).
+- Why the re-audit still saw it: the reproduction reads `-Since 2026-10-07` and the 2026-10-07 shift's logs, which predate the fix and will always show BL-1525's L1/L4 claims. All four BL-1525 claims (L8 06:02 on 10-06, L1 11:11, L4 11:25, L3 14:12 Done) happened before the fix landed. The audit tooling is an audit path a lane may not edit, so the reproduction cannot be re-anchored here.
+- Evidence the fix holds: every shift since it landed (20261008-034419, -082227, -111350) was scanned for a task claimed twice in one shift - none. Shift 082227 requeued BL-1728, recorded it in `lanes-20261008-082227\requeued.txt`, and no lane of that shift claimed it again.
+- For the re-audit: run the reproduction with `-Since 2026-10-08` (or any date after the fix); expected "no task claimed more than once per shift".
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. BL-1691's per-shift requeue guard verified in RunDarkFactory.ps1; no task claimed twice in any of the three shifts since; the reproduction's 2026-10-07 window predates the fix
