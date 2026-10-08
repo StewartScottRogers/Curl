@@ -33,3 +33,4 @@ On Windows, when `-R` opens the `-o` file but `SetFileTime` refuses the time, Cu
 ## Log
 
 - 2026-10-04: Created.
+- 2026-10-07: Backlog -> Doing.
