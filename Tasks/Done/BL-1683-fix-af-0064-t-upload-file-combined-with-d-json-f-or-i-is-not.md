@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1683 — Fix AF-0064: -T / --upload-file combined with -d, --json, -F or -I is not refused: Curl sends a PUT and exits 0 where curl warns and exits 2
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -71,6 +71,16 @@ The finding closes only when a later re-audit by the conformance auditor confirm
      branches in `TransferEachUrlAsync` and `RefuseUploadRequestMethodAsync`.
   3. Under `-Z -d a=1 -T f URL` curl writes only the warning; Curl also draws the combined meter's
      header and two empty status lines after it. Make it draw none when no transfer started.
+- 2026-10-07, resumed from the stash (`f65d81a0`): all three done. The `-T -F` test now pins the
+  refusal; `CurlCommandRunnerUploadTests` covers `-d -T`, `-s -d -T` and the two-URL case, and
+  `CurlCommandRunnerParallelProgressMeterTests` the `-Z` case. Real curl also draws no `-Z` meter after
+  a bad glob (`-Z "http://127.0.0.1:1/[1-"`), where Curl drew one too: `ParallelRun.EndAsync` now draws
+  none when `ParallelTransferQueue.HasStartedAny` is false, which fixes both. To keep complexity at 10,
+  the check became `RefusedUploadRequestMethodAsync` and the trace-output opening
+  `OpenTransferEventOutputOnceAsync`; `EndAsync`'s loops moved to two helpers. The finding's
+  reproduction gives `curl 2 / Curl 2`, the same stderr, and an empty request.bin for both.
+  Measure-CodeQuality: Curl.Cli.UnitLibrary and Curl.Console both 100% line and branch, 0 failing members.
+  Not checked: what curl does under `-Z` when an earlier URL started before a later one is refused.
 
 ## Log
 
@@ -78,3 +88,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Needs Curl.Console.UnitTests, held by BL-1596 (Doing): a test there pins the old -T -F behaviour; fix is ready, see Notes for what is left.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. -T with -d, --json, -F, -I, -G or --no-head now warns, sends nothing and exits 2 as curl does; -Z draws no meter when nothing started
