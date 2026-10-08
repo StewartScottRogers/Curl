@@ -4,7 +4,7 @@ title: Fix AF-0067: CLAUDE.md says Integration tests live only in *.IntegrationT
 priority: Normal
 assignee: Claude
 pipeline: docs
-depends-on: []
+depends-on: [BL-1604]
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-08
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Notes
 
+- 2026-10-07 (lane 1): CLAUDE.md states the rule ADR-0421 decided, and the rollout has since moved the Cli, Console, Core and Ssh tests into their own `*.IntegrationTests` projects (BL-1599, BL-1600 and siblings are Done). The reproduction now gives 4, not 17: the four Curl.Cryptography.UnitTests files (BrainpoolEcdsaTests, Cast128Tests, X25519Tests, X448Tests), which BL-1604 retags to `LongRunning` and which also brings in `CURL_RUN_LONG_RUNNING_TESTS`. BL-1604 is in Doing on another lane and touches Curl.Cryptography.UnitTests, outside this task. Decision: leave CLAUDE.md as it is - softening it to "being rolled out" would make it false again the moment BL-1604 lands. This task depends on BL-1604; once it is Done, rerun the reproduction (expect 0), confirm a `LongRunning` test and the variable exist, and complete.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Waits on BL-1604: the reproduction's last 4 hits are the Curl.Cryptography.UnitTests tests BL-1604 retags to LongRunning
