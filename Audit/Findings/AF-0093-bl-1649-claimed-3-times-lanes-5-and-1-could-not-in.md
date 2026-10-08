@@ -3,12 +3,12 @@ id: AF-0093
 title: BL-1649 claimed 3 times; lanes 5 and 1 could not integrate because fast tests failed after rebasing
 auditor: process
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1649:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-1771
+tasks: BL-1771
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

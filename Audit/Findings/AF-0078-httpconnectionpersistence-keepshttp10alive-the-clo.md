@@ -3,12 +3,12 @@ id: AF-0078
 title: HttpConnectionPersistence.KeepsHttp10Alive: the close check's slice 'colon + 1' can become 'colon - 1' with no test failing
 auditor: quality
 severity: High
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpConnectionPersistence.cs:KeepsHttp10Alive-plus1:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpConnectionPersistence.cs:89:+1
-task: none
-tasks:
+task: BL-1756
+tasks: BL-1756
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

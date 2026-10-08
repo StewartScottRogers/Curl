@@ -3,12 +3,12 @@ id: AF-0088
 title: ADR-0410 decision 3 says file:// reads a source's time with stat off Windows; off Windows the code reads nothing
 auditor: truthfulness
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: truthfulness:Documentation/Planning/Decisions/ADR-0410-remote-file-times-travel-as-unix-seconds-so-r-can-stamp-and-cap-times-past-year-9999.md:SourceLastWriteReader:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-1766
+tasks: BL-1766
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

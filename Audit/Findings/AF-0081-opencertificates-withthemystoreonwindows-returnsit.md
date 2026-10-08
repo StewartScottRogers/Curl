@@ -3,12 +3,12 @@ id: AF-0081
 title: OpenCertificates_WithTheMyStoreOnWindows_ReturnsItsCertificates checks only that the result is not null
 auditor: quality
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Networking.UnitTests/SystemClientCertificateStoreTests.cs:OpenCertificates_WithTheMyStoreOnWindows_ReturnsItsCertificates:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-1759
+tasks: BL-1759
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/SystemClientCertificateStoreTests.
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

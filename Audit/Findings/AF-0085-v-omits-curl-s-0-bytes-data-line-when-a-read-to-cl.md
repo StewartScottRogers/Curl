@@ -3,12 +3,12 @@ id: AF-0085
 title: -v omits curl's '{ [0 bytes data]' line when a read-to-close HTTP body ends with an empty read (e.g. --ignore-content-length on an empty body)
 auditor: conformance
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:--verbose-read-to-close-empty-body:stderr
 reproduction: none
-task: none
-tasks:
+task: BL-1763
+tasks: BL-1763
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ $o="$env:TEMP\af-icl"; $a=@('-v','--ignore-content-length','http://127.0.0.1:509
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

@@ -3,12 +3,12 @@ id: AF-0086
 title: Requirements FR-085 cites a test that does not exist and states one reset message where the code has several
 auditor: truthfulness
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: truthfulness:Documentation/Product/Requirements.md:FR-085:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-1764
+tasks: BL-1764
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
