@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1770 — Fix AF-0092: BL-1647 claimed 3 times; lanes 9 and 8 could not integrate because fast tests failed (the flaky EveryMember_ManyConcurrentCallers cookie test)
 
@@ -41,12 +41,33 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (For shifts after this fix; see Notes: the 2026-10-07 logs it reads are history and cannot change.)
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: `Test-Green` in `RunDarkFactory.ps1` parked a finished task whenever the fast
+  tests were red twice in full runs. A concurrency-sensitive test
+  (`EveryMember_ManyConcurrentCallers_...` in Curl.Cookies.UnitTests) stayed red through
+  both full runs while nine lanes built at once, so BL-1647 and eight other tasks in the
+  15:28-16:20 window were parked and reclaimed, though none had broken it.
+- Fix: after two red full runs, the test projects both runs named as failed
+  (`Get-FailedTestProjects`) are run once more on their own (`Test-GreenAlone`). Green
+  alone means the red came from load, not the task: it is traced as `flaky` and the task
+  integrates. A real breakage is still red alone and still parks. Chosen default: a run
+  red without naming a project, or with an aborted test host, vouches for nothing
+  smaller, so then the task still parks as before (conservative; the L9 "then no test
+  named" case stays a park).
+- `-TestFlakyTests` gains three self-test cases for `Get-FailedTestProjects`; all pass.
+  Script help (integrate step) and `Test-Green`'s comment say the new rule.
+- The reproduction reads `-Since 2026-10-07` logs, which record the three claims and
+  will keep recording them; the fix is that a later window's logs show a task claimed
+  once when only load-sensitive tests are red. The process auditor's re-audit on a later
+  window is what closes AF-0092.
+- Build clean; fast tests: 33 test assemblies passed, none failed.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Integration reruns the failing test projects alone after two red full runs, so a load-flaky test no longer parks finished tasks (AF-0092)
