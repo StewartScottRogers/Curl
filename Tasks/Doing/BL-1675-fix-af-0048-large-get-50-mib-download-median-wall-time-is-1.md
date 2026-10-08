@@ -4,7 +4,7 @@ title: Fix AF-0048: large-get (50 MiB download) median wall time is 1.81x curl's
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1749]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 lane: no
 requirement: none
@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the performance auditor confirm
 - [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-08, interactive: root cause was not the body reader. `PhysicalFileSystem` opened files with `FileOptions.Asynchronous`, so each of about 3,200 16 KiB `-o` writes was an overlapped write completed through the thread pool (about 60 ms against about 28 ms synchronous). Commit a7c6bb900 opens files synchronously and makes `DeferredOutputFileStream.WriteAsync` write synchronously once the file is open. `Measure-Performance.ps1 -Iterations 20`, large-get: before curl 93.5 ms, Curl 156.5 ms (1.67x); after curl 92.5 ms, Curl 129.5 ms (1.40x); the other five scenarios within about 3 ms of curl. A back-to-back loopback harness gives 1.04x. The rest (about 40 ms) is before `Main` and tracks binary size (on-launch scan of the 17 MB binary), so it moves to BL-1749; this task waits on it and is then re-measured interactively. The stashed 64 KiB-receive change gained under 1 ms and was dropped.
 
 - 2026-10-07, lane 5: the fix is written and the HTTP unit tests pass (1889 passed,
   18 skipped). `HttpResponseBodyReader.CopyFramedAsync` now receives a Content-Length
