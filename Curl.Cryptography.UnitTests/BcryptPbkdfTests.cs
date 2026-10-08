@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Security.Cryptography;
 using System.Text;
 using Curl.Testing;
 
@@ -91,24 +93,50 @@ public sealed class BcryptPbkdfTests
         Assert.AreEqual(expectedHash, Convert.ToHexStringLower(hash));
     }
 
+    // OpenBSD bcrypt_pbkdf with one round: block k (from 1) is bcrypt_hash(SHA-512(password),
+    // SHA-512(salt || BE32(k))), and a 1024-byte key has stride 32, so key[i * 32 + k - 1] is
+    // byte i of block k. The reference is built here from ComputeHash, which the Go
+    // TestBcryptHash vector pins, so every byte of the key is checked, not a sample.
     [TestMethod]
-    public void DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte()
+    public void DeriveKey_OneRoundMaximumLengthKey_EqualsTheInterleavedBlockHashes()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] password = "password"u8.ToArray();
+        byte[] salt = "salt"u8.ToArray();
         byte[] key = new byte[BcryptPbkdf.MaximumKeySize];
         diagnostics.Arrange("rounds", 1);
         diagnostics.Arrange("key size", key.Length);
 
         using (diagnostics.Phase("derive"))
         {
-            BcryptPbkdf.DeriveKey("password"u8, "salt"u8, 1, key);
+            BcryptPbkdf.DeriveKey(password, salt, 1, key);
         }
 
-        int probe = key[^1] | key[0] | key[31];
+        byte[] expectedKey = InterleavedOneRoundBlockHashes(password, salt, key.Length);
         diagnostics.Bytes("derived key", key);
-        diagnostics.Act("first, middle and last bytes ORed", probe);
-        diagnostics.Assert("probe is not zero", "not 0", probe);
-        Assert.AreNotEqual(0, probe);
+        diagnostics.Diff("key", Convert.ToHexStringLower(expectedKey), Convert.ToHexStringLower(key));
+        Assert.AreEqual(Convert.ToHexStringLower(expectedKey), Convert.ToHexStringLower(key));
+    }
+
+    private static byte[] InterleavedOneRoundBlockHashes(byte[] password, byte[] salt, int keyLength)
+    {
+        int stride = (keyLength + BcryptPbkdf.HashSize - 1) / BcryptPbkdf.HashSize;
+        byte[] passwordHash = SHA512.HashData(password);
+        byte[] countedSalt = new byte[salt.Length + 4];
+        salt.CopyTo(countedSalt, 0);
+        byte[] block = new byte[BcryptPbkdf.HashSize];
+        byte[] key = new byte[keyLength];
+        for (int blockNumber = 1; blockNumber <= stride; blockNumber++)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(countedSalt.AsSpan(salt.Length), (uint)blockNumber);
+            BcryptPbkdf.ComputeHash(new BlowfishState(), passwordHash, SHA512.HashData(countedSalt), block);
+            for (int index = 0; (index * stride) + blockNumber - 1 < keyLength; index++)
+            {
+                key[(index * stride) + blockNumber - 1] = block[index];
+            }
+        }
+
+        return key;
     }
 
     [TestMethod]

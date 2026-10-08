@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1758 — Fix AF-0080: DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte ORs three bytes together, so a key filled only at byte 0 passes
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Replaced the three-byte OR probe with a full-key comparison: the test (renamed `DeriveKey_OneRoundMaximumLengthKey_EqualsTheInterleavedBlockHashes`, since it no longer just checks bytes are filled) builds the expected 1024-byte key from OpenBSD's one-round construction - block k = bcrypt_hash(SHA-512(password), SHA-512(salt || BE32(k))), interleaved with stride 32 - using `ComputeHash`, which the Go TestBcryptHash vector already pins. Ran the pipeline directly rather than the full feature stages: the change is one test, no production code.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. BcryptPbkdf maximum-length key test compares every byte against an independent reference; AF-0080 reproduction no longer matches
