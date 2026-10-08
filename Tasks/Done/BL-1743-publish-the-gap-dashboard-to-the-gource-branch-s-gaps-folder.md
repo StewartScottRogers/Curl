@@ -8,7 +8,7 @@ depends-on: [BL-1742]
 touches: [.github/workflows/gource.yml]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1743 — Publish the gap dashboard to the gource branch's gaps/ folder from gource.yml
 
@@ -61,14 +61,29 @@ from `raw.githubusercontent.com`. Without the change below, a render would delet
 
 ## Acceptance criteria
 
-- [ ] `.github/workflows/gource.yml` has a `gaps-page` job with the condition, concurrency group, timeout and steps above. It contains no `--force` push outside the render job's existing one.
-- [ ] The render job's publish step carries `gaps/index.html` and `gaps/data.json` over, and adds `gaps` to the committed paths when present.
-- [ ] The header comment lists five jobs and explains `gaps-page` and the render carry-over.
-- [ ] After the task's push, `gh run list --workflow Gource --branch work/dark-factory --limit 1` shows the run's `gaps-page` job as `success`, and `https://stewartscottrogers.github.io/Curl/gaps/` serves the page once Pages has rebuilt. Both are recorded in this task's Notes.
+- [x] `.github/workflows/gource.yml` has a `gaps-page` job with the condition, concurrency group, timeout and steps above. It contains no `--force` push outside the render job's existing one.
+- [x] The render job's publish step carries `gaps/index.html` and `gaps/data.json` over, and adds `gaps` to the committed paths when present.
+- [x] The header comment lists five jobs and explains `gaps-page` and the render carry-over.
+- [x] Handed to BL-1751, not checked here (a lane cannot push, so the run does not exist yet): After the task's push, `gh run list --workflow Gource --branch work/dark-factory --limit 1` shows the run's `gaps-page` job as `success`, and `https://stewartscottrogers.github.io/Curl/gaps/` serves the page once Pages has rebuilt. Both are recorded in this task's Notes.
 
 ## Notes
+
+- `gaps-page` checks out `.github/gaps/site` and `Gap` sparsely. On `gap` it skips when
+  `Gap/Tools/Export-GapDashboardData.ps1` is missing from the commit; on `work/dark-factory`
+  it skips when the page is missing. The `gap` branch does not exist yet (2026-10-08).
+- Choice: `data.json` is compared with its `"generated"` line removed. The exporter stamps
+  that line on every run, so a byte comparison would republish identical data on every push
+  to `gap`. `index.html` has no such line, so the same filter leaves it compared byte for byte.
+- The render carry-over fetches `gaps/data.json` from `gource` even when this commit has the
+  page: the data only ever comes from the gap branch through `gaps-page` or the release watcher.
+- The `on.push` trigger ignores only `gource` and `board`, so it already covers `gap`. The
+  header comment says so.
+- `dotnet build`: 0 errors. Fast tests: all green, none failed.
+- The last criterion needs the pushed run and Pages, which a lane cannot reach. It went to
+  BL-1751.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. gource.yml publishes the gap dashboard to gource's gaps/ through a new gaps-page job, and render carries gaps/ over; the post-push check is BL-1751
