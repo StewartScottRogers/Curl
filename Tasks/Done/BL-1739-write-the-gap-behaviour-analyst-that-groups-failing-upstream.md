@@ -8,7 +8,7 @@ depends-on: [BL-1737, BL-1729, BL-1730]
 touches: [Gap/Instructions/Behaviour.md, .claude/agents/gap-behaviour.md]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1739 — Write the gap-behaviour analyst that groups failing upstream cases by cause
 
@@ -57,14 +57,20 @@ The agent uses `model: opus` and `tools: Read, Grep, Glob, Bash`.
 
 ## Acceptance criteria
 
-- [ ] `.claude/agents/gap-behaviour.md` exists with `model: opus` and tools limited to `Read, Grep, Glob, Bash`. Its body names `Gap/Instructions/Analyst-Rules.md` and `Gap/Instructions/Behaviour.md`.
-- [ ] `Gap/Instructions/Behaviour.md` states steps 1 to 7. The signature one-liner runs under Windows PowerShell 5.1 against BL-1729's fixture measurement (`Gap/Tools/Fixtures/behaviour/`), and its output is shown in the file.
-- [ ] The example report block parses with `ConvertFrom-Json` in Windows PowerShell 5.1.
-- [ ] No file in this task tells the analyst to read anything under `Audit/`.
+- [x] `.claude/agents/gap-behaviour.md` exists with `model: opus` and tools limited to `Read, Grep, Glob, Bash`. Its body names `Gap/Instructions/Analyst-Rules.md` and `Gap/Instructions/Behaviour.md`.
+- [x] `Gap/Instructions/Behaviour.md` states steps 1 to 7. The signature one-liner runs under Windows PowerShell 5.1 against BL-1729's fixture measurement (`Gap/Tools/Fixtures/behaviour/`), and its output is shown in the file.
+- [x] The example report block parses with `ConvertFrom-Json` in Windows PowerShell 5.1.
+- [x] No file in this task tells the analyst to read anything under `Audit/`.
 
 ## Notes
+
+- Delivered directly rather than through align-and-document: two new instruction files, no code, and the run's budget is small.
+- Signature one-liner: cuts the quoted lines after `: expected` (they differ per case and would make every bucket one case), then strips paths, test numbers, ports and numbers; buckets by signature and first keyword. Property named `Case`, not `Item`: under Windows PowerShell 5.1 `$_.Group.Item` resolves to the collection's `Item` method. Run against the converted BL-1729 fixture under 5.1.26100; its output is in Behaviour.md.
+- The example report block was extracted from Behaviour.md and parsed with ConvertFrom-Json under 5.1; its items equal the fixture's gap items (Compare-Object prints nothing).
+- Gap/README.md does not list the analysts' method files by name, so it was left alone (outside `touches`).
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. gap-behaviour analyst (Opus) and Gap/Instructions/Behaviour.md group failing upstream cases by cause, with a 5.1-tested signature one-liner
