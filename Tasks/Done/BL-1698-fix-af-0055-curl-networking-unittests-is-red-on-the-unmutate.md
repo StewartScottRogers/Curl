@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1698 — Fix AF-0055: Curl.Networking.UnitTests is red on the unmutated tree: LocalBindLines writes 'Could not Resolve host' and the Windows resolve-and-bind test fails
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- No code change was needed. `LocalBindLines.CouldNotResolveHost` already writes `Could not resolve host: {hostName}` (lowercase r), and `git log -S "Could not Resolve host"` finds the capital R only in the audit scorecard (c6419ee25) and the release commit (db27fb0d3) - never in Curl.Networking.UnitLibrary. The finding most likely recorded a defect the audit-seeder planted in the throwaway worktree (an uppercased letter in a -v line) as a real one; the scorecard should have set it aside. Worth checking when the quality auditor re-audits.
+- 2026-10-07: the reproduction passes on the unmutated tree (Passed: 1); `dotnet build` clean; fast tests all green, Curl.Networking.UnitTests Failed 0, Passed 3120, Skipped 29.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. AF-0055 reproduction passes: the line already reads 'Could not resolve host'; the finding came from a planted defect, no code change
