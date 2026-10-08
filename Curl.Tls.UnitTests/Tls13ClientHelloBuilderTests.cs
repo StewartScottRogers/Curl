@@ -48,6 +48,22 @@ public sealed class Tls13ClientHelloBuilderTests
     }
 
     [TestMethod]
+    public void AFixedExtensionBelowStatusRequestGoesAtItsPlaceInTheOrder()
+    {
+        TlsExtensionType maxFragmentLength = (TlsExtensionType)1;
+        TlsExtension fixedExtension = new(maxFragmentLength, [4]);
+        Tls13ClientSettings settings = new() { ExtensionOrder = [maxFragmentLength, TlsExtensionType.SupportedVersions], FixedExtensions = [fixedExtension] };
+        Diagnostics.Arrange("extension order", "max_fragment_length (1, fixed), supported_versions");
+
+        ClientHello hello = new Tls13ClientHelloBuilder(settings, Random, []).Build([], null);
+
+        Diagnostics.Act("extensions", Types(hello));
+        Diagnostics.Assert("extensions", $"{maxFragmentLength}, {TlsExtensionType.SupportedVersions}", Types(hello));
+        CollectionAssert.AreEqual(new[] { maxFragmentLength, TlsExtensionType.SupportedVersions }, hello.Extensions.Select(extension => extension.Type).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 4 }, hello.Extensions[0].Data);
+    }
+
+    [TestMethod]
     public void AListedExtensionWithNothingToSendIsLeftOut()
     {
         Tls13ClientSettings settings = new()
