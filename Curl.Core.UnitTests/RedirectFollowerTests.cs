@@ -644,8 +644,15 @@ public sealed class RedirectFollowerTests
 
         await Follow(handler, Context(Location(), upload: true));
 
-        Diagnostics.Assert("handler.Contexts[1].Upload is not null", true, handler.Contexts[1].Upload is not null);
-        Assert.IsNotNull(handler.Contexts[1].Upload);
+        ITransferContext second = handler.Contexts[1];
+        Diagnostics.Assert("second.Http!.CustomMethod", null, second.Http!.CustomMethod);
+        Assert.IsNull(second.Http!.CustomMethod);
+        Diagnostics.Assert("second.NoBody", false, second.NoBody);
+        Assert.IsFalse(second.NoBody);
+        Diagnostics.Assert("handler.Uploads count", 2, handler.Uploads.Count());
+        Assert.HasCount(2, handler.Uploads);
+        Diagnostics.Assert("handler.Uploads[1]", string.Join(", ", new byte[] { 1, 2, 3 }), string.Join(", ", handler.Uploads[1]));
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, handler.Uploads[1]);
     }
 
     [TestMethod]

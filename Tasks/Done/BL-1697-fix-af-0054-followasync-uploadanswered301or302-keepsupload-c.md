@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1697 — Fix AF-0054: FollowAsync_UploadAnswered301Or302_KeepsUpload checks only that the second request's Upload is not null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now pins what curl sends on the second hop: no custom method (so `-T` keeps its implied PUT, not a switch to GET), `NoBody` false, two uploads sent, and the second upload is the bytes 1, 2, 3 read from the start - not just a non-null stream.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. KeepsUpload test now asserts the second hop's method, NoBody and upload bytes
