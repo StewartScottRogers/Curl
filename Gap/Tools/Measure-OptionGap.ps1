@@ -231,7 +231,7 @@ function Measure-OptionGap($Inventory, [string] $TargetVersion, [string] $Candid
 
 function Invoke-OptionGapSelfTest {
     $fixtures = Join-Path $script:OptionToolsDirectory 'Fixtures/options'
-    $release = Join-Path $fixtures 'release'
+    $release = Join-Path $fixtures 'upstream'
     $lines = New-Object System.Collections.Generic.List[string]
     $report = { param([string] $Name, [bool] $Passed, [string] $Detail) if ($Passed) { $lines.Add("PASS $Name") } else { $lines.Add("FAIL $Name ($Detail)") } }
 

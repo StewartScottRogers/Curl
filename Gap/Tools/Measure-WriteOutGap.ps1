@@ -259,7 +259,7 @@ function Measure-WriteOutGap($Inventory, [string] $TargetVersion, [string] $Cand
 }
 
 function Invoke-WriteOutGapSelfTest {
-    $release = Join-Path $script:WriteOutFixtures 'release'
+    $release = Join-Path $script:WriteOutFixtures 'upstream'
     $lines = New-Object System.Collections.Generic.List[string]
     $report = { param([string] $Name, [bool] $Passed, [string] $Detail) if ($Passed) { $lines.Add("PASS $Name") } else { $lines.Add("FAIL $Name ($Detail)") } }
 
