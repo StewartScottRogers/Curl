@@ -34,3 +34,4 @@ Every test in `Curl.Tls.UnitTests`' `TlsClientConnectionTests`, `TlsExtensionCod
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
