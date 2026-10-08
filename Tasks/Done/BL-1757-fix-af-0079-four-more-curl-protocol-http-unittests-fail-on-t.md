@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1757 — Fix AF-0079: Four more Curl.Protocol.Http.UnitTests fail on the unmutated tree because HttpResponseBodyReader holds the body and writes it only in a finally block
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- No code change was needed. The code the finding quotes (`MemoryStream held = new(); Stream destination = output; output = held;` at `HttpResponseBodyReader.cs:321`) is not in this tree and `git log -S"MemoryStream held"` finds it in no commit of `Curl.Protocol.Http.UnitLibrary`, so it was not shipped code: most likely a defect the audit seeder planted in the audit worktree that was then reported as a baseline failure. `HttpResponseBodyReader` writes each read straight to the output (`CopyFramedAsync`, `CopyChunkedAsync`).
+- The reproduction run on this tree (2026-10-08): `Passed! - Failed: 0, Passed: 8` (the filter now matches 8 tests). `dotnet build` clean and all fast tests green.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Reproduction passes 8/8; the quoted held-body code is in no commit, so no code change was needed
