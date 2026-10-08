@@ -73,3 +73,4 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Code and tests written, uncommitted (shift stash): ConnectResult.ConnectReplyHeadersStored, HttpProxyTunnelReply.HeaderCount, TcpConnector/PoolingConnector pass it, handler seeds HeadersStoredBefore and cuts HTTP/2-3 trailers (StoredLengthOf); 3 test projects green. Left: full build + fast tests, Measure-CodeQuality on 3 libraries, ADR for trailer counting, commit
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Unstarted: lane 9 found a clean worktree and no access to the earlier lane's shift stash holding the written code (ConnectResult.ConnectReplyHeadersStored etc.); the run's budget could not cover rewriting it across three libraries plus Measure-CodeQuality. Next run: apply that stash by hash first
