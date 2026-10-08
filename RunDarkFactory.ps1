@@ -53,7 +53,9 @@
     on subagents spends all of theirs before the next check, so the prompt allows one
     subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap). What the
     task's own runs of the last 24 hours cost comes off its next run's cap, down to $1, so a
-    requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56). A task run that
+    requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56). Once
+    those runs leave less than $1 of the cap, a fresh claim of the task is not run at all but
+    goes to Blocked (AF-0096: BL-1609's five claims cost $5.17). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed and the task
     goes to Blocked for Stewart, since it is too big for one run and wants splitting.
     -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
@@ -1922,6 +1924,24 @@ function Get-TaskSpentUsd {
     return $spent
 }
 
+function Test-TaskCapSpent {
+    # Whether a task's runs of the last day already cost all but $1 of its cap (AF-0096).
+    # Get-RunBudgetUsd never gives a run less than $1, so without this a task requeued
+    # again and again got $1 and a turn more each time (BL-1609: five runs, $5.17).
+    param([double]$Cap, [double]$SpentUsd)
+    return ($Cap -gt 0 -and $SpentUsd -gt 0 -and ($Cap - $SpentUsd) -lt 1.0)
+}
+
+function Get-TaskCapSpentWhy {
+    # Why a freshly claimed task must not run again, or '' when it may (AF-0096).
+    param([string]$Id)
+    $spent = Get-TaskSpentUsd $LogDir $Id
+    $cap = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir)
+    if (-not (Test-TaskCapSpent $cap $spent)) { return '' }
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    return "its runs of the last day already cost $($spent.ToString('0.00', $culture)) of its $($cap.ToString('0.00', $culture)) US dollar cost cap, so it was not run again; split the task"
+}
+
 function Get-RecentRunCosts {
     # total_cost_usd from the result events of the newest task runs' logs in a log folder
     # (BL-1377-20261003-145757-L1.jsonl and its -resumed run; resolver runs are not tasks).
@@ -2129,6 +2149,12 @@ if ($TestTaskBudget) {
     $cases += ,@('a spent cap still leaves 1 dollar', '1', "$(Get-RunBudgetUsd 6 $twelve 5.73)")
     $cases += ,@('earlier runs come off -TaskBudgetUsd too', '4', "$(Get-RunBudgetUsd 6 ([double[]](1.0, 1.0, 1.0)) 2)")
     $cases += ,@('-TaskBudgetUsd 0 stays no cap after spending', '0', "$(Get-RunBudgetUsd 0 $twelve 2)")
+    # A task whose runs of the last day left less than $1 of its cap is not run again (AF-0096).
+    $cases += ,@('a cap with 1 dollar or more left is not spent', 'False', "$(Test-TaskCapSpent 3.21 2.21)")
+    $cases += ,@('a cap with under 1 dollar left is spent', 'True', "$(Test-TaskCapSpent 3.21 2.22)")
+    $cases += ,@('a task with no runs has not spent its cap', 'False', "$(Test-TaskCapSpent 0.5 0)")
+    $cases += ,@('-TaskBudgetUsd 0 is never spent', 'False', "$(Test-TaskCapSpent 0 9)")
+    $cases += ,@('BL-1609 stops after its third run', 'False,False,True', "$((Test-TaskCapSpent 3.21 0.41), (Test-TaskCapSpent 3.21 1.56), (Test-TaskCapSpent 3.21 3.59) -join ',')")
     Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {
@@ -4886,9 +4912,19 @@ while ($true) {
     Write-Heartbeat 'run'
     $inOvertime = $overtimeId -eq $id
     $overtimeId = ''
-    # A fresh claim of a task that came back with work in progress starts from that work (AF-0091).
-    $stashNote = if ($resuming) { '' } else { Restore-TaskStash $id }
-    $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming -Note $stashNote }
+    # A fresh claim of a task whose runs of the last day already spent its cost cap is not
+    # run again: it goes to Blocked like a run that reached the cap (AF-0096).
+    $capWhy = if ($resuming -or $inOvertime) { '' } else { Get-TaskCapSpentWhy $id }
+    if ($capWhy) {
+        Write-Trace $id 'cost cap' $capWhy 'Yellow'
+        $script:RunResult = $null
+        $script:LimitResetAt = $null
+        $run = [pscustomobject]@{ TimedOut = $false; ExitCode = 0 }
+    } else {
+        # A fresh claim of a task that came back with work in progress starts from that work (AF-0091).
+        $stashNote = if ($resuming) { '' } else { Restore-TaskStash $id }
+        $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming -Note $stashNote }
+    }
     $state = Get-TaskState $id
 
     # A run killed at its time limit keeps its claim and its work for one overtime run, so
@@ -4923,11 +4959,13 @@ while ($true) {
     $apiRetries = 0
 
     if ($state -eq 'Doing') {
-        $why = if ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
+        $why = if ($capWhy) { $capWhy }
+            elseif ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
             elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
             elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
-        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
+        $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
+        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
         git -C $Root add -A Tasks 2>&1 | Out-Null
         git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
         if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
@@ -4955,7 +4993,8 @@ while ($true) {
         Write-Trace $id 'DONE' (Get-Short (Get-LastLogLine $id)) 'Green'
     } elseif ($state -eq 'Blocked') {
         $blocked++
-        if ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
+        # A task blocked at its spent cap was never run, so it says nothing about the runs.
+        if ($capWhy) { } elseif ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
         $outcome = 'BLOCKED (see Tasks\Blocked)'
         Write-Trace $id 'BLOCKED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } elseif ($state -in 'Backlog', 'Parked') {
