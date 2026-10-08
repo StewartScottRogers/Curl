@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ssh.UnitLibrary]
+touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-08
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-07 (lane 9): killing the `>` to `>=` mutant needs tests in `Curl.Protocol.Ssh.UnitTests` (the library has no tests of its own), so it is added to `touches`. Planned tests, beside the overflow rows in `Sftp/SftpFileDownloadTests.RangeText.cs`: `Choose` with `"9223372036854775807-"` on a large file reads offset long.MaxValue path (or `"-9223372036854775807"` = whole file, offset 0, length size), and `"9223372036854775808-"` / `"-9223372036854775808"` exit 33 with NotDelivered. BL-1518 (in Doing) already touches `Curl.Protocol.Ssh.UnitTests`, so the task goes back to Backlog until BL-1518 is Done.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Needs Curl.Protocol.Ssh.UnitTests for the boundary tests, which BL-1518 (Doing) touches; resume once BL-1518 is Done.
