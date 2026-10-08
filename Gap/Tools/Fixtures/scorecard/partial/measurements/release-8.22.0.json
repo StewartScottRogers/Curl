@@ -1,0 +1,10 @@
+{
+  "fromVersion": "8.21.0",
+  "toVersion": "8.22.0",
+  "items": [
+    { "key": "options:--a", "change": "removed", "before": { "key": "options:--a", "name": "--a", "introducedIn": null, "attributes": {} }, "after": null },
+    { "key": "options:--b", "change": "changed", "before": { "key": "options:--b", "name": "--b", "introducedIn": null, "attributes": {} }, "after": { "key": "options:--b", "name": "--b", "introducedIn": null, "attributes": { "argument": "<n>" } } },
+    { "key": "options:--g", "change": "added", "before": null, "after": { "key": "options:--g", "name": "--g", "introducedIn": "8.22.0", "attributes": {} } },
+    { "key": "options:--h", "change": "added", "before": null, "after": { "key": "options:--h", "name": "--h", "introducedIn": "8.22.0", "attributes": {} } }
+  ]
+}

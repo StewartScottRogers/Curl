@@ -1,0 +1,12 @@
+{
+  "area": "exitcodes",
+  "targetVersion": "8.21.0",
+  "candidateCommit": "d15d115db0a1b2c3d4e5f60718293a4b5c6d7e01",
+  "platform": "windows",
+  "reference": "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel",
+  "measuredAt": "2026-10-09T14:30:00Z",
+  "items": [
+    { "key": "exitcodes:50", "state": "excluded", "reason": "obsolete-code", "expected": null, "actual": null, "evidence": null, "introducedIn": null }
+  ],
+  "counts": { "match": 0, "gap": 0, "unmeasured": 0, "excluded": 1, "x": 0, "y": 0 }
+}
