@@ -45,18 +45,23 @@ public sealed class Http2FlowControlWindow
 
     /// <summary>
     /// Grows the window by <paramref name="delta" />, or shrinks it when negative, unless it
-    /// would pass <see cref="MaximumSize" />.
+    /// would pass <see cref="MaximumSize" /> or fall below <see cref="long.MinValue" />.
     /// </summary>
     /// <param name="delta">A WINDOW_UPDATE increment, or a change of SETTINGS_INITIAL_WINDOW_SIZE.</param>
-    /// <returns><see langword="false" />, leaving the window unchanged, when it would pass the maximum.</returns>
+    /// <returns>
+    /// <see langword="false" />, leaving the window unchanged, when it would pass the maximum
+    /// or fall below <see cref="long.MinValue" />; the sum is taken without overflow, so no
+    /// <paramref name="delta" /> can wrap past either bound.
+    /// </returns>
     public bool TryAdjust(long delta)
     {
-        if (Size + delta > MaximumSize)
+        var adjusted = (Int128)Size + delta;
+        if (adjusted > MaximumSize || adjusted < long.MinValue)
         {
             return false;
         }
 
-        Size += delta;
+        Size = (long)adjusted;
         return true;
     }
 }

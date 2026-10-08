@@ -93,6 +93,40 @@ public sealed class Http2FlowControlWindowTests
     }
 
     [TestMethod]
+    public void TryAdjust_DeltaOverflowingLong_RefusesAndKeepsTheSize()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var window = new Http2FlowControlWindow(1);
+        diagnostics.Arrange("window size", window.Size);
+
+        var adjusted = window.TryAdjust(long.MaxValue);
+        diagnostics.Act("TryAdjust(long.MaxValue)", adjusted);
+        diagnostics.Act("window size", window.Size);
+
+        diagnostics.Assert("adjusted", false, adjusted);
+        diagnostics.Assert("window size", 1, window.Size);
+        Assert.IsFalse(adjusted);
+        Assert.AreEqual(1, window.Size);
+    }
+
+    [TestMethod]
+    public void TryAdjust_DeltaUnderflowingLong_RefusesAndKeepsTheSize()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var window = new Http2FlowControlWindow(-1);
+        diagnostics.Arrange("window size", window.Size);
+
+        var adjusted = window.TryAdjust(long.MinValue);
+        diagnostics.Act("TryAdjust(long.MinValue)", adjusted);
+        diagnostics.Act("window size", window.Size);
+
+        diagnostics.Assert("adjusted", false, adjusted);
+        diagnostics.Assert("window size", -1, window.Size);
+        Assert.IsFalse(adjusted);
+        Assert.AreEqual(-1, window.Size);
+    }
+
+    [TestMethod]
     public void TryAdjust_BelowZero_LeavesNothingAvailable()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

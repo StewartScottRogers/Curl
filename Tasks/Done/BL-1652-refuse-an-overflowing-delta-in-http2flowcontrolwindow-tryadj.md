@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Http2.UnitLibrary, Curl.Http2.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1652 — Refuse an overflowing delta in Http2FlowControlWindow.TryAdjust
 
@@ -25,13 +25,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test `TryAdjust_DeltaOverflowingLong_RefusesAndKeepsTheSize` in `Curl.Http2.UnitTests` creates `new Http2FlowControlWindow(1)`, calls `TryAdjust(long.MaxValue)`, and asserts `false` and `Size` 1; it fails before the fix and passes after.
-- [ ] `dotnet build Curl.Http2.UnitTests -warnaserror` is clean and `dotnet test Curl.Http2.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] `Curl.Http2.UnitLibrary` keeps 100% line and branch coverage.
+- [x] A test `TryAdjust_DeltaOverflowingLong_RefusesAndKeepsTheSize` in `Curl.Http2.UnitTests` creates `new Http2FlowControlWindow(1)`, calls `TryAdjust(long.MaxValue)`, and asserts `false` and `Size` 1; it fails before the fix and passes after.
+- [x] `dotnet build Curl.Http2.UnitTests -warnaserror` is clean and `dotnet test Curl.Http2.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] `Curl.Http2.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- `TryAdjust` now sums `Size + delta` as an `Int128`, so nothing wraps, and refuses (window unchanged) when the sum passes `MaximumSize` or falls below `long.MinValue`. Choice for the very negative delta the Context left open: refuse it the same way rather than clamp or throw - the method is a Try method and its contract is "false, unchanged"; the wire never sends one (`Http2Connection` passes 31-bit values). `TryAdjust_DeltaUnderflowingLong_RefusesAndKeepsTheSize` pins it.
+- Measure-CodeQuality -Library Curl.Http2.UnitLibrary: 100% line, 100% branch, 0 failing members. 362 tests pass in Curl.Http2.UnitTests.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Http2FlowControlWindow.TryAdjust refuses any delta that would pass MaximumSize or wrap a long, leaving the window unchanged
