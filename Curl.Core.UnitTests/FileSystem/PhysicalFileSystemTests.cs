@@ -8,10 +8,10 @@ namespace Curl.Core.FileSystem;
 
 /// <summary>
 /// Drives <see cref="PhysicalFileSystem" /> against the real disk, in a fresh temporary
-/// directory per test, or against the null device. Only the pin of curl 8.21.0's measured
-/// <c>file:///NUL</c> header date is <c>[TestCategory("Integration")]</c>; the rest need no
-/// network, and the fast run must reach every line of <see cref="PhysicalFileSystem" />
-/// for its coverage gate.
+/// directory per test, or against the null device. None is <c>[TestCategory("Integration")]</c>:
+/// the pin of curl 8.21.0's measured <c>file:///NUL</c> header date lives in
+/// <c>Curl.Core.IntegrationTests</c>' <c>PhysicalFileSystemIntegrationTests</c>, and the fast
+/// run must reach every line of <see cref="PhysicalFileSystem" /> for its coverage gate.
 /// </summary>
 [TestClass]
 public sealed partial class PhysicalFileSystemTests
@@ -270,31 +270,6 @@ public sealed partial class PhysicalFileSystemTests
         await result.Content!.DisposeAsync();
         diagnostics.Assert("last write time", null, result.LastWriteTimeUtc);
         Assert.IsNull(result.LastWriteTimeUtc);
-    }
-
-    // curl 8.21.0 on Windows, measured: `curl -sI file:///NUL` prints
-    // "Content-Length: 0", "Accept-ranges: bytes" and "Last-Modified: Thu, 01 Jan 1970 00:00:00 GMT".
-    // FileProtocolHandler writes the date with the "R" format, so this pins its bytes.
-    [TestMethod]
-    [TestCategory("Integration")]
-    [OSCondition(OperatingSystems.Windows)]
-    public async Task OpenForReadAsync_WindowsNullDevice_ReportsCurlsMeasuredLastModifiedDate()
-    {
-        var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("path", "NUL");
-
-        var result = await new PhysicalFileSystem().OpenForReadAsync("NUL", CancellationToken.None);
-
-        ActResult(diagnostics, result);
-        await result.Content!.DisposeAsync();
-        diagnostics.Assert("length", 0L, result.Length);
-        Assert.AreEqual(0L, result.Length);
-        Assert.IsNotNull(result.LastWriteTimeUtc);
-        string lastModified = result.LastWriteTimeUtc.Value.UtcDateTime.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-        diagnostics.Assert("last modified", "Thu, 01 Jan 1970 00:00:00 GMT", lastModified);
-        Assert.AreEqual(
-            "Thu, 01 Jan 1970 00:00:00 GMT",
-            lastModified);
     }
 
     [TestMethod]
