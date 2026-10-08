@@ -207,7 +207,7 @@
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
                  failing test names traced as "flaky?"; only red twice counts (BL-898), and not even
-                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093). A conflict gets one headless run to resolve
+                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093, AF-0101). A conflict gets one headless run to resolve
                  it, and a finished task whose build or tests go red on the rebased
                  tree gets one headless repair run there, still holding the lock,
                  traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
@@ -3764,7 +3764,8 @@ function Test-Green {
     }
     # A concurrency-sensitive test can stay red through two full runs while every lane builds
     # at once, and then park every finished task in the window (AF-0092: BL-1647 and eight
-    # more, on EveryMember_ManyConcurrentCallers_...). So the projects that failed are run
+    # more, on EveryMember_ManyConcurrentCallers_...; AF-0101: BL-1627, red on Curl.Http2 and
+    # then on that cookie test, and redone by another lane). So the projects that failed are run
     # once more on their own: green alone means the red came from the machine's load, not
     # from this task's change, which red alone would still show.
     # A project counts as failed when the run names it so or never reports it passed (AF-0093:
