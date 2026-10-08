@@ -40,3 +40,4 @@ The published native `curl.exe` from `dotnet publish Curl.Console` is materially
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
