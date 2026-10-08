@@ -67,12 +67,26 @@ each check.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Write-GapFindings.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7, with one check per rule 1 to 9. That includes: a finding whose task is Done but whose items still measure `gap` stays open; an item absent from the measurement does not close its finding; a closed finding reopened has `regression: true`.
-- [ ] The files written match `Gap/Findings/FINDING-TEMPLATE.md`'s front matter and section order exactly.
-- [ ] `-WhatIf` prints what it would write and changes nothing.
-- [ ] The header help documents every parameter and rule. The script is ASCII only.
+- [x] `Gap/Tools/Write-GapFindings.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7, with one check per rule 1 to 9. That includes: a finding whose task is Done but whose items still measure `gap` stays open; an item absent from the measurement does not close its finding; a closed finding reopened has `regression: true`.
+- [x] The files written match `Gap/Findings/FINDING-TEMPLATE.md`'s front matter and section order exactly.
+- [x] `-WhatIf` prints what it would write and changes nothing.
+- [x] The header help documents every parameter and rule. The script is ASCII only.
 
 ## Notes
+
+- Group key: the report block (Gap-Format.md section 6) has no `key` field, so a group's
+  key is its `key` when an analyst adds one, else `<area>:<slug of its title>`. Titles stay
+  stable across runs, so the key does too.
+- Measurements line uses FINDING-TEMPLATE.md's wording, `<stamp>: <n> of <m> items are
+  gaps.`, plus `<k> not in this run's measurement.` for absent items; a rerun with the same
+  stamp adds no second line.
+- Release-diff findings are keyed `<area>:newest`, one per area; severity added High,
+  changed Medium, removed Low (ADR-0433 decision 3), the finding taking the highest.
+- Rule 2 counts an item as listed when any finding of the area lists it (open, closed or
+  rejected): a closed one reopens by rule 5, a rejected one stays Stewart's call.
+- The release diff is applied before the areas, so a `newest` finding of a measured area
+  gets this run's Measurements line too.
+- `-WhatIf` comes from `SupportsShouldProcess`: one "What if" line per file written.
 
 ## Log
 
