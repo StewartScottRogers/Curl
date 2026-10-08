@@ -40,3 +40,4 @@ BL-1281 changed `RunDarkFactory.ps1`: a failed claim push is traced as `race` (a
 
 - 2026-10-02: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master

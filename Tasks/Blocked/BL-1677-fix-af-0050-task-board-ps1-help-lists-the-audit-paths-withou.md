@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Interactive only: the fix edits .claude/skills/task-board/task-board.ps1, a guard file no lane may change; an interactive session does it on the audit branch
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master

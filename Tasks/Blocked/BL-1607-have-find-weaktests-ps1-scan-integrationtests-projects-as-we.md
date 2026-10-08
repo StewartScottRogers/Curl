@@ -38,3 +38,4 @@ completed:
 
 - 2026-10-07: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master

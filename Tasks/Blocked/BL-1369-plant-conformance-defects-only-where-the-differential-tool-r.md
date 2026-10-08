@@ -35,3 +35,4 @@ Every planted conformance defect is reachable by the conformance auditor's gener
 
 - 2026-10-03: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master
