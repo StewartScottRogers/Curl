@@ -84,3 +84,4 @@ The workflow never opens a pull request and never force-pushes. The `gap` branch
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
