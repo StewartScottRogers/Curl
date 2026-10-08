@@ -8,7 +8,7 @@ depends-on: [BL-1715]
 touches: [Curl.Console]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1682 — Fix AF-0063: small-get peak working set is 2.017x curl's (just over the 2x threshold)
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the performance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -78,6 +78,20 @@ The finding closes only when a later re-audit by the performance auditor confirm
   re-measures and trims the remaining ~0.5 MB on the HTTP path (runner startup, HTTP handler
   static tables) with the QueryWorkingSet page count, until the median is at most 2x curl's.
 
+- 2026-10-07, lane 8: fixed by delay-loading DLLs (ADR-0431). After BL-1715 the loopback
+  measurement (1 KiB body, `-s -o NUL`, median of 15, `GetProcessMemoryInfo` peak) still gave
+  curl.exe 6.93 MB against Curl 14.00 MB (2.02x). The process module list showed Curl mapping
+  `ncrypt`, `Secur32`, `NTASN1`, `ADVAPI32`, `msvcrt`, `kernel.appcore`, `bcryptPrimitives` and
+  `wshunix` that curl.exe does not; `dumpbin -dependents` shows ILC imports `ncrypt`, `Secur32`,
+  `ADVAPI32`, `CRYPT32` and `IPHLPAPI` statically. A `DelayLoadDllsPlainTransfersNeverCall` target in
+  `Curl.Console.csproj` (beside ADR-0402's ole32 swap) delay-loads those five: Curl now peaks at
+  13.11 MB, 1.89x. `https://example.com/` still succeeds (Schannel loads `Secur32` on first call).
+  Also measured with no effect: `UseWindowsThreadPool`, `UseSystemResourceKeys`,
+  `DOTNET_GCConserveMemory=9`. The lane cannot run `Audit/Tools/Measure-Performance.ps1` (guard
+  hook), so the first box is ticked on this equivalent measurement; the performance auditor's
+  re-audit is what closes AF-0063. Margin is ~5%; a later cut could look at `wshunix` (a Unix
+  socket probe) and `bcryptPrimitives` (a random-bytes call) on the plain HTTP path.
+
 ## Log
 
 - 2026-10-08: Created.
@@ -86,3 +100,4 @@ The finding closes only when a later re-audit by the performance auditor confirm
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Waits on BL-1715 (lazy per-scheme protocol handlers); then trim the remaining ~0.5 MB on the HTTP path
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Native curl.exe delay-loads ncrypt, Secur32, ADVAPI32, CRYPT32 and IPHLPAPI; small GET peaks at 1.89x curl's working set, under 2x
