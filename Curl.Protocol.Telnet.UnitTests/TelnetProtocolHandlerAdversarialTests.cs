@@ -101,6 +101,35 @@ public sealed class TelnetProtocolHandlerAdversarialTests
         AssertExchange(exchange, CurlExitCode.Ok, "62", "FF FA 18 00 76 74 FF F0");
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_SubnegotiationOfAMillionBytes_KeepsOnlyCurlsBufferAndWritesTheDataAfterIt()
+    {
+        // BL-1669: curl's CURL_SB_ACCUM drops every byte past its 512-byte subbuffer, and
+        // the IAC SE it adds and takes back off leave 510 kept; the rest is read and dropped.
+        byte[] stream = [0xFF, 0xFA, 0x05, .. Enumerable.Repeat((byte)0x41, 1_000_000), 0xFF, 0xF0, 0x62];
+        ScriptedRead[] reads = [.. stream.Chunk(4096).Select(chunk => new ScriptedRead(chunk))];
+        var connection = new ScriptedConnection(reads);
+        var output = new MemoryStream();
+        TranscriptTransferEvents events = new();
+        var context = new TransferContext { Url = TelnetUrl, Output = output, Upload = new MemoryStream(), Events = events };
+        Diagnostics.ArrangeContext(context);
+        Diagnostics.Arrange("reads", $"IAC SB STATUS, 1,000,000 x 41, IAC SE, 62 in {reads.Length} reads of at most 4096 bytes");
+
+        TransferResult result = await new TelnetProtocolHandler(new RecordingConnector(ConnectResult.Connected(connection)))
+            .ExecuteAsync(context);
+
+        int parameterLines = events.Transcript.Count(line => line == "*  41");
+        Diagnostics.ActResult(result);
+        Diagnostics.ActOutput(output.ToArray());
+        Diagnostics.Act("subnegotiation parameter lines traced", parameterLines.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("62", ToHex(output.ToArray()));
+        Assert.AreEqual(string.Empty, ToHex(connection.Sent));
+        Assert.AreEqual(1, events.Transcript.Count(line => line == "* RCVD IAC SB "));
+        Assert.AreEqual(508, parameterLines, "the option and 509 bytes after it are kept, 508 of them traced as parameters");
+    }
+
     // Malformed input: commands that are almost right.
 
     [TestMethod]

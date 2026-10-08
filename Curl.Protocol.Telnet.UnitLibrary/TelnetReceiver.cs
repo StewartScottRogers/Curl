@@ -44,6 +44,8 @@ namespace Curl.Protocol.Telnet;
 /// and so does a value over 1000 characters. A <c>NEW-ENVIRON</c> one is answered with an
 /// <c>IS</c> list of every variable that fits, <c>USER</c> first when a user name was
 /// given, then each <c>NEW_ENV</c>; empty when neither gave one. Any other is ignored.
+/// Only a subnegotiation's first 510 bytes are kept, answered and traced; the rest is
+/// read and dropped, as curl's 512-byte buffer does.
 /// </para>
 /// </remarks>
 internal sealed class TelnetReceiver
@@ -57,6 +59,14 @@ internal sealed class TelnetReceiver
     /// fit is left out and the next one tried.
     /// </summary>
     private const int NewEnvironmentReplyLimit = 2042;
+
+    /// <summary>
+    /// The most subnegotiation bytes kept, option first: curl 8.21.0's 512-byte
+    /// <c>subbuffer</c> less the closing <c>IAC SE</c> its <c>CURL_SB_ACCUM</c> adds and
+    /// then takes back off. Every byte past this is read and dropped, so a server that
+    /// never sends <c>IAC SE</c> cannot grow memory.
+    /// </summary>
+    private const int MaximumSubnegotiationLength = 510;
 
     private readonly TelnetOptionValues optionValues;
 
@@ -282,14 +292,23 @@ internal sealed class TelnetReceiver
             return;
         }
 
-        subnegotiation.Add(value);
+        KeepSubnegotiationByte(value);
+    }
+
+    /// <summary>Keeps one subnegotiation byte while there is room for it, as curl's <c>CURL_SB_ACCUM</c> does.</summary>
+    private void KeepSubnegotiationByte(byte value)
+    {
+        if (subnegotiation.Count < MaximumSubnegotiationLength)
+        {
+            subnegotiation.Add(value);
+        }
     }
 
     private TelnetReceiveError ReceiveSubnegotiationCommand(byte value, TelnetOutbox replies)
     {
         if (value == TelnetByte.InterpretAsCommand)
         {
-            subnegotiation.Add(value);
+            KeepSubnegotiationByte(value);
             state = TelnetReceiveState.Subnegotiation;
             return TelnetReceiveError.None;
         }
