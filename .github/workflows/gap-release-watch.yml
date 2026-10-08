@@ -9,9 +9,10 @@
 #                         diff against that release even when it is not newer than the last
 #                         one recorded.
 #   * push              - to work/dark-factory, only when this file changes: a dry run that
-#                         does steps 1 to 3 and prints what steps 4 to 6 would do, with no
-#                         commit and no push. It is how GitHub validates the file before it
-#                         reaches master.
+#                         does steps 2 and 3 on the pushed commit itself (step 1 only says
+#                         what it would do, because master may not have Gap/ yet) and prints
+#                         what steps 4 to 6 would do, with no commit and no push. It is how
+#                         GitHub validates the file before it reaches master.
 #
 # Steps:
 #   1. Check out the repository, take origin/gap (or create gap from origin/master when it
@@ -82,6 +83,12 @@ jobs:
       # Step 1: gap, current with master.
       - name: Bring the gap branch up to date with master
         run: |
+          if ($env:DRY_RUN -eq 'true') {
+            # A dry run validates the pushed commit's own Gap/ files: master (and so a gap
+            # branch made from it) may not have them yet (BL-1753).
+            Write-Output 'dry run: would bring gap up to date with origin/master; staying on the pushed commit'
+            exit 0
+          }
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch --quiet origin master
