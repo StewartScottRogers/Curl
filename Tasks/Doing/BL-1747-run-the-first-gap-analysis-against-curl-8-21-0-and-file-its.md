@@ -62,3 +62,4 @@ shifts or with `-AlongsideShift`. Read `Gap/README.md` (BL-1745) first.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
