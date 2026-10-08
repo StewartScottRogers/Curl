@@ -1,5 +1,5 @@
 ---
-id: BL-1663
+id: BL-1665
 title: Refuse SMB read and write responses one byte short of their offset words instead of throwing
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1663 — Refuse SMB read and write responses one byte short of their offset words instead of throwing
+# BL-1665 — Refuse SMB read and write responses one byte short of their offset words instead of throwing
 
 ## Goal
 
