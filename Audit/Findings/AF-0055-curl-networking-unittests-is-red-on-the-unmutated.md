@@ -3,8 +3,8 @@ id: AF-0055
 title: Curl.Networking.UnitTests is red on the unmutated tree: LocalBindLines writes 'Could not Resolve host' and the Windows resolve-and-bind test fails
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/TcpConnectorTests.LocalBindLines.cs:ConnectAsync_WithAHostThatDoesNotResolveOnWindows_ReportsTheResolveAndBindFailures:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo --filter "Name=ConnectA
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
