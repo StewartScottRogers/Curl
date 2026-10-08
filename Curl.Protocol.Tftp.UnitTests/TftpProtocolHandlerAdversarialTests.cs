@@ -104,6 +104,33 @@ public sealed class TftpProtocolHandlerAdversarialTests
         CollectionAssert.AreEqual(new ushort[] { 1, 0, 1 }, AcknowledgedBlocks(channel));
     }
 
+    /// <summary>
+    /// Measured against curl 8.21.0 (Schannel) with Record-CurlExchange.ps1 -Tftp
+    /// -TftpNoOack and an injected OACK before a 256-byte DATA 1 (BL-1667): curl compares
+    /// the whole option name, not its prefix, so it ignores <c>blksizex=256</c> (keeping
+    /// 512 and ending after block 1, exit 0, where <c>blksize=256</c> waits for block 2)
+    /// and <c>tsizex=0</c> (exit 0, where <c>tsize=0</c> exits 71).
+    /// </summary>
+    [TestMethod]
+    [DataRow("blksizex\0256\0", DisplayName = "blksizex")]
+    [DataRow("tsizex\00\0", DisplayName = "tsizex")]
+    public async Task ExecuteAsync_OptionAcknowledgementNameOnlyStartsWithAKnownOption_IgnoresTheOption(string options)
+    {
+        var channel = Channel(
+            OptionAcknowledgement(options),
+            Data(1, Payload(256, 'a')),
+            Data(2, "b"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes written", 256L, output.Length);
+        Assert.AreEqual(Payload(256, 'a'), Encoding.ASCII.GetString(output.ToArray()));
+        CollectionAssert.AreEqual(new ushort[] { 0, 1 }, AcknowledgedBlocks(channel));
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_MaxFileSizeExactlyTheFirstBlockAndASecondBlockFollows_WritesTheFirstAndExits63()
     {
