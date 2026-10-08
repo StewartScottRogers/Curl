@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1764 — Fix AF-0086: Requirements FR-085 cites a test that does not exist and states one reset message where the code has several
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- FR-085 now cites the three real exit-55 send-failure tests in `Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Timeouts.cs` and states every message the code produces: Winsock words on Windows (reset, aborted), the OS socket-error text off Windows, and curl_easy_strerror(55) with no socket error. Reproduction now prints 0 and no line number. Docs only; build clean, fast tests green.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. FR-085 cites the real exit-55 send-failure tests and states every message they pin
