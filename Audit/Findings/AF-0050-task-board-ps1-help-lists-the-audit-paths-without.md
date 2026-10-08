@@ -3,8 +3,8 @@ id: AF-0050
 title: task-board.ps1 help lists the audit paths without the four guard files the code also treats as audit paths
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-help
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'path \(Au
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.

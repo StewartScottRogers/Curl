@@ -3,8 +3,8 @@ id: AF-0043
 title: Of_UnsolicitedCodingWithoutRaw_ThrowsExit61 never checks exit code 61
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitTests/HttpResponseBodyFramingTests.cs:Of_UnsolicitedCodingWithoutRaw_ThrowsExit61:name-lies
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ Select-String -Path Curl.Protocol.Http.UnitTests/HttpResponseBodyFramingTests.cs
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.

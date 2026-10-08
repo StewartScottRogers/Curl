@@ -3,8 +3,8 @@ id: AF-0047
 title: AbandonResponseAsync's `isResponseEnded = true` can become false with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs:AbandonResponseAsync-true:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs:211:true
 task: none
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
