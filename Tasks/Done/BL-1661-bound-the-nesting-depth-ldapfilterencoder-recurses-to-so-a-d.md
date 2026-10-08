@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ldap.UnitLibrary, Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1661 — Bound the nesting depth LdapFilterEncoder recurses to, so a deeply nested LDAP URL filter cannot overflow the stack
 
@@ -23,13 +23,19 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Ldap.UnitTests` encodes a filter nested 100,000 levels deep without crashing the test host and gets the refusal (or the encoding) the ADR decides.
-- [ ] `LdapAdversarialTests.Encode_FilterNestedTwoHundredDeep_EncodesOneConstructedPerLevel` still passes.
-- [ ] `Curl.Protocol.Ldap.UnitLibrary` stays at 100% line and branch coverage.
+- [x] A test in `Curl.Protocol.Ldap.UnitTests` encodes a filter nested 100,000 levels deep without crashing the test host and gets the refusal (or the encoding) the ADR decides.
+- [x] `LdapAdversarialTests.Encode_FilterNestedTwoHundredDeep_EncodesOneConstructedPerLevel` still passes.
+- [x] `Curl.Protocol.Ldap.UnitLibrary` stays at 100% line and branch coverage.
 
 ## Notes
+
+- Decided a fixed limit, not an iterative parser (ADR-0425): `LdapFilterEncoder.MaximumSetDepth` = 256 nested `&`/`|`/`!` sets, both dialects; a 257th refuses the filter (`null`), the same failure as any filter the build refuses. Depth is counted, not the number of sets.
+- Real curl not measured: OpenLDAP's `ldap_pvt_put_filter`/`put_complex_filter` recurse without a depth check, so a deep enough filter crashes the reference build too; a crash is not behaviour to match, and no real filter nests near 256.
+- The check lives in its own `ParseNestedSet` so `ParseSet` stays at complexity 10. Measure-CodeQuality on the library: 100% line, 100% branch, 0 failing members.
+- Tests added in `LdapAdversarialTests`: 100,000 deep refused (both dialects), 256 encodes and 257 refused (both dialects), many shallow sibling sets encode, the encoder is reusable after a depth refusal.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. LDAP filters nest at most 256 sets (ADR-0425); deeper ones are refused instead of overflowing the stack
