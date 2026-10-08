@@ -21,7 +21,8 @@
     passes a path only master changed.
 
     Guarded paths: Audit/ (this script included, so the factory cannot weaken it),
-    .claude/agents/audit-*, and the guards themselves - .claude/hooks/guard-audit-paths.ps1,
+    .claude/agents/audit-*, the gap analysis office's Gap/ and .claude/agents/gap-*
+    (ADR-0433), and the guards themselves - .claude/hooks/guard-audit-paths.ps1,
     .claude/settings.json (which registers that hook), .github/workflows/ci.yml (which runs
     this) and .claude/skills/task-board/task-board.ps1 (which refuses audit work to lanes).
     A change to any of them is interactive-only work that reaches master through the
@@ -53,6 +54,8 @@ $ErrorActionPreference = 'Stop'
 $GuardedPatterns = @(
     '^Audit/',
     '^\.claude/agents/audit-',
+    '^Gap/',
+    '^\.claude/agents/gap-',
     '^\.claude/hooks/guard-audit-paths\.ps1$',
     '^\.claude/settings\.json$',
     '^\.github/workflows/ci\.yml$',
@@ -76,15 +79,22 @@ function Get-OffendingPaths([string]$BaseRef, [string]$HeadRef, [string]$Repo) {
     return @($mine | Where-Object { ($differs -contains $_) -and (Test-GuardedPath $_) } | Sort-Object -Unique)
 }
 
+function Get-BoardAuditPathTest([string]$BoardScript) {
+    # task-board.ps1's Test-AuditPath as a script block taking one path, or $null when
+    # the board script has none.
+    $ast = [Management.Automation.Language.Parser]::ParseFile($BoardScript, [ref]$null, [ref]$null)
+    $function = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-AuditPath' }, $true)
+    if (-not $function) { return $null }
+    return [scriptblock]::Create("$($function.Extent.Text)`nTest-AuditPath `$args[0]")
+}
+
 function Get-BoardMisses([string]$BoardScript) {
     # The guarded paths task-board.ps1's Test-AuditPath does not call audit paths. Each
     # pattern gives one sample path: a prefix pattern (ending / or -) a file under it,
     # an exact one the path itself. A guarded path the board misses lets a lane claim a
     # task this guard will fail (BL-1209).
-    $ast = [Management.Automation.Language.Parser]::ParseFile($BoardScript, [ref]$null, [ref]$null)
-    $function = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-AuditPath' }, $true)
-    if (-not $function) { return @('(no Test-AuditPath in the board script)') }
-    $test = [scriptblock]::Create("$($function.Extent.Text)`nTest-AuditPath `$args[0]")
+    $test = Get-BoardAuditPathTest $BoardScript
+    if (-not $test) { return @('(no Test-AuditPath in the board script)') }
     $misses = @()
     foreach ($pattern in $GuardedPatterns) {
         $sample = $pattern.TrimStart('^').TrimEnd('$') -replace '\\(.)', '$1'
@@ -122,7 +132,7 @@ function Invoke-SelfTest {
         New-Item -ItemType Directory -Force $repo | Out-Null
         Invoke-ScratchGit $repo init -q -b master
         foreach ($p in 'Curl.Core.UnitLibrary/x.cs', '.claude/agents/code-reviewer.md', '.claude/agents/audit-quality.md',
-            '.claude/hooks/guard-audit-paths.ps1', '.claude/settings.json', '.github/workflows/ci.yml',
+            '.claude/agents/gap-options.md', 'Gap/README.md', '.claude/hooks/guard-audit-paths.ps1', '.claude/settings.json', '.github/workflows/ci.yml',
             '.claude/skills/task-board/task-board.ps1', 'Audit/Guard/Test-AuditPathsUntouched.ps1') {
             Set-File $repo $p "base $p`n"
         }
@@ -189,6 +199,17 @@ function Invoke-SelfTest {
             Assert-Case "h: factory changes $p" $r $true
         }
 
+        # The gap analysis office's paths are guarded too (ADR-0433), and only they:
+        # Gaps.md and gapper.md merely start with the same letters.
+        $r = New-ScratchRepo 'i'; Invoke-FactoryCommit $r @('Gap/README.md')
+        Assert-Case 'i: factory changes Gap/README.md' $r $true
+
+        $r = New-ScratchRepo 'j'; Invoke-FactoryCommit $r @('.claude/agents/gap-options.md')
+        Assert-Case 'j: factory changes .claude/agents/gap-options.md' $r $true
+
+        $r = New-ScratchRepo 'k'; Invoke-FactoryCommit $r @('Gaps.md', '.claude/agents/gapper.md')
+        Assert-Case 'k: factory adds Gaps.md and .claude/agents/gapper.md' $r $false
+
         # The board must refuse lanes every guarded path, or a lane builds work this
         # guard then fails (BL-1209). Checked on the real board script, then on a copy
         # with ci.yml taken out of its list, which must be caught.
@@ -196,14 +217,28 @@ function Invoke-SelfTest {
         $misses = @(Get-BoardMisses $board)
         $ok = $misses.Count -eq 0
         if (-not $ok) { $script:selfTestFailures++ }
-        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (i: task-board.ps1 calls every guarded path an audit path) missed: $(if ($misses) { $misses -join ', ' } else { 'none' })"
+        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (l: task-board.ps1 calls every guarded path an audit path) missed: $(if ($misses) { $misses -join ', ' } else { 'none' })"
         New-Item -ItemType Directory -Force $scratch | Out-Null
         $weakened = Join-Path $scratch 'task-board.ps1'
         [IO.File]::WriteAllText($weakened, ([IO.File]::ReadAllText($board) -replace "(?m)^\s*'\.github/workflows/ci\.yml',\r?\n", ''))
         $misses = @(Get-BoardMisses $weakened)
         $ok = ($misses -join ',') -eq '.github/workflows/ci.yml'
         if (-not $ok) { $script:selfTestFailures++ }
-        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (j: a board missing ci.yml is caught) missed: $(if ($misses) { $misses -join ', ' } else { 'none' })"
+        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (m: a board missing ci.yml is caught) missed: $(if ($misses) { $misses -join ', ' } else { 'none' })"
+
+        # The board agrees with this guard on the gap office's paths: a copy without the
+        # Gap/ prefix is caught, and the look-alikes are not audit paths to the board.
+        $weakened = Join-Path $scratch 'task-board-no-gap.ps1'
+        [IO.File]::WriteAllText($weakened, ([IO.File]::ReadAllText($board) -replace "(?m)^.*StartsWith\('Gap/'.*\r?\n", ''))
+        $misses = @(Get-BoardMisses $weakened)
+        $ok = ($misses -join ',') -eq 'Gap/x.md'
+        if (-not $ok) { $script:selfTestFailures++ }
+        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (n: a board missing Gap/ is caught) missed: $(if ($misses) { $misses -join ', ' } else { 'none' })"
+        $test = Get-BoardAuditPathTest $board
+        $claimed = @('Gaps.md', '.claude/agents/gapper.md' | Where-Object { & $test $_ })
+        $ok = $claimed.Count -eq 0
+        if (-not $ok) { $script:selfTestFailures++ }
+        Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) (o: task-board.ps1 does not call Gaps.md or .claude/agents/gapper.md audit paths) claimed: $(if ($claimed) { $claimed -join ', ' } else { 'none' })"
     }
     finally {
         Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue
@@ -223,6 +258,6 @@ if ($offending.Count -eq 0) {
 }
 foreach ($path in $offending) {
     Write-Host "Audit guard: $path changed on work/dark-factory since its merge base with master"
-    Write-Host "::error file=$path::Audit guard: $path changed on work/dark-factory since its merge base with master. Audit paths and their guards change only through the audit branch (ADR-0267)."
+    Write-Host "::error file=$path::Audit guard: $path changed on work/dark-factory since its merge base with master. Audit paths and their guards change only through the audit branch (ADR-0267, ADR-0433)."
 }
 exit 1

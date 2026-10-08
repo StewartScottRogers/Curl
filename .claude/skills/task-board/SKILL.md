@@ -106,9 +106,11 @@ The script refuses:
   `new` a task whose `touches` name an audit path, unless `-NoLane` is given; and
   claiming with `move -To Doing` a task that is interactive only
 
-An **audit path** belongs to the audit office, outside the factory's reach (ADR-0267):
-`Audit`, anything under `Audit/`, an auditor agent `.claude/agents/audit-*`, or one of the
-guard files that protect them - `.claude/hooks/guard-audit-paths.ps1`,
+An **audit path** belongs to the audit office (ADR-0267) or the gap analysis office
+(ADR-0433), outside the factory's reach: `Audit`, anything under `Audit/`, an auditor agent
+`.claude/agents/audit-*`, `Gap`, anything under `Gap/`, a gap analyst agent
+`.claude/agents/gap-*`, or one of the guard files that protect them -
+`.claude/hooks/guard-audit-paths.ps1`,
 `.claude/settings.json`, `.github/workflows/ci.yml` and
 `.claude/skills/task-board/task-board.ps1` - in any letter case. The guard files are the
 ones CI's audit guard (`Audit/Guard/Test-AuditPathsUntouched.ps1`) fails the factory's

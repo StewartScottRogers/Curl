@@ -181,7 +181,8 @@ catch rate is measured. An auditor that misses a defect planted for it, returns 
 block, or changes the audited tree is **unreliable** on that audit's scorecard: its numbers
 are marked, and its re-audits close nothing on its word alone (ADR-0422).
 
-Audit paths are `Audit/` and `.claude/agents/audit-*`; the guard files that protect them -
+Audit paths are `Audit/` and `.claude/agents/audit-*` (ADR-0267), and the gap analysis
+office's `Gap/` and `.claude/agents/gap-*` (ADR-0433); the guard files that protect them -
 `.claude/hooks/guard-audit-paths.ps1`, `.claude/settings.json`, `.github/workflows/ci.yml`
 and `.claude/skills/task-board/task-board.ps1` - change only through the `audit` branch
 too. Four guards keep the factory out: tasks that touch an audit path or a guard file are
