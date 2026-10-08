@@ -67,6 +67,21 @@ public sealed class CurlCommandRunnerParallelProgressMeterTests
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ParallelRunThatStartsNoTransfer_WritesNoMeter()
+    {
+        fileSystem.ExistingContent["f"] = Encoding.ASCII.GetBytes("F");
+
+        int exitCode = await RunAsync(["-Z", "-d", "a=1", "-T", "f", "http://a.test/1"]);
+
+        string expectedStandardError = "Warning: You can only select one HTTP request method! You asked for both PUT " + NewLine
+            + "Warning: (-T, --upload-file) and POST (-d, --data)." + NewLine;
+        Diagnostics.Assert("exit code", 2, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedStandardError), Lf(StandardErrorText));
+        Assert.AreEqual(2, exitCode);
+        Assert.AreEqual(expectedStandardError, StandardErrorText);
+    }
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private async Task<int> RunAsync(IReadOnlyList<string> arguments)

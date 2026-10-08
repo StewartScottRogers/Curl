@@ -529,6 +529,13 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.FailedInit, CurlEasyErrorText.Of(CurlExitCode.FailedInit));
 
     /// <summary>
+    /// The end a <c>-Z</c> run records for a <c>-T</c> upload refused because another request method is
+    /// selected (<see cref="RefusedUploadRequestMethodAsync" />): exit 2, its warning already written.
+    /// </summary>
+    private static readonly TransferResult UploadRequestMethodConflictFailure =
+        TransferResult.Failure(CurlExitCode.FailedInit, CurlEasyErrorText.Of(CurlExitCode.FailedInit));
+
+    /// <summary>
     /// The result of a transfer whose <c>--interface</c> value libcurl refuses when curl sets it
     /// (<c>CURLOPT_INTERFACE</c>, option 10062, 0x274e): exit 43 with curl 8.21.0's message, before
     /// any connection (measured 2026-09-29, BL-600 Notes). It is compared by reference, so that
@@ -1414,14 +1421,12 @@ internal sealed class CurlCommandRunner(
                 return (globFailure.ExitCode, true);
             }
 
-            if (eventStandardError is null)
+            if (await RefusedUploadRequestMethodAsync(options, index).ConfigureAwait(false))
             {
-                eventStandardError = new HoldableStream(standardError);
-                transferEventOutput = await TransferEventOutput
-                    .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
-                    .ConfigureAwait(false);
+                return (CurlExitCode.FailedInit, true);
             }
 
+            await OpenTransferEventOutputOnceAsync(options).ConfigureAwait(false);
             (exitCode, bool runEnded) = await TransferEachMatchAsync(dispatch, options, index, uploadFiles, glob, exitCode)
                 .ConfigureAwait(false);
             if (runEnded)
@@ -1431,6 +1436,54 @@ internal sealed class CurlCommandRunner(
         }
 
         return (exitCode, false);
+    }
+
+    /// <summary>
+    /// Opens the run's <see cref="transferEventOutput" /> over a new <see cref="eventStandardError" /> the
+    /// first time a URL is about to transfer, and does nothing after that.
+    /// </summary>
+    /// <param name="options">The option group whose <c>-v</c> and trace options the output follows.</param>
+    /// <returns>A task that completes when the output is open.</returns>
+    private async Task OpenTransferEventOutputOnceAsync(CommandLineOptions options)
+    {
+        if (eventStandardError is not null)
+        {
+            return;
+        }
+
+        eventStandardError = new HoldableStream(standardError);
+        transferEventOutput = await TransferEventOutput
+            .OpenAsync(options, fileSystem, GatedDeferringStandardOutput, eventStandardError, runsOnWindows, standardOutputIsTerminal, timeProvider, () => standardOutputSwitchedToBinary)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Refuses the URL at <paramref name="index" /> when its <c>-T</c> upload finds another request method
+    /// selected, as curl 8.21.0 does at that transfer's setup: <see cref="CommandLineWarning.PutRequestedWith" />'s
+    /// line unless <c>-s</c>, nothing sent, and the run ends with exit 2 after the transfers before it
+    /// (measured 2026-10-07, BL-1683 Notes).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="index">The URL's index in the group.</param>
+    /// <returns>
+    /// <see langword="true" /> when the URL was refused, its lines written and the run's end recorded;
+    /// <see langword="false" /> when it has no upload or no other method is selected.
+    /// </returns>
+    private async Task<bool> RefusedUploadRequestMethodAsync(CommandLineOptions options, int index)
+    {
+        if (UploadFileOf(options, index) is null
+            || CommandLineWarning.PutRequestedWith(options.HttpMethodBeforeUpload) is not { } conflictLines)
+        {
+            return false;
+        }
+
+        if (!options.Silent)
+        {
+            await WriteErrorLinesAsync(conflictLines).ConfigureAwait(false);
+        }
+
+        await RecordParallelRunEndAsync(UploadRequestMethodConflictFailure).ConfigureAwait(false);
+        return true;
     }
 
     /// <summary>
