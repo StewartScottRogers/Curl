@@ -72,3 +72,4 @@ Commit `Gap/Upstream/8.21.0/exitcodes.json`.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
