@@ -5,7 +5,8 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-08
 completed:
@@ -46,7 +47,33 @@ The finding closes only when a later re-audit by the performance auditor confirm
 
 ## Notes
 
+- 2026-10-07, lane 5: the fix is written and the HTTP unit tests pass (1889 passed,
+  18 skipped). `HttpResponseBodyReader.CopyFramedAsync` now receives a Content-Length
+  or read-to-close body in reads of up to `ReceiveSize` (64 KiB, four `ReadSize`
+  pieces). It still reports and writes each 16 KiB piece separately, so the
+  `passed 16384` exit-23 message and the `--trace` data events are unchanged. There
+  are a quarter as many receives. The chunked path is unchanged. New test:
+  `CopyAsync_LargeContentLengthBody_ReceivesInFourPieceReadsAndWritesInPiecesOfTheReadSize`.
+  Why 64 KiB: it is the smallest multiple of curl's 16 KiB write size that cuts the
+  number of receives by a useful amount, and the pieces written still match curl's
+  (decided by Claude under Stewart's delegation).
+- The work is not committed. Rule 6 of the shift sends uncommitted work to the
+  shift's stash, under this task's ID.
+- Still to do: the first acceptance criterion runs `Audit/Tools/Measure-Performance.ps1`.
+  That is an audit path, and the guard hook stops every dark factory lane from reading
+  or running it. So this task is now `lane: no`. An interactive session needs to:
+  1. Apply the stashed diff.
+  2. Run the reproduction.
+  3. If Curl's median is at most 1.25 times curl's, tick the box, commit and move the
+     task to Done.
+  4. If it is not: a likely next cause is the unbuffered stdout FileStream's async
+     writes, which run on the thread pool. Fixing that is a `Curl.Console` change and
+     needs its own task.
+- Added `Curl.Protocol.Http.UnitTests` to `touches` for the new test. No task in
+  Doing names it.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Fix written (64 KiB receives, 16 KiB writes), tests green, left in the shift stash; the reproduction is the audit office's performance script, which no lane may run, so it is lane: no for an interactive session to measure and finish
