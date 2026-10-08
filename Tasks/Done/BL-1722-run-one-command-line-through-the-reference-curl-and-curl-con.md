@@ -8,7 +8,7 @@ depends-on: [BL-1721]
 touches: [Gap/Tools/Invoke-GapProbe.ps1, Gap/Tools/Fixtures/probe]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1722 — Run one command line through the reference curl and Curl.Console side by side with Gap/Tools/Invoke-GapProbe.ps1
 
@@ -61,13 +61,29 @@ echoes its arguments and environment, kept under `Gap/Tools/Fixtures/probe/`.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Invoke-GapProbe.ps1 -SelfTest` prints `PASS` lines and no `FAIL`, and exits 0, under Windows PowerShell 5.1 and PowerShell 7. It checks five things: an argument with a space and a double quote arrives as one argument; `HOME`, `USERPROFILE`, `APPDATA`, `CURL_HOME` and `XDG_CONFIG_HOME` point at an empty folder; an `-Environment` entry is passed and a `$null` entry removes the variable; a run past `-TimeoutSeconds` reports `TimedOut`; a reference whose version line names another version is reported as not matching.
-- [ ] On a Windows machine with Git for Windows, `. Gap/Tools/Invoke-GapProbe.ps1; Get-GapReferenceCurl` returns the `mingw64\bin\curl.exe` path and its `curl 8.21.0` version line.
-- [ ] Each function has comment-based help. The script is ASCII only.
+- [x] `Gap/Tools/Invoke-GapProbe.ps1 -SelfTest` prints `PASS` lines and no `FAIL`, and exits 0, under Windows PowerShell 5.1 and PowerShell 7. It checks five things: an argument with a space and a double quote arrives as one argument; `HOME`, `USERPROFILE`, `APPDATA`, `CURL_HOME` and `XDG_CONFIG_HOME` point at an empty folder; an `-Environment` entry is passed and a `$null` entry removes the variable; a run past `-TimeoutSeconds` reports `TimedOut`; a reference whose version line names another version is reported as not matching.
+- [x] On a Windows machine with Git for Windows, `. Gap/Tools/Invoke-GapProbe.ps1; Get-GapReferenceCurl` returns the `mingw64\bin\curl.exe` path and its `curl 8.21.0` version line.
+- [x] Each function has comment-based help. The script is ASCII only.
 
 ## Notes
+
+- A `.ps1` path given as `-CandidatePath` or `-ReferencePath` runs through the current
+  PowerShell host with `-File`; when that host is pwsh installed as a .NET tool (its
+  process is `dotnet.exe`), `$PSHOME\pwsh.dll` is passed first. This is how the self-test
+  stands `Gap/Tools/Fixtures/probe/Write-ProbeEcho.ps1` in for both binaries.
+- The PowerShell stand-in itself creates an `AppData` (pwsh) or `Microsoft` (5.1) folder
+  in the empty profile folder as it starts, so the empty-folder check allows those two
+  names and nothing else. A real curl creates nothing there.
+- `Get-GapReferenceCurl` matches when the `--version` first line starts `curl <target> `
+  (ordinal). Off Windows the reference is the first `curl` application on PATH.
+- On timeout the process is killed with `Process.Kill()` (no tree kill: Windows
+  PowerShell 5.1 has no `Kill($true)`); curl starts no children, so this suffices.
+- Verified on this machine: self-test 5 PASS under pwsh 7 and Windows PowerShell 5.1;
+  `Get-GapReferenceCurl` returns `C:\Program Files\Git\mingw64\bin\curl.exe`,
+  `curl 8.21.0 (x86_64-w64-mingw32) ... Schannel ...`, Matches True.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Gap/Tools/Invoke-GapProbe.ps1 runs a command line through the matched reference curl and Curl.Console in a controlled environment; -SelfTest passes on PS 5.1 and 7
