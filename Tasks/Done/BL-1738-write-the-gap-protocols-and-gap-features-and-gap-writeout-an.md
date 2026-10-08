@@ -9,7 +9,7 @@ touches: [Gap/Instructions/Protocols.md, Gap/Instructions/Features.md, Gap/Instr
 model: sonnet
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1738 — Write the gap-protocols and gap-features and gap-writeout and gap-exitcodes analysts
 
@@ -52,13 +52,18 @@ Agents use `model: haiku` and `tools: Read, Grep, Glob, Bash`. Each body names
 
 ## Acceptance criteria
 
-- [ ] The four agent files exist with `model: haiku` and tools limited to `Read, Grep, Glob, Bash`. Each body names `Gap/Instructions/Analyst-Rules.md` and its own method file.
-- [ ] The four method files each state their grouping rules, the severity mapping above, and an example report block that parses with `ConvertFrom-Json` in Windows PowerShell 5.1.
-- [ ] No file in this task tells an analyst to read anything under `Audit/`, or to put a `Gap/`, `Audit/` or `.claude/` path in `touches`.
+- [x] The four agent files exist with `model: haiku` and tools limited to `Read, Grep, Glob, Bash`. Each body names `Gap/Instructions/Analyst-Rules.md` and its own method file.
+- [x] The four method files each state their grouping rules, the severity mapping above, and an example report block that parses with `ConvertFrom-Json` in Windows PowerShell 5.1.
+- [x] No file in this task tells an analyst to read anything under `Audit/`, or to put a `Gap/`, `Audit/` or `.claude/` path in `touches`.
 
 ## Notes
+
+- Written in the session rather than through align-and-document: four short files following gap-options.md and Options.md. Agents use model haiku per the task.
+- Protocols groups by scheme family (plain + TLS variant, scp+sftp under Ssh); schemes Curl lists but the reference lacks get their own not-in-reference group because the fix is the opposite. Features groups one capability per group (HTTP2+h2c, GSS-API+Kerberos+SPNEGO). Exit codes has at most two groups; a strerror gap on a missing code joins the missing-codes group.
+- Every example block was extracted and parsed with ConvertFrom-Json in Windows PowerShell 5.1. A grep confirmed no file in the task names the audit folder.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. gap-protocols, gap-features, gap-writeout and gap-exitcodes Haiku analysts and their method files exist
