@@ -343,6 +343,57 @@ public sealed class LdapAdversarialTests
     }
 
     [TestMethod]
+    [DataRow(LdapDialect.OpenLdap)]
+    [DataRow(LdapDialect.WinLdap)]
+    public void Encode_FilterNestedOneHundredThousandDeep_IsRefusedWithoutOverflowingTheStack(LdapDialect dialect)
+    {
+        string filter = NestedAnd(100_000);
+
+        byte[]? encoded = Encoder(dialect).Encode(filter);
+
+        Assert.IsNull(encoded);
+    }
+
+    [TestMethod]
+    [DataRow(LdapDialect.OpenLdap)]
+    [DataRow(LdapDialect.WinLdap)]
+    public void Encode_FilterNestedToTheMaximumSetDepth_EncodesAndOneDeeperIsRefused(LdapDialect dialect)
+    {
+        string deepest = NestedAnd(LdapFilterEncoder.MaximumSetDepth);
+        string tooDeep = NestedAnd(LdapFilterEncoder.MaximumSetDepth + 1);
+
+        byte[]? encoded = Encoder(dialect).Encode(deepest);
+        byte[]? refused = Encoder(dialect).Encode(tooDeep);
+
+        Assert.IsNotNull(encoded);
+        Assert.IsNull(refused);
+    }
+
+    [TestMethod]
+    public void Encode_ManySiblingSetsEachShallow_CountsDepthNotSetsAndEncodes()
+    {
+        string filter = "(&" + string.Concat(Enumerable.Repeat("(|(cn=a))", LdapFilterEncoder.MaximumSetDepth * 2)) + ")";
+
+        byte[]? encoded = Encoder(LdapDialect.OpenLdap).Encode(filter);
+
+        Assert.IsNotNull(encoded);
+    }
+
+    [TestMethod]
+    public void Encode_ReusedAfterADepthRefusal_EncodesTheMaximumDepthAgain()
+    {
+        LdapFilterEncoder encoder = Encoder(LdapDialect.OpenLdap);
+
+        Assert.IsNull(encoder.Encode(NestedAnd(LdapFilterEncoder.MaximumSetDepth + 1)));
+        byte[]? reused = encoder.Encode(NestedAnd(LdapFilterEncoder.MaximumSetDepth));
+
+        Assert.IsNotNull(reused);
+    }
+
+    private static string NestedAnd(int depth) =>
+        string.Concat(Enumerable.Repeat("(&", depth)) + "(cn=a)" + new string(')', depth);
+
+    [TestMethod]
     public void Encode_ReusedAfterARefusal_EncodesTheNextFilterAsAFreshEncoderDoes()
     {
         LdapFilterEncoder encoder = Encoder(LdapDialect.OpenLdap);
