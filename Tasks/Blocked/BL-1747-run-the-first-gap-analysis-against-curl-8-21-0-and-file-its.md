@@ -63,3 +63,4 @@ shifts or with `-AlongsideShift`. Read `Gap/README.md` (BL-1745) first.
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. First gap analysis running (herdr tab); finished interactively once its gap pull request merges, so Doing holds nothing orphaned
