@@ -3199,7 +3199,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
-   the deadline, move it to Backlog before then with a -Reason saying what is left.
+   the deadline, file what is left as a task with the board script, add its ID to the
+   task's `depends-on`, record what you measured under Notes, and move it to Backlog
+   before then with a -Reason naming that task: the next lane then starts on the work
+   that is left, not on measuring the task again (AF-0094).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3285,7 +3288,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
-   the deadline, move it to Backlog before then with a -Reason saying what is left.
+   the deadline, file what is left as a task with the board script, add its ID to the
+   task's `depends-on`, record what you measured under Notes, and move it to Backlog
+   before then with a -Reason naming that task: the next lane then starts on the work
+   that is left, not on measuring the task again (AF-0094).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
