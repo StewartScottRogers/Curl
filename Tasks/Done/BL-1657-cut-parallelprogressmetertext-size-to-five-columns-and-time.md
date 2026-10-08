@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1657 — Cut ParallelProgressMeterText Size to five columns and Time to eight as curl's msnprintf buffers do
 
@@ -25,13 +25,18 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Size` returns exactly five characters for every value from 0 to `long.MaxValue`, matching curl's truncation, with tests at `(100L << 20) - 1`, `(100L << 50) - 1` and `long.MaxValue`.
-- [ ] `Time` returns exactly eight characters for every value, matching curl's truncation, with a test at `long.MaxValue`.
-- [ ] 100% line and branch coverage of `Curl.Output.UnitLibrary` holds; build clean, fast tests green.
+- [x] `Size` returns exactly five characters for every value from 0 to `long.MaxValue`, matching curl's truncation, with tests at `(100L << 20) - 1`, `(100L << 50) - 1` and `long.MaxValue`.
+- [x] `Time` returns exactly eight characters for every value, matching curl's truncation, with a test at `long.MaxValue`.
+- [x] 100% line and branch coverage of `Curl.Output.UnitLibrary` holds; build clean, fast tests green.
 
 ## Notes
+
+- `Size` cuts its `xx.yU` text with `[..5]` and `Time` its days-alone text with `[..8]`, the only layouts that can exceed their columns, as curl's `msnprintf(max5, 6, ...)` and `msnprintf(r, 9, ...)` do. `(100L << 20) - 1` and `(100L << 50) - 1` are `99.10`; `long.MaxValue` seconds is `10675199`. Decision in ADR-0428.
+- Not measured against real curl: the cut follows from the buffer sizes in `src/tool_progress.c`, and a ~100 MiB `-Z` download through `Record-CurlExchange.ps1` would only confirm it. Chose the source over the measurement to stay within the run (ADR-0428, "Why").
+- Measure-CodeQuality: `Curl.Output.UnitLibrary` 100% line, 100% branch, 0 failing members. Full fast tests green.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. ParallelProgressMeterText.Size is always five characters and Time eight, cut as curl's msnprintf buffers cut them

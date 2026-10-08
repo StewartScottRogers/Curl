@@ -13,6 +13,8 @@ public sealed class ParallelProgressMeterTextAdversarialTests
     [DataRow(100_000L)]
     [DataRow(10_239_999L)]
     [DataRow(10_240_000L)]
+    [DataRow((100L << 20) - 1)]
+    [DataRow((100L << 50) - 1)]
     [DataRow(long.MaxValue - 1)]
     [DataRow(long.MaxValue)]
     public void Size_AnyCountFromZeroToLongMaxValue_IsFiveColumns(long bytes)

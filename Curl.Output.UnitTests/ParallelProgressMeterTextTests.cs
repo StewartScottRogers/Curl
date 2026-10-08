@@ -65,6 +65,7 @@ public sealed class ParallelProgressMeterTextTests
     [DataRow(10000000L, "9765k")]
     [DataRow(10240000L, " 9.7M")]
     [DataRow(75000000L, "71.5M")]
+    [DataRow((100L << 20) - 1, "99.10")]
     [DataRow(300000000L, " 286M")]
     [DataRow(1666000000L, "1588M")]
     [DataRow(10485760000L, " 9.7G")]
@@ -72,6 +73,7 @@ public sealed class ParallelProgressMeterTextTests
     [DataRow(10737418240000L, " 9.7T")]
     [DataRow(10995116277760000L, " 9.7P")]
     [DataRow(112589990684262400L, " 100P")]
+    [DataRow((100L << 50) - 1, "99.10")]
     [DataRow(long.MaxValue, "8191P")]
     public void Size_Bytes_IsFiveColumnsAsMax5DataWritesIt(long bytes, string expected)
     {
@@ -94,6 +96,7 @@ public sealed class ParallelProgressMeterTextTests
     [DataRow(360000L, "  4d 04h")]
     [DataRow(86399999L, "999d 23h")]
     [DataRow(86400000L, "   1000d")]
+    [DataRow(long.MaxValue, "10675199")]
     public void Time_Seconds_IsEightColumnsAsTime2StrWritesIt(long seconds, string expected)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

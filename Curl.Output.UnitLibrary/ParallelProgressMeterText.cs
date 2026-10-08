@@ -52,7 +52,10 @@ public static class ParallelProgressMeterText
     /// Formats a byte count or speed in five columns as <c>max5data</c> does: right-aligned below
     /// 100000; then, dividing by 1024 for each unit, <c>xx.yU</c> while under 100 of the unit and
     /// <c>xxxxU</c> while under 10000, as in <c> 292k</c>, <c>71.5M</c> and <c>1589M</c>. Petabytes are
-    /// the last unit, and <see cref="long.MaxValue" /> is <c>8191P</c>.
+    /// the last unit, and <see cref="long.MaxValue" /> is <c>8191P</c>. The text is cut to five
+    /// characters as curl's six-byte <c>msnprintf</c> buffer cuts it: because <c>unitSize / 10</c>
+    /// rounds down, the tenths digit reaches 10 just below 100 of a unit, so 100 MiB less one byte is
+    /// <c>99.10</c>, the unit letter cut off (ADR-0428).
     /// </summary>
     /// <param name="bytes">The count, never negative.</param>
     /// <returns>Five characters.</returns>
@@ -72,13 +75,15 @@ public static class ParallelProgressMeterText
         }
 
         return unit > 0 && bytes < 100 * unitSize
-            ? string.Create(CultureInfo.InvariantCulture, $"{bytes / unitSize,2}.{bytes % unitSize / (unitSize / 10)}{SizeUnits[unit]}")
+            ? string.Create(CultureInfo.InvariantCulture, $"{bytes / unitSize,2}.{bytes % unitSize / (unitSize / 10)}{SizeUnits[unit]}")[..5]
             : string.Create(CultureInfo.InvariantCulture, $"{bytes / unitSize,4}{SizeUnits[unit]}");
     }
 
     /// <summary>
     /// Formats a number of seconds in eight columns as <c>time2str</c> does: blank for none,
-    /// <c>hh:mm:ss</c> up to 99 hours, <c>ddd hhh</c> up to 999 days, then days alone.
+    /// <c>hh:mm:ss</c> up to 99 hours, <c>ddd hhh</c> up to 999 days, then days alone, cut to eight
+    /// characters as curl's nine-byte <c>msnprintf</c> buffer cuts it, so <see cref="long.MaxValue" />
+    /// is <c>10675199</c> (ADR-0428).
     /// </summary>
     /// <param name="seconds">The seconds; zero or fewer is blank.</param>
     /// <returns>Eight characters.</returns>
@@ -99,7 +104,7 @@ public static class ParallelProgressMeterText
 
         return days <= 999
             ? string.Create(CultureInfo.InvariantCulture, $"{days,3}d {hours % 24:D2}h")
-            : string.Create(CultureInfo.InvariantCulture, $"{days,7}d");
+            : string.Create(CultureInfo.InvariantCulture, $"{days,7}d")[..8];
     }
 
     /// <summary>
