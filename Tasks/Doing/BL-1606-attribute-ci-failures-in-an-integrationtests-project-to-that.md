@@ -36,3 +36,4 @@ When the coordinator files a "Fix CI failure ..." task (BL-987) for a failure in
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
