@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1, .claude/skills/task-board/SKILL.md, .claude/agents/task-planner.md, CLAUDE.md]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1705 — Make RunDarkFactory.ps1 choose the Claude model per task: a model front-matter field, else a rule on the task, -Model as an override
 
@@ -47,21 +47,28 @@ Overlap: BL-1286, BL-1606, BL-1678, BL-1679, BL-1691 and BL-1692 to BL-1696 also
 
 ## Acceptance criteria
 
-- [ ] `RunDarkFactory.ps1` has a function that returns the model and the reason for a task (inputs: the forced `-Model` value, the task's front-matter `model`, `pipeline`, `priority`, `touches`, title, and whether it is a retry), and `-Model` defaults to `auto`.
-- [ ] A new switch `-TestModelChoice` (documented in the script header beside the other `-Test*` switches) runs table-driven cases and exits non-zero on any failure. It covers at least: a forced `-Model` beating a task's `model:`; `model: haiku`, `sonnet` and `opus` each winning over the rule; an invalid `model:` falling back to the rule; each of the six crypto/security libraries (and a `.UnitTests` twin) giving `opus`; `feature` and `protocol` giving `opus`; a retried task giving `opus`; a High "Fix CI failure ..." task giving `opus`; `docs` and a `direct` diagnostic-output task giving `sonnet`; a Normal ordinary `direct` task giving `sonnet`; no case ever giving `haiku` without being asked.
-- [ ] `RunDarkFactory.ps1 -TestModelChoice` and the existing `-TestHeartbeat`, `-TestRestart` and `-TestTaskBudget` switches all pass.
-- [ ] `Invoke-TaskRun` passes the chosen model, not the parameter, to `claude --model`; the shift start, the `-Continuous` hand-over and `-Restart` forward `-Model` unchanged, and the self-test for `-Restart` (or a new case in `-TestModelChoice`) shows `auto` surviving a hand-over.
-- [ ] The lane's `claim` trace line, and the `end` trace line, state the model and why, for example `claim  <title>  [model sonnet: docs pipeline]`; the lane heartbeat JSON and `status.json` lane objects gain `model` and `modelWhy` fields (schema 1 stays readable: added fields only, and `-TestHeartbeat` shows them).
-- [ ] Cost per model can be compared: each task's run logs record the model (in the `end` trace line or a first line of the `.jsonl` log, with `total_cost_usd` still readable by `Get-RecentRunCosts`), and the lane's SUMMARY lines at shift end and the shift's closing summary print the runs, tasks and US dollars per model.
-- [ ] The header of `RunDarkFactory.ps1` documents the rule above and the `-Model` override; `.claude/skills/task-board/SKILL.md` lists the optional `model` front-matter field (values, that it wins over the factory's rule, and that Haiku is not chosen by the rule) and its table row notes it is read by `RunDarkFactory.ps1`; `CLAUDE.md`'s "Dark factory" section gains one sentence saying the factory picks the model per task (a task's `model:` wins, `-Model` forces one for all); `.claude/agents/task-planner.md` tells the planner it may set `model:` when a task is clearly easy (`sonnet`) or clearly hard (`opus`) and otherwise leaves it out.
-- [ ] `.claude/skills/task-board/task-board.ps1` is unchanged (`git diff --stat` shows it absent), and `Test-AuditPathsUntouched.ps1` would not flag the change.
-- [ ] `dotnet build -warnaserror` is clean (the script change must not break the solution) and nothing was started that needs an audit.
+- [x] `RunDarkFactory.ps1` has a function that returns the model and the reason for a task (inputs: the forced `-Model` value, the task's front-matter `model`, `pipeline`, `priority`, `touches`, title, and whether it is a retry), and `-Model` defaults to `auto`.
+- [x] A new switch `-TestModelChoice` (documented in the script header beside the other `-Test*` switches) runs table-driven cases and exits non-zero on any failure. It covers at least: a forced `-Model` beating a task's `model:`; `model: haiku`, `sonnet` and `opus` each winning over the rule; an invalid `model:` falling back to the rule; each of the six crypto/security libraries (and a `.UnitTests` twin) giving `opus`; `feature` and `protocol` giving `opus`; a retried task giving `opus`; a High "Fix CI failure ..." task giving `opus`; `docs` and a `direct` diagnostic-output task giving `sonnet`; a Normal ordinary `direct` task giving `sonnet`; no case ever giving `haiku` without being asked.
+- [x] `RunDarkFactory.ps1 -TestModelChoice` and the existing `-TestHeartbeat`, `-TestRestart` and `-TestTaskBudget` switches all pass.
+- [x] `Invoke-TaskRun` passes the chosen model, not the parameter, to `claude --model`; the shift start, the `-Continuous` hand-over and `-Restart` forward `-Model` unchanged, and the self-test for `-Restart` (or a new case in `-TestModelChoice`) shows `auto` surviving a hand-over.
+- [x] The lane's `claim` trace line, and the `end` trace line, state the model and why, for example `claim  <title>  [model sonnet: docs pipeline]`; the lane heartbeat JSON and `status.json` lane objects gain `model` and `modelWhy` fields (schema 1 stays readable: added fields only, and `-TestHeartbeat` shows them).
+- [x] Cost per model can be compared: each task's run logs record the model (in the `end` trace line or a first line of the `.jsonl` log, with `total_cost_usd` still readable by `Get-RecentRunCosts`), and the lane's SUMMARY lines at shift end and the shift's closing summary print the runs, tasks and US dollars per model.
+- [x] The header of `RunDarkFactory.ps1` documents the rule above and the `-Model` override; `.claude/skills/task-board/SKILL.md` lists the optional `model` front-matter field (values, that it wins over the factory's rule, and that Haiku is not chosen by the rule) and its table row notes it is read by `RunDarkFactory.ps1`; `CLAUDE.md`'s "Dark factory" section gains one sentence saying the factory picks the model per task (a task's `model:` wins, `-Model` forces one for all); `.claude/agents/task-planner.md` tells the planner it may set `model:` when a task is clearly easy (`sonnet`) or clearly hard (`opus`) and otherwise leaves it out.
+- [x] `.claude/skills/task-board/task-board.ps1` is unchanged (`git diff --stat` shows it absent), and `Test-AuditPathsUntouched.ps1` would not flag the change.
+- [x] `dotnet build -warnaserror` is clean (the script change must not break the solution) and nothing was started that needs an audit.
 
 ## Notes
 
 Not decided here, so do not add scope: a Haiku tier for lanes, per-model cost caps, and choosing the model from task size. File them separately if wanted.
 
+- 2026-10-07 (lane 8): `Get-ModelChoice` (pure), `Get-TaskModelChoice` (reads a task file's front matter and Log), `Test-TaskRetried`, `Set-ModelChoice`, `Format-ModelChoice` and `Get-ModelCostSummary` in `RunDarkFactory.ps1`; `-TestModelChoice` runs 41 cases. `-Model` defaults to `auto`; probes use `$ProbeModel` (sonnet under auto).
+- Retry test decided: the task's Log holds a `Doing -> Backlog` (requeue, park, hand-back) or `Doing -> Blocked` (failed, stalled or killed run) line, the two forms task-board.ps1 writes. A Blocked task later unblocked therefore runs on opus too; that is intended, since its first run did not finish.
+- Cost per model: each run log's first line is `{"type":"factory","model":...,"why":...}` (written only when the log is new, so `Get-RecentRunCosts`, which reads the last 5 lines, is unaffected). The lane SUMMARY line, each runner's shift-end trace and the coordinator's closing trace append `models: <m> <runs> runs <tasks> tasks $<usd>; ...`. The model text sits on the SUMMARY line itself because every later line in a lane summary is read as a stall.
+- `-Restart` reuses the running coordinator's own command line, so `-Model` survives it as given; the self-test pins that the shift start and hand-over both forward `'-Model', $Model`.
+- No ADR: the decision is recorded in this task's Context and the script header (THE MODEL PER TASK). task-board.ps1 unchanged.
+
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. RunDarkFactory.ps1 picks the model per task (model: field, else opus/sonnet rule, -Model forces); traced, in heartbeats and costed per model
