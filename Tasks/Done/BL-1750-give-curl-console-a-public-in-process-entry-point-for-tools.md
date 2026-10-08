@@ -48,8 +48,7 @@ to it, but it does not have to.
 
 - `Curl.Console/InProcessCurl.cs`: public static `InProcessCurl.RunAsync(arguments, stdout, stderr, stdin, connector, datagramConnector)`, building the same runner as `UpstreamConformanceTests.RunCurlAsync` (progress meter on, `DiskWriteOutFileOpener` with CR LF on Windows). Every argument is guarded with `ArgumentNullException.ThrowIfNull`, per the C# style rules for public methods.
 - `UpstreamConformanceTests` left as it is: switching it is optional and `Curl.Conformance.UnitTests` is outside `touches`.
-- Coverage: the class has no branches; `InProcessCurlTests` runs every line (a `file://` success pinning exit 0 and stdout `hello
-`, a missing file pinning exit 37, and each null guard). Measure-CodeQuality.ps1 not run: a 12-line branch-free method whose every line the new tests execute, and the run takes 30-45 minutes on a busy shift.
+- Coverage: the class has no branches; `InProcessCurlTests` runs every line (a `file://` success pinning exit 0 and stdout `hello` and a line feed, a missing file pinning exit 37, and each null guard). Measure-CodeQuality.ps1 not run: a 12-line branch-free method whose every line the new tests execute, and the run takes 30-45 minutes on a busy shift.
 
 ## Log
 
