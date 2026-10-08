@@ -3,8 +3,8 @@ id: AF-0069
 title: Requirements FR-007 cites test RunAsync_RangeThatNamesNoRange_ReturnsExit33WithoutDispatching, which does not exist
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Product/Requirements.md:FR-007:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
