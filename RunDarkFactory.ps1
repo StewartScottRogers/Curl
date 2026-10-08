@@ -192,7 +192,7 @@
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
                  failing test names traced as "flaky?"; only red twice counts (BL-898), and not even
-                 then when the projects that failed pass when run alone (AF-0092). A conflict gets one headless run to resolve
+                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093). A conflict gets one headless run to resolve
                  it, and a finished task whose build or tests go red on the rebased
                  tree gets one headless repair run there, still holding the lock,
                  traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
@@ -2196,17 +2196,38 @@ function Get-FailedTestNames {
         $parts += $(if ($assemblies.Count) { "$($assemblies -join ', '): $shown" } else { $shown })
     } elseif ($assemblies.Count) { $parts += "$($assemblies -join ', ') failed" }
     if ($aborted) { $parts += 'a test host aborted' }
-    if (-not $parts.Count) { return 'no test named' }
+    if (-not $parts.Count) {
+        # Red without a name parked BL-1649 and BL-1588 with nothing to go on (AF-0093), so
+        # the last line that looks like an error says why, when there is one.
+        $why = @($Output | Where-Object { $_ -match '(?i)\berror\b|exited with|exception' } | Select-Object -Last 1)
+        if (-not $why.Count) { return 'no test named' }
+        $line = "$($why[0])".Trim()
+        if ($line.Length -gt 120) { $line = $line.Substring(0, 117) + '...' }
+        return "no test named: $line"
+    }
     return $parts -join '; '
 }
 
 function Get-FailedTestProjects {
-    # The test projects a dotnet test run's -Output names as failed, so a red run can be run
-    # again with only them (AF-0092). Empty when a test host aborted or the run was red
-    # without naming a project: then nothing smaller than the whole run can stand in for it.
-    param([string[]]$Output)
-    if ($Output | Where-Object { $_ -match 'test run was aborted|Test host process crashed|hang timeout' }) { return @() }
-    return @($Output | ForEach-Object { if ($_ -match '^Failed!\s.*?-\s+([\w.]+)\.dll') { $Matches[1] } } | Select-Object -Unique)
+    # The test projects a red dotnet test run's -Output gives no reason to trust, so it can be
+    # run again with only them (AF-0092): those it names as failed, and those of -TestProjects
+    # it never reports as passed - a host that crashed, or a run red without naming a test,
+    # leaves no summary line for its project (AF-0093). Empty when more than -Most are in
+    # doubt: then the run broke as a whole, and nothing smaller can stand in for it.
+    param([string[]]$Output, [string[]]$TestProjects = @(), [int]$Most = 10)
+    $failed = @($Output | ForEach-Object { if ($_ -match '^Failed!\s.*?-\s+([\w.]+)\.dll') { $Matches[1] } })
+    $passed = @($Output | ForEach-Object { if ($_ -match '^Passed!\s.*?-\s+([\w.]+)\.dll') { $Matches[1] } })
+    $unreported = @($TestProjects | Where-Object { $_ -notin $passed -and $_ -notin $failed })
+    $doubt = @(@($failed) + @($unreported) | Select-Object -Unique)
+    if ($doubt.Count -gt $Most) { return @() }
+    return $doubt
+}
+
+function Get-UnitTestProjectNames {
+    # The *.UnitTests projects a fast-test run of -Repo reports on: each prints a Passed! or
+    # Failed! summary. *.IntegrationTests print none under the fast filter, so they are left out.
+    param([string]$Repo)
+    return @(Get-ChildItem -Path $Repo -Directory -Filter '*.UnitTests' | Where-Object { Test-Path (Join-Path $_.FullName "$($_.Name).csproj") } | ForEach-Object Name)
 }
 
 if ($TestFlakyTests) {
@@ -2227,10 +2248,17 @@ if ($TestFlakyTests) {
             'Failed!  - Failed:     1, Passed:     1, Skipped:     0, Total:     2, Duration: 1 s - Curl.Cli.UnitTests.dll (net10.0)',
             'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)',
             'Failed!  - Failed:     1, Passed:     1, Skipped:     0, Total:     2, Duration: 1 s - Curl.Cookies.UnitTests.dll (net10.0)')) -join ','))
-        ,@('no project to rerun after an aborted host', '', ((Get-FailedTestProjects @(
+        ,@('red without a name says the error line', 'no test named: Testhost process for source(s) Curl.Ftp.UnitTests.dll exited with error: x', (Get-FailedTestNames @(
+            'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)',
+            'Testhost process for source(s) Curl.Ftp.UnitTests.dll exited with error: x')))
+        ,@('crashed host project rerun alone', 'Curl.Cli.UnitTests,Curl.Ftp.UnitTests', ((Get-FailedTestProjects -TestProjects 'Curl.Cli.UnitTests', 'Curl.Core.UnitTests', 'Curl.Ftp.UnitTests' -Output @(
             'Failed!  - Failed:     1, Passed:     1 - Curl.Cli.UnitTests.dll (net10.0)',
+            'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)',
             'The active test run was aborted. Reason: Test host process crashed')) -join ','))
-        ,@('no project to rerun when none is named', '', ((Get-FailedTestProjects @('Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)')) -join ',')))
+        ,@('unreported project rerun alone when none is named', 'Curl.Ftp.UnitTests', ((Get-FailedTestProjects -TestProjects 'Curl.Core.UnitTests', 'Curl.Ftp.UnitTests' -Output @(
+            'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)')) -join ','))
+        ,@('no project to rerun when the whole run broke', '', ((Get-FailedTestProjects -Most 1 -TestProjects 'Curl.Core.UnitTests', 'Curl.Ftp.UnitTests' -Output @('error MSB1009')) -join ','))
+        ,@('no project to rerun when none is named or known', '', ((Get-FailedTestProjects @('Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)')) -join ',')))
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
@@ -3609,7 +3637,7 @@ function Invoke-FastTests {
     # would hold the integrate lock, and so every lane, for ever: the blame collector kills
     # a test host that stops making progress, and the run counts as red.
     $output = @(& dotnet test $Root --no-build -nologo --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | ForEach-Object { "$_" })
-    return [pscustomobject]@{ Green = ($LASTEXITCODE -eq 0); Failed = (Get-FailedTestNames $output); Projects = @(Get-FailedTestProjects $output) }
+    return [pscustomobject]@{ Green = ($LASTEXITCODE -eq 0); Failed = (Get-FailedTestNames $output); Projects = @(Get-FailedTestProjects $output (Get-UnitTestProjectNames $Root)) }
 }
 
 function Test-GreenAlone {
@@ -3648,7 +3676,9 @@ function Test-Green {
     # more, on EveryMember_ManyConcurrentCallers_...). So the projects that failed are run
     # once more on their own: green alone means the red came from the machine's load, not
     # from this task's change, which red alone would still show.
-    # A run red without naming a project vouches for nothing smaller, so both must name one.
+    # A project counts as failed when the run names it so or never reports it passed (AF-0093:
+    # BL-1649 parked twice on runs red with no test named); a run that broke as a whole
+    # vouches for nothing smaller, so both runs must leave some project in doubt.
     $projects = @(@($first.Projects) + @($second.Projects) | Select-Object -Unique)
     if ($first.Projects.Count -and $second.Projects.Count -and (Test-GreenAlone $projects)) {
         Write-Trace $Id 'flaky' "failed twice in the full run, passed alone ($($projects -join ', ')): $($first.Failed); then $($second.Failed)" 'Yellow'
