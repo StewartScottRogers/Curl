@@ -436,7 +436,7 @@ function Invoke-SelfTest {
 
         $afterFirst = [System.IO.File]::ReadAllBytes($historyFile)
         $history = @(Read-JsonFile $historyFile)
-        $prefix = $originalHistory.Length - 3
+        $prefix = [Array]::LastIndexOf($originalHistory, [byte]0x7D) + 1
         $samePrefix = $true
         for ($i = 0; $i -lt $prefix; $i++) { if ($afterFirst[$i] -ne $originalHistory[$i]) { $samePrefix = $false; break } }
         Test-Check 'history gains exactly one entry and keeps the earlier one byte-identical' ($history.Length -eq 2 -and $samePrefix -and $history[1].stamp -eq '2026-10-09_1430')
@@ -462,7 +462,7 @@ function Invoke-SelfTest {
 
         $afterSecond = [System.IO.File]::ReadAllBytes($historyFile)
         $history = @(Read-JsonFile $historyFile)
-        $prefix = $afterFirst.Length - 3
+        $prefix = [Array]::LastIndexOf($afterFirst, [byte]0x7D) + 1
         $samePrefix = $true
         for ($i = 0; $i -lt $prefix; $i++) { if ($afterSecond[$i] -ne $afterFirst[$i]) { $samePrefix = $false; break } }
         Test-Check 'the partial run appends one entry with only its measured area' (
