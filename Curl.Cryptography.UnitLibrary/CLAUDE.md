@@ -284,5 +284,8 @@ Namespace `Curl.Cryptography`. It holds:
   with the source cited beside each vector, plus negative cases (a flipped bit, an
   invalid point, a non-canonical encoding). Tests are platform-neutral; a vector that
   takes more than a second is `TestCategory=Integration`.
+- **Optimized in every configuration (ADR-0426).** The project file sets
+  `<Optimize>true</Optimize>`, so the masked table scans run at Release speed under the
+  Debug tests; one bcrypt hash takes tens of milliseconds, not hundreds. Keep it.
 - Same quality gates as every library: 100% line and branch coverage, cyclomatic
   complexity of at most 10, CRAP of at most 30.

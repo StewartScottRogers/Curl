@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1558 — Make BcryptPbkdf's bcrypt_hash fast enough that a one-round, 1024-byte key derives in well under a second
 
@@ -24,9 +24,9 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Cryptography.UnitTests --filter "FullyQualifiedName~Curl.Cryptography.BcryptPbkdfTests." --logger "console;verbosity=detailed"` prints no `SLOW:` line, and the before and after `PHASE derive` times are in Notes.
-- [ ] All `Curl.Cryptography.UnitTests` fast tests pass and `dotnet build -warnaserror` is clean.
-- [ ] `Curl.Cryptography.UnitLibrary` keeps 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
+- [x] `dotnet test Curl.Cryptography.UnitTests --filter "FullyQualifiedName~Curl.Cryptography.BcryptPbkdfTests." --logger "console;verbosity=detailed"` prints no `SLOW:` line, and the before and after `PHASE derive` times are in Notes.
+- [x] All `Curl.Cryptography.UnitTests` fast tests pass and `dotnet build -warnaserror` is clean.
+- [x] `Curl.Cryptography.UnitLibrary` keeps 100% line and branch coverage, complexity at most 10 and CRAP at most 30.
 
 ## Notes
 
@@ -34,3 +34,4 @@ completed:
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Curl.Cryptography compiles optimized in Debug (ADR-0426): one bcrypt hash 600 ms -> 42 ms, BcryptPbkdfTests print no SLOW: line

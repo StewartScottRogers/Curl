@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- Compiled optimized in Debug too, so the tests run the constant-time table scans at Release speed (BL-1558, ADR-0426). -->
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Cryptography.UnitTests" />
   </ItemGroup>
