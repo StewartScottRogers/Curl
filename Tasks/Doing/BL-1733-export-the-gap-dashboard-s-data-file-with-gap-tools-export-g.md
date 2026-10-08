@@ -62,3 +62,4 @@ fixture's output also serves as the page's preview data, so BL-1742 copies it to
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
