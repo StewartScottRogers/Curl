@@ -8,7 +8,7 @@ depends-on: [BL-1721, BL-1722]
 touches: [Gap/Tools/Measure-VersionGap.ps1, Gap/Tools/Fixtures/version, Gap/Upstream/8.21.0/protocols.json, Gap/Upstream/8.21.0/features.json]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1724 — Measure the URL scheme and curl -V feature gaps with Gap/Tools/Measure-VersionGap.ps1
 
@@ -61,14 +61,20 @@ Commit both 8.21.0 inventories.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Measure-VersionGap.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks: `(S)` headings give both schemes; a reference-only scheme joins the measurement but not the inventory; agreement gives `match`; a scheme Curl lists that the reference lacks gives `gap`; a scheme both lack gives `excluded` with `reference-lacks:`; the docs fallback expects every documented item.
-- [ ] `Gap/Upstream/8.21.0/protocols.json` (at least the 26 documented schemes) and `Gap/Upstream/8.21.0/features.json` are committed and valid against `Gap-Format.md`.
-- [ ] A real run on Windows writes both measurements, and their counts are recorded in this task's Notes.
-- [ ] `-InventoryOnly` runs under `pwsh` with no binaries present. The header help documents every parameter. The script is ASCII only.
+- [x] `Gap/Tools/Measure-VersionGap.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks: `(S)` headings give both schemes; a reference-only scheme joins the measurement but not the inventory; agreement gives `match`; a scheme Curl lists that the reference lacks gives `gap`; a scheme both lack gives `excluded` with `reference-lacks:`; the docs fallback expects every documented item.
+- [x] `Gap/Upstream/8.21.0/protocols.json` (at least the 26 documented schemes) and `Gap/Upstream/8.21.0/features.json` are committed and valid against `Gap-Format.md`.
+- [x] A real run on Windows writes both measurements, and their counts are recorded in this task's Notes.
+- [x] `-InventoryOnly` runs under `pwsh` with no binaries present. The header help documents every parameter. The script is ASCII only.
 
 ## Notes
+
+- Real run on Windows, 2026-10-08, reference `curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel ...` (Git for Windows), candidate the Release Curl.Console build: protocols match 27, gap 2 (smb, smbs: Curl lists them, the reference does not), excluded 0, X/Y 27/29 (26 documented schemes plus ipfs, ipns and mqtts from the reference's Protocols: line); features match 16, gap 7 (ECH, GSS-API, HTTP2, HTTP3, TLS-SRP listed by Curl only; SSPI and threadsafe listed by the reference only; threadsafe is the one reference-only feature), excluded 7, X/Y 16/23. The gaps are measurements for the gap office to file, not fixed here.
+- Inventories: 26 schemes in protocols.json, 29 features in features.json.
+- Choice: the probe runs only for a scheme both binaries list; a scheme only one lists is already gap on the listing. Feature names compare case-insensitively; scheme keys are lower case. Debug and TrackMemory, when both lack them, are excluded with debug-build-only (Gap-Format.md features vocabulary) rather than reference-lacks.
+- Choice: -Candidate and -Reference parameters added beside the task's list so a run can name either binary; -ProbeResults canned files are probe-results.json (matched reference) and probe-results-docs.json (no reference) under Gap/Tools/Fixtures/version.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Measure-VersionGap.ps1 writes protocols and features measurements; self-test passes on PS 5.1 and 7; 8.21.0 inventories committed
