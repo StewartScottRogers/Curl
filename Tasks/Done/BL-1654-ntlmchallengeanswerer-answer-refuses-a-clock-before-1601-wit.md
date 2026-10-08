@@ -29,7 +29,7 @@ completed: 2026-10-07
 
 ## Notes
 
-- Decided (ADR-0426): match curl's signed `(time + 11644473600) * 10000000` arithmetic. `WriteV2Blob` now writes `timestamp.UtcTicks - 504911232000000000`, identical to `ToFileTime` from 1601 on and a negative FILETIME before it, so `Answer` and `ComputeV2` never throw for the clock's value. Documenting the exception instead would make Curl fail where curl does not.
+- Decided (ADR-0427): match curl's signed `(time + 11644473600) * 10000000` arithmetic. `WriteV2Blob` now writes `timestamp.UtcTicks - 504911232000000000`, identical to `ToFileTime` from 1601 on and a negative FILETIME before it, so `Answer` and `ComputeV2` never throw for the clock's value. Documenting the exception instead would make Curl fail where curl does not.
 - Test: `NtlmChallengeAnswererTests.Answer_ClockBefore1601_SendsNegativeFileTimeInsteadOfThrowing` (the BL-1503 input). Measure-CodeQuality: Curl.Ntlm.UnitLibrary 100% line, 100% branch, 0 failing members.
 
 ## Log
