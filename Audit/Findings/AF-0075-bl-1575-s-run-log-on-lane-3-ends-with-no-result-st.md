@@ -3,8 +3,8 @@ id: AF-0075
 title: BL-1575's run log on lane 3 ends with no result: still running (an Agent call) when the logs were copied
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
 key: process:logs:BL-1575:unfinished-run
 reproduction: none
 task: BL-1694
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0075 - BL-1575's run log on lane 3 ends with no result: still running (an Agent call) when the logs were copied
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the reproduction: unfinishedRuns is empty. The tail of BL-1575-20261007-111121-L3.jsonl is type result, subtype success, ending 'FACTORY: DONE BL-1575 every test in DefaultConfigFileSearchTests to LibcurlSourceCodeTransferFileTests ...'.
+
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.

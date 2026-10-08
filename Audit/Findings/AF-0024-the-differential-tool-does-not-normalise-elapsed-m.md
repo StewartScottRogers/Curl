@@ -3,8 +3,8 @@ id: AF-0024
 title: The differential tool does not normalise elapsed milliseconds in error text or the -v source port, so identical behaviour is counted as a difference
 auditor: conformance
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
 key: conformance:Audit/Tools/Invoke-DifferentialConformance.ps1:Get-Normalised:stderr
 reproduction: none
 task: BL-1280
@@ -13,9 +13,9 @@ found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0024 - The differential tool does not normalise elapsed milliseconds in error text or the -v source port, so identical behaviour is counted as a difference
 
@@ -45,8 +45,10 @@ Select-String -Path Audit/Tools/Invoke-DifferentialConformance.ps1 -Pattern 'aft
 - 2026-10-03 | 2026-10-03_0623.md | reproduces: yes | Ran the reproduction: the count is 0. Invoke-DifferentialConformance.ps1's Get-Normalised still normalises only the port, Date, boundary, meter lines and the PROXY source port. In this audit's run (seed 1162681642), 4 of the 5 reported differences are this gap alone. Cases 152, 179 and 254 differ only in 'after 0 ms' (curl) vs 'after 7/6/42 ms' (Curl) in an otherwise identical exit-7 message. Case 157 differs only in the -v 'Established connection ... from 127.0.0.1 port 55548/55549' source port.
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | Ran the reproduction: count 0. Invoke-DifferentialConformance.ps1 still has no normalisation for 'after N ms' or the -v 'Established ... port N' source port. In this audit's run (seed 1516403247) 8 of the 14 differing cases are only that noise: 35, 71, 79, 137, 202, 223 and 227 differ only in 'after N ms', and 154 (--get -v) differs only in 'from 127.0.0.1 port 51113' versus '51114'.
 - 2026-10-07 | 2026-10-07_1336.md | reproduces: no | Ran the reproduction from the tree root in Windows PowerShell: count 4 (lines 34, 134, 242, 244). Get-Normalised now masks the -v '* Established connection ... from <address> port N' source port as SOURCEPORT (line 244, before the server-port replacement) and the elapsed time 'after N ms' and 'after N milliseconds' (lines 248-249), and lists both in $Normalisations (lines 134-135). The finding's pattern 'after \\d\+ ms' matches the literal text 'after \d+ ms', so its count reflects only the source-port fix; the elapsed-time normalisation was confirmed by reading lines 246-249. In the 300-case run no case differed by elapsed milliseconds or source port alone.
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the reproduction (pattern 'after \\d\+ ms|port \\d|Established'): count 5, not 0. The tool masks the -v source port (Audit/Tools/Invoke-DifferentialConformance.ps1:244, '* Established connection ... from \S+ port' -> SOURCEPORT) and elapsed time (lines 248-249, 'after \d+ ms' -> 'after N ms', 'after \d+ milliseconds'). The 300-case run confirmed it: AF-0065's '(45) ... after 1 ms' vs 'after 34 ms' and every -v case compared equal.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.

@@ -42,6 +42,8 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "Name=CopyA
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the dotnet test command: 'Failed! - Failed: 3, Passed: 0'. LargeReadToCloseBody shows 'ASSERT write sizes: expected 16384, 16384, 7232, actual ' (nothing written in pieces). OutputFailsOnALargeBody shows 'Expected exception of exact type HttpTransferException but no exception was thrown'. Cause: HttpResponseBodyReader.cs:321-351 buffers into 'MemoryStream held' and copies it once in finally.
+
 ## Log
 
 - 2026-10-07: filed proposed.

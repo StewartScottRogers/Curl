@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_1336.md | not re-audited | Ran the reproduction. Measure-FactoryProcess.ps1 -Since 2026-10-03 has no task BL-1467: the log folder holds only shift 20261007-111121. Select-String failed with 'Cannot find path ...\logs\DarkFactory-20261006-200306-L4.log because it does not exist' (the L5 log is missing too). The result cannot tell; not re-audited.
+- 2026-10-08 | 2026-10-08_0748.md | not re-audited | Ran the reproduction. The log folder no longer holds DarkFactory-20261006-200306-L4.log or -L5.log (Select-String: path does not exist), and the measured tasks (229, all from shifts since 2026-10-07) do not include BL-1467. The command cannot tell either way.
 
 ## Log
 

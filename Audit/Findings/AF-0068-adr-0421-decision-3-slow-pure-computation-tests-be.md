@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The count of TestCategory("LongRunning") in *.UnitTests is 3: Cast128Tests.cs:73, X25519Tests.cs:76 and X448Tests.cs:76, each also carrying [RunsOnlyWhenLongRunningTestsAreEnabled], which skips unless CURL_RUN_LONG_RUNNING_TESTS is 1. integration.yml runs them with the variable set. ADR-0421 decision 3 is in the code.
+
 ## Log
 
 - 2026-10-07: filed proposed.

@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The reproduction's count of [TestCategory("Integration")] lines in *.UnitTests projects is 0. Directory.Build.props' VerifyIntegrationTestPlacement target enforces the rule at build time.
+
 ## Log
 
 - 2026-10-07: filed proposed.

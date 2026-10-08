@@ -1,0 +1,47 @@
+---
+id: AF-0095
+title: BL-1488 cost 6.56 US dollars, 5.5 times the 1.19 median; lane 7's five Sonnet sub-agents used up the session budget
+auditor: process
+severity: Low
+status: proposed
+reason:
+key: process:logs:BL-1488:cost-outlier
+reproduction: none
+task: none
+tasks:
+found: 2026-10-08
+found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
+scorecard: 2026-10-08_0748.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0095 - BL-1488 cost 6.56 US dollars, 5.5 times the 1.19 median; lane 7's five Sonnet sub-agents used up the session budget
+
+## Summary
+
+Low finding from the process auditor at `logs/BL-1488-20261007-111121-L7.jsonl`: BL-1488 cost 6.56 US dollars, 5.5 times the 1.19 median; lane 7's five Sonnet sub-agents used up the session budget.
+
+## Evidence
+
+Location: `logs/BL-1488-20261007-111121-L7.jsonl`
+
+L7 run: 21.4 min, 184 tool calls, 5 Agent calls; $5.73, of which claude-sonnet-5-5 $4.86 and opus $0.87. It ended at 14:42:22 with stash and REQUEUE 'Session budget ran out with work in the~'. L2 then did the task in 4.8 min and 24 turns for $0.83 (DONE 14:52:01).
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-07 -LogRoot ..\logs -CiRunsJson ..\logs\ci-runs.json -OutFile $env:TEMP\process.json; (Get-Content $env:TEMP\process.json -Raw | ConvertFrom-Json).tasks | Sort-Object costUsd -Descending | Select-Object -First 5 id,claims,costUsd,minutes,outcome
+```
+
+- Expected: No task over 3 times the median costUsd (3.57).
+- Actual: BL-1488 costUsd 6.5614 (claims 2)
+
+## Re-audits
+
+## Log
+
+- 2026-10-08: filed proposed.

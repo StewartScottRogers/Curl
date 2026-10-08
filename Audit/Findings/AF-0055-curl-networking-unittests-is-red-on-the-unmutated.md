@@ -3,8 +3,8 @@ id: AF-0055
 title: Curl.Networking.UnitTests is red on the unmutated tree: LocalBindLines writes 'Could not Resolve host' and the Windows resolve-and-bind test fails
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/TcpConnectorTests.LocalBindLines.cs:ConnectAsync_WithAHostThatDoesNotResolveOnWindows_ReportsTheResolveAndBindFailures:failing-test
 reproduction: none
 task: BL-1698
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_0748.md
 ---
 # AF-0055 - Curl.Networking.UnitTests is red on the unmutated tree: LocalBindLines writes 'Could not Resolve host' and the Windows resolve-and-bind test fails
 
@@ -42,7 +42,10 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo --filter "Name=ConnectA
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Ran the dotnet test command: 'Passed! - Failed: 0, Passed: 1' for ConnectAsync_WithAHostThatDoesNotResolveOnWindows_ReportsTheResolveAndBindFailures.
+
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_0748.md: the reproduction no longer reproduces.
