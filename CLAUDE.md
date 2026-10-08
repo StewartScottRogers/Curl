@@ -27,7 +27,9 @@ An Integration test touches something real outside the process - a socket, the d
 OS, a native API, a system agent - and carries `[TestCategory("Integration")]`. It lives
 only in a `Curl.<Area>.IntegrationTests` project, never in a `*.UnitTests` project, and
 every test in an `*.IntegrationTests` project carries the category, so the fast command
-skips them all. A test whose only real resources are files in a temporary directory it
+skips them all. `Directory.Build.props` enforces this at build time: its
+`VerifyIntegrationTestPlacement` target fails the build, naming the file, when either half
+is broken. A test whose only real resources are files in a temporary directory it
 creates and deletes, or a loopback socket it opens and closes without sending a byte, is a
 unit test. A slow test that is pure computation is not an Integration test: it stays in its
 `*.UnitTests` project as a `LongRunning` test. See ADR-0421.

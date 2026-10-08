@@ -8,7 +8,7 @@ depends-on: [BL-1597, BL-1598, BL-1599, BL-1600, BL-1601, BL-1602]
 touches: [Directory.Build.props, CLAUDE.md]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1603 — Fail the build when a UnitTests project holds an Integration test or an IntegrationTests project holds a test without one
 
@@ -34,15 +34,26 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Directory.Build.props` has the target, its comment and the four-file allow-list for `Curl.Cryptography.UnitTests`; nothing else in the solution changes except the one `CLAUDE.md` sentence.
-- [ ] `dotnet build -warnaserror` at the repository root is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Notes record each of these checked by hand and then reverted, with the error text the build printed: (1) adding `[TestCategory("Integration")]` to a test in `Curl.Protocol.Dict.UnitTests` fails `dotnet build Curl.Protocol.Dict.UnitTests` naming that file; (2) removing `[TestCategory("Integration")]` from one test in `Curl.Networking.IntegrationTests` fails its build naming that file; (3) the four `Curl.Console.UnitTests` files whose doc comments mention the attribute build clean; (4) removing `X25519Tests.cs` from the allow-list fails `dotnet build Curl.Cryptography.UnitTests`.
-- [ ] `git status` after the hand checks shows only `Directory.Build.props`, `CLAUDE.md` and this task file changed.
-- [ ] Root `CLAUDE.md` names `Directory.Build.props` as where the rule is enforced.
+- [x] `Directory.Build.props` has the target, its comment and the four-file allow-list for `Curl.Cryptography.UnitTests`; nothing else in the solution changes except the one `CLAUDE.md` sentence.
+- [x] `dotnet build -warnaserror` at the repository root is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Notes record each of these checked by hand and then reverted, with the error text the build printed: (1) adding `[TestCategory("Integration")]` to a test in `Curl.Protocol.Dict.UnitTests` fails `dotnet build Curl.Protocol.Dict.UnitTests` naming that file; (2) removing `[TestCategory("Integration")]` from one test in `Curl.Networking.IntegrationTests` fails its build naming that file; (3) the four `Curl.Console.UnitTests` files whose doc comments mention the attribute build clean; (4) removing `X25519Tests.cs` from the allow-list fails `dotnet build Curl.Cryptography.UnitTests`.
+- [x] `git status` after the hand checks shows only `Directory.Build.props`, `CLAUDE.md` and this task file changed.
+- [x] Root `CLAUDE.md` names `Directory.Build.props` as where the rule is enforced.
 
 ## Notes
+
+- Target `VerifyIntegrationTestPlacement` in `Directory.Build.props`, `BeforeTargets="CoreCompile"`, property functions only (`File.ReadAllText`, `Regex.Matches`/`IsMatch`), no `Exec`. Reads only unlinked `Compile` items that exist on disk. The Error tasks batch per file, so a build names the first offending file and stops there.
+- Class-level coverage: a file passes when an Integration attribute line is followed (through any further attribute lines) by a `class` declaration.
+- Allow-list keys are `<project>/<path>` with forward slashes; a Compile identity's backslashes are turned into `/` before comparison.
+- Hand checks, each reverted afterwards:
+  1. `[TestCategory("Integration")]` added to a test in `Curl.Protocol.Dict.UnitTests/DictProtocolHandlerAdversarialTests.cs`: `dotnet build Curl.Protocol.Dict.UnitTests` failed with `DictProtocolHandlerAdversarialTests.cs : error : Curl.Protocol.Dict.UnitTests/DictProtocolHandlerAdversarialTests.cs carries [TestCategory("Integration")], but Curl.Protocol.Dict.UnitTests is a unit test project. Integration tests live only in a Curl.<Area>.IntegrationTests project (ADR-0421); move the test there.`
+  2. `[TestCategory("Integration")]` removed from `Curl.Networking.IntegrationTests/DnsSocketOpenerIntegrationTests.cs`: its build failed with `DnsSocketOpenerIntegrationTests.cs : error : Curl.Networking.IntegrationTests/DnsSocketOpenerIntegrationTests.cs has 1 test methods but only 0 [TestCategory("Integration")] attributes. Every test in a *.IntegrationTests project carries the Integration category (ADR-0421).`
+  3. `Curl.Console.UnitTests` (whose `DiskWriteOutFileOpenerTests.cs`, `PhysicalOutputPathsTests.cs`, `KerberosDiskFileReaderTests.cs` and `KerberosDiskFileWriterTests.cs` mention the attribute in `///` comments) built clean in the full `dotnet build -warnaserror`: 0 warnings, 0 errors.
+  4. `X25519Tests.cs` removed from the allow-list: `dotnet build Curl.Cryptography.UnitTests` failed with `X25519Tests.cs : error : Curl.Cryptography.UnitTests/X25519Tests.cs carries [TestCategory("Integration")], but Curl.Cryptography.UnitTests is a unit test project. ...`
+- `dotnet build -warnaserror` clean; `dotnet test --filter "TestCategory!=Integration"` green (33 assemblies passed, none failed).
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. dotnet build fails, naming the file, when a UnitTests project holds an Integration test or an IntegrationTests test lacks the category

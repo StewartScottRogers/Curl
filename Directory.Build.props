@@ -105,4 +105,67 @@
            Text="$(MSBuildProjectName) is a production project and must be ahead-of-time compatible. It sets IsAotCompatible=$(IsAotCompatible); remove that override and let Directory.Build.props set it to true." />
   </Target>
 
+  <!--
+    Integration tests live only in Curl.<Area>.IntegrationTests projects (ADR-0421, BL-1603):
+    a *.UnitTests project's own source carries no [TestCategory("Integration")] attribute,
+    and every test in an *.IntegrationTests project carries one, so the fast run
+    (TestCategory!=Integration) skips every Integration test and runs every unit test.
+    It is a build check rather than a test because a test that reads the source touches
+    the disk, which would make it an Integration test the fast run never runs.
+
+    Only the project's own files are read: linked Compile items (MSTestSettings.cs,
+    TestDiagnostics.cs, fakes linked from another project) are checked in their home
+    project. An Integration attribute is a line whose first non-blank character is "[" and
+    which names TestCategory("Integration"), so a mention in a /// comment does not count.
+    In an *.IntegrationTests project a file passes when a class-level attribute covers it,
+    or when it has at least as many Integration attributes as [TestMethod] and
+    [DataTestMethod] attributes. That is a source count: a method with two Integration
+    attributes could hide another with none, and that is accepted.
+  -->
+  <PropertyGroup>
+    <_IntegrationAttributePattern>(?m)^\s*\[[^\]\r\n]*\bTestCategory\s*\(\s*"Integration"\s*\)</_IntegrationAttributePattern>
+    <_ClassLevelIntegrationAttributePattern>$(_IntegrationAttributePattern)[^\r\n]*(\r?\n\s*\[[^\r\n]*)*\r?\n[ \t\w]*\bclass\b</_ClassLevelIntegrationAttributePattern>
+    <_TestMethodAttributePattern>(?m)^\s*\[[^\]\r\n]*\b(TestMethod|DataTestMethod)\b</_TestMethodAttributePattern>
+  </PropertyGroup>
+
+  <!--
+    Files in a *.UnitTests project still allowed to hold Integration tests, as
+    <project>/<path> with forward slashes. Only Curl.Cryptography.UnitTests' four slow,
+    CPU-only vector files remain; ADR-0421's decision 3 reclassifies them as LongRunning in
+    the task that follows BL-1525's speed-up, and that task empties this list.
+  -->
+  <ItemGroup>
+    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/X25519Tests.cs" />
+    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/X448Tests.cs" />
+    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/Cast128Tests.cs" />
+    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/BrainpoolEcdsaTests.cs" />
+  </ItemGroup>
+
+  <Target Name="VerifyIntegrationTestPlacement"
+          BeforeTargets="CoreCompile"
+          Condition="$(MSBuildProjectName.EndsWith('.UnitTests')) Or $(MSBuildProjectName.EndsWith('.IntegrationTests'))">
+    <PropertyGroup>
+      <_IntegrationTestInUnitTestsAllowedList>;@(IntegrationTestInUnitTestsAllowed);</_IntegrationTestInUnitTestsAllowedList>
+      <_IsUnitTestsProject>$(MSBuildProjectName.EndsWith('.UnitTests'))</_IsUnitTestsProject>
+    </PropertyGroup>
+    <ItemGroup>
+      <_TestPlacementSource Include="@(Compile)" Condition="'%(Compile.Link)' == '' And Exists('%(Compile.FullPath)')" />
+      <_TestPlacementSource>
+        <PlacementKey>$(MSBuildProjectName)/$([System.String]::Copy('%(Identity)').Replace('\', '/'))</PlacementKey>
+        <IntegrationAttributes>$([System.Text.RegularExpressions.Regex]::Matches($([System.IO.File]::ReadAllText('%(FullPath)')), '$(_IntegrationAttributePattern)').Count)</IntegrationAttributes>
+        <ClassLevelIntegrationAttribute>$([System.Text.RegularExpressions.Regex]::IsMatch($([System.IO.File]::ReadAllText('%(FullPath)')), '$(_ClassLevelIntegrationAttributePattern)'))</ClassLevelIntegrationAttribute>
+        <TestMethodAttributes>$([System.Text.RegularExpressions.Regex]::Matches($([System.IO.File]::ReadAllText('%(FullPath)')), '$(_TestMethodAttributePattern)').Count)</TestMethodAttributes>
+      </_TestPlacementSource>
+      <_TestPlacementSource>
+        <Allowed>$(_IntegrationTestInUnitTestsAllowedList.Contains(';%(PlacementKey);'))</Allowed>
+      </_TestPlacementSource>
+    </ItemGroup>
+    <Error Condition="'$(_IsUnitTestsProject)' == 'true' And '%(_TestPlacementSource.IntegrationAttributes)' != '0' And '%(_TestPlacementSource.Allowed)' != 'True'"
+           File="%(_TestPlacementSource.FullPath)"
+           Text="%(_TestPlacementSource.PlacementKey) carries [TestCategory(&quot;Integration&quot;)], but $(MSBuildProjectName) is a unit test project. Integration tests live only in a Curl.&lt;Area&gt;.IntegrationTests project (ADR-0421); move the test there." />
+    <Error Condition="'$(_IsUnitTestsProject)' != 'true' And '%(_TestPlacementSource.ClassLevelIntegrationAttribute)' != 'True' And %(_TestPlacementSource.IntegrationAttributes) &lt; %(_TestPlacementSource.TestMethodAttributes)"
+           File="%(_TestPlacementSource.FullPath)"
+           Text="%(_TestPlacementSource.PlacementKey) has %(_TestPlacementSource.TestMethodAttributes) test methods but only %(_TestPlacementSource.IntegrationAttributes) [TestCategory(&quot;Integration&quot;)] attributes. Every test in a *.IntegrationTests project carries the Integration category (ADR-0421)." />
+  </Target>
+
 </Project>
