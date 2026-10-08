@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitTests/TcpConnectorTests.LocalBindLines.cs:ConnectAsync_WithAHostThatDoesNotResolveOnWindows_ReportsTheResolveAndBindFailures:failing-test
 reproduction: none
-task: none
-tasks:
+task: BL-1698
+tasks: BL-1698
 found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
