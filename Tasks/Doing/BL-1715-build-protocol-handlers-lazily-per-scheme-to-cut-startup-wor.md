@@ -35,4 +35,4 @@ Where to start: `Curl.Console/CurlComposition.cs`, `CreateProtocolHandlers` (aro
 ## Log
 
 - 2026-10-07: Created.
-
+- 2026-10-07: Backlog -> Doing.
