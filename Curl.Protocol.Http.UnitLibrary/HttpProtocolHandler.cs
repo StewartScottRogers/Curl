@@ -309,7 +309,7 @@ public sealed class HttpProtocolHandler(
         TransferResult result = Http3RefusalOf(plan) is { } refusal
             ? await ExchangeWithoutHttp3Async(plan, refusal).ConfigureAwait(false)
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
-        return WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines);
+        return plan.OpenedConnection ? WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines) : result;
     }
 
     /// <summary>
@@ -322,7 +322,9 @@ public sealed class HttpProtocolHandler(
     /// <remarks>
     /// An <c>--aws-sigv4</c> transfer keeps its own message: every line its signer reports is a
     /// <c>-v</c> info line, never a failure, so the string to sign never becomes the error
-    /// message (BL-1454).
+    /// message (BL-1454). A transfer whose first connection never opened keeps its own message
+    /// too: curl makes the context only once connected, so a refused connect or a failed
+    /// <c>--interface</c> bind never meets it (measured, BL-1684).
     /// </remarks>
     private static TransferResult WithFirstAuthorizationFailure(TransferResult result, HttpAuthRequest request, IReadOnlyList<string> authorizationLines) =>
         result.ExitCode != CurlExitCode.Ok && request.AwsSigV4 is null && authorizationLines.Count > 0
@@ -533,6 +535,7 @@ public sealed class HttpProtocolHandler(
             };
         }
 
+        plan.OpenedConnection = true;
         plan.TakeServerCertificateFrom(connect);
         plan.Progress.ReportTransferStarted();
 
@@ -2565,6 +2568,12 @@ public sealed class HttpProtocolHandler(
         /// before it connects, as curl 8.21.0's <c>cr_in_rewind</c> fails it (ADR-0279).
         /// </summary>
         public bool UploadCannotRewind { get; private set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether a connection was opened for this request, so a
+        /// transfer that failed before one opened keeps its own message (BL-1684).
+        /// </summary>
+        public bool OpenedConnection { get; set; }
 
         /// <summary>
         /// Gets how many redirects the transfer has followed before this request: the chain's

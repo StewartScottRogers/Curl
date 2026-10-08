@@ -77,13 +77,34 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual("The requested URL returned error: 401", result.ErrorMessage);
     }
 
+    [TestMethod]
+    [DataRow(CurlExitCode.CouldntConnect, "Failed to connect to 127.0.0.1 port 50998 after 0 ms: Could not connect to server")]
+    [DataRow(CurlExitCode.InterfaceFailed, "Failed to connect to 127.0.0.1 port 50998 after 0 ms: Failed binding local connection end")]
+    public async Task ExecuteAsync_NegotiateWithoutATicketConnectFails_KeepsTheConnectFailure(CurlExitCode exitCode, string connectFailure)
+    {
+        Diagnostics.Arrange("connect failure", connectFailure);
+        TransferResult result = await NegotiateWithoutATicketResultAsync(new QueueConnector(ConnectResult.Failed(exitCode, connectFailure)), HttpFailMode.None);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
+        Assert.AreEqual(exitCode, result.ExitCode);
+        Diagnostics.Assert("error message", connectFailure, result.ErrorMessage);
+        Assert.AreEqual(connectFailure, result.ErrorMessage);
+    }
+
     /// <summary>
     /// Runs <c>--negotiate -u :</c> with <paramref name="fail" /> against
     /// <paramref name="response" />, every context step failing for want of a ticket.
     /// </summary>
-    private static async Task<TransferResult> NegotiateWithoutATicketResultAsync(string response, HttpFailMode fail)
+    private static Task<TransferResult> NegotiateWithoutATicketResultAsync(string response, HttpFailMode fail) =>
+        NegotiateWithoutATicketResultAsync(QueueConnector.For(new TurnTakingConnection(65536, response)), fail);
+
+    /// <summary>
+    /// Runs <c>--negotiate -u :</c> with <paramref name="fail" /> through
+    /// <paramref name="connector" />, every context step failing for want of a ticket.
+    /// </summary>
+    private static async Task<TransferResult> NegotiateWithoutATicketResultAsync(QueueConnector connector, HttpFailMode fail)
     {
-        TurnTakingConnection connection = new(65536, response);
         ScriptedTokenSource tokens = new(
             new SecurityContextStep(SecurityContextStatus.NoCredentials, []),
             new SecurityContextStep(SecurityContextStatus.NoCredentials, []));
@@ -95,6 +116,6 @@ public sealed partial class HttpProtocolHandlerTests
             Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Negotiate, Fail = fail },
         };
 
-        return await NegotiateHandler(QueueConnector.For(connection), tokens).ExecuteAsync(context);
+        return await NegotiateHandler(connector, tokens).ExecuteAsync(context);
     }
 }
