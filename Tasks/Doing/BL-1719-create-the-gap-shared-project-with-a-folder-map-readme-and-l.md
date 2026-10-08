@@ -71,3 +71,4 @@ folder holds the project files and this map.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
