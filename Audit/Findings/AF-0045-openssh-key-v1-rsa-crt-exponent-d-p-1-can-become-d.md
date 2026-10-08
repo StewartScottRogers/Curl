@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs:FromComponents-minus1:surviving-mutant
 reproduction: mutation Curl.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs:99:-1
-task: none
-tasks:
+task: BL-1672
+tasks: BL-1672
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md

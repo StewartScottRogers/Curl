@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: performance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:large-get:slower-than-curl
 reproduction: none
-task: none
-tasks:
+task: BL-1675
+tasks: BL-1675
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md

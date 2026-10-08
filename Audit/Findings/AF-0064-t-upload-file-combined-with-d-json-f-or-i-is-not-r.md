@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:upload-file-method-conflict:exit-code
 reproduction: none
-task: none
-tasks:
+task: BL-1683
+tasks: BL-1683
 found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md

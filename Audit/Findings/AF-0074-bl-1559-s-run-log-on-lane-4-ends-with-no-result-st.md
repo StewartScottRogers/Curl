@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:BL-1559:unfinished-run
 reproduction: none
-task: none
-tasks:
+task: BL-1693
+tasks: BL-1693
 found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md

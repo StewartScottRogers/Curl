@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:ReadNumber-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs:133:>
-task: none
-tasks:
+task: BL-1671
+tasks: BL-1671
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md

@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/Http2Session.cs:LogPeerConnectionFrames-and:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/Http2Session.cs:432:&&
-task: none
-tasks:
+task: BL-1673
+tasks: BL-1673
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md

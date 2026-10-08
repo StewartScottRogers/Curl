@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs:AbandonResponseAsync-true:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs:211:true
-task: none
-tasks:
+task: BL-1674
+tasks: BL-1674
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
