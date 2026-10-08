@@ -1,5 +1,5 @@
 ---
-id: BL-1661
+id: BL-1662
 title: Refuse a four-digit HTTP status code with exit 8 Invalid status line as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-07
 completed:
 ---
-# BL-1661 — Refuse a four-digit HTTP status code with exit 8 Invalid status line as curl does
+# BL-1662 — Refuse a four-digit HTTP status code with exit 8 Invalid status line as curl does
 
 ## Goal
 

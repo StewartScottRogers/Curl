@@ -38,11 +38,11 @@ completed: 2026-10-07
 - **Malformed input:** garbage status line, `2x0` code, HTTP/1.2, header with no colon, folding before any header, obsolete folding, bare LF line ends, chunk extension, trailer, non-hex chunk size, CRLF and bare LF in `-H` and `-A` (curl sends them verbatim). Tests: `ExecuteAsync_GarbageStatusLine_FailsAsHttp09NotAllowed`, `ExecuteAsync_HeaderWithoutColon_FailsWithWeirdServerReply`, `ExecuteAsync_LineBreakInACustomHeader_SendsItVerbatimAsCurlDoes`, `ExecuteAsync_CrlfInTheUserAgent_SendsItVerbatimAsCurlDoes`, plus rows of the accepting test above.
 - **Invalid partitions:** conflicting and negative `Content-Length`, `Content-Length` beside chunked, only a 100 then close, a body shorter than its `Content-Length`, a chunk cut short. Tests: `ExecuteAsync_InvalidContentLength_FailsWithWeirdServerReply`, `ExecuteAsync_OnlyAnInterim100ThenClose_FailsWithEmptyReply`, `ExecuteAsync_BodyShorterThanContentLength_FailsWithPartialFileAfterDeliveringWhatCame`, `ExecuteAsync_ChunkCutShort_FailsWithPartialFileAfterDeliveringWhatCame`.
 - **State and concurrency:** one handler fed refused and valid responses alternately, and one handler running sixteen transfers at once from the thread pool. Tests: `ExecuteAsync_OneHandlerAlternatingRefusedAndValidResponses_EachTransferStandsAlone`, `ExecuteAsync_OneHandlerSixteenConcurrentTransfers_EachGetsExactlyOneWholeBody`.
-- **Defect found:** `HTTP/1.1 1000 X` - curl exits 8 `Invalid status line`, Curl exits 1 `Received HTTP/0.9 when not allowed`. Filed as BL-1661 (Normal: a wrong exit code, no crash, hang or security issue); its test was not committed here.
+- **Defect found:** `HTTP/1.1 1000 X` - curl exits 8 `Invalid status line`, Curl exits 1 `Received HTTP/0.9 when not allowed`. Filed as BL-1662 (Normal: a wrong exit code, no crash, hang or security issue); its test was not committed here.
 - No input over 1 MiB, so no Integration test. No platform-specific text or path.
 - Test count (fast run, `Curl.Protocol.Http.UnitTests`): 1864 before, 1897 after (33 new cases).
 ## Log
 
 - 2026-10-06: Created.
 - 2026-10-07: Backlog -> Doing.
-- 2026-10-07: Doing -> Done. 33 adversarial black-box HTTP handler tests pinned to measured curl 8.21.0; one defect filed as BL-1661
+- 2026-10-07: Doing -> Done. 33 adversarial black-box HTTP handler tests pinned to measured curl 8.21.0; one defect filed as BL-1662
