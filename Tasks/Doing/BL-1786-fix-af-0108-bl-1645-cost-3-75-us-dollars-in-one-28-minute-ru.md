@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Added AF-0108 (41 test runs in 45 Bash calls, $3.75) to the no-rerun-loop rule in both run prompts of RunDarkFactory.ps1, as BL-1784 and BL-1785 did for AF-0106 and AF-0107.
+
 ## Log
 
 - 2026-10-08: Created.
