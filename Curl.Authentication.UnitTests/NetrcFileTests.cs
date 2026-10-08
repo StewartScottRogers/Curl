@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -15,6 +16,8 @@ public sealed class NetrcFileTests
 
     private static readonly string LongLineAfterMatch =
         "machine 127.0.0.1 login a password p\n#" + new string('x', 20000) + "\n";
+
+    public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
     [DataRow("default login d password dp\nmachine 127.0.0.1 login m password mp\n", "d", "dp", DisplayName = "A default ahead of the machine wins")]
@@ -66,9 +69,14 @@ public sealed class NetrcFileTests
     [DataRow("machine 127.0.0.1 login a password pa\nmachine other login \"abc\n", "a", "pa", DisplayName = "A syntax error after the match is never read")]
     public void Find_WithoutUserName_ReturnsTheEntryCurlPicks(string text, string? expectedLogin, string? expectedPassword)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", text);
+        diagnostics.Arrange("host", Host);
+        diagnostics.Arrange("user name", null);
+
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
 
-        AssertFound(result, expectedLogin, expectedPassword);
+        AssertFound(diagnostics, result, expectedLogin, expectedPassword);
     }
 
     [TestMethod]
@@ -79,9 +87,14 @@ public sealed class NetrcFileTests
     [DataRow("machine 127.0.0.1 login a password pa\ndefault password dp\n", "z", null, "dp", DisplayName = "A default without a login")]
     public void Find_WithUserName_ReturnsTheEntryForThatUser(string text, string userName, string? expectedLogin, string? expectedPassword)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", text);
+        diagnostics.Arrange("host", Host);
+        diagnostics.Arrange("user name", userName);
+
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName);
 
-        AssertFound(result, expectedLogin, expectedPassword);
+        AssertFound(diagnostics, result, expectedLogin, expectedPassword);
     }
 
     [TestMethod]
@@ -96,8 +109,21 @@ public sealed class NetrcFileTests
     [DataRow("login x password y\nmachine 127.0.0.1\n", DisplayName = "A login and password outside any entry")]
     public void Find_WithoutUserName_NoEntry_IsNotFound(string text)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", text);
+        diagnostics.Arrange("host", Host);
+        diagnostics.Arrange("user name", null);
+
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
 
+        diagnostics.Act("outcome", result.Outcome);
+        diagnostics.Act("login", result.Login);
+        diagnostics.Act("password", result.Password);
+        diagnostics.Act("exit code", result.ExitCode);
+        diagnostics.Assert("outcome", NetrcLookupOutcome.NotFound, result.Outcome);
+        diagnostics.Assert("login", null, result.Login);
+        diagnostics.Assert("password", null, result.Password);
+        diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(NetrcLookupOutcome.NotFound, result.Outcome);
         Assert.IsNull(result.Login);
         Assert.IsNull(result.Password);
@@ -111,8 +137,15 @@ public sealed class NetrcFileTests
     [DataRow("machine 127.0.0.1\n", "z", DisplayName = "An empty entry")]
     public void Find_WithUserName_NoEntryForThatUser_IsNotFound(string text, string userName)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", text);
+        diagnostics.Arrange("host", Host);
+        diagnostics.Arrange("user name", userName);
+
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName);
 
+        diagnostics.Act("outcome", result.Outcome);
+        diagnostics.Assert("outcome", NetrcLookupOutcome.NotFound, result.Outcome);
         Assert.AreEqual(NetrcLookupOutcome.NotFound, result.Outcome);
     }
 
@@ -124,19 +157,30 @@ public sealed class NetrcFileTests
     [DataRow("machine other login \"abc\nmachine 127.0.0.1 login a password pa\n", DisplayName = "An unterminated quote before the match")]
     public void Find_MalformedBeforeAMatch_IsASyntaxError(string text)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", text);
+        diagnostics.Arrange("host", Host);
+
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
 
-        AssertSyntaxError(result);
+        AssertSyntaxError(diagnostics, result);
     }
 
     [TestMethod]
     public void Find_SyntaxError_CarriesCurlsMessageAndExitCode()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", "machine 127.0.0.1 login \"abc\n");
+
         NetrcLookupResult result = NetrcFile.Find("machine 127.0.0.1 login \"abc\n", Host, userName: null);
 
+        string actual = $"curl: ({(int)result.ExitCode}) {NetrcLookupResult.SyntaxErrorMessage}";
+        diagnostics.Act("message", actual);
+        diagnostics.Diff("message", "curl: (26) .netrc error: syntax error", actual);
+        diagnostics.Assert("message", "curl: (26) .netrc error: syntax error", actual);
         Assert.AreEqual(
             "curl: (26) .netrc error: syntax error",
-            $"curl: ({(int)result.ExitCode}) {NetrcLookupResult.SyntaxErrorMessage}");
+            actual);
     }
 
     [TestMethod]
@@ -146,11 +190,14 @@ public sealed class NetrcFileTests
     [DataRow(5000, true, DisplayName = "5000 bytes")]
     public void Find_UnquotedPasswordLength_IsLimitedTo4095Bytes(int length, bool isSyntaxError)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string password = new('p', length);
+        diagnostics.Arrange("password length", length);
+        diagnostics.Arrange("expects syntax error", isSyntaxError);
 
         NetrcLookupResult result = NetrcFile.Find($"machine 127.0.0.1 login a password {password}\n", Host, userName: null);
 
-        AssertFoundOrSyntaxError(result, isSyntaxError, "a", password);
+        AssertFoundOrSyntaxError(diagnostics, result, isSyntaxError, "a", password);
     }
 
     [TestMethod]
@@ -158,62 +205,84 @@ public sealed class NetrcFileTests
     [DataRow(4096, true, DisplayName = "4096 bytes")]
     public void Find_QuotedPasswordLength_IsLimitedTo4095Bytes(int length, bool isSyntaxError)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string password = new('p', length);
+        diagnostics.Arrange("quoted password length", length);
+        diagnostics.Arrange("expects syntax error", isSyntaxError);
 
         NetrcLookupResult result = NetrcFile.Find($"machine 127.0.0.1 login a password \"{password}\"\n", Host, userName: null);
 
-        AssertFoundOrSyntaxError(result, isSyntaxError, "a", password);
+        AssertFoundOrSyntaxError(diagnostics, result, isSyntaxError, "a", password);
     }
 
     [TestMethod]
     public void Find_QuotedPassword_LimitCountsTheUnescapedBytes()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         // 4096 characters between the quotes, 4094 once the two escapes are removed.
         string password = "pp" + new string('p', 4092);
+        diagnostics.Arrange("quoted password characters", 4096);
+        diagnostics.Arrange("escapes", 2);
 
         NetrcLookupResult result = NetrcFile.Find($"machine 127.0.0.1 login a password \"\\p\\p{new string('p', 4092)}\"\n", Host, userName: null);
 
-        AssertFound(result, "a", password);
+        AssertFound(diagnostics, result, "a", password);
     }
 
     [TestMethod]
     public void Find_PasswordOf4096Utf8Bytes_IsASyntaxError()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("password", "2048 x U+00E9 (4096 UTF-8 bytes)");
+
         NetrcLookupResult result = NetrcFile.Find($"machine 127.0.0.1 login a password {new string('é', 2048)}\n", Host, userName: null);
 
-        AssertSyntaxError(result);
+        AssertSyntaxError(diagnostics, result);
     }
 
     [TestMethod]
     public void Find_CommentLongerThanATokenMayBe_IsSkipped()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("comment length", 5000);
+
         NetrcLookupResult result = NetrcFile.Find($"# {new string('p', 5000)}\nmachine 127.0.0.1 login a password p\n", Host, userName: null);
 
-        AssertFound(result, "a", "p");
+        AssertFound(diagnostics, result, "a", "p");
     }
 
     [TestMethod]
     public void Find_MacroLineLongerThanATokenMayBe_IsSkipped()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("macro line length", 5000);
+
         NetrcLookupResult result = NetrcFile.Find($"macdef m\n{new string('p', 5000)}\n\nmachine 127.0.0.1 login a password p\n", Host, userName: null);
 
-        AssertFound(result, "a", "p");
+        AssertFound(diagnostics, result, "a", "p");
     }
 
     [TestMethod]
     public void Find_HostName_IsMatchedWithoutRegardToCase()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", "machine localhost login u password p\n");
+        diagnostics.Arrange("host", "LOCALHOST");
+
         NetrcLookupResult result = NetrcFile.Find("machine localhost login u password p\n", "LOCALHOST", userName: null);
 
-        AssertFound(result, "u", "p");
+        AssertFound(diagnostics, result, "u", "p");
     }
 
     [TestMethod]
     public void Find_LongTokenAfterTheMatch_IsNeverRead()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token length after the match", 5000);
+
         NetrcLookupResult result = NetrcFile.Find($"machine 127.0.0.1 login a password p\nmachine x login {new string('p', 5000)}\n", Host, userName: null);
 
-        AssertFound(result, "a", "p");
+        AssertFound(diagnostics, result, "a", "p");
     }
 
     [TestMethod]
@@ -222,11 +291,14 @@ public sealed class NetrcFileTests
     [DataRow(20000, true, DisplayName = "20000 bytes")]
     public void Find_LineLength_IsLimitedTo16382BytesBeforeItsLineFeed(int length, bool isSyntaxError)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string text = "#" + new string('x', length - 1) + "\nmachine 127.0.0.1 login a password p\n";
+        diagnostics.Arrange("comment line length", length);
+        diagnostics.Arrange("expects syntax error", isSyntaxError);
 
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
 
-        AssertFoundOrSyntaxError(result, isSyntaxError, "a", "p");
+        AssertFoundOrSyntaxError(diagnostics, result, isSyntaxError, "a", "p");
     }
 
     [TestMethod]
@@ -234,108 +306,161 @@ public sealed class NetrcFileTests
     [DataRow(16383, true, DisplayName = "16383 bytes")]
     public void Find_LastLineWithoutLineFeed_IsLimitedTo16382Bytes(int length, bool isSyntaxError)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string text = "machine 127.0.0.1 login a password p\n#" + new string('x', length - 1);
+        diagnostics.Arrange("last line length", length);
+        diagnostics.Arrange("expects syntax error", isSyntaxError);
 
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
 
-        AssertFoundOrSyntaxError(result, isSyntaxError, "a", "p");
+        AssertFoundOrSyntaxError(diagnostics, result, isSyntaxError, "a", "p");
     }
 
     [TestMethod]
     public void Find_LineOf16383Utf8Bytes_IsASyntaxError()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string text = "#" + new string('é', 8191) + "\nmachine 127.0.0.1 login a password p\n";
+        diagnostics.Arrange("comment line", "# then 8191 x U+00E9 (16383 UTF-8 bytes)");
 
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
 
-        AssertSyntaxError(result);
+        AssertSyntaxError(diagnostics, result);
     }
 
     [TestMethod]
     public void Find_LongLineAfterTheMatchingEntryBeforeItEnds_IsASyntaxError()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text length", LongLineAfterMatch.Length);
+
         // The entry ends only at the end of the text, so the long line is read first.
         NetrcLookupResult result = NetrcFile.Find(LongLineAfterMatch, Host, userName: null);
 
-        AssertSyntaxError(result);
+        AssertSyntaxError(diagnostics, result);
     }
 
     [TestMethod]
     public void Find_LongLineInsideAMacroDefinition_IsASyntaxError()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         string text = "macdef m\n" + new string('x', 16383) + "\n\nmachine 127.0.0.1 login a password p\n";
+        diagnostics.Arrange("macro line length", 16383);
 
         NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
 
-        AssertSyntaxError(result);
+        AssertSyntaxError(diagnostics, result);
     }
 
     [TestMethod]
     public async Task FindAsync_ReadsTheStreamAsUtf8()
     {
-        using var stream = new MemoryStream(Encoding.UTF8.GetBytes("machine 127.0.0.1 login a password pé\n"));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] bytes = Encoding.UTF8.GetBytes("machine 127.0.0.1 login a password pé\n");
+        diagnostics.Arrange("stream length", bytes.Length);
+        diagnostics.Bytes("stream", bytes);
+        using var stream = new MemoryStream(bytes);
 
         NetrcLookupResult result = await NetrcFile.FindAsync(stream, Host, userName: null, CancellationToken.None);
 
-        AssertFound(result, "a", "pé");
+        AssertFound(diagnostics, result, "a", "pé");
+        diagnostics.Act("stream can read", stream.CanRead);
+        diagnostics.Assert("stream can read", true, stream.CanRead);
         Assert.IsTrue(stream.CanRead, "The stream is left open.");
     }
 
     [TestMethod]
     public async Task FindAsync_KeepsAByteOrderMarkAsText()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         // Measured: glued to "machine", the byte order mark makes it an unknown token.
         byte[] bytes = [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("machine 127.0.0.1 login a password p\n")];
+        diagnostics.Arrange("stream length", bytes.Length);
+        diagnostics.Bytes("stream", bytes);
         using var stream = new MemoryStream(bytes);
 
         NetrcLookupResult result = await NetrcFile.FindAsync(stream, Host, userName: null, CancellationToken.None);
 
+        diagnostics.Act("outcome", result.Outcome);
+        diagnostics.Assert("outcome", NetrcLookupOutcome.NotFound, result.Outcome);
         Assert.AreEqual(NetrcLookupOutcome.NotFound, result.Outcome);
     }
 
     [TestMethod]
     public void Find_NullText_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => NetrcFile.Find(null!, Host, userName: null));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("text", null);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => NetrcFile.Find(null!, Host, userName: null));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public void Find_NullHostName_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => NetrcFile.Find(string.Empty, null!, userName: null));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("host", null);
+
+        ArgumentNullException exception = Assert.ThrowsExactly<ArgumentNullException>(() => NetrcFile.Find(string.Empty, null!, userName: null));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
     [TestMethod]
     public async Task FindAsync_NullStream_Throws()
     {
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => NetrcFile.FindAsync(null!, Host, userName: null, CancellationToken.None));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("stream", null);
+
+        ArgumentNullException exception = await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => NetrcFile.FindAsync(null!, Host, userName: null, CancellationToken.None));
+
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
-    private static void AssertFound(NetrcLookupResult result, string? expectedLogin, string? expectedPassword)
+    private static void AssertFound(TestDiagnostics diagnostics, NetrcLookupResult result, string? expectedLogin, string? expectedPassword)
     {
+        diagnostics.Act("outcome", result.Outcome);
+        diagnostics.Act("login", result.Login);
+        diagnostics.Act("password length", result.Password?.Length);
+        diagnostics.Assert("outcome", NetrcLookupOutcome.Found, result.Outcome);
+        diagnostics.Assert("login", expectedLogin, result.Login);
+        diagnostics.Assert("password length", expectedPassword?.Length, result.Password?.Length);
+        diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(NetrcLookupOutcome.Found, result.Outcome);
         Assert.AreEqual(expectedLogin, result.Login);
         Assert.AreEqual(expectedPassword, result.Password);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
     }
 
-    private static void AssertSyntaxError(NetrcLookupResult result)
+    private static void AssertSyntaxError(TestDiagnostics diagnostics, NetrcLookupResult result)
     {
+        diagnostics.Act("outcome", result.Outcome);
+        diagnostics.Act("login", result.Login);
+        diagnostics.Act("password", result.Password);
+        diagnostics.Assert("outcome", NetrcLookupOutcome.SyntaxError, result.Outcome);
+        diagnostics.Assert("login", null, result.Login);
+        diagnostics.Assert("password", null, result.Password);
+        diagnostics.Assert("exit code", CurlExitCode.ReadError, result.ExitCode);
         Assert.AreEqual(NetrcLookupOutcome.SyntaxError, result.Outcome);
         Assert.IsNull(result.Login);
         Assert.IsNull(result.Password);
         Assert.AreEqual(CurlExitCode.ReadError, result.ExitCode);
     }
 
-    private static void AssertFoundOrSyntaxError(NetrcLookupResult result, bool isSyntaxError, string expectedLogin, string expectedPassword)
+    private static void AssertFoundOrSyntaxError(TestDiagnostics diagnostics, NetrcLookupResult result, bool isSyntaxError, string expectedLogin, string expectedPassword)
     {
         if (isSyntaxError)
         {
-            AssertSyntaxError(result);
+            AssertSyntaxError(diagnostics, result);
         }
         else
         {
-            AssertFound(result, expectedLogin, expectedPassword);
+            AssertFound(diagnostics, result, expectedLogin, expectedPassword);
         }
     }
 }

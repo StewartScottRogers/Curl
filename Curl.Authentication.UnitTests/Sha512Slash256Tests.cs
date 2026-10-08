@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -8,6 +9,8 @@ namespace Curl.Authentication;
 [TestClass]
 public sealed class Sha512Slash256Tests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow("", "c672b8d1ef56ed28ab87c3622c5114069bdd3ad7b8f9737498d0c01ecef0967a", DisplayName = "Empty")]
     [DataRow("abc", "53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23", DisplayName = "One block")]
@@ -17,16 +20,32 @@ public sealed class Sha512Slash256Tests
         DisplayName = "112 bytes: padding needs a second block")]
     public void HashData_NistExample_GivesTheExampleHash(string message, string expected)
     {
-        byte[] hash = Sha512Slash256.HashData(Encoding.ASCII.GetBytes(message));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] input = Encoding.ASCII.GetBytes(message);
+        diagnostics.Arrange("message length", input.Length);
+        diagnostics.Bytes("message", input);
 
-        Assert.AreEqual(expected, Convert.ToHexStringLower(hash));
+        byte[] hash = Sha512Slash256.HashData(input);
+
+        string actual = Convert.ToHexStringLower(hash);
+        diagnostics.Act("hash", actual);
+        diagnostics.Diff("hash", expected, actual);
+        diagnostics.Assert("hash", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     public void HashData_111Bytes_FitsOneBlock()
     {
-        byte[] hash = Sha512Slash256.HashData(new byte[111]);
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] input = new byte[111];
+        diagnostics.Arrange("message length", input.Length);
+        diagnostics.Bytes("message", input);
 
+        byte[] hash = Sha512Slash256.HashData(input);
+
+        diagnostics.Act("hash", Convert.ToHexStringLower(hash));
+        diagnostics.Assert("hash length", 32, hash.Length);
         Assert.HasCount(32, hash);
     }
 }
