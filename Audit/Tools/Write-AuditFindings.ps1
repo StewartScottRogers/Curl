@@ -34,18 +34,29 @@
       duplicate   Before anything else, open findings that share a key are one finding: all but
                   the lowest ID are closed with closed-how duplicate and duplicate-of, and their
                   tasks join the original's tasks list.
-      set aside   A re-audit or repeat whose finding sits in a project that depends on a planted
-                  defect's project (its .csproj references in -Tree, transitively), or whose
-                  evidence cites a planted file by name, is recorded "not re-audited | overlaps
-                  planted defect PD-###" and counts as neither yes nor no: auditors run their
-                  reproductions in the planted tree.
+      rerun       A finding with a mutation reproduction re-audited by its own auditor has the
+                  runner's targeted rerun on the clean audited -Commit (-RerunReproductions) first,
+                  when the auditor says "no" or a planted defect overlaps it. No plant can touch
+                  that rerun, so its answer stands: an own "no" with the mutant killed closes
+                  (mechanical, below) and is never set aside; a survivor is recorded "reproduces:
+                  yes (runner rerun on clean commit)". Its JSON and output stay in
+                  <ReportDirectory>\reruns.
+      set aside   A re-audit or repeat the clean rerun did not answer is recorded "not re-audited |
+                  overlaps planted defect PD-###" and counts as neither yes nor no when the
+                  auditor's evidence cites a planted file by name, or the finding's location is the
+                  planted file, or - for a finding with a mutation reproduction only - its location
+                  is in a project that depends on a planted defect's project (its .csproj references
+                  in -Tree, transitively): auditors run their reproductions in the planted tree.
+                  (ADR-0422, amended 2026-10-07: a dependency alone set aside every re-audit of
+                  audit 20261007-133608.)
       re-audit    Each other reaudits entry appends a Re-audits line to the finding it names (one
                   from another auditor marked "(re-audited by <auditor>)"). An open finding whose
                   own auditor says it no longer reproduces is closed (status, reason, closed,
                   closed-how, closed-by and a Log line) by the first of:
                     mechanical        it has a mutation reproduction and the runner's targeted
                                       rerun on the clean audited -Commit kills the mutant
-                                      (-RerunReproductions), whatever -Unreliable says;
+                                      (-RerunReproductions), whatever -Unreliable says and
+                                      whatever plant overlaps it;
                     reliable-reaudit  no mechanical answer (none, or the rerun could not tell)
                                       and the auditor is not in -Unreliable;
                     consecutive       no mechanical answer and the finding's previous Re-audits
@@ -158,11 +169,14 @@ function Get-ProjectClosure([string]$Project) {
     return @($seen.Keys)
 }
 
-function Get-OverlappingPlant($Target, [string]$Evidence, [object[]]$Planted) {
+function Get-OverlappingPlant($Target, [string]$Evidence, [object[]]$Planted, [bool]$ProjectClosure) {
     # The planted defect that may have produced this audit's verdict on the finding, or $null: one
-    # in a project the finding's location depends on (Get-ProjectClosure), or one whose file name
-    # the auditor's evidence cites. Auditors re-audit in the planted tree (BL-1597's audit: AF-0009
-    # and AF-0026 "reproduced" because of PD-303 and PD-103).
+    # whose file name the auditor's evidence cites, or one in the very file the finding's location
+    # names. Auditors re-audit in the planted tree (BL-1597's audit: AF-0009 and AF-0026
+    # "reproduced" because of PD-303 and PD-103). With -ProjectClosure (a finding with a mechanical
+    # reproduction, whose mutant any test in the project's closure can kill or miss) also one in a
+    # project the finding's location depends on (Get-ProjectClosure); the caller then lets the
+    # runner's clean rerun, which no plant can touch, decide instead (ADR-0422, amended 2026-10-07).
     foreach ($p in $Planted) {
         $file = "$($p.file)" -replace '\\', '/'
         $name = $file.Substring($file.LastIndexOf('/') + 1)
@@ -170,6 +184,8 @@ function Get-OverlappingPlant($Target, [string]$Evidence, [object[]]$Planted) {
         if ($file -notmatch '/') { continue }
         $plantProject = ($file -split '/')[0]
         foreach ($part in ("$($Target.Location)" -split ',\s*')) {
+            if (Test-SamePath (ConvertTo-Normalised $part) $file) { return $p }
+            if (-not $ProjectClosure) { continue }
             $project = (($part -replace '\\', '/').Trim() -split '/')[0]
             if ($project -and (@(Get-ProjectClosure $project) -contains $plantProject)) { return $p }
         }
@@ -255,11 +271,12 @@ function ConvertTo-FiledFinding($Finding, [string]$Auditor) {
 
 function Get-ReauditLines([string]$Text) {
     # The Re-audits lines, oldest first: Date, Scorecard, Reproduces, Evidence, Own (written for the
-    # finding's own auditor: every line not marked "(re-audited by <auditor>)").
+    # finding's own auditor: every line not marked "(re-audited by <auditor>)"). A verdict may carry
+    # a note: "reproduces: yes (runner rerun on clean commit)".
     $section = if ($Text -match '(?s)## Re-audits[ \t]*\r?\n(.*?)(\r?\n## |\z)') { $Matches[1] } else { '' }
     $lines = @()
     foreach ($line in ($section -split '\r?\n')) {
-        if ($line -notmatch '^- (\S+) \| (\S+) \| reproduces: (yes|no) \| ?(.*)$') { continue }
+        if ($line -notmatch '^- (\S+) \| (\S+) \| reproduces: (yes|no)(?: \([^)|]*\))? \| ?(.*)$') { continue }
         $lines += [pscustomobject]@{ Date = $Matches[1]; Scorecard = $Matches[2]; Reproduces = ($Matches[3] -eq 'yes'); Evidence = $Matches[4]; Own = ($Matches[4] -notlike '(re-audited by *') }
     }
     return $lines
@@ -277,25 +294,35 @@ function Get-ConsecutiveNo([string]$Text, [string]$ScorecardName) {
 }
 
 function Invoke-MechanicalReproduction($Target) {
-    # Reruns a finding's mechanical reproduction on the audited commit: 'killed' (the targeted
-    # mutant is killed or timed out: fixed), 'survived' (still reproduces), 'unverified' (not run,
-    # or it could not tell), or 'none' (the finding has no mechanical reproduction).
+    # Reruns a finding's mechanical reproduction on the clean audited commit (Invoke-MutationTest.ps1
+    # checks -Commit out in a throwaway worktree; the planted tree is never used): 'killed' (the
+    # targeted mutant is killed or timed out: fixed), 'survived' (still reproduces), 'unverified'
+    # (not run, or it could not tell), or 'none' (the finding has no mechanical reproduction). The
+    # tool's JSON and output stay in <ReportDirectory>\reruns\<id>.json and .log, and one line per
+    # rerun in reruns\outcomes.txt.
     $site = Get-MutationSite $Target.Reproduction
     if (-not $site) { return 'none' }
     if ($MechanicalOutcomes.ContainsKey($Target.Id)) { return $MechanicalOutcomes[$Target.Id] }
     if (-not $RerunReproductions) { return 'unverified' }
     $member = if ($Target.Key -match ':([A-Za-z0-9_]+)-[a-z0-9]+:surviving-mutant$') { $Matches[1] } else { '' }
-    $out = Join-Path ([IO.Path]::GetTempPath()) ("reproduction-$($Target.Id)-" + [guid]::NewGuid().ToString('N') + '.json')
+    $reruns = Join-Path $ReportDirectory 'reruns'
+    New-Item -ItemType Directory -Force $reruns | Out-Null
+    $out = Join-Path $reruns "$($Target.Id).json"
+    $log = Join-Path $reruns "$($Target.Id).log"
+    Remove-Item -LiteralPath $out -ErrorAction SilentlyContinue
     $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot 'Invoke-MutationTest.ps1'), '-Site', "$($site.File):$($site.Line):$($site.Operator)", '-Commit', $Commit, '-ExcludeBaselineFailures', '-TimeoutSeconds', '600', '-OutFile', $out)
     if ($member) { $arguments += @('-Member', $member) }
     $ErrorActionPreference = 'Continue'
-    & powershell @arguments *> $null
+    & powershell @arguments *> $log
     $outcome = 'unverified'
+    $raw = ''
     if (Test-Path -LiteralPath $out) {
         $result = Get-Content -LiteralPath $out -Raw | ConvertFrom-Json
-        $outcome = switch ("$($result.outcome)") { 'killed' { 'killed' } 'timedOut' { 'killed' } 'survived' { 'survived' } default { 'unverified' } }
-        Remove-Item -LiteralPath $out -ErrorAction SilentlyContinue
+        $raw = "$($result.outcome)"
+        $outcome = switch ($raw) { 'killed' { 'killed' } 'timedOut' { 'killed' } 'survived' { 'survived' } default { 'unverified' } }
     }
+    # Not to the console: RunAudit.ps1 reads this script's output as its one summary line.
+    [IO.File]::AppendAllText((Join-Path $reruns 'outcomes.txt'), "$($Target.Id) $($site.File):$($site.Line):$($site.Operator) on $Commit`: $outcome$(if ($raw -and $raw -ne $outcome) { " ($raw)" })`r`n", $Utf8)
     return $outcome
 }
 
@@ -481,7 +508,7 @@ function Invoke-WriteFindings {
             $same = @($existing | Where-Object { $_.Key -ceq $filed.Key })
             $live = @($same | Where-Object { $_.Status -in 'proposed', 'accepted', 'deferred', 'blocked', 'rejected' })[0]
             if ($live) {
-                $plant = Get-OverlappingPlant $live "$($f.evidence)" $planted
+                $plant = Get-OverlappingPlant $live "$($f.evidence)" $planted ([bool](Get-MutationSite $live.Reproduction))
                 if ($plant) { Add-SetAsideLine $live $plant 'yes' 'still reported' }
                 else { Add-ReauditLine $live.Path "- $Date | $Scorecard | reproduces: yes | still reported" }
                 if ($live.Status -ne 'rejected') { $counts.open++ }
@@ -508,18 +535,27 @@ function Invoke-WriteFindings {
                 continue
             }
             $reproduces = [bool]$r.reproduces
-            $plant =Get-OverlappingPlant $target "$($r.evidence)" $planted
-            if ($plant) { Add-SetAsideLine $target $plant $(if ($reproduces) { 'yes' } else { 'no' }) "$($r.evidence)"; continue }
+            $verdict = if ($reproduces) { 'yes' } else { 'no' }
             $own = $target.Auditor -eq $auditor
-            $mechanical = if ((-not $reproduces) -and $own) { Invoke-MechanicalReproduction $target } else { 'none' }
+            $hasMechanical = [bool](Get-MutationSite $target.Reproduction)
+            $plant = Get-OverlappingPlant $target "$($r.evidence)" $planted $hasMechanical
+            # The runner's rerun on the clean audited commit comes first: no plant can touch it, so
+            # it decides an own "no" (to close) and an own verdict a plant may have produced.
+            $mechanical = if ($own -and $hasMechanical -and ((-not $reproduces) -or $plant)) { Invoke-MechanicalReproduction $target } else { 'none' }
             $evidence = "$($r.evidence)"
             if (-not $own) { $evidence = "(re-audited by $auditor) $evidence" }
-            if ($mechanical -ne 'none') { $evidence += " Runner's targeted mutation rerun: $mechanical." }
-            Add-ReauditLine $target.Path "- $Date | $Scorecard | reproduces: $(if ($reproduces) { 'yes' } else { 'no' }) | $evidence"
+            if ($mechanical -ne 'none') { $evidence += " Runner's targeted mutation rerun on the clean audited commit: $mechanical." }
+            # Set aside only what the clean rerun did not answer: no rerun, one that could not tell,
+            # or an own "yes" the rerun contradicts (killed) - a "yes" closes nothing either way.
+            $answered = ($mechanical -eq 'survived') -or ($mechanical -eq 'killed' -and -not $reproduces)
+            if ($plant -and -not $answered) { Add-SetAsideLine $target $plant $verdict $evidence; continue }
+            $line = "reproduces: $verdict"
+            if ($mechanical -eq 'survived' -and ($plant -or -not $reproduces)) { $line = 'reproduces: yes (runner rerun on clean commit)' }
+            Add-ReauditLine $target.Path "- $Date | $Scorecard | $line | $evidence"
             $path = if ($reproduces) { $null } else { Get-ClosePath $target $auditor $flagged $mechanical }
             if ($path) {
                 $because = switch ($path.How) {
-                    'mechanical' { "the reproduction no longer reproduces, and the runner's targeted mutant was killed" }
+                    'mechanical' { "the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit" }
                     'consecutive' { "a second consecutive re-audit by its own auditor found the reproduction no longer reproduces ($($path.By))" }
                     default { 'the reproduction no longer reproduces' }
                 }
@@ -600,24 +636,31 @@ if ($SelfTest) {
         Copy-Item -LiteralPath (Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md') -Destination $FindingsDirectory
         $ReportDirectory = Join-Path $closure 'reports'; $Manifest = Join-Path $closure 'manifest.json'; $Tree = Join-Path $closure 'tree'
         $Unreliable = @('quality')
-        $script:MechanicalOutcomes = @{ 'AF-0010' = 'killed'; 'AF-0011' = 'survived' }
+        $script:MechanicalOutcomes = @{ 'AF-0010' = 'killed'; 'AF-0011' = 'survived'; 'AF-0020' = 'killed'; 'AF-0021' = 'survived'; 'AF-0023' = 'unverified' }
         $line2 = Invoke-WriteFindings
         # LF throughout, whatever line endings the checkout gave the fixture.
         function Lf([string]$Prefix) { (Text $Prefix) -replace "`r`n", "`n" }
-        $c10 = Lf 'AF-0010'; $c11 = Lf 'AF-0011'; $c12 = Lf 'AF-0012'; $c13 = Lf 'AF-0013'; $c14 = Lf 'AF-0014'; $c15 = Lf 'AF-0015'; $c16 = Lf 'AF-0019'; $c17 = Lf 'AF-0017'; $c18 = Lf 'AF-0018'
-        Check 'an unreliable auditor''s "no" closes when the runner''s targeted mutant is killed' ($c10 -match '(?m)^status: closed$' -and $c10 -match '(?m)^closed-how: mechanical$' -and $c10 -match '(?m)^closed-by: 2026-10-14_0930.md$' -and $c10 -match "rerun: killed\.") 'AF-0010'
-        Check 'a "no" the runner''s rerun contradicts (survived) stays open' ($c11 -match '(?m)^status: accepted$' -and $c11 -match "rerun: survived\.") 'AF-0011'
+        $c10 = Lf 'AF-0010'; $c11 = Lf 'AF-0011'; $c12 = Lf 'AF-0012'; $c13 = Lf 'AF-0013'; $c14 = Lf 'AF-0014'; $c15 = Lf 'AF-0015'; $c16 = Lf 'AF-0024'; $c17 = Lf 'AF-0017'; $c18 = Lf 'AF-0018'
+        $c20 = Lf 'AF-0020'; $c21 = Lf 'AF-0021'; $c22 = Lf 'AF-0022'; $c23 = Lf 'AF-0023'
+        Check 'an unreliable auditor''s "no" closes when the runner''s targeted mutant is killed' ($c10 -match '(?m)^status: closed$' -and $c10 -match '(?m)^closed-how: mechanical$' -and $c10 -match '(?m)^closed-by: 2026-10-14_0930.md$' -and $c10 -match "rerun on the clean audited commit: killed\.") 'AF-0010'
+        Check 'a "no" the runner''s rerun contradicts (survived) stays open, recorded as the rerun''s "yes"' ($c11 -match '(?m)^status: accepted$' -and $c11 -match "\| reproduces: yes \(runner rerun on clean commit\) \| not sampled Runner's targeted mutation rerun on the clean audited commit: survived\.") 'AF-0011'
+        Check 'a plant in another file of the project does not set aside a "no" the clean rerun confirms (killed): closes mechanical' ($c20 -match '(?m)^status: closed$' -and $c20 -match '(?m)^closed-how: mechanical$' -and $c20 -match '\| reproduces: no \| killed in the planted tree Runner''s targeted mutation rerun on the clean audited commit: killed\.' -and $c20 -notmatch 'overlaps planted defect') 'AF-0020'
+        Check 'a plant in another file of the project, and the clean rerun''s mutant survives: open, "yes"' ($c21 -match '(?m)^status: accepted$' -and $c21 -match '\| reproduces: yes \(runner rerun on clean commit\) \| killed in the planted tree Runner''s targeted mutation rerun on the clean audited commit: survived\.' -and $c21 -notmatch 'overlaps planted defect') 'AF-0021'
+        Check 'a re-audit of a finding in the planted file itself is set aside' ($c22 -match 'overlaps planted defect PD-103 in Curl\.Dep\.UnitLibrary/Reader\.cs, so the auditor''s verdict \(reproduces no\) is set aside: asserts the length now' -and $c22 -match '(?m)^status: accepted$') 'AF-0022'
+        Check 'a mutation finding overlapping a plant whose clean rerun cannot tell is set aside' ($c23 -match 'overlaps planted defect PD-103 in Curl\.Dep\.UnitLibrary/Reader\.cs, so the auditor''s verdict \(reproduces yes\) is set aside: survived in the planted tree Runner''s targeted mutation rerun on the clean audited commit: unverified\.' -and $c23 -match '(?m)^status: accepted$') 'AF-0023'
+        Check 'a runner''s "yes" line parses as a yes' (@(Get-ReauditLines $c21).Count -eq 1 -and @(Get-ReauditLines $c21)[0].Reproduces) 'AF-0021'
         Check 'another auditor''s re-audit is marked and closes nothing' ($c11 -match '\| reproduces: no \| \(re-audited by security\) looked fine') 'AF-0011'
         Check 'two consecutive "no"s on two audits close an unreliable auditor''s finding' ($c12 -match '(?m)^status: closed$' -and $c12 -match '(?m)^closed-how: consecutive$' -and $c12 -match '(?m)^closed-by: 2026-10-07_0844.md, 2026-10-14_0930.md$') 'AF-0012'
         Check 'closed-how is inserted in template order into a finding from before ADR-0422' ($c12 -match '(?s)\nclosed: 2026-10-14\nclosed-how: consecutive\nclosed-by: ') 'AF-0012'
         Check 'a "no" after a "yes" from an unreliable auditor stays open' ($c13 -match '(?m)^status: accepted$') 'AF-0013'
         Check 'open findings with one key: the later is closed as a duplicate of the earlier' ($c15 -match '(?m)^status: closed$' -and $c15 -match '(?m)^closed-how: duplicate$' -and $c15 -match '(?m)^duplicate-of: AF-0014$' -and $c14 -match '(?m)^tasks: BL-6, BL-7$' -and $c14 -match '(?m)^status: accepted$') 'AF-0015'
         Check 'the same mutant in other words is a repeat of the open finding' ($c14 -match 'reproduces: yes \| still reported' -and -not ((Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -match 'title: NoDelay can become false')) 'AF-0014'
-        Check 'a new surviving mutant gets the mechanical key, reproduction and command' ($c16 -match '(?m)^key: quality:Curl\.Net\.UnitLibrary/C\.cs:Check-eq:surviving-mutant\r?$' -and $c16 -match '(?m)^reproduction: mutation Curl\.Net\.UnitLibrary/C\.cs:6:==\r?$' -and $c16 -match 'Invoke-MutationTest\.ps1 -Site Curl\.Net\.UnitLibrary/C\.cs:6:== -Member Check -ExcludeBaselineFailures') 'AF-0019'
-        Check 'a re-audit in a project that depends on a planted defect''s project is set aside, not counted' ($c17 -match '\| not re-audited \| overlaps planted defect PD-103 in Curl\.Dep\.UnitLibrary/Reader\.cs, so the auditor''s verdict \(reproduces yes\) is set aside: fails with IndexOutOfRange' -and $c17 -notmatch 'reproduces: yes \| fails') 'AF-0017'
+        Check 'a new surviving mutant gets the mechanical key, reproduction and command' ($c16 -match '(?m)^key: quality:Curl\.Net\.UnitLibrary/C\.cs:Check-eq:surviving-mutant\r?$' -and $c16 -match '(?m)^reproduction: mutation Curl\.Net\.UnitLibrary/C\.cs:6:==\r?$' -and $c16 -match 'Invoke-MutationTest\.ps1 -Site Curl\.Net\.UnitLibrary/C\.cs:6:== -Member Check -ExcludeBaselineFailures') 'AF-0024'
+        Check 'a re-audit with no mechanical reproduction, in a project that only depends on a planted defect''s project, counts' ($c17 -match '\| reproduces: yes \| fails with IndexOutOfRange' -and $c17 -notmatch 'overlaps planted defect') 'AF-0017'
         Check 'a re-audit whose evidence cites a planted file is set aside' ($c18 -match 'overlaps planted defect PD-104' -and $c18 -match '(?m)^status: accepted\r?$') 'AF-0018'
-        Check 'a set-aside line is neither yes nor no' (@(Get-ReauditLines $c17).Count -eq 2) "$(@(Get-ReauditLines $c17).Count) parsed"        Check 'a re-audit with reproduces null is "not re-audited", not a no' ($c14 -match '\| 2026-10-14_0930\.md \| not re-audited \| site not sampled' -and $c14 -match '(?m)^status: accepted\r?$') 'AF-0014'
-        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 3, catches 0') $line2
+        Check 'a set-aside line is neither yes nor no' (@(Get-ReauditLines $c22).Count -eq 1) "$(@(Get-ReauditLines $c22).Count) parsed"
+        Check 'a re-audit with reproduces null is "not re-audited", not a no' ($c14 -match '\| 2026-10-14_0930\.md \| not re-audited \| site not sampled' -and $c14 -match '(?m)^status: accepted\r?$') 'AF-0014'
+        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 4, catches 0') $line2
         $Tree = ''
         Check 'with no tree the member is the key''s <what> without its operator' ((Get-SiteMember ([pscustomobject]@{ File = 'X.UnitLibrary/Y.cs'; Line = 3; Operator = 'true' }) 'quality:X.UnitLibrary/Y.cs:Turn-true:surviving-mutant') -eq 'Turn') 'Turn'
         exit $(if ($failed) { 1 } else { 0 })

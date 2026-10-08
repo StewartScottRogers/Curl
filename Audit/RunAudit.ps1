@@ -27,9 +27,10 @@
          <stamp>\reports\<auditor>.md. A planted tree left changed afterwards marks that auditor
          as having written to the audited tree (unreliable), and is reset before the next.
       6. Write-AuditScorecard.ps1 -ReliabilityOnly, then Write-AuditFindings.ps1 -Tree <planted>
-         -RerunReproductions, which reruns each mechanical reproduction the closure rule needs on
-         the clean audited commit (never the planted tree) and sets aside verdicts that overlap a
-         planted defect, then Write-AuditScorecard.ps1, writing into the audit branch (ADR-0422).
+         -RerunReproductions, which first reruns each mechanical reproduction the closure rule needs
+         on the clean audited commit (never the planted tree; results in <stamp>\reports\reruns),
+         then sets aside the verdicts that rerun leaves unanswered and that overlap a planted
+         defect, then Write-AuditScorecard.ps1, writing into the audit branch (ADR-0422).
       When -Auditors leaves out an auditor that has accepted findings, the run warns, in its
       output and its log, that they will not be re-audited; the scorecard's Attention section
       says so too.

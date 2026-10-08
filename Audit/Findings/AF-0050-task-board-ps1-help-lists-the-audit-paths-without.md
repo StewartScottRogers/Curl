@@ -3,12 +3,12 @@ id: AF-0050
 title: task-board.ps1 help lists the audit paths without the four guard files the code also treats as audit paths
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-1677
+tasks: BL-1677
 found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
@@ -42,6 +42,9 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'path \(Au
 
 ## Re-audits
 
+- 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the reproduction. It matches task-board.ps1:19 'path (Audit, Audit/..., .claude/agents/audit-*), is never offered' and task-board.ps1:209 "'.github/workflows/ci.yml',". The help still lists only the three audit-path forms, while Test-AuditPath (lines 205-216) also treats the four guard files (.claude/hooks/guard-audit-paths.ps1, .claude/settings.json, .github/workflows/ci.yml, .claude/skills/task-board/task-board.ps1) as audit paths.
+
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.

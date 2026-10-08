@@ -143,12 +143,20 @@ Two more closes are not re-audits:
 | `duplicate` | It has the same key as an open finding with a lower ID: `Write-AuditFindings.ps1` closes it at the start of an audit, or an interactive session marks it; `duplicate-of` names the original, whose `tasks` gains its tasks. |
 | `stewart` | Stewart closes an accepted finding himself ([Moves](#moves)), for example one the scorecard lists as stuck. |
 
+For a finding with a mechanical `reproduction`, the runner's rerun on the clean audited commit
+comes first whenever its own auditor says "no" or a planted defect overlaps it, and no plant can
+touch it: a killed mutant closes the finding (`mechanical`) even when a plant overlaps it, and a
+surviving one is recorded `reproduces: yes (runner rerun on clean commit)`. The rerun's JSON and
+output stay in the run folder's `reports\reruns`.
+
 A verdict that cannot be trusted is recorded but counts as neither yes nor no: a re-audit with
-`"reproduces": null`, and one that **overlaps a planted defect** - the finding's location is in
-a project that depends (by project references, transitively) on the project of a defect
-planted for that audit, or the auditor's evidence names the planted file. Auditors run their
+`"reproduces": null`, and one the clean rerun did not answer that **overlaps a planted defect** -
+the auditor's evidence names the planted file, or the finding's location is the planted file, or,
+for a finding with a mechanical reproduction only, its location is in a project that depends (by
+project references, transitively) on the planted file's project. Auditors run their
 reproductions in the planted tree, so such a verdict may measure the plant (the 2026-10-07
-re-audits of AF-0009 and AF-0026 measured PD-303 and PD-103).
+re-audits of AF-0009 and AF-0026 measured PD-303 and PD-103). A dependency alone no longer sets
+aside a finding without a mechanical reproduction ([ADR-0422](../../Documentation/Planning/Decisions/ADR-0422-audit-findings-close-on-mechanical-evidence.md#amended-2026-10-07-the-clean-rerun-comes-before-the-set-aside)).
 
 ## Body
 
@@ -168,9 +176,9 @@ A `Re-audits` line has four fields separated by ` | `:
 - 2026-10-14 | 2026-10-14_0930.md | reproduces: no | Select-String finds no match; the test now asserts exit code 2.
 ```
 
-The date of the re-audit, its scorecard's file name, `reproduces: yes`, `reproduces: no` or
-`not re-audited`, and the evidence: what running the reproduction showed, or "still
-reported" when rule 5 added the line. Evidence a different auditor gave starts
-`(re-audited by <auditor>)`; a mechanical rerun's result is appended (`Runner's targeted
-mutation rerun: killed.`); a set-aside verdict reads `overlaps planted defect PD-### in
+The date of the re-audit, its scorecard's file name, `reproduces: yes`, `reproduces: no`,
+`reproduces: yes (runner rerun on clean commit)` or `not re-audited`, and the evidence: what
+running the reproduction showed, or "still reported" when rule 5 added the line. Evidence a
+different auditor gave starts `(re-audited by <auditor>)`; a mechanical rerun's result is
+appended (`Runner's targeted mutation rerun on the clean audited commit: killed.`); a set-aside verdict reads `overlaps planted defect PD-### in
 <file>, so the auditor's verdict (reproduces yes) is set aside: <evidence>`.
