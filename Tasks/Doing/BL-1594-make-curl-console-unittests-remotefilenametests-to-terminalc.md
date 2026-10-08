@@ -34,3 +34,4 @@ Every test in these `Curl.Console.UnitTests` files (13 files, 95 test methods, c
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
