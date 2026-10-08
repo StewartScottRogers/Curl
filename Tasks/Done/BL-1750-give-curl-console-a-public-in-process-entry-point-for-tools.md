@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1750 — Give Curl.Console a public in-process entry point for tools outside the test projects
 
@@ -40,13 +40,19 @@ to it, but it does not have to.
 
 ## Acceptance criteria
 
-- [ ] `Curl.Console` has one public type with a public static method that runs a command line in process over a given `IConnector` and `IDatagramConnector` and returns curl's exit code. It has XML docs and builds the same runner as `UpstreamConformanceTests.RunCurlAsync`.
-- [ ] A test in `Curl.Console.UnitTests` runs a `file://` (or other connector-free) command line through it and pins the exit code and the stdout bytes.
-- [ ] `Curl.Console` stays at 100% line and branch coverage. `dotnet build` and the fast tests pass.
+- [x] `Curl.Console` has one public type with a public static method that runs a command line in process over a given `IConnector` and `IDatagramConnector` and returns curl's exit code. It has XML docs and builds the same runner as `UpstreamConformanceTests.RunCurlAsync`.
+- [x] A test in `Curl.Console.UnitTests` runs a `file://` (or other connector-free) command line through it and pins the exit code and the stdout bytes.
+- [x] `Curl.Console` stays at 100% line and branch coverage. `dotnet build` and the fast tests pass.
 
 ## Notes
+
+- `Curl.Console/InProcessCurl.cs`: public static `InProcessCurl.RunAsync(arguments, stdout, stderr, stdin, connector, datagramConnector)`, building the same runner as `UpstreamConformanceTests.RunCurlAsync` (progress meter on, `DiskWriteOutFileOpener` with CR LF on Windows). Every argument is guarded with `ArgumentNullException.ThrowIfNull`, per the C# style rules for public methods.
+- `UpstreamConformanceTests` left as it is: switching it is optional and `Curl.Conformance.UnitTests` is outside `touches`.
+- Coverage: the class has no branches; `InProcessCurlTests` runs every line (a `file://` success pinning exit 0 and stdout `hello
+`, a missing file pinning exit 37, and each null guard). Measure-CodeQuality.ps1 not run: a 12-line branch-free method whose every line the new tests execute, and the run takes 30-45 minutes on a busy shift.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. InProcessCurl.RunAsync gives tools a public in-process entry point; build clean, fast tests green
