@@ -55,7 +55,8 @@
     five Sonnet test-writers in one message cost BL-1486 $2.97 of its $4.65; AF-0098: three
     test-writers, then on Opus, in one message took BL-1585 to $4.49). What the
     task's own runs of the last 24 hours cost comes off its next run's cap, down to $1, so a
-    requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56). Once
+    requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56; AF-0099:
+    BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more). Once
     those runs leave less than $1 of the cap, a fresh claim of the task is not run at all but
     goes to Blocked (AF-0096: BL-1609's five claims cost $5.17). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed and the task
@@ -3161,7 +3162,8 @@ function Restore-TaskStash {
     # A task that went back to Backlog with work in progress left it in the shared stash
     # list as "darkfactory <id> <stamp>" (Save-StrayChanges). A lane's run may not run
     # git stash, not even git stash list (AF-0091: BL-1609's fourth claim was spent finding
-    # the third's stash), so the shift applies the newest such stash itself when the task
+    # the third's stash; AF-0099: BL-1683's second claim began by hunting for the first's),
+    # so the shift applies the newest such stash itself when the task
     # is claimed again. Returns the note put in front of the run's prompt, '' for none.
     param([string]$Id, [string]$Repo = $Root)
     $pattern = "^(\S+) .*: darkfactory $([regex]::Escape($Id)) "
