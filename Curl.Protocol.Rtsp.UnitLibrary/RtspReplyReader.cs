@@ -14,9 +14,10 @@ namespace Curl.Protocol.Rtsp;
 /// <c>CSeq</c> is 0, while one that closes after <c>…CSeq: 1\r\nPubl</c> has sent a <c>CSeq</c>
 /// of 1. A header line followed by continuation lines (a space or tab first) is read as one line
 /// with them joined, once a byte after the last has arrived (BL-840). The bytes still unread
-/// when the server closes are written to the header output unchecked, continuation lines joined. A reply whose first bytes are not <c>RTSP/</c>, exactly, fails with 52,
-/// <c>Empty reply from server</c>, nothing written; so does a connection closed before any
-/// byte. A head longer than <see cref="MaximumHeadLength" /> fails with 100, as the HTTP
+/// when the server closes are written to the header output unchecked, continuation lines joined. Bytes before the first <c>RTSP/</c>, exactly - an interleaved <c>$</c>
+/// frame or other stray bytes - are skipped unwritten (BL-1663); a reply with no <c>RTSP/</c>
+/// in it fails with 52, <c>Empty reply from server</c>, nothing written, once the server
+/// closes; so does a connection closed before any byte. A head longer than <see cref="MaximumHeadLength" /> fails with 100, as the HTTP
 /// library's does. A failed read fails with 56, a failed header write with 23.
 /// </remarks>
 internal static class RtspReplyReader
@@ -55,7 +56,7 @@ internal static class RtspReplyReader
         int processed = 0;
         while (true)
         {
-            RefuseUnlessRtsp(parser, buffer.AsSpan(0, received));
+            received = SkipBytesBeforeReply(parser, buffer, received);
             int lineEnd;
             while ((lineEnd = ReadableLineEnd(parser, buffer.AsSpan(0, received), processed)) > 0)
             {
@@ -142,17 +143,40 @@ internal static class RtspReplyReader
     }
 
     /// <summary>
-    /// Fails with 52 when the bytes received so far cannot begin <c>RTSP/</c> and no status line
-    /// has been read.
+    /// Drops the bytes received before the reply, until no status line has been read: everything
+    /// before the first <c>R</c> that can begin <c>RTSP/</c>, so an interleaved <c>$</c> frame
+    /// or other stray bytes are skipped unwritten, as curl 8.21.0's <c>rtsp_filter_rtp</c> skips
+    /// them on a transfer with no interleaved channel set up (measured, BL-1663).
     /// </summary>
-    private static void RefuseUnlessRtsp(RtspReplyHeadParser parser, ReadOnlySpan<byte> received)
+    /// <returns>How many bytes are left in <paramref name="buffer" />, from its start.</returns>
+    private static int SkipBytesBeforeReply(RtspReplyHeadParser parser, byte[] buffer, int received)
+    {
+        int start = parser.HasStatus ? 0 : ReplyStart(buffer.AsSpan(0, received));
+        buffer.AsSpan(start, received - start).CopyTo(buffer);
+        return received - start;
+    }
+
+    /// <summary>
+    /// Finds the first offset whose bytes match <c>RTSP/</c> as far as they go, or the length of
+    /// <paramref name="received" /> when none does.
+    /// </summary>
+    private static int ReplyStart(ReadOnlySpan<byte> received)
     {
         ReadOnlySpan<byte> prefix = "RTSP/"u8;
-        int length = Math.Min(received.Length, prefix.Length);
-        if (!parser.HasStatus && !received[..length].SequenceEqual(prefix[..length]))
+        int start = 0;
+        while (start < received.Length)
         {
-            throw new RtspTransferException(CurlExitCode.GotNothing, EmptyReply);
+            ReadOnlySpan<byte> candidate = received[start..];
+            int length = Math.Min(candidate.Length, prefix.Length);
+            if (candidate[..length].SequenceEqual(prefix[..length]))
+            {
+                return start;
+            }
+
+            start++;
         }
+
+        return start;
     }
 
     /// <summary>

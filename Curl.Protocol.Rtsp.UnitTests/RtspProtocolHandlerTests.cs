@@ -618,7 +618,59 @@ public sealed class RtspProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("$\0\0\u0004abcd")]
+    [DataRow("XYZ$\0\0\u0004abcd")]
+    [DataRow("RTSPX R")]
+    public async Task ExecuteAsync_BytesBeforeTheReply_SkipsThemAndWritesOnlyTheHead(string prefix)
+    {
+        // Measured with Record-CurlExchange.ps1 against curl 8.21.0 (Schannel), 2026-10-07,
+        // curl -sS -i rtsp://127.0.0.1:<port>/m: an interleaved frame or stray bytes before the
+        // reply give exit 0 and only the RTSP head on stdout (BL-1663). The first two rows are the
+        // measured replies; the third follows rtsp_filter_rtp, which skips an R not starting RTSP/.
+        var headers = new MemoryStream();
+
+        TransferResult result = await Handler(Server(prefix + "RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n")).ExecuteAsync(Context(headerOutput: headers));
+
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n", Encoding.Latin1.GetString(headers.ToArray()));
+        Assert.AreEqual(28L, result.Report!.HeaderSize);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FrameBeforeAWrongCSeq_ParsesTheHeadAfterItAndFailsWith85()
+    {
+        // Measured with Record-CurlExchange.ps1 against curl 8.21.0 (Schannel), 2026-10-07 (BL-1663).
+        var headers = new MemoryStream();
+
+        TransferResult result = await Handler(Server("$\0\0\u0004abcdRTSP/1.0 200 OK\r\nCSeq: 7\r\n\r\n")).ExecuteAsync(Context(headerOutput: headers));
+
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.RtspCseqError, result);
+        Assert.AreEqual(CurlExitCode.RtspCseqError, result.ExitCode);
+        Assert.AreEqual("The CSeq of this request 1 did not match the response 7", result.ErrorMessage);
+        Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 7\r\n\r\n", Encoding.Latin1.GetString(headers.ToArray()));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_StrayBytesAndAPrefixSplitAcrossReads_SkipsTheBytesAndReadsTheReply()
+    {
+        var headers = new MemoryStream();
+        Diagnostics.ArrangeReply("XY | ZRT | SP/1.0 200 OK\\r\\nCSeq: 1\\r\\n\\r\\n");
+        var server = new ScriptedConnection(Bytes("XY"), Bytes("ZRT"), Bytes("SP/1.0 200 OK\r\nCSeq: 1\r\n\r\n"));
+
+        TransferResult result = await Handler(server).ExecuteAsync(Context(headerOutput: headers));
+
+        Diagnostics.ActResult(result);
+        Diagnostics.AssertExitCode(CurlExitCode.Ok, result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n", Encoding.Latin1.GetString(headers.ToArray()));
+    }
+
+    [TestMethod]
     [DataRow("")]
+    [DataRow("$\0\0\u0004abcd")]
     [DataRow("RTSPX")]
     [DataRow("rtsp/1.0 200 OK\r\nCSeq: 1\r\n\r\n")]
     [DataRow("RTSP")]
