@@ -174,6 +174,65 @@ public sealed class MontgomeryModulusTests
         Assert.AreEqual(expected, modulus.IsBelowModulus(limbs));
     }
 
+    [TestMethod]
+    [DataRow(89, 3)]
+    [DataRow(521, 17)]
+    [DataRow(607, 19)]
+    public void Exponentiate_ModulusOfAnOddLimbCount_EqualsBigIntegerModPow(int mersenneExponent, int expectedLimbCount)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        BigInteger p = (BigInteger.One << mersenneExponent) - 1;
+        var modulus = new MontgomeryModulus(p.ToByteArray(isUnsigned: true, isBigEndian: true));
+        BigInteger baseValue = p - 2;
+        byte[] exponent = Enumerable.Range(0, 40).Select(index => (byte)((index * 37) + 11)).ToArray();
+        uint[] limbs = new uint[modulus.LimbCount];
+        MontgomeryModulus.ToLimbs(baseValue.ToByteArray(isUnsigned: true, isBigEndian: true), limbs);
+        diagnostics.Arrange("modulus", $"2^{mersenneExponent} - 1");
+        diagnostics.Arrange("limb count", modulus.LimbCount);
+        diagnostics.Arrange("base", "p - 2");
+        diagnostics.Bytes("exponent", exponent);
+
+        modulus.Exponentiate(limbs, exponent, limbs);
+        diagnostics.Act("result", ToInteger(limbs));
+
+        BigInteger expected = BigInteger.ModPow(baseValue, ToInteger(exponent), p);
+        diagnostics.Assert("limb count", expectedLimbCount, modulus.LimbCount);
+        diagnostics.Assert("base^exponent mod p", expected, ToInteger(limbs));
+        Assert.AreEqual(expectedLimbCount, modulus.LimbCount);
+        Assert.AreEqual(expected, ToInteger(limbs));
+    }
+
+    [TestMethod]
+    public void Exponentiate_ExponentsOfOneLength_TakeTheSameSequenceOfOperationsWhateverTheirBits()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var modulus = new MontgomeryModulus(Modulus);
+        uint[] baseValue = Limbs(modulus, "0123456789ABCDEF");
+        uint[] result = new uint[modulus.LimbCount];
+        byte[][] exponents = [new byte[8], Enumerable.Repeat((byte)0xFF, 8).ToArray(), Convert.FromHexString("80000000000000F1"), Convert.FromHexString("0F1E2D3C4B5A6978")];
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Arrange("exponents", string.Join(", ", exponents.Select(Convert.ToHexString)));
+
+        List<List<string>> sequences = [];
+        foreach (byte[] exponent in exponents)
+        {
+            List<string> operations = [];
+            modulus.Exponentiate(baseValue, exponent, result, operations);
+            sequences.Add(operations);
+        }
+
+        diagnostics.Act("operation counts", string.Join(", ", sequences.Select(sequence => sequence.Count)));
+
+        // Each 4-bit window: four squarings, one masked look-up, one multiplication.
+        string[] window = ["square", "square", "square", "square", "select", "multiply"];
+        string[] expected = Enumerable.Repeat(window, 16).SelectMany(step => step).ToArray();
+        diagnostics.Assert("operations of every exponent", string.Join(" ", expected), string.Join(" ", sequences[1]));
+        foreach (List<string> sequence in sequences)
+        {
+            CollectionAssert.AreEqual(expected, sequence);
+        }
+    }
+
     private static void ArrangeModulus(TestDiagnostics diagnostics, MontgomeryModulus modulus)
     {
         diagnostics.Arrange("modulus", "2^107 - 1");

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
 namespace Curl.Cryptography;
@@ -7,7 +8,8 @@ namespace Curl.Cryptography;
 /// Arithmetic modulo an odd modulus in Montgomery form, on fixed-width 32-bit limbs
 /// stored least significant first: multiplication by coarsely integrated operand scanning
 /// (CIOS) with a masked final subtraction, modular addition, subtraction and reduction,
-/// and a fixed-window exponentiation whose table look-up reads every entry.
+/// and a fixed-window exponentiation whose table look-up reads every entry, which runs on
+/// 64-bit limbs with its own multiplication and squaring because it is the hot path.
 /// <see cref="FiniteFieldDiffieHellman" /> runs on it with a public prime, and
 /// <see cref="RsaCrtPrivateKey" /> with the secret primes of an RSA key, and the brainpool
 /// curves' field and group order (<see cref="BrainpoolDomainParameters" />) with public primes.
@@ -16,7 +18,9 @@ namespace Curl.Cryptography;
 /// Constant-time in the operands, the exponent and the modulus's value: every loop bound
 /// is the limb count or a byte length, both public, and a secret only ever becomes a mask.
 /// The set-up derives R mod m and R^2 mod m by doubling 1 with masked modular additions,
-/// so it never divides by the modulus either. <see cref="Clear" /> zeroes the modulus and
+/// so it never divides by the modulus either; the 64-bit limbs' constants are those doubled
+/// on. Carries on 64-bit limbs are unsigned comparisons taken as values, which compile to
+/// a flag set, never a branch (ADR-0429). <see cref="Clear" /> zeroes the modulus and
 /// its derived values when the modulus is a secret.
 /// </remarks>
 internal sealed class MontgomeryModulus
@@ -31,6 +35,13 @@ internal sealed class MontgomeryModulus
     private readonly uint[] rSquared;
     private readonly uint[] one;
     private readonly uint negativeInverse;
+
+    // The same modulus on 64-bit limbs for Exponentiate, whose Montgomery radix is
+    // R' = 2^(64 * ceil(LimbCount / 2)): R' mod m, R'^2 mod m, and -m^-1 mod 2^64.
+    private readonly ulong[] wideModulus;
+    private readonly ulong[] wideOne;
+    private readonly ulong[] wideRSquared;
+    private readonly ulong wideNegativeInverse;
 
     /// <summary>Prepares the arithmetic modulo the odd big-endian <paramref name="modulusBigEndian" />.</summary>
     /// <param name="modulusBigEndian">An odd modulus greater than 1; leading zero bytes only widen the limbs.</param>
@@ -47,6 +58,20 @@ internal sealed class MontgomeryModulus
         one.CopyTo(rSquared, 0);
         DoubleRepeatedly(rSquared, 32 * LimbCount, scratch);
         negativeInverse = ComputeNegativeInverse(modulus[0]);
+
+        // R' is R times 2^32 when the limb count is odd, and R itself when it is even.
+        int wideLimbCount = (LimbCount + 1) / 2;
+        int extraBits = 32 * ((2 * wideLimbCount) - LimbCount);
+        uint[] wideValue = new uint[LimbCount];
+        wideModulus = ToWideLimbs(modulus, wideLimbCount);
+        one.CopyTo(wideValue, 0);
+        DoubleRepeatedly(wideValue, extraBits, scratch);
+        wideOne = ToWideLimbs(wideValue, wideLimbCount);
+        rSquared.CopyTo(wideValue, 0);
+        DoubleRepeatedly(wideValue, 2 * extraBits, scratch);
+        wideRSquared = ToWideLimbs(wideValue, wideLimbCount);
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(wideValue.AsSpan()));
+        wideNegativeInverse = ComputeWideNegativeInverse(wideModulus[0]);
     }
 
     /// <summary>The number of 32-bit limbs a residue occupies.</summary>
@@ -105,27 +130,52 @@ internal sealed class MontgomeryModulus
     /// <param name="baseValue">The base, already reduced below the modulus.</param>
     /// <param name="exponent">The big-endian exponent; only its length shapes the running time.</param>
     /// <param name="result">Receives the power; may be the same span as <paramref name="baseValue" />.</param>
-    public void Exponentiate(ReadOnlySpan<uint> baseValue, ReadOnlySpan<byte> exponent, Span<uint> result)
+    public void Exponentiate(ReadOnlySpan<uint> baseValue, ReadOnlySpan<byte> exponent, Span<uint> result) =>
+        Exponentiate(baseValue, exponent, result, null);
+
+    /// <summary>
+    /// <see cref="Exponentiate(ReadOnlySpan{uint}, ReadOnlySpan{byte}, Span{uint})" />, writing
+    /// each step it takes to <paramref name="operations" /> when one is given - <c>square</c>,
+    /// <c>select</c> (the masked table look-up) and <c>multiply</c> - so a test can see that
+    /// the sequence depends only on the exponent's length, never on its bits.
+    /// </summary>
+    /// <param name="baseValue">The base, already reduced below the modulus.</param>
+    /// <param name="exponent">The big-endian exponent; only its length shapes the running time.</param>
+    /// <param name="result">Receives the power; may be the same span as <paramref name="baseValue" />.</param>
+    /// <param name="operations">Receives the steps taken, or <see langword="null" /> to record none.</param>
+    /// <remarks>
+    /// The work runs on 64-bit limbs (<see cref="Math.BigMul(ulong, ulong, out ulong)" />),
+    /// a quarter of the inner-loop steps of 32-bit limbs, in its own Montgomery radix, so
+    /// the base and the result stay in ordinary form at this method's edges. Every window
+    /// squares four times, reads all 16 table entries and multiplies once, by base^0 when
+    /// the window is zero, and every carry and borrow is computed with bitwise arithmetic.
+    /// </remarks>
+    internal void Exponentiate(ReadOnlySpan<uint> baseValue, ReadOnlySpan<byte> exponent, Span<uint> result, ICollection<string>? operations)
     {
-        int n = LimbCount;
-        uint[] work = new uint[((TableSize + 3) * n) + n + 2];
-        Span<uint> table = work.AsSpan(0, TableSize * n);
-        Span<uint> accumulator = work.AsSpan(TableSize * n, n);
-        Span<uint> selected = work.AsSpan((TableSize + 1) * n, n);
-        Span<uint> unit = work.AsSpan((TableSize + 2) * n, n);
-        Span<uint> scratch = work.AsSpan((TableSize + 3) * n);
+        int m = wideModulus.Length;
+        ulong[] work = new ulong[((TableSize + 2) * m) + (2 * m) + 1];
+        Span<ulong> table = work.AsSpan(0, TableSize * m);
+        Span<ulong> accumulator = work.AsSpan(TableSize * m, m);
+        Span<ulong> selected = work.AsSpan((TableSize + 1) * m, m);
+        Span<ulong> scratch = work.AsSpan((TableSize + 2) * m);
         try
         {
-            FillTable(baseValue, table, scratch);
-            one.CopyTo(accumulator);
+            CopyToWideLimbs(baseValue[..LimbCount], selected);
+            FillWideTable(selected, table, scratch);
+            wideOne.CopyTo(accumulator);
             foreach (byte exponentByte in exponent)
             {
-                ApplyWindow(accumulator, table, (uint)exponentByte >> WindowBits, selected, scratch);
-                ApplyWindow(accumulator, table, exponentByte & 0xFu, selected, scratch);
+                ApplyWideWindow(accumulator, table, (uint)exponentByte >> WindowBits, selected, scratch, operations);
+                ApplyWideWindow(accumulator, table, exponentByte & 0xFu, selected, scratch, operations);
             }
 
-            unit[0] = 1;
-            Multiply(result, accumulator, unit, scratch);
+            selected.Clear();
+            selected[0] = 1;
+            MultiplyWide(accumulator, accumulator, selected, scratch);
+            for (int index = 0; index < LimbCount; index++)
+            {
+                result[index] = (uint)(accumulator[index >> 1] >> (32 * (index & 1)));
+            }
         }
         finally
         {
@@ -300,6 +350,9 @@ internal sealed class MontgomeryModulus
         CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(modulus.AsSpan()));
         CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(rSquared.AsSpan()));
         CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(one.AsSpan()));
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(wideModulus.AsSpan()));
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(wideRSquared.AsSpan()));
+        CryptographicOperations.ZeroMemory(MemoryMarshal.AsBytes(wideOne.AsSpan()));
     }
 
     /// <summary>
@@ -317,16 +370,79 @@ internal sealed class MontgomeryModulus
         return 0u - inverse;
     }
 
-    /// <summary>Sets <paramref name="destination" /> to the one entry of <paramref name="table" /> <paramref name="window" /> names, reading every entry.</summary>
-    private static void SelectEntry(ReadOnlySpan<uint> table, uint window, Span<uint> destination)
+    /// <summary>
+    /// Returns -m^-1 modulo 2^64 for the odd lowest 64-bit limb <paramref name="lowestLimb" />,
+    /// by Newton's iteration (1, 2, 4, ... 64 correct bits).
+    /// </summary>
+    private static ulong ComputeWideNegativeInverse(ulong lowestLimb)
     {
-        int n = destination.Length;
+        ulong inverse = 1;
+        for (int step = 0; step < 6; step++)
+        {
+            inverse *= 2ul - (lowestLimb * inverse);
+        }
+
+        return 0ul - inverse;
+    }
+
+    /// <summary>Returns a new array of <paramref name="wideLimbCount" /> 64-bit limbs holding the 32-bit <paramref name="limbs" />.</summary>
+    private static ulong[] ToWideLimbs(ReadOnlySpan<uint> limbs, int wideLimbCount)
+    {
+        ulong[] wide = new ulong[wideLimbCount];
+        CopyToWideLimbs(limbs, wide);
+        return wide;
+    }
+
+    /// <summary>Packs the 32-bit <paramref name="limbs" />, least significant first, into the 64-bit <paramref name="wide" />, zero-extending.</summary>
+    private static void CopyToWideLimbs(ReadOnlySpan<uint> limbs, Span<ulong> wide)
+    {
+        wide.Clear();
+        for (int index = 0; index < limbs.Length; index++)
+        {
+            wide[index >> 1] |= (ulong)limbs[index] << (32 * (index & 1));
+        }
+    }
+
+    /// <summary>
+    /// The carry out of adding a value to <paramref name="left" /> that gave <paramref name="sum" />, 0 or 1:
+    /// an unsigned comparison as a value, which compiles to <c>clt.un</c> and then to a flag
+    /// set (<c>setb</c> on x64, <c>cset</c> on Arm64), never a branch.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong CarryOut(ulong left, ulong sum) =>
+        Unsafe.BitCast<bool, byte>(sum < left);
+
+    /// <summary>The borrow out of <paramref name="left" /> - <paramref name="right" />, 0 or 1, the same branch-free comparison as <see cref="CarryOut" />.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong BorrowOut(ulong left, ulong right) =>
+        Unsafe.BitCast<bool, byte>(left < right);
+
+    /// <summary>
+    /// Returns the high half of <paramref name="left" /> * <paramref name="right" /> +
+    /// <paramref name="first" /> + <paramref name="second" />, which never exceeds 128 bits,
+    /// and writes the low half to <paramref name="low" />.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong MultiplyAdd(ulong left, ulong right, ulong first, ulong second, out ulong low)
+    {
+        ulong high = Math.BigMul(left, right, out ulong productLow);
+        ulong withFirst = productLow + first;
+        ulong withSecond = withFirst + second;
+        low = withSecond;
+        return high + CarryOut(productLow, withFirst) + CarryOut(withFirst, withSecond);
+    }
+
+    /// <summary>Sets <paramref name="destination" /> to the one entry of <paramref name="table" /> <paramref name="window" /> names, reading every entry.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static void SelectWideEntry(ReadOnlySpan<ulong> table, uint window, Span<ulong> destination)
+    {
+        int m = destination.Length;
         destination.Clear();
         for (int entry = 0; entry < TableSize; entry++)
         {
-            uint mask = (uint)(((ulong)((uint)entry ^ window) - 1) >> 32);
-            ReadOnlySpan<uint> candidate = table.Slice(entry * n, n);
-            for (int limb = 0; limb < n; limb++)
+            ulong mask = 0ul - (((ulong)((uint)entry ^ window) - 1) >> 63);
+            ReadOnlySpan<ulong> candidate = table.Slice(entry * m, m);
+            for (int limb = 0; limb < m; limb++)
             {
                 destination[limb] |= candidate[limb] & mask;
             }
@@ -342,29 +458,185 @@ internal sealed class MontgomeryModulus
         }
     }
 
-    /// <summary>Fills the table with base^0 to base^15 in Montgomery form.</summary>
-    private void FillTable(ReadOnlySpan<uint> baseValue, Span<uint> table, Span<uint> scratch)
+    /// <summary>Fills the table with base^0 to base^15 in the 64-bit limbs' Montgomery form.</summary>
+    private void FillWideTable(ReadOnlySpan<ulong> baseValue, Span<ulong> table, Span<ulong> scratch)
     {
-        int n = LimbCount;
-        one.CopyTo(table[..n]);
-        Span<uint> first = table.Slice(n, n);
-        Multiply(first, baseValue, rSquared, scratch);
+        int m = wideModulus.Length;
+        wideOne.CopyTo(table[..m]);
+        Span<ulong> first = table.Slice(m, m);
+        MultiplyWide(first, baseValue, wideRSquared, scratch);
         for (int entry = 2; entry < TableSize; entry++)
         {
-            Multiply(table.Slice(entry * n, n), table.Slice((entry - 1) * n, n), first, scratch);
+            MultiplyWide(table.Slice(entry * m, m), table.Slice((entry - 1) * m, m), first, scratch);
         }
     }
 
     /// <summary>Squares the accumulator four times, then multiplies in table entry <paramref name="window" />, even when it is base^0.</summary>
-    private void ApplyWindow(Span<uint> accumulator, ReadOnlySpan<uint> table, uint window, Span<uint> selected, Span<uint> scratch)
+    private void ApplyWideWindow(Span<ulong> accumulator, ReadOnlySpan<ulong> table, uint window, Span<ulong> selected, Span<ulong> scratch, ICollection<string>? operations)
     {
         for (int square = 0; square < WindowBits; square++)
         {
-            Multiply(accumulator, accumulator, accumulator, scratch);
+            SquareWide(accumulator, accumulator, scratch);
+            operations?.Add("square");
         }
 
-        SelectEntry(table, window, selected);
-        Multiply(accumulator, accumulator, selected, scratch);
+        SelectWideEntry(table, window, selected);
+        operations?.Add("select");
+        MultiplyWide(accumulator, accumulator, selected, scratch);
+        operations?.Add("multiply");
+    }
+
+    /// <summary>
+    /// Montgomery multiplication on 64-bit limbs, finely integrated (one pass per limb of
+    /// <paramref name="right" /> both multiplies and reduces): <paramref name="result" /> =
+    /// <paramref name="left" /> * <paramref name="right" /> * R'^-1 modulo the modulus, for
+    /// operands below it. <paramref name="result" /> may alias either operand.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private void MultiplyWide(Span<ulong> result, ReadOnlySpan<ulong> left, ReadOnlySpan<ulong> right, Span<ulong> scratch)
+    {
+        int m = wideModulus.Length;
+        Span<ulong> total = scratch[..(m + 1)];
+        total.Clear();
+        left = left[..m];
+        right = right[..m];
+
+        // The inner loop reads by reference past one bounds check per span above: it is
+        // where the exponentiation spends its time.
+        ref ulong leftLimbs = ref MemoryMarshal.GetReference(left);
+        ref ulong modulusLimbs = ref MemoryMarshal.GetArrayDataReference(wideModulus);
+        ref ulong totalLimbs = ref MemoryMarshal.GetReference(total);
+        for (int index = 0; index < m; index++)
+        {
+            ulong factorOfRight = right[index];
+            ulong productCarry = MultiplyAdd(leftLimbs, factorOfRight, totalLimbs, 0, out ulong low);
+            ulong factor = low * wideNegativeInverse;
+            ulong reductionCarry = MultiplyAdd(factor, modulusLimbs, low, 0, out _);
+            for (int limb = 1; limb < m; limb++)
+            {
+                productCarry = MultiplyAdd(Unsafe.Add(ref leftLimbs, limb), factorOfRight, Unsafe.Add(ref totalLimbs, limb), productCarry, out low);
+                reductionCarry = MultiplyAdd(factor, Unsafe.Add(ref modulusLimbs, limb), low, reductionCarry, out Unsafe.Add(ref totalLimbs, limb - 1));
+            }
+
+            ulong carries = productCarry + reductionCarry;
+            ulong top = carries + total[m];
+            total[m - 1] = top;
+            total[m] = CarryOut(productCarry, carries) + CarryOut(carries, top);
+        }
+
+        SubtractWideModulusIfNotBelow(result, total);
+    }
+
+    /// <summary>
+    /// Montgomery squaring on 64-bit limbs, separated operand scanning: the full square,
+    /// each cross product computed once and doubled, then reduced limb by limb.
+    /// <paramref name="result" /> = <paramref name="value" />^2 * R'^-1 modulo the modulus,
+    /// for a value below it; <paramref name="result" /> may alias <paramref name="value" />.
+    /// <paramref name="scratch" /> holds at least 2 * m + 1 limbs.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private void SquareWide(Span<ulong> result, ReadOnlySpan<ulong> value, Span<ulong> scratch)
+    {
+        int m = wideModulus.Length;
+        Span<ulong> total = scratch[..((2 * m) + 1)];
+        total.Clear();
+        value = value[..m];
+        ref ulong valueLimbs = ref MemoryMarshal.GetReference(value);
+        ref ulong totalLimbs = ref MemoryMarshal.GetReference(total);
+        for (int row = 0; row < m; row++)
+        {
+            ulong rowLimb = value[row];
+            ulong carry = 0;
+            for (int column = row + 1; column < m; column++)
+            {
+                ref ulong target = ref Unsafe.Add(ref totalLimbs, row + column);
+                carry = MultiplyAdd(rowLimb, Unsafe.Add(ref valueLimbs, column), target, carry, out target);
+            }
+
+            total[row + m] = carry;
+        }
+
+        DoubleAndAddDiagonal(total, value);
+        ReduceWide(total);
+        SubtractWideModulusIfNotBelow(result, total.Slice(m, m + 1));
+    }
+
+    /// <summary>Doubles the cross products in <paramref name="total" />, then adds each value limb's square on the diagonal.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static void DoubleAndAddDiagonal(Span<ulong> total, ReadOnlySpan<ulong> value)
+    {
+        ulong shiftedOut = 0;
+        for (int index = 0; index < 2 * value.Length; index++)
+        {
+            ulong limb = total[index];
+            total[index] = (limb << 1) | shiftedOut;
+            shiftedOut = limb >> 63;
+        }
+
+        ulong carry = 0;
+        for (int index = 0; index < value.Length; index++)
+        {
+            ulong high = MultiplyAdd(value[index], value[index], total[2 * index], carry, out total[2 * index]);
+            ulong sum = total[(2 * index) + 1] + high;
+            carry = CarryOut(high, sum);
+            total[(2 * index) + 1] = sum;
+        }
+    }
+
+    /// <summary>
+    /// Montgomery reduction of the 2 * m + 1 limbs of <paramref name="total" />, below
+    /// R' times the modulus: adds the multiple of the modulus that clears each low limb in
+    /// turn, leaving total / R' in limbs m to 2 * m.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private void ReduceWide(Span<ulong> total)
+    {
+        int m = wideModulus.Length;
+        ref ulong modulusLimbs = ref MemoryMarshal.GetArrayDataReference(wideModulus);
+        ref ulong totalLimbs = ref MemoryMarshal.GetReference(total);
+        ulong pending = 0;
+        for (int index = 0; index < m; index++)
+        {
+            ulong factor = total[index] * wideNegativeInverse;
+            ulong carry = 0;
+            for (int limb = 0; limb < m; limb++)
+            {
+                ref ulong target = ref Unsafe.Add(ref totalLimbs, index + limb);
+                carry = MultiplyAdd(factor, Unsafe.Add(ref modulusLimbs, limb), target, carry, out target);
+            }
+
+            ulong withCarry = total[index + m] + carry;
+            ulong withPending = withCarry + pending;
+            pending = CarryOut(carry, withCarry) + CarryOut(withCarry, withPending);
+            total[index + m] = withPending;
+        }
+
+        total[2 * m] = pending;
+    }
+
+    /// <summary>
+    /// Writes total - modulus to <paramref name="result" />, then keeps total instead, by
+    /// mask, when the subtraction borrowed out of total's top limb.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private void SubtractWideModulusIfNotBelow(Span<ulong> result, ReadOnlySpan<ulong> total)
+    {
+        ReadOnlySpan<ulong> wide = wideModulus;
+        int m = wide.Length;
+        ulong borrow = 0;
+        for (int index = 0; index < m; index++)
+        {
+            ulong difference = total[index] - wide[index];
+            ulong withBorrow = difference - borrow;
+            borrow = BorrowOut(total[index], wide[index]) | BorrowOut(difference, borrow);
+            result[index] = withBorrow;
+        }
+
+        ulong keepTotal = 0ul - BorrowOut(total[m], borrow);
+        for (int index = 0; index < m; index++)
+        {
+            result[index] = (total[index] & keepTotal) | (result[index] & ~keepTotal);
+        }
     }
 
     /// <summary>total += left * factor, over n + 2 limbs.</summary>
