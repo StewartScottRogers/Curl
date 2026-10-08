@@ -133,7 +133,10 @@ out: once 85% of the 5-hour window (`-StopAtUsage`) or 97% of the weekly window
 nothing new, finish what they hold and push; the next shift waits for a fresh 5-hour
 window, or for the weekly reset when the week is used up, with a notice rather than the
 alarm. `-Lanes Auto` paces lanes to the 5-hour window only; `-WeeklyPace` also spreads
-the weekly budget evenly to its reset (ADR-0130, BL-806). Inside herdr (`HERDR_ENV=1`) that opens the shift
+the weekly budget evenly to its reset (ADR-0130, BL-806). The factory picks the Claude
+model per task - a task's front-matter `model:` wins, else opus for security, crypto,
+feature, protocol, retried and CI-fix work and sonnet for the rest - and `-Model` forces
+one model for every task (BL-1705). Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart
 watches shifts in herdr. Stop a shift by closing its tabs (or killing its process tree).
