@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smb.UnitLibrary, Curl.Protocol.Smb.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1665 — Refuse SMB read and write responses one byte short of their offset words instead of throwing
 
@@ -25,13 +25,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `SmbReadResponse.TryGetData` on a 50-byte reply and `SmbWriteResponse.TryReadCount` on a 42-byte reply return a refusal and do not throw, pinned by tests in `SmbAdversarialTests`.
-- [ ] A handler test drives a 50-byte read reply through `SmbProtocolHandler.ExecuteAsync` and gets an exit code, not an exception.
-- [ ] `dotnet build` is clean and the fast tests pass; `Curl.Protocol.Smb.UnitLibrary` keeps 100% line and branch coverage.
+- [x] `SmbReadResponse.TryGetData` on a 50-byte reply and `SmbWriteResponse.TryReadCount` on a 42-byte reply return a refusal and do not throw, pinned by tests in `SmbAdversarialTests`.
+- [x] A handler test drives a 50-byte read reply through `SmbProtocolHandler.ExecuteAsync` and gets an exit code, not an exception.
+- [x] `dotnet build` is clean and the fast tests pass; `Curl.Protocol.Smb.UnitLibrary` keeps 100% line and branch coverage.
 
 ## Notes
+
+- Chose refusal over reading the stale byte as zero: both minimums now end at the word they read (`DataOffsetOffset + 2` = 51, `CountOffset + 2` = 43). curl reads one stale byte from its 0x9000-byte receive buffer there, which is undefined content, not behaviour to copy; a reply that ends inside a field is short, and each parser already has its short-reply refusal (exit 56 `Failure when receiving data from the peer` for a read, the upload's exit 25 refusal for a write).
+- Tests: the 50 and 42 rows in `SmbAdversarialTests`, and `ExecuteAsync_ReadReplyEndingInsideTheDataOffsetWord_Exits56NotThrows`. Measure-CodeQuality: Smb 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-07: Created by BL-1516.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. SMB read and write replies that end inside their offset or count word are refused (exit 56 / upload refusal) instead of throwing

@@ -82,9 +82,10 @@ public sealed class SmbAdversarialTests
         Assert.AreEqual(expected, response.LastChangeTimeUtc);
     }
 
-    // 50 bytes, which reads the data offset word one byte past the end, is BL-1663's fix.
+    // 50 bytes ends inside the data offset word: refused as short, not read past the end (BL-1665).
     [TestMethod]
     [DataRow(SmbMessageHeader.Length + 13, "Failure when receiving data from the peer")]
+    [DataRow(SmbMessageHeader.Length + 14, "Failure when receiving data from the peer")]
     [DataRow(SmbMessageHeader.Length + 15, "Invalid input packet")]
     public void ReadResponse_LengthAroundTheDataOffsetWord_IsRefusedAsShortOrAsDataPastTheEnd(int length, string expected)
     {
@@ -97,9 +98,10 @@ public sealed class SmbAdversarialTests
         Assert.AreEqual(expected, refusal);
     }
 
-    // 42 bytes, which reads the count word one byte past the end, is BL-1663's fix.
+    // 42 bytes ends inside the count word: refused, not read past the end (BL-1665).
     [TestMethod]
     [DataRow(SmbMessageHeader.Length + 5, false)]
+    [DataRow(SmbMessageHeader.Length + 6, false)]
     [DataRow(SmbMessageHeader.Length + 7, true)]
     public void WriteResponse_LengthAroundTheCountWord_IsReadOnlyWhenWhole(int length, bool expected)
     {
@@ -292,6 +294,21 @@ public sealed class SmbAdversarialTests
         Diagnostics.AssertResult(CurlExitCode.RecvError, "Invalid input packet", result);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual("Invalid input packet", result.ErrorMessage);
+        Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReadReplyEndingInsideTheDataOffsetWord_Exits56NotThrows()
+    {
+        byte[] read = ReadReply(11)[..(SmbMessageHeader.Length + 14)];
+        BinaryPrimitives.WriteUInt16BigEndian(read.AsSpan(2), (ushort)(read.Length - SmbMessageHeader.NetBiosHeaderLength));
+        var output = new MemoryStream();
+
+        TransferResult result = await RunAsync(Download(read), Context(output));
+
+        Diagnostics.AssertResult(CurlExitCode.RecvError, "Failure when receiving data from the peer", result);
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
         Assert.AreEqual(0, output.Length);
     }
 
