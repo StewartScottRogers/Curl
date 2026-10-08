@@ -72,10 +72,10 @@
     C:\curl-crosscheck when the temp path holds a blank.
 
 .PARAMETER Reference
-    The reference curl. Default: Get-GapReferenceCurlPath of Invoke-GapProbe.ps1.
+    The reference curl. Default: Get-GapReferenceCurlPath of GapProbeFunctions.ps1.
 
 .PARAMETER Candidate
-    The Curl.Console binary. Default: Get-GapCandidateCurl of Invoke-GapProbe.ps1 (the
+    The Curl.Console binary. Default: Get-GapCandidateCurl of GapProbeFunctions.ps1 (the
     newest Release build).
 
 .PARAMETER ExpansionFile

@@ -187,7 +187,7 @@ function Measure-OptionGap($Inventory, [string] $TargetVersion, [string] $Candid
         $referenceLine = $canned.reference
     }
     else {
-        . (Join-Path $script:OptionToolsDirectory 'Invoke-GapProbe.ps1')
+        . (Join-Path $script:OptionToolsDirectory 'GapProbeFunctions.ps1')
         $reference = Get-GapReferenceCurl -TargetVersion $TargetVersion
         if ($null -ne $reference -and $reference.Matches) { $referenceLine = $reference.VersionLine.TrimEnd() }
         $CandidatePath = Get-GapCandidateCurl -Path $CandidatePath
@@ -260,6 +260,12 @@ function Invoke-OptionGapSelfTest {
     $docsByKey = @{}; foreach ($i in $docs.items) { $docsByKey[$i.key] = $i }
     $docsOk = $null -eq $docs.reference -and $docs.referenceFallback -ceq 'docs' -and $docsByKey['options:--fail'].state -ceq 'gap' -and $docsByKey['options:--verbose'].state -ceq 'match' -and $docsByKey['options:--fail:no-form'].state -ceq 'match'
     & $report 'the docs fallback marks an unknown-option answer as gap' $docsOk ($docs | ConvertTo-Json -Depth 6 -Compress)
+
+    # Live path with an explicit Curl.Console outside this script's repository: the stand-in must be the binary that runs (BL-1747).
+    $echo = Join-Path $script:OptionToolsDirectory 'Fixtures/probe/Write-ProbeEcho.ps1'
+    $live = Measure-OptionGap $inventory '9.9.9' $echo $null '0000000000000000000000000000000000000000'
+    $liveGaps = @($live.items | Where-Object { $_.actual -like 'exit 7*' })
+    & $report 'an explicit -Candidate is the binary the live probes run' ($liveGaps.Count -gt 0 -and $liveGaps.Count -eq @($live.items).Count) (($live.items | Select-Object -First 2 | ConvertTo-Json -Compress -Depth 4))
 
     $c = $measured.counts
     & $report 'counts.x is match and counts.y is match + gap + unmeasured' ($c.match -eq 6 -and $c.gap -eq 2 -and $c.x -eq 6 -and $c.y -eq 8 -and $c.excluded -eq 0) ($c | ConvertTo-Json -Compress)

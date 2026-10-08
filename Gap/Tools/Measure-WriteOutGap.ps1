@@ -215,7 +215,7 @@ function Measure-WriteOutGap($Inventory, [string] $TargetVersion, [string] $Cand
         $referenceLine = $canned.reference
     }
     else {
-        . (Join-Path $script:WriteOutToolsDirectory 'Invoke-GapProbe.ps1')
+        . (Join-Path $script:WriteOutToolsDirectory 'GapProbeFunctions.ps1')
         $reference = Get-GapReferenceCurl -TargetVersion $TargetVersion
         if ($null -ne $reference -and $reference.Matches) { $referenceLine = $reference.VersionLine.TrimEnd() }
         $CandidatePath = Get-GapCandidateCurl -Path $CandidatePath
@@ -282,6 +282,12 @@ function Invoke-WriteOutGapSelfTest {
     $hasFallback = @($measured.PSObject.Properties.Name) -contains 'referenceFallback'
     $c = $measured.counts
     & $report 'a matching reference is recorded, no referenceFallback, counts follow the formula' ($measured.reference -ceq 'curl 9.9.9 (fixture) libcurl/9.9.9' -and -not $hasFallback -and $c.match -eq 6 -and $c.gap -eq 3 -and $c.x -eq 6 -and $c.y -eq 9) ($c | ConvertTo-Json -Compress)
+
+    # Live path with an explicit Curl.Console outside this script's repository: the stand-in must be the binary that runs (BL-1747).
+    $echo = Join-Path $script:WriteOutToolsDirectory 'Fixtures/probe/Write-ProbeEcho.ps1'
+    $live = Measure-WriteOutGap $inventory '9.9.9' $echo $null '0000000000000000000000000000000000000000'
+    $liveFirst = @($live.items | Where-Object { $_.key -ceq 'writeout:content_type:value' })
+    & $report 'an explicit -Candidate is the binary the live probes run' ($liveFirst.Count -eq 1 -and $liveFirst[0].actual -like '*Arguments*') ($liveFirst | ConvertTo-Json -Compress -Depth 4)
 
     $docs = Measure-WriteOutGap $inventory '9.9.9' 'unused' (Join-Path $script:WriteOutFixtures 'probe-results-docs.json') '0000000000000000000000000000000000000000'
     $docsByKey = @{}; foreach ($i in $docs.items) { $docsByKey[$i.key] = $i }
