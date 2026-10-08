@@ -8,7 +8,7 @@ depends-on: [BL-1720]
 touches: [Gap/Tools/Write-GapFindings.ps1, Gap/Tools/Fixtures/findings]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1731 — Write gap findings and close or reopen them only on re-measurement with Gap/Tools/Write-GapFindings.ps1
 
@@ -92,3 +92,4 @@ each check.
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Write-GapFindings.ps1 files, measures, closes and reopens gap findings by rules 1 to 9; -SelfTest passes 15 checks on PowerShell 5.1 and 7.
