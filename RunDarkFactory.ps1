@@ -3280,7 +3280,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3373,7 +3373,7 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86).
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
