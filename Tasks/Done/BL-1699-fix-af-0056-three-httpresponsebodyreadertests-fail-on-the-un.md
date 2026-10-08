@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1699 — Fix AF-0056: Three HttpResponseBodyReaderTests fail on the unmutated tree: the length-delimited/read-to-close body is held whole and written once at the end
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-07 (lane 4): No code change was needed. `HttpResponseBodyReader.CopyFramedAsync` on this tree writes each read as it arrives (no `MemoryStream` held, no write in a `finally`), and `git log -S "held.ToArray" --all` finds no commit that ever contained the code the finding quotes, so the auditor most likely measured a defect the audit seeder planted in its throwaway worktree rather than the unmutated tree. The reproduction run from the repository root gives Passed: 3, Failed: 0. `dotnet build` is clean and every fast test project passes. The finding still closes only on the quality auditor's re-audit.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. AF-0056 reproduction passes 3/3 on the unmutated tree; the body is already written read by read, no code change needed
