@@ -49,7 +49,9 @@
     of the newest 40 task runs in the log folder, never below $2 and never above
     -TaskBudgetUsd (default $6; AF-0004, AF-0033, ADR-0288, ADR-0407). 2.7 rather than 3
     because claude checks the cap between turns, so a run can end one turn's cost above
-    it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A task run that
+    it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A turn that waits
+    on subagents spends all of theirs before the next check, so the prompt allows one
+    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed and the task
     goes to Blocked for Stewart, since it is too big for one run and wants splitting.
     -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
@@ -3060,6 +3062,9 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+   Run at most one subagent at a time, and never start several in one message: the
+   shift's cost cap is checked only between your own turns, so subagents running in
+   parallel all spend inside one turn and carry the run past the cap (AF-0052).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3142,6 +3147,9 @@ Rules for this unattended run, in addition to CLAUDE.md:
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
+   Run at most one subagent at a time, and never start several in one message: the
+   shift's cost cap is checked only between your own turns, so subagents running in
+   parallel all spend inside one turn and carry the run past the cap (AF-0052).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
