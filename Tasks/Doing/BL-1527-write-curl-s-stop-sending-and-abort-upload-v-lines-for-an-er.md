@@ -34,3 +34,4 @@ When a status of 300 or above that leads to no resend arrives while the request 
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
