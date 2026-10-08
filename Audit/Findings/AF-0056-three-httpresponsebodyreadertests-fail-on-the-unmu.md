@@ -3,8 +3,8 @@ id: AF-0056
 title: Three HttpResponseBodyReaderTests fail on the unmutated tree: the length-delimited/read-to-close body is held whole and written once at the end
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitTests/HttpResponseBodyReaderTests.cs:HttpResponseBodyReaderTests:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "Name=CopyA
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
