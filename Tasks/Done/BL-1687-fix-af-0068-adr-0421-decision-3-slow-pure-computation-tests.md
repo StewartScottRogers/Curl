@@ -8,7 +8,7 @@ depends-on: [BL-1604]
 touches: [Documentation]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1687 — Fix AF-0068: ADR-0421 decision 3 (slow pure-computation tests become LongRunning with an env-var skip) is not in the code
 
@@ -41,12 +41,25 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-07: The reproduction counts `TestCategory("LongRunning")` in `*.UnitTests`; only retagging the four Curl.Cryptography.UnitTests tests (BL-1604, in Doing on another lane, touching Curl.Cryptography.UnitTests) changes it. This task touches only Documentation, so it waits on BL-1604 and then verifies the reproduction gives 4.
+- 2026-10-07 (lane 7): after BL-1604 the reproduction gives 3, not 0 or 4. BL-1604 retagged
+  X25519, X448 and CAST-128 LongRunning with `[RunsOnlyWhenLongRunningTestsAreEnabled]`,
+  and integration.yml runs them with `CURL_RUN_LONG_RUNNING_TESTS: '1'`; the Brainpool
+  test measured under 3 s per row in Debug, so by decision 3's own drop-under-3-s rule it
+  lost both attributes and joined the fast run. The code follows the ADR's rule; the ADR's
+  list of four was what had gone stale. Fix: ADR-0421 decision 3 and its consequence line
+  now name the three LongRunning tests, the attribute, and why Brainpool runs in the fast
+  run. Decision (sensible default): the finding's expected count of 4 is superseded by 3,
+  the number the corrected ADR names; the defect AF-0068 reports - ADR decision 3 not in
+  the code - no longer reproduces. No `TestCategory("Integration")` remains in
+  Curl.Cryptography.UnitTests.
+- Verification: `dotnet build` 0 errors; fast tests 33 test assemblies passed, 0 failed
+  (Curl.Cryptography.UnitTests 1451 passed, 3 skipped - the three LongRunning tests).
 
 ## Log
 
@@ -54,3 +67,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Waits on BL-1604 (retags the four Curl.Cryptography.UnitTests slow tests LongRunning), which the reproduction needs
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. ADR-0421 decision 3 matches the code: three LongRunning Cryptography tests, Brainpool in the fast run
