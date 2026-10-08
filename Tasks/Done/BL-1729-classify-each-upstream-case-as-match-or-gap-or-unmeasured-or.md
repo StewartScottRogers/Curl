@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-1728]
-touches: [Gap/Tools/ConvertTo-BehaviourMeasurement.ps1, Gap/Tools/Fixtures/behaviour]
+touches: [Gap/Tools/ConvertTo-BehaviourMeasurement.ps1, Gap/Tools/Fixtures/behaviour, Gap/Instructions/Gap-Format.md]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1729 — Classify each upstream case as match or gap or unmeasured or excluded with Gap/Tools/ConvertTo-BehaviourMeasurement.ps1
 
@@ -66,13 +66,19 @@ each rule above, plus a pass and a failure, and the matching fake `tests/data` f
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. There is one check per rule 1 to 7, plus pass gives `match`, failure gives `gap` with its first difference, and a summary of counts per reason that adds up to the case count.
-- [ ] A real run on the 8.21.0 raw output from BL-1728 writes a measurement whose `counts` add up to the number of `test*` files. Its per-reason table is recorded in this task's Notes.
-- [ ] The header help documents every parameter and the rule order. The script is ASCII only.
+- [x] `Gap/Tools/ConvertTo-BehaviourMeasurement.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. There is one check per rule 1 to 7, plus pass gives `match`, failure gives `gap` with its first difference, and a summary of counts per reason that adds up to the case count.
+- [x] A real run on the 8.21.0 raw output from BL-1728 writes a measurement whose `counts` add up to the number of `test*` files. Its per-reason table is recorded in this task's Notes.
+- [x] The header help documents every parameter and the rule order. The script is ASCII only.
 
 ## Notes
+
+- 2026-10-08 (lane 1): Added `Gap/Instructions/Gap-Format.md` to `touches` to document the new `reasons` field (count per reason, `behaviour` only) the measurement carries for the scorecard; no other task in Doing on origin/work/dark-factory names it.
+- 2026-10-08 (lane 1): Defaults taken. `<server>` lines `http` and `none` count as the harness's own; any other first word (`http-ipv6`, `https`, `http-proxy`...) is `needs-server:<word>`, and a certificate after the name (`https test-localhost.pem`) is dropped. `!<feature>` asks for absence and never fits rules 3 or 4. Feature names compare case-insensitively. Every item carries `attributes.keywords`; failed items get expected `upstream test<N> passes`. `targetVersion` comes from `-Version`, else the folder two above `-TestsData`; `-Reference` (new) is the reference's version line, written when `-ReferenceFeatures` is given; without a reference, `referenceFallback` is `docs`. Harness timeouts are recorded by Measure-UpstreamCases.cs as Failed, so they arrive as `gap`, never `timeout`.
+- 2026-10-08 (lane 1): Limit for BL-1740: rule 4 compares `<features>` with `curl -V` names, but tests also use runtests-derived names (`cookies`, `proxy`, `verbose-strings`...) that `curl -V` never prints, so the orchestrator should pass those too or such cases are excluded as `reference-lacks`.
+- 2026-10-08 (lane 1): Real run on 8.21.0 raw output at c99168a8 (2013 `test*` files): match 560, gap 161, unmeasured 804, excluded 488 (sum 2013), X/Y 560/1525. Per reason: libcurl-api 355, needs-server:ftp 213, debug-build-only 132, unknown-variable 102, needs-server:smtp 83, needs-server:imap 64, harness-unsupported 53, needs-server:https 50, needs-server:pop3 49, needs-server:sftp 38, needs-server:mqtt 20, needs-server:http-proxy 18, needs-server:tftp 16, needs-server:scp 14, needs-server:http-ipv6 12, needs-server:socks5 11, needs-server:file 8, needs-server:ftps 8, needs-server:ftp-ipv6 6, needs-server:http/2 4, needs-server:httptls+srp 4, needs-server:socks4 4, needs-server:dns 3, needs-server:gopher 3, needs-server:https-proxy 3, needs-server:http-unix 2, needs-server:http/3 2, needs-server:https-mtls 2, needs-server:smb 2, needs-server:socks5unix 2, and 1 each for libcurl-unit-test, dict, gopher-ipv6, gophers, imaps, mqtts, pop3s, smtps, telnet.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. ConvertTo-BehaviourMeasurement.ps1 classifies every upstream case as match, gap, unmeasured or excluded with a reason (8.21.0: X/Y 560/1525, 488 excluded)
