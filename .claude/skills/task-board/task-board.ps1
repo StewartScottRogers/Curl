@@ -16,14 +16,15 @@
                task whose touches overlap a task in Doing is not offered, so lanes
                of the dark factory never work on the same files at once. A task
                whose front matter says 'lane: no', or whose touches name an audit
-               path - Audit, Audit/..., .claude/agents/audit-*, or one of the guard
-               files .claude/hooks/guard-audit-paths.ps1, .claude/settings.json,
+               path - Audit, Audit/..., .claude/agents/audit-*, Gap, Gap/...,
+               .claude/agents/gap-*, or one of the guard files
+               .claude/hooks/guard-audit-paths.ps1, .claude/settings.json,
                .github/workflows/ci.yml and .claude/skills/task-board/task-board.ps1
                (Test-AuditPath) - is never offered either: it is interactive only,
                run by naming it (/task-run BL-###).
                Inside a dark factory shift (CURL_DARK_FACTORY_LANE set), 'new'
                refuses an audit-path task without -NoLane and 'move -To Doing'
-               refuses an interactive-only task (ADR-0267).
+               refuses an interactive-only task (ADR-0267, ADR-0433).
       capacity How many tasks the board could have running at once right now: the
                tasks in Doing, plus the ready tasks that could start beside them,
                picked in 'next' order so no two overlap in touches. One line,
@@ -170,7 +171,7 @@ function ConvertTo-Task([IO.FileInfo] $File) {
     if (-not $PriorityRank.ContainsKey($taskPriority)) { $taskPriority = 'Normal' }
 
     # 'lane: no' means interactive only; absent, empty or 'yes' means any runner. A task
-    # that touches an audit path is interactive only whatever it says (ADR-0267).
+    # that touches an audit path is interactive only whatever it says (ADR-0267, ADR-0433).
     $laneAllowed = ([string]$fields['lane']).Trim() -ine 'no' -and
         @($touched | Where-Object { Test-AuditPath $_ }).Count -eq 0
 
@@ -196,9 +197,10 @@ function ConvertTo-TouchPath([string] $Item) {
     return $Item.Trim().Trim('"', "'").Replace([string][char]92, '/').TrimEnd('/')
 }
 
-# An audit path is the audit office's, outside the dark factory's reach (ADR-0267):
-# Audit or anything under it, an auditor agent .claude/agents/audit-*, or one of the
-# guard files that protect them, in any case. Takes a path ConvertTo-TouchPath has
+# An audit path is outside the dark factory's reach: Audit or anything under it, an
+# auditor agent .claude/agents/audit-* (ADR-0267), Gap or anything under it, a gap
+# analyst agent .claude/agents/gap-* (ADR-0433), or one of the guard files that protect
+# them, in any case. Takes a path ConvertTo-TouchPath has
 # normalised. An ancestor such as .claude or * is not one: the hook and CI catch real
 # writes, and refusing * would refuse every task filed without touches.
 # The guard files are the ones Audit/Guard/Test-AuditPathsUntouched.ps1's
@@ -215,6 +217,9 @@ function Test-AuditPath([string] $TouchPath) {
     return $TouchPath -ieq 'Audit' -or
         $TouchPath.StartsWith('Audit/', [StringComparison]::OrdinalIgnoreCase) -or
         $TouchPath -ilike '.claude/agents/audit-*' -or
+        $TouchPath -ieq 'Gap' -or
+        $TouchPath.StartsWith('Gap/', [StringComparison]::OrdinalIgnoreCase) -or
+        $TouchPath -ilike '.claude/agents/gap-*' -or
         @($guardFiles | Where-Object { $_ -ieq $TouchPath }).Count -gt 0
 }
 
@@ -501,7 +506,7 @@ switch ($Command) {
         if ((Test-DarkFactoryLane) -and -not $NoLane) {
             $auditTouch = @($touchList | Where-Object { Test-AuditPath $_ }) | Select-Object -First 1
             if ($auditTouch) {
-                throw "Dark factory lanes may not file a task that touches ${auditTouch}: the audit office is outside the factory's reach (ADR-0267). File it with -NoLane for an interactive session."
+                throw "Dark factory lanes may not file a task that touches ${auditTouch}: the audit and gap analysis offices are outside the factory's reach (ADR-0267, ADR-0433). File it with -NoLane for an interactive session."
             }
         }
 

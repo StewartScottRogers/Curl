@@ -24,15 +24,20 @@ Every part below exists; the last column names the task that built it.
 
 ## Independence
 
-**Interactive only.** Every task that writes to `Audit/` or `.claude/agents/audit-*` is
-interactive only: it carries `lane: no`, or touches an audit path, so `task-board.ps1`
+**Audit paths.** `Audit/` and `.claude/agents/audit-*` are audit paths, and so are the gap
+analysis office's `Gap/` and its gap analyst agents `.claude/agents/gap-*`
+([ADR-0433](../Documentation/Planning/Decisions/ADR-0433-a-gap-analysis-office-measures-curl-against-upstream-curl-releases.md),
+BL-1746): every guard below protects all four alike, so the factory can neither read nor
+move the yardstick it is measured by.
+
+**Interactive only.** Every task that writes to an audit path is interactive only: it carries `lane: no`, or touches an audit path, so `task-board.ps1`
 never offers it to a dark factory lane and refuses a lane that tries to claim or file one
 (BL-993, BL-996). An interactive session runs it by name, `/task-run BL-###`.
 
 **The hook.** Every dark factory process carries `CURL_DARK_FACTORY_LANE` (BL-995). While it
 is set, the PreToolUse hook `.claude/hooks/guard-audit-paths.ps1` refuses any tool call that
-reads or changes an audit path (BL-997), so a lane cannot read the planted defects or the
-auditors' instructions, nor edit them.
+reads or changes an audit path (BL-997), so a lane cannot read the planted defects, the
+auditors' instructions or the gap office's measurements, nor edit them.
 
 **The CI guard.** `Guard/Test-AuditPathsUntouched.ps1` fails the `CI` workflow's
 `audit-guard` job whenever `work/dark-factory` carries a change of its own to an audit path,

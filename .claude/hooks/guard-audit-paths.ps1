@@ -11,45 +11,55 @@
     permission rules but still runs hooks, and a lane's shell cannot unset the variable
     for the hook, whose process Claude Code starts.
 
-    Audit paths are the audit office's, outside the factory's reach (ADR-0267): the Audit
-    folder and the auditor agents .claude/agents/audit-*. Reading counts as well as
-    changing: a lane that can read the planted-defect catalogue or the auditors'
-    instructions can write code that passes them. It looks at:
+    Audit paths are outside the factory's reach: the audit office's Audit folder and
+    auditor agents .claude/agents/audit-* (ADR-0267), and the gap analysis office's Gap
+    folder and gap analyst agents .claude/agents/gap-* (ADR-0433). Reading counts as well
+    as changing: a lane that can read the planted-defect catalogue, the auditors'
+    instructions or the gap office's yardstick can write code that passes them. It looks
+    at:
 
       Edit, Write, MultiEdit   tool_input.file_path
       NotebookEdit             tool_input.notebook_path
       Read                     tool_input.file_path
       Grep                     tool_input.path, tool_input.glob, and the two joined
       Glob                     tool_input.pattern, tool_input.path, and the two joined
-      Bash, PowerShell         tool_input.command: a path into Audit, a path to an
-                               auditor agent, or the bare word Audit as an argument
+      Bash, PowerShell         tool_input.command: a path into Audit or Gap, a path to
+                               an auditor or gap analyst agent, or the bare word Audit
+                               or Gap as an argument
 
     A refused call exits 2 with the reason on standard error, which Claude Code shows the
     model instead of running the tool. It fails closed: inside a shift, input it cannot
-    parse is refused. A false positive in a command (a commit message quoting "Audit/")
-    is accepted; the lane rewords it.
+    parse is refused. A false positive in a command (a commit message quoting "Audit/" or
+    "Gap/") is accepted; the lane rewords it. The bare words are matched case-sensitively,
+    so "audit" and "gap" in prose ("gap analysis") pass.
 
-    Not covered: a Grep or Glob over a folder that contains Audit, such as the repository
-    root, still searches it.
+    Not covered: a Grep or Glob over a folder that contains Audit or Gap, such as the
+    repository root, still searches it.
 #>
 if ([string]::IsNullOrEmpty($env:CURL_DARK_FACTORY_LANE)) { exit 0 }
 
-$Refusal = 'Refused by the audit guard: dark factory lanes may not read or change Audit/ or .claude/agents/audit-* (ADR-0267). Leave this to an interactive session.'
+$Refusal = 'Refused by the audit guard: dark factory lanes may not read or change Audit/, .claude/agents/audit-* (ADR-0267), Gap/ or .claude/agents/gap-* (ADR-0433). Leave this to an interactive session.'
+
+# The guarded folders and the agent-name prefixes that go with them.
+$GuardedFolders = 'Audit|Gap'
+$GuardedAgents = 'audit|gap'
 
 function Test-AuditFilePath([string]$Path) {
-    # A file path or glob, either slash: into the Audit folder, or an auditor agent.
+    # A file path or glob, either slash: into the Audit or Gap folder, or an auditor or
+    # gap analyst agent.
     if (-not $Path) { return $false }
     $p = $Path.Replace([string][char]92, '/')
-    return ($p -match '(?i)(^|/)Audit(/|$)') -or ($p -match '(?i)(^|/)\.claude/agents/audit-[^/]*$')
+    return ($p -match "(?i)(^|/)($GuardedFolders)(/|$)") -or ($p -match "(?i)(^|/)\.claude/agents/($GuardedAgents)-[^/]*$")
 }
 
 function Test-AuditCommand([string]$Command) {
-    # A shell command naming a path into Audit, an auditor agent, or Audit itself as an
-    # argument (case-sensitive, so the word "audit" in prose passes).
+    # A shell command naming a path into Audit or Gap, an auditor or gap analyst agent,
+    # or Audit or Gap itself as an argument (case-sensitive, so the words "audit" and
+    # "gap" in prose pass).
     if (-not $Command) { return $false }
-    return ($Command -match '(?i)(^|[\s"''=(:/\\])Audit[\\/]') -or
-        ($Command -match '(?i)\.claude[\\/]agents[\\/]audit-') -or
-        ($Command -cmatch '(^|[\s"''])Audit($|[\s"'';|&)])')
+    return ($Command -match "(?i)(^|[\s`"'=(:/\\])($GuardedFolders)[\\/]") -or
+        ($Command -match "(?i)\.claude[\\/]agents[\\/]($GuardedAgents)-") -or
+        ($Command -cmatch "(^|[\s`"'])($GuardedFolders)($|[\s`"';|&)])")
 }
 
 function Join-SearchPath([string]$Folder, [string]$Pattern) {
