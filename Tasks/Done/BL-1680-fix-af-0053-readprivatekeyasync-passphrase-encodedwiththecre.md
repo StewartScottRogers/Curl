@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1680 — Fix AF-0053: ReadPrivateKeyAsync_Passphrase_EncodedWithTheCredentialEncoding uses an ASCII passphrase and only IsNotNull, so it cannot tell which encoding was used
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix (pipeline `feature` collapsed to a direct change: no production code changes). Re-encrypting a key with a non-ASCII passphrase needs ssh-keygen/OpenSSL and console-encoding guesswork, so the test instead uses `TestUserKeys.PassphraseWhoseUtf16BytesAreSecret` (U+6573 U+7263 U+7465), whose UTF-16LE bytes are exactly the ASCII bytes of `secret`: the existing `RsaPkcs1Aes128` key opens only when the credential encoding is UTF-16LE.
+- `ReadPrivateKeyAsync_Passphrase_EncodedWithTheCredentialEncoding` now asserts the decrypted key's public blob equals the RSA `.pub` blob; new `ReadPrivateKeyAsync_PassphraseInAnotherEncoding_DoesNotDecrypt` (UTF-8, Latin-1, ASCII) asserts null, so swapping `passphraseEncoding.GetBytes` for any fixed encoding fails a test.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. SshUserKeySource passphrase test now uses a non-ASCII passphrase that opens the key only in the credential encoding and fails in UTF-8, Latin-1 and ASCII

@@ -12,6 +12,13 @@ internal static class TestUserKeys
     /// <summary>The passphrase of every encrypted text here.</summary>
     internal const string Passphrase = "secret";
 
+    /// <summary>
+    /// A non-ASCII passphrase whose UTF-16LE bytes are exactly <see cref="Passphrase" />'s
+    /// ASCII bytes (<c>73 65 63 72 65 74</c>), so it opens the encrypted texts here only
+    /// when encoded as UTF-16LE; UTF-8, Latin-1 or ASCII give other bytes and fail.
+    /// </summary>
+    internal const string PassphraseWhoseUtf16BytesAreSecret = "敳牣瑥";
+
     /// <summary>The RSA key as <c>ssh-keygen -m PEM</c> writes it: PKCS #1.</summary>
     internal const string RsaPkcs1 = """
         -----BEGIN RSA PRIVATE KEY-----
