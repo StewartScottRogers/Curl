@@ -86,6 +86,25 @@ public sealed class ClientCertificateLoaderTests
         AssertPrivateParametersExport(loaded, failure);
     }
 
+    // AF-0057: the OpenSSL build splits --cert at the first colon even after a drive letter,
+    // so "q:/cert.pem" is the file "q" with the passphrase "/cert.pem"; only the Windows
+    // Schannel build keeps a drive letter's colon in the path.
+    [TestMethod]
+    public void Load_OpenSslBuildDriveLetterLikeCert_SplitsAtTheDriveLetterColon()
+    {
+        var options = new TlsClientOptions(ClientCertificate: "q:/cert.pem");
+        Diagnostics.Arrange("--cert", options.ClientCertificate);
+
+        var (loaded, failure) = ClientCertificateLoader.Load(options, matchesSchannelBuild: false, new FakeClientCertificateStore());
+        Diagnostics.Act("loaded is null", loaded is null);
+        Diagnostics.Act("failure message", failure?.ErrorMessage);
+
+        Assert.IsNull(loaded);
+        Assert.IsNotNull(failure);
+        Assert.AreEqual(Curl.Protocol.Abstractions.CurlExitCode.SslCertProblem, failure.ExitCode);
+        Assert.StartsWith("could not load PEM client certificate from q, OpenSSL error ", failure.ErrorMessage);
+    }
+
     /// <summary>Writes a passphrase-protected PKCS #12 file holding a self-signed RSA certificate and its key.</summary>
     /// <param name="directory">The folder to write <c>client.p12</c> in; created when missing.</param>
     /// <returns>The file's path; its passphrase is <c>secret</c>.</returns>
