@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1763 — Fix AF-0085: -v omits curl's '{ [0 bytes data]' line when a read-to-close HTTP body ends with an empty read (e.g. --ignore-content-length on an empty body)
 
@@ -66,3 +66,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. -v writes '{ [0 bytes data]' for a read-to-close body that closes without a byte; AF-0085 reproduction gives curl: 1 / Curl: 1.
