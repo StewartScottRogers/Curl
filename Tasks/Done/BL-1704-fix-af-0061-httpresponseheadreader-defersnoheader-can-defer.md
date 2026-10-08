@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1704 — Fix AF-0061: HttpResponseHeadReader.DefersNoHeader can defer every header (false -> true) with no test failing
 
@@ -41,12 +41,23 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The production code was right; the gap was a missing test. Added
+  `HttpResponseHeadReaderTests.ReadAsync_ReaderWithoutDefersFrom_TellsEveryFinalHeaderBeforeReturning`:
+  a reader built without `DefersFrom` must have told `HeaderReceived` of every final-head header
+  (A, B) by the time `ReadAsync` returns, before `ReportHeldLines`, at 1-, 7- and 65536-byte reads.
+- Added `Curl.Protocol.Http.UnitTests` to `touches`: the test belongs there and no task in Doing on
+  `origin/work/dark-factory` named it.
+- A lane may not read `Audit/` (guard hook), so `Invoke-MutationTest.ps1` could not run here. The same
+  mutant was applied by hand (`DefersNoHeader` `false` -> `true`): the new test failed (killed), every
+  other `HttpResponseHeadReaderTests` test passed; reverted. The quality auditor's re-audit confirms it.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A test now pins that a head reader without DefersFrom tells HeaderReceived of every header before ReadAsync returns, killing the AF-0061 mutant
