@@ -3,8 +3,8 @@ id: AF-0064
 title: -T / --upload-file combined with -d, --json, -F or -I is not refused: Curl sends a PUT and exits 0 where curl warns and exits 2
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:upload-file-method-conflict:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $o="$env:TEMP\af-put"; $a=@('-d','a=1','-T','CLAUDE.md','http://127.0.0.1:50999/
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
