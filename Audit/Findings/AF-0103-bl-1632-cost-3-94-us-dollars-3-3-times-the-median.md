@@ -3,12 +3,12 @@ id: AF-0103
 title: BL-1632 cost 3.94 US dollars, 3.3 times the median; a 73-turn run on lane 6 could not integrate
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1632:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-1781
+tasks: BL-1781
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

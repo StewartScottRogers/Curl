@@ -3,12 +3,12 @@ id: AF-0106
 title: BL-1619 cost 3.79 US dollars, 3.2 times the median; a 66-turn run on lane 2 was parked on the flaky cookie test
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1619:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-1784
+tasks: BL-1784
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

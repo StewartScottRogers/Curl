@@ -3,12 +3,12 @@ id: AF-0082
 title: Read_Extensions_AreIgnored checks only that a search was parsed, not that the extensions left it unchanged
 auditor: quality
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Protocol.Ldap.UnitTests/OpenLdapUrlReaderTests.cs:Read_Extensions_AreIgnored:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-1760
+tasks: BL-1760
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Ldap.UnitTests/OpenLdapUrlReaderTests.cs -Patt
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

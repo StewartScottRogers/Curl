@@ -3,12 +3,12 @@ id: AF-0079
 title: Four more Curl.Protocol.Http.UnitTests fail on the unmutated tree because HttpResponseBodyReader holds the body and writes it only in a finally block
 auditor: quality
 severity: High
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:HeldBodyBaselineFailures:failing-test
 reproduction: none
-task: none
-tasks:
+task: BL-1757
+tasks: BL-1757
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "FullyQuali
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

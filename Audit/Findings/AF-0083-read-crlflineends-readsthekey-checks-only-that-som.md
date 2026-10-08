@@ -3,12 +3,12 @@ id: AF-0083
 title: Read_CrLfLineEnds_ReadsTheKey checks only that some key came back, not that it is the RSA key in the file
 auditor: quality
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Protocol.Ssh.UnitTests/Keys/SshPrivateKeyReaderTests.cs:Read_CrLfLineEnds_ReadsTheKey:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-1761
+tasks: BL-1761
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Ssh.UnitTests/Keys/SshPrivateKeyReaderTests.cs
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

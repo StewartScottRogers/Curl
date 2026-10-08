@@ -3,12 +3,12 @@ id: AF-0111
 title: BL-1557 cost 3.63 US dollars in one 118-turn run, 3.05 times the median
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1557:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-1789
+tasks: BL-1789
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

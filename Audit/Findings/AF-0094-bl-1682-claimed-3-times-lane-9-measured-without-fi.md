@@ -3,12 +3,12 @@ id: AF-0094
 title: BL-1682 claimed 3 times; lane 9 measured without fixing and lane 2 found it waiting on BL-1715, which its depends-on did not name
 auditor: process
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1682:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-1772
+tasks: BL-1772
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

@@ -3,12 +3,12 @@ id: AF-0087
 title: Requirements FR-075 cites two tests by names they no longer have
 auditor: truthfulness
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: truthfulness:Documentation/Product/Requirements.md:FR-075:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-1765
+tasks: BL-1765
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
