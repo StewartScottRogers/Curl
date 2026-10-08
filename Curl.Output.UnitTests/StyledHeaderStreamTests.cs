@@ -53,12 +53,81 @@ public sealed class StyledHeaderStreamTests
     }
 
     [TestMethod]
-    public void Write_LineWithNoLineFeed_StylesItAsItIs()
+    public void Flush_LineWithNoLineFeed_StylesItAsItIs()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         using StyledHeaderStream stream = CreateStream();
 
         stream.Write(Encoding.Latin1.GetBytes("A: b"));
+        stream.Flush();
+        Check(diagnostics, "A: b", "\e[1mA\e[0m: b", OutputText);
+
+        Assert.AreEqual("\e[1mA\e[0m: b", OutputText);
+    }
+
+    [TestMethod]
+    public void Write_HeadOneByteAtATime_StylesAsOneWrite()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        using StyledHeaderStream stream = CreateStream();
+
+        foreach (byte octet in Encoding.Latin1.GetBytes(Head))
+        {
+            stream.Write([octet], 0, 1);
+        }
+
+        Check(diagnostics, Head, StyledHead, OutputText);
+
+        Assert.AreEqual(StyledHead, OutputText);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_HeadSplitAtTheColon_StylesAsOneWrite()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        await using StyledHeaderStream stream = CreateStream();
+
+        int colon = Head.IndexOf(':', StringComparison.Ordinal);
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(Head[..colon]));
+        await stream.WriteAsync(Encoding.Latin1.GetBytes(Head[colon..]));
+        Check(diagnostics, Head, StyledHead, OutputText);
+
+        Assert.AreEqual(StyledHead, OutputText);
+    }
+
+    [TestMethod]
+    public void Write_LineWithNoLineFeed_HoldsItUntilFlush()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        using StyledHeaderStream stream = CreateStream();
+
+        stream.Write(Encoding.Latin1.GetBytes("A: b"));
+        Check(diagnostics, "A: b", string.Empty, OutputText);
+
+        Assert.AreEqual(string.Empty, OutputText);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_LineWithNoLineFeed_HoldsItUntilAWriteFinishesIt()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        await using StyledHeaderStream stream = CreateStream();
+
+        await stream.WriteAsync(Encoding.Latin1.GetBytes("A: b"));
+        await stream.WriteAsync(Encoding.Latin1.GetBytes("c\r\n"));
+        Check(diagnostics, "A: b + c\r\n", "\e[1mA\e[0m: bc\r\n", OutputText);
+
+        Assert.AreEqual("\e[1mA\e[0m: bc\r\n", OutputText);
+    }
+
+    [TestMethod]
+    public void Dispose_LineWithNoLineFeed_StylesAndWritesIt()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        StyledHeaderStream stream = CreateStream();
+
+        stream.Write(Encoding.Latin1.GetBytes("A: b"));
+        stream.Dispose();
         Check(diagnostics, "A: b", "\e[1mA\e[0m: b", OutputText);
 
         Assert.AreEqual("\e[1mA\e[0m: b", OutputText);
