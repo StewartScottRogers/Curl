@@ -79,3 +79,4 @@ Retargeting (BL-1748) changes it.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
