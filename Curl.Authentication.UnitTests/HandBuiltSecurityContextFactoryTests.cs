@@ -1,6 +1,7 @@
 using System.Formats.Asn1;
 using Curl.Kerberos;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -20,27 +21,49 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
 
     private static readonly byte[] RandomBytes = [.. Enumerable.Range(1, 64).Select(value => (byte)value)];
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task Negotiate_TicketGrantingTicketCached_SendsMitNegTokenInitAndCompletesOnTheApReply()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeKdc kdc = new();
         FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Negotiate);
+        diagnostics.Arrange("host", Host);
         using ISecurityContext context = Factory(kdc).Create(Request(SecurityMechanism.Negotiate));
 
         SecurityContextStep first = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
 
+        diagnostics.Act("first status", first.Status);
+        diagnostics.Bytes("first token", first.Token);
+        diagnostics.Act("KDC exchanges", string.Join(" | ", kdc.Exchanges));
+        diagnostics.Act("requested service name", string.Join("/", kdc.Requests.Single().Body.ServerName!.Components.ToArray()));
+        diagnostics.Assert("first status", SecurityContextStatus.ContinueNeeded, first.Status);
+        diagnostics.Assert("is completed", false, context.IsCompleted);
+        diagnostics.Diff("KDC exchanges", "udp kdc.example.test:88", string.Join(" | ", kdc.Exchanges));
+        diagnostics.Diff("requested service name", "HTTP/" + Host, string.Join("/", kdc.Requests.Single().Body.ServerName!.Components.ToArray()));
+        diagnostics.Assert("name type", KerberosServiceTicketSource.HostBasedServiceNameType, kdc.Requests.Single().Body.ServerName!.NameType);
         Assert.AreEqual(SecurityContextStatus.ContinueNeeded, first.Status);
         Assert.IsFalse(context.IsCompleted);
         CollectionAssert.AreEqual(new[] { "udp kdc.example.test:88" }, kdc.Exchanges);
         CollectionAssert.AreEqual(new[] { "HTTP", Host }, kdc.Requests.Single().Body.ServerName!.Components.ToArray());
         Assert.AreEqual(KerberosServiceTicketSource.HostBasedServiceNameType, kdc.Requests.Single().Body.ServerName!.NameType);
         (string[] mechanisms, byte[] kerberosToken) = ReadNegTokenInit(first.Token);
+        diagnostics.Act("offered mechanisms", string.Join(" ", mechanisms));
+        diagnostics.Diff("offered mechanisms", "1.2.840.113554.1.2.2", string.Join(" ", mechanisms));
         CollectionAssert.AreEqual(new[] { "1.2.840.113554.1.2.2" }, mechanisms);
         acceptor.Accept(kerberosToken);
 
         byte[] negTokenResp = new SpnegoNegotiationResponse(SpnegoNegotiationState.AcceptCompleted, SpnegoMechanism.KerberosV5, acceptor.Reply(), null).Encode();
+        diagnostics.Bytes("NegTokenResp", negTokenResp);
         SecurityContextStep second = await context.NextTokenAsync(negTokenResp, CancellationToken.None);
 
+        diagnostics.Act("second status", second.Status);
+        diagnostics.Bytes("second token", second.Token);
+        diagnostics.Assert("second status", SecurityContextStatus.Completed, second.Status);
+        diagnostics.Assert("second token length", 0, second.Token.Length);
+        diagnostics.Assert("is completed", true, context.IsCompleted);
         Assert.AreEqual(SecurityContextStatus.Completed, second.Status);
         Assert.IsEmpty(second.Token);
         Assert.IsTrue(context.IsCompleted);
@@ -49,13 +72,22 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task Kerberos_TicketGrantingTicketCached_SendsTheBareGssTokenAndCompletesOnTheApReply()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Kerberos);
+        diagnostics.Arrange("host", Host);
         using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Kerberos));
 
         SecurityContextStep first = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
+        diagnostics.Bytes("first token", first.Token);
         acceptor.Accept(first.Token);
         SecurityContextStep second = await context.NextTokenAsync(acceptor.Reply(), CancellationToken.None);
 
+        diagnostics.Act("first status", first.Status);
+        diagnostics.Act("second status", second.Status);
+        diagnostics.Assert("first status", SecurityContextStatus.ContinueNeeded, first.Status);
+        diagnostics.Assert("second status", SecurityContextStatus.Completed, second.Status);
+        diagnostics.Assert("is completed", true, context.IsCompleted);
         Assert.AreEqual(SecurityContextStatus.ContinueNeeded, first.Status);
         Assert.AreEqual(SecurityContextStatus.Completed, second.Status);
         Assert.IsTrue(context.IsCompleted);
@@ -64,7 +96,10 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task Negotiate_MixedCaseHostAndDomainRealm_AsksForTheLowerCasedPrincipalInThatRealm()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeKdc kdc = new();
+        diagnostics.Arrange("host", "Server.Example.Test");
+        diagnostics.Arrange("domain_realm", ".example.test = EXAMPLE.TEST");
         KerberosConfiguration configuration = Configuration("[domain_realm]\n .example.test = EXAMPLE.TEST\n");
         KerberosServiceTicketSource tickets = new(() => configuration, () => Cache(TicketGrantingTicket()), _ => Client(configuration, kdc));
         using ISecurityContext context = new HandBuiltSecurityContextFactory(tickets, new FixedTimeProvider(FakeKdc.Now), new FixedKerberosRandomSource(RandomBytes), new FixedNtlmRandomSource(RandomBytes))
@@ -72,6 +107,10 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
 
         SecurityContextStep step = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
 
+        diagnostics.Act("status", step.Status);
+        diagnostics.Act("requested service name", string.Join("/", kdc.Requests.Single().Body.ServerName!.Components.ToArray()));
+        diagnostics.Assert("status", SecurityContextStatus.ContinueNeeded, step.Status);
+        diagnostics.Diff("requested service name", "HTTP/" + Host, string.Join("/", kdc.Requests.Single().Body.ServerName!.Components.ToArray()));
         Assert.AreEqual(SecurityContextStatus.ContinueNeeded, step.Status);
         CollectionAssert.AreEqual(new[] { "HTTP", Host }, kdc.Requests.Single().Body.ServerName!.Components.ToArray());
     }
@@ -79,15 +118,25 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task GetAsync_TicketGrantingTicketCached_StoresTheTgsTicketInTheDefaultCacheSoTheSecondGetAsksNoKdc()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeKdc kdc = new();
         InMemoryKerberosFiles files = CacheFiles(TicketGrantingTicket());
         int cacheLength = files.Contents(DefaultCachePath).Length;
+        diagnostics.Arrange("host", Host);
+        diagnostics.Arrange("cache length before", cacheLength);
         KerberosServiceTicketSource tickets = Tickets(kdc, () => Store(files));
 
         using KerberosCredential first = await tickets.GetAsync("HTTP", Host, CancellationToken.None);
         int storedLength = files.Contents(DefaultCachePath).Length;
         using KerberosCredential second = await tickets.GetAsync("HTTP", Host, CancellationToken.None);
 
+        diagnostics.Act("cache length after first get", storedLength);
+        diagnostics.Act("cache length after second get", files.Contents(DefaultCachePath).Length);
+        diagnostics.Act("KDC exchange count", kdc.Exchanges.Count);
+        diagnostics.Assert("KDC exchange count", 1, kdc.Exchanges.Count);
+        diagnostics.Assert("cache length unchanged by second get", storedLength, files.Contents(DefaultCachePath).Length);
+        diagnostics.Diff("second ticket", first.Ticket.Encode(), second.Ticket.Encode());
+        diagnostics.Diff("server name", "HTTP/" + Host, string.Join("/", second.Server.Components.ToArray()));
         Assert.IsGreaterThan(cacheLength, storedLength);
         Assert.HasCount(1, kdc.Exchanges);
         Assert.AreEqual(storedLength, files.Contents(DefaultCachePath).Length);
@@ -98,23 +147,37 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task GetAsync_DomainRealmConfigured_ReadsTheCacheOnlyInTheKdcClient()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeKdc kdc = new();
         InMemoryKerberosFiles files = CacheFiles(TicketGrantingTicket());
+        diagnostics.Arrange("host", Host);
+        diagnostics.Arrange("domain_realm", ".example.test = EXAMPLE.TEST");
         KerberosConfiguration configuration = Configuration("[domain_realm]\n .example.test = EXAMPLE.TEST\n");
         KerberosServiceTicketSource tickets = new(() => configuration, () => Store(files), _ => Client(configuration, kdc));
 
         using KerberosCredential ticket = await tickets.GetAsync("HTTP", Host, CancellationToken.None);
 
+        diagnostics.Act("paths read", string.Join(" | ", files.PathsRead));
+        diagnostics.Diff("paths read", DefaultCachePath, string.Join(" | ", files.PathsRead));
         CollectionAssert.AreEqual(new[] { DefaultCachePath }, files.PathsRead);
     }
 
     [TestMethod]
     public async Task Ntlm_MakesCurlsOwnNtlmType1()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Ntlm);
+        diagnostics.Arrange("host", Host);
         using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Ntlm));
 
         SecurityContextStep step = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
 
+        diagnostics.Act("status", step.Status);
+        diagnostics.Bytes("type 1 token", step.Token);
+        diagnostics.Act("context type", context.GetType().Name);
+        diagnostics.Assert("status", SecurityContextStatus.ContinueNeeded, step.Status);
+        diagnostics.Diff("type 1 token base64", "TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=", Convert.ToBase64String(step.Token));
+        diagnostics.Assert("context type", nameof(HandBuiltNtlmSecurityContext), context.GetType().Name);
         Assert.AreEqual(SecurityContextStatus.ContinueNeeded, step.Status);
         Assert.AreEqual("TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=", Convert.ToBase64String(step.Token));
         Assert.IsInstanceOfType<HandBuiltNtlmSecurityContext>(context);
@@ -123,7 +186,10 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task FirstStep_NoCredentialCacheFile_AnswersNoCredentials()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential cache", "file not found");
         await AssertFirstStepFailsAsync(
+            diagnostics,
             new KerberosServiceTicketSource(() => KerberosConfiguration.Empty, () => throw new KerberosFileException(KerberosFileError.NotFound), _ => throw new AssertFailedException("No KDC client is needed.")),
             SecurityContextStatus.NoCredentials);
     }
@@ -131,34 +197,45 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task FirstStep_CacheWithoutTicketGrantingTicket_AnswersNoCredentials()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeKdc kdc = new();
+        diagnostics.Arrange("credential cache", "no credentials");
 
-        await AssertFirstStepFailsAsync(Tickets(kdc, () => Cache()), SecurityContextStatus.NoCredentials);
+        await AssertFirstStepFailsAsync(diagnostics, Tickets(kdc, () => Cache()), SecurityContextStatus.NoCredentials);
 
+        diagnostics.Act("KDC exchange count", kdc.Exchanges.Count);
+        diagnostics.Assert("KDC exchange count", 0, kdc.Exchanges.Count);
         Assert.IsEmpty(kdc.Exchanges);
     }
 
     [TestMethod]
     public async Task FirstStep_KdcUnreachable_AnswersRefused()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeKdc kdc = new();
         kdc.UnreachableHosts.Add("kdc.example.test");
+        diagnostics.Arrange("unreachable KDC", "kdc.example.test");
 
-        await AssertFirstStepFailsAsync(Tickets(kdc, () => Cache(TicketGrantingTicket())), SecurityContextStatus.Refused);
+        await AssertFirstStepFailsAsync(diagnostics, Tickets(kdc, () => Cache(TicketGrantingTicket())), SecurityContextStatus.Refused);
     }
 
     [TestMethod]
     public async Task FirstStep_ExpiredTicketFromKdc_AnswersNoCredentials()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeKdc kdc = new() { Override = _ => FakeKdc.Error(32) };
+        diagnostics.Arrange("KDC error code", 32);
 
-        await AssertFirstStepFailsAsync(Tickets(kdc, () => Cache(TicketGrantingTicket())), SecurityContextStatus.NoCredentials);
+        await AssertFirstStepFailsAsync(diagnostics, Tickets(kdc, () => Cache(TicketGrantingTicket())), SecurityContextStatus.NoCredentials);
     }
 
     [TestMethod]
     public async Task FirstStep_MalformedKrb5Conf_AnswersRefused()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("krb5.conf", "section syntax error");
         await AssertFirstStepFailsAsync(
+            diagnostics,
             new KerberosServiceTicketSource(() => throw new KerberosConfigurationException(KerberosConfigurationError.SectionSyntax, "bad"), () => Cache(), _ => throw new AssertFailedException("No KDC client is needed.")),
             SecurityContextStatus.Refused);
     }
@@ -166,45 +243,73 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task FirstStep_CachedServiceTicketOfAnUnknownEncryptionType_AnswersRefused()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         CachedCredential desTicket = Cached(new KerberosPrincipal(KerberosServiceTicketSource.HostBasedServiceNameType, FakeKdc.Realm, ["HTTP", Host]), new KerberosKey(1, new byte[8]));
+        diagnostics.Arrange("cached ticket encryption type", 1);
 
-        await AssertFirstStepFailsAsync(Tickets(new FakeKdc(), () => Cache(desTicket)), SecurityContextStatus.Refused);
+        await AssertFirstStepFailsAsync(diagnostics, Tickets(new FakeKdc(), () => Cache(desTicket)), SecurityContextStatus.Refused);
     }
 
     [TestMethod]
     public async Task Reply_NegTokenRespRejects_AnswersRefused()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] reject = new SpnegoNegotiationResponse(SpnegoNegotiationState.Reject, null, null, null).Encode();
+        diagnostics.Bytes("reply", reject);
 
-        Assert.AreEqual(SecurityContextStatus.Refused, await ReplyStatusAsync(SecurityMechanism.Negotiate, _ => reject));
+        SecurityContextStatus status = await ReplyStatusAsync(diagnostics, SecurityMechanism.Negotiate, _ => reject);
+
+        diagnostics.Assert("status", SecurityContextStatus.Refused, status);
+        Assert.AreEqual(SecurityContextStatus.Refused, status);
     }
 
     [TestMethod]
     public async Task Reply_NegTokenRespWithoutResponseToken_AnswersRefused()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] empty = new SpnegoNegotiationResponse(SpnegoNegotiationState.AcceptCompleted, SpnegoMechanism.KerberosV5, null, null).Encode();
+        diagnostics.Bytes("reply", empty);
 
-        Assert.AreEqual(SecurityContextStatus.Refused, await ReplyStatusAsync(SecurityMechanism.Negotiate, _ => empty));
+        SecurityContextStatus status = await ReplyStatusAsync(diagnostics, SecurityMechanism.Negotiate, _ => empty);
+
+        diagnostics.Assert("status", SecurityContextStatus.Refused, status);
+        Assert.AreEqual(SecurityContextStatus.Refused, status);
     }
 
     [TestMethod]
     public async Task Reply_NotANegTokenResp_AnswersMalformedToken()
     {
-        Assert.AreEqual(SecurityContextStatus.MalformedToken, await ReplyStatusAsync(SecurityMechanism.Negotiate, _ => [0x30, 0x00]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Bytes("reply", [0x30, 0x00]);
+
+        SecurityContextStatus status = await ReplyStatusAsync(diagnostics, SecurityMechanism.Negotiate, _ => [0x30, 0x00]);
+
+        diagnostics.Assert("status", SecurityContextStatus.MalformedToken, status);
+        Assert.AreEqual(SecurityContextStatus.MalformedToken, status);
     }
 
     [TestMethod]
     public async Task Reply_KerberosTokenNotAnApReply_AnswersMalformedToken()
     {
-        Assert.AreEqual(SecurityContextStatus.MalformedToken, await ReplyStatusAsync(SecurityMechanism.Kerberos, _ => [0x60, 0x00]));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Bytes("reply", [0x60, 0x00]);
+
+        SecurityContextStatus status = await ReplyStatusAsync(diagnostics, SecurityMechanism.Kerberos, _ => [0x60, 0x00]);
+
+        diagnostics.Assert("status", SecurityContextStatus.MalformedToken, status);
+        Assert.AreEqual(SecurityContextStatus.MalformedToken, status);
     }
 
     [TestMethod]
     public async Task Reply_ApReplyInAnotherKey_AnswersRefused()
     {
-        Assert.AreEqual(
-            SecurityContextStatus.Refused,
-            await ReplyStatusAsync(SecurityMechanism.Kerberos, acceptor => acceptor.Reply(Enumerable.Repeat((byte)0x44, 32).ToArray())));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("reply key", "32 bytes of 0x44");
+
+        SecurityContextStatus status = await ReplyStatusAsync(diagnostics, SecurityMechanism.Kerberos, acceptor => acceptor.Reply(Enumerable.Repeat((byte)0x44, 32).ToArray()));
+
+        diagnostics.Assert("status", SecurityContextStatus.Refused, status);
+        Assert.AreEqual(SecurityContextStatus.Refused, status);
     }
 
     [TestMethod]
@@ -212,7 +317,10 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [DataRow(false)]
     public async Task WrapAndUnwrap_KerberosCompleted_ProtectMessagesWithTheContextKey(bool encrypt)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] message = [0x01, 0x00, 0x10, 0x00];
+        diagnostics.Arrange("encrypt", encrypt);
+        diagnostics.Bytes("message", message);
         FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
         using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Kerberos));
         acceptor.Accept((await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None)).Token);
@@ -221,6 +329,14 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
         (byte[] wrappedMessage, ulong sequence, bool encrypted) = acceptor.Rfc4121Unwrap(context.Wrap(message, encrypt)!);
         byte[]? unwrapped = context.Unwrap(acceptor.Rfc4121Wrap(message, acceptor.AcceptorSequence!.Value, encrypt));
 
+        diagnostics.Bytes("message the acceptor read", wrappedMessage);
+        diagnostics.Act("sequence", sequence);
+        diagnostics.Act("encrypted", encrypted);
+        diagnostics.Bytes("message the context read", unwrapped!);
+        diagnostics.Diff("wrapped message", message, wrappedMessage);
+        diagnostics.Assert("sequence", acceptor.InitiatorSequence, sequence);
+        diagnostics.Assert("encrypted", encrypt, encrypted);
+        diagnostics.Diff("unwrapped message", message, unwrapped!);
         CollectionAssert.AreEqual(message, wrappedMessage);
         Assert.AreEqual(acceptor.InitiatorSequence, sequence);
         Assert.AreEqual(encrypt, encrypted);
@@ -230,44 +346,68 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [TestMethod]
     public async Task Unwrap_AlteredWrapToken_AnswersNull()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Negotiate);
+        diagnostics.Arrange("alteration", "last byte of the wrap token XOR 0xFF");
         using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Negotiate));
         (_, byte[] kerberosToken) = ReadNegTokenInit((await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None)).Token);
         acceptor.Accept(kerberosToken);
         await context.NextTokenAsync(new SpnegoNegotiationResponse(SpnegoNegotiationState.AcceptCompleted, SpnegoMechanism.KerberosV5, acceptor.Reply(), null).Encode(), CancellationToken.None);
         byte[] wrapped = acceptor.Rfc4121Wrap([0x01, 0x02], acceptor.AcceptorSequence!.Value, encrypt: true);
         wrapped[^1] ^= 0xFF;
+        diagnostics.Bytes("altered wrap token", wrapped);
 
         byte[]? unwrapped = context.Unwrap(wrapped);
 
+        diagnostics.Act("unwrapped", unwrapped is null ? "null" : "bytes");
+        diagnostics.Assert("unwrapped is null", true, unwrapped is null);
         Assert.IsNull(unwrapped);
     }
 
     [TestMethod]
     public async Task WrapAndUnwrap_BeforeTheContextCompletes_Throw()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Kerberos);
+        diagnostics.Bytes("message", [0x01]);
         using ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Kerberos));
-        Assert.ThrowsExactly<InvalidOperationException>(() => context.Wrap([0x01], encrypt: true));
+        InvalidOperationException wrapFailure = Assert.ThrowsExactly<InvalidOperationException>(() => context.Wrap([0x01], encrypt: true));
+        diagnostics.Act("wrap before any step", wrapFailure.GetType().Name);
 
         await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
 
-        Assert.ThrowsExactly<InvalidOperationException>(() => context.Unwrap([0x01]));
+        InvalidOperationException unwrapFailure = Assert.ThrowsExactly<InvalidOperationException>(() => context.Unwrap([0x01]));
+        diagnostics.Act("unwrap after the first step", unwrapFailure.GetType().Name);
+        diagnostics.Assert("wrap exception", nameof(InvalidOperationException), wrapFailure.GetType().Name);
+        diagnostics.Assert("unwrap exception", nameof(InvalidOperationException), unwrapFailure.GetType().Name);
     }
 
     [TestMethod]
     public void Dispose_BeforeAnyStep_DoesNotThrow()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Negotiate);
         ISecurityContext context = Factory(new FakeKdc()).Create(Request(SecurityMechanism.Negotiate));
 
         context.Dispose();
 
+        diagnostics.Act("is completed", context.IsCompleted);
+        diagnostics.Assert("is completed", false, context.IsCompleted);
         Assert.IsFalse(context.IsCompleted);
     }
 
     [TestMethod]
     public void Create_NullRequest_Throws()
     {
-        Assert.ThrowsExactly<ArgumentNullException>(() => Factory(new FakeKdc()).Create(null!));
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("request", "null");
+
+        ArgumentNullException failure = Assert.ThrowsExactly<ArgumentNullException>(() => Factory(new FakeKdc()).Create(null!));
+
+        diagnostics.Act("exception type", failure.GetType().Name);
+        diagnostics.Act("parameter name", failure.ParamName);
+        diagnostics.Assert("exception type", nameof(ArgumentNullException), failure.GetType().Name);
     }
 
     private static SecurityContextRequest Request(SecurityMechanism mechanism) => new(mechanism, "HTTP", Host);
@@ -331,19 +471,28 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
         SecondTicket = [],
     };
 
-    private static async Task AssertFirstStepFailsAsync(KerberosServiceTicketSource tickets, SecurityContextStatus expected)
+    private static async Task AssertFirstStepFailsAsync(TestDiagnostics diagnostics, KerberosServiceTicketSource tickets, SecurityContextStatus expected)
     {
+        diagnostics.Arrange("mechanism", SecurityMechanism.Negotiate);
+        diagnostics.Arrange("expected status", expected);
         using ISecurityContext context = Factory(tickets).Create(Request(SecurityMechanism.Negotiate));
 
         SecurityContextStep step = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
 
+        diagnostics.Act("status", step.Status);
+        diagnostics.Bytes("token", step.Token);
+        diagnostics.Act("is completed", context.IsCompleted);
+        diagnostics.Assert("status", expected, step.Status);
+        diagnostics.Assert("token length", 0, step.Token.Length);
+        diagnostics.Assert("is completed", false, context.IsCompleted);
         Assert.AreEqual(expected, step.Status);
         Assert.IsEmpty(step.Token);
         Assert.IsFalse(context.IsCompleted);
     }
 
-    private static async Task<SecurityContextStatus> ReplyStatusAsync(SecurityMechanism mechanism, Func<FakeGssAcceptor, byte[]> reply)
+    private static async Task<SecurityContextStatus> ReplyStatusAsync(TestDiagnostics diagnostics, SecurityMechanism mechanism, Func<FakeGssAcceptor, byte[]> reply)
     {
+        diagnostics.Arrange("mechanism", mechanism);
         FakeGssAcceptor acceptor = new(KerberosEncryptionType.Aes256CtsHmacSha196);
         using ISecurityContext context = Factory(new FakeKdc()).Create(Request(mechanism));
         SecurityContextStep first = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None);
@@ -351,6 +500,11 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
 
         SecurityContextStep second = await context.NextTokenAsync(reply(acceptor), CancellationToken.None);
 
+        diagnostics.Act("reply status", second.Status);
+        diagnostics.Bytes("reply token", second.Token);
+        diagnostics.Act("is completed", context.IsCompleted);
+        diagnostics.Assert("reply token length", 0, second.Token.Length);
+        diagnostics.Assert("is completed", false, context.IsCompleted);
         Assert.IsEmpty(second.Token);
         Assert.IsFalse(context.IsCompleted);
         return second.Status;

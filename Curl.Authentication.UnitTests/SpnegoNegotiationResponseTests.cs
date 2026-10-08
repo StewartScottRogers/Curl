@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Authentication;
 
 /// <summary>
@@ -16,11 +18,22 @@ public sealed class SpnegoNegotiationResponseTests
 
     private const string Reject = "A1073005A0030A0102";
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void Decode_AcceptCompleted_ReadsEveryField()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", AcceptCompletedKerberos);
+        diagnostics.Bytes("token", Convert.FromHexString(AcceptCompletedKerberos));
+
         SpnegoNegotiationResponse response = SpnegoNegotiationResponse.Decode(Convert.FromHexString(AcceptCompletedKerberos));
 
+        diagnostics.Act("response", response);
+        diagnostics.Assert("state", SpnegoNegotiationState.AcceptCompleted, response.State);
+        diagnostics.Assert("supported mechanism", SpnegoMechanism.KerberosV5, response.SupportedMechanism);
+        diagnostics.Diff("response token hex", "AABBCC", Convert.ToHexString(response.ResponseToken!.Value.Span));
+        diagnostics.Diff("mechanism list MIC hex", "DDEE", Convert.ToHexString(response.MechanismListMic!.Value.Span));
         Assert.AreEqual(SpnegoNegotiationState.AcceptCompleted, response.State);
         Assert.AreEqual(SpnegoMechanism.KerberosV5, response.SupportedMechanism);
         Assert.AreEqual("AABBCC", Convert.ToHexString(response.ResponseToken!.Value.Span));
@@ -30,8 +43,17 @@ public sealed class SpnegoNegotiationResponseTests
     [TestMethod]
     public void Decode_AcceptIncomplete_ReadsTheNtlmChallenge()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", AcceptIncompleteNtlm);
+        diagnostics.Bytes("token", Convert.FromHexString(AcceptIncompleteNtlm));
+
         SpnegoNegotiationResponse response = SpnegoNegotiationResponse.Decode(Convert.FromHexString(AcceptIncompleteNtlm));
 
+        diagnostics.Act("response", response);
+        diagnostics.Assert("state", SpnegoNegotiationState.AcceptIncomplete, response.State);
+        diagnostics.Assert("supported mechanism", SpnegoMechanism.Ntlmssp, response.SupportedMechanism);
+        diagnostics.Diff("response token text", "NTLM", System.Text.Encoding.ASCII.GetString(response.ResponseToken!.Value.Span));
+        diagnostics.Assert("mechanism list MIC", null, response.MechanismListMic);
         Assert.AreEqual(SpnegoNegotiationState.AcceptIncomplete, response.State);
         Assert.AreEqual(SpnegoMechanism.Ntlmssp, response.SupportedMechanism);
         Assert.AreEqual("NTLM", System.Text.Encoding.ASCII.GetString(response.ResponseToken!.Value.Span));
@@ -41,24 +63,42 @@ public sealed class SpnegoNegotiationResponseTests
     [TestMethod]
     public void Decode_Reject_HasOnlyTheState()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", Reject);
+        diagnostics.Bytes("token", Convert.FromHexString(Reject));
+
         SpnegoNegotiationResponse response = SpnegoNegotiationResponse.Decode(Convert.FromHexString(Reject));
 
+        diagnostics.Act("response", response);
+        diagnostics.Assert("response", new SpnegoNegotiationResponse(SpnegoNegotiationState.Reject, null, null, null), response);
         Assert.AreEqual(new SpnegoNegotiationResponse(SpnegoNegotiationState.Reject, null, null, null), response);
     }
 
     [TestMethod]
     public void Decode_RequestMic_ReadsTheState()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", "A1073005A0030A0103");
+        diagnostics.Bytes("token", Convert.FromHexString("A1073005A0030A0103"));
+
         SpnegoNegotiationResponse response = SpnegoNegotiationResponse.Decode(Convert.FromHexString("A1073005A0030A0103"));
 
+        diagnostics.Act("response", response);
+        diagnostics.Assert("state", SpnegoNegotiationState.RequestMic, response.State);
         Assert.AreEqual(SpnegoNegotiationState.RequestMic, response.State);
     }
 
     [TestMethod]
     public void Decode_NoFields_ReturnsAllAbsent()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", "A1023000");
+        diagnostics.Bytes("token", Convert.FromHexString("A1023000"));
+
         SpnegoNegotiationResponse response = SpnegoNegotiationResponse.Decode(Convert.FromHexString("A1023000"));
 
+        diagnostics.Act("response", response);
+        diagnostics.Assert("response", new SpnegoNegotiationResponse(null, null, null, null), response);
         Assert.AreEqual(new SpnegoNegotiationResponse(null, null, null, null), response);
     }
 
@@ -70,8 +110,14 @@ public sealed class SpnegoNegotiationResponseTests
     [DataRow("A1073005A30304010F", DisplayName = "MIC alone")]
     public void Encode_DecodedResponse_ReturnsTheSameBytes(string hex)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", hex);
+        diagnostics.Bytes("token", Convert.FromHexString(hex));
+
         SpnegoNegotiationResponse response = SpnegoNegotiationResponse.Decode(Convert.FromHexString(hex));
 
+        diagnostics.Act("response", response);
+        diagnostics.Diff("encoded hex", hex, Convert.ToHexString(response.Encode()));
         Assert.AreEqual(hex, Convert.ToHexString(response.Encode()));
     }
 
@@ -89,9 +135,16 @@ public sealed class SpnegoNegotiationResponseTests
     [DataRow("A1020400", DisplayName = "Not a SEQUENCE inside [1]")]
     public void Decode_Malformed_ThrowsMalformed(string hex)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", hex);
+        diagnostics.Bytes("token", Convert.FromHexString(hex));
+
         SpnegoTokenException exception = Assert.ThrowsExactly<SpnegoTokenException>(
             () => SpnegoNegotiationResponse.Decode(Convert.FromHexString(hex)));
 
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("error", SpnegoTokenError.Malformed, exception.Error);
+        diagnostics.Diff("message", "SPNEGO token could not be decoded: Malformed.", exception.Message);
         Assert.AreEqual(SpnegoTokenError.Malformed, exception.Error);
         Assert.AreEqual("SPNEGO token could not be decoded: Malformed.", exception.Message);
     }
@@ -101,9 +154,15 @@ public sealed class SpnegoNegotiationResponseTests
     [DataRow("602106062B0601050502A0173015A00E300C060A2B06010401823702020AA2030401AA", DisplayName = "A framed initial token")]
     public void Decode_AnotherToken_ThrowsUnexpectedToken(string hex)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("token hex", hex);
+        diagnostics.Bytes("token", Convert.FromHexString(hex));
+
         SpnegoTokenException exception = Assert.ThrowsExactly<SpnegoTokenException>(
             () => SpnegoNegotiationResponse.Decode(Convert.FromHexString(hex)));
 
+        diagnostics.Act("exception", exception.GetType().Name);
+        diagnostics.Assert("error", SpnegoTokenError.UnexpectedToken, exception.Error);
         Assert.AreEqual(SpnegoTokenError.UnexpectedToken, exception.Error);
     }
 }

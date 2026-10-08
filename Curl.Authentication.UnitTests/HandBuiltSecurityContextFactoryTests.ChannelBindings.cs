@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Curl.Kerberos;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -20,7 +21,10 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
     [DataRow(SecurityMechanism.Kerberos)]
     public async Task ChannelBindings_Sha256RsaServerCertificate_SendsTheMd5OfItsTlsServerEndPointBindings(SecurityMechanism mechanism)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] certificate = TlsServerEndPointChannelBindingsTests.RsaCertificate(HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        diagnostics.Arrange("mechanism", mechanism);
+        diagnostics.Bytes("server certificate", certificate);
 
         FakeGssAcceptor acceptor = await EstablishAsync(Request(mechanism) with { ServerCertificate = certificate });
 
@@ -28,21 +32,34 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
         byte[] structure = new byte[20 + applicationData.Length];
         BinaryPrimitives.WriteUInt32LittleEndian(structure.AsSpan(16), (uint)applicationData.Length);
         applicationData.CopyTo(structure, 20);
+        diagnostics.Bytes("bindings in the authenticator checksum", ChecksumBindings(acceptor));
+        diagnostics.Act("bindings length", ChecksumBindings(acceptor).Length);
+        diagnostics.Diff("bindings", MD5.HashData(structure), ChecksumBindings(acceptor));
         CollectionAssert.AreEqual(MD5.HashData(structure), ChecksumBindings(acceptor));
     }
 
     [TestMethod]
     public async Task ChannelBindings_NoServerCertificate_SendsZeros()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Negotiate);
+        diagnostics.Arrange("server certificate", "none");
+
         FakeGssAcceptor acceptor = await EstablishAsync(Request(SecurityMechanism.Negotiate));
 
+        diagnostics.Bytes("bindings in the authenticator checksum", ChecksumBindings(acceptor));
+        diagnostics.Act("bindings length", ChecksumBindings(acceptor).Length);
+        diagnostics.Diff("bindings", new byte[16], ChecksumBindings(acceptor));
         CollectionAssert.AreEqual(new byte[16], ChecksumBindings(acceptor));
     }
 
     [TestMethod]
     public async Task ChannelBindings_RsaPssServerCertificateWithoutTicket_FailsWithExit91BeforeLookingForOne()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
         byte[] certificate = TlsServerEndPointChannelBindingsTests.RsaCertificate(HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        diagnostics.Arrange("mechanism", SecurityMechanism.Negotiate);
+        diagnostics.Bytes("RSA-PSS server certificate", certificate);
         KerberosServiceTicketSource noCache = new(
             () => KerberosConfiguration.Empty,
             () => throw new AssertFailedException("The bindings fail before the cache is read."),
@@ -52,6 +69,10 @@ public sealed partial class HandBuiltSecurityContextFactoryTests
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             async () => await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, CancellationToken.None));
 
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Act("message", failure.Message);
+        diagnostics.Assert("exit code", CurlExitCode.SslInvalidCertStatus, failure.ExitCode);
+        diagnostics.Diff("message", "Could not find digest algorithm UNDEF (NID 0)", failure.Message);
         Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, failure.ExitCode);
         Assert.AreEqual("Could not find digest algorithm UNDEF (NID 0)", failure.Message);
     }
