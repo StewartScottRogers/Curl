@@ -51,3 +51,4 @@ Every test in the files named below writes, through BL-1457's shared `TestDiagno
 ## Log
 
 - 2026-10-07: Created, split from BL-1458.
+- 2026-10-07: Backlog -> Doing.
