@@ -39,3 +39,4 @@ completed:
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Lane 7 could not integrate: push kept being refused. The work is on branch factory/BL-1605-lane-7-20261007-111121; start with git cherry-pick --no-commit factory/BL-1605-lane-7-20261007-111121 and fix it.
