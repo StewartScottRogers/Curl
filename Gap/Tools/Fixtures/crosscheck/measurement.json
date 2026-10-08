@@ -113,6 +113,21 @@
           "HTTP"
         ]
       }
+    },
+    {
+      "key": "behaviour:test9",
+      "state": "match",
+      "reason": null,
+      "expected": "upstream test9 passes",
+      "actual": "passes",
+      "evidence": "tests/data/test9",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP",
+          "FORM"
+        ]
+      }
     }
   ],
   "counts": {},

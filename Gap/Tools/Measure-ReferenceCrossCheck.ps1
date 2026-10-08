@@ -140,13 +140,25 @@ function Remove-ProgressMeter([byte[]] $Bytes) {
     return ($kept -join '')
 }
 
+# Bytes with every occurrence of the request's random multipart boundary, read from its
+# Content-Type: multipart/...; boundary= header, replaced by a fixed token, as upstream's
+# <strip> rules do; each run of curl picks its own boundary.
+function Set-FixedMultipartBoundary([byte[]] $Bytes, [byte[]] $Request) {
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    $header = [regex]::Match($latin1.GetString($Request), '(?im)^Content-Type:[ \t]*multipart/[^\r\n]*?;[ \t]*boundary=("?)([^";\r\n]+)\1')
+    if (-not $header.Success) { return ,$Bytes }
+    $text = $latin1.GetString($Bytes).Replace($header.Groups[2].Value, '<multipart-boundary>')
+    return ,([byte[]]$latin1.GetBytes($text))
+}
+
 function Read-Recording([string] $Folder) {
     $exit = ''
     if (Test-Path -LiteralPath (Join-Path $Folder 'exitcode.txt')) { $exit = ([System.IO.File]::ReadAllText((Join-Path $Folder 'exitcode.txt'))).Trim() }
+    $request = Read-Bytes (Join-Path $Folder 'request.bin')
     return [pscustomobject]@{
         ExitCode = $exit
-        Request = Read-Bytes (Join-Path $Folder 'request.bin')
-        Stdout = Read-Bytes (Join-Path $Folder 'stdout.bin')
+        Request = Set-FixedMultipartBoundary $request $request
+        Stdout = Set-FixedMultipartBoundary (Read-Bytes (Join-Path $Folder 'stdout.bin')) $request
         Stderr = Remove-ProgressMeter (Read-Bytes (Join-Path $Folder 'stderr.txt'))
     }
 }
@@ -300,13 +312,14 @@ if ($SelfTest) {
         Report ($s['behaviour:test4'].state -eq 'gap' -and $s['behaviour:test4'].expected -like 'reference curl exits 7;*' -and $s['behaviour:test4'].actual -eq 'stderr differs at byte 2') 'differ, gap: stays gap with the reference output as expected'
         Report ($s['behaviour:test5'].state -eq 'unmeasured' -and $s['behaviour:test6'].state -eq 'match' -and $s['behaviour:test7'].state -eq 'gap' -and $s['behaviour:test7'].actual -eq 'request differs') 'left-out cases keep their in-process verdict'
         Report ($s['behaviour:test8'].state -eq 'match') 'progress meter lines in stderr are not a difference'
+        Report ($s['behaviour:test9'].state -eq 'match' -and $null -eq $s['behaviour:test9'].reason) 'recordings that differ only in their multipart boundary agree'
         $x = $r.crossCheck
-        Report ($x.crossChecked -eq 5 -and $x.referenceDiverges -eq 1 -and $x.disagreements -eq 2) 'crossChecked 5, referenceDiverges 1, disagreements 2'
+        Report ($x.crossChecked -eq 6 -and $x.referenceDiverges -eq 1 -and $x.disagreements -eq 2) 'crossChecked 6, referenceDiverges 1, disagreements 2'
         Report ($x.leftOut['not-match-or-gap'] -eq 1 -and $x.leftOut['server-not-http-alone'] -eq 1 -and $x.leftOut['reply-not-one-data'] -eq 1 -and $x.leftOut['not-parsed'] -eq 0 -and $x.leftOut['limit'] -eq 0) 'selection counts each rule'
-        Report ($r.counts.match -eq 4 -and $r.counts.gap -eq 3 -and $r.counts.unmeasured -eq 1 -and $r.reasons.'reference-diverges' -eq 1) 'counts and reasons are recomputed'
+        Report ($r.counts.match -eq 5 -and $r.counts.gap -eq 3 -and $r.counts.unmeasured -eq 1 -and $r.reasons.'reference-diverges' -eq 1) 'counts and reasons are recomputed'
         $script:Limit = 2
         $l = Invoke-CrossCheck
-        Report ($l.crossCheck.crossChecked -eq 2 -and $l.crossCheck.leftOut['limit'] -eq 5) '-Limit caps the cases and counts the rest under limit'
+        Report ($l.crossCheck.crossChecked -eq 2 -and $l.crossCheck.leftOut['limit'] -eq 6) '-Limit caps the cases and counts the rest under limit'
     } finally {
         if (Test-Path -LiteralPath $script:OutFile) { Remove-Item -LiteralPath $script:OutFile -Force }
     }
