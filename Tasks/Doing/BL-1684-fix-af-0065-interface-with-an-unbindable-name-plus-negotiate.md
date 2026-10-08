@@ -70,3 +70,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Fix is in Curl.Protocol.Http.UnitLibrary (HttpProtocolHandler.WithFirstAuthorizationFailure), which BL-1609 in Doing touches; resume once BL-1609 is Done
+- 2026-10-07: Backlog -> Doing.
