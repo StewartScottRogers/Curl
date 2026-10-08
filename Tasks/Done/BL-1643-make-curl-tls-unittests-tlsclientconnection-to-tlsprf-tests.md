@@ -1,0 +1,44 @@
+---
+id: BL-1643
+title: Make Curl.Tls.UnitTests' TlsClientConnection to TlsPrf tests write descriptive diagnostic output
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: [BL-1457]
+touches: [Curl.Tls.UnitTests]
+requirement: none
+created: 2026-10-07
+completed: 2026-10-07
+---
+# BL-1643 — Make Curl.Tls.UnitTests' TlsClientConnection to TlsPrf tests write descriptive diagnostic output
+
+## Goal
+
+Every test in `Curl.Tls.UnitTests`' `TlsClientConnectionTests`, `TlsExtensionCodecTests` and `TlsPrfTests` (3 files, 52 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs, Act result and assertion context (plus `PHASE` timings where it has phases), with no test's logic or assertions changed.
+
+## Context
+
+- Split from BL-1489 (one task per range of files, as its Notes direct); BL-1489 keeps the whole-project checks and depends on this task. Follow BL-1489's Context for what matters in this project, and `Documentation/Wiki/Test-Diagnostics.md` and BL-1457's ADR for the line format; no prefix of your own; output only; large payloads through `BYTES`; nothing printed may depend on the operating system.
+- Every class is in namespace `Curl.Tls`, flat in the project root. A shared fake or helper may write lines for the tests that use it, as long as each test's `END` line counts them.
+
+## Acceptance criteria
+
+- [x] `dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~Curl.Tls.TlsClientConnectionTests.|FullyQualifiedName~Curl.Tls.TlsExtensionCodecTests.|FullyQualifiedName~Curl.Tls.TlsPrfTests." --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In these files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Tls.UnitTests -warnaserror` is clean and `dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Tls.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+
+## Notes
+
+- Counts before -> after (Assert. / [TestMethod / [DataRow( matches): TlsClientConnectionTests 43/13/7 -> 43/13/7, TlsExtensionCodecTests 94/29/0 -> 94/29/0, TlsPrfTests 12/10/0 -> 12/10/0. No assertion was changed; a few were rewritten to assert on a local holding the same value, so ACT could print it.
+- The filtered detailed run printed 56 END lines (52 methods, DataRow cases expanded), none with a zero count, 56 passed.
+- No test printed a SLOW: line; the handshake tests in TlsClientConnectionTests carry handshake and exchange PHASE lines.
+- AssertRejectsTruncationAndTrailingBytes became an instance method so it writes ASSERT lines for the tests that call it.
+- Only Curl.Tls.UnitTests was built (-warnaserror, clean) and tested (1283 passed): nothing references a test project, so the whole-solution build cannot change.
+
+## Log
+
+- 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every test in the three files writes ARRANGE, ACT and ASSERT diagnostics; build clean, 1283 tests pass
