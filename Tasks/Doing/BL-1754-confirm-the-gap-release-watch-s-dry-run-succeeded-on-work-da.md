@@ -40,3 +40,4 @@ push starts a fresh dry run (file another confirmation task for it).
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
