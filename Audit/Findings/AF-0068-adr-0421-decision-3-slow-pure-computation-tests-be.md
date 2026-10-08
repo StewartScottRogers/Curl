@@ -3,8 +3,8 @@ id: AF-0068
 title: ADR-0421 decision 3 (slow pure-computation tests become LongRunning with an env-var skip) is not in the code
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0421-integration-tests-live-only-in-integrationtests-projects.md:LongRunning:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
