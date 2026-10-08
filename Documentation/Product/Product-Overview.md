@@ -277,7 +277,10 @@ Checkable by someone outside the project, in priority order:
    against them, rising per release, is the headline number — far better evidence than
    any coverage percentage. **Today: 559 of the 2,017 vendored cases (28%) pass**, as
    listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`; a listed case that
-   stops passing fails the build.
+   stops passing fails the build. The gap analysis office (ADR-0433, `Gap/README.md`)
+   measures this continuously against the targeted curl release, in seven areas from
+   options to the behaviour of every upstream case, and publishes its scores on its
+   dashboard, <https://stewartscottrogers.github.io/Curl/gaps/>.
 2. **Differential testing.** For a corpus of invocations, real `curl` and this
    implementation produce byte-identical stdout, stderr and exit code. A
    disagreement is a bug here until proven otherwise.

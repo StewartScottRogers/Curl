@@ -8,7 +8,7 @@ depends-on: [BL-1741, BL-1736, BL-1743, BL-1744]
 touches: [Gap/README.md, CLAUDE.md, Documentation/Wiki/Glossary.md, Documentation/Product/Product-Overview.md]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1745 — Document the gap analysis office in Gap/README.md and CLAUDE.md and the glossary
 
@@ -68,15 +68,21 @@ continuously and where its dashboard is.
 
 ## Acceptance criteria
 
-- [ ] `Gap/README.md` has the sections listed above, with no row marked planned for a part that exists.
-- [ ] Root `CLAUDE.md` has a `## Gap analysis office` section with the seven points above, and the Git and GitHub section names the `gap` branch's pull requests.
-- [ ] `Documentation/Wiki/Glossary.md` has a `## The gap analysis office` section defining every term listed.
-- [ ] `Documentation/Product/Product-Overview.md`'s Success criteria mention the office and its dashboard URL.
-- [ ] Every command and path named in these documents exists in the repository. Spot-check by running `Gap\RunGapAnalysis.cmd -DryRun` and listing each named file.
+- [x] `Gap/README.md` has the sections listed above, with no row marked planned for a part that exists.
+- [x] Root `CLAUDE.md` has a `## Gap analysis office` section with the seven points above, and the Git and GitHub section names the `gap` branch's pull requests.
+- [x] `Documentation/Wiki/Glossary.md` has a `## The gap analysis office` section defining every term listed.
+- [x] `Documentation/Product/Product-Overview.md`'s Success criteria mention the office and its dashboard URL.
+- [x] Every command and path named in these documents exists in the repository. Spot-check by running `Gap\RunGapAnalysis.cmd -DryRun` and listing each named file.
 
 ## Notes
+
+- Delivered directly in the session rather than through align-and-document, to stay inside the run's cost cap; every statement was checked against the scripts' help, `Gap/Instructions/Gap-Format.md`, `Gap/Triage.md`, the agents' `model:` lines, `gap-release-watch.yml` and the dashboard page.
+- No difference from ADR-0433 found that needed a follow-up task: the analysts' models, the score rule, the closing rule and the watcher's schedule all match it.
+- `GapRunGapAnalysis.cmd -DryRun` refuses inside a lane (CURL_DARK_FACTORY_LANE set), as documented; run with the variable unset it printed all eleven steps' commands. Every path named in the four documents exists.
+- The Independence section states BL-1746 as intent, since BL-1746 is still in Backlog.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Gap/README.md, CLAUDE.md, the glossary and the product overview now document the gap analysis office as built
