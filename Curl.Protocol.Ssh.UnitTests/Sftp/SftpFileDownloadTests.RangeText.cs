@@ -26,6 +26,8 @@ public sealed partial class SftpFileDownloadTests
     [DataRow("2-x", NotDelivered, DisplayName = "text left over after no last number")]
     [DataRow("99999999999999999999-", NotDelivered, DisplayName = "first number overflows")]
     [DataRow("1-99999999999999999999", NotDelivered, DisplayName = "second number overflows")]
+    [DataRow("9223372036854775808-", NotDelivered, DisplayName = "first number one past long.MaxValue")]
+    [DataRow("-9223372036854775808", NotDelivered, DisplayName = "last bytes one past long.MaxValue")]
     [DataRow("11-12", "Offset (11) was beyond file size (10)", DisplayName = "start beyond the file")]
     public async Task DownloadAsync_RangeTextCurlSshRangeRefuses_EndsWithExit33AfterOpenAndStatWritingNothing(string text, string message)
     {
@@ -50,6 +52,7 @@ public sealed partial class SftpFileDownloadTests
     [DataRow("- 3", 7L, 3L, DisplayName = "last bytes")]
     [DataRow("-20", 0L, 10L, DisplayName = "more last bytes than the file")]
     [DataRow("5-100", 5L, 5L, DisplayName = "end past the file")]
+    [DataRow("-9223372036854775807", 0L, 10L, DisplayName = "last bytes exactly long.MaxValue")]
     public void Choose_RangeTextCurlSshRangeReads_ChoosesThePartItNames(string text, long offset, long length)
     {
         Diagnostics.ArrangeText("range text", text);
