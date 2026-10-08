@@ -1,8 +1,10 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.PacketProtection;
+using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Transport;
 
@@ -11,40 +13,78 @@ public sealed class SshPacketReaderTests
 {
     private static readonly SshKeyDerivation ReaderKeys = new(HashAlgorithmName.SHA256, [7], [.. new byte[32]], [.. new byte[32]]);
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public async Task ReadAsync_ReturnsThePayloadOfEachPacketAndCountsSequenceNumbers()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = new SshServerScript().Packet(2, 1, 2, 3).Packet(4).Bytes;
+        diagnostics.Bytes("scripted packets", bytes);
+        diagnostics.Arrange("chunk size", 3);
         SshPacketReader reader = new(new SshConnectionReader(ScriptedConnection.InChunks(bytes, 3)));
 
-        CollectionAssert.AreEqual(new byte[] { 2, 1, 2, 3 }, await reader.ReadAsync(CancellationToken.None));
-        Assert.AreEqual(1u, reader.SequenceNumber);
-        CollectionAssert.AreEqual(new byte[] { 4 }, await reader.ReadAsync(CancellationToken.None));
-        Assert.AreEqual(2u, reader.SequenceNumber);
+        byte[] first = await reader.ReadAsync(CancellationToken.None);
+        uint firstSequenceNumber = reader.SequenceNumber;
+        byte[] second = await reader.ReadAsync(CancellationToken.None);
+        uint secondSequenceNumber = reader.SequenceNumber;
+        diagnostics.Act("first packet", SshAuthenticationDiagnostics.MessageName(first));
+        diagnostics.Bytes("first packet", first);
+        diagnostics.Act("sequence number after first", firstSequenceNumber);
+        diagnostics.Act("second packet", SshAuthenticationDiagnostics.MessageName(second));
+        diagnostics.Bytes("second packet", second);
+        diagnostics.Act("sequence number after second", secondSequenceNumber);
+
+        diagnostics.Diff("first packet", new byte[] { 2, 1, 2, 3 }, first);
+        diagnostics.Assert("sequence number after first", 1u, firstSequenceNumber);
+        diagnostics.Diff("second packet", new byte[] { 4 }, second);
+        diagnostics.Assert("sequence number after second", 2u, secondSequenceNumber);
+        CollectionAssert.AreEqual(new byte[] { 2, 1, 2, 3 }, first);
+        Assert.AreEqual(1u, firstSequenceNumber);
+        CollectionAssert.AreEqual(new byte[] { 4 }, second);
+        Assert.AreEqual(2u, secondSequenceNumber);
     }
 
     [TestMethod]
     public async Task ReadAsync_ReadsWhatTheWriterWrote()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         ScriptedConnection written = new();
         byte[] payload = [20, .. Enumerable.Range(0, 300).Select(value => (byte)value)];
+        diagnostics.Arrange("payload", SshAuthenticationDiagnostics.MessageName(payload));
+        diagnostics.Bytes("payload", payload);
         await new SshPacketWriter(written, new RepeatingRandomSource(1)).WriteAsync(payload, CancellationToken.None);
+        diagnostics.Bytes("written packet", written.Written);
 
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(written.Written)));
 
-        CollectionAssert.AreEqual(payload, await reader.ReadAsync(CancellationToken.None));
+        byte[] read = await reader.ReadAsync(CancellationToken.None);
+        diagnostics.Act("read packet", SshAuthenticationDiagnostics.MessageName(read));
+        diagnostics.Bytes("read packet", read);
+
+        diagnostics.Diff("read packet", payload, read);
+        CollectionAssert.AreEqual(payload, read);
     }
 
     [TestMethod]
     public async Task ReadAsync_PacketOfTheMaximumSize_IsRead()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] payload = new byte[SshPacketReader.MaximumPacketSize - 4 - 1 - 11];
         payload[0] = 2;
         byte[] bytes = new SshServerScript().Packet(payload).Bytes;
+        diagnostics.Arrange("maximum packet size", SshPacketReader.MaximumPacketSize);
+        diagnostics.Arrange("payload length", payload.Length);
+        diagnostics.Arrange("scripted packet length", bytes.Length);
+        diagnostics.Assert("scripted packet length", SshPacketReader.MaximumPacketSize, bytes.Length);
         Assert.AreEqual(SshPacketReader.MaximumPacketSize, bytes.Length);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
 
-        Assert.AreEqual(payload.Length, (await reader.ReadAsync(CancellationToken.None)).Length);
+        byte[] read = await reader.ReadAsync(CancellationToken.None);
+        diagnostics.Act("read payload length", read.Length);
+
+        diagnostics.Assert("read payload length", payload.Length, read.Length);
+        Assert.AreEqual(payload.Length, read.Length);
     }
 
     [TestMethod]
@@ -54,10 +94,18 @@ public sealed class SshPacketReaderTests
     [DataRow(12u, (byte)200, DisplayName = "padding longer than the packet")]
     public async Task ReadAsync_BrokenFraming_ThrowsInvalidData(uint packetLength, byte paddingLength)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = new SshServerScript().RawPacket(packetLength, paddingLength, new byte[64]).Bytes;
+        diagnostics.Arrange("packet length", packetLength);
+        diagnostics.Arrange("padding length", paddingLength);
+        diagnostics.Bytes("scripted packet", bytes);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
 
-        await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await reader.ReadAsync(CancellationToken.None));
+        InvalidDataException failure = await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await reader.ReadAsync(CancellationToken.None));
+        diagnostics.Act("exception", $"{failure.GetType().Name}: {SshAuthenticationDiagnostics.Text(failure.Message)}");
+
+        diagnostics.Assert("exception type", nameof(InvalidDataException), failure.GetType().Name);
+        Assert.AreEqual(typeof(InvalidDataException), failure.GetType());
     }
 
     [TestMethod]
@@ -67,12 +115,18 @@ public sealed class SshPacketReaderTests
     [DataRow(0u, -12, DisplayName = "zero length")]
     public async Task ReadAsync_UnprotectedLengthZeroOrOverTheMaximum_ThrowsWithLibssh2sCode(uint packetLength, int expectedCode)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = new SshServerScript().RawPacket(packetLength, 4, new byte[64]).Bytes;
+        diagnostics.Arrange("packet length", packetLength);
+        diagnostics.Arrange("expected libssh2 error code", expectedCode);
+        diagnostics.Bytes("scripted packet", bytes);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
 
         SshPacketLengthException failure = await Assert.ThrowsExactlyAsync<SshPacketLengthException>(
             async () => await reader.ReadAsync(CancellationToken.None));
+        diagnostics.Act("libssh2 error code", failure.Libssh2ErrorCode);
 
+        diagnostics.Assert("libssh2 error code", expectedCode, failure.Libssh2ErrorCode);
         Assert.AreEqual(expectedCode, failure.Libssh2ErrorCode);
     }
 
@@ -84,13 +138,20 @@ public sealed class SshPacketReaderTests
     [DataRow(39984u, true, DisplayName = "4 + 39984 + a 16-byte tag, over the maximum: -41")]
     public async Task ReadAsync_LengthNearTheMaximum_CountsTheTag(uint packetLength, bool refused)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = [.. SshTestEncoding.UInt32(packetLength), .. new byte[128]];
+        diagnostics.Arrange("packet length", packetLength);
+        diagnostics.Arrange("refused", refused);
+        diagnostics.Bytes("scripted bytes", bytes);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
         reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With("aes128-gcm@openssh.com", null), ReaderKeys));
 
         Exception failure = await Assert.ThrowsAsync<Exception>(async () => await reader.ReadAsync(CancellationToken.None));
+        Type expectedType = refused ? typeof(SshPacketLengthException) : typeof(EndOfStreamException);
+        diagnostics.Act("exception", $"{failure.GetType().Name}: {SshAuthenticationDiagnostics.Text(failure.Message)}");
 
-        Assert.AreEqual(refused ? typeof(SshPacketLengthException) : typeof(EndOfStreamException), failure.GetType());
+        diagnostics.Assert("exception type", expectedType.Name, failure.GetType().Name);
+        Assert.AreEqual(expectedType, failure.GetType());
     }
 
     [TestMethod]
@@ -99,16 +160,22 @@ public sealed class SshPacketReaderTests
     [DataRow("chacha20-poly1305@openssh.com", null, DisplayName = "ChaCha20-Poly1305, as measured")]
     public async Task ReadAsync_ProtectedLengthOverTheMaximum_ThrowsWithMinus41(string cipher, string? mac)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("cipher", cipher);
+        diagnostics.Arrange("mac", mac ?? "(none)");
         byte[] bytes = new SshServerScript()
             .Protect(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys), resetSequenceNumber: true)
             .Packet([6, 1, 2, 3], sealedPacket => sealedPacket[0] ^= 0x80)
             .Bytes;
+        diagnostics.Bytes("scripted sealed packet", bytes);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
         reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys));
 
         SshPacketLengthException failure = await Assert.ThrowsExactlyAsync<SshPacketLengthException>(
             async () => await reader.ReadAsync(CancellationToken.None));
+        diagnostics.Act("libssh2 error code", failure.Libssh2ErrorCode);
 
+        diagnostics.Assert("libssh2 error code", -41, failure.Libssh2ErrorCode);
         Assert.AreEqual(-41, failure.Libssh2ErrorCode);
     }
 
@@ -124,16 +191,25 @@ public sealed class SshPacketReaderTests
     [DataRow("chacha20-poly1305@openssh.com", null, -12, DisplayName = "ChaCha20-Poly1305")]
     public async Task ReadAsync_ProtectedPacketAltered_ThrowsWithLibssh2sCode(string cipher, string? mac, int expectedCode)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("cipher", cipher);
+        diagnostics.Arrange("mac", mac ?? "(none)");
+        diagnostics.Arrange("expected libssh2 error code", expectedCode);
         byte[] bytes = new SshServerScript()
             .Protect(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys), resetSequenceNumber: true)
             .Packet([6, 1, 2, 3], sealedPacket => sealedPacket[^1] ^= 1)
             .Bytes;
+        diagnostics.Bytes("scripted altered sealed packet", bytes);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
         reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With(cipher, mac), ReaderKeys));
 
         SshPacketAuthenticationException failure = await Assert.ThrowsExactlyAsync<SshPacketAuthenticationException>(
             async () => await reader.ReadAsync(CancellationToken.None));
+        diagnostics.Act("libssh2 error code", failure.Libssh2ErrorCode);
+        diagnostics.Act("sequence number", reader.SequenceNumber);
 
+        diagnostics.Assert("libssh2 error code", expectedCode, failure.Libssh2ErrorCode);
+        diagnostics.Assert("sequence number", 0u, reader.SequenceNumber);
         Assert.AreEqual(expectedCode, failure.Libssh2ErrorCode);
         Assert.AreEqual(0u, reader.SequenceNumber, "a packet that fails its check is not counted");
     }
@@ -143,20 +219,34 @@ public sealed class SshPacketReaderTests
     [DataRow(28u, DisplayName = "a multiple of 16 only with the length field")]
     public async Task ReadAsync_EncryptThenMacFraming_RefusesLengthsOffTheBlockSize(uint packetLength)
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = [.. SshTestEncoding.UInt32(packetLength), .. new byte[128]];
+        diagnostics.Arrange("packet length", packetLength);
+        diagnostics.Bytes("scripted bytes", bytes);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
         reader.ChangeProtection(SshPacketProtections.ForServerToClient(SshTestAlgorithms.With("aes128-gcm@openssh.com", null), ReaderKeys));
 
-        await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await reader.ReadAsync(CancellationToken.None));
+        InvalidDataException failure = await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await reader.ReadAsync(CancellationToken.None));
+        diagnostics.Act("exception", $"{failure.GetType().Name}: {SshAuthenticationDiagnostics.Text(failure.Message)}");
+
+        diagnostics.Assert("exception type", nameof(InvalidDataException), failure.GetType().Name);
+        Assert.AreEqual(typeof(InvalidDataException), failure.GetType());
     }
 
     [TestMethod]
     public async Task ReadAsync_PeerClosesInsideThePacket_ThrowsEndOfStream()
     {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         byte[] bytes = new byte[8];
         BinaryPrimitives.WriteUInt32BigEndian(bytes, 12);
+        diagnostics.Arrange("scripted byte count", bytes.Length);
+        diagnostics.Bytes("scripted bytes", bytes);
         SshPacketReader reader = new(new SshConnectionReader(new ScriptedConnection(bytes)));
 
-        await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () => await reader.ReadAsync(CancellationToken.None));
+        EndOfStreamException failure = await Assert.ThrowsExactlyAsync<EndOfStreamException>(async () => await reader.ReadAsync(CancellationToken.None));
+        diagnostics.Act("exception", $"{failure.GetType().Name}: {SshAuthenticationDiagnostics.Text(failure.Message)}");
+
+        diagnostics.Assert("exception type", nameof(EndOfStreamException), failure.GetType().Name);
+        Assert.AreEqual(typeof(EndOfStreamException), failure.GetType());
     }
 }
