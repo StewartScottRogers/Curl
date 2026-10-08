@@ -65,3 +65,4 @@ self-test runs with `-ArchivePath`-style local inputs and needs no network.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
