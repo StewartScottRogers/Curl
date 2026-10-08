@@ -1,0 +1,13 @@
+{
+  "reference": "curl 9.9.9 (fixture) libcurl/9.9.9",
+  "answers": {
+    "--verbose": { "reference": { "exitCode": 2, "stderr": "curl: (2) no URL specified" }, "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "-v": { "reference": { "exitCode": 2, "stderr": "curl: (2) no URL specified" }, "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "--no-verbose": { "reference": { "exitCode": 2, "stderr": "curl: (2) no URL specified" }, "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "--max-time 1": { "reference": { "exitCode": 2, "stderr": "curl: (2) no URL specified" }, "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "-m 1": { "reference": { "exitCode": 2, "stderr": "curl: (2) no URL specified" }, "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "--max-time": { "reference": { "exitCode": 2, "stderr": "curl: option --max-time: requires parameter" }, "candidate": { "exitCode": 0, "stderr": "" } },
+    "--fail": { "reference": { "exitCode": 2, "stderr": "curl: (2) no URL specified" }, "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "--no-fail": { "reference": { "exitCode": 2, "stderr": "curl: (2) no URL specified" }, "candidate": { "exitCode": 2, "stderr": "curl: option --no-fail: is unknown" } }
+  }
+}

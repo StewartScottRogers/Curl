@@ -1,0 +1,13 @@
+{
+  "reference": null,
+  "answers": {
+    "--verbose": { "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "-v": { "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "--no-verbose": { "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "--max-time 1": { "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "-m 1": { "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } },
+    "--max-time": { "candidate": { "exitCode": 2, "stderr": "curl: option --max-time: requires parameter" } },
+    "--fail": { "candidate": { "exitCode": 2, "stderr": "curl: option --fail: is unknown\ncurl: try 'curl --help' or 'curl --manual' for more information" } },
+    "--no-fail": { "candidate": { "exitCode": 2, "stderr": "curl: (2) no URL specified" } }
+  }
+}
