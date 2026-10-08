@@ -24,7 +24,11 @@
       tasksDone                 tasks whose trace reached DONE since -Since
       medianTaskMinutes         median minutes from a done task's last claim to its DONE
       p90TaskMinutes            the same at the 90th percentile (nearest rank)
-      tasksClaimedMoreThanOnce  tasks claimed more than once since -Since: redone work
+      tasksClaimedMoreThanOnce  tasks claimed more than once since -Since: redone work. A claim
+                                is one `claim` trace line in a DarkFactory-*.log file. Not
+                                counted: `race` lines, the older "claim   lost the race;
+                                picking again" lines, and any mention of "claim BL-nnn" in a
+                                run transcript (.jsonl files are read only for cost and tokens)
       requeues                  REQUEUE lines: a task sent back from Doing to Backlog
       resumedRuns               task runs whose log is a -resumed.jsonl
       ciRedMinutes              minutes from the end of the first failed CI run after a
@@ -191,7 +195,10 @@ function Measure-Process([string]$Root, [datetime]$From, [object[]]$CiRuns) {
     $terminal = @{ DONE = 'done'; REQUEUE = 'requeued'; BLOCKED = 'blocked'; PARKED = 'parked' }
     foreach ($e in $events) {
         if ($e.Id -notmatch '^BL-\d+$') { continue }
-        if ($e.Verb -eq 'claim') {
+        # A claim is a pushed claim. Older factory logs traced a refused claim push as a
+        # "claim   lost the race; picking again" line (BL-1281 now traces it as verb race), so
+        # that text is a lost race, not a claim (BL-1286).
+        if ($e.Verb -eq 'claim' -and $e.Text -notmatch '^lost the race') {
             if (-not $tasks.Contains($e.Id)) { $tasks[$e.Id] = [pscustomobject]@{ Id = $e.Id; Claims = 0; LastClaim = $null; Ended = $null; Outcome = 'open' } }
             $t = $tasks[$e.Id]; $t.Claims++; $t.LastClaim = $e.At; $t.Ended = $null; $t.Outcome = 'open'
         }
@@ -287,6 +294,11 @@ if ($SelfTest) {
     $ok = "$($m.laneMinutes)" -eq '941.42'
     if (-not $ok) { $failed++ }
     Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) laneMinutes: $($m.laneMinutes) (expected 941.42)"
+    # BL-1286: a lost race (the older "claim   lost the race" line or a race line) is no claim.
+    $bl003 = @($m.tasks | Where-Object { $_.id -eq 'BL-003' })[0]
+    $ok = $bl003.claims -eq 1
+    if (-not $ok) { $failed++ }
+    Write-Host "$(if ($ok) { 'PASS' } else { 'FAIL' }) task row BL-003 lost-race and race lines not counted: claims $($bl003.claims) (expected 1)"
     $bl004 = @($m.tasks | Where-Object { $_.id -eq 'BL-004' })[0]
     $ok = $bl004.outcome -eq 'open'
     if (-not $ok) { $failed++ }

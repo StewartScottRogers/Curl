@@ -2,8 +2,8 @@
 
 Every auditor ends its reply with one machine-readable report block. The audit run
 saves each reply, and the audit tools read the block:
-`Audit/Tools/Write-AuditFindings.ps1` (planned, BL-1016) turns it into finding files
-under `Audit/Findings/`, and `Audit/Tools/Write-AuditScorecard.ps1` (planned, BL-1017)
+`Audit/Tools/Write-AuditFindings.ps1` (BL-1016) turns it into finding files
+under `Audit/Findings/`, and `Audit/Tools/Write-AuditScorecard.ps1` (BL-1017)
 turns it into the scorecard's rows. The tools read nothing else from the reply, so
 anything not in the block is lost to them. The rules every auditor follows are in
 [Auditor-Rules.md](Auditor-Rules.md); the finding file is described in
@@ -106,7 +106,7 @@ is missing, `null` or 0 (BL-1364). Re-audits never count toward them.
 
 ### performance
 
-From `Audit/Tools/Measure-Performance.ps1` (planned, BL-1007). For each scenario, in this
+From `Audit/Tools/Measure-Performance.ps1` (BL-1007). For each scenario, in this
 order: `startup`, `small-get`, `large-get`, `headers-verbose`, `chunked`, `redirects`:
 
 | Name | Unit | Meaning |
@@ -126,7 +126,7 @@ Plus one name for the whole run:
 
 ### process
 
-From `Audit/Tools/Measure-FactoryProcess.ps1` (planned, BL-1008), whose header help is the
+From `Audit/Tools/Measure-FactoryProcess.ps1` (BL-1008), whose header help is the
 authoritative definition of each; units and a short meaning here:
 
 | Name | Unit | Meaning |
@@ -151,20 +151,20 @@ authoritative definition of each; units and a short meaning here:
 
 | Name | Unit | Meaning |
 | --- | --- | --- |
-| `mutationScore.<Library>` | fraction, 0 to 1 | One per library mutated, for example `mutationScore.Curl.Cli.UnitLibrary`: the `score` `Audit/Tools/Invoke-MutationTest.ps1` (planned, BL-1004) reports, `(killed + timedOut) / (killed + timedOut + survived)`. |
+| `mutationScore.<Library>` | fraction, 0 to 1 | One per library mutated, for example `mutationScore.Curl.Cli.UnitLibrary`: the `score` `Audit/Tools/Invoke-MutationTest.ps1` (BL-1004) reports, `(killed + timedOut) / (killed + timedOut + survived)`. |
 
 ### security
 
 | Name | Unit | Meaning |
 | --- | --- | --- |
-| `fuzzIterations.<target>` | count | One per fuzz target run (`tls-handshake`, `cli`, `ssh`): inputs `Audit/Tools/Fuzz/Fuzz.cs` (planned, BL-1005) fed that target. |
+| `fuzzIterations.<target>` | count | One per fuzz target run (`tls-handshake`, `cli`, `ssh`): inputs `Audit/Tools/Fuzz/Fuzz.cs` (BL-1005) fed that target. |
 | `fuzzCrashes.<target>` | count | Distinct inputs the harness saved for that target: an unexpected exception or a hang, one per exception type and top stack frame. |
 
 ### conformance
 
 | Name | Unit | Meaning |
 | --- | --- | --- |
-| `differentialCases` | count | Generated command lines run through both binaries by `Audit/Tools/Invoke-DifferentialConformance.ps1` (planned, BL-1006). |
+| `differentialCases` | count | Generated command lines run through both binaries by `Audit/Tools/Invoke-DifferentialConformance.ps1` (BL-1006). |
 | `differentialDifferences` | count | Cases whose request bytes, standard output, standard error or exit code differed. |
 
 ### truthfulness
