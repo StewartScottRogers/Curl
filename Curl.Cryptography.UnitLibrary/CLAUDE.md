@@ -85,7 +85,8 @@ Namespace `Curl.Cryptography`. It holds:
   wrong tag, plus the internal `FormatBlock` that lays out B0 and the counter blocks.
   Constant-time.
 - `MontgomeryModulus` (internal): arithmetic modulo an odd modulus, public or secret, on
-  32-bit limbs - CIOS Montgomery multiplication with a masked final subtraction, a fixed
+  32-bit limbs - Montgomery multiplication with a masked final subtraction (on the limbs
+  read in place as 64-bit ones when their count is even, BL-1711; 32-bit CIOS when odd), a fixed
   4-bit window exponentiation whose table look-up reads all 16 entries (run on 64-bit
   limbs with its own multiplication and squaring, carries from unsigned comparisons,
   ADR-0429), `Reduce` of any

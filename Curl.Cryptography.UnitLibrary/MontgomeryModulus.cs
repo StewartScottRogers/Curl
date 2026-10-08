@@ -6,10 +6,11 @@ namespace Curl.Cryptography;
 
 /// <summary>
 /// Arithmetic modulo an odd modulus in Montgomery form, on fixed-width 32-bit limbs
-/// stored least significant first: multiplication by coarsely integrated operand scanning
-/// (CIOS) with a masked final subtraction, modular addition, subtraction and reduction,
-/// and a fixed-window exponentiation whose table look-up reads every entry, which runs on
-/// 64-bit limbs with its own multiplication and squaring because it is the hot path.
+/// stored least significant first: Montgomery multiplication with a masked final
+/// subtraction, run on 64-bit limbs read in place when the limb count is even and by 32-bit
+/// coarsely integrated operand scanning (CIOS) when it is odd, modular addition,
+/// subtraction and reduction, and a fixed-window exponentiation whose table look-up reads
+/// every entry, which runs on 64-bit limbs with its own multiplication and squaring.
 /// <see cref="FiniteFieldDiffieHellman" /> runs on it with a public prime, and
 /// <see cref="RsaCrtPrivateKey" /> with the secret primes of an RSA key, and the brainpool
 /// curves' field and group order (<see cref="BrainpoolDomainParameters" />) with public primes.
@@ -36,7 +37,7 @@ internal sealed class MontgomeryModulus
     private readonly uint[] one;
     private readonly uint negativeInverse;
 
-    // The same modulus on 64-bit limbs for Exponentiate, whose Montgomery radix is
+    // The same modulus on 64-bit limbs for Exponentiate and an even-limbed Multiply, whose Montgomery radix is
     // R' = 2^(64 * ceil(LimbCount / 2)): R' mod m, R'^2 mod m, and -m^-1 mod 2^64.
     private readonly ulong[] wideModulus;
     private readonly ulong[] wideOne;
@@ -192,7 +193,31 @@ internal sealed class MontgomeryModulus
     /// <param name="left">The first operand.</param>
     /// <param name="right">The second operand.</param>
     /// <param name="scratch">At least <see cref="LimbCount" /> + 2 limbs of working space.</param>
+    /// <remarks>
+    /// With an even <see cref="LimbCount" /> the 64-bit limbs' radix R' equals R, so the
+    /// 32-bit limbs are read in place as 64-bit ones (little-endian, as every .NET target
+    /// is) and <see cref="MultiplyWide" /> does the work in a quarter of the inner-loop
+    /// steps; an odd count keeps the 32-bit loop. The choice rests on the limb count alone,
+    /// which is public, and neither loop has a bound or index that depends on a value.
+    /// </remarks>
     public void Multiply(Span<uint> result, ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> scratch)
+    {
+        int n = LimbCount;
+        if ((n & 1) == 0)
+        {
+            MultiplyWide(
+                MemoryMarshal.Cast<uint, ulong>(result[..n]),
+                MemoryMarshal.Cast<uint, ulong>(left[..n]),
+                MemoryMarshal.Cast<uint, ulong>(right[..n]),
+                MemoryMarshal.Cast<uint, ulong>(scratch[..(n + 2)]));
+            return;
+        }
+
+        MultiplyNarrow(result, left, right, scratch);
+    }
+
+    /// <summary>The 32-bit CIOS loop of <see cref="Multiply" />, for an odd <see cref="LimbCount" />.</summary>
+    private void MultiplyNarrow(Span<uint> result, ReadOnlySpan<uint> left, ReadOnlySpan<uint> right, Span<uint> scratch)
     {
         int n = LimbCount;
         Span<uint> total = scratch[..(n + 2)];

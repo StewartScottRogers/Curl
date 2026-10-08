@@ -62,6 +62,32 @@ public sealed class MontgomeryModulusTests
     }
 
     [TestMethod]
+    [DataRow("02", "03")]
+    [DataRow("01FFFFFFFFFFFFFFFFFFFFFE", "01FFFFFFFFFFFFFFFFFFFFFE")]
+    public void Multiply_OddLimbCount_GivesTheProductTimesRInverseOnTheThirtyTwoBitLoop(string left, string right)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        BigInteger p = (BigInteger.One << 89) - 1;
+        byte[] modulusBytes = p.ToByteArray(isUnsigned: true, isBigEndian: true);
+        var modulus = new MontgomeryModulus(modulusBytes);
+        BigInteger r = BigInteger.One << (32 * modulus.LimbCount);
+        uint[] result = new uint[modulus.LimbCount];
+        ArrangeModulus(diagnostics, modulus);
+        diagnostics.Arrange("left", left);
+        diagnostics.Arrange("right", right);
+
+        modulus.Multiply(result, Limbs(modulus, left), Limbs(modulus, right), new uint[modulus.LimbCount + 2]);
+        diagnostics.Act("result", ToInteger(result));
+
+        BigInteger expected = ToInteger(Convert.FromHexString(left)) * ToInteger(Convert.FromHexString(right))
+            * BigInteger.ModPow(r, p - 2, p) % p;
+        diagnostics.Assert("limb count", 3, modulus.LimbCount);
+        diagnostics.Assert("left * right * R^-1 mod p", expected, ToInteger(result));
+        Assert.AreEqual(3, modulus.LimbCount);
+        Assert.AreEqual(expected, ToInteger(result));
+    }
+
+    [TestMethod]
     [DataRow("03", "00")]
     [DataRow("03", "01")]
     [DataRow("07FFFFFFFFFFFFFFFFFFFFFFFFFE", "FFFF")]
