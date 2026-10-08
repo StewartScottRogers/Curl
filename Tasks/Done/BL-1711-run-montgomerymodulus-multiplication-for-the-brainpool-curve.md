@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary, Curl.Cryptography.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1711 — Run MontgomeryModulus multiplication for the brainpool curves and RSA on 64-bit limbs
 
@@ -38,3 +38,4 @@ completed:
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Multiply on 64-bit limbs for even limb counts; P512r1 ECDH 2.9x faster
