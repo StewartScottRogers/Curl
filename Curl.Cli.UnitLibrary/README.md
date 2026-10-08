@@ -2,8 +2,9 @@
 
 The command-line layer: turning the arguments curl was given into settings, and refusing
 them with curl's own messages and exit code when they are wrong. `Curl.Console`'s
-`CurlCommandRunner` calls `CommandLineParser.Parse` and builds each transfer from the result;
-it does not yet pass on `Range`, `ResumeFrom` or `MaxFileSize` (task BL-095), nor `ConnectTimeout` or `MaxTime` (tasks BL-123 and BL-124).
+`CurlCommandRunner` calls `CommandLineParser.Parse` and builds each transfer from the result,
+passing on every setting this layer reads, `Range`, `ResumeFrom`, `MaxFileSize`, `ConnectTimeout`
+and `MaxTime` among them.
 
 ## What lives here
 

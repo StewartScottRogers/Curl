@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1685 — Fix AF-0066: Cli README says CurlCommandRunner does not yet pass on Range, ResumeFrom, MaxFileSize, ConnectTimeout or MaxTime; it passes all five
 
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Took lane 4's README change from `factory/BL-1685-lane-4-20261007-111121` (its task-file edits conflicted and were dropped). `Curl.Cli.UnitLibrary/README.md` now says the runner passes on every setting this layer reads, `Range`, `ResumeFrom`, `MaxFileSize`, `ConnectTimeout` and `MaxTime` among them. Made directly rather than through align-and-document: a one-sentence fix. The reproduction finds no README match and still finds `TransferContextFactory.cs:164`. Docs only, no `.cs` changed; build clean, 33 fast test assemblies passed, 0 failed.
 
 ## Log
 
@@ -52,3 +54,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Lane 4 could not integrate: push kept being refused. The work is on branch factory/BL-1685-lane-4-20261007-111121; start with git cherry-pick --no-commit factory/BL-1685-lane-4-20261007-111121 and fix it.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Cli README now says CurlCommandRunner passes Range, ResumeFrom, MaxFileSize, ConnectTimeout and MaxTime; AF-0066 reproduction no longer matches
