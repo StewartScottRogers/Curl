@@ -1,4 +1,6 @@
 10:00:05 L2 -   shift   start  branch=work/dark-factory model=opus until 18:00
+10:00:05 L2 BL-003 claim   lost the race; picking again
+10:00:05 L2 BL-003 race    another lane pushed first; picking again
 10:00:05 L2 BL-003 claim   Fixture task three
 10:45:05 L2 BL-003 DONE    2026-01-01: Doing -> Done. Fixture task three works.
 10:46:00 L2 -   wait    No task is ready.
