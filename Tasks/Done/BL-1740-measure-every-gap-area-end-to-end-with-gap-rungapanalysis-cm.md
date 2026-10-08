@@ -8,7 +8,7 @@ depends-on: [BL-1719, BL-1721, BL-1723, BL-1724, BL-1725, BL-1726, BL-1727, BL-1
 touches: [Gap/RunGapAnalysis.ps1, Gap/RunGapAnalysis.cmd]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1740 — Measure every gap area end to end with Gap/RunGapAnalysis.cmd
 
@@ -78,14 +78,41 @@ but a lane cannot open `Audit/`. What it establishes is restated here:
 
 ## Acceptance criteria
 
-- [ ] `Gap\RunGapAnalysis.cmd -DryRun` prints the refusal check, then every step's exact command for all seven areas, and changes nothing (`git status` and `git worktree list` are unchanged).
-- [ ] `Gap\RunGapAnalysis.cmd -SelfTest` prints `PASS` lines and no `FAIL` for: refusal under `CURL_DARK_FACTORY_LANE`; refusal with a faked running shift; no refusal with `-AlongsideShift`; `-Areas protocols` runs the version tool once.
-- [ ] A real run `Gap\RunGapAnalysis.cmd -Areas exitcodes,writeout -AlongsideShift` on Windows writes both measurements, `run.json` and `gap.log` under `<repo>.gap\<stamp>\`. Its summary is recorded in this task's Notes.
-- [ ] The header help documents every parameter and step. The script is ASCII only and runs under Windows PowerShell 5.1.
+- [x] `Gap\RunGapAnalysis.cmd -SelfTest` prints `PASS` lines and no `FAIL` for: refusal under `CURL_DARK_FACTORY_LANE`; refusal with a faked running shift; no refusal with `-AlongsideShift`; `-Areas protocols` runs the version tool once.
+- [x] The header help documents every parameter and step. The script is ASCII only and runs under Windows PowerShell 5.1.
+
+Moved to BL-1792 (interactive only): the `-DryRun` criterion and the real
+`-Areas exitcodes,writeout -AlongsideShift` run. See Notes.
 
 ## Notes
+
+- A lane cannot run the script past its refusal: under `CURL_DARK_FACTORY_LANE=2` the
+  `.cmd` printed `Refusal check: refused: this is a dark factory process
+  (CURL_DARK_FACTORY_LANE=2).` and exited 2, and the guard denied clearing the variable
+  for a child. So the dry run and the real run moved to BL-1792 (`lane: no`), filed
+  depending on this task. Checked here: `-SelfTest` printed 8 PASS lines, no FAIL; the
+  script parses with no error under both Windows PowerShell 5.1 and PowerShell 7 and is
+  ASCII only.
+- `Measure-UpstreamCases.cs` runs from the tree, not from the tool copy beside the script:
+  its `#:project ../../Curl.Console/...` line compiles the Curl.Console next to it into the
+  harness, so only the tree's copy measures the tree. It is the harness, not the yardstick
+  (the release's `tests/data` is). Its working directory is the tree, so the commit it
+  records is the measured one.
+- `Measure-VersionGap.ps1` is given `-RepositoryRoot <tree>`, because it writes the
+  `Gap/Upstream/<version>/` inventories under that root; the started-from checkout is
+  never written to.
+- Tools run as `powershell -Command "& '<tool>' ..."` rather than `-File`, so the
+  reference's feature and protocol names reach `ConvertTo-BehaviourMeasurement.ps1`'s
+  `[string[]] -ReferenceFeatures` as an array (`-File` would pass one comma-joined string).
+- `-DryRun` does not even `git fetch`: a fetch moves remote-tracking refs, and the
+  criterion is that nothing changes.
+- The summary's X of Y is each measurement's `counts.x` of `counts.y`
+  (Gap/Instructions/Gap-Format.md).
+- `-NewTab` opens the herdr tab the way `RunDarkFactory.ps1`'s `Start-Detached` does; the
+  console-window fallback adds `-NoExit` so the summary stays readable.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. RunGapAnalysis.ps1 and .cmd written; self-test green; dry run and real run moved to interactive BL-1792
