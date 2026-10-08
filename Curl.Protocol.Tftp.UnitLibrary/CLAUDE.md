@@ -69,6 +69,11 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   port-unreachable for the datagram sent - is answered the same way
   (`TftpTimeLimits.RefusedReceive`, BL-1452), so a port where nothing listens ends with
   exit 7 `Received too short packet` once the retries run out.
+- Download only: each receive may fill only the block size in force plus four bytes, as
+  curl 8.21.0's `tftp_receive_packet` asks `recvfrom` for (BL-1668, ADR-0430). A longer
+  DATA packet is cut to the block size on Linux and macOS and written; on Windows the
+  receive fails with `SocketError.MessageSize`, answered as a datagram under four bytes
+  (measured: nothing written, `Received too short packet`).
 - Upload only: an ACK of the wrong block re-sends the last packet at once and counts a
   retry (one too many is exit 55 `tftp_tx: giving up waiting for block N ack`), without
   moving the next scheduled re-send. Before DATA 1, a re-send after an ACK is the WRQ's

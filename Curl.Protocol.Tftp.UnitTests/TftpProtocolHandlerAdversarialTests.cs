@@ -388,6 +388,42 @@ public sealed class TftpProtocolHandlerAdversarialTests
         Assert.AreEqual(TimeSpan.Zero, clock.Now);
     }
 
+    /// <summary>
+    /// Linux and macOS (BL-1668): curl 8.21.0 receives into the block size plus four, so
+    /// the kernel cuts a 600-byte DATA payload to 512 bytes and curl writes and ACKs those.
+    /// The scripted channel cuts a datagram to the buffer as those sockets do.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DataLongerThanDefaultBlockSize_CutsItToTheBlockSizeAsLinuxAndMacOSDo()
+    {
+        var channel = Channel(Data(1, Payload(600, 'a')), Data(2, "b"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output written", Payload(512, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(Payload(512, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(513, result.BytesTransferred);
+        CollectionAssert.AreEqual(new ushort[] { 1, 2 }, AcknowledgedBlocks(channel));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_DataLongerThanAcknowledgedBlockSize_CutsItToTheAcknowledgedBlockSize()
+    {
+        var channel = Channel(OptionAcknowledgement("blksize\016\0"), Data(1, Payload(40, 'a')), Data(2, "b"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output, tftpBlockSize: 16));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output written", Payload(16, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(Payload(16, 'a') + "b", Encoding.ASCII.GetString(output.ToArray()));
+        CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, AcknowledgedBlocks(channel));
+    }
+
     private static string Payload(int length, char fill) => new(fill, length);
 
     private static (byte[] Datagram, EndPoint Source) Data(ushort block, string payload) =>

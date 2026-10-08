@@ -448,6 +448,33 @@ public sealed class TftpDownloadRetransmissionTests
         Assert.AreEqual(TransferEndPoint, channel.Sent[2].Destination);
     }
 
+    /// <summary>
+    /// Windows (BL-1668, measured with curl 8.21.0 Schannel): a DATA 1 of 600 payload bytes
+    /// fails curl's <c>recvfrom</c> of 516 bytes with WSAEMSGSIZE, which curl notes as
+    /// <c>Received too short packet</c>; nothing of it is written or acknowledged, and the
+    /// next DATA 1 of one byte completes the download with exit 0.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DataLongerThanBlockSizeFailsReceiveAsOnWindows_ReportsTooShortAndCompletesOnNextBlock()
+    {
+        Diagnostics.Arrange("refusal socket error", SocketError.MessageSize);
+        var channel = Channel(FallsSilentDatagramChannel.Refusal(SocketError.MessageSize), Data(1, "b"));
+        var output = new MemoryStream();
+        var events = new RecordingTransferEvents();
+
+        var result = await Run(channel, Context(output: output, events: events));
+
+        DiagnoseOutcome(result, CurlExitCode.Ok, null);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("output written", "b", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual("b", Encoding.ASCII.GetString(output.ToArray()));
+        Diagnostics.Assert("too short events", 1, events.Steps.Count(step => step == "Received too short packet"));
+        Assert.AreEqual(1, events.Steps.Count(step => step == "Received too short packet"));
+        Diagnostics.Assert("datagrams sent", 3, channel.Sent.Count);
+        Assert.HasCount(3, channel.Sent);
+        Assert.AreEqual(ServerEndPoint, channel.Sent[1].Destination);
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_ReceiveFailsWithOtherSocketError_ThrowsSocketException()
     {

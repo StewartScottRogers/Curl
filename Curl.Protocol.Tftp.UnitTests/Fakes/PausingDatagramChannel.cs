@@ -42,8 +42,10 @@ public sealed class PausingDatagramChannel(
             throw new InvalidOperationException("The silence did not end the handler's wait.");
         }
 
-        next.Datagram.CopyTo(buffer);
-        return ValueTask.FromResult(new DatagramReceived(next.Datagram.Length, next.Source));
+        // A datagram longer than the buffer is cut to it, as a Linux or macOS socket cuts it.
+        var length = Math.Min(next.Datagram.Length, buffer.Length);
+        next.Datagram.AsSpan(0, length).CopyTo(buffer.Span);
+        return ValueTask.FromResult(new DatagramReceived(length, next.Source));
     }
 
     /// <inheritdoc />

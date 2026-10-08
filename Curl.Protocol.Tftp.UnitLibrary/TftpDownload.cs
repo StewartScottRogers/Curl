@@ -135,7 +135,7 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
     {
         while (true)
         {
-            var received = pending ?? await limits.ReceiveBeforeAsync(channel, buffer, resendAt).ConfigureAwait(false);
+            var received = pending ?? await limits.ReceiveBeforeAsync(channel, ReceiveBuffer(), resendAt).ConfigureAwait(false);
             pending = null;
             var outcome = received is not null
                 ? await AnswerAsync(received).ConfigureAwait(false)
@@ -148,6 +148,16 @@ internal sealed class TftpDownload(ITransferContext context, IDatagramChannel ch
             }
         }
     }
+
+    /// <summary>
+    /// The part of the buffer one receive may fill: the block size in force plus the DATA
+    /// header, as curl 8.21.0's <c>tftp_receive_packet</c> passes <c>blksize + 4</c> to
+    /// <c>recvfrom</c>, so a longer datagram is cut to it on Linux and macOS and fails the
+    /// receive on Windows (BL-1668).
+    /// </summary>
+    /// <returns>The first block size plus four bytes of the buffer.</returns>
+    private Memory<byte> ReceiveBuffer() =>
+        buffer.AsMemory(0, blockSize + TftpPackets.DataHeaderLength);
 
     /// <summary>
     /// Ends the transfer when the maximum time or the retries have run out, otherwise
