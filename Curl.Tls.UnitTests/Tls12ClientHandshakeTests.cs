@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Curl.Cryptography;
+using Curl.Testing;
 using static Curl.Tls.Tls12HandshakeDriver;
 
 namespace Curl.Tls;
@@ -21,6 +22,10 @@ public sealed class Tls12ClientHandshakeTests
         MinimumVersion = TlsProtocolVersion.Tls10,
         SignatureAlgorithms = [TlsSignatureScheme.DsaSha256, TlsSignatureScheme.DsaSha384, TlsSignatureScheme.DsaSha512, TlsSignatureScheme.DsaSha224, TlsSignatureScheme.DsaSha1],
     };
+
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
     [DataRow((ushort)0xc02b, "ecdsa")]
@@ -66,7 +71,9 @@ public sealed class Tls12ClientHandshakeTests
         using Tls12RecordWriteState write = Tls12RecordWriteState.Create(client.RecordProtection!, client.KeyBlock!.ClientWrite, SystemTlsRandomSource.Instance);
         using Tls12RecordReadState read = Tls12RecordReadState.Create(client.RecordProtection!, server.KeyBlock.ClientWrite);
         byte[] record = write.Protect(TlsContentType.ApplicationData, "GET / HTTP/1.1"u8);
-        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+        byte[] recovered = read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value!;
+        Diagnostics.Diff("application data round trip", "GET / HTTP/1.1"u8, recovered);
+        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), recovered);
     }
 
     [TestMethod]
@@ -90,7 +97,9 @@ public sealed class Tls12ClientHandshakeTests
         using Tls12RecordWriteState write = Tls12RecordWriteState.Create(client.RecordProtection!, client.KeyBlock!.ClientWrite, SystemTlsRandomSource.Instance);
         using Tls12RecordReadState read = Tls12RecordReadState.Create(client.RecordProtection!, server.KeyBlock.ClientWrite);
         byte[] record = write.Protect(TlsContentType.ApplicationData, "GET / HTTP/1.1"u8);
-        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+        byte[] recovered = read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value!;
+        Diagnostics.Diff("application data round trip", "GET / HTTP/1.1"u8, recovered);
+        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), recovered);
     }
 
     [TestMethod]
@@ -99,7 +108,9 @@ public sealed class Tls12ClientHandshakeTests
         Tls12ClientHandshake client = Client(EverySuite with { MinimumVersion = TlsProtocolVersion.Tls10, MaximumVersion = TlsProtocolVersion.Tls11, CipherSuites = [0xc0ac, 0xc0a0, 0xc02b, 0xc011, Tls12CipherSuite.EmptyRenegotiationInfoScsv] });
 
         ClientHello decoded = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+        Diagnostics.Act("offered suites", Hex(decoded.CipherSuites.ToArray()));
 
+        Diagnostics.Assert("offered suites", Hex([0xc011, Tls12CipherSuite.EmptyRenegotiationInfoScsv]), Hex(decoded.CipherSuites.ToArray()));
         CollectionAssert.AreEqual(new ushort[] { 0xc011, Tls12CipherSuite.EmptyRenegotiationInfoScsv }, decoded.CipherSuites.ToArray());
     }
 
@@ -122,7 +133,9 @@ public sealed class Tls12ClientHandshakeTests
         using Tls12RecordWriteState write = Tls12RecordWriteState.Create(client.RecordProtection!, client.KeyBlock!.ClientWrite, SystemTlsRandomSource.Instance, insertEmptyFragment: false);
         using Tls12RecordReadState read = Tls12RecordReadState.Create(client.RecordProtection!, server.KeyBlock.ClientWrite);
         byte[] record = write.Protect(TlsContentType.ApplicationData, "GET / HTTP/1.1"u8);
-        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+        byte[] recovered = read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value!;
+        Diagnostics.Diff("application data round trip", "GET / HTTP/1.1"u8, recovered);
+        CollectionAssert.AreEqual("GET / HTTP/1.1"u8.ToArray(), recovered);
     }
 
     [TestMethod]
@@ -257,11 +270,26 @@ public sealed class Tls12ClientHandshakeTests
         Tls12TestServer server = new(TestServerCredential.Rsa(TlsSignatureScheme.RsaPkcs1Sha256)) { Version = TlsProtocolVersion.Tls11, CipherSuite = 0xc014 };
         Tls12ClientHandshake client = Client(DefaultSettings with { MinimumVersion = TlsProtocolVersion.Tls11, MaximumVersion = TlsProtocolVersion.Tls11 });
 
+        Diagnostics.Arrange("server", Describe(server));
+
         Tls12HandshakeOutput hello = client.Start();
-        Tls12HandshakeOutput clientFlight = Deliver(client, server.Answer(hello.MessagesToSend[0].Bytes));
-        Tls12HandshakeOutput output = Deliver(client, server.ReceiveClientFlight(clientFlight.MessagesToSend));
+        Tls12HandshakeOutput clientFlight;
+        using (Diagnostics.Phase("server's first flight and the client's answer"))
+        {
+            clientFlight = Deliver(client, server.Answer(hello.MessagesToSend[0].Bytes));
+        }
+
+        Tls12HandshakeOutput output;
+        using (Diagnostics.Phase("server's final flight"))
+        {
+            output = Deliver(client, server.ReceiveClientFlight(clientFlight.MessagesToSend));
+        }
+
+        Diagnostics.Act("handshake", Describe(client, output));
 
         ClientHello decoded = ClientHello.Decode(Body(hello.MessagesToSend[0])).Value;
+        Diagnostics.Act("hello extensions", Extensions(decoded));
+        Diagnostics.Assert("hello legacy version", "0x0302", $"0x{decoded.LegacyVersion:x4}");
         Assert.AreEqual((ushort)0x0302, decoded.LegacyVersion);
         Assert.IsFalse(decoded.Extensions.Any(extension => extension.Type == TlsExtensionType.SignatureAlgorithms));
         AssertCompletesWithServerKeys(client, server, output);
@@ -282,7 +310,10 @@ public sealed class Tls12ClientHandshakeTests
         Tls12ClientHandshake client = Client(DefaultSettings with { ApplicationProtocols = ["h2"], RequestOcspStatus = true });
 
         ClientHello hello = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+        Diagnostics.Act("hello extensions", Extensions(hello));
 
+        Diagnostics.Assert("extension count", 10, hello.Extensions.Count);
+        Diagnostics.Assert("legacy version", "0x0303", $"0x{hello.LegacyVersion:x4}");
         CollectionAssert.AreEqual(
             new[]
             {
@@ -302,7 +333,9 @@ public sealed class Tls12ClientHandshakeTests
         Tls12ClientHandshake client = Client(new Tls12ClientSettings { OfferSessionTicket = false, OfferEncryptThenMac = false, OfferExtendedMasterSecret = false });
 
         ClientHello hello = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+        Diagnostics.Act("hello extensions", Extensions(hello));
 
+        Diagnostics.Assert("extension count", 4, hello.Extensions.Count);
         CollectionAssert.AreEqual(
             new[] { TlsExtensionType.RenegotiationInfo, TlsExtensionType.EcPointFormats, TlsExtensionType.SupportedGroups, TlsExtensionType.SignatureAlgorithms },
             hello.Extensions.Select(extension => extension.Type).ToArray());
@@ -319,7 +352,9 @@ public sealed class Tls12ClientHandshakeTests
         Tls12ClientHandshake client = Client(DefaultSettings with { PadHello = padHello, ServerName = new string('a', serverNameLength) });
 
         ClientHello hello = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+        Diagnostics.Act("hello", $"{hello.Encode().Length} bytes, last extension {hello.Extensions[^1].Type}");
 
+        Diagnostics.Assert("padded to 512 bytes", padded, hello.Extensions[^1].Type == TlsExtensionType.Padding && hello.Encode().Length == 512);
         Assert.AreEqual(padded, hello.Extensions[^1].Type == TlsExtensionType.Padding);
         Assert.AreEqual(padded, hello.Encode().Length == 512);
     }
@@ -331,7 +366,9 @@ public sealed class Tls12ClientHandshakeTests
         Tls12ClientHandshake client = Client(DefaultSettings with { SupportedGroups = [], OfferSessionTicket = false });
 
         ClientHello hello = ClientHello.Decode(Body(client.Start().MessagesToSend[0])).Value;
+        Diagnostics.Act("hello extensions", Extensions(hello));
 
+        Diagnostics.Assert("extension count", 5, hello.Extensions.Count);
         CollectionAssert.AreEqual(
             new[] { TlsExtensionType.RenegotiationInfo, TlsExtensionType.ServerName, TlsExtensionType.EncryptThenMac, TlsExtensionType.ExtendedMasterSecret, TlsExtensionType.SignatureAlgorithms },
             hello.Extensions.Select(extension => extension.Type).ToArray());
@@ -471,6 +508,7 @@ public sealed class Tls12ClientHandshakeTests
 
         Tls12HandshakeOutput output = Run(client, server);
 
+        Diagnostics.Assert("certificate status rejection", new OcspStapleOutcome(OcspStapleStatus.NoResponse), output.Failure?.CertificateStatusRejection);
         Assert.IsNull(client.OcspResponse);
         Assert.IsNull(verifier.Presented[0].OcspResponse);
         Assert.AreEqual(new OcspStapleOutcome(OcspStapleStatus.NoResponse), output.Failure!.CertificateStatusRejection);
@@ -619,7 +657,9 @@ public sealed class Tls12ClientHandshakeTests
 
         Tls12HandshakeOutput output = Run(client, server, flight => [flight[0], new(TlsContentType.Handshake, helloRequest), .. flight[1..]]);
         Tls12HandshakeOutput after = client.ReceiveHandshake(helloRequest);
+        Diagnostics.Act("HelloRequest after the handshake", Describe(client, after));
 
+        Diagnostics.Assert("messages sent for the late HelloRequest", 0, after.MessagesToSend.Count);
         AssertCompletesWithServerKeys(client, server, output);
         Assert.IsNull(after.Failure);
         Assert.IsTrue(after.IsComplete);
@@ -633,13 +673,24 @@ public sealed class Tls12ClientHandshakeTests
         Tls12ClientHandshake client = Client();
         byte[] flight = [.. server.Answer(client.Start().MessagesToSend[0].Bytes).SelectMany(message => message.Bytes)];
         List<Tls12OutgoingMessage> sent = [];
+        Diagnostics.Arrange("server", Describe(server));
+        Diagnostics.Arrange("server's first flight", $"{flight.Length} bytes in 7-byte chunks");
 
-        foreach (byte[] chunk in flight.Chunk(7))
+        using (Diagnostics.Phase("client takes the server's first flight in chunks"))
         {
-            sent.AddRange(client.ReceiveHandshake(chunk).MessagesToSend);
+            foreach (byte[] chunk in flight.Chunk(7))
+            {
+                sent.AddRange(client.ReceiveHandshake(chunk).MessagesToSend);
+            }
         }
 
-        Tls12HandshakeOutput output = Deliver(client, server.ReceiveClientFlight(sent));
+        Tls12HandshakeOutput output;
+        using (Diagnostics.Phase("server's final flight"))
+        {
+            output = Deliver(client, server.ReceiveClientFlight(sent));
+        }
+
+        Diagnostics.Act("handshake", Describe(client, output));
         AssertCompletesWithServerKeys(client, server, output);
     }
 
@@ -657,17 +708,65 @@ public sealed class Tls12ClientHandshakeTests
         _ => null!,
     };
 
+    private static string Hex(IEnumerable<ushort> values) => string.Join(", ", values.Select(value => $"0x{value:x4}"));
+
+    private static string Extensions(ClientHello hello) => string.Join(", ", hello.Extensions.Select(extension => extension.Type));
+
+    private static string Describe(Tls12ClientSettings settings) =>
+        $"TLS {settings.MinimumVersion} to {settings.MaximumVersion}, "
+        + (settings.CipherSuites.Count > 8 ? $"{settings.CipherSuites.Count} suites" : $"suites [{Hex(settings.CipherSuites)}]")
+        + $", groups [{Hex(settings.SupportedGroups)}], {settings.SignatureAlgorithms.Count} signature schemes"
+        + $", ALPN [{string.Join(", ", settings.ApplicationProtocols)}], ticket {settings.OfferSessionTicket}, extended master secret {settings.OfferExtendedMasterSecret}"
+        + $", encrypt-then-MAC {settings.OfferEncryptThenMac}, OCSP {settings.RequestOcspStatus}, pad {settings.PadHello}, server name length {settings.ServerName?.Length ?? 0}"
+        + $", resuming {settings.SessionToResume is not null}, client certificate {settings.ClientCertificate is not null}";
+
+    private static string Describe(Tls12TestServer server) =>
+        $"{server.Version}, suite 0x{server.CipherSuite:x4}, ECDHE group 0x{server.EcdheGroup:x4}, DHE group {server.DheGroup.PrimeLength} bytes"
+        + $", signature scheme {(server.SignatureScheme is { } scheme ? $"0x{scheme:x4}" : "default")}, ALPN {server.ApplicationProtocol ?? "none"}"
+        + $", ticket {server.IssueTicket}, client certificate requested {server.RequestClientCertificate}";
+
+    private static string Describe(Tls12ClientHandshake client, Tls12HandshakeOutput output) =>
+        $"complete {output.IsComplete}, failure {output.Failure?.Alert.ToString() ?? "none"}, {client.Version?.ToString() ?? "no version"}"
+        + $", suite {(client.CipherSuite is { } suite ? $"0x{suite.Code:x4}" : "none")}, group {(client.NegotiatedGroup is { } group ? $"0x{group:x4}" : "none")}"
+        + $", resumed {client.IsResumed}, {output.MessagesToSend.Count} messages sent";
+
+    /// <summary>Builds the client, writing its settings as an ARRANGE line.</summary>
+    private Tls12ClientHandshake Client(Tls12ClientSettings? settings = null, IServerCertificateVerifier? verifier = null)
+    {
+        Diagnostics.Arrange("client settings", Describe(settings ?? DefaultSettings));
+        return Tls12HandshakeDriver.Client(settings, verifier);
+    }
+
+    /// <summary>
+    /// Runs the handshake through <see cref="Tls12HandshakeDriver.Run" /> with a PHASE line for
+    /// each flight, writing the server as an ARRANGE line and how the handshake ended as an ACT line.
+    /// </summary>
+    private Tls12HandshakeOutput Run(Tls12ClientHandshake client, Tls12TestServer server, Func<List<Tls12OutgoingMessage>, List<Tls12OutgoingMessage>>? replaceFlight = null)
+    {
+        Diagnostics.Arrange("server", Describe(server));
+        Tls12HandshakeOutput output = Tls12HandshakeDriver.Run(client, server, replaceFlight, diagnostics: Diagnostics);
+        Diagnostics.Act("handshake", Describe(client, output));
+        return output;
+    }
+
     /// <summary>Protects <paramref name="content" /> under one side's write keys and checks the other side's read state recovers it.</summary>
-    private static void AssertProtects(Tls12RecordProtectionParameters protection, Tls12WriteKeys writeKeys, Tls12WriteKeys peerReadKeys, ReadOnlySpan<byte> content)
+    private void AssertProtects(Tls12RecordProtectionParameters protection, Tls12WriteKeys writeKeys, Tls12WriteKeys peerReadKeys, ReadOnlySpan<byte> content)
     {
         using Tls12RecordWriteState write = Tls12RecordWriteState.Create(protection, writeKeys, SystemTlsRandomSource.Instance);
         using Tls12RecordReadState read = Tls12RecordReadState.Create(protection, peerReadKeys);
         byte[] record = write.Protect(TlsContentType.ApplicationData, content);
-        CollectionAssert.AreEqual(content.ToArray(), read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value);
+        byte[] recovered = read.Unprotect(TlsContentType.ApplicationData, record.AsSpan(5)).Value!;
+        Diagnostics.Diff("application data round trip", content, recovered);
+        CollectionAssert.AreEqual(content.ToArray(), recovered);
     }
 
-    private static void AssertCompletesWithServerKeys(Tls12ClientHandshake client, Tls12TestServer server, Tls12HandshakeOutput output)
+    /// <summary>Writes the failure, completion, key block and master secret against the server's, then asserts them.</summary>
+    private void AssertCompletesWithServerKeys(Tls12ClientHandshake client, Tls12TestServer server, Tls12HandshakeOutput output)
     {
+        Diagnostics.Assert("failure", "none", output.Failure?.Alert.ToString() ?? "none");
+        Diagnostics.Assert("handshake complete", true, output.IsComplete);
+        Diagnostics.Diff("key block", KeyBlockComparer.Flatten(server.KeyBlock), KeyBlockComparer.Flatten(client.KeyBlock));
+        Diagnostics.Diff("master secret", server.MasterSecret, client.Session?.MasterSecret ?? []);
         Assert.IsNull(output.Failure);
         Assert.IsTrue(output.IsComplete);
         Assert.IsTrue(client.IsComplete);
@@ -683,7 +782,7 @@ public sealed class Tls12ClientHandshakeTests
 
         public int GetHashCode(Tls12KeyBlock? obj) => 0;
 
-        private static byte[] Flatten(Tls12KeyBlock? block) => block is null
+        public static byte[] Flatten(Tls12KeyBlock? block) => block is null
             ? []
             : [.. block.ClientWrite.MacKey, .. block.ClientWrite.Key, .. block.ClientWrite.Iv, .. block.ServerWrite.MacKey, .. block.ServerWrite.Key, .. block.ServerWrite.Iv];
     }

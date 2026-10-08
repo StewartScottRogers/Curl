@@ -1,0 +1,43 @@
+---
+id: BL-1636
+title: Make Curl.Tls.UnitTests' Tls12ClientHandshakeTests tests write descriptive diagnostic output
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: [BL-1457]
+touches: [Curl.Tls.UnitTests]
+requirement: none
+created: 2026-10-07
+completed: 2026-10-07
+---
+# BL-1636 — Make Curl.Tls.UnitTests' Tls12ClientHandshakeTests tests write descriptive diagnostic output
+
+## Goal
+
+Every test in `Curl.Tls.UnitTests`' `Tls12ClientHandshakeTests` (1 file, 37 test methods, counted 2026-10-07) writes, through BL-1457's `TestDiagnostics` helper, its Arrange inputs, Act result and assertion context (plus `PHASE` timings for each handshake flight), with no test's logic or assertions changed.
+
+## Context
+
+- Split from BL-1489 (one task per range of files, as its Notes direct); BL-1489 keeps the whole-project checks and depends on this task. Follow BL-1489's Context for what matters in this project, and `Documentation/Wiki/Test-Diagnostics.md` and BL-1457's ADR for the line format; no prefix of your own; output only; large payloads through `BYTES`; nothing printed may depend on the operating system.
+- The class is in namespace `Curl.Tls`, flat in the project root. A shared fake or helper (`Tls12TestServer`, `Tls12HandshakeDriver`) may write lines for the tests that use it, as long as each test's `END` line counts them.
+
+## Acceptance criteria
+
+- [x] `dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~Curl.Tls.Tls12ClientHandshakeTests." --logger "console;verbosity=detailed"` prints an `END` line for every test it runs, and none matches `END .*(\(arrange 0,|, act 0,|, assert 0\))`.
+- [x] In this file the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches are no lower than before; before and after numbers are in Notes.
+- [x] `dotnet build Curl.Tls.UnitTests -warnaserror` is clean and `dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Tls.UnitTests/` and this task file.
+- [x] Notes list every test that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; a real performance problem gets a follow-up task whose ID is in Notes.
+
+## Notes
+
+- Approach: the test class shadows the driver's `Client` and `Run` with instance wrappers. `Client` writes the settings as an ARRANGE line. `Run` writes the server as an ARRANGE line and how the handshake ended as an ACT line. It also passes the test's diagnostics to `Tls12HandshakeDriver.Run`, which now takes an optional `TestDiagnostics` and writes a PHASE line for each flight; the other test files that call it are unchanged. `AssertCompletesWithServerKeys` writes ASSERT lines for the failure and completion, plus DIFF lines for the key block and master secret. The record round trips write a DIFF line. The ClientHello-only tests write their extensions or suites as ACT lines and one ASSERT line each. No assertion or test logic changed.
+- Counts in `Tls12ClientHandshakeTests.cs`, before -> after: `Assert.` 84 -> 84, `[TestMethod` 37 -> 37, `[DataRow(` 75 -> 75.
+- The filtered detailed run printed 96 END lines (37 methods with their data rows), and none had arrange, act or assert 0.
+- SLOW: no test printed one. The slowest phase seen was the server checking the client's flight, at about 19 ms.
+
+## Log
+
+- 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Tls12ClientHandshakeTests write ARRANGE/ACT/ASSERT lines and per-flight PHASE timings

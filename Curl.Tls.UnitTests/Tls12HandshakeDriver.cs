@@ -1,3 +1,5 @@
+using Curl.Testing;
+
 namespace Curl.Tls;
 
 /// <summary>Runs <see cref="Tls12ClientHandshake" /> against <see cref="Tls12TestServer" />, with hooks to replace what the server sends.</summary>
@@ -8,28 +10,50 @@ internal static class Tls12HandshakeDriver
     /// <summary>
     /// Runs a whole handshake and returns every message the client sent after its hello,
     /// with its last completion and failure; the server checks the client's flight whenever
-    /// the client sends one.
+    /// the client sends one. Given <paramref name="diagnostics" />, it writes a PHASE line for
+    /// each flight.
     /// </summary>
     public static Tls12HandshakeOutput Run(
         Tls12ClientHandshake client,
         Tls12TestServer server,
         Func<List<Tls12OutgoingMessage>, List<Tls12OutgoingMessage>>? replaceFlight = null,
-        Func<List<Tls12OutgoingMessage>, List<Tls12OutgoingMessage>>? replaceFinalFlight = null)
+        Func<List<Tls12OutgoingMessage>, List<Tls12OutgoingMessage>>? replaceFinalFlight = null,
+        TestDiagnostics? diagnostics = null)
     {
-        List<Tls12OutgoingMessage> flight = server.Answer(client.Start().MessagesToSend[0].Bytes);
-        Tls12HandshakeOutput output = Deliver(client, (replaceFlight ?? (original => original))(flight));
+        List<Tls12OutgoingMessage> flight;
+        using (diagnostics?.Phase("client hello and the server's first flight"))
+        {
+            flight = server.Answer(client.Start().MessagesToSend[0].Bytes);
+        }
+
+        Tls12HandshakeOutput output;
+        using (diagnostics?.Phase("client takes the server's first flight"))
+        {
+            output = Deliver(client, (replaceFlight ?? (original => original))(flight));
+        }
+
         if (output.Failure is not null || output.MessagesToSend.Count == 0)
         {
             return output;
         }
 
-        List<Tls12OutgoingMessage> finalFlight = server.ReceiveClientFlight(output.MessagesToSend);
+        List<Tls12OutgoingMessage> finalFlight;
+        using (diagnostics?.Phase("server takes the client's flight"))
+        {
+            finalFlight = server.ReceiveClientFlight(output.MessagesToSend);
+        }
+
         if (output.IsComplete)
         {
             return output;
         }
 
-        Tls12HandshakeOutput final = Deliver(client, (replaceFinalFlight ?? (original => original))(finalFlight));
+        Tls12HandshakeOutput final;
+        using (diagnostics?.Phase("client takes the server's final flight"))
+        {
+            final = Deliver(client, (replaceFinalFlight ?? (original => original))(finalFlight));
+        }
+
         return final with { MessagesToSend = [.. output.MessagesToSend, .. final.MessagesToSend] };
     }
 
