@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Curl.Core;
+using Curl.Core.FileSystem;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -211,6 +212,29 @@ public sealed class CurlCommandRunnerRemoteTimeTests
         Assert.EndsWith(
             "Warning: Failed to set filetime 1577959445 on outfile: CreateFile failed: " + Environment.NewLine
             + "Warning: GetLastError 0x00000005" + Environment.NewLine,
+            Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    /// <summary>
+    /// A file that opened but whose time Windows refused gets upstream's
+    /// <c>SetFileTime failed</c> line (<c>tool_filetime.c</c> lines 107-126, tag
+    /// <c>curl-8_21_0</c>), wrapped after <c>failed: </c> as the <c>CreateFile</c> one is (BL-1453).
+    /// </summary>
+    /// <returns>A task that completes when the test has run.</returns>
+    [TestMethod]
+    public async Task RunAsync_RemoteTimeRefusedAfterTheFileOpened_PrintsSetFileTimeFailedWarnings()
+    {
+        outputFiles = new InMemoryFileSystem { FileTimeErrorCode = 87, FileTimeFailedStep = FileTimeFailedStep.SetTime };
+
+        int exitCode = await RunAsync(["-R", "-o", "out2.txt", SourceUrl], WritingBody(DateTimeOffset.FromUnixTimeSeconds(1577959445)), runsOnWindows: true);
+
+        const string ExpectedEnding = "Warning: Failed to set filetime 1577959445 on outfile: SetFileTime failed: \nWarning: GetLastError 0x00000057\n";
+        Diagnostics.Assert("exit code", (int)CurlExitCode.Ok, exitCode);
+        Diagnostics.Assert("stderr ends with the filetime warnings", true, Lf(StandardErrorText).EndsWith(ExpectedEnding, StringComparison.Ordinal));
+        Assert.AreEqual((int)CurlExitCode.Ok, exitCode);
+        Assert.EndsWith(
+            "Warning: Failed to set filetime 1577959445 on outfile: SetFileTime failed: " + Environment.NewLine
+            + "Warning: GetLastError 0x00000057" + Environment.NewLine,
             Encoding.UTF8.GetString(standardError.ToArray()));
     }
 

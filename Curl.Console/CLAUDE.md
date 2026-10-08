@@ -335,7 +335,7 @@ Under `-R`/`--remote-time` a successful transfer to an `-o` file whose result ca
 `SourceLastWriteTimeUtc` stamps the closed file with it through `IFileTimeSetter`
 (`PhysicalFileSystem` in production), even when no body was written, as curl does. A
 failed stamp prints curl's `Failed to set filetime` warning lines unless `-s`: the Windows
-build's `CreateFile failed: GetLastError` form on Windows, and elsewhere the POSIX build's
+build's `CreateFile failed: GetLastError` form on Windows when the file does not open and its `SetFileTime failed` form when the time is refused once it has (BL-1453), and elsewhere the POSIX build's
 `on '<file>': <strerror>`, worded from `utimes`'s errno by `CRuntimeErrorNumbers` (BL-1433). On Windows a
 time before 1752-09-14T00:00:00Z is first capped to it with `Warning: Capping set filetime to
 minimum to avoid overflow` (unless `-s`), as curl 8.21.0 does; off Windows it is set as given

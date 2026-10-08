@@ -4342,26 +4342,35 @@ internal sealed class CurlCommandRunner(
             await WriteErrorLineAsync(cappedWarning).ConfigureAwait(false);
         }
 
-        if (!outputFileTimeSetter.TrySetLastWriteUnixSeconds(outputFile, sourceLastWriteUnixSeconds, out int errorCode)
+        if (!outputFileTimeSetter.TrySetLastWriteUnixSeconds(outputFile, sourceLastWriteUnixSeconds, out int errorCode, out FileTimeFailedStep failedStep)
             && !options.Silent)
         {
-            await WriteErrorLineAsync(FileTimeFailureWarning(outputFile, sourceLastWriteUnixSeconds, errorCode))
+            await WriteErrorLineAsync(FileTimeFailureWarning(outputFile, sourceLastWriteUnixSeconds, errorCode, failedStep))
                 .ConfigureAwait(false);
         }
     }
 
     /// <summary>
-    /// Gives the platform's <see cref="RemoteTimeFailureWarning" /> line: the Windows
-    /// <c>CreateFile</c> form on Windows, the POSIX <c>strerror</c> form elsewhere (BL-1433).
+    /// Gives the platform's <see cref="RemoteTimeFailureWarning" /> line: on Windows the
+    /// <c>CreateFile</c> form when the file did not open and the <c>SetFileTime</c> form when
+    /// it opened but refused the time (BL-1453), the POSIX <c>strerror</c> form elsewhere (BL-1433).
     /// </summary>
     /// <param name="outputFile">The <c>-o</c> file.</param>
     /// <param name="sourceLastWriteUnixSeconds">The time that could not be set, in Unix seconds.</param>
     /// <param name="errorCode">The Win32 error code on Windows, <c>utimes</c>'s <c>errno</c> elsewhere.</param>
+    /// <param name="failedStep">Whether opening the file or setting its time failed.</param>
     /// <returns>The warning line.</returns>
-    private string FileTimeFailureWarning(string outputFile, long sourceLastWriteUnixSeconds, int errorCode) =>
-        runsOnWindows
-            ? RemoteTimeFailureWarning.ForWindowsOpen(sourceLastWriteUnixSeconds, errorCode)
-            : RemoteTimeFailureWarning.ForPosix(sourceLastWriteUnixSeconds, outputFile, errorCode, errorNumbers);
+    private string FileTimeFailureWarning(string outputFile, long sourceLastWriteUnixSeconds, int errorCode, FileTimeFailedStep failedStep)
+    {
+        if (!runsOnWindows)
+        {
+            return RemoteTimeFailureWarning.ForPosix(sourceLastWriteUnixSeconds, outputFile, errorCode, errorNumbers);
+        }
+
+        return failedStep == FileTimeFailedStep.SetTime
+            ? RemoteTimeFailureWarning.ForWindowsStamp(sourceLastWriteUnixSeconds, errorCode)
+            : RemoteTimeFailureWarning.ForWindowsOpen(sourceLastWriteUnixSeconds, errorCode);
+    }
 
     /// <summary>
     /// Caps an <c>-R</c> time to the range curl 8.21.0 sets on a Windows file.

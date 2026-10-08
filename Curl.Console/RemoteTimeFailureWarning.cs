@@ -21,11 +21,10 @@ namespace Curl.Console;
 /// filetime, filename, curlx_strerror(errno))</c> after <c>utimes</c> fails (BL-1433).
 /// </para>
 /// <para>
-/// .NET's <see cref="File.SetLastWriteTimeUtc(string, DateTime)" /> opens and stamps the
-/// file in one call and does not say which step failed, so on Windows the runner always
-/// prints <see cref="ForWindowsOpen" />'s <c>CreateFile</c> line, the step that fails for a
-/// missing or refused file; <see cref="ForWindowsStamp" /> is the line for a
-/// <c>SetFileTime</c> that fails once the file is open.
+/// The output file's time setter says which step failed, so on Windows the runner prints
+/// <see cref="ForWindowsOpen" />'s <c>CreateFile</c> line for a missing or refused file and
+/// <see cref="ForWindowsStamp" />'s <c>SetFileTime</c> line for a time refused once the file
+/// is open, as upstream's lines 107-126 do (BL-1453).
 /// </para>
 /// </remarks>
 internal static class RemoteTimeFailureWarning
