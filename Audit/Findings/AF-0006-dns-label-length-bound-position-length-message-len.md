@@ -46,6 +46,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Networking run, seed 0: no mutant sampled at DnsAnswerDecoder.cs:319 (code unchanged there); the only survivors are CertificateRevocationListFile.cs:116, TcpPendingConnection.cs:86, TlsFailureMessages.cs:320. Not shown surviving by the reproduction; the site was not sampled so this is unverified.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run did not sample the site. Hand-mutated DnsAnswerDecoder.cs:319 to >= in a scratch copy: Decode_ACnameLabelEndingExactlyAtTheMessageEnd_IsReadAndThenFailsWithOutOfRange failed, so the mutant is killed.
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | The tool reproduction cannot run: the Networking baseline is red (AF-0026), so it stops with 'the unmutated tests failed or timed out (exit 1)'. Applied by hand in a scratch export and run with the 5 failing ECH tests filtered out (baseline 2996 passed): DnsAnswerDecoder.cs:319 'position + length > message.Length' -> '>='. Killed by Decode_ACnameLabelEndingExactlyAtTheMessageEnd_IsReadAndThenFailsWithOutOfRange.
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-101 in Curl.Cryptography.UnitLibrary/AeadChaCha20Poly1305.cs, so the auditor's verdict (reproduces no) is set aside: Ran the -Site reproduction: resolvedLine 319, outcome killed. excludedTests: ConnectAsync_WithAHostThatDoesNotResolveOnWindows_ReportsTheResolveAndBindFailures (a red baseline test, filed this audit).
 
 ## Log
 

@@ -43,6 +43,7 @@ Select-String -Path Curl.Networking.UnitTests/SslStreamTlsProviderTests.Revocati
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: Select-String finds no 'Assert.IsNotNull(failure)' in SslStreamTlsProviderTests.RevocationBestEffort.cs. The test now asserts Assert.AreEqual((CurlExitCode.PeerFailedVerification, UntrustedRootLine), failure).
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-101 in Curl.Cryptography.UnitLibrary/AeadChaCha20Poly1305.cs, so the auditor's verdict (reproduces no) is set aside: Ran the Select-String reproduction: no match. VerifyPeer_WithNoChainAndRevocationCheckBestEffortInTheSchannelBuild_StillRefuses now asserts Assert.AreEqual((CurlExitCode.PeerFailedVerification, UntrustedRootLine), failure).
 
 ## Log
 

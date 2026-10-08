@@ -46,6 +46,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Cryptography run, seed 0: killed 19, timedOut 4, survived 0, score 1. BrainpoolPoint.cs:163 mutant timed out (counted as killed).
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run sampled BrainpoolPoint.cs:163 (the || below-modulus check) and it was killed.
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | The seed-0 tool run at this commit did not sample BrainpoolPoint.cs:161, so the mutant was applied by hand in a scratch export (git archive HEAD): ' || ' -> ' && ' in 'if (!domain.Field.IsBelowModulus(x) || !domain.Field.IsBelowModulus(y))'. Killed: 3 failures, TryComputeSharedSecret_PeerPointWithOnlyYRaisedByThePrime_ReturnsFalseAndZeroesTheSecret for BrainpoolP256r1, P384r1 and P512r1.
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-101 in Curl.Cryptography.UnitLibrary/AeadChaCha20Poly1305.cs, so the auditor's verdict (reproduces no) is set aside: Ran the -Site reproduction: resolvedLine 161, outcome killed (score 1). No baseline failures were excluded in Curl.Cryptography.UnitTests.
 
 ## Log
 

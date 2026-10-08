@@ -46,6 +46,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Networking run, seed 0: no mutant sampled in ConnectToMappings.cs (line 135 still has IsMapped: false); not shown surviving by the reproduction, unverified.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run did not sample the site. Hand-mutated ConnectToMappings.Failure to IsMapped: true in a scratch copy: Map_WhenTheMatchingDestinationDoesNotParse_ReportsCurlsExit49Message failed, so the mutant is killed.
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | By hand, same method as AF-0006: ConnectToMappings.cs:135 Failure's 'IsMapped: false' -> 'IsMapped: true'. Killed: 9 failures, including Map_WhenTheMatchingDestinationDoesNotParse_ReportsCurlsExit49Message (three rows).
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-101 in Curl.Cryptography.UnitLibrary/AeadChaCha20Poly1305.cs, so the auditor's verdict (reproduces no) is set aside: Ran the -Site reproduction: resolvedLine 135, outcome killed.
 
 ## Log
 

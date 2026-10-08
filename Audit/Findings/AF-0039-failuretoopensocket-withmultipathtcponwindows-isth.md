@@ -43,6 +43,7 @@ Select-String -Path Curl.Networking.UnitTests/FastOpenSocketOptionTests.cs -Patt
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Ran the reproduction: no 'Assert.IsNotNull(new TcpDialer' match in FastOpenSocketOptionTests.cs. FailureToOpenSocket_WithMultipathTcpOnWindows_IsTheSystemsRefusal now asserts Assert.AreEqual(SocketError.ProtocolNotSupported, refusal?.SocketErrorCode).
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-101 in Curl.Cryptography.UnitLibrary/AeadChaCha20Poly1305.cs, so the auditor's verdict (reproduces no) is set aside: Ran the Select-String reproduction: no match. The test now asserts Assert.AreEqual(SocketError.ProtocolNotSupported, refusal?.SocketErrorCode).
 
 ## Log
 

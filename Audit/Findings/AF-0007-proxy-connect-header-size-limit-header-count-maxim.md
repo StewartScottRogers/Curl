@@ -46,6 +46,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | Networking run, seed 0: no mutant sampled at HttpProxyTunnel.cs:170 (code unchanged); not shown surviving by the reproduction, unverified.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Seed-0 run did not sample the site. Hand-mutated HttpProxyTunnel.cs:170 to >= in a scratch copy: ReadReplyAsync_WhenALineEndsTheHeaderBlockAt307200Bytes_KeepsReading failed, so the mutant is killed.
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | By hand, same method as AF-0006: HttpProxyTunnel.cs:203 'header.Count > MaximumHeaderBytes' -> '>='. Killed by ReadReplyAsync_WhenALineEndsTheHeaderBlockAt307200Bytes_KeepsReading.
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-101 in Curl.Cryptography.UnitLibrary/AeadChaCha20Poly1305.cs, so the auditor's verdict (reproduces no) is set aside: Ran the -Site reproduction: line 170 had moved, so the tool resolved the site in ReplyAfterLatestByte to line 193. Outcome killed.
 
 ## Log
 

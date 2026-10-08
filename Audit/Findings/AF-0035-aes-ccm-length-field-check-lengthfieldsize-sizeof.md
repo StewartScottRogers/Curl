@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 ## Re-audits
 
 - 2026-10-07 | 2026-10-07_0844.md | reproduces: no | Not in the seed-0 tool sample at this commit, so applied by hand in a scratch export: AeadAesCcm.cs:168 'lengthFieldSize < sizeof(int)' -> '<='. Killed by EncryptAndTryDecrypt_ElevenByteNonce_MatchTheBclCiphertextAndTag.
+- 2026-10-07 | 2026-10-07_1336.md | not re-audited | overlaps planted defect PD-101 in Curl.Cryptography.UnitLibrary/AeadChaCha20Poly1305.cs, so the auditor's verdict (reproduces no) is set aside: Ran the -Site reproduction: resolvedLine 168, outcome killed.
 
 ## Log
 

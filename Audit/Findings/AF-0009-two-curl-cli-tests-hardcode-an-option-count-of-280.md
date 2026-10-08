@@ -3,8 +3,8 @@ id: AF-0009
 title: Two Curl.Cli tests hardcode an option count of 280 and fail against the 281 options in the table; the red baseline blocks mutation testing of Curl.Cli
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-07_1336.md: the reproduction no longer reproduces.
 key: quality:Curl.Cli.UnitTests/CommandLineNextGroupTests.cs:OptionTable_EveryRow_IsClassifiedAsGlobalOrPerGroupExactlyOnce:name-lies
 reproduction: none
 task: BL-1265
@@ -13,9 +13,9 @@ found: 2026-10-02
 found-at: 337ed10b42ddd4d09991deaecb10826c2dedba00
 scorecard: 2026-10-02_1400.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-07
+closed-how: reliable-reaudit
+closed-by: 2026-10-07_1336.md
 ---
 # AF-0009 - Two Curl.Cli tests hardcode an option count of 280 and fail against the 281 options in the table; the red baseline blocks mutation testing of Curl.Cli
 
@@ -46,8 +46,10 @@ dotnet test Curl.Cli.UnitTests -c Release --filter "Name=OptionTable_EveryRow_Is
 - 2026-10-03 | 2026-10-03_1233.md | reproduces: no | dotnet test Curl.Cli.UnitTests with the two filtered tests: Passed 2, Failed 0.
 - 2026-10-03 | 2026-10-03_1459.md | reproduces: no | Both named Curl.Cli tests pass (Passed: 2, Failed: 0).
 - 2026-10-07 | 2026-10-07_0844.md | not re-audited | overlaps planted defect PD-303 in Curl.Cli.UnitLibrary/CommandLineOptionTable.cs (the --path-as-is row removed: 282 options counted against the test's 281), so the auditor's verdict (reproduces yes) is set aside and is not a reproduction (corrected 2026-10-07, ADR-0422): Ran the reproduction: 'Failed! - Failed: 2, Passed: 0'. Both OptionTable_EveryRow_IsClassifiedAsGlobalOrPerGroupExactlyOnce and EveryListedOption_IsParsedAndListedOnce fail with 'expected count: 281, actual count: 282'. The hardcoded count still does not match the table, so Curl.Cli's baseline stays red.
+- 2026-10-07 | 2026-10-07_1336.md | reproduces: no | Ran the dotnet test reproduction: Passed! Failed: 0, Passed: 2, Total: 2. Both option-count tests pass.
 
 ## Log
 
 - 2026-10-02: filed proposed.
 - 2026-10-02: proposed -> accepted.
+- 2026-10-07: accepted -> closed. Re-audit 2026-10-07_1336.md: the reproduction no longer reproduces.
