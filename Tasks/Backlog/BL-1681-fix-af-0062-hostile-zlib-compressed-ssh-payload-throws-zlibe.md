@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ssh.UnitLibrary]
+touches: [Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-08
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the security auditor confirms t
 
 ## Notes
 
+- 2026-10-07 (lane 9): Fix written and verified locally, then left uncommitted for the shift to stash. `SshZlibDecompressor.Decompress` now reads through a private `ReadInflated` that catches the inflater's `IOException` (the BCL's `ZLibException` is internal, so it cannot be named) and rethrows it as `InvalidDataException("The SSH packet is not a valid continuation of the zlib stream.")`. `TryInflatePayload` and `SshPacketReader` then refuse the FDICT header (78 20) as their contracts say. Regression tests: `SshZlibDecompressorTests.Decompress_HeaderAskingForAPresetDictionary_ThrowsInvalidDataExceptionNotZLibException` and `SshWireDecodersTests.TryInflatePayload_HeaderAskingForAPresetDictionary_ReturnsFalse`; all 9 decompressor and inflate tests pass. The new catch block needs those tests to keep 100% coverage, so `touches` now includes Curl.Protocol.Ssh.UnitTests. BL-1518 (Doing) also touches that project, so the task goes back to Backlog until BL-1518 releases it. If the stash is lost, redo the fix from this note: it takes about 10 minutes.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Needs Curl.Protocol.Ssh.UnitTests for its regression tests, which BL-1518 (Doing) touches; fix is written and verified, see Notes
