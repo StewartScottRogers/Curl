@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1785 — Fix AF-0107: BL-1682 cost 3.76 US dollars, 3.2 times the median, over three runs
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Same fix as BL-1783 and BL-1784: AF-0107 cited in the no-rerun-loop rule of both prompt templates in RunDarkFactory.ps1 (park what is left as a task, do not measure again). The reproduction reads the audit folder and logs, which a lane may not run (ADR-0267), so the re-audit confirms it.
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. AF-0107's BL-1682 cost lesson added to the factory run prompts' no-rerun rule

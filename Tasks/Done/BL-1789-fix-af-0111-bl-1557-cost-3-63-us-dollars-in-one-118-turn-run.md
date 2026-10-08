@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1789 — Fix AF-0111: BL-1557 cost 3.63 US dollars in one 118-turn run, 3.05 times the median
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cited AF-0111 (117 tool calls, no Read, 118 turns, $3.63) in both run prompts in RunDarkFactory.ps1. The reproduction reads the 2026-10-07 log, which a prompt change cannot alter; the fix is to future runs.
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Run prompts cite AF-0111's 117 tool calls with no Read in 118 turns

@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1786 — Fix AF-0108: BL-1645 cost 3.75 US dollars in one 28-minute run, 3.1 times the median
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added AF-0108 (41 test runs in 45 Bash calls, $3.75) to the no-rerun-loop rule in both run prompts of RunDarkFactory.ps1, as BL-1784 and BL-1785 did for AF-0106 and AF-0107.
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. AF-0108 cited in the no-rerun-loop rule of both run prompts

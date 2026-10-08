@@ -55,7 +55,7 @@
     five Sonnet test-writers in one message cost BL-1486 $2.97 of its $4.65; AF-0098: three
     test-writers, then on Opus, in one message took BL-1585 to $4.49; AF-0100: three Sonnet
     test-writers, each started in the background in its own message, took BL-1555 to
-    $4.33; AF-0102: three test-writers on Opus in one message took BL-1586 to $4.23). What the
+    $4.33; AF-0102: three test-writers on Opus in one message took BL-1586 to $4.23; AF-0104: four Sonnet test-writers in one message took BL-1487 to $3.88). What the
     task's own runs of the last 24 hours cost comes off its next run's cap, down to $1, so a
     requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56; AF-0099:
     BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more). Once
@@ -207,7 +207,7 @@
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
                  failing test names traced as "flaky?"; only red twice counts (BL-898), and not even
-                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093, AF-0101). A conflict gets one headless run to resolve
+                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093, AF-0101, AF-0103). A conflict gets one headless run to resolve
                  it, and a finished task whose build or tests go red on the rebased
                  tree gets one headless repair run there, still holding the lock,
                  traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
@@ -3277,7 +3277,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
    Run at most one subagent at a time, and never start several in one message or
    start one in the background while another runs: the
    shift's cost cap is checked only between your own turns, so subagents running in
-   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102).
+   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
+   Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
+   one passes alone and fails in the run, file a task for it with the board script and
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3367,7 +3370,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
    Run at most one subagent at a time, and never start several in one message or
    start one in the background while another runs: the
    shift's cost cap is checked only between your own turns, so subagents running in
-   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102).
+   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
+   Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
+   one passes alone and fails in the run, file a task for it with the board script and
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -3765,7 +3771,8 @@ function Test-Green {
     # A concurrency-sensitive test can stay red through two full runs while every lane builds
     # at once, and then park every finished task in the window (AF-0092: BL-1647 and eight
     # more, on EveryMember_ManyConcurrentCallers_...; AF-0101: BL-1627, red on Curl.Http2 and
-    # then on that cookie test, and redone by another lane). So the projects that failed are run
+    # then on that cookie test, and redone by another lane; AF-0103: BL-1632, red on
+    # Curl.Protocol.Smtp.UnitTests and then with no test named, and redone by another lane). So the projects that failed are run
     # once more on their own: green alone means the red came from the machine's load, not
     # from this task's change, which red alone would still show.
     # A project counts as failed when the run names it so or never reports it passed (AF-0093:
