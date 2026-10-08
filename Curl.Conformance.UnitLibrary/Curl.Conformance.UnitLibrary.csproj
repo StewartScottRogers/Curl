@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />
+    <!-- Gap/Tools/Expand-UpstreamCase.cs (BL-1730) reuses the harness's command line and part bodies. -->
+    <InternalsVisibleTo Include="Expand-UpstreamCase" />
   </ItemGroup>
 
   <ItemGroup>

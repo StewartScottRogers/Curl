@@ -230,6 +230,7 @@ inventory item of the targeted version exactly one state on one platform.
 | `items[].evidence` | string or `null` | The command line, file or case that shows it, enough to reproduce a gap. |
 | `items[].introducedIn` | string or `null` | Copied from the inventory. |
 | `counts` | object | `match`, `gap`, `unmeasured`, `excluded`, `x`, `y`, all integers. |
+| `reasons` | object | `behaviour` only: the number of items per reason, keyed by reason in ordinal order. Its values add up to `unmeasured + excluded`. |
 
 `x` is `match`. `y` is `match + gap + unmeasured`. An `excluded` item counts in neither.
 

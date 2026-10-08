@@ -362,11 +362,16 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
             : new SourceLastWrite(raw, null, true);
     }
 
-    /// <summary>The platform's source time reader: <c>GetFileTime</c> on Windows, none elsewhere.</summary>
+    /// <summary>
+    /// The platform's source time reader: <c>GetFileTime</c> on Windows, <c>statx</c> on Linux,
+    /// <c>fgetattrlist</c> on macOS, none elsewhere.
+    /// </summary>
     /// <returns>The reader.</returns>
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
     private static ISourceLastWriteReader PlatformSourceLastWriteReader() =>
-        OperatingSystem.IsWindows() ? new Win32SourceLastWriteReader() : new NoRawSourceLastWriteReader();
+        OperatingSystem.IsWindows() ? new Win32SourceLastWriteReader()
+        : OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() ? new PosixSourceLastWriteReader()
+        : new NoRawSourceLastWriteReader();
 
     /// <summary>The platform's curl's last representable source time; none off Windows.</summary>
     /// <returns>The Unix seconds, or <see langword="null" />.</returns>

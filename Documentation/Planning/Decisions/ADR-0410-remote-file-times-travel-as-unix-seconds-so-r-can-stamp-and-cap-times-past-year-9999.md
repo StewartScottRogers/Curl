@@ -61,11 +61,19 @@ just as it reads such a `Last-Modified`.
    a document from year 40000 is newer than any `-z` date. Sending an `If-Modified-Since`
    for a `-z` date past 9999 formats the year as curl does, measured first.
 3. **`file://`.** `Curl.Protocol.File.UnitLibrary` reads a source file's time as Unix seconds
-   where .NET's `DateTime`-based `FileSystemInfo.LastWriteTimeUtc` cannot hold it (the Win32
-   `FILETIME` on Windows, `stat` off Windows, through `LibraryImport`, which is AOT-safe and
-   in the base class library), and compares `-z` the same way.
+   where .NET's `DateTime`-based `FileSystemInfo.LastWriteTimeUtc` cannot hold it, and
+   compares `-z` the same way. On Windows, `Win32SourceLastWriteReader` reads the raw Win32
+   `FILETIME` with `GetFileTime` through `LibraryImport`, which is AOT-safe and in the base
+   class library. On Linux and macOS, `FileProtocolHandler` picks
+   `PosixSourceLastWriteReader`, which reads the open descriptor's 64-bit `st_mtime` seconds
+   (BL-1790): `statx` with `AT_EMPTY_PATH` and `STATX_MTIME` on Linux, and `fgetattrlist`
+   with `ATTR_CMN_MODTIME` on macOS. Both answers lay out the same on x64 and arm64, unlike
+   `struct stat`, whose layout differs between Linux x64, Linux arm64 and macOS's two inode
+   ABIs, so neither needs a per-architecture layout. A refused call reads nothing and the
+   `DateTime` view `FileOpenResult.LastWriteTimeUtc` carries is used. Any other platform
+   gets `NoRawSourceLastWriteReader`, which reads nothing.
 4. **`-R`.** `Curl.Core.UnitLibrary`'s `IFileTimeSetter` takes Unix seconds, and stamps a time
-   past 9999 itself (`SetFileTime` on Windows, `utimensat` off Windows, through
+   past 9999 itself (`SetFileTime` on Windows, `utimes` off Windows as curl does, through
    `LibraryImport`), since `File.SetLastWriteTimeUtc` takes a `DateTime`. `Curl.Console`'s
    `StampOutputFileTimeAsync` works in Unix seconds and, when the runner's `runsOnWindows`
    is true, caps a time above `910670515199` to it with

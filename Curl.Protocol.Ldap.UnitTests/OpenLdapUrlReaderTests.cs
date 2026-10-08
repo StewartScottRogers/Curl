@@ -90,13 +90,22 @@ public sealed class OpenLdapUrlReaderTests
     }
 
     [TestMethod]
-    [DataRow("x????!")]
-    [DataRow("x????a,,b")]
-    public void Read_Extensions_AreIgnored(string path)
+    [DataRow("x????!", "x")]
+    [DataRow("x????a,,b", "x")]
+    [DataRow("x?cn?sub?(cn=a)?!e,f", "x?cn?sub?(cn=a)")]
+    public void Read_Extensions_AreIgnored(string path, string pathWithoutExtensions)
     {
-        bool parsed = Read(path).Search is not null;
-        Diagnostics.Assert("search parsed", true, parsed);
-        Assert.IsNotNull(Read(path).Search);
+        LdapSearchParameters expected = Read(pathWithoutExtensions).Search!;
+        LdapSearchParameters actual = Read(path).Search!;
+
+        Diagnostics.Assert("base DN", expected.BaseObject, actual.BaseObject);
+        Diagnostics.Assert("scope", expected.Scope, actual.Scope);
+        Diagnostics.Assert("filter", expected.Filter, actual.Filter);
+
+        Assert.AreEqual(expected.BaseObject, actual.BaseObject);
+        CollectionAssert.AreEqual(expected.Attributes.ToArray(), actual.Attributes.ToArray());
+        Assert.AreEqual(expected.Scope, actual.Scope);
+        Assert.AreEqual(expected.Filter, actual.Filter);
     }
 
     [TestMethod]

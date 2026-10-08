@@ -82,6 +82,45 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", true, DisplayName = "--ignore-content-length, Content-Length: 0")]
+    [DataRow("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n", false, DisplayName = "no Content-Length, Connection: close")]
+    public async Task ExecuteAsync_ReadToCloseBodyClosingWithoutAByte_ReportsOneEmptyDataEvent(string response, bool ignoreContentLength)
+    {
+        // curl -v [--ignore-content-length] against both responses writes "{ [0 bytes data]"
+        // after the "< " line (measured 2026-10-08, BL-1763 Notes).
+        ScriptedConnection connection = Connection(response, 65536);
+        RecordingTransferEvents events = new();
+        HttpRequestOptions options = new() { IgnoreContentLength = ignoreContentLength };
+        Diagnostics.Arrange("response, --ignore-content-length", OneLine(response) + ", " + ignoreContentLength);
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18441/f.txt", events, options));
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        WriteExpectedLines("data events", ["{ "], events.Events.Where(e => e.StartsWith('{')).ToArray());
+        CollectionAssert.AreEqual(new[] { "{ " }, events.Events.Where(e => e.StartsWith('{')).ToArray());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReadToCloseBodyWithBytes_ReportsNoEmptyDataEventAtTheClose()
+    {
+        // curl -v against "Connection: close" with body hello writes only "{ [5 bytes data]"
+        // (measured 2026-10-08, BL-1763 Notes).
+        ScriptedConnection connection = Connection("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello", 65536);
+        RecordingTransferEvents events = new();
+        Diagnostics.Arrange("response", "HTTP/1.1 200 OK, Connection: close, body hello");
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EventsContext("http://127.0.0.1:18441/f.txt", events));
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        WriteExpectedLines("data events", ["{ hello"], events.Events.Where(e => e.StartsWith('{')).ToArray());
+        CollectionAssert.AreEqual(new[] { "{ hello" }, events.Events.Where(e => e.StartsWith('{')).ToArray());
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_PostWithData_ReportsTheBodySentAfterTheHead()
     {
         // curl -s -v -d hi http://127.0.0.1:18473/p -o o3: } [2 bytes data], then

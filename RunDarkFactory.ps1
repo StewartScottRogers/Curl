@@ -51,7 +51,16 @@
     because claude checks the cap between turns, so a run can end one turn's cost above
     it; with fewer than 10 logged runs the cap is -TaskBudgetUsd itself. A turn that waits
     on subagents spends all of theirs before the next check, so the prompt allows one
-    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap). A task run that
+    subagent at a time (AF-0052: five in parallel took BL-1458 $1.77 past its cap; AF-0097:
+    five Sonnet test-writers in one message cost BL-1486 $2.97 of its $4.65; AF-0098: three
+    test-writers, then on Opus, in one message took BL-1585 to $4.49; AF-0100: three Sonnet
+    test-writers, each started in the background in its own message, took BL-1555 to
+    $4.33; AF-0102: three test-writers on Opus in one message took BL-1586 to $4.23; AF-0104: four Sonnet test-writers in one message took BL-1487 to $3.88). What the
+    task's own runs of the last 24 hours cost comes off its next run's cap, down to $1, so a
+    requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56; AF-0099:
+    BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more). Once
+    those runs leave less than $1 of the cap, a fresh claim of the task is not run at all but
+    goes to Blocked (AF-0096: BL-1609's five claims cost $5.17). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed and the task
     goes to Blocked for Stewart, since it is too big for one run and wants splitting.
     -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
@@ -130,6 +139,12 @@
     pull request, by Stewart's standing permission - only when the CI workflow passed on
     Windows, Linux and macOS for the exact commit being merged.
 
+    A commit that only changes the board and is pushed on its own - a claim, requeue,
+    park, return or CI-watch filing - says [skip ci], so it starts no CI run and cancels
+    none: with lanes claiming every minute or two, every run was once cancelled for two
+    hours after a fix was in (AF-0089). When the commit to merge is one of those, the
+    coordinator starts a CI run on it by hand before it waits for the result.
+
     CI WATCH
 
     Lanes test only on Windows, so a lane shift's coordinator watches CI for them (BL-987).
@@ -191,7 +206,8 @@
       run        /task-run in the lane's worktree. The run commits but never pushes.
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
-                 failing test names traced as "flaky?"; only red twice counts (BL-898). A conflict gets one headless run to resolve
+                 failing test names traced as "flaky?"; only red twice counts (BL-898), and not even
+                 then when the projects that failed, or never reported passing, pass when run alone (AF-0092, AF-0093, AF-0101, AF-0103). A conflict gets one headless run to resolve
                  it, and a finished task whose build or tests go red on the rebased
                  tree gets one headless repair run there, still holding the lock,
                  traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
@@ -401,6 +417,10 @@ param(
     # that it could not, how shift start settles a task in Doing held by no lane, and that a
     # refused start raises the alarm (BL-1071), and exit.
     [switch]$TestPark,
+    # Prove, on a throwaway repository, that a claim applies its task's own shift stash and
+    # no other, and that a stash that no longer applies leaves the worktree clean and the
+    # run its hash (AF-0091), and exit.
+    [switch]$TestTaskStash,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -1880,12 +1900,51 @@ function Get-RunBudgetUsd {
     # the recent task runs' costs, so a run that ends one turn above it still stays under
     # three times the median, never above -TaskBudgetUsd and never below $2. Fewer than 10
     # recent costs leaves -TaskBudgetUsd as it is; -TaskBudgetUsd 0 means no cap.
-    param([double]$Ceiling, [double[]]$RecentCosts)
+    # -SpentUsd is what the task's earlier runs of the last day already cost (AF-0095): it
+    # comes off the cap, down to $1, so a task requeued and run again stays near one cap
+    # in all rather than two.
+    param([double]$Ceiling, [double[]]$RecentCosts, [double]$SpentUsd = 0)
     if ($Ceiling -le 0) { return 0.0 }
     $costs = @($RecentCosts | Where-Object { $_ -gt 0 })
-    if ($costs.Count -lt 10) { return $Ceiling }
-    $cap = [math]::Round(2.7 * (Get-MedianCost $costs), 2)
-    return [math]::Min($Ceiling, [math]::Max(2.0, $cap))
+    $cap = if ($costs.Count -lt 10) { $Ceiling } else { [math]::Min($Ceiling, [math]::Max(2.0, [math]::Round(2.7 * (Get-MedianCost $costs), 2))) }
+    if ($SpentUsd -le 0) { return $cap }
+    return [math]::Max(1.0, [math]::Round($cap - $SpentUsd, 2))
+}
+
+function Get-TaskSpentUsd {
+    # What a task's earlier task and resumed runs in a log folder cost, in US dollars,
+    # counting only logs written in the last -Hours (AF-0095): a requeued task's next run
+    # gets the rest of one cap, while a task parked days ago starts afresh.
+    param([string]$Dir, [string]$Id, [double]$Hours = 24)
+    if (-not (Test-Path $Dir)) { return 0.0 }
+    $since = (Get-Date).AddHours(-$Hours)
+    $pattern = '^' + [regex]::Escape($Id) + '-\d{8}-\d{6}(-L\d+)?(-resumed)?\.jsonl$'
+    $spent = 0.0
+    foreach ($log in @(Get-ChildItem $Dir -Filter "$Id-*.jsonl" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern -and $_.LastWriteTime -ge $since })) {
+        $line = Get-Content $log.FullName -Tail 5 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"total_cost_usd"' } | Select-Object -Last 1
+        if (-not $line) { continue }
+        $evt = try { $line | ConvertFrom-Json } catch { $null }
+        if ($evt -and $evt.type -eq 'result') { $spent += [double]$evt.total_cost_usd }
+    }
+    return $spent
+}
+
+function Test-TaskCapSpent {
+    # Whether a task's runs of the last day already cost all but $1 of its cap (AF-0096).
+    # Get-RunBudgetUsd never gives a run less than $1, so without this a task requeued
+    # again and again got $1 and a turn more each time (BL-1609: five runs, $5.17).
+    param([double]$Cap, [double]$SpentUsd)
+    return ($Cap -gt 0 -and $SpentUsd -gt 0 -and ($Cap - $SpentUsd) -lt 1.0)
+}
+
+function Get-TaskCapSpentWhy {
+    # Why a freshly claimed task must not run again, or '' when it may (AF-0096).
+    param([string]$Id)
+    $spent = Get-TaskSpentUsd $LogDir $Id
+    $cap = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir)
+    if (-not (Test-TaskCapSpent $cap $spent)) { return '' }
+    $culture = [System.Globalization.CultureInfo]::InvariantCulture
+    return "its runs of the last day already cost $($spent.ToString('0.00', $culture)) of its $($cap.ToString('0.00', $culture)) US dollar cost cap, so it was not run again; split the task"
 }
 
 function Get-RecentRunCosts {
@@ -2083,6 +2142,24 @@ if ($TestTaskBudget) {
     Set-Content (Join-Path $dir 'BL-3-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
     Set-Content (Join-Path $dir 'BL-4-20261003-100000-L4.jsonl') '{"type":"assistant"}'
     $cases += ,@('costs read from task and resumed runs only', '1.25,2.5', ((@(Get-RecentRunCosts $dir) | Sort-Object) -join ','))
+    # A requeued task's next run gets the rest of one cap (AF-0095).
+    Set-Content (Join-Path $dir 'BL-2-20261003-110000-L5.jsonl') '{"type":"factory","model":"sonnet"}', '{"type":"result","total_cost_usd":1}'
+    Set-Content (Join-Path $dir 'BL-2-20261001-100000-L1.jsonl') '{"type":"result","total_cost_usd":7}'
+    (Get-Item (Join-Path $dir 'BL-2-20261001-100000-L1.jsonl')).LastWriteTime = (Get-Date).AddDays(-3)
+    Set-Content (Join-Path $dir 'BL-22-20261003-100000-L1.jsonl') '{"type":"result","total_cost_usd":8}'
+    Set-Content (Join-Path $dir 'BL-2-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
+    $cases += ,@('a task spent its last day of task and resumed runs only', '3.5', "$(Get-TaskSpentUsd $dir 'BL-2')")
+    $cases += ,@('a task with no runs spent nothing', '0', "$(Get-TaskSpentUsd $dir 'BL-9')")
+    $cases += ,@('earlier runs come off the cap', '2.01', "$(Get-RunBudgetUsd 6 $twelve 1.5)")
+    $cases += ,@('a spent cap still leaves 1 dollar', '1', "$(Get-RunBudgetUsd 6 $twelve 5.73)")
+    $cases += ,@('earlier runs come off -TaskBudgetUsd too', '4', "$(Get-RunBudgetUsd 6 ([double[]](1.0, 1.0, 1.0)) 2)")
+    $cases += ,@('-TaskBudgetUsd 0 stays no cap after spending', '0', "$(Get-RunBudgetUsd 0 $twelve 2)")
+    # A task whose runs of the last day left less than $1 of its cap is not run again (AF-0096).
+    $cases += ,@('a cap with 1 dollar or more left is not spent', 'False', "$(Test-TaskCapSpent 3.21 2.21)")
+    $cases += ,@('a cap with under 1 dollar left is spent', 'True', "$(Test-TaskCapSpent 3.21 2.22)")
+    $cases += ,@('a task with no runs has not spent its cap', 'False', "$(Test-TaskCapSpent 0.5 0)")
+    $cases += ,@('-TaskBudgetUsd 0 is never spent', 'False', "$(Test-TaskCapSpent 0 9)")
+    $cases += ,@('BL-1609 stops after its third run', 'False,False,True', "$((Test-TaskCapSpent 3.21 0.41), (Test-TaskCapSpent 3.21 1.56), (Test-TaskCapSpent 3.21 3.59) -join ',')")
     Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {
@@ -2191,8 +2268,38 @@ function Get-FailedTestNames {
         $parts += $(if ($assemblies.Count) { "$($assemblies -join ', '): $shown" } else { $shown })
     } elseif ($assemblies.Count) { $parts += "$($assemblies -join ', ') failed" }
     if ($aborted) { $parts += 'a test host aborted' }
-    if (-not $parts.Count) { return 'no test named' }
+    if (-not $parts.Count) {
+        # Red without a name parked BL-1649 and BL-1588 with nothing to go on (AF-0093), so
+        # the last line that looks like an error says why, when there is one.
+        $why = @($Output | Where-Object { $_ -match '(?i)\berror\b|exited with|exception' } | Select-Object -Last 1)
+        if (-not $why.Count) { return 'no test named' }
+        $line = "$($why[0])".Trim()
+        if ($line.Length -gt 120) { $line = $line.Substring(0, 117) + '...' }
+        return "no test named: $line"
+    }
     return $parts -join '; '
+}
+
+function Get-FailedTestProjects {
+    # The test projects a red dotnet test run's -Output gives no reason to trust, so it can be
+    # run again with only them (AF-0092): those it names as failed, and those of -TestProjects
+    # it never reports as passed - a host that crashed, or a run red without naming a test,
+    # leaves no summary line for its project (AF-0093). Empty when more than -Most are in
+    # doubt: then the run broke as a whole, and nothing smaller can stand in for it.
+    param([string[]]$Output, [string[]]$TestProjects = @(), [int]$Most = 10)
+    $failed = @($Output | ForEach-Object { if ($_ -match '^Failed!\s.*?-\s+([\w.]+)\.dll') { $Matches[1] } })
+    $passed = @($Output | ForEach-Object { if ($_ -match '^Passed!\s.*?-\s+([\w.]+)\.dll') { $Matches[1] } })
+    $unreported = @($TestProjects | Where-Object { $_ -notin $passed -and $_ -notin $failed })
+    $doubt = @(@($failed) + @($unreported) | Select-Object -Unique)
+    if ($doubt.Count -gt $Most) { return @() }
+    return $doubt
+}
+
+function Get-UnitTestProjectNames {
+    # The *.UnitTests projects a fast-test run of -Repo reports on: each prints a Passed! or
+    # Failed! summary. *.IntegrationTests print none under the fast filter, so they are left out.
+    param([string]$Repo)
+    return @(Get-ChildItem -Path $Repo -Directory -Filter '*.UnitTests' | Where-Object { Test-Path (Join-Path $_.FullName "$($_.Name).csproj") } | ForEach-Object Name)
 }
 
 if ($TestFlakyTests) {
@@ -2207,7 +2314,23 @@ if ($TestFlakyTests) {
             '  Failed D [1 ms]', '  Failed E [1 ms]',
             'Failed!  - Failed:     2, Passed:     1, Skipped:     0, Total:     3, Duration: 1 s - Curl.Core.UnitTests.dll (net10.0)')))
         ,@('aborted host', 'a test host aborted', (Get-FailedTestNames @('The active test run was aborted. Reason: Test host process crashed')))
-        ,@('red without a name', 'no test named', (Get-FailedTestNames @('Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)'))))
+        ,@('red without a name', 'no test named', (Get-FailedTestNames @('Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)')))
+        ,@('failed projects to rerun alone', 'Curl.Cli.UnitTests,Curl.Cookies.UnitTests', ((Get-FailedTestProjects @(
+            '  Failed A [1 ms]',
+            'Failed!  - Failed:     1, Passed:     1, Skipped:     0, Total:     2, Duration: 1 s - Curl.Cli.UnitTests.dll (net10.0)',
+            'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)',
+            'Failed!  - Failed:     1, Passed:     1, Skipped:     0, Total:     2, Duration: 1 s - Curl.Cookies.UnitTests.dll (net10.0)')) -join ','))
+        ,@('red without a name says the error line', 'no test named: Testhost process for source(s) Curl.Ftp.UnitTests.dll exited with error: x', (Get-FailedTestNames @(
+            'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)',
+            'Testhost process for source(s) Curl.Ftp.UnitTests.dll exited with error: x')))
+        ,@('crashed host project rerun alone', 'Curl.Cli.UnitTests,Curl.Ftp.UnitTests', ((Get-FailedTestProjects -TestProjects 'Curl.Cli.UnitTests', 'Curl.Core.UnitTests', 'Curl.Ftp.UnitTests' -Output @(
+            'Failed!  - Failed:     1, Passed:     1 - Curl.Cli.UnitTests.dll (net10.0)',
+            'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)',
+            'The active test run was aborted. Reason: Test host process crashed')) -join ','))
+        ,@('unreported project rerun alone when none is named', 'Curl.Ftp.UnitTests', ((Get-FailedTestProjects -TestProjects 'Curl.Core.UnitTests', 'Curl.Ftp.UnitTests' -Output @(
+            'Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)')) -join ','))
+        ,@('no project to rerun when the whole run broke', '', ((Get-FailedTestProjects -Most 1 -TestProjects 'Curl.Core.UnitTests', 'Curl.Ftp.UnitTests' -Output @('error MSB1009')) -join ','))
+        ,@('no project to rerun when none is named or known', '', ((Get-FailedTestProjects @('Passed!  - Failed:     0, Passed:     1 - Curl.Core.UnitTests.dll (net10.0)')) -join ',')))
     $failed = 0
     foreach ($case in $cases) {
         if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
@@ -2370,6 +2493,13 @@ if ($TestAudioOff) {
     exit $(if ($script:audioOffFailed) { 1 } else { 0 })
 }
 
+# The body of every commit that changes only the board and is pushed on its own - a claim,
+# requeue, park, return or CI-watch filing. CI's concurrency group cancels the run in
+# progress at each push, and with lanes claiming every minute or two no run finished for
+# two hours after a fix was in (AF-0089); GitHub starts no run for a push whose head
+# commit says this, so board pushes no longer cancel the run that tests the code.
+$SkipCiNote = '[skip ci] Board change only; the run on the code before it stands.'
+
 function Invoke-MergeToMaster {
     # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
     # into master through a pull request - only when the CI workflow passed, on every
@@ -2383,6 +2513,8 @@ function Invoke-MergeToMaster {
     # CI on the last push takes a few minutes; wait for the run on this exact commit.
     $deadline = (Get-Date).AddMinutes(30)
     $run = $null
+    # A board-only head commit started no run (AF-0089), so start one on it by hand.
+    if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
     while ($true) {
         $run = @(gh run list --workflow CI --branch $Branch --commit $head --limit 1 --json status,conclusion 2>$null | ConvertFrom-Json)
         if ($run.Count -and $run[0].status -eq 'completed') { break }
@@ -2801,7 +2933,7 @@ function New-CiFailureTasks {
             }
             if (-not $filed.Count) { return }
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
-            git -C $CiWatchDir commit -q -m "chore(tasks): file $(($filed | ForEach-Object { $_.Id }) -join ', ') for CI failures" -m "Filed by the dark factory's CI watch (BL-987)." 2>&1 | Out-Null
+            git -C $CiWatchDir commit -q -m "chore(tasks): file $(($filed | ForEach-Object { $_.Id }) -join ', ') for CI failures" -m "Filed by the dark factory's CI watch (BL-987)." -m $SkipCiNote 2>&1 | Out-Null
             git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { continue }
             foreach ($task in $filed) {
@@ -3028,6 +3160,85 @@ function Save-StrayChanges {
     Write-Trace $Id 'stash' "uncommitted work kept: git stash list" 'Yellow'
 }
 
+function Restore-TaskStash {
+    # A task that went back to Backlog with work in progress left it in the shared stash
+    # list as "darkfactory <id> <stamp>" (Save-StrayChanges). A lane's run may not run
+    # git stash, not even git stash list (AF-0091: BL-1609's fourth claim was spent finding
+    # the third's stash; AF-0099: BL-1683's second claim began by hunting for the first's),
+    # so the shift applies the newest such stash itself when the task
+    # is claimed again. Returns the note put in front of the run's prompt, '' for none.
+    param([string]$Id, [string]$Repo = $Root)
+    $pattern = "^(\S+) .*: darkfactory $([regex]::Escape($Id)) "
+    $entry = @(git -C $Repo stash list --format='%H %gs' 2>$null) | Where-Object { $_ -match $pattern } | Select-Object -First 1
+    if (-not $entry) { return '' }
+    $sha = ($entry -split ' ', 2)[0]
+    $applied = $false
+    if (-not (@(git -C $Repo status --porcelain) | Where-Object { $_ })) {
+        git -C $Repo stash apply -q $sha 2>&1 | Out-Null
+        $applied = $LASTEXITCODE -eq 0
+        if (-not $applied) {
+            # A conflict half-applies it; the worktree was clean, so put it back that way.
+            git -C $Repo reset -q --hard HEAD 2>&1 | Out-Null
+            git -C $Repo clean -fdq 2>&1 | Out-Null
+        }
+    }
+    if ($applied) {
+        Write-Trace $Id 'stash' "applied the earlier run's work from stash $($sha.Substring(0, 8))" 'Yellow'
+        return @"
+STASHED WORK. An earlier run of $Id went back to Backlog with uncommitted work, which the
+shift kept as stash $sha and has applied to this worktree. Read git status, git diff and
+the task file before changing anything, and carry on from that work rather than starting over.
+
+"@
+    }
+    Write-Trace $Id 'stash' "stash $($sha.Substring(0, 8)) from an earlier run did not apply cleanly; the run is told its hash" 'Yellow'
+    return @"
+STASHED WORK. An earlier run of $Id went back to Backlog with uncommitted work, which the
+shift kept as stash $sha. It did not apply cleanly to this branch, so this worktree is
+clean. ``git diff $sha^1 $sha`` shows its changes to tracked files and
+``git show --stat $sha^3`` the files it added (``git show $sha^3:<path>`` prints one);
+carry over what still fits rather than starting over.
+
+"@
+}
+
+if ($TestTaskStash) {
+    $repo = Join-Path ([IO.Path]::GetTempPath()) "df-task-stash-$PID"
+    New-Item -ItemType Directory -Force -Path $repo | Out-Null
+    git -C $repo init -q -b master 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    Set-Content -Path (Join-Path $repo 'a.txt') -Value 'one'
+    git -C $repo add a.txt; git -C $repo commit -q -m one 2>&1 | Out-Null
+    $failed = 0
+    $check = { param($Name, $Expected, $Got)
+        if ($Expected -ceq $Got) { Write-Host "PASS ${Name}: $Got" -ForegroundColor Green }
+        else { Write-Host "FAIL ${Name}: expected $Expected, got $Got" -ForegroundColor Red; $script:failed++ } }
+    $read = { param($f) $p = Join-Path $repo $f; if (Test-Path $p) { (Get-Content $p -Raw).Trim() } else { '-' } }
+    try {
+        & $check 'no stash, no note' '' (Restore-TaskStash -Id 'BL-1' -Repo $repo)
+        # An earlier run's work: a tracked change and a new file, stashed as the shift does.
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'two'
+        Set-Content -Path (Join-Path $repo 'b.txt') -Value 'new'
+        git -C $repo stash push -q --include-untracked -m 'darkfactory BL-1 20260101-000000' 2>&1 | Out-Null
+        & $check 'other task''s stash is left alone' '' (Restore-TaskStash -Id 'BL-10' -Repo $repo)
+        & $check 'other task''s claim stays clean' 'one -' "$(& $read 'a.txt') $(& $read 'b.txt')"
+        $note = Restore-TaskStash -Id 'BL-1' -Repo $repo
+        & $check 'its own stash is applied' 'two new' "$(& $read 'a.txt') $(& $read 'b.txt')"
+        & $check 'the note says it was applied' 'True' "$($note -match 'has applied to this worktree')"
+        # Back to clean, then a branch that moved under the stash: it cannot apply.
+        git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'three'
+        git -C $repo commit -q -am three 2>&1 | Out-Null
+        $note = Restore-TaskStash -Id 'BL-1' -Repo $repo
+        & $check 'a conflict leaves the worktree clean' "three - True" "$(& $read 'a.txt') $(& $read 'b.txt') $(-not (git -C $repo status --porcelain))"
+        $sha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        & $check 'the note gives the hash to read it by' 'True' "$($note.Contains("git diff $sha^1 $sha"))"
+    } finally {
+        Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 # ---------------------------------------------------------------------------- run
 
 $Prompt = @'
@@ -3056,20 +3267,28 @@ Rules for this unattended run, in addition to CLAUDE.md:
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
    master, never force push, never merge.
 5. If the task ends Blocked or back in Backlog, commit only the task board change and
-   push it. Leave any unfinished code uncommitted; the shift stashes it.
+   push it. Leave any unfinished code uncommitted; the shift stashes it and applies it
+   again when the task is next claimed.
 6. The task must not be left in Doing.
 7. This run ends the moment your reply ends, and anything still in the background - a
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
-   Run at most one subagent at a time, and never start several in one message: the
+   Run at most one subagent at a time, and never start several in one message or
+   start one in the background while another runs: the
    shift's cost cap is checked only between your own turns, so subagents running in
-   parallel all spend inside one turn and carry the run past the cap (AF-0052).
+   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
+   Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
+   one passes alone and fails in the run, file a task for it with the board script and
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn).
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
-   the deadline, move it to Backlog before then with a -Reason saying what is left.
+   the deadline, file what is left as a task with the board script, add its ID to the
+   task's `depends-on`, record what you measured under Notes, and move it to Backlog
+   before then with a -Reason naming that task: the next lane then starts on the work
+   that is left, not on measuring the task again (AF-0094).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3141,20 +3360,28 @@ Rules for this unattended run, in addition to CLAUDE.md:
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.
 6. If the task ends Blocked or back in Backlog, commit only the task board change.
-   Leave any unfinished code uncommitted; the shift stashes it.
+   Leave any unfinished code uncommitted; the shift stashes it and applies it again
+   when the task is next claimed.
 7. The task must not be left in Doing.
 8. This run ends the moment your reply ends, and anything still in the background - a
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
    dotnet build and dotnet test in the foreground with the Bash tool and a timeout of up
    to 3600000 ms, and never end your reply to wait for a notification.
-   Run at most one subagent at a time, and never start several in one message: the
+   Run at most one subagent at a time, and never start several in one message or
+   start one in the background while another runs: the
    shift's cost cap is checked only between your own turns, so subagents running in
-   parallel all spend inside one turn and carry the run past the cap (AF-0052).
+   parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
+   Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
+   one passes alone and fails in the run, file a task for it with the board script and
+   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn).
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
    read the report rather than running it again. If the task cannot be finished before
-   the deadline, move it to Backlog before then with a -Reason saying what is left.
+   the deadline, file what is left as a task with the board script, add its ID to the
+   task's `depends-on`, record what you measured under Notes, and move it to Backlog
+   before then with a -Reason naming that task: the next lane then starts on the work
+   that is left, not on measuring the task again (AF-0094).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -3334,8 +3561,10 @@ function Invoke-TaskRun {
     # One headless Claude run in this checkout. By default it is the task run; a lane
     # passes its own prompt and deny list, and a log suffix for the resolver's run.
     # -Resume is the task run again after the usage limit cut the last one off.
-    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume, [switch]$Overtime)
+    # -Note goes in front of the prompt, e.g. Restore-TaskStash's word on an earlier run's work.
+    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume, [switch]$Overtime, [string]$Note = '')
     if (-not $Text) { $Text = if ($Lane) { $LanePrompt } else { $Prompt } }
+    $Text = $Note + $Text
     if ($Overtime) { $Text = $OvertimeNote + $Text; $Suffix += '-overtime' }
     elseif ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
     if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
@@ -3356,8 +3585,9 @@ function Invoke-TaskRun {
     # headless run that then ends its reply to wait for it exits with the task still in
     # Doing (BL-855). It inherits CURL_DARK_FACTORY_LANE.
     # The cost cap (AF-0004, AF-0033): the run stops once it has cost 2.7 times the median
-    # recent run, at most -TaskBudgetUsd.
-    $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir)
+    # recent run, at most -TaskBudgetUsd, less what the task's runs of the last day cost
+    # (AF-0095). Read before this run's log exists, so it never counts itself.
+    $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir) (Get-TaskSpentUsd $LogDir $Id)
     $budget = if ($script:RunBudgetUsd -gt 0) { ' --max-budget-usd ' + $script:RunBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
     # The task's model (BL-1705); the resolver's, overtime and resumed runs keep it. The
     # log's first line names it, so cost per model can be read back (Get-ModelCostSummary).
@@ -3475,7 +3705,7 @@ function Invoke-Claim {
             $requeued = @(Invoke-Requeue)
             if ($requeued.Count) {
                 Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-                Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done") | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done", '-m', $SkipCiNote) | Out-Null
                 if (-not (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))) { continue }
             }
             $boardArgs = @('next')
@@ -3489,7 +3719,7 @@ function Invoke-Claim {
             Invoke-Board @('move', '-Id', $id, '-To', 'Doing') | Out-Null
             if ((Get-TaskState $id) -ne 'Doing') { continue }
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-            Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane") | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane", '-m', $SkipCiNote) | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return @{ Id = $id } }
             # Only a claim that was pushed is traced as 'claim', so the log counts claims
             # truly; a refused push is 'race', and an unheard one is no race at all.
@@ -3504,14 +3734,29 @@ function Invoke-FastTests {
     # would hold the integrate lock, and so every lane, for ever: the blame collector kills
     # a test host that stops making progress, and the run counts as red.
     $output = @(& dotnet test $Root --no-build -nologo --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | ForEach-Object { "$_" })
-    return [pscustomobject]@{ Green = ($LASTEXITCODE -eq 0); Failed = (Get-FailedTestNames $output) }
+    return [pscustomobject]@{ Green = ($LASTEXITCODE -eq 0); Failed = (Get-FailedTestNames $output); Projects = @(Get-FailedTestProjects $output (Get-UnitTestProjectNames $Root)) }
+}
+
+function Test-GreenAlone {
+    # Runs only the named test projects' fast tests, with no other test project competing
+    # for the machine. True when every one is green, false when any is red or cannot be found.
+    param([string[]]$Projects)
+    if (-not $Projects.Count) { return $false }
+    foreach ($project in $Projects) {
+        $path = Join-Path $Root "$project\$project.csproj"
+        if (-not (Test-Path $path)) { return $false }
+        & dotnet test $path --no-build -nologo --filter 'TestCategory!=Integration' --blame-hang-timeout 10m 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { return $false }
+    }
+    return $true
 }
 
 function Test-Green {
     # Build and fast tests in this checkout, after a rebase put other lanes' work under ours.
     # Returns '' when green, or why not. Under six lanes' load a timing-sensitive test can
     # fail once and pass on the next run, which is no reason to throw a finished task away,
-    # so a red run is run once more and only red twice counts (BL-898).
+    # so a red run is run once more and only red twice counts (BL-898), unless the projects
+    # that failed pass when run alone (AF-0092).
     param([string]$Id = '-')
     & dotnet build $Root -nologo -v q 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { return 'build failed' }
@@ -3521,6 +3766,21 @@ function Test-Green {
     $second = Invoke-FastTests
     if ($second.Green) {
         Write-Trace $Id 'flaky' "failed once, passed on the rerun: $($first.Failed)" 'Yellow'
+        return ''
+    }
+    # A concurrency-sensitive test can stay red through two full runs while every lane builds
+    # at once, and then park every finished task in the window (AF-0092: BL-1647 and eight
+    # more, on EveryMember_ManyConcurrentCallers_...; AF-0101: BL-1627, red on Curl.Http2 and
+    # then on that cookie test, and redone by another lane; AF-0103: BL-1632, red on
+    # Curl.Protocol.Smtp.UnitTests and then with no test named, and redone by another lane). So the projects that failed are run
+    # once more on their own: green alone means the red came from the machine's load, not
+    # from this task's change, which red alone would still show.
+    # A project counts as failed when the run names it so or never reports it passed (AF-0093:
+    # BL-1649 parked twice on runs red with no test named); a run that broke as a whole
+    # vouches for nothing smaller, so both runs must leave some project in doubt.
+    $projects = @(@($first.Projects) + @($second.Projects) | Select-Object -Unique)
+    if ($first.Projects.Count -and $second.Projects.Count -and (Test-GreenAlone $projects)) {
+        Write-Trace $Id 'flaky' "failed twice in the full run, passed alone ($($projects -join ', ')): $($first.Failed); then $($second.Failed)" 'Yellow'
         return ''
     }
     return "fast tests failed twice ($($first.Failed); then $($second.Failed))"
@@ -3619,7 +3879,7 @@ function Invoke-Park {
             if ((Get-TaskState $Id) -ne 'Doing') { return '' }
             Invoke-Board @('move', '-Id', $Id, '-To', 'Backlog', '-Reason', "Lane $Lane could not integrate: $Why. The work is on branch $park; start with git cherry-pick --no-commit $park and fix it.") | Out-Null
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
-            Invoke-Git @('commit', '-q', '-m', "chore(tasks): park $Id - $Why") | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): park $Id - $Why", '-m', $SkipCiNote) | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
         }
     } finally { $lock.Dispose() }
@@ -4193,7 +4453,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             }
             if ($returned.Count) {
                 git -C $Root add -A Tasks 2>&1 | Out-Null
-                git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" 2>&1 | Out-Null
+                git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" -m $SkipCiNote 2>&1 | Out-Null
                 git -C $Root push -q origin "HEAD:$branch" 2>&1 | Out-Null
                 if ($LASTEXITCODE -ne 0) {
                     git -C $Root reset -q --hard "origin/$branch" 2>&1 | Out-Null
@@ -4533,6 +4793,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # loop above stopped watching, so file it now (BL-1031).
     Invoke-CiWatch -Branch $branch -Final
     Remove-CiWatch
+    # Those tasks were pushed from the ci-watch worktree; pull them here too, or the board
+    # below still says nothing is ready and -Continuous leaves them waiting for the next
+    # shift Stewart starts (AF-0090: three CI-fix tasks waited 5 hours).
+    if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
     $reasons = @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)
     # -Continuous: while the board still has ready work, the next shift starts itself, so
     # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
@@ -4664,7 +4928,19 @@ while ($true) {
     Write-Heartbeat 'run'
     $inOvertime = $overtimeId -eq $id
     $overtimeId = ''
-    $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming }
+    # A fresh claim of a task whose runs of the last day already spent its cost cap is not
+    # run again: it goes to Blocked like a run that reached the cap (AF-0096).
+    $capWhy = if ($resuming -or $inOvertime) { '' } else { Get-TaskCapSpentWhy $id }
+    if ($capWhy) {
+        Write-Trace $id 'cost cap' $capWhy 'Yellow'
+        $script:RunResult = $null
+        $script:LimitResetAt = $null
+        $run = [pscustomobject]@{ TimedOut = $false; ExitCode = 0 }
+    } else {
+        # A fresh claim of a task that came back with work in progress starts from that work (AF-0091).
+        $stashNote = if ($resuming) { '' } else { Restore-TaskStash $id }
+        $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming -Note $stashNote }
+    }
     $state = Get-TaskState $id
 
     # A run killed at its time limit keeps its claim and its work for one overtime run, so
@@ -4699,11 +4975,13 @@ while ($true) {
     $apiRetries = 0
 
     if ($state -eq 'Doing') {
-        $why = if ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
+        $why = if ($capWhy) { $capWhy }
+            elseif ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
             elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
-            elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
+            elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (2.7 times the median run, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
-        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
+        $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
+        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
         git -C $Root add -A Tasks 2>&1 | Out-Null
         git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
         if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
@@ -4731,7 +5009,8 @@ while ($true) {
         Write-Trace $id 'DONE' (Get-Short (Get-LastLogLine $id)) 'Green'
     } elseif ($state -eq 'Blocked') {
         $blocked++
-        if ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
+        # A task blocked at its spent cap was never run, so it says nothing about the runs.
+        if ($capWhy) { } elseif ($null -eq $script:RunResult -or $run.TimedOut) { $failStreak++ } else { $failStreak = 0 }
         $outcome = 'BLOCKED (see Tasks\Blocked)'
         Write-Trace $id 'BLOCKED' (Get-Short (Get-LastLogLine $id)) 'Yellow'
     } elseif ($state -in 'Backlog', 'Parked') {

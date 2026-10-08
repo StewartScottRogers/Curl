@@ -123,7 +123,8 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// (ADR-0046): the bytes read along with the head as one
     /// <see cref="ITransferEvents.ReportDataReceived" />, then one per read, a chunked body's
     /// framing and trailers included, as curl 8.21.0's <c>--trace</c> shows them (measured,
-    /// BL-407 Notes).
+    /// BL-407 Notes), and one empty event for a read-to-close body that closed without a byte
+    /// (BL-1763).
     /// </summary>
     internal ITransferEvents Events { get; set; } = NoTransferEvents.Instance;
 
@@ -417,13 +418,20 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     /// <summary>
     /// Ends the body where the peer closed: cleanly for a read-to-close body, and with exit
-    /// 18 for a Content-Length body still short.
+    /// 18 for a Content-Length body still short. A read-to-close body that ended without a
+    /// byte reports its closing read as one empty data event, which <c>-v</c> shows as
+    /// <c>{ [0 bytes data]</c>, as curl 8.21.0 does (measured, BL-1763 Notes).
     /// </summary>
-    private static void EndAtClose(bool isReadToClose, long remaining)
+    private void EndAtClose(bool isReadToClose, long remaining)
     {
         if (!isReadToClose)
         {
             throw new HttpTransferException(CurlExitCode.PartialFile, HttpTransferMessages.BodyBytesMissing(remaining));
+        }
+
+        if (remaining == long.MaxValue)
+        {
+            Events.ReportDataReceived([]);
         }
     }
 

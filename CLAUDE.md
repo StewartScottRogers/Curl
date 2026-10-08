@@ -79,6 +79,8 @@ do the job without me"): an interactive session merges the audit office's pull r
 into `master` itself, then merges `master` into `work/dark-factory`, and goes on to the
 next audit task without asking - but only when the `CI` workflow passed on Windows, Linux
 and macOS for the pull request's head commit. It reports what it merged afterwards.
+The gap analysis office's pull requests (the `gap` branch) are merged under the same
+standing exception and the same CI condition.
 
 Ask first for: a force push or any rewrite of already-pushed history, any other merge to `master`,
 a tag or a release, creating a repository or changing its visibility, and deleting a
@@ -219,6 +221,23 @@ reliable or says so on two audits running. Duplicates close as `duplicate`, and 
 may close an accepted finding himself (`closed-how: stewart`); the scorecard lists findings
 stuck open after more than 3 audits. Re-audit verdicts that overlap a planted defect are set
 aside.
+
+## Gap analysis office
+The gap analysis office measures Curl against upstream curl's release data - the targeted
+version's tarball (`Gap/Baselines/target.json`) and the matched reference curl - in seven
+areas: options, protocols, features, write-out variables, exit codes, environment, and the
+behaviour of upstream's `tests/data` cases (ADR-0433; `Gap/README.md` maps the folder).
+Seven read-only analysts group each area's gaps by cause: `gap-behaviour` (Opus),
+`gap-options` and `gap-environment` (Sonnet), `gap-protocols`, `gap-features`,
+`gap-writeout` and `gap-exitcodes` (Haiku).
+
+Run it with `Gap\RunGapAnalysis.cmd -NewTab` (in herdr; never with `Start-Process`).
+Findings are `Gap/Findings/GF-####-*.md` on the `gap` branch, and close only when a later
+run re-measures every item as `match` (or `excluded` with a reason), never because a task reached Done. Claude files
+their tasks without asking (`Gap/Triage.md`); Stewart may reject any finding. The weekly
+`gap-release-watch.yml` records each new curl release's gaps as `scope: newest` findings;
+moving the targeted version is an ADR. Dashboard:
+<https://stewartscottrogers.github.io/Curl/gaps/>.
 
 ## Repository layout
 Flat and linear. Every project is a directory immediately under the repository root.

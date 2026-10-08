@@ -51,3 +51,28 @@ worded as `Audit/Findings/README.md`, `Audit/Instructions/Report-Format.md` and
 | Re-audit | An auditor rerunning a finding's reproduction; a finding closes only when a re-audit confirms the fix. | `reaudits` in an auditor's report |
 | Reliable | Said of an auditor in one audit when it caught every planted defect assigned to it, returned a parseable report and did not write to the audited tree; the findings of an auditor that is not reliable are flagged unreliable in that scorecard. | none (a scorecard column) |
 | Scorecard | The fixed-format summary of one audit, kept as `Audit/Scorecards/yyyy-MM-dd_HHmm.md`. | none (a file) |
+
+## The gap analysis office
+
+Terms used by the gap analysis office under `Gap/`
+([ADR-0433](../Planning/Decisions/ADR-0433-a-gap-analysis-office-measures-curl-against-upstream-curl-releases.md)),
+worded as `Gap/Instructions/Gap-Format.md` words them.
+
+| Term | Meaning | Name in code |
+| --- | --- | --- |
+| Analyst | One of the seven read-only agents, one per area, that reads a run's measurement of its area, groups the gaps by cause, suggests where in Curl to close each cause, and ends with one report block. | `.claude/agents/gap-<area>.md`; the report is `<run>/reports/gap-<area>.md` |
+| Excluded | The state of an item that does not apply, with a reason (for example `reference-lacks:<feature>`, `platform:<os>`, `debug-build-only`); it counts in neither X nor Y. | `excluded` (`items[].state`) |
+| Gap | The state of an item Curl does not match; it counts in Y but not in X. | `gap` (`items[].state`) |
+| Gap finding | One cause of one or more gaps, kept as one file `Gap/Findings/GF-####-<slug>.md`, filed `open` (accepted), closed only when a run measures every one of its items as match or excluded. | `GF-####`; written by `Gap/Tools/Write-GapFindings.ps1` |
+| Item | One thing upstream has in one area - an option, scheme, feature, write-out variable, exit code, environment variable or config element, or test case - listed in the upstream inventory and given one state per measurement. | `items[]` |
+| Item key | An item's stable name, `<area>:<item>[:<facet>]` (for example `options:--ech:argument`), the same in every file, run and version and never holding a value, date or line number. | `items[].key` |
+| Match | The state of an item where Curl behaves as upstream does; it counts in X and Y. | `match` (`items[].state`) |
+| Measurement | One area's result in one run: every item of the targeted version's inventory with exactly one state on one platform, and the counts X and Y. | `<run>/measurements/<area>.json`, written by the area's `Gap/Tools/Measure-*` tool |
+| Newest version | The latest upstream curl release, recorded by the weekly release watcher. | `version` in `Gap/Baselines/newest.json` |
+| Reference build | The real curl a probe compares Curl with: Git for Windows' Schannel mingw curl on Windows, the curl on `PATH` elsewhere, used only when its `--version` names the targeted version; otherwise the measurement falls back to the release's documents. | `Get-GapReferenceCurl` in `Gap/Tools/Invoke-GapProbe.ps1` |
+| Regression | A closed gap finding whose item measures gap again; it reopens with `regression: true`. | `regression` (finding front matter) |
+| Release diff | The item-by-item comparison of two upstream versions' inventories: what was added, removed or changed. | `<run>/measurements/release-<version>.json`, written by `Gap/Tools/Compare-UpstreamReleases.ps1` |
+| Scope | Whether a gap finding is against the targeted version (`target`, gets tasks) or only against the newest (`newest`, waits for a retarget ADR). | `scope` (finding front matter) |
+| Targeted version | The upstream curl release Curl matches and every measurement is made against; only an ADR moves it. | `version` in `Gap/Baselines/target.json` |
+| Unmeasured | The state of an item the office cannot measure yet, with a reason (for example `needs-server:<protocol>`, `no-probe`); it counts in Y but not in X, so it lowers the score. | `unmeasured` (`items[].state`) |
+| Upstream inventory | What upstream has in one area for one version, read from the release tarball; it holds no measurement. | `Gap/Upstream/<version>/<area>.json` |

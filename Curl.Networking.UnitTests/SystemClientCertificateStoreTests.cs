@@ -1,10 +1,12 @@
+using System.Security.Cryptography.X509Certificates;
 using Curl.Testing;
 
 namespace Curl.Networking;
 
 /// <summary>
-/// <see cref="SystemClientCertificateStore" /> against the machine's own stores. Only
-/// whether a store opens is asserted, never what is in it.
+/// <see cref="SystemClientCertificateStore" /> against the machine's own stores: a store
+/// that opens returns the certificates <see cref="X509Store" /> itself lists for it, and
+/// one that cannot be reached returns <see langword="null" />.
 /// </summary>
 [TestClass]
 public sealed class SystemClientCertificateStoreTests
@@ -23,10 +25,20 @@ public sealed class SystemClientCertificateStoreTests
 
         var certificates = new SystemClientCertificateStore().OpenCertificates(Enum.Parse<ClientCertificateStoreLocation>(location), "MY");
 
-        Diagnostics.Act("store opened", certificates is not null);
-        Diagnostics.Assert("store opened", true, certificates is not null);
+        var expected = ThumbprintsListedByX509Store(Enum.Parse<StoreLocation>(location), "MY");
+        var actual = certificates is null ? null : certificates.Select(certificate => certificate.Thumbprint).Order(StringComparer.Ordinal).ToArray();
 
-        Assert.IsNotNull(certificates);
+        Diagnostics.Act("thumbprints", actual is null ? "<null>" : string.Join(",", actual));
+        Diagnostics.Assert("thumbprints", string.Join(",", expected), actual is null ? "<null>" : string.Join(",", actual));
+
+        Assert.IsNotNull(actual);
+        CollectionAssert.AreEqual(expected, actual);
+    }
+
+    private static string[] ThumbprintsListedByX509Store(StoreLocation location, string storeName)
+    {
+        using var store = new X509Store(storeName, location, OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
+        return store.Certificates.Select(certificate => certificate.Thumbprint).Order(StringComparer.Ordinal).ToArray();
     }
 
     [TestMethod]

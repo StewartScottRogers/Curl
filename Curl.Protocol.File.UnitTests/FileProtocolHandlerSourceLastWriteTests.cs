@@ -279,6 +279,49 @@ public sealed class FileProtocolHandlerSourceLastWriteTests
         Assert.IsLessThanOrEqualTo(0L, actual);
     }
 
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX)]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    public void PosixSourceLastWriteReader_NotAFileStream_ReadsNothing()
+    {
+        Diagnostics.Arrange("source", "empty MemoryStream");
+
+        long? actual = new PosixSourceLastWriteReader().ReadLastWriteUnixSeconds(new MemoryStream());
+
+        Diagnostics.Act("ReadLastWriteUnixSeconds", actual);
+        Diagnostics.Assert("ReadLastWriteUnixSeconds", null, actual);
+        Assert.IsNull(actual);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux | OperatingSystems.OSX)]
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    [System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    public async Task PosixSourceLastWriteReader_SourceStampedYear2100_ReadsItsUnixSecondsFromTheDescriptor()
+    {
+        const long year2100UnixSeconds = 4_102_444_800;
+        string path = Path.Combine(Path.GetTempPath(), $"bl1790-{Guid.NewGuid():N}.txt");
+        await System.IO.File.WriteAllBytesAsync(path, Encoding.ASCII.GetBytes("hi\n"));
+        try
+        {
+            System.IO.File.SetLastWriteTimeUtc(path, DateTimeOffset.FromUnixTimeSeconds(year2100UnixSeconds).UtcDateTime);
+            using var source = new FileStream(path, FileMode.Open, FileAccess.Read);
+
+            Diagnostics.Arrange("source", "file stamped 2100-01-01T00:00:00Z");
+
+            long? actual = new PosixSourceLastWriteReader().ReadLastWriteUnixSeconds(source);
+
+            Diagnostics.Act("ReadLastWriteUnixSeconds", actual);
+            Diagnostics.Assert("ReadLastWriteUnixSeconds", year2100UnixSeconds, actual);
+            Assert.AreEqual(year2100UnixSeconds, actual);
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
+    }
+
     private static void StampYear30000(string path)
     {
         long fileTime = (Year30000UnixSeconds * 10_000_000) + 116_444_736_000_000_000;
