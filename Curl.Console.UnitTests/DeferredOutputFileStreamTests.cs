@@ -126,6 +126,43 @@ public sealed class DeferredOutputFileStreamTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_OpenFileWhoseWriteFails_ReturnsATaskFaultedWithTheIOException()
+    {
+        fileSystem.WriteFailingPaths.Add("x");
+        using DeferredOutputFileStream stream = new(fileSystem, "x", FileWriteMode.Truncate);
+        Diagnostics.Arrange("file", "x, opened before the transfer, whose writes fail");
+        Diagnostics.Arrange("write", "7 bytes");
+
+        Assert.IsTrue(await stream.TryOpenNowAsync());
+        ValueTask write = stream.WriteAsync(new byte[7].AsMemory());
+        Diagnostics.Act("task faulted", write.IsFaulted);
+
+        Diagnostics.Assert("task faulted", true, write.IsFaulted);
+        Assert.IsTrue(write.IsFaulted);
+        await Assert.ThrowsExactlyAsync<IOException>(() => write.AsTask());
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_OpenFileAndCancelledToken_ReturnsACancelledTaskAndWritesNothing()
+    {
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
+        using CancellationTokenSource cancellation = new();
+        await cancellation.CancelAsync();
+        Diagnostics.Arrange("file", "a.txt, written once with 01");
+        Diagnostics.Arrange("second write", "02 with a cancelled token");
+
+        await stream.WriteAsync(new byte[] { 1 }.AsMemory());
+        ValueTask write = stream.WriteAsync(new byte[] { 2 }.AsMemory(), cancellation.Token);
+        Diagnostics.Act("task cancelled", write.IsCanceled);
+        Diagnostics.Bytes("file bytes", fileSystem.Written["a.txt"].ToArray());
+
+        Diagnostics.Assert("task cancelled", true, write.IsCanceled);
+        Assert.IsTrue(write.IsCanceled);
+        await Assert.ThrowsAsync<OperationCanceledException>(() => write.AsTask());
+        CollectionAssert.AreEqual(new byte[] { 1 }, fileSystem.Written["a.txt"].ToArray());
+    }
+
+    [TestMethod]
     public async Task OpenFailureWarning_BeforeAndAfterAFailedOpen_IsNullThenCurlsWarning()
     {
         InMemoryFileSystem files = new() { UnwritableStatus = FileAccessStatus.AccessDenied };
