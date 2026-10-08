@@ -238,6 +238,18 @@ public sealed class TlsAdversarialTests
     }
 
     [TestMethod]
+    public void ServerName_EmptyHostName_IsDecodeError()
+    {
+        byte[] data = [0x00, 0x03, 0x00, 0x00, 0x00];
+        Diagnostics.Bytes("data", data);
+
+        TlsAlertDescription? alert = ServerNameExtension.DecodeHostName(data).Alert;
+        Diagnostics.Act("alert", alert);
+
+        Assert.AreEqual(TlsAlertDescription.DecodeError, alert);
+    }
+
+    [TestMethod]
     public void ServerName_AcknowledgementWithData_IsDecodeError()
     {
         TlsAlertDescription? alert = ServerNameExtension.DecodeAcknowledgement([0x00]);
@@ -265,6 +277,30 @@ public sealed class TlsAdversarialTests
         Diagnostics.Bytes("body", body);
 
         TlsAlertDescription? alert = CertificateMessage.Decode(body).Alert;
+        Diagnostics.Act("alert", alert);
+
+        Assert.AreEqual(TlsAlertDescription.DecodeError, alert);
+    }
+
+    [TestMethod]
+    public void Certificate_EntryWithEmptyCertData_IsDecodeError()
+    {
+        byte[] body = [0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00];
+        Diagnostics.Bytes("body", body);
+
+        TlsAlertDescription? alert = CertificateMessage.Decode(body).Alert;
+        Diagnostics.Act("alert", alert);
+
+        Assert.AreEqual(TlsAlertDescription.DecodeError, alert);
+    }
+
+    [TestMethod]
+    public void Tls12Certificate_EmptyCertificate_IsDecodeError()
+    {
+        byte[] body = [0x00, 0x00, 0x03, 0x00, 0x00, 0x00];
+        Diagnostics.Bytes("body", body);
+
+        TlsAlertDescription? alert = Tls12CertificateMessage.Decode(body).Alert;
         Diagnostics.Act("alert", alert);
 
         Assert.AreEqual(TlsAlertDescription.DecodeError, alert);

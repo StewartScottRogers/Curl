@@ -24,7 +24,7 @@ public sealed record CertificateMessage(byte[] CertificateRequestContext, IReadO
 
     /// <summary>Decodes a Certificate body (the bytes after the handshake header).</summary>
     /// <param name="body">The message body.</param>
-    /// <returns>The Certificate message, or the alert the bytes call for.</returns>
+    /// <returns>The Certificate message, or the alert the bytes call for (<see cref="TlsAlertDescription.DecodeError" /> for an entry with empty <c>cert_data</c>).</returns>
     public static TlsDecodeResult<CertificateMessage> Decode(byte[] body)
     {
         TlsReader reader = new(body);
@@ -33,7 +33,7 @@ public sealed record CertificateMessage(byte[] CertificateRequestContext, IReadO
         List<CertificateEntry> entries = [];
         while (list.HasMore)
         {
-            byte[] data = list.ReadOpaque(3);
+            byte[] data = list.ReadNonEmptyOpaque(3);
             entries.Add(new CertificateEntry(data, TlsExtensionBlock.Read(list)));
         }
 
