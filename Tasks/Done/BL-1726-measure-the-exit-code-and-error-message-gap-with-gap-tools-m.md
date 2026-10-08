@@ -8,7 +8,7 @@ depends-on: [BL-1721]
 touches: [Gap/Tools/Measure-ExitCodeGap.ps1, Gap/Tools/Fixtures/exitcodes, Gap/Upstream/8.21.0/exitcodes.json]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1726 — Measure the exit code and error message gap with Gap/Tools/Measure-ExitCodeGap.ps1
 
@@ -62,14 +62,28 @@ Commit `Gap/Upstream/8.21.0/exitcodes.json`.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Measure-ExitCodeGap.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks: numbers and names parse from the error table; texts parse from `strerror.c`, including a text split across C string literals; a missing enum member gives `gap`; an equal text gives `match` and a one-character difference gives `gap`; an obsolete code is scored as the header help says.
-- [ ] `Gap/Upstream/8.21.0/exitcodes.json` is committed and valid against `Gap-Format.md`.
-- [ ] A real run against this repository writes the measurement, and its counts are recorded in this task's Notes.
-- [ ] The header help documents every parameter, every source file and the scoring rules. The script is ASCII only.
+- [x] `Gap/Tools/Measure-ExitCodeGap.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks: numbers and names parse from the error table; texts parse from `strerror.c`, including a text split across C string literals; a missing enum member gives `gap`; an equal text gives `match` and a one-character difference gives `gap`; an obsolete code is scored as the header help says.
+- [x] `Gap/Upstream/8.21.0/exitcodes.json` is committed and valid against `Gap-Format.md`.
+- [x] A real run against this repository writes the measurement, and its counts are recorded in this task's Notes.
+- [x] The header help documents every parameter, every source file and the scoring rules. The script is ASCII only.
 
 ## Notes
+
+- Real run, 2026-10-08, Windows, curl 8.21.0: 276 items; match 259, gap 0, unmeasured 0,
+  excluded 17 (the obsolete codes 20, 24, 29, 32, 34, 40, 41, 44, 46, 50, 51, 57, 62, 75,
+  76 and two more), X/Y 259/259. Every live code exists in `CurlExitCode` under the same
+  number and every `curl_easy_strerror` text matches byte for byte.
+- Obsolete codes carry no new attribute: they get the name `CURLE_OBSOLETE<n>` (curl.h's
+  name for them) as `curleName`, which marks them, so `Gap-Format.md` needed no new field.
+  They are `excluded` with `obsolete-code`, because upstream never returns them.
+- `exitcodes:<n>:man` has no candidate facet, but the format gives every inventory item a
+  state, so it takes the state of `exitcodes:<n>` (the tool documents the code; Curl has it
+  or not). `exitcodes:<n>:strerror` exists only for codes with a case in `strerror.c`.
+- The inventory is always written to `<RepositoryRoot>/Gap/Upstream/<version>/exitcodes.json`;
+  no extra parameter was needed. `candidateCommit` falls back to 40 zeros outside git.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Measure-ExitCodeGap.ps1 self-test passes on 5.1 and 7; 8.21.0 inventory committed; real run 259/259 match, 17 obsolete excluded.
