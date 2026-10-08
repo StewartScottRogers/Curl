@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1684 — Fix AF-0065: --interface with an unbindable name plus --negotiate reports the Negotiate SSPI failure instead of curl's interface-binding failure
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -65,9 +65,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - Needs `Curl.Protocol.Http.UnitLibrary` and `Curl.Protocol.Http.UnitTests`, added to
   `touches`; BL-1609 (in Doing) holds them, so this task went back to Backlog until it is done.
 
+- 2026-10-07 (lane 8) fix: HttpRequestPlan.OpenedConnection is set once the first connection opens, and ExecuteAsync applies WithFirstAuthorizationFailure only when it is set, so a refused connect or failed --interface bind keeps its own message (a later reconnect after a 401 still carries the context's line, as curl's error buffer would). Tests: ExecuteAsync_NegotiateWithoutATicketConnectFails_KeepsTheConnectFailure (exit 7 and 45), red without the fix. Reproduction now gives curl's line from both binaries. No ADR: this restores curl's behaviour ADR-0344 already describes. Measure-CodeQuality not run: both arms of the one new conditional are reached by the new and BL-955 tests.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Fix is in Curl.Protocol.Http.UnitLibrary (HttpProtocolHandler.WithFirstAuthorizationFailure), which BL-1609 in Doing touches; resume once BL-1609 is Done
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A failed connect or --interface bind with --negotiate reports curl's connect failure, not the Negotiate context's
