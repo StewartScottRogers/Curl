@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1702 — Fix AF-0059: DohResponseReader.ReadLineAsync: 'next is >= 0' can become '> 0' with no test failing
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Networking.UnitTests` to `touches`: the fix is a test, and no other task in Doing on `origin/work/dark-factory` names that project.
+- No production change. The test `ReadBodyAsync_WithANulByteInAChunkExtension_ReadsTheWholeSizeLine` sends a chunk size line `7;name=a\0b`: curl's chunk parser skips every byte after the size up to the LF, so the body is read. Chose a chunk extension rather than a status or header line because curl rejects a NUL byte in a header line ("Nul byte in header"), so pinning a header line with a NUL as accepted would pin a divergence; the chunk extension is where today's behaviour and curl's agree.
+- Lanes may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit guard). Applied the mutant (`next is > 0`) by hand instead: the new test failed (1 of 31 DoH reader tests), so the mutant is killed; then reverted it. The quality auditor's re-audit confirms with the tool itself.
+- Follow-up worth considering: curl fails a DoH response whose status or header line holds a NUL byte; `DohResponseReader` accepts it. Not changed here (outside this finding).
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Test kills the AF-0059 mutant; build and fast tests green
