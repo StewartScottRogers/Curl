@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-    Lists test methods, across every *.UnitTests project of a tree, whose bodies do not check
+    Lists test methods, across every *.UnitTests and *.IntegrationTests project of a tree, whose bodies do not check
     what their names promise: candidates for the quality auditor's steps 1 and 2.
 
 .DESCRIPTION
     The quality auditor read only the twins of the libraries it mutated, so a weak test planted
     in any other test project went unseen in three audits running (BL-1368). This scan reads
-    every test method of every *.UnitTests project and flags, as a candidate:
+    every test method of every *.UnitTests and *.IntegrationTests project (BL-1607) and flags, as a candidate:
 
       ignored-test       [Ignore] on the method, or a body ending in Assert.Inconclusive
       no-assertion       a body with no assertion once comments are removed (an assertion is an
@@ -31,7 +31,7 @@
     Write the JSON here as well as to standard output.
 
 .PARAMETER SelfTest
-    Scan Audit/Tools/Fixtures/weak-tests and check every kind is found, and nothing else.
+    Scan Audit/Tools/Fixtures/weak-tests (a UnitTests and an IntegrationTests project) and check every kind is found, and nothing else.
 #>
 param(
     [string]$Root,
@@ -143,7 +143,7 @@ function Get-Candidates($Method, [hashtable]$ExitCodes) {
 function Invoke-Scan([string]$Tree) {
     $exitCodes = Get-ExitCodeValues $Tree
     $candidates = @(); $tests = 0; $projects = 0
-    foreach ($project in @(Get-ChildItem -LiteralPath $Tree -Directory -Filter '*.UnitTests')) {
+    foreach ($project in @(Get-ChildItem -LiteralPath $Tree -Directory | Where-Object { $_.Name -like '*.UnitTests' -or $_.Name -like '*.IntegrationTests' } | Sort-Object Name)) {
         $projects++
         foreach ($file in @(Get-ChildItem -LiteralPath $project.FullName -Recurse -Filter '*.cs' -File | Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' })) {
             foreach ($method in @(Get-TestMethods $file.FullName)) {
@@ -163,6 +163,7 @@ if ($SelfTest) {
     $got = @($r.candidates | ForEach-Object { "$($_.test):$($_.kind)" } | Sort-Object)
     $want = @(
         'Constructor_TwoHandlers_ThrowsInvalidOperationExceptionNamingDict:name-lies',
+        'Fetch_Loopback_ReturnsTheBody:weak-assertion',
         'Parse_Value_ThrowsFormatException:name-lies',
         'RunAsync_SaveFails_ExitsWith23:name-lies',
         'Write_Info_WritesTheLine:weak-assertion',
@@ -172,7 +173,7 @@ if ($SelfTest) {
     $failed = 0
     function Check([string]$Name, [bool]$Ok, [string]$Detail) { if (-not $Ok) { $script:failed++ }; Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Detail" }
     Check 'every planted kind is found, and nothing else' (($got -join '|') -eq ($want -join '|')) ($got -join ', ')
-    Check 'tests and projects are counted' ($r.testsScanned -eq 11 -and $r.projectsScanned -eq 1) "tests $($r.testsScanned), projects $($r.projectsScanned)"
+    Check 'tests and projects are counted' ($r.testsScanned -eq 12 -and $r.projectsScanned -eq 2) "tests $($r.testsScanned), projects $($r.projectsScanned)"
     $line = @($r.candidates | Where-Object { $_.test -eq 'RunAsync_SaveFails_ExitsWith23' })[0]
     Check 'a candidate names its file and signature line' ($line.file -eq 'Sample.UnitTests/SampleTests.cs' -and $line.line -gt 0) "$($line.file):$($line.line)"
     exit $(if ($failed) { 1 } else { 0 })

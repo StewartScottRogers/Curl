@@ -26,12 +26,18 @@ Do exactly this:
    `dotnet build -warnaserror` in the worktree: it must succeed, except where an entry's
    **Builds** says otherwise. If a site makes the build fail when it should not, undo it and
    choose another site.
+   For a **conformance** plant, also prove it is reachable: build `Curl.Console` and run the
+   entry's **Trigger** command (a generated-case form: options from the differential tool's value
+   pools plus `http://127.0.0.1:PORT/`, e.g. via `Record-CurlExchange.ps1`) against the planted
+   build and against real curl. The exit code (or stderr) must differ. If it does not, undo the
+   site and choose another; never keep a conformance plant that needs a URL the tool does not
+   generate. Keep the one command and both outcomes for the manifest's `trigger`.
 3. **Hide and commit.** Delete `Audit/PlantedDefects/`, `Audit/Findings/` and
    `Audit/Scorecards/` from the worktree, so an auditor that looks cannot see the answers or old
    findings. Then commit everything in the worktree as one commit with the message
    `Audit baseline` - `git -c user.name="Audit seeder" -c user.email=audit-seeder@example.invalid commit -am` after `git add -A` - on the detached HEAD. Never create a branch and never push.
 4. **Write the manifest** to the manifest path, as JSON:
-   `{ "seed": <seed>, "commit": "<the Audit baseline commit>", "planted": [ { "id": "PD-###", "auditor": "<auditor>", "file": "<path relative to the worktree, or to the log copy for process>", "line": <line or null>, "description": "<what you changed, concretely>", "catch": "<a short fragment a correct finding must contain>" } ] }`.
+   `{ "seed": <seed>, "commit": "<the Audit baseline commit>", "planted": [ { "id": "PD-###", "auditor": "<auditor>", "file": "<path relative to the worktree, or to the log copy for process>", "line": <line or null>, "description": "<what you changed, concretely>", "catch": "<a short fragment a correct finding must contain>", "trigger": "<conformance only: the one command that shows the changed exit code, with the exit code of the planted build and of real curl; null for other auditors>" } ] }`.
    The `catch` is one short fragment - a distinctive identifier, word or finding kind such as
    `SequenceEqual`, `Parse_Port_Rejects` or `weak-assertion` - taken from the entry's **Catch**
    and made concrete for this site. A finding catches the defect when it comes from the same

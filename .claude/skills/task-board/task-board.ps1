@@ -16,8 +16,11 @@
                task whose touches overlap a task in Doing is not offered, so lanes
                of the dark factory never work on the same files at once. A task
                whose front matter says 'lane: no', or whose touches name an audit
-               path (Audit, Audit/..., .claude/agents/audit-*), is never offered
-               either: it is interactive only, run by naming it (/task-run BL-###).
+               path - Audit, Audit/..., .claude/agents/audit-*, or one of the guard
+               files .claude/hooks/guard-audit-paths.ps1, .claude/settings.json,
+               .github/workflows/ci.yml and .claude/skills/task-board/task-board.ps1
+               (Test-AuditPath) - is never offered either: it is interactive only,
+               run by naming it (/task-run BL-###).
                Inside a dark factory shift (CURL_DARK_FACTORY_LANE set), 'new'
                refuses an audit-path task without -NoLane and 'move -To Doing'
                refuses an interactive-only task (ADR-0267).
