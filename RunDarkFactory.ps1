@@ -401,6 +401,10 @@ param(
     # that it could not, how shift start settles a task in Doing held by no lane, and that a
     # refused start raises the alarm (BL-1071), and exit.
     [switch]$TestPark,
+    # Prove, on a throwaway repository, that a claim applies its task's own shift stash and
+    # no other, and that a stash that no longer applies leaves the worktree clean and the
+    # run its hash (AF-0091), and exit.
+    [switch]$TestTaskStash,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -3028,6 +3032,84 @@ function Save-StrayChanges {
     Write-Trace $Id 'stash' "uncommitted work kept: git stash list" 'Yellow'
 }
 
+function Restore-TaskStash {
+    # A task that went back to Backlog with work in progress left it in the shared stash
+    # list as "darkfactory <id> <stamp>" (Save-StrayChanges). A lane's run may not run
+    # git stash, not even git stash list (AF-0091: BL-1609's fourth claim was spent finding
+    # the third's stash), so the shift applies the newest such stash itself when the task
+    # is claimed again. Returns the note put in front of the run's prompt, '' for none.
+    param([string]$Id, [string]$Repo = $Root)
+    $pattern = "^(\S+) .*: darkfactory $([regex]::Escape($Id)) "
+    $entry = @(git -C $Repo stash list --format='%H %gs' 2>$null) | Where-Object { $_ -match $pattern } | Select-Object -First 1
+    if (-not $entry) { return '' }
+    $sha = ($entry -split ' ', 2)[0]
+    $applied = $false
+    if (-not (@(git -C $Repo status --porcelain) | Where-Object { $_ })) {
+        git -C $Repo stash apply -q $sha 2>&1 | Out-Null
+        $applied = $LASTEXITCODE -eq 0
+        if (-not $applied) {
+            # A conflict half-applies it; the worktree was clean, so put it back that way.
+            git -C $Repo reset -q --hard HEAD 2>&1 | Out-Null
+            git -C $Repo clean -fdq 2>&1 | Out-Null
+        }
+    }
+    if ($applied) {
+        Write-Trace $Id 'stash' "applied the earlier run's work from stash $($sha.Substring(0, 8))" 'Yellow'
+        return @"
+STASHED WORK. An earlier run of $Id went back to Backlog with uncommitted work, which the
+shift kept as stash $sha and has applied to this worktree. Read git status, git diff and
+the task file before changing anything, and carry on from that work rather than starting over.
+
+"@
+    }
+    Write-Trace $Id 'stash' "stash $($sha.Substring(0, 8)) from an earlier run did not apply cleanly; the run is told its hash" 'Yellow'
+    return @"
+STASHED WORK. An earlier run of $Id went back to Backlog with uncommitted work, which the
+shift kept as stash $sha. It did not apply cleanly to this branch, so this worktree is
+clean. ``git diff $sha^1 $sha`` shows its changes to tracked files and
+``git show --stat $sha^3`` the files it added (``git show $sha^3:<path>`` prints one);
+carry over what still fits rather than starting over.
+
+"@
+}
+
+if ($TestTaskStash) {
+    $repo = Join-Path ([IO.Path]::GetTempPath()) "df-task-stash-$PID"
+    New-Item -ItemType Directory -Force -Path $repo | Out-Null
+    git -C $repo init -q -b master 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    Set-Content -Path (Join-Path $repo 'a.txt') -Value 'one'
+    git -C $repo add a.txt; git -C $repo commit -q -m one 2>&1 | Out-Null
+    $failed = 0
+    $check = { param($Name, $Expected, $Got)
+        if ($Expected -ceq $Got) { Write-Host "PASS ${Name}: $Got" -ForegroundColor Green }
+        else { Write-Host "FAIL ${Name}: expected $Expected, got $Got" -ForegroundColor Red; $script:failed++ } }
+    $read = { param($f) $p = Join-Path $repo $f; if (Test-Path $p) { (Get-Content $p -Raw).Trim() } else { '-' } }
+    try {
+        & $check 'no stash, no note' '' (Restore-TaskStash -Id 'BL-1' -Repo $repo)
+        # An earlier run's work: a tracked change and a new file, stashed as the shift does.
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'two'
+        Set-Content -Path (Join-Path $repo 'b.txt') -Value 'new'
+        git -C $repo stash push -q --include-untracked -m 'darkfactory BL-1 20260101-000000' 2>&1 | Out-Null
+        & $check 'other task''s stash is left alone' '' (Restore-TaskStash -Id 'BL-10' -Repo $repo)
+        & $check 'other task''s claim stays clean' 'one -' "$(& $read 'a.txt') $(& $read 'b.txt')"
+        $note = Restore-TaskStash -Id 'BL-1' -Repo $repo
+        & $check 'its own stash is applied' 'two new' "$(& $read 'a.txt') $(& $read 'b.txt')"
+        & $check 'the note says it was applied' 'True' "$($note -match 'has applied to this worktree')"
+        # Back to clean, then a branch that moved under the stash: it cannot apply.
+        git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'three'
+        git -C $repo commit -q -am three 2>&1 | Out-Null
+        $note = Restore-TaskStash -Id 'BL-1' -Repo $repo
+        & $check 'a conflict leaves the worktree clean' "three - True" "$(& $read 'a.txt') $(& $read 'b.txt') $(-not (git -C $repo status --porcelain))"
+        $sha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        & $check 'the note gives the hash to read it by' 'True' "$($note.Contains("git diff $sha^1 $sha"))"
+    } finally {
+        Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 # ---------------------------------------------------------------------------- run
 
 $Prompt = @'
@@ -3056,7 +3138,8 @@ Rules for this unattended run, in addition to CLAUDE.md:
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
    master, never force push, never merge.
 5. If the task ends Blocked or back in Backlog, commit only the task board change and
-   push it. Leave any unfinished code uncommitted; the shift stashes it.
+   push it. Leave any unfinished code uncommitted; the shift stashes it and applies it
+   again when the task is next claimed.
 6. The task must not be left in Doing.
 7. This run ends the moment your reply ends, and anything still in the background - a
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
@@ -3141,7 +3224,8 @@ Rules for this unattended run, in addition to CLAUDE.md:
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.
 6. If the task ends Blocked or back in Backlog, commit only the task board change.
-   Leave any unfinished code uncommitted; the shift stashes it.
+   Leave any unfinished code uncommitted; the shift stashes it and applies it again
+   when the task is next claimed.
 7. The task must not be left in Doing.
 8. This run ends the moment your reply ends, and anything still in the background - a
    command moved there, run_in_background, a Monitor, a subagent - dies with it. Run
@@ -3334,8 +3418,10 @@ function Invoke-TaskRun {
     # One headless Claude run in this checkout. By default it is the task run; a lane
     # passes its own prompt and deny list, and a log suffix for the resolver's run.
     # -Resume is the task run again after the usage limit cut the last one off.
-    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume, [switch]$Overtime)
+    # -Note goes in front of the prompt, e.g. Restore-TaskStash's word on an earlier run's work.
+    param([string]$Id, [string]$Text = '', [string[]]$Deny = $null, [string]$Suffix = '', [int]$Minutes = 0, [switch]$Resume, [switch]$Overtime, [string]$Note = '')
     if (-not $Text) { $Text = if ($Lane) { $LanePrompt } else { $Prompt } }
+    $Text = $Note + $Text
     if ($Overtime) { $Text = $OvertimeNote + $Text; $Suffix += '-overtime' }
     elseif ($Resume) { $Text = $ResumeNote + $Text; $Suffix += '-resumed' }
     if ($null -eq $Deny) { $Deny = if ($Lane) { $LaneForbidden } else { $Forbidden } }
@@ -4664,7 +4750,9 @@ while ($true) {
     Write-Heartbeat 'run'
     $inOvertime = $overtimeId -eq $id
     $overtimeId = ''
-    $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming }
+    # A fresh claim of a task that came back with work in progress starts from that work (AF-0091).
+    $stashNote = if ($resuming) { '' } else { Restore-TaskStash $id }
+    $run = if ($inOvertime) { Invoke-TaskRun $id -Minutes $overtimeMinutes -Overtime } else { Invoke-TaskRun $id -Resume:$resuming -Note $stashNote }
     $state = Get-TaskState $id
 
     # A run killed at its time limit keeps its claim and its work for one overtime run, so
