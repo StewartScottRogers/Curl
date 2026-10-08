@@ -80,14 +80,32 @@ public sealed class HandBuiltCertificateVerifierTests
     }
 
     [TestMethod]
+    public void Verify_WhenTheServersOwnCertificateDoesNotParseBeforeAValidOne_JudgesItAsNoCertificate()
+    {
+        using var certificate = SelfSignedLocalhostCertificate();
+        var verifier = Verifier(new TlsClientOptions(Insecure: true));
+        var nothingSent = Verifier(new TlsClientOptions(Insecure: true));
+        Diagnostics.Arrange("options", "Insecure: true");
+        Diagnostics.Bytes("server certificate", [1, 2, 3]);
+        Diagnostics.Arrange("second certificate", "self-signed P-256 CN=localhost");
+
+        var verdict = verifier.Verify(new ServerCertificateChain([[1, 2, 3], certificate.RawData], "localhost", null));
+        nothingSent.Verify(new ServerCertificateChain([], "localhost", null));
+
+        Diagnostics.Act("accepted", verdict.IsAccepted);
+        Diagnostics.Act("observed verify result", verifier.Observed.VerifyResult);
+        Diagnostics.Act("verify result with nothing sent", nothingSent.Observed.VerifyResult);
+        Diagnostics.Assert("accepted", true, verdict.IsAccepted);
+        Diagnostics.Assert("observed verify result", nothingSent.Observed.VerifyResult, verifier.Observed.VerifyResult);
+        Assert.IsTrue(verdict.IsAccepted);
+        Assert.AreNotEqual(18L, verifier.Observed.VerifyResult);
+        Assert.AreEqual(nothingSent.Observed.VerifyResult, verifier.Observed.VerifyResult);
+    }
+
+    [TestMethod]
     public void Verify_WhenAnotherCertificateDoesNotParse_LeavesItOutOfTheChain()
     {
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var request = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256);
-        var names = new SubjectAlternativeNameBuilder();
-        names.AddDnsName("localhost");
-        request.CertificateExtensions.Add(names.Build());
-        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        using var certificate = SelfSignedLocalhostCertificate();
         var verifier = Verifier(new TlsClientOptions(Insecure: true));
         Diagnostics.Arrange("options", "Insecure: true");
         Diagnostics.Arrange("server certificate", "self-signed P-256 CN=localhost");
@@ -115,6 +133,16 @@ public sealed class HandBuiltCertificateVerifierTests
 
         Diagnostics.Act("exception", exception.GetType().Name);
         Diagnostics.Assert("exception", nameof(ArgumentNullException), exception.GetType().Name);
+    }
+
+    private static X509Certificate2 SelfSignedLocalhostCertificate()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256);
+        var names = new SubjectAlternativeNameBuilder();
+        names.AddDnsName("localhost");
+        request.CertificateExtensions.Add(names.Build());
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
     }
 
     private static HandBuiltCertificateVerifier Verifier(TlsClientOptions options, bool matchesSchannelBuild = false) =>
