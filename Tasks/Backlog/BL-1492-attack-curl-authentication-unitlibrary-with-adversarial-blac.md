@@ -4,7 +4,7 @@ title: Attack Curl.Authentication.UnitLibrary with adversarial black-box tests i
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-1491, BL-1454, BL-1458]
+depends-on: [BL-1491, BL-1454, BL-1710]
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-06
