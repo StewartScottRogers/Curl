@@ -33,3 +33,4 @@ ADR-0410 decision 3. Today `FileProtocolHandler` picks `NoRawSourceLastWriteRead
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
