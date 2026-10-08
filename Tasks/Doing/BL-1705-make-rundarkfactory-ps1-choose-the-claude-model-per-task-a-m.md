@@ -64,3 +64,4 @@ Not decided here, so do not add scope: a Haiku tier for lanes, per-model cost ca
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
