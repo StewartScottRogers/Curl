@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: [BL-1448]
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: FR-067
 created: 2026-10-07
 completed:
@@ -31,7 +31,18 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 
 ## Notes
 
+- 2026-10-07 (lane 4): `ConnectResult` lives in `Curl.Protocol.Abstractions.UnitLibrary`, not in
+  `Curl.Networking.UnitLibrary`, so reporting the CONNECT reply's header count to the handler needs
+  that library and its tests; added both to `touches` (no task in Doing on `origin/work/dark-factory`
+  names them). Plan: add a `ResponseHeadersStored`-style count to `ConnectResult`, seed the handler's
+  first hop from it (`HttpProtocolHandler.cs` ~1132), and count `requestStream.TrailerBytes` lines in
+  `TrailersOfAsync` (~1843) against the same 5000 limit. Both measurements need a loopback proxy and an
+  HTTP/2 trailer server in `Record-CurlExchange.ps1`, which it may not have yet.
+- Returned to Backlog unstarted: this run's budget could not cover two real-curl measurements, the
+  change across three libraries and a Measure-CodeQuality run.
+
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. Unstarted: run budget too small for the two real-curl measurements (CONNECT proxy, HTTP/2 trailers), the change across Http, Networking and Abstractions, and Measure-CodeQuality; plan in Notes
