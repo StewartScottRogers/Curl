@@ -3,8 +3,8 @@ id: AF-0065
 title: --interface with an unbindable name plus --negotiate reports the Negotiate SSPI failure instead of curl's interface-binding failure
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:--interface:stderr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $o="$env:TEMP\af-if"; $a=@('--interface','@f.txt','--negotiate','-s','-S','http:
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
