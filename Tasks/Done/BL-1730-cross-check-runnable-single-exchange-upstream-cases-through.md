@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-1729, BL-1722]
-touches: [Gap/Tools/Measure-ReferenceCrossCheck.ps1, Gap/Tools/Expand-UpstreamCase.cs, Gap/Tools/Fixtures/crosscheck, Record-CurlExchange.ps1]
+touches: [Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj, Gap/Tools/Measure-ReferenceCrossCheck.ps1, Gap/Tools/Expand-UpstreamCase.cs, Gap/Tools/Fixtures/crosscheck, Record-CurlExchange.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1730 — Cross-check runnable single-exchange upstream cases through the reference curl and Curl.Console with Gap/Tools/Measure-ReferenceCrossCheck.ps1
 
@@ -74,14 +74,40 @@ is needed. Cover the four combinations in step 3.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Measure-ReferenceCrossCheck.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7, covering the four combinations in step 3 and the selection rule's counts.
-- [ ] A real run on Windows against the 8.21.0 behaviour measurement finishes. The numbers cross-checked, left out (by rule), `reference-diverges`, and in-process versus out-of-process disagreements are recorded in this task's Notes.
-- [ ] If `Record-CurlExchange.ps1` was extended, its existing header-documented modes still work, shown by re-running one recorded exchange from an existing test fixture with byte-identical output. Its header help documents the new parameter.
-- [ ] The header help documents every parameter and the selection rules. The script is ASCII only.
+- [x] `Gap/Tools/Measure-ReferenceCrossCheck.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7, covering the four combinations in step 3 and the selection rule's counts.
+- [x] A real run on Windows against the 8.21.0 behaviour measurement finishes. The numbers cross-checked, left out (by rule), `reference-diverges`, and in-process versus out-of-process disagreements are recorded in this task's Notes.
+- [x] If `Record-CurlExchange.ps1` was extended, its existing header-documented modes still work, shown by re-running one recorded exchange from an existing test fixture with byte-identical output. Its header help documents the new parameter.
+- [x] The header help documents every parameter and the selection rules. The script is ASCII only.
 
 ## Notes
+
+- Touches widened (no task in Doing on origin/work/dark-factory names it):
+  `Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj` gains
+  `InternalsVisibleTo Include="Expand-UpstreamCase"`. The harness's command splitter
+  (`UpstreamCommandLineSplitter`) and part decoding (`UpstreamTestPartBodies`) are internal;
+  granting the file-based app access reuses them instead of re-implementing them, and adds no
+  public API.
+- `Expand-UpstreamCase.cs` takes a batch of case numbers in one `dotnet run`, so the run builds
+  once. It applies the three expansion-side selection rules (not-parsed, server-not-http-alone,
+  reply-not-one-data) and writes arguments, reply, stdin and client files as JSON.
+- Decisions (sensible defaults): stderr is compared after dropping progress meter lines (their
+  times differ run to run); each binary's command line starts `--max-time 20`
+  (`-CaseTimeLimitSeconds`) because test25 (a redirect loop) hung the first real run for 40
+  minutes; the server answers up to 20 connections with the same `<data>`, as sws does for a
+  followed redirect. Record-CurlExchange.ps1 needed no extension (its -Response escapes carry
+  any bytes), so it is unchanged and the third criterion holds trivially.
+- Real run, Windows, reference `curl 8.21.0 (x86_64-w64-mingw32) ... Schannel`, against an
+  in-process measurement of 8.21.0 cases 1-80 (match 58, gap 14, unmeasured 8), 246 s:
+  cross-checked 47; left out by not-match-or-gap 8, limit 0, not-parsed 0,
+  server-not-http-alone 2, reply-not-one-data 23; reference-diverges 3 (test17, test56,
+  test73); disagreements 6 (test9, test39, test44 in-process match now gap; test60, test62,
+  test71 stay gap with the reference's output as expected). test9/39/44 differ only in the
+  random multipart boundary: filed BL-1755 to normalise it.
+- Self-test: 10 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7.
+
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Measure-ReferenceCrossCheck.ps1 runs single-exchange HTTP cases through the reference curl and Curl.Console and amends the behaviour measurement
