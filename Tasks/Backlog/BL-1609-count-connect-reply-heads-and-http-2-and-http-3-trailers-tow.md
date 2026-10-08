@@ -38,6 +38,28 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
   first hop from it (`HttpProtocolHandler.cs` ~1132), and count `requestStream.TrailerBytes` lines in
   `TrailersOfAsync` (~1843) against the same 5000 limit. Both measurements need a loopback proxy and an
   HTTP/2 trailer server in `Record-CurlExchange.ps1`, which it may not have yet.
+- Measured 2026-10-07 (lane 8), curl 8.21.0 (mingw64, Schannel), `Record-CurlExchange.ps1 -Script`
+  (a plain proxy: `read`, send the CONNECT reply, `read`, send the final response, `pause 500`,
+  `close`; the `-Response` mode answers one request per connection, so it cannot serve a tunnel),
+  `-sv -i -p -x http://127.0.0.1:18609 http://example.test/`: CONNECT reply
+  `HTTP/1.1 200 Connection established` with `X-C1..X-C3000`, then `200` with `Content-Length: 2`
+  and `X-H1..X-H3000`: **exit 100**. The CONNECT heads count: 3000 + `Content-Length` +
+  `X-H1..X-H1999` = 5000, `< X-H2000: v` is the last `<` line, then
+  `* Too many response headers, 5000 is max` and `* closing connection #0`. The header output holds
+  the whole CONNECT head (with its blank line) and the final head through `X-H1999: v\r\n`, no blank
+  line, no body (57849 bytes). Status lines are not counted, as in BL-1448.
+- HTTP/2 trailers cannot be measured on this machine: the Windows curl 8.21.0 has no HTTP2 feature
+  (no nghttp2), and `Record-CurlExchange.ps1` serves no h2 origin (only an h2 proxy). By source,
+  `lib/headers.c`'s client writer pushes every `CLIENTWRITE_HEADER` write, trailers
+  (`CLIENTWRITE_TRAILER`) included, through `Curl_headers_push`, the same path whose limit BL-1448
+  measured for chunked trailers; so the next run should count them too and record that in an ADR.
+- Simpler seam found: the handler need not read a count from `ConnectResult`. The CONNECT head
+  already reaches the transfer through `IConnectReplyHeadWritingEvents.WriteConnectReplyHeadAsync`
+  (`Curl.Console/ConnectReplyHeadWritingEvents.cs`), so either that writer counts the head's lines,
+  or `ConnectResult` gets a `ConnectReplyHeadersStored` set from the opening reply's head in
+  `TcpConnector.SecureOpenedTunnelAsync` (also rebuilt in `PoolingConnector.cs` ~550).
+- Returned to Backlog again (lane 8): measured CONNECT, but the run's budget could not cover the
+  change across three libraries and the Measure-CodeQuality run.
 - Returned to Backlog unstarted: this run's budget could not cover two real-curl measurements, the
   change across three libraries and a Measure-CodeQuality run.
 
@@ -47,3 +69,4 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Unstarted: run budget too small for the two real-curl measurements (CONNECT proxy, HTTP/2 trailers), the change across Http, Networking and Abstractions, and Measure-CodeQuality; plan in Notes
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Backlog. CONNECT measured (heads count, exit 100, last < X-H2000; Notes); left: count CONNECT heads and HTTP/2-3 trailers in Http/Networking/Abstractions, tests, Measure-CodeQuality
