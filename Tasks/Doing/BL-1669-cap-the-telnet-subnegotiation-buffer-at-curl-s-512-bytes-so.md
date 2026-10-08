@@ -33,3 +33,4 @@ A telnet server that sends `IAC SB` and then any number of bytes without `IAC SE
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
