@@ -34,3 +34,4 @@ A transfer through an HTTP proxy tunnel counts the CONNECT reply's headers, and 
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
