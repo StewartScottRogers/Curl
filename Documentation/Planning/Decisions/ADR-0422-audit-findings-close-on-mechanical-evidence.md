@@ -92,3 +92,40 @@ targeted site is `site-missing` and reads as no mechanical answer until a sessio
 reproduction's site (done for AF-0030, now in `TurnOffNagle`). The planted-defect set-aside is
 deliberately broad: a plant in a widely referenced library sets aside re-audits across its
 dependants for that audit.
+
+## Amended 2026-10-07: the clean rerun comes before the set-aside
+
+Decided by Claude under Stewart's delegation.
+
+Audit 20261007-133608 (scorecard `2026-10-07_1336.md`) had a reliable quality auditor (2 of 2
+planted defects caught) re-audit 18 findings, and closed one. Eighteen Re-audits lines read
+"not re-audited | overlaps planted defect PD-###". AF-0005's reproduction is a mutant in
+`Curl.Cryptography.UnitLibrary/BrainpoolPoint.cs`; the auditor ran it and the mutant was killed,
+but PD-101 was planted in `AeadChaCha20Poly1305.cs`, another file of the same project, so the
+project rule of decision 3 set the verdict aside. `Write-AuditFindings.ps1` set aside before it
+reached the runner's own rerun, so the rerun on the clean commit - the evidence decision 2 closes
+on, which no plant can touch - never ran. With eight plants spread over the most referenced
+libraries, nearly every finding sits in or above a planted project, so fixed findings could not
+close at all.
+
+Decisions 2 and 3 now read:
+
+- **The rerun first.** When a finding with a mechanical reproduction is re-audited by its own
+  auditor, and the auditor says "no" or a planted defect overlaps it, the runner reruns the
+  reproduction on the clean audited commit before anything else. Its answer stands, plant or
+  no plant: an own "no" with the mutant killed closes the finding (`mechanical`); a mutant that
+  survives is recorded `reproduces: yes (runner rerun on clean commit)` and closes nothing. Only
+  a rerun that cannot tell (`site-missing`, a red baseline) leaves the overlap rule to set the
+  verdict aside, as does an own "yes" the clean rerun contradicts (a "yes" closes nothing, so it
+  waits for the next audit). The rerun's JSON and output stay in the run folder,
+  `reports\reruns\<id>.json` and `.log`, with one line per rerun in `reports\reruns\outcomes.txt`.
+- **A narrower overlap for the rest.** A finding with no mechanical reproduction is set aside only
+  when the planted defect's file is the finding's own file, or the auditor's evidence names the
+  planted file - not because its project depends on a planted project. A plant adds a defect, so
+  in a dependency it pushes a verdict towards "yes", not "no"; a stray "yes" costs at most a Re-fix
+  task that finds nothing to fix, while the broad rule cost every "no". AF-0026's 2026-10-07 line,
+  whose evidence named `TlsReader.cs`, would still be set aside; AF-0009's would not. Findings with
+  a mechanical reproduction keep the project rule for what the rerun leaves unanswered, because
+  any test in the project's closure decides whether a mutant is killed.
+
+The 18 set-aside verdicts of audit 20261007-133608 were evaluated again with the corrected rules.

@@ -127,7 +127,7 @@ function Get-FindingWaits([string]$Repo, [string]$FindingsAt, [string]$TasksAt) 
         }
         if ($tasks.Count -lt $ids.Count) { continue }
         $completed = @($tasks | ForEach-Object { Get-FrontValue ((Invoke-Git $Repo @('show', "${TasksAt}:$_")) -join "`n") 'completed' } | Sort-Object)[-1]
-        $reaudited = @([regex]::Matches($text, '(?m)^- (\d{4}-\d\d-\d\d) \| \S+ \| reproduces: (yes|no) \|') | Where-Object { $_.Groups[1].Value -gt $completed })
+        $reaudited = @([regex]::Matches($text, '(?m)^- (\d{4}-\d\d-\d\d) \| \S+ \| reproduces: (yes|no)(?: \([^)|]*\))? \|') | Where-Object { $_.Groups[1].Value -gt $completed })
         if (-not $reaudited.Count) { $waits.ReauditPending++ }
     }
     return $waits

@@ -47,9 +47,11 @@ checkable by someone else. The design is
   message or an ADR saying it was fixed is not evidence that it no longer reproduces. A
   reproduction you could not run, or whose result does not tell, is `"reproduces": null`
   ("not re-audited"), never `false`.
-- The tree you audit has planted defects in it. A re-audit verdict on a finding in a project
-  that depends on a planted defect's project, or whose evidence names a planted file, is set
-  aside by the audit run as "not re-audited"; it is not counted as yes or no (ADR-0422).
+- The tree you audit has planted defects in it. A re-audit verdict whose evidence names a
+  planted file, or on a finding in a planted file, is set aside by the audit run as "not
+  re-audited"; it is not counted as yes or no. For a finding with a mutation reproduction the
+  run's own rerun on the clean commit decides instead, and when that cannot tell, a verdict on
+  a finding in a project that depends on a planted defect's project is set aside too (ADR-0422).
 - Breaking rule 1 or rule 6 makes your audit unreliable: the audit run treats an
   auditor that changed the audited tree, or returned no parseable report block, as
   unreliable for that scorecard ([Scorecards/README.md](../Scorecards/README.md#reliability)).
