@@ -79,3 +79,4 @@ Commit `Gap/Upstream/8.21.0/options.json`, generated from the real 8.21.0 releas
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
