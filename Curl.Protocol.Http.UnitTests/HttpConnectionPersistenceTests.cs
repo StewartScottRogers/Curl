@@ -113,6 +113,7 @@ public sealed class HttpConnectionPersistenceTests
     [DataRow("connection:Keep-Alive", true, DisplayName = "Any case, no blank")]
     [DataRow("Connection: Foo, Keep-Alive", true, DisplayName = "Among other options")]
     [DataRow("Connection: keep-alive, close", false, DisplayName = "close wins")]
+    [DataRow("Connection: close, keep-alive", false, DisplayName = "close wins when named first")]
     [DataRow("Connection: close", false, DisplayName = "close")]
     [DataRow("Keep-Alive: timeout=5", false, DisplayName = "Another header")]
     [DataRow("X-Connection: keep-alive", false, DisplayName = "A header ending in Connection")]

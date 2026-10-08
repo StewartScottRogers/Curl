@@ -1,0 +1,21 @@
+{
+  "release": "fixture/9.9.9/tests/data",
+  "platform": "Windows",
+  "commit": "unknown",
+  "startedAt": "2026-10-08T12:00:00-07:00",
+  "finishedAt": "2026-10-08T12:00:10-07:00",
+  "cases": [
+    { "number": 1, "kind": "Skipped", "detail": "the harness does not act on <client><tool>", "milliseconds": 1 },
+    { "number": 2, "kind": "Skipped", "detail": "the harness does not act on <client><tool>", "milliseconds": 1 },
+    { "number": 3, "kind": "Skipped", "detail": "Curl lacks the feature unittest", "milliseconds": 1 },
+    { "number": 4, "kind": "Skipped", "detail": "the harness has no value for %HTTP3PORT", "milliseconds": 1 },
+    { "number": 5, "kind": "Skipped", "detail": "the harness has no value for %FTPPORT", "milliseconds": 1 },
+    { "number": 6, "kind": "Skipped", "detail": "the harness has no value for %SRCDIR", "milliseconds": 1 },
+    { "number": 7, "kind": "Skipped", "detail": "the harness does not act on <client><setenv>", "milliseconds": 1 },
+    { "number": 8, "kind": "Passed", "detail": "", "milliseconds": 12 },
+    { "number": 9, "kind": "Failed", "detail": "stdout differs at byte 4", "milliseconds": 15 },
+    { "number": 10, "kind": "Skipped", "detail": "the harness does not act on <client><tool>", "milliseconds": 1 },
+    { "number": 11, "kind": "Skipped", "detail": "the harness has no value for %PWD", "milliseconds": 1 },
+    { "number": 12, "kind": "Skipped", "detail": "the harness has no value for %HTTPSPORT", "milliseconds": 1 }
+  ]
+}
