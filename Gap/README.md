@@ -13,6 +13,6 @@ below is planned.
 | `Findings/` | Gap findings, `GF-####-*.md` | planned, BL-1720, BL-1731 |
 | `Scorecards/` | One scorecard per run, plus `history.json` | planned, BL-1720, BL-1732 |
 | `Tools/` | The office's scripts | planned, BL-1721 to BL-1735 |
-| `Triage.md` | How findings become tasks | planned, BL-1734 |
+| `Triage.md` | How findings become tasks | BL-1734 |
 | `RunGapAnalysis.cmd`, `RunGapAnalysis.ps1` | The entry point that runs a gap analysis | planned, BL-1740, BL-1741 |
 | `../.claude/agents/gap-*.md` | The gap analyst agents | planned, BL-1737 to BL-1739 |
