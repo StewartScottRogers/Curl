@@ -3,8 +3,8 @@ id: AF-0054
 title: FollowAsync_UploadAnswered301Or302_KeepsUpload checks only that the second request's Upload is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Core.UnitTests/RedirectFollowerTests.cs:FollowAsync_UploadAnswered301Or302_KeepsUpload:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Core.UnitTests/RedirectFollowerTests.cs -Pattern 'Keeps
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
