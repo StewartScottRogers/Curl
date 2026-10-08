@@ -3,8 +3,8 @@ id: AF-0062
 title: Hostile zlib-compressed SSH payload throws ZLibException out of SshZlibDecompressor.Decompress and SshWireDecoders.TryInflatePayload instead of a refusal
 auditor: security
 severity: Critical
-status: proposed
-reason:
+status: accepted
+reason: 
 key: security:Curl.Protocol.Ssh.UnitLibrary/Compression/SshZlibDecompressor.cs:SshZlibDecompressor.Decompress:fuzz-crash
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet run Audit/Tools/Fuzz/Fuzz.cs -- --target ssh --iterations 200000 --seed 2
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
