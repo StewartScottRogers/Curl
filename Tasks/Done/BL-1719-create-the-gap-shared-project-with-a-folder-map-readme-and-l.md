@@ -68,7 +68,7 @@ folder holds the project files and this map.
 
 ## Notes
 
-- The lane audit guard refuses any read of the audit office folder, so its `.projitems` could not be copied. `Gap.shproj` copies `Tasks/Tasks.shproj`; `Gap.projitems` writes the recursive take-every-file glob (`***`) with both project files excluded, as the task describes, and explains why the glob is load-bearing for this office. Default taken: the README table keeps the task's nine rows, each "Built by" cell `planned, BL-####`.
+- The lane audit guard refuses any read of the audit office folder, so its `.projitems` could not be copied. `Gap.shproj` copies `Tasks/Tasks.shproj`; `Gap.projitems` writes the recursive take-every-file glob (`**\*`) with both project files excluded, as the task describes, and explains why the glob is load-bearing for this office. Default taken: the README table keeps the task's nine rows, each "Built by" cell `planned, BL-####`.
 - GUID {8AD9ABE3-ECE3-4DD6-A9F6-C0D86B3C82DF} is both `ProjectGuid` and `SharedGUID`. Build: 0 warnings, 0 errors; fast tests green.
 
 ## Log
