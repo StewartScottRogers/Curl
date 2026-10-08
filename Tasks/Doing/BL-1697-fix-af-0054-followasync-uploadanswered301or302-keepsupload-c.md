@@ -49,3 +49,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-07: Backlog -> Doing.
