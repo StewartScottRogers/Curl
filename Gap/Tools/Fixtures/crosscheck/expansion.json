@@ -1,0 +1,67 @@
+{
+  "cases": [
+    {
+      "number": 1,
+      "leftOutBy": null,
+      "arguments": [
+        "--include",
+        "http://127.0.0.1:18990/1"
+      ],
+      "response": "SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LUxlbmd0aDogNQ0KDQpoZWxsbw==",
+      "standardInput": "",
+      "clientFiles": []
+    },
+    {
+      "number": 2,
+      "leftOutBy": null,
+      "arguments": [
+        "--include",
+        "http://127.0.0.1:18990/2"
+      ],
+      "response": "SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LUxlbmd0aDogNQ0KDQpoZWxsbw==",
+      "standardInput": "",
+      "clientFiles": []
+    },
+    {
+      "number": 3,
+      "leftOutBy": null,
+      "arguments": [
+        "--include",
+        "http://127.0.0.1:18990/3"
+      ],
+      "response": "SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LUxlbmd0aDogNQ0KDQpoZWxsbw==",
+      "standardInput": "",
+      "clientFiles": []
+    },
+    {
+      "number": 4,
+      "leftOutBy": null,
+      "arguments": [
+        "--include",
+        "http://127.0.0.1:18990/4"
+      ],
+      "response": "SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LUxlbmd0aDogNQ0KDQpoZWxsbw==",
+      "standardInput": "",
+      "clientFiles": []
+    },
+    {
+      "number": 6,
+      "leftOutBy": "server-not-http-alone"
+    },
+    {
+      "number": 7,
+      "leftOutBy": "reply-not-one-data"
+    },
+    {
+      "number": 8,
+      "leftOutBy": null,
+      "arguments": [
+        "--include",
+        "http://127.0.0.1:18990/8"
+      ],
+      "response": "SFRUUC8xLjEgMjAwIE9LDQpDb250ZW50LUxlbmd0aDogNQ0KDQpoZWxsbw==",
+      "standardInput": "",
+      "clientFiles": []
+    }
+  ]
+}

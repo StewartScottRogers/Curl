@@ -1,0 +1,120 @@
+{
+  "area": "behaviour",
+  "release": "9.9.9",
+  "items": [
+    {
+      "key": "behaviour:test1",
+      "state": "match",
+      "reason": null,
+      "expected": "upstream test1 passes",
+      "actual": "passes",
+      "evidence": "tests/data/test1",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    },
+    {
+      "key": "behaviour:test2",
+      "state": "gap",
+      "reason": null,
+      "expected": "upstream test2 passes",
+      "actual": "stdout differs at byte 4",
+      "evidence": "tests/data/test2",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    },
+    {
+      "key": "behaviour:test3",
+      "state": "match",
+      "reason": null,
+      "expected": "upstream test3 passes",
+      "actual": "passes",
+      "evidence": "tests/data/test3",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    },
+    {
+      "key": "behaviour:test4",
+      "state": "gap",
+      "reason": null,
+      "expected": "upstream test4 passes",
+      "actual": "stderr differs at byte 2",
+      "evidence": "tests/data/test4",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    },
+    {
+      "key": "behaviour:test5",
+      "state": "unmeasured",
+      "reason": "needs-server:ftp",
+      "expected": null,
+      "actual": null,
+      "evidence": "the harness has no value for %FTPPORT",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    },
+    {
+      "key": "behaviour:test6",
+      "state": "match",
+      "reason": null,
+      "expected": "upstream test6 passes",
+      "actual": "passes",
+      "evidence": "tests/data/test6",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    },
+    {
+      "key": "behaviour:test7",
+      "state": "gap",
+      "reason": null,
+      "expected": "upstream test7 passes",
+      "actual": "request differs",
+      "evidence": "tests/data/test7",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    },
+    {
+      "key": "behaviour:test8",
+      "state": "match",
+      "reason": null,
+      "expected": "upstream test8 passes",
+      "actual": "passes",
+      "evidence": "tests/data/test8",
+      "introducedIn": null,
+      "attributes": {
+        "keywords": [
+          "HTTP"
+        ]
+      }
+    }
+  ],
+  "counts": {},
+  "reasons": {}
+}
