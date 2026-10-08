@@ -65,6 +65,26 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
 
     private readonly List<HstsEntry> entries = [];
 
+    /// <summary>
+    /// Each held host name's position, the index into <see cref="entries" /> plus
+    /// <see cref="droppedCount" />, so a lookup by name never scans the list (BL-1610). A name
+    /// held twice (only a host past <see cref="HstsFileLineParser.MaxHostLength" /> can be added
+    /// twice) keeps its first position, as the scan it replaces would find.
+    /// </summary>
+    private readonly Dictionary<string, int> positionByName = new(AsciiCaseInsensitiveComparer.Instance);
+
+    /// <summary>How many entries have been dropped from the front since the index was last rebuilt.</summary>
+    private int droppedCount;
+
+    /// <summary>Whether <see cref="positionByName" /> left out a repeated name.</summary>
+    private bool holdsRepeatedName;
+
+    /// <summary>
+    /// No held entry expires before this second; it may be earlier than the earliest expiry held,
+    /// never later. Until the clock reaches it, no lookup has an expired entry to remove.
+    /// </summary>
+    private long earliestExpiry = HstsEntry.UnlimitedExpiry;
+
     /// <summary>Gets the entries held, in order.</summary>
     public IReadOnlyList<HstsEntry> Entries => entries;
 
@@ -157,7 +177,7 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
         }
         else
         {
-            entries[index] = entries[index] with { IncludeSubDomains = header.IncludeSubDomains, ExpiresUnixSeconds = expires };
+            Replace(index, entries[index] with { IncludeSubDomains = header.IncludeSubDomains, ExpiresUnixSeconds = expires });
         }
 
         LogVerbose("stored entry for ", host, string.Empty);
@@ -274,11 +294,11 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
         else if (AsciiText.EqualsIgnoringCase(entries[index].Host, host))
         {
             HstsEntry held = entries[index];
-            entries[index] = held with
+            Replace(index, held with
             {
                 IncludeSubDomains = held.IncludeSubDomains || includeSubDomains,
                 ExpiresUnixSeconds = Math.Max(held.ExpiresUnixSeconds, expires),
-            };
+            });
         }
     }
 
@@ -294,6 +314,44 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
     private int IndexOfName(string name, bool includingParents)
     {
         long now = NowSeconds();
+        if (earliestExpiry <= now)
+        {
+            int found = IndexOfNameRemovingExpired(name, includingParents, now);
+            RebuildIndex();
+            return found;
+        }
+
+        if (positionByName.TryGetValue(name, out int position))
+        {
+            return position - droppedCount;
+        }
+
+        return includingParents ? IndexOfParent(name) : -1;
+    }
+
+    /// <summary>
+    /// The index of the longest-named <c>includeSubDomains</c> entry <paramref name="name" /> is a
+    /// subdomain of, looked up one parent name at a time from the longest; -1 when none.
+    /// </summary>
+    private int IndexOfParent(string name)
+    {
+        for (int dot = name.IndexOf('.'); dot >= 0; dot = name.IndexOf('.', dot + 1))
+        {
+            if (positionByName.TryGetValue(name[(dot + 1)..], out int position) && entries[position - droppedCount].IncludeSubDomains)
+            {
+                return position - droppedCount;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The lookup <see cref="IndexOf" /> makes once an entry may have expired: scans the entries
+    /// in order, removing each expired one passed, and stops at the host's own entry.
+    /// </summary>
+    private int IndexOfNameRemovingExpired(string name, bool includingParents, long now)
+    {
         int parent = -1;
         int index = 0;
         while (index < entries.Count)
@@ -343,10 +401,33 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
 
         if (entries.Count == MaxEntries)
         {
-            entries.RemoveAt(0);
+            DropFirst();
         }
 
+        holdsRepeatedName |= !positionByName.TryAdd(name, entries.Count + droppedCount);
         entries.Add(new HstsEntry(name, includeSubDomains, expires));
+        earliestExpiry = Math.Min(earliestExpiry, expires);
+    }
+
+    /// <summary>Drops the first entry, moving every other position down by counting it.</summary>
+    private void DropFirst()
+    {
+        string host = entries[0].Host;
+        entries.RemoveAt(0);
+        if (holdsRepeatedName)
+        {
+            RebuildIndex();
+            return;
+        }
+
+        positionByName.Remove(host);
+        droppedCount++;
+    }
+
+    private void Replace(int index, HstsEntry entry)
+    {
+        entries[index] = entry;
+        earliestExpiry = Math.Min(earliestExpiry, entry.ExpiresUnixSeconds);
     }
 
     private void RemoveAt(int index)
@@ -354,6 +435,22 @@ public sealed class HstsCache(TimeProvider timeProvider, IDiagnosticLog? diagnos
         if (index >= 0)
         {
             entries.RemoveAt(index);
+            RebuildIndex();
+        }
+    }
+
+    /// <summary>Indexes every entry held again, after entries were removed from the middle.</summary>
+    private void RebuildIndex()
+    {
+        positionByName.Clear();
+        droppedCount = 0;
+        holdsRepeatedName = false;
+        earliestExpiry = HstsEntry.UnlimitedExpiry;
+        for (int index = 0; index < entries.Count; index++)
+        {
+            HstsEntry entry = entries[index];
+            holdsRepeatedName |= !positionByName.TryAdd(entry.Host, index);
+            earliestExpiry = Math.Min(earliestExpiry, entry.ExpiresUnixSeconds);
         }
     }
 

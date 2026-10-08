@@ -25,5 +25,20 @@ internal static class AsciiText
         return true;
     }
 
+    /// <summary>
+    /// A hash code for <paramref name="text" /> that is equal for any two texts
+    /// <see cref="EqualsIgnoringCase" /> calls equal.
+    /// </summary>
+    public static int GetHashCodeIgnoringCase(ReadOnlySpan<char> text)
+    {
+        HashCode hash = default;
+        foreach (char character in text)
+        {
+            hash.Add(ToLower(character));
+        }
+
+        return hash.ToHashCode();
+    }
+
     private static char ToLower(char character) => char.IsAsciiLetterUpper(character) ? (char)(character | 0x20) : character;
 }
