@@ -3,8 +3,8 @@ id: AF-0066
 title: Cli README says CurlCommandRunner does not yet pass on Range, ResumeFrom, MaxFileSize, ConnectTimeout or MaxTime; it passes all five
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Cli.UnitLibrary/README.md:CurlCommandRunner:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Cli.UnitLibrary/README.md -SimpleMatch 'does not yet pa
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
