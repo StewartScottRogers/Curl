@@ -78,7 +78,7 @@ continuously and where its dashboard is.
 
 - Delivered directly in the session rather than through align-and-document, to stay inside the run's cost cap; every statement was checked against the scripts' help, `Gap/Instructions/Gap-Format.md`, `Gap/Triage.md`, the agents' `model:` lines, `gap-release-watch.yml` and the dashboard page.
 - No difference from ADR-0433 found that needed a follow-up task: the analysts' models, the score rule, the closing rule and the watcher's schedule all match it.
-- `GapRunGapAnalysis.cmd -DryRun` refuses inside a lane (CURL_DARK_FACTORY_LANE set), as documented; run with the variable unset it printed all eleven steps' commands. Every path named in the four documents exists.
+- `Gap\RunGapAnalysis.cmd -DryRun` refuses inside a lane (CURL_DARK_FACTORY_LANE set), as documented; run with the variable unset it printed all eleven steps' commands. Every path named in the four documents exists.
 - The Independence section states BL-1746 as intent, since BL-1746 is still in Backlog.
 
 ## Log
