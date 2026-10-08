@@ -90,3 +90,4 @@ calls the real `task-board.ps1` with `CLAUDE_PROJECT_DIR` set to the copy.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
