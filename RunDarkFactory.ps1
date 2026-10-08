@@ -2467,7 +2467,8 @@ function Get-CiFailures {
             $awaitingMessage[$job] = $false
             continue
         }
-        if (-not $entry.Project -and $text -match '\sin\s.*?[/\\](Curl[\w.]*\.UnitTests)[/\\]') { $entry.Project = $Matches[1] }
+        # A stack-trace frame under a test project's folder, either suffix: *.UnitTests or *.IntegrationTests.
+        if (-not $entry.Project -and $text -match '\sin\s.*?[/\\](Curl[\w.]*\.(?:UnitTests|IntegrationTests))[/\\]') { $entry.Project = $Matches[1] }
         if ($text -match '^Failed!\s.*-\s+([\w.]+)\.dll') {
             if (-not $entry.Project) { $entry.Project = $Matches[1] }
             $current[$job] = $null
@@ -2548,10 +2549,12 @@ function Get-CiTaskNewArgs {
 function Get-CiTouches {
     # The test project and the library it tests, or for a build error the project that did not
     # build and its twin, as far as they exist in -Repo. Empty when the project is unknown.
+    # Both test-project suffixes map to their library: X.UnitTests and X.IntegrationTests each
+    # give X.UnitLibrary and X (the latter for Curl.Console).
     param([string]$Project, [string]$Repo)
     if (-not $Project) { return @() }
     $pair = @($Project)
-    if ($Project -match '^(.+)\.UnitTests$') { $pair += @("$($Matches[1]).UnitLibrary", $Matches[1]) }
+    if ($Project -match '^(.+)\.(?:UnitTests|IntegrationTests)$') { $pair += @("$($Matches[1]).UnitLibrary", $Matches[1]) }
     elseif ($Project -match '^(.+)\.UnitLibrary$') { $pair += "$($Matches[1]).UnitTests" }
     else { $pair += "$Project.UnitTests" }
     return @($pair | Where-Object { Test-Path (Join-Path $Repo $_) -PathType Container })
@@ -2867,6 +2870,16 @@ if ($TestCiWatch) {
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f 'error CS1002 in X.cs' @('Linux') 'build')))))
     & $check 'flaky title' 'Fix flaky CI test A that failed once on Linux' (Get-CiTaskTitle ([pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'flaky'; Platforms = @('Linux') }))
     & $check 'touches' 'Curl.Protocol.Ssh.UnitTests,Curl.Protocol.Ssh.UnitLibrary' ((Get-CiTouches -Project 'Curl.Protocol.Ssh.UnitTests' -Repo $Root) -join ',')
+    & $check 'integration touches' 'Curl.Networking.IntegrationTests,Curl.Networking.UnitLibrary' ((Get-CiTouches -Project 'Curl.Networking.IntegrationTests' -Repo $Root) -join ',')
+    & $check 'console integration touches' 'Curl.Console.IntegrationTests,Curl.Console' ((Get-CiTouches -Project 'Curl.Console.IntegrationTests' -Repo $Root) -join ',')
+    $integrationLog = @(
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000000Z   Failed Connect_Loopback_Succeeds [12 ms]"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000001Z   Error Message:"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000002Z    Assert.AreEqual failed."
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000003Z      at Curl.Networking.TcpDialerTests.Connect_Loopback_Succeeds() in /home/runner/work/Curl/Curl/Curl.Networking.IntegrationTests/TcpDialerTests.cs:line 12"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000004Z Failed!  - Failed:     1, Passed:     3 - SomethingElse.dll (net10.0)")
+    & $check 'integration test failure parsed' 'Connect_Loopback_Succeeds|Curl.Networking.IntegrationTests' `
+        ((@(Get-CiFailures $integrationLog) | ForEach-Object { "$($_.Key)|$($_.Project)" }) -join ';')
     $body = Join-Path ([IO.Path]::GetTempPath()) "df-ci-body-$PID.md"
     Copy-Item (Join-Path $Root '.claude\skills\task-board\TASK-TEMPLATE.md') $body
     Set-CiTaskBody -Path $body -RunUrl 'https://github.com/o/r/actions/runs/9' -Verdict ([pscustomobject]@{

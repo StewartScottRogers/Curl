@@ -8,7 +8,7 @@ depends-on: [BL-1597]
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1606 — Attribute CI failures in an IntegrationTests project to that project and its library in RunDarkFactory.ps1
 
@@ -27,13 +27,19 @@ When the coordinator files a "Fix CI failure ..." task (BL-987) for a failure in
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File RunDarkFactory.ps1 -TestCiWatch` passes, including the new IntegrationTests cases for `Get-CiTouches` and the log parser.
-- [ ] `Get-CiTouches` and the parser's comments say they handle both test-project suffixes.
-- [ ] No other behaviour of `RunDarkFactory.ps1` changes: every other `-Test*` switch the script's header lists still passes (Notes list those run).
+- [x] `powershell -NoProfile -File RunDarkFactory.ps1 -TestCiWatch` passes, including the new IntegrationTests cases for `Get-CiTouches` and the log parser.
+- [x] `Get-CiTouches` and the parser's comments say they handle both test-project suffixes.
+- [x] No other behaviour of `RunDarkFactory.ps1` changes: every other `-Test*` switch the script's header lists still passes (Notes list those run).
 
 ## Notes
+
+- The parser's stack-trace regex and `Get-CiTouches` now accept `.UnitTests` or `.IntegrationTests`; both suffixes map to `X.UnitLibrary` and `X`, filtered by `Test-Path` (so `Curl.Console.IntegrationTests` gives `Curl.Console`).
+- New `-TestCiWatch` cases: integration touches (Networking, Console) and a stack trace under `/Curl.Networking.IntegrationTests/` whose `Failed!` line names another dll, proving the frame wins. 35 checks pass.
+- Other switches run, all exit 0 with no FAIL: TestOutOfTokens, TestAutoLanes, TestMachineProbe, TestHeartbeat, TestShiftBranch, TestRestart, TestFlakyTests, TestTaskIds, TestTaskBudget, TestModelChoice, TestAuditCadence, TestAudioOff, TestLaneMarker, TestPark. TestAlarm not run: it sounds the alarm on the shared machine.
+- dotnet build clean; fast tests: 33 test projects passed, 0 failed.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. CI failures in a *.IntegrationTests project are attributed to it, with touches of the project and its library
