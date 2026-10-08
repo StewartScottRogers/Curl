@@ -77,3 +77,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Needs Curl.Console.UnitTests, held by BL-1596 (Doing): a test there pins the old -T -F behaviour; fix is ready, see Notes for what is left.
+- 2026-10-07: Backlog -> Doing.
