@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Authentication.Fakes;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Authentication;
 
@@ -26,13 +27,21 @@ public sealed class AuthDiagnosticLogTests
 
     private static readonly string Type2Challenge = "NTLM " + HandBuiltNtlmSecurityContextTests.MeasuredChallenge;
 
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void CreateAuthorization_DigestAndBasicOffered_LogsDigestChosenAtInfo()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenges", Basic + " | " + Digest);
+        diagnostics.Arrange("allowed", HttpAuthSchemes.Any);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Info);
 
         string? value = Ranked(log, new ScriptedSecurityContextFactory()).CreateAuthorization(HttpRequest(HttpAuthSchemes.Any), [Basic, Digest]);
 
+        diagnostics.Act("authorization", value);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("info line", "server offered Basic, Digest; allowed Any; chose Digest", string.Join(" | ", log.At(DiagnosticLogLevel.Info)));
         CollectionAssert.AreEqual(new[] { "server offered Basic, Digest; allowed Any; chose Digest" }, log.At(DiagnosticLogLevel.Info));
         Assert.AreEqual(DiagnosticLogComponents.Auth, log.Lines[0].Component);
         AssertNoSecret(log, value!);
@@ -41,10 +50,16 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public void CreateAuthorization_BasicChosen_LogsNoPasswordAndNoBase64Credential()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", Basic);
+        diagnostics.Arrange("password", Secret);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
 
         string? value = Ranked(log, new ScriptedSecurityContextFactory()).CreateAuthorization(HttpRequest(HttpAuthSchemes.Basic), [Basic]);
 
+        diagnostics.Act("authorization", value);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("info line", "server offered Basic; allowed Basic; chose Basic", string.Join(" | ", log.At(DiagnosticLogLevel.Info)));
         CollectionAssert.AreEqual(new[] { "server offered Basic; allowed Basic; chose Basic" }, log.At(DiagnosticLogLevel.Info));
         AssertNoSecret(log, value!);
         AssertNoSecret(log, Convert.ToBase64String(Encoding.UTF8.GetBytes("u:" + Secret)));
@@ -53,10 +68,16 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public void CreateAuthorization_NoOfferedSchemeAllowed_LogsAWarning()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", Digest);
+        diagnostics.Arrange("allowed", HttpAuthSchemes.Basic);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
 
-        Ranked(log, new ScriptedSecurityContextFactory()).CreateAuthorization(HttpRequest(HttpAuthSchemes.Basic), [Digest]);
+        string? value = Ranked(log, new ScriptedSecurityContextFactory()).CreateAuthorization(HttpRequest(HttpAuthSchemes.Basic), [Digest]);
 
+        diagnostics.Act("authorization", value);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("warning line", "server offered Digest; none of the allowed Basic can answer", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
         CollectionAssert.AreEqual(new[] { "server offered Digest; none of the allowed Basic can answer" }, log.At(DiagnosticLogLevel.Warning));
         Assert.IsEmpty(log.At(DiagnosticLogLevel.Info));
     }
@@ -64,10 +85,15 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public void CreateAuthorization_BeforeAnyChallenge_LogsNothing()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenges", "(none)");
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
 
-        Ranked(log, new ScriptedSecurityContextFactory()).CreateAuthorization(HttpRequest(HttpAuthSchemes.Basic), []);
+        string? value = Ranked(log, new ScriptedSecurityContextFactory()).CreateAuthorization(HttpRequest(HttpAuthSchemes.Basic), []);
 
+        diagnostics.Act("authorization", value);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Assert("line count", 0, log.Lines.Count);
         Assert.IsEmpty(log.Lines);
     }
 
@@ -76,10 +102,16 @@ public sealed class AuthDiagnosticLogTests
     [DataRow(Digest, "Digest algorithm MD5 (not named), qop none", DisplayName = "No algorithm, no qop")]
     public void CreateAuthorization_Digest_LogsTheAlgorithmAndQopAtVerbose(string challenge, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", challenge);
+        diagnostics.Arrange("expected", expected);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
 
         string? value = Ranked(log, new ScriptedSecurityContextFactory()).CreateAuthorization(HttpRequest(HttpAuthSchemes.Digest), [challenge]);
 
+        diagnostics.Act("authorization", value);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("verbose line", expected, string.Join(" | ", log.At(DiagnosticLogLevel.Verbose)));
         CollectionAssert.AreEqual(new[] { expected }, log.At(DiagnosticLogLevel.Verbose));
         AssertNoSecret(log, value!);
     }
@@ -87,11 +119,16 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_NegotiateMakesNoToken_LogsAWarning()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("context status", SecurityContextStatus.NoCredentials);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Warning);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
 
         string? value = await Ranked(log, contexts).CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Negotiate), [], CancellationToken.None);
 
+        diagnostics.Act("authorization", value ?? "(null)");
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("warning line", "Negotiate context made no token; no Negotiate answer sent", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
         Assert.IsNull(value);
         CollectionAssert.AreEqual(new[] { "Negotiate context made no token; no Negotiate answer sent" }, log.At(DiagnosticLogLevel.Warning));
     }
@@ -99,6 +136,10 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_NtlmRounds_LogsEachRoundAtVerboseWithoutTheMessages()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("type 2 challenge", Type2Challenge);
+        diagnostics.Bytes("type 1", Type1);
+        diagnostics.Bytes("type 3", Type3);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
         ScriptedSecurityContextFactory contexts = new(
             new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1)),
@@ -110,6 +151,10 @@ public sealed class AuthDiagnosticLogTests
         string? type1 = await ntlm.CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
         string? type3 = await ntlm.CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), type1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None);
 
+        diagnostics.Act("type 1 header", type1);
+        diagnostics.Act("type 3 header", type3);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("verbose lines", "NTLM type 1 sent | NTLM type 2 received, type 3 sent", string.Join(" | ", log.At(DiagnosticLogLevel.Verbose)));
         CollectionAssert.AreEqual(new[] { "NTLM type 1 sent", "NTLM type 2 received, type 3 sent" }, log.At(DiagnosticLogLevel.Verbose));
         AssertNoSecret(log, type1!["NTLM ".Length..]);
         AssertNoSecret(log, type3!["NTLM ".Length..]);
@@ -119,23 +164,34 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public async Task CreateAuthorizationAsync_ServerChallengesTheType3Again_LogsNtlmSkipped()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("challenge", "NTLM");
+        diagnostics.Arrange("sent", "type 3");
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Warning);
         NtlmHttpAuthenticator ntlm = new(new ScriptedSecurityContextFactory(), matchesSspiBuild: false, log);
 
-        await ntlm.CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), "NTLM " + Convert.ToBase64String(Type3), sentBeforeAnyChallenge: false, ["NTLM"], CancellationToken.None);
+        string? value = await ntlm.CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), "NTLM " + Convert.ToBase64String(Type3), sentBeforeAnyChallenge: false, ["NTLM"], CancellationToken.None);
 
+        diagnostics.Act("authorization", value ?? "(null)");
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("warning line", "NTLM skipped: the server answered the type 3 message with another challenge", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
         CollectionAssert.AreEqual(new[] { "NTLM skipped: the server answered the type 3 message with another challenge" }, log.At(DiagnosticLogLevel.Warning));
     }
 
     [TestMethod]
     public async Task CreateAuthorizationAsync_NtlmContextMakesNoType1_LogsNtlmSkipped()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("context status", SecurityContextStatus.NoCredentials);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Warning);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
 
-        await new NtlmHttpAuthenticator(contexts, matchesSspiBuild: false, log)
+        string? value = await new NtlmHttpAuthenticator(contexts, matchesSspiBuild: false, log)
             .CreateAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
 
+        diagnostics.Act("authorization", value ?? "(null)");
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("warning line", "NTLM skipped: the security context made no message (NoCredentials)", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
         CollectionAssert.AreEqual(new[] { "NTLM skipped: the security context made no message (NoCredentials)" }, log.At(DiagnosticLogLevel.Warning));
     }
 
@@ -144,15 +200,21 @@ public sealed class AuthDiagnosticLogTests
     [DataRow(DiagnosticLogLevel.Error, DisplayName = "error")]
     public async Task CreateAuthorizationAsync_RefusedNtlmLogin_LogsTheFailureAtErrorAndNothingMoreAtError(DiagnosticLogLevel level)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("level", level);
+        diagnostics.Arrange("type 2 challenge", Type2Challenge);
         RecordingDiagnosticLog log = new(level);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(
             new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Type1),
             new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
         RankedHttpAuthenticator ranked = Ranked(log, contexts, matchesSspiBuild: true);
 
-        await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+        HttpAuthenticationFailedException exception = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => ranked.ContinueAuthorizationAsync(HttpRequest(HttpAuthSchemes.Ntlm), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("error line", "NTLM authentication failed with exit 94 (AuthError): An authentication function returned an error", string.Join(" | ", log.At(DiagnosticLogLevel.Error)));
         CollectionAssert.AreEqual(new[] { "NTLM authentication failed with exit 94 (AuthError): An authentication function returned an error" }, log.At(DiagnosticLogLevel.Error));
         Assert.AreEqual(level == DiagnosticLogLevel.Error, log.Lines.TrueForAll(line => line.Level == DiagnosticLogLevel.Error));
         AssertNoSecret(log, HandBuiltNtlmSecurityContextTests.MeasuredChallenge);
@@ -161,6 +223,9 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public async Task ChooseMechanism_ServerOffersSeveral_LogsThePickAtInfoAndPlainWithoutThePassword()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("offered", "LOGIN PLAIN");
+        diagnostics.Arrange("password", Secret);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
         SaslAuthenticator sasl = new(Encoding.UTF8, () => "c", answerDigestMd5AsSspi: false, securityContexts: null, log);
         SaslRequest request = SaslRequestFor(new NetworkCredential("u", Secret));
@@ -168,6 +233,10 @@ public sealed class AuthDiagnosticLogTests
         string? mechanism = sasl.ChooseMechanism(request, ["LOGIN", "PLAIN"]);
         byte[]? initialResponse = await sasl.Begin(mechanism!, request).GetInitialResponseAsync(CancellationToken.None);
 
+        diagnostics.Act("mechanism", mechanism);
+        diagnostics.Bytes("initial response", initialResponse);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Assert("mechanism", "PLAIN", mechanism);
         Assert.AreEqual("PLAIN", mechanism);
         CollectionAssert.AreEqual(new[] { "server offered SASL LOGIN PLAIN; chose PLAIN" }, log.At(DiagnosticLogLevel.Info));
         CollectionAssert.AreEqual(new[] { "SASL PLAIN exchange begun" }, log.At(DiagnosticLogLevel.Verbose));
@@ -177,24 +246,34 @@ public sealed class AuthDiagnosticLogTests
     [TestMethod]
     public void ChooseMechanism_NoneUsable_LogsAWarning()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("offered", "SCRAM-SHA-1");
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Warning);
         SaslAuthenticator sasl = new(Encoding.UTF8, () => "c", answerDigestMd5AsSspi: false, securityContexts: null, log);
 
         Assert.IsNull(sasl.ChooseMechanism(SaslRequestFor(new NetworkCredential("u", Secret)), ["SCRAM-SHA-1"]));
 
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("warning line", "server offered SASL SCRAM-SHA-1; none can be used", string.Join(" | ", log.At(DiagnosticLogLevel.Warning)));
         CollectionAssert.AreEqual(new[] { "server offered SASL SCRAM-SHA-1; none can be used" }, log.At(DiagnosticLogLevel.Warning));
     }
 
     [TestMethod]
     public async Task Begin_DigestMd5ChallengeSspiRejects_LogsTheFailureAtError()
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism", "DIGEST-MD5");
+        diagnostics.Arrange("challenge", "realm=\"localhost\",qop=\"auth\",algorithm=md5-sess");
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Error);
         ISaslExchange exchange = new SaslAuthenticator(Encoding.UTF8, () => "c", answerDigestMd5AsSspi: true, securityContexts: new ScriptedSecurityContextFactory(), log)
             .Begin("DIGEST-MD5", SaslRequestFor(new NetworkCredential("u", Secret)));
 
-        await Assert.ThrowsExactlyAsync<SaslAuthenticationFailedException>(
+        SaslAuthenticationFailedException exception = await Assert.ThrowsExactlyAsync<SaslAuthenticationFailedException>(
             () => exchange.RespondAsync("realm=\"localhost\",qop=\"auth\",algorithm=md5-sess"u8.ToArray(), CancellationToken.None).AsTask());
 
+        diagnostics.Act("exception", exception.Message);
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("error line", "DIGEST-MD5 authentication failed with exit 94 (AuthError): An authentication function returned an error", string.Join(" | ", log.At(DiagnosticLogLevel.Error)));
         CollectionAssert.AreEqual(new[] { "DIGEST-MD5 authentication failed with exit 94 (AuthError): An authentication function returned an error" }, log.At(DiagnosticLogLevel.Error));
     }
 
@@ -204,14 +283,31 @@ public sealed class AuthDiagnosticLogTests
     [DataRow(false, SecurityMechanism.Negotiate, "Negotiate context for server.example.test: system GSS-API, else hand-built (off Windows the default credentials, falling back when GSS-API is unsupported)", DisplayName = "Negotiate off Windows")]
     public void Create_Routes_LogsTheRouteAndWhyAtVerboseWithoutTheCredential(bool isWindows, SecurityMechanism mechanism, string expected)
     {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("isWindows", isWindows);
+        diagnostics.Arrange("mechanism", mechanism);
+        diagnostics.Arrange("expected", expected);
         RecordingDiagnosticLog log = new(DiagnosticLogLevel.Verbose);
         SecurityContextRequest request = new(mechanism, "HTTP", "server.example.test") { UserName = "alice", Password = Secret, Domain = "EXAMPLE" };
         ScriptedSecurityContext context = new(new SecurityContextStep(SecurityContextStatus.ContinueNeeded, [1]));
 
         using ISecurityContext created = new RoutingSecurityContextFactory(isWindows, new ScriptedSecurityContextFactory(context), new ScriptedSecurityContextFactory(context), log).Create(request);
 
+        diagnostics.Act("log", Joined(log));
+        diagnostics.Diff("verbose line", expected, string.Join(" | ", log.At(DiagnosticLogLevel.Verbose)));
         CollectionAssert.AreEqual(new[] { expected }, log.At(DiagnosticLogLevel.Verbose));
         AssertNoSecret(log, "alice");
+    }
+
+    private static string Joined(RecordingDiagnosticLog log)
+    {
+        List<string> messages = [];
+        foreach ((_, _, string message) in log.Lines)
+        {
+            messages.Add(message);
+        }
+
+        return string.Join(" | ", messages);
     }
 
     private static void AssertNoSecret(RecordingDiagnosticLog log, string forbidden)

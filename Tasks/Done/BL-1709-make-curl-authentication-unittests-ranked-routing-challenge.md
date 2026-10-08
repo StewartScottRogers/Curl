@@ -8,7 +8,7 @@ depends-on: [BL-1457, BL-1708]
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1709 — Make Curl.Authentication.UnitTests ranked, routing, challenge-scheme and diagnostic-log tests write descriptive diagnostic output
 
@@ -35,17 +35,23 @@ Every test in the files named below writes, through BL-1457's shared `TestDiagno
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test in this task's files, and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints no line for a test in this task's files: each wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in this task's files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean and `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Authentication.UnitTests/` and this task file.
-- [ ] Notes list every test in this task's files that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test in this task's files, and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints no line for a test in this task's files: each wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in this task's files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean and `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Authentication.UnitTests/` and this task file.
+- [x] Notes list every test in this task's files that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
 
 ## Notes
 
 - Sized for one run: 86 test methods in the files above.
+- Counts (`Assert.` / `[TestMethod` / `[DataRow(`), before and after, unchanged: RankedHttpAuthenticatorTests 61/34/37, RoutingSecurityContextFactoryTests 39/16/6, HttpChallengeSchemesTests 5/5/22, AuthDiagnosticLogTests 25/14/7, AuthDiagnosticLogNetrcSigV4NegotiateTests 16/9/6, SaslDigestMd5Tests 10/8/25. Project total 819 tests, all passing.
+- Where a test asserted only through `Assert.Throws*`, its return value is now captured so the exception can be printed; the call and its check are the same. Calls whose result was discarded now keep it in a local to print it.
+- The detailed run's `END` lines for this task's files show no `arrange 0`, `act 0` or `assert 0`.
+- SLOW: none of this task's tests printed a `SLOW:` line.
+- The shared fakes (`Fakes/RecordingDiagnosticLog.cs`, `ScriptedSecurityContextFactory.cs`) needed no change.
 
 ## Log
 
 - 2026-10-07: Created, split from BL-1458.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. All 86 tests in the six files write ARRANGE, ACT and ASSERT or DIFF lines; counts unchanged; 819 tests green
