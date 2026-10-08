@@ -41,10 +41,26 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured curl 8.21.0 (mingw, Schannel) on 2026-10-08 with `Record-CurlExchange.ps1 -Response`:
+  `-v --ignore-content-length` against `Content-Length: 0` and plain `-v` against
+  `Connection: close` with no body both write `{ [0 bytes data]` after `< `; with a 5-byte
+  body (either way) curl writes only `{ [5 bytes data]`, no empty line at the close. So the
+  rule is: a read-to-close body that closed without a byte reports one empty data event.
+- Fix: `HttpResponseBodyReader.EndAtClose` reports `Events.ReportDataReceived([])` when a
+  read-to-close body ends with nothing received. This also fixes the no-Content-Length case,
+  which the finding did not name.
+- Tests: `HttpProtocolHandlerTests.Events.cs` -
+  `ExecuteAsync_ReadToCloseBodyClosingWithoutAByte_ReportsOneEmptyDataEvent` (both cases) and
+  `ExecuteAsync_ReadToCloseBodyWithBytes_ReportsNoEmptyDataEventAtTheClose`. The tests live in
+  `Curl.Protocol.Http.UnitTests`, the library's own test project.
+- Reproduction run against the Debug build (`Curl.Console/bin/Debug/net10.0/curl.exe`, the
+  build this lane makes): `curl: 1 / Curl: 1`.
+- `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 0 failing members.
 
 ## Log
 
