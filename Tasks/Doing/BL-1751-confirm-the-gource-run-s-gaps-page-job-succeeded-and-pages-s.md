@@ -34,3 +34,4 @@ the shift has pushed BL-1743's commit to `work/dark-factory`. If the job failed,
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
