@@ -8,7 +8,7 @@ depends-on: [BL-1457, BL-1709]
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1710 — Make Curl.Authentication.UnitTests AWS SigV4 and SASL tests write descriptive diagnostic output
 
@@ -32,18 +32,23 @@ Every test in the files named below writes, through BL-1457's shared `TestDiagno
 
 ## Acceptance criteria
 
-- [ ] `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test in this task's files, and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints no line for a test in this task's files: each wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
-- [ ] The run's total test count is unchanged, and in this task's files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
-- [ ] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean and `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
-- [ ] The task's commits change only files under `Curl.Authentication.UnitTests/` and this task file.
-- [ ] Notes list every test in this task's files that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
-- [ ] Overall, for the whole project (the last of the five split tasks): every test in `Curl.Authentication.UnitTests` prints an `END` line and the `Select-String` pattern above prints nothing for the entire run; the total test count is unchanged from the 426 test methods BL-1458 counted; and the `Assert.`, `[TestMethod` and `[DataRow(` totals (534 `[DataRow(` lines) over the project (excluding `obj`) are no lower than before BL-1706 started.
+- [x] `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration" --logger "console;verbosity=detailed"` prints an `END` line for every test in this task's files, and piping that output to `Select-String -Pattern 'END .*(\(arrange 0,|, act 0,|, assert 0\))'` prints no line for a test in this task's files: each wrote at least one `ARRANGE`, one `ACT` and one `ASSERT` or `DIFF` line.
+- [x] The run's total test count is unchanged, and in this task's files the numbers of `Assert.`, `[TestMethod` and `[DataRow(` matches (each counted with `Select-String -AllMatches`) are no lower than before the task; the before and after numbers are recorded in Notes.
+- [x] `dotnet build Curl.Authentication.UnitTests -warnaserror` is clean and `dotnet test Curl.Authentication.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] The task's commits change only files under `Curl.Authentication.UnitTests/` and this task file.
+- [x] Notes list every test in this task's files that printed a `SLOW:` line with its `PHASE` breakdown, or say none did; for each that is a real performance problem a follow-up task is filed and its ID is in Notes.
+- [x] Overall, for the whole project (the last of the five split tasks): every test in `Curl.Authentication.UnitTests` prints an `END` line and the `Select-String` pattern above prints nothing for the entire run; the total test count is unchanged from the 426 test methods BL-1458 counted; and the `Assert.`, `[TestMethod` and `[DataRow(` totals (534 `[DataRow(` lines) over the project (excluding `obj`) are no lower than before BL-1706 started.
 
 ## Notes
 
 - Sized for one run: 92 test methods in the files above.
+- Before/after counts (`Assert.`, `[TestMethod`, `[DataRow(`): AwsSigV4SignerTests.cs 60/35/35 -> 60/35/35; SaslAuthenticatorTests.cs 56/33/43 -> 56/33/43; SaslAuthenticatorSecurityContextTests.cs 62/24/38 -> 62/24/38. Whole project (excluding obj): 764/426/534 before and after.
+- Run: 819 tests, 815 passed, 4 skipped (platform-conditional tests that run off Windows only, unchanged); every executed test prints an END line and the Select-String pattern prints nothing for the whole project.
+- SLOW: none - no test in the project printed a SLOW line, so no follow-up task.
+- `ScriptedSecurityContext.cs` and `ScriptedSecurityContextFactory.cs` needed no change: the tests print each scripted token as BYTES themselves.
 
 ## Log
 
 - 2026-10-07: Created, split from BL-1458.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Every AWS SigV4 and SASL test in Curl.Authentication.UnitTests writes ARRANGE, ACT and ASSERT/DIFF diagnostics; the whole project now does
