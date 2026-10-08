@@ -310,13 +310,17 @@ public sealed class SshPrivateKeyReaderTests
     public void Read_TextBeforeTheBlock_ReadsTheKey()
     {
         string text = "Bag Attributes\n" + TestUserKeys.EcdsaP256Sec1;
+        SshPublicKey expected = SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile).Key!;
         Diagnostics.ArrangeText("key file", text);
 
         SshPrivateKey? key = SshPrivateKeyReader.Read(text, []);
 
         Diagnostics.ActKey(key);
-        Diagnostics.Assert("key read", true, key is not null);
-        Assert.IsNotNull(key);
+        Diagnostics.Assert("key type", expected.KeyType, key?.KeyType);
+        Diagnostics.AssertBytes("public key blob", expected.Blob, key?.PublicKeyBlob);
+        Assert.IsInstanceOfType<EcdsaSshPrivateKey>(key);
+        Assert.AreEqual("ecdsa-sha2-nistp256", key.KeyType);
+        CollectionAssert.AreEqual(expected.Blob, key.PublicKeyBlob);
     }
 
     private void WriteKeyExpectingNone(string label, SshPrivateKey? key)

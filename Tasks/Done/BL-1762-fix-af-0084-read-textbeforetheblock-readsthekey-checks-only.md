@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1762 — Fix AF-0084: Read_TextBeforeTheBlock_ReadsTheKey checks only that some key came back, not that it is the ECDSA P-256 key in the file
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts the key is an `EcdsaSshPrivateKey` of type `ecdsa-sha2-nistp256` whose public key blob equals the blob in `TestUserKeys.EcdsaP256PublicKeyFile`, the same checks as `Read_EcdsaKeyInEachFormat_ReadsTheKeyOfItsPublicKeyFile`.
+- Kept the method name `Read_TextBeforeTheBlock_ReadsTheKey`: it is still true ("the key" is the file's key), and the finding's `Select-String` reproduction searches for it, so a rename would leave the re-audit nothing to find.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Test now asserts the ECDSA P-256 key type and public key blob
