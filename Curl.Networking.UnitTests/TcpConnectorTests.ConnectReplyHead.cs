@@ -60,6 +60,37 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ThroughATunnelWhoseReplyHolds3Headers_CarriesTheCountInTheResult()
+    {
+        const string reply = "HTTP/1.1 200 Connection established\r\nX-A: 1\r\nX-B: 2\r\nX-C: 3\r\n\r\n";
+        var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply));
+        var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("connect reply headers stored", 3, result.ConnectReplyHeadersStored);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(3, result.ConnectReplyHeadersStored);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenTheHandshakeInsideTheTunnelFails_ReturnsTheFailureWithNoHeaderCount()
+    {
+        const string reply = "HTTP/1.1 200 Connection established\r\nX-A: 1\r\n\r\n";
+        var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply));
+        var tlsProvider = new FakeTlsProvider { FailureToReturn = ConnectResult.Failed(CurlExitCode.SslConnectError, "handshake refused") };
+        var connector = CreateProxyConnector(proxyConnection, tlsProvider);
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpProxy });
+
+        Diagnostics.Assert("result.ExitCode", CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.IsNull(result.Connection);
+        Assert.AreEqual(0, result.ConnectReplyHeadersStored);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheProxyClosesBeforeItsHeaderBlockEnds_GivesTheEventsNoHead()
     {
         var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n"));

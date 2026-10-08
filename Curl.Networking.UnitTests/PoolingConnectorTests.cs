@@ -196,6 +196,20 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ForANewConnection_PassesTheConnectReplyHeaderCountOn()
+    {
+        _inner.ConnectReplyHeadersStored = 3;
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("inner connect reply headers stored", 3);
+        Diagnostics.Act("opened connect reply headers stored", opened.ConnectReplyHeadersStored);
+        Diagnostics.Assert("opened connect reply headers stored", 3, opened.ConnectReplyHeadersStored);
+        Assert.AreEqual(3, opened.ConnectReplyHeadersStored);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ReusingAForwardProxyConnection_ReportsItWithProxy()
     {
         await using var pool = CreatePool();

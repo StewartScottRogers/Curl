@@ -58,6 +58,13 @@ internal readonly record struct HttpProxyTunnelReply(int StatusCode, string? Fai
     public ReadOnlyMemory<byte> Head { get; init; }
 
     /// <summary>
+    /// Gets how many header lines <see cref="Head" /> holds - its lines less the status line and
+    /// the blank line that ends it - which curl 8.21.0 stores and counts toward its limit of
+    /// 5000 response headers (measured, BL-1609 Notes); <c>0</c> for an empty head.
+    /// </summary>
+    public int HeaderCount => Math.Max(0, Head.Span.Count((byte)'\n') - 2);
+
+    /// <summary>
     /// Gets a value indicating whether the body is <c>Transfer-Encoding: chunked</c>, so it ends
     /// with its last chunk and trailer rather than after <see cref="ContentLength" /> bytes.
     /// </summary>

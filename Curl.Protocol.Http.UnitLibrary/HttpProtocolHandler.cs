@@ -289,9 +289,7 @@ public sealed class HttpProtocolHandler(
         using HttpTransferDeadline deadline = new(context);
         HttpInfoLineRecorder authorizationLines = new();
         HttpInfoLineRecorder proxyAuthorizationLines = new();
-        string? proxyAuthorization = proxyAuthRequest is null
-            ? null
-            : await Authenticator.CreateAuthorizationAsync(proxyAuthRequest with { Events = proxyAuthorizationLines }, [], context.CancellationToken).ConfigureAwait(false);
+        string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
         HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
         {
@@ -311,6 +309,16 @@ public sealed class HttpProtocolHandler(
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
         return plan.OpenedConnection ? WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines) : result;
     }
+
+    /// <summary>
+    /// Makes the first request's <c>Proxy-Authorization</c> value for a forward proxy, the
+    /// authenticator's lines going to <paramref name="lines" />; <see langword="null" /> when
+    /// there is no forward proxy.
+    /// </summary>
+    private async ValueTask<string?> CreateFirstProxyAuthorizationAsync(HttpAuthRequest? proxyAuthRequest, HttpInfoLineRecorder lines, CancellationToken cancellationToken) =>
+        proxyAuthRequest is null
+            ? null
+            : await Authenticator.CreateAuthorizationAsync(proxyAuthRequest with { Events = lines }, [], cancellationToken).ConfigureAwait(false);
 
     /// <summary>
     /// Gives a failed transfer the message of the first line the authenticator reported while
@@ -1027,7 +1035,7 @@ public sealed class HttpProtocolHandler(
             LimitsFileSize = HttpDownloadConditions.LimitOf(context.MaxFileSize) is not null,
             DecodesTransferCoding = options.TransferEncoding,
             Log = exchangeLog,
-            HeadersStoredBefore = HeadersStoredBefore(earlier, options),
+            HeadersStoredBefore = HeadersStoredBefore(earlier, options, connect),
         };
         int cookiesStored = 0;
         HttpAuthProblemLines originProblems = new();
@@ -1129,10 +1137,11 @@ public sealed class HttpProtocolHandler(
     /// Gives how many response headers the transfer stored before an exchange: those of the
     /// exchange a retry answers, through its <paramref name="earlier" /> report, or else those
     /// of the hops before this one (<see cref="HttpRequestOptions.ResponseHeadersStored" />),
-    /// since curl 8.21.0 counts them all toward one limit of 5000 (measured, BL-1448 Notes).
+    /// with the header lines of the CONNECT reply that opened the connection's tunnel,
+    /// since curl 8.21.0 counts them all toward one limit of 5000 (measured, BL-1448 and BL-1609 Notes).
     /// </summary>
-    private static int HeadersStoredBefore(TransferReport? earlier, HttpRequestOptions options) =>
-        earlier?.ResponseHeadersStored ?? options.ResponseHeadersStored;
+    private static int HeadersStoredBefore(TransferReport? earlier, HttpRequestOptions options, ConnectResult connect) =>
+        earlier?.ResponseHeadersStored ?? (options.ResponseHeadersStored + connect.ConnectReplyHeadersStored);
 
     /// <summary>
     /// Gives how <c>-f</c> or <c>--fail-with-body</c> applies to a response: as asked, unless
@@ -1836,7 +1845,33 @@ public sealed class HttpProtocolHandler(
         }
 
         ReadOnlyMemory<byte> trailers = await TrailersOfAsync(body, requestStream, cancellationToken).ConfigureAwait(false);
-        await WriteHeadersAsync(context.HeaderOutput, trailers, cancellationToken).ConfigureAwait(false);
+        int storedLength = StoredLengthOf(trailers.Span, requestStream is null ? int.MaxValue : HttpResponseHeadReader.MaximumHeaderCount - body.HeadersStored);
+        await WriteHeadersAsync(context.HeaderOutput, trailers[..storedLength], cancellationToken).ConfigureAwait(false);
+        if (storedLength < trailers.Length)
+        {
+            throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders)
+            {
+                InfoLines = [HttpTransferMessages.TooManyResponseHeaders],
+            };
+        }
+    }
+
+    /// <summary>
+    /// Gives the length of the first <paramref name="allowed" /> lines of <paramref name="trailers" />, all of
+    /// them when there are no more: the HTTP/2 or HTTP/3 trailers curl 8.21.0 stores before the one past its
+    /// limit of 5000 response headers, which it counts as it counts chunked trailers (BL-1609 Notes, ADR).
+    /// A chunked body's trailers were already cut by <see cref="HttpChunkedDecoder.TrailerLimit" />.
+    /// </summary>
+    internal static int StoredLengthOf(ReadOnlySpan<byte> trailers, int allowed)
+    {
+        int length = 0;
+        for (int line = 0; line < allowed && length < trailers.Length; line++)
+        {
+            int end = trailers[length..].IndexOf((byte)'\n');
+            length = end < 0 ? trailers.Length : length + end + 1;
+        }
+
+        return length;
     }
 
     /// <summary>
