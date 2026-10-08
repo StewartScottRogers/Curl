@@ -84,3 +84,4 @@ is needed. Cover the four combinations in step 3.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
