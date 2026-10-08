@@ -51,3 +51,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Lane 4 could not integrate: push kept being refused. The work is on branch factory/BL-1685-lane-4-20261007-111121; start with git cherry-pick --no-commit factory/BL-1685-lane-4-20261007-111121 and fix it.
+- 2026-10-07: Backlog -> Doing.
