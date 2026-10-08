@@ -8,7 +8,7 @@ depends-on: [BL-1720]
 touches: [Gap/Tools/Get-UpstreamRelease.ps1, Gap/Tools/Fixtures/release, Gap/Baselines]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1721 — Download and cache an upstream curl release with a pinned SHA-256 in Gap/Tools/Get-UpstreamRelease.ps1
 
@@ -65,14 +65,21 @@ temporary baselines folder (add a `-BaselinesDirectory` parameter, default
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Get-UpstreamRelease.ps1 -SelfTest` prints `PASS` lines and no `FAIL`, and exits 0, under Windows PowerShell 5.1 and PowerShell 7. It checks five things: the first run writes the manifest with the archive's hash; only `docs/`, `tests/data/`, `lib/strerror.c` and `COPYING` are extracted (`lib/other.c` is not); a second run with the same archive returns without re-extracting; an archive whose hash differs from the manifest throws and changes nothing; the printed path is the version's cache folder.
-- [ ] `Gap/Baselines/target.json` and `Gap/Baselines/curl-8.21.0.json` are committed. The latter holds the SHA-256 of the real `curl-8.21.0.tar.gz` and its URL.
-- [ ] Running `powershell -NoProfile -File Gap/Tools/Get-UpstreamRelease.ps1` with no arguments prints a folder that contains `docs/cmdline-opts/write-out.md`, `docs/libcurl/libcurl-errors.md`, `lib/strerror.c` and more than 1900 `tests/data/test*` files.
-- [ ] The header help documents every parameter, the cache locations and the hash rule. The script is ASCII only.
+- [x] `Gap/Tools/Get-UpstreamRelease.ps1 -SelfTest` prints `PASS` lines and no `FAIL`, and exits 0, under Windows PowerShell 5.1 and PowerShell 7. It checks five things: the first run writes the manifest with the archive's hash; only `docs/`, `tests/data/`, `lib/strerror.c` and `COPYING` are extracted (`lib/other.c` is not); a second run with the same archive returns without re-extracting; an archive whose hash differs from the manifest throws and changes nothing; the printed path is the version's cache folder.
+- [x] `Gap/Baselines/target.json` and `Gap/Baselines/curl-8.21.0.json` are committed. The latter holds the SHA-256 of the real `curl-8.21.0.tar.gz` and its URL.
+- [x] Running `powershell -NoProfile -File Gap/Tools/Get-UpstreamRelease.ps1` with no arguments prints a folder that contains `docs/cmdline-opts/write-out.md`, `docs/libcurl/libcurl-errors.md`, `lib/strerror.c` and more than 1900 `tests/data/test*` files.
+- [x] The header help documents every parameter, the cache locations and the hash rule. The script is ASCII only.
 
 ## Notes
+
+- The self-test fixture is the folder `Gap/Tools/Fixtures/release/curl-9.9.9/`; the self-test tars it into a temporary `curl-9.9.9.tar.gz` (System32 tar.exe on Windows, tar elsewhere). The mismatch check uses a second archive holding only `COPYING`.
+- `-ArchivePath` always hashes and checks the archive, even when the cache is complete, so a wrong local archive still throws; a download run returns at once when `.complete` holds the pinned hash.
+- An incomplete version folder (no `.complete`, or a different hash in it) is deleted and re-extracted with `--strip-components 1`.
+- Windows PowerShell 5.1 has no `$PSScriptRoot` while binding parameter defaults, so `-BaselinesDirectory` is defaulted in the body.
+- Real run 2026-10-08: curl-8.21.0.tar.gz from the GitHub release, SHA-256 d9b327997999045a24cda50f3983e69e51c516bd8be6ef9842fc7f99135e33bb; 2013 `tests/data/test*` files; the second run returns in 0.35 s.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Get-UpstreamRelease.ps1 fetches, pins and caches curl 8.21.0; self-test passes on PS 5.1 and 7.
