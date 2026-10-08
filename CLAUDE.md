@@ -11,7 +11,7 @@ injected interfaces so it can be unit tested without a network. See
 `Documentation/Product/Product-Overview.md`.
 
 ## Toolchain
-- .NET Software Development Kit 10 (see `global.json` once added). Target framework: `net10.0` unless a project states otherwise.
+- .NET Software Development Kit 10 (`global.json` at the repository root pins SDK 10.0.401 with `rollForward: latestFeature`). Target framework: `net10.0` unless a project states otherwise.
 - The solution file lives at the repository root (`Curl.slnx` preferred, `Curl.sln` acceptable).
 - Shell is Windows. Use PowerShell or `cmd` syntax, backslash paths are fine.
 

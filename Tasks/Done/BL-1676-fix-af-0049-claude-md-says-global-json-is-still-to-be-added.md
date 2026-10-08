@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1676 — Fix AF-0049: CLAUDE.md says global.json is still to be added, but it exists
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Done directly: a one-line doc fix, no align-and-document run needed. CLAUDE.md:14 now names `global.json` and the SDK pin it holds (10.0.401, rollForward latestFeature). Reproduction prints only `True`. Build clean, fast tests green.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. CLAUDE.md now points at the existing global.json SDK pin instead of calling it future work
