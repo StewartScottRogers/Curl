@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-1720]
-touches: [Gap/Tools/New-TasksFromGaps.ps1, Gap/Tools/Fixtures/tasks, Gap/Triage.md]
+touches: [Gap/Tools/New-TasksFromGaps.ps1, Gap/Tools/Fixtures/tasks, Gap/Triage.md, Gap/README.md]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1734 — File lane-eligible Curl tasks for open gap findings with Gap/Tools/New-TasksFromGaps.ps1
 
@@ -80,14 +80,25 @@ calls the real `task-board.ps1` with `CLAUDE_PROJECT_DIR` set to the copy.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/New-TasksFromGaps.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks each mapping row; a filed task contains the finding's Evidence and Suggestion text and none of the template's HTML comments; the finding gains `task`, `tasks` and a `Log` line; a hand-filed `Close GF-####` task stops a second filing; dropped `Gap/` touches; the refusal when `CURL_DARK_FACTORY_LANE` is set.
-- [ ] Every task the self-test files passes `task-board.ps1 status` with no warning, and none says `lane: no`.
-- [ ] `Gap/Triage.md` states the six steps above.
-- [ ] `-WhatIf` changes nothing. The header help documents every parameter and the mapping. The script is ASCII only.
+- [x] `Gap/Tools/New-TasksFromGaps.ps1 -SelfTest` prints `PASS` lines and no `FAIL` under Windows PowerShell 5.1 and PowerShell 7. It checks each mapping row; a filed task contains the finding's Evidence and Suggestion text and none of the template's HTML comments; the finding gains `task`, `tasks` and a `Log` line; a hand-filed `Close GF-####` task stops a second filing; dropped `Gap/` touches; the refusal when `CURL_DARK_FACTORY_LANE` is set.
+- [x] Every task the self-test files passes `task-board.ps1 status` with no warning, and none says `lane: no`.
+- [x] `Gap/Triage.md` states the six steps above.
+- [x] `-WhatIf` changes nothing. The header help documents every parameter and the mapping. The script is ASCII only.
 
 ## Notes
+
+- Added `Gap/README.md` to `touches`: its `Triage.md` row said "planned, BL-1734", false once this lands. No task in Doing on `origin/work/dark-factory` names it.
+- Choices taken (sensible defaults, Claude under Stewart's delegation):
+  - "Dated after the last completion" compares the Measurements line's date with the latest `completed` date strictly: a run on the completion day may predate the fix, and the next run catches it.
+  - A finding's tasks are its `tasks` list plus any board task titled `Close GF-####` / `Re-close GF-####` for it; open means Backlog, Doing, Blocked or Deferred. A listed ID that is on no board files nothing (the board passed in may lag).
+  - An item's acceptance box gives the item's `expected` answer when the optional `-MeasurementsDirectory` (a run's `measurements/` folder) holds it; otherwise it points at the copied Evidence. Findings themselves carry no `expected`.
+  - The yardstick is the `sources` of `Gap/Upstream/<target>/<area>.json`, else the release tarball named generically (behaviour has no inventory yet).
+  - `task-board.ps1 new` runs as a child of the same PowerShell edition (`$PSHOME`, since the process may be a dotnet host) with `CLAUDE_PROJECT_DIR` set to `-BoardRoot` and restored.
+  - `-SelfTest` itself runs inside a lane; its inner runs clear `CURL_DARK_FACTORY_LANE`, except the one checking the refusal.
+- Verified: `-SelfTest` 21 PASS, 0 FAIL under Windows PowerShell 5.1 and PowerShell 7; ASCII only; `dotnet build -warnaserror` clean; fast tests green.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Gap/Tools/New-TasksFromGaps.ps1 files Close and Re-close tasks for open target gap findings and writes their IDs back; Gap/Triage.md explains the flow
