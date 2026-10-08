@@ -388,6 +388,7 @@ The last fenced `json` block of a gap analyst's reply. The run reads only that b
 | `area` | string | The area analysed. |
 | `run` | string | The run stamp. |
 | `groups` | object[] | One entry per cause. |
+| `groups[].key` | string | The group key `<area>:<cause-slug>` (section 7): an existing finding's key when the group holds that finding's items, else a new key stable across runs. |
 | `groups[].title` | string | The cause in one line, as a finding title. |
 | `groups[].severity` | string | `Critical`, `High`, `Medium` or `Low` (section 7). |
 | `groups[].introducedIn` | string or `null` | The version that introduced the cause's items, the oldest when they differ. |
@@ -407,6 +408,7 @@ that is not a `gap`.
   "run": "2026-10-09_1430",
   "groups": [
     {
+      "key": "options:encrypted-client-hello",
       "title": "Encrypted Client Hello options are missing",
       "severity": "High",
       "introducedIn": "8.8.0",

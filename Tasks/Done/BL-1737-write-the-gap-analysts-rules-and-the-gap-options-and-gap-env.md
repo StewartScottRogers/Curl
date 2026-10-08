@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: [BL-1720, BL-1723, BL-1727]
-touches: [Gap/Instructions/Analyst-Rules.md, Gap/Instructions/Options.md, Gap/Instructions/Environment.md, .claude/agents/gap-options.md, .claude/agents/gap-environment.md]
+touches: [Gap/Instructions/Analyst-Rules.md, Gap/Instructions/Gap-Format.md, Gap/Instructions/Options.md, Gap/Instructions/Environment.md, .claude/agents/gap-options.md, .claude/agents/gap-environment.md]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1737 — Write the gap analysts' rules and the gap-options and gap-environment analysts
 
@@ -74,14 +74,19 @@ to end with the report block.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Instructions/Analyst-Rules.md` states rules 1 to 8 above.
-- [ ] `Gap/Instructions/Options.md` and `Gap/Instructions/Environment.md` each give their area's grouping method, the severity mapping for their items, and an example report block that parses with `ConvertFrom-Json` and satisfies `Gap-Format.md`.
-- [ ] `.claude/agents/gap-options.md` and `.claude/agents/gap-environment.md` exist with `model: sonnet`, tools limited to `Read, Grep, Glob, Bash`, and a body that names their two instruction files and the report block.
-- [ ] No file in this task tells an analyst to read anything under `Audit/`.
+- [x] `Gap/Instructions/Analyst-Rules.md` states rules 1 to 8 above.
+- [x] `Gap/Instructions/Options.md` and `Gap/Instructions/Environment.md` each give their area's grouping method, the severity mapping for their items, and an example report block that parses with `ConvertFrom-Json` and satisfies `Gap-Format.md`.
+- [x] `.claude/agents/gap-options.md` and `.claude/agents/gap-environment.md` exist with `model: sonnet`, tools limited to `Read, Grep, Glob, Bash`, and a body that names their two instruction files and the report block.
+- [x] No file in this task tells an analyst to read anything under `Audit/`.
 
 ## Notes
+
+- Added `Gap/Instructions/Gap-Format.md` to touches: rule 4 has each group carry a reused or new `key`, but section 6 of the format had no `groups[].key` field, and `Write-GapFindings.ps1` (BL-1731) needs it to match a group to its finding. No task in Doing on `origin/work/dark-factory` names that file. Added the field and put it in the example.
+- Severity tables map each facet or recipe kind to ADR-0433 decision 3's scale; a group takes the highest severity of its items (the sensible default, so a mixed group is never under-rated).
+- Unknown option families over about twenty options are split by protocol so the filed task stays one `/task-run`.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Analyst rules, options and environment methods, and the two Sonnet analyst agents written; example blocks parse; groups[].key added to Gap-Format section 6
