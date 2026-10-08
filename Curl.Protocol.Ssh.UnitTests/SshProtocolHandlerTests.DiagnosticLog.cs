@@ -208,8 +208,16 @@ public sealed partial class SshProtocolHandlerTests
         };
         ArrangeTransfer(context);
 
-        TransferResult result = await Handler(server, files, agent: agent).ExecuteAsync(context);
-        await server.WhenSessionsEndAsync();
+        TransferResult result;
+        using (Diagnostics.Phase("transfer"))
+        {
+            result = await Handler(server, files, agent: agent).ExecuteAsync(context);
+        }
+
+        using (Diagnostics.Phase("session end"))
+        {
+            await server.WhenSessionsEndAsync();
+        }
 
         ActTransfer(result, context, server);
         checkedOutcome = string.Join(" | ", log.Lines.Select(line => $"{line.Level} {line.Message}"));
