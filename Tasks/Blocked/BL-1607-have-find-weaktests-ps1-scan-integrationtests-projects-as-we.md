@@ -27,12 +27,14 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Audit/Tools/Find-WeakTests.ps1 -SelfTest` passes, including the new IntegrationTests case.
-- [ ] Run against the repository, the scan's project count includes every `*.IntegrationTests` folder; Notes record the before and after project and test counts.
-- [ ] The script's help says it scans `*.UnitTests` and `*.IntegrationTests` projects.
-- [ ] The change is committed on the `audit` branch, not `work/dark-factory`.
+- [x] `powershell -NoProfile -File Audit/Tools/Find-WeakTests.ps1 -SelfTest` passes, including the new IntegrationTests case.
+- [x] Run against the repository, the scan's project count includes every `*.IntegrationTests` folder; Notes record the before and after project and test counts.
+- [x] The script's help says it scans `*.UnitTests` and `*.IntegrationTests` projects.
+- [x] The change is committed on the `audit` branch, not `work/dark-factory`.
 
 ## Notes
+
+- 2026-10-08: Find-WeakTests.ps1 scans *.UnitTests and *.IntegrationTests (help updated); -SelfTest passes with a new Sample.IntegrationTests fixture (12 tests, 2 projects). On the work/dark-factory tree: before 33 projects, 14851 tests, 74 candidates; after 38 projects, 14875 tests, 75 candidates. Invoke-MutationTest.ps1 left unchanged: mutation scores are measured by the fast UnitTests twins. Committed on the audit branch, merged in PR #72.
 
 ## Log
 

@@ -31,7 +31,7 @@ BL-1281 changed `RunDarkFactory.ps1`: a failed claim push is traced as `race` (a
 
 ## Acceptance criteria
 
-- [ ] The measurer counts a task's claims from `claim` trace lines only (or `chore(tasks): claim` commits), not from mentions in other tasks' transcripts nor from `race` lines.
+- [x] The measurer counts a task's claims from `claim` trace lines only (or `chore(tasks): claim` commits), not from mentions in other tasks' transcripts nor from `race` lines.
 - [ ] AF-0025's reproduction, run with `-Since` set to a date after BL-1281 reached `work/dark-factory`, shows no task claimed 3 or more times.
 
 ## Notes
@@ -41,3 +41,4 @@ BL-1281 changed `RunDarkFactory.ps1`: a failed claim push is traced as `race` (a
 - 2026-10-02: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Done on the audit branch; waiting on PR #72's CI before merging to master
+- 2026-10-08: Blocked -> Deferred. Measurer fixed in PR #72; the remaining 3+ claims are real requeues (see Notes), left to the process re-audit and AF-0051 and AF-0072

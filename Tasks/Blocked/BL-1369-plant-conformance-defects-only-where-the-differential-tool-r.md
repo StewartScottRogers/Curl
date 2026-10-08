@@ -24,10 +24,10 @@ Every planted conformance defect is reachable by the conformance auditor's gener
 
 ## Acceptance criteria
 
-- [ ] The conformance catalogue entries name only mappings the differential tool's value pools reach (for example connection refused 7, range 33, missing -T file 26), none needing a malformed URL.
-- [ ] audit-seeder.md step 2: for a conformance plant, run one command that shows the changed exit code in the planted build and record it in the manifest as `trigger`.
-- [ ] A seeded manifest's conformance entry has a `trigger` that reproduces the difference in the planted build (Notes record it).
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] The conformance catalogue entries name only mappings the differential tool's value pools reach (for example connection refused 7, range 33, missing -T file 26), none needing a malformed URL.
+- [x] audit-seeder.md step 2: for a conformance plant, run one command that shows the changed exit code in the planted build and record it in the manifest as `trigger`.
+- [x] A seeded manifest's conformance entry has a `trigger` that reproduces the difference in the planted build (Notes record it).
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
 
