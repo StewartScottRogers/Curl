@@ -3,8 +3,8 @@ id: AF-0057
 title: ClientCertificateLoader: the OpenSSL build's recognisesDriveLetters: false can become true with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/ClientCertificateLoader.cs:static-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ClientCertificateLoader.cs:74:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
