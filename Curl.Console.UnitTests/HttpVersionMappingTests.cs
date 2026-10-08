@@ -1,6 +1,7 @@
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -14,6 +15,10 @@ public sealed class HttpVersionMappingTests
 {
     private const string Url = "https://example.com/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     [DataRow(null, HttpVersionPreference.Http11)]
     [DataRow(RequestedHttpVersion.Http10, HttpVersionPreference.Http10)]
@@ -25,7 +30,14 @@ public sealed class HttpVersionMappingTests
     [DataRow((RequestedHttpVersion)99, HttpVersionPreference.Http11)]
     public void ToHttpVersionPreference_MapsEachVersionOption(RequestedHttpVersion? version, HttpVersionPreference expected)
     {
-        Assert.AreEqual(expected, HttpVersionMapping.ToHttpVersionPreference(version));
+        Diagnostics.Arrange("version", version);
+
+        HttpVersionPreference actual = HttpVersionMapping.ToHttpVersionPreference(version);
+
+        Diagnostics.Act("preference", actual);
+
+        Diagnostics.Assert("preference", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -45,21 +57,43 @@ public sealed class HttpVersionMappingTests
     [DataRow(RequestedHttpVersion.Http3Only, false, "h2,http/1.1")]
     public void HttpOverTlsApplicationProtocolsOf_OffersWhatThePlatformsCurlOffers(RequestedHttpVersion? version, bool isWindows, string expected)
     {
-        Assert.AreEqual(expected, string.Join(',', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(version, isWindows)));
+        Diagnostics.Arrange("version", version);
+        Diagnostics.Arrange("isWindows", isWindows);
+
+        string actual = string.Join(',', HttpVersionMapping.HttpOverTlsApplicationProtocolsOf(version, isWindows));
+
+        Diagnostics.Act("offered", actual);
+
+        Diagnostics.Assert("offered", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void CreateTcpConnector_NoVersionOptionOnWindows_OffersHttp11Only()
     {
-        Assert.AreEqual("http/1.1", OfferedBy(Url));
+        Diagnostics.Arrange("arguments", Url);
+
+        string actual = OfferedBy(Url);
+
+        Diagnostics.Act("offered", actual);
+
+        Diagnostics.Assert("offered", "http/1.1", actual);
+        Assert.AreEqual("http/1.1", actual);
     }
 
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void CreateTcpConnector_NoVersionOptionOffWindows_OffersH2ThenHttp11()
     {
-        Assert.AreEqual("h2,http/1.1", OfferedBy(Url));
+        Diagnostics.Arrange("arguments", Url);
+
+        string actual = OfferedBy(Url);
+
+        Diagnostics.Act("offered", actual);
+
+        Diagnostics.Assert("offered", "h2,http/1.1", actual);
+        Assert.AreEqual("h2,http/1.1", actual);
     }
 
     [TestMethod]
@@ -71,7 +105,14 @@ public sealed class HttpVersionMappingTests
     [DataRow("--http3-only", "h2,http/1.1")]
     public void CreateTcpConnector_VersionOption_OffersTheSameOnEveryPlatform(string option, string expected)
     {
-        Assert.AreEqual(expected, OfferedBy(option, Url));
+        Diagnostics.Arrange("option", option);
+
+        string actual = OfferedBy(option, Url);
+
+        Diagnostics.Act("offered", actual);
+
+        Diagnostics.Assert("offered", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -81,10 +122,16 @@ public sealed class HttpVersionMappingTests
     [DataRow("--http3-only", HttpVersionPreference.Http3Only)]
     public void HttpRequestOptionsFromCommandLine_Http2OrHttp3Option_SetsTheVersion(string option, HttpVersionPreference expected)
     {
+        Diagnostics.Arrange("option", option);
         CommandLineParseResult result = OpenSslBuildParser.Parse([option, Url]);
         Assert.IsTrue(result.IsAccepted);
 
-        Assert.AreEqual(expected, HttpRequestOptionsMapping.FromCommandLine(result.Options).Version);
+        HttpVersionPreference actual = HttpRequestOptionsMapping.FromCommandLine(result.Options).Version;
+
+        Diagnostics.Act("version", actual);
+
+        Diagnostics.Assert("version", expected, actual);
+        Assert.AreEqual(expected, actual);
     }
 
     private static string OfferedBy(params string[] arguments)

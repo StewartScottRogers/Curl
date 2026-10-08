@@ -1,5 +1,6 @@
 using System.Net;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 
 namespace Curl.Console;
 
@@ -19,12 +20,19 @@ public sealed class MultiStateTraceEventsTests
         ConnectionNumber = 0,
     };
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void StartLines_AreCurlsLinesUpToConnect()
     {
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Diagnostics.Arrange("source", "MultiStateTraceEvents.StartLines");
+        string[] actual = MultiStateTraceEvents.StartLines.ToArray();
+        Diagnostics.Act("start line count", actual.Length);
+
+        string[] expected =
+            [
                 "[MULTI] [INIT] added to multi, mid=1, running=1, total=2",
                 "[MULTI] [INIT] pollset[], timeouts=0, paused 0/0 (r/w)",
                 "[MULTI] [INIT] multi_wait(fds=0, timeout=0) tinternal=0",
@@ -32,8 +40,9 @@ public sealed class MultiStateTraceEventsTests
                 "[MULTI] [SETUP] [PGRS-STARTOP] set",
                 "[MULTI] [SETUP] [PGRS-STARTSINGLE] set",
                 "[MULTI] [SETUP] -> [CONNECT]",
-            },
-            MultiStateTraceEvents.StartLines.ToArray());
+            ];
+        Diagnostics.Assert("start lines", string.Join(" | ", expected), string.Join(" | ", actual));
+        CollectionAssert.AreEqual(expected, actual);
     }
 
     [TestMethod]
@@ -41,6 +50,7 @@ public sealed class MultiStateTraceEventsTests
     {
         // curl 8.21.0, -s -v --trace-config multi, a 200 with Content-Length: 2 and "hi" (measured 2026-10-02, BL-1188 Notes).
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MicrosecondClock clock = new();
         MultiStateTraceEvents events = new(inner, clock, () => 0);
 
@@ -58,9 +68,10 @@ public sealed class MultiStateTraceEventsTests
         events.ReportDataReceived("hi"u8);
         events.ReportInfo("Connection #0 to host 127.0.0.1:47821 left intact");
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Diagnostics.Act("recorded call count", inner.Calls.Count);
+
+        string[] expected =
+            [
                 "Info [MULTI] [CONNECT] transfer credentials: -",
                 "Info [MULTI] [CONNECT] [CPOOL] added connection 0. The cache now contains 1 members",
                 "Info [MULTI] [CONNECT] [PGRS-POSTQUEUE] set",
@@ -100,8 +111,9 @@ public sealed class MultiStateTraceEventsTests
                 "Info [MULTI] [DONE] -> [COMPLETED]",
                 "Info [MULTI] [COMPLETED] -> [MSGSENT]",
                 "Info [MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1",
-            },
-            inner.Calls);
+            ];
+        Diagnostics.Assert("recorded calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     [TestMethod]
@@ -110,6 +122,7 @@ public sealed class MultiStateTraceEventsTests
         // curl 8.21.0, -s -v --trace-config all, the same exchange (measured 2026-10-02, BL-1188 Notes); the
         // [TCP] send and recv lines Curl does not write are left out.
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MultiStateTraceEvents events = new(inner, new MicrosecondClock(), () => 0);
 
         foreach (string line in (string[])
@@ -133,9 +146,10 @@ public sealed class MultiStateTraceEventsTests
         events.ReportInfo("[READ] client_reset, clear readers");
         events.ReportInfo("Connection #0 to host 127.0.0.1:47823 left intact");
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Diagnostics.Act("recorded call count", inner.Calls.Count);
+
+        string[] expected =
+            [
                 "Info [MULTI] [CONNECT] transfer credentials: -",
                 "Info [MULTI] [CONNECT] [CPOOL] added connection 0. The cache now contains 1 members",
                 "Info [MULTI] [CONNECT] [PGRS-POSTQUEUE] set",
@@ -184,8 +198,9 @@ public sealed class MultiStateTraceEventsTests
                 "Info [MULTI] [DONE] -> [COMPLETED]",
                 "Info [MULTI] [COMPLETED] -> [MSGSENT]",
                 "Info [MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1",
-            },
-            inner.Calls);
+            ];
+        Diagnostics.Assert("recorded calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     [TestMethod]
@@ -194,6 +209,7 @@ public sealed class MultiStateTraceEventsTests
         // curl 8.21.0, -s -v --trace-config multi, the second of two URLs on one kept-alive connection
         // (measured 2026-10-02, BL-1212 Notes).
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MicrosecondClock clock = new();
         int connectionNumbersTaken = 0;
         MultiStateTraceEvents events = new(inner, clock, () => connectionNumbersTaken++);
@@ -206,10 +222,13 @@ public sealed class MultiStateTraceEventsTests
         events.ReportResponseHeader("HTTP/1.1 200 OK\r\n"u8);
         events.ReportInfo("Connection #0 to host 127.0.0.1:18712 left intact");
 
+        Diagnostics.Act("connection numbers taken", connectionNumbersTaken);
+        Diagnostics.Act("recorded call count", inner.Calls.Count);
+
+        Diagnostics.Assert("connection numbers taken", 0, connectionNumbersTaken);
         Assert.AreEqual(0, connectionNumbersTaken);
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        string[] expected =
+            [
                 "Info [MULTI] [CONNECT] transfer credentials: -",
                 "Reused",
                 "Info [MULTI] [CONNECT] [PGRS-POSTQUEUE] set",
@@ -234,8 +253,9 @@ public sealed class MultiStateTraceEventsTests
                 "Info [MULTI] [DONE] -> [COMPLETED]",
                 "Info [MULTI] [COMPLETED] -> [MSGSENT]",
                 "Info [MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1",
-            },
-            inner.Calls);
+            ];
+        Diagnostics.Assert("recorded calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     [TestMethod]
@@ -244,6 +264,7 @@ public sealed class MultiStateTraceEventsTests
         // curl 8.21.0, -s -v --trace-config multi, http://127.0.0.1:1/, exit 7 (measured 2026-10-02, BL-1212
         // Notes); curl polls once per second of the connect, Curl once (ADR-0391).
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MicrosecondClock clock = new();
         MultiStateTraceEvents events = new(inner, clock, () => 4);
 
@@ -254,9 +275,10 @@ public sealed class MultiStateTraceEventsTests
         events.ReportInfo("Failed to connect to 127.0.0.1:1 after 2024 ms: Could not connect to server");
         events.ReportInfo("closing connection #4");
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Diagnostics.Act("recorded call count", inner.Calls.Count);
+
+        string[] expected =
+            [
                 "Info [MULTI] [CONNECT] transfer credentials: -",
                 "Info [MULTI] [CONNECT] [CPOOL] added connection 4. The cache now contains 1 members",
                 "Info [MULTI] [CONNECT] [PGRS-POSTQUEUE] set",
@@ -284,14 +306,16 @@ public sealed class MultiStateTraceEventsTests
                 "Info [MULTI] [COMPLETED] [PGRS-STARTTRANSFER] added 2024209ns",
                 "Info [MULTI] [COMPLETED] -> [MSGSENT]",
                 "Info [MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1",
-            },
-            inner.Calls);
+            ];
+        Diagnostics.Assert("recorded calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     [TestMethod]
     public void AFailedAddressBeforeOneThatConnects_WritesItsCloseAndTheConnectedLinesAfter()
     {
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MultiStateTraceEvents events = new(inner, new MicrosecondClock(), () => 0);
         events.ReportInfo("connect to ::1 port 80 from :: port 0 failed: Connection refused");
         inner.Calls.Clear();
@@ -299,28 +323,34 @@ public sealed class MultiStateTraceEventsTests
         events.ReportInfo("connect to 127.0.0.2 port 80 from 0.0.0.0 port 0 failed: Connection refused");
         events.ReportConnectionOpened(Opened);
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Diagnostics.Act("recorded call count", inner.Calls.Count);
+
+        string[] expected =
+            [
                 "Info [MULTI] [CONNECTING] Curl_multi_will_close fd=3",
                 "Info connect to 127.0.0.2 port 80 from 0.0.0.0 port 0 failed: Connection refused",
                 "Info [MULTI] [CONNECTING] [PGRS-CONNECT] added 0ns",
                 "Opened",
                 "Info [MULTI] [CONNECTING] connected [0][DNS][SETUP][HAPPY-EYEBALLS][TCP]",
-            },
-            inner.Calls);
+            ];
+        Diagnostics.Assert("recorded calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     [TestMethod]
     public void ASecondFailedToConnectLine_WritesNoFailedConnectLinesAgain()
     {
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MultiStateTraceEvents events = new(inner, new MicrosecondClock(), () => 0);
         events.ReportInfo("Failed to connect to h:1 after 1 ms: Could not connect to server");
         inner.Calls.Clear();
 
         events.ReportInfo("Failed to connect to h:1 after 1 ms: Could not connect to server");
 
+        Diagnostics.Act("recorded calls", string.Join(" | ", inner.Calls));
+
+        Diagnostics.Assert("recorded calls", "Info Failed to connect to h:1 after 1 ms: Could not connect to server", string.Join(" | ", inner.Calls));
         CollectionAssert.AreEqual(new[] { "Info Failed to connect to h:1 after 1 ms: Could not connect to server" }, inner.Calls);
     }
 
@@ -328,15 +358,17 @@ public sealed class MultiStateTraceEventsTests
     public void AShuttingDownLine_EndsTheTransferAsLeftIntactDoes()
     {
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MultiStateTraceEvents events = new(inner, new MicrosecondClock(), () => 0);
         events.ReportInfo("Request completely sent off");
         inner.Calls.Clear();
 
         events.ReportInfo("shutting down connection #0");
 
-        CollectionAssert.AreEqual(
-            new[]
-            {
+        Diagnostics.Act("recorded call count", inner.Calls.Count);
+
+        string[] expected =
+            [
                 "Info [MULTI] [PERFORMING] pollset[fd=3 IN], timeouts=0",
                 "Info [MULTI] [PERFORMING] multi_wait(fds=1, timeout=1000) tinternal=-1",
                 "Info [MULTI] [PERFORMING] [PGRS-STARTTRANSFER] added 0ns",
@@ -347,8 +379,9 @@ public sealed class MultiStateTraceEventsTests
                 "Info [MULTI] [DONE] -> [COMPLETED]",
                 "Info [MULTI] [COMPLETED] -> [MSGSENT]",
                 "Info [MULTI] [COMPLETED] removed from multi, mid=1, running=0, total=1",
-            },
-            inner.Calls);
+            ];
+        Diagnostics.Assert("recorded calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     [TestMethod]
@@ -357,10 +390,15 @@ public sealed class MultiStateTraceEventsTests
     public void ALineNoGroupIsTiedTo_IsPassedOnAlone(string line)
     {
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MultiStateTraceEvents events = new(inner, new MicrosecondClock(), () => 0);
 
-        events.ReportInfo(line);
+        Diagnostics.Arrange("line", line);
 
+        events.ReportInfo(line);
+        Diagnostics.Act("recorded calls", string.Join(" | ", inner.Calls));
+
+        Diagnostics.Assert("recorded calls", $"Info {line}", string.Join(" | ", inner.Calls));
         CollectionAssert.AreEqual(new[] { $"Info {line}" }, inner.Calls);
     }
 
@@ -368,6 +406,7 @@ public sealed class MultiStateTraceEventsTests
     public void TheEventsNoGroupIsTiedTo_ArePassedOnUnchanged()
     {
         CallRecordingEvents inner = new();
+        Diagnostics.Arrange("events", "recording inner events, microsecond clock");
         MultiStateTraceEvents events = new(inner, new MicrosecondClock(), () => 0);
 
         events.ReportTlsHandshake(null!);
@@ -377,10 +416,11 @@ public sealed class MultiStateTraceEventsTests
         events.ReportCertificateVerifyResult(18, isProxy: false);
         events.ReportTlsEarlyData(-7);
         events.ReportDataSent([4, 5]);
+        Diagnostics.Act("recorded call count", inner.Calls.Count);
+        string[] expected = ["Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust", "VerifyResult 18 False", "EarlyData -7", "DataSent 2"];
+        Diagnostics.Assert("recorded calls", string.Join(" | ", expected), string.Join(" | ", inner.Calls));
 
-        CollectionAssert.AreEqual(
-            new[] { "Handshake", "TlsData 1 True", "TlsMessage", "TlsTrust", "VerifyResult 18 False", "EarlyData -7", "DataSent 2" },
-            inner.Calls);
+        CollectionAssert.AreEqual(expected, inner.Calls);
     }
 
     /// <summary>A clock that counts in microseconds and stands still until a test moves it.</summary>

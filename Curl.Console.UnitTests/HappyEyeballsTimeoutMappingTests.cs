@@ -1,6 +1,7 @@
 using Curl.Cli;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
+using Curl.Testing;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
 namespace Curl.Console;
@@ -16,19 +17,33 @@ public sealed class HappyEyeballsTimeoutMappingTests
 {
     private const string Url = "https://example.com/";
 
+    public TestContext TestContext { get; set; } = null!;
+
+    private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
+
     [TestMethod]
     public void FromCommandLine_HappyEyeballsTimeout1000_RacesQuicFor1000Milliseconds()
     {
+        Diagnostics.Arrange("arguments", "--http3 --happy-eyeballs-timeout-ms 1000");
+
         HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--http3", "--happy-eyeballs-timeout-ms", "1000"));
 
+        Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
+
+        Diagnostics.Assert("HappyEyeballsTimeout", TimeSpan.FromMilliseconds(1000), http.HappyEyeballsTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(1000), http.HappyEyeballsTimeout);
     }
 
     [TestMethod]
     public void FromCommandLine_NoHappyEyeballsTimeout_RacesQuicForTheDefault200Milliseconds()
     {
+        Diagnostics.Arrange("arguments", "--http3");
+
         HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--http3"));
 
+        Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
+
+        Diagnostics.Assert("HappyEyeballsTimeout", TimeSpan.FromMilliseconds(200), http.HappyEyeballsTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(200), http.HappyEyeballsTimeout);
     }
 
@@ -37,24 +52,39 @@ public sealed class HappyEyeballsTimeoutMappingTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void FromCommandLine_HappyEyeballsTimeoutPastTheLongestTimerDelay_IsHeldToIt()
     {
+        Diagnostics.Arrange("arguments", "--happy-eyeballs-timeout-ms 9000000000000");
+
         HttpRequestOptions http = HttpRequestOptionsMapping.FromCommandLine(Parse("--happy-eyeballs-timeout-ms", "9000000000000"));
 
+        Diagnostics.Act("HappyEyeballsTimeout", http.HappyEyeballsTimeout);
+
+        Diagnostics.Assert("HappyEyeballsTimeout", TimeSpan.FromMilliseconds(uint.MaxValue - 1), http.HappyEyeballsTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(uint.MaxValue - 1), http.HappyEyeballsTimeout);
     }
 
     [TestMethod]
     public void CreateTcpConnector_HappyEyeballsTimeout50_RacesAddressFamiliesFor50Milliseconds()
     {
+        Diagnostics.Arrange("arguments", "--happy-eyeballs-timeout-ms 50");
+
         TcpConnector connector = CreateTcpConnector(Parse("--happy-eyeballs-timeout-ms", "50"));
 
+        Diagnostics.Act("HappyEyeballsTimeout", connector.HappyEyeballsTimeout);
+
+        Diagnostics.Assert("HappyEyeballsTimeout", TimeSpan.FromMilliseconds(50), connector.HappyEyeballsTimeout);
         Assert.AreEqual(TimeSpan.FromMilliseconds(50), connector.HappyEyeballsTimeout);
     }
 
     [TestMethod]
     public void CreateTcpConnector_NoHappyEyeballsTimeout_RacesAddressFamiliesForTheDefault()
     {
+        Diagnostics.Arrange("arguments", "(none)");
+
         TcpConnector connector = CreateTcpConnector(Parse());
 
+        Diagnostics.Act("HappyEyeballsTimeout", connector.HappyEyeballsTimeout);
+
+        Diagnostics.Assert("HappyEyeballsTimeout", TcpConnector.DefaultHappyEyeballsTimeout, connector.HappyEyeballsTimeout);
         Assert.AreEqual(TcpConnector.DefaultHappyEyeballsTimeout, connector.HappyEyeballsTimeout);
     }
 
