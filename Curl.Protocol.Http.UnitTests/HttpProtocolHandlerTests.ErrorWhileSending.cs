@@ -177,6 +177,84 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// Measured (BL-1527 Notes): curl 8.21.0 <c>-v</c>, a 500 or a 301 without <c>-L</c> arriving
+    /// while the body is sent writes <c>HTTP error before end of send, stop sending</c> and
+    /// <c>abort upload after having sent N bytes</c> after the head's headers, before its empty line.
+    /// </summary>
+    /// <param name="response">The status's head, sent after the first piece of body.</param>
+    /// <param name="headerLines">The head's lines after its status line, as <c>-v</c> writes them.</param>
+    [TestMethod]
+    [DataRow(ServerErrorHead + "fail", new[] { "< Content-Length: 4\r\n" }, DisplayName = "500")]
+    [DataRow(MovedHead, new[] { "< Location: /v\r\n", "< Content-Length: 0\r\n" }, DisplayName = "301 without -L")]
+    public async Task ExecuteAsync_ErrorWhileSendingTheBody_WritesStopSendingAndAbortUploadBeforeTheEmptyLine(string response, string[] headerLines)
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            GatedConnection connection = FailingWhileSending(response, chunkSize, ExpectingHead.Length);
+            RecordingTransferEvents events = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", OneLine(response));
+
+            await RunPastTheWaitAsync(QueueConnector.For(connection), ExpectEventsContext(BigBodyOptions(), events));
+
+            string statusLine = response[..(response.IndexOf('\n', StringComparison.Ordinal) + 1)];
+            string[] expected = [
+                "< " + statusLine,
+                .. headerLines,
+                "* HTTP error before end of send, stop sending",
+                $"* abort upload after having sent {FirstPiece} bytes",
+                "< \r\n",
+            ];
+            string[] lines = VerboseLinesFromStatusToEmptyLine(events, "< " + statusLine);
+            Diagnostics.Diff("lines from the status line to the empty line", string.Join(" | ", expected), string.Join(" | ", lines));
+            CollectionAssert.AreEqual(expected, lines, $"Chunk size {chunkSize}: {string.Join(" | ", lines)}");
+        }
+    }
+
+    /// <summary>
+    /// Measured (BL-1527 Notes): curl 8.21.0 <c>-v -L</c>, a 301 arriving while the body is sent
+    /// writes <c>Need to rewind upload for next request</c> and <c>close instead of sending N more
+    /// bytes</c> after the status line, and <c>Keep sending data to get tossed away</c> before the
+    /// empty line, with no stop-sending or abort-upload line.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_301FollowedWhileSendingTheBody_WritesCloseInsteadOfSendingAndKeepSending()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            GatedConnection connection = FailingWhileSending(MovedHead, chunkSize, ExpectingHead.Length);
+            RecordingTransferEvents events = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("follow redirects, scripted response", "true, 301 after first piece");
+
+            await RunPastTheWaitAsync(QueueConnector.For(connection), ExpectEventsContext(BigBodyOptions() with { FollowRedirects = true }, events));
+
+            string[] expected = [
+                "< HTTP/1.1 301 Moved Permanently\r\n",
+                "* Need to rewind upload for next request",
+                $"* close instead of sending {BigBody.Length - FirstPiece} more bytes",
+                "< Location: /v\r\n",
+                "< Content-Length: 0\r\n",
+                "* Keep sending data to get tossed away",
+                "< \r\n",
+            ];
+            string[] lines = VerboseLinesFromStatusToEmptyLine(events, "< HTTP/1.1 301 Moved Permanently\r\n");
+            Diagnostics.Diff("lines from the status line to the empty line", string.Join(" | ", expected), string.Join(" | ", lines));
+            CollectionAssert.AreEqual(expected, lines, $"Chunk size {chunkSize}: {string.Join(" | ", lines)}");
+        }
+    }
+
+    private static string[] VerboseLinesFromStatusToEmptyLine(RecordingTransferEvents events, string statusLine)
+    {
+        string[] lines = events.Events.Where(line => line.StartsWith("* ", StringComparison.Ordinal) || line.StartsWith("< ", StringComparison.Ordinal)).ToArray();
+        int start = Array.IndexOf(lines, statusLine);
+        Assert.IsGreaterThanOrEqualTo(0, start, string.Join(" | ", lines));
+        int end = Array.IndexOf(lines, "< \r\n", start);
+        Assert.IsGreaterThan(start, end, string.Join(" | ", lines));
+        return lines[start..(end + 1)];
+    }
+
     private static TransferContext ErrorContext(HttpRequestOptions options, Stream output, Stream? headerOutput, ITransferEvents events) =>
         new()
         {

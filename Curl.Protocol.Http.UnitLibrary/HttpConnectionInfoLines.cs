@@ -156,6 +156,30 @@ internal static class HttpConnectionInfoLines
         string.Create(CultureInfo.InvariantCulture, $"abort upload after having sent {bytesSent} bytes");
 
     /// <summary>
+    /// The line written before a head's empty line when a final status of <c>300</c> or above
+    /// that leads to no resend arrived while the request body was being sent (measured, BL-1527 Notes).
+    /// </summary>
+    internal const string StopSendingBeforeEndOfSend = "HTTP error before end of send, stop sending";
+
+    /// <summary>
+    /// The line written before a head's empty line when a redirect <c>-L</c> follows arrived while
+    /// the request body was being sent (measured, BL-1527 Notes).
+    /// </summary>
+    internal const string KeepSendingToTossAway = "Keep sending data to get tossed away";
+
+    /// <summary>
+    /// Formats the line written after <see cref="NeedToRewindUpload" /> when the redirect's status
+    /// line arrived while the request body was being sent (measured, BL-1527 Notes).
+    /// </summary>
+    /// <param name="knownLength">The body's length, or <see langword="null" /> for a body of unknown length.</param>
+    /// <param name="bytesSent">The body bytes sent before sending stopped.</param>
+    /// <returns>The line, such as <c>close instead of sending 1441947 more bytes</c>.</returns>
+    internal static string CloseInsteadOfSending(long? knownLength, long bytesSent) =>
+        knownLength is { } length
+            ? string.Create(CultureInfo.InvariantCulture, $"close instead of sending {length - bytesSent} more bytes")
+            : "close instead of sending unknown amount of more bytes";
+
+    /// <summary>
     /// Formats the line written once a request's whole body has been sent.
     /// </summary>
     /// <param name="bytesSent">The body bytes sent, chunk framing included.</param>

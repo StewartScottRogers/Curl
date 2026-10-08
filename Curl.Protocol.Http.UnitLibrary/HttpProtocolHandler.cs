@@ -1035,7 +1035,7 @@ public sealed class HttpProtocolHandler(
             HeadersStoredBefore = body.HeadersStoredBefore,
             LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
             LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
-            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine),
+            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine, upload),
             HeaderReceived = (statusLine, header) =>
             {
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
@@ -1083,6 +1083,7 @@ public sealed class HttpProtocolHandler(
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
+            ReportUploadStopped(context.Events, upload, retry, discardsBody);
             delivery = DeliveryOf(plan, actedOn, discardsBody);
             HttpDownloadConditions.ReportUndeliveredBody(context, actedOn, delivery);
             bool ignoresBody = IgnoresBody(plan, actedOn, delivery, discardsBody);
@@ -1223,9 +1224,10 @@ public sealed class HttpProtocolHandler(
     /// Reports <c>Need to rewind upload for next request</c> after a <c>3xx</c> status line under
     /// <c>-L</c> when the request sent a body that is not empty, as curl 8.21.0 does whatever the
     /// redirect then does with the body: a <c>307</c> sends it again, a <c>302</c> drops it
-    /// (measured, BL-1213 Notes).
+    /// (measured, BL-1213 Notes). When the status line arrived while the body was being sent,
+    /// <c>close instead of sending N more bytes</c> follows it (measured, BL-1527 Notes).
     /// </summary>
-    private static void ReportUploadRewind(HttpRequestPlan plan, HttpStatusLine statusLine)
+    private static void ReportUploadRewind(HttpRequestPlan plan, HttpStatusLine statusLine, HttpRequestBodyWriter upload)
     {
         if (plan.Options.FollowRedirects
             && statusLine.StatusCode is >= 300 and < 400
@@ -1233,7 +1235,44 @@ public sealed class HttpProtocolHandler(
             && plan.Framing.KnownLength != 0)
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
+            ReportUploadClosed(plan.Context.Events, plan.Framing.KnownLength, upload);
         }
+    }
+
+    /// <summary>
+    /// Reports <c>close instead of sending N more bytes</c> when the body was cut short, N being
+    /// what was left of <paramref name="knownLength" />, or <c>unknown amount of</c> without one.
+    /// </summary>
+    private static void ReportUploadClosed(ITransferEvents events, long? knownLength, HttpRequestBodyWriter upload)
+    {
+        if (upload.CutShort)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.CloseInsteadOfSending(knownLength, upload.BytesSent));
+        }
+    }
+
+    /// <summary>
+    /// Reports what curl 8.21.0 writes before the head's empty line when a final status arrived
+    /// while the request body was being sent and cut it short (measured, BL-1527 Notes): nothing
+    /// for one answered with a resend, which writes its own lines; <c>Keep sending data to get
+    /// tossed away</c> for a redirect <c>-L</c> follows; and otherwise <c>HTTP error before end of
+    /// send, stop sending</c> and <c>abort upload after having sent N bytes</c>.
+    /// </summary>
+    private static void ReportUploadStopped(ITransferEvents events, HttpRequestBodyWriter upload, HttpRequestPlan? retry, bool discardsBody)
+    {
+        if (!upload.CutShort || retry is not null)
+        {
+            return;
+        }
+
+        if (discardsBody)
+        {
+            events.ReportInfo(HttpConnectionInfoLines.KeepSendingToTossAway);
+            return;
+        }
+
+        events.ReportInfo(HttpConnectionInfoLines.StopSendingBeforeEndOfSend);
+        events.ReportInfo(HttpConnectionInfoLines.AbortUpload(upload.BytesSent));
     }
 
     private static void EchoResponseLineAfter(IHttpStreamConnection? requestStream, IConnection connection, byte[] line)
