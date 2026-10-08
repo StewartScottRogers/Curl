@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1760 — Fix AF-0082: Read_Extensions_AreIgnored checks only that a search was parsed, not that the extensions left it unchanged
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix, done directly rather than through the full feature stages: no production code changes. `Read_Extensions_AreIgnored` now reads the same URL without its extensions and compares base DN, attributes, scope and filter; a third row (`x?cn?sub?(cn=a)?!e,f`) has non-default attributes, scope and filter so a reader leaking extensions into any of them fails. Curl.Protocol.Ldap.UnitTests: 608 passed.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Read_Extensions_AreIgnored compares the search with the one read without extensions (AF-0082)
