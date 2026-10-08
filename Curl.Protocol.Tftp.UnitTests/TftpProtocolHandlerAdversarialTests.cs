@@ -80,6 +80,30 @@ public sealed class TftpProtocolHandlerAdversarialTests
         CollectionAssert.AreEqual(new ushort[] { 0, 1, 2 }, AcknowledgedBlocks(channel));
     }
 
+    /// <summary>
+    /// Measured against curl 8.21.0 (Schannel) with Record-CurlExchange.ps1 -Tftp: it
+    /// answers the late OACK with ACK 0, ignores DATA 2, writes the next DATA 1 after the
+    /// first block (514 bytes), acknowledges it as block 1 and exits 0 (BL-1666).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_OptionAcknowledgementAfterData1_AcknowledgesBlock0AndWritesTheNextData1AsNewData()
+    {
+        var channel = Channel(
+            Data(1, Payload(512, 'a')),
+            OptionAcknowledgement("blksize\0512\0"),
+            Data(1, "bb"));
+        var output = new MemoryStream();
+
+        var result = await RunAsync(channel, Context(output));
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("bytes written", 514L, output.Length);
+        Assert.AreEqual(Payload(512, 'a') + "bb", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual(514, result.BytesTransferred);
+        CollectionAssert.AreEqual(new ushort[] { 1, 0, 1 }, AcknowledgedBlocks(channel));
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_MaxFileSizeExactlyTheFirstBlockAndASecondBlockFollows_WritesTheFirstAndExits63()
     {

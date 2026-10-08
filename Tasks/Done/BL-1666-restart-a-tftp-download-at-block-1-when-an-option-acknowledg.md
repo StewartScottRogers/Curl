@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1666 — Restart a tftp download at block 1 when an option acknowledgement arrives after DATA
 
@@ -24,12 +24,16 @@ A `tftp://` download that receives an option acknowledgement after it has starte
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Protocol.Tftp.UnitTests` sends DATA 1, OACK, DATA 1 (short) and asserts the output is both blocks' bytes, ACKs 1, 0, 1, and exit 0, matching measured curl.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A test in `Curl.Protocol.Tftp.UnitTests` sends DATA 1, OACK, DATA 1 (short) and asserts the output is both blocks' bytes, ACKs 1, 0, 1, and exit 0, matching measured curl.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured curl 8.21.0 (Schannel, mingw64) with a throwaway copy of Record-CurlExchange.ps1 -Tftp -TftpNoOack, TftpData 512 `a` + `bb`, `ACK1=PACKET` OACK blksize 512 and `ACK0=PACKET` DATA 1 `bb`: curl sent ACK 1, ACK 0 (ignoring the server's DATA 2), ACK 1, wrote 514 bytes, exit 0. The copy let the injected packet fire on an ACK the server did not expect (ACK 0); the committed script was left alone because it is outside this task's touches.
+- Fix: `TftpDownload.AcceptOptionAcknowledgementAsync` sets `expectedBlock` back to 1. Test: `TftpProtocolHandlerAdversarialTests.ExecuteAsync_OptionAcknowledgementAfterData1_AcknowledgesBlock0AndWritesTheNextData1AsNewData`.
 
 ## Log
 
 - 2026-10-07: Created by BL-1520.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A tftp download restarts at block 1 after a late OACK: DATA 1, OACK, DATA 1 writes both blocks, ACKs 1, 0, 1, exit 0, as curl 8.21.0
