@@ -47,6 +47,26 @@ public sealed class NtlmChallengeAnswererTests
     }
 
     [TestMethod]
+    public void Answer_ClockBefore1601_SendsNegativeFileTimeInsteadOfThrowing()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        NtlmChallengeMessage challenge = new(NtlmNegotiateFlags.NegotiateExtendedSessionSecurity, new byte[8], [], [], []);
+        ArrangeChallenge(diagnostics, challenge, "u", "pw");
+        diagnostics.Arrange("clock", "DateTimeOffset.MinValue (0001-01-01 UTC)");
+        NtlmChallengeAnswerer answerer = new(new FixedTimeProvider(DateTimeOffset.MinValue), new FixedRandomSource(ClientChallenge));
+
+        NtlmAuthenticateMessage message = answerer.Answer(challenge, "u", "pw");
+        ActMessage(diagnostics, message);
+        long writtenTime = BitConverter.ToInt64(message.NtChallengeResponse, 24);
+        diagnostics.Act("file time at offset 24", writtenTime);
+
+        // curl's (time + 11644473600) * 10000000 for 0001-01-01: -62135596800 + 11644473600 seconds.
+        long expectedTime = (-62135596800L + 11644473600L) * 10000000L;
+        diagnostics.Assert("file time at offset 24", expectedTime, writtenTime);
+        Assert.AreEqual(expectedTime, writtenTime);
+    }
+
+    [TestMethod]
     public void Answer_NoExtendedSessionSecurity_SendsNtlmV1()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

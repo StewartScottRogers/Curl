@@ -34,6 +34,11 @@ public static class NtlmResponseComputation
 
     private const byte LmKeyPadding = 0xBD;
 
+    // 1601-01-01 UTC in ticks. The FILETIME is the signed tick count from it, as curl's
+    // signed 64-bit (time + 11644473600) * 10000000 is, so a time before 1601 writes a
+    // negative FILETIME where DateTimeOffset.ToFileTime would throw.
+    private const long FileTimeEpochTicks = 504911232000000000;
+
     /// <summary>
     /// NTLMv1 without extended session security: <c>DESL(LMOWFv1)</c> and
     /// <c>DESL(NTOWFv1)</c> of the server challenge, as curl sends them
@@ -98,7 +103,9 @@ public static class NtlmResponseComputation
     /// the LM response is <c>HMAC_MD5(NTOWFv2, server challenge, client challenge)</c>
     /// followed by the client challenge. Like curl it always sends the LMv2 response and
     /// never reads an <c>MsvAvTimestamp</c>. The session base key is
-    /// <c>HMAC_MD5(NTOWFv2, NTProofStr)</c>, and is the key exchange key.
+    /// <c>HMAC_MD5(NTOWFv2, NTProofStr)</c>, and is the key exchange key. A
+    /// <paramref name="timestamp" /> before 1601 is written as a negative FILETIME, as
+    /// curl's signed arithmetic writes it, rather than refused.
     /// </summary>
     /// <exception cref="ArgumentException">Either challenge is not <see cref="ChallengeLength" /> bytes.</exception>
     public static NtlmResponses ComputeV2(
@@ -173,7 +180,7 @@ public static class NtlmResponseComputation
         byte[] blob = new byte[V2BlobTargetInformationOffset + targetInformation.Length + V2BlobTrailerLength];
         blob[0] = 1;
         blob[1] = 1;
-        BinaryPrimitives.WriteInt64LittleEndian(blob.AsSpan(V2BlobHeaderLength), timestamp.ToFileTime());
+        BinaryPrimitives.WriteInt64LittleEndian(blob.AsSpan(V2BlobHeaderLength), timestamp.UtcTicks - FileTimeEpochTicks);
         clientChallenge.CopyTo(blob.AsSpan(V2BlobHeaderLength + 8));
         targetInformation.CopyTo(blob.AsSpan(V2BlobTargetInformationOffset));
         return blob;
