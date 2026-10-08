@@ -43,3 +43,4 @@ Every test in `Curl.Tls.UnitTests` writes, through BL-1457's shared `TestDiagnos
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1631 to BL-1644 (one per range of test files); this task runs only the whole-project checks once they are Done
+- 2026-10-07: Backlog -> Doing.
