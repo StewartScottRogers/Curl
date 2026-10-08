@@ -35,3 +35,4 @@ A POP3 greeting whose timestamp is followed by more text (`+OK hi <a@b> trailing
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
