@@ -189,8 +189,10 @@
       run        /task-run in the lane's worktree. The run commits but never pushes.
       integrate  The lane rebases its commits onto the shared branch, rebuilds, runs
                  the fast tests and pushes. Red fast tests are run once more, with the
-                 failing test names traced as "flaky?"; only red twice parks (BL-898). A conflict gets one headless run to resolve
-                 it. Work that still will not integrate is pushed to its own branch,
+                 failing test names traced as "flaky?"; only red twice counts (BL-898). A conflict gets one headless run to resolve
+                 it, and a finished task whose build or tests go red on the rebased
+                 tree gets one headless repair run there, still holding the lock,
+                 traced as "repair" (AF-0051). Work that still will not integrate is pushed to its own branch,
                  factory/<ID>-lane-<n>-<stamp>, and the task goes back to Backlog on the
                  shared branch, retried for several minutes; a park whose move is never
                  pushed is in the lane's summary and the end-of-shift report (BL-1071).
@@ -3182,6 +3184,40 @@ or
 FACTORY: UNRESOLVED {ID} <why>
 '@
 
+# A finished task whose build or fast tests went red only once the rebase put other
+# lanes' work under it is repaired there and then, by a run that sees the red tree, rather
+# than parked for a later run that starts from a green one. BL-1467 was claimed three
+# times: its second run rebuilt its own branch, found it green and changed nothing, and
+# was parked again for the same break (AF-0051).
+$RepairPrompt = @'
+DARK FACTORY SHIFT, LANE {LANE}. Stewart is away; never ask a question.
+
+Task {ID} is finished in this checkout and its commits have just been rebased onto
+origin/{BRANCH}, where other lanes pushed work meanwhile. The rebase went cleanly, but
+on the combined tree {RED}: this lane's change and theirs do not fit together (a type,
+member or test helper renamed, moved or deleted on one side, for instance). Fix it here:
+
+1. Run `dotnet build`, and `dotnet test --filter "TestCategory!=Integration"` once it
+   builds, to see what is red. It is red only on this combined tree, so do not judge
+   the task by its own commits alone.
+2. Fix the code so both sides' work survives: the other lanes' work is already shared,
+   and task {ID} must still do what its commits say. Adapt this lane's code to theirs;
+   change theirs only where nothing else fits.
+3. Build and run the fast tests again until both are green, then commit the fix
+   (Conventional Commits, naming {ID}). Do not move the task: it stays in Done.
+4. Never run git push, git pull, git fetch, git rebase, git reset, or git checkout of
+   another branch: the shift integrates your commit.
+5. This run ends the moment your reply ends, and anything still in the background dies
+   with it. Run dotnet build and dotnet test in the foreground with the Bash tool and a
+   timeout of up to 3600000 ms, and never end your reply to wait for a notification.
+   It is killed at {DEADLINE}.
+
+End your reply with exactly one line, either
+FACTORY: REPAIRED {ID}
+or
+FACTORY: UNREPAIRED {ID} <why>
+'@
+
 $script:ToolLabels = @{}
 
 # Commands only Stewart may authorize (CLAUDE.md). --dangerously-skip-permissions does
@@ -3482,6 +3518,26 @@ function Test-Green {
     return "fast tests failed twice ($($first.Failed); then $($second.Failed))"
 }
 
+function Repair-IntegrationBreak {
+    # One repair run for a finished task that went red only on the rebased tree (AF-0051),
+    # while this lane still holds the integrate lock, so no other lane's push moves the tree
+    # under it. Returns '' once build and fast tests are green and committed, or why not.
+    param([string]$Id, [string]$Red)
+    Write-Trace $Id 'repair' "$Red after the rebase; one run to fix it on the combined tree" 'DarkYellow'
+    Set-HeartbeatStep @('repair', "$Red on the shared branch")
+    $text = $RepairPrompt.Replace('{RED}', $Red)
+    Invoke-TaskRun -Id $Id -Text $text -Deny $LaneForbidden -Suffix '-repair' -Minutes 30 | Out-Null
+    # The repair's work counts only once committed: what is pushed is HEAD, not the worktree.
+    if (Test-WorktreeDirty $Root) {
+        Invoke-Git @('add', '-A') | Out-Null
+        Invoke-Git @('commit', '-q', '-m', "fix: repair $Id on top of the other lanes' work") | Out-Null
+    }
+    $still = Test-Green -Id $Id
+    if ($still) { return "$Red, and still $still after a repair run" }
+    Write-Trace $Id 'repair' 'green on the combined tree after the repair run' 'Green'
+    return ''
+}
+
 function Invoke-Integrate {
     # Rebases this lane's commits onto the shared branch, checks them, and pushes. Returns
     # '' on success or why it could not.
@@ -3524,6 +3580,7 @@ function Invoke-Integrate {
             if ($State -eq 'Done') {
                 Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
                 $red = Test-Green -Id $Id
+                if ($red) { $red = Repair-IntegrationBreak -Id $Id -Red $red }
                 if ($red) { return "$red after rebasing onto the other lanes' work" }
                 Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
             }

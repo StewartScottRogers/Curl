@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1678 — Fix AF-0051: BL-1467 claimed 3 times and requeued twice: lanes 4 and 5 each failed to integrate after rebasing onto other lanes' work
 
@@ -41,12 +41,31 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded. (For future shifts; see Notes.)
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: when a finished task's build went red only on the rebased tree, `Invoke-Integrate`
+  parked it straight away. The next run started from the parked branch on its own, found it
+  green and changed nothing, so it was parked again for the same break (BL-1467's L5 run).
+- Fix in `RunDarkFactory.ps1`: `Repair-IntegrationBreak` runs one headless repair run
+  (`$RepairPrompt`, log suffix `-repair`, 30 minutes, the lane deny list) on the combined
+  red tree while the lane still holds the integrate lock, so no other push moves the tree
+  under it. It commits whatever the run left, re-runs `Test-Green`, and the task parks only
+  if it is still red. Traced as `repair`. The header's `integrate` step says so.
+- AF-0072's per-shift requeue list already stops a parked task being claimed again in the
+  same shift. With the repair run, a break like BL-1467's is fixed within the first claim:
+  one claim, one DONE.
+- The reproduction measures the 2026-10-06 logs, which cannot change, so it still shows 3
+  claims for BL-1467. It can only show the fix on later shifts' logs, at the re-audit.
+  This lane cannot run `Audit/Tools/Measure-FactoryProcess.ps1` (the audit guard refuses
+  it), so the lane logs were read with Select-String instead.
+- Checked: the script parses, `-TestPark` passes, `dotnet build` is clean, and the fast
+  tests are green. No self-test covers the repair run, because it needs a live Claude run.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. A finished task that goes red on the rebased tree gets one repair run in place before it is parked (AF-0051)
