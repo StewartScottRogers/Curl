@@ -501,7 +501,7 @@ if ((Invoke-GapStep 'gap-merge' 'git' (@('-C', $gapWorktree) + $merge)) -ne 0) {
 # The measurement tools run from the gap worktree's Gap/Tools, so their inventories land in
 # its Gap/Upstream; the tools beside this script stand in when it lacks one.
 $gapTools = Join-Path $gapWorktree 'Gap/Tools'
-$needed = @('Get-UpstreamRelease.ps1', 'Invoke-GapProbe.ps1', 'Measure-OptionGap.ps1', 'Measure-VersionGap.ps1', 'Measure-WriteOutGap.ps1', 'Measure-ExitCodeGap.ps1', 'Measure-EnvironmentGap.ps1', 'ConvertTo-BehaviourMeasurement.ps1', 'Measure-ReferenceCrossCheck.ps1', 'Write-GapFindings.ps1', 'Write-GapScorecard.ps1', 'Export-GapDashboardData.ps1', 'New-TasksFromGaps.ps1')
+$needed = @('Get-UpstreamRelease.ps1', 'GapProbeFunctions.ps1', 'Measure-OptionGap.ps1', 'Measure-VersionGap.ps1', 'Measure-WriteOutGap.ps1', 'Measure-ExitCodeGap.ps1', 'Measure-EnvironmentGap.ps1', 'ConvertTo-BehaviourMeasurement.ps1', 'Measure-ReferenceCrossCheck.ps1', 'Write-GapFindings.ps1', 'Write-GapScorecard.ps1', 'Export-GapDashboardData.ps1', 'New-TasksFromGaps.ps1')
 if ($DryRun -or @($needed | Where-Object { -not (Test-Path -LiteralPath (Join-Path $gapTools $_)) }).Count -eq 0) { $script:ToolsDirectory = $gapTools }
 else { Write-GapLog "The gap worktree lacks some Gap/Tools; using $script:ToolsDirectory." 'DarkYellow' }
 $gapFindings = Join-Path $gapWorktree 'Gap/Findings'
@@ -516,9 +516,9 @@ if ((Invoke-GapTool 'release' 'Get-UpstreamRelease.ps1' @('-Version', $CurlVersi
 $release = if ($DryRun) { '<release folder>' } else { @($script:LastOutput | Where-Object { $_ })[-1].Trim() }
 Write-Host '== Step 5: the reference curl and run.json'
 $reference = $null
-if ($DryRun) { Write-Host "[reference] . $(Join-Path $script:ToolsDirectory 'Invoke-GapProbe.ps1'); Get-GapReferenceCurl -TargetVersion $CurlVersion" }
+if ($DryRun) { Write-Host "[reference] . $(Join-Path $script:ToolsDirectory 'GapProbeFunctions.ps1'); Get-GapReferenceCurl -TargetVersion $CurlVersion" }
 else {
-    . (Join-Path $script:ToolsDirectory 'Invoke-GapProbe.ps1')
+    . (Join-Path $script:ToolsDirectory 'GapProbeFunctions.ps1')
     $ErrorActionPreference = 'Stop'
     $reference = Get-GapReferenceCurl -TargetVersion $CurlVersion
 }

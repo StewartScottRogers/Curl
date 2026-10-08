@@ -308,16 +308,21 @@ function Invoke-ProxyRecipe([hashtable] $Variables) {
     return [pscustomobject]@{ Reference = $referenceRun; Candidate = (Invoke-ProxyRun (Get-GapCandidateCurl -Path $script:CandidatePath) $Variables) }
 }
 
-# The recipe for a key: { Run (scriptblock), Documented (the stdout the document states,
+# A recipe's Run is called with its Arguments. It must not be a .GetNewClosure() block built
+# from the values: a closure is bound to a new module that cannot see this script's functions
+# (BL-1747), so the values travel as Arguments to a block that is defined here, at script scope.
+$script:RunConfigRecipe = { param([object[]] $RecipeArguments) Invoke-ConfigRecipe $RecipeArguments[0] $RecipeArguments[1] $RecipeArguments[2] $RecipeArguments[3] }
+
+# The recipe for a key: { Run (scriptblock called with Arguments), Arguments, Documented (the stdout the document states,
 # or $null) }, or $null when the key has none.
 function Get-Recipe($Item) {
     $key = $Item.key
     switch -CaseSensitive ($key) {
-        'environment:http_proxy' { return @{ Run = { Invoke-ProxyRecipe @{ http_proxy = 'PROXY' } }; Documented = $null } }
-        'environment:HTTPS_PROXY' { return @{ Run = { Invoke-ProxyRecipe @{ HTTPS_PROXY = 'PROXY' } }; Documented = $null } }
-        'environment:ALL_PROXY' { return @{ Run = { Invoke-ProxyRecipe @{ ALL_PROXY = 'PROXY' } }; Documented = $null } }
-        'environment:NO_PROXY' { return @{ Run = { Invoke-ProxyRecipe @{ http_proxy = 'PROXY'; NO_PROXY = 'gap.invalid' } }; Documented = $null } }
-        'environment:config-syntax:q-disables' { return @{ Run = { Invoke-ConfigRecipe '.curlrc' "write-out = $Hit" @('CURL_HOME') 'q' }; Documented = '' } }
+        'environment:http_proxy' { return @{ Run = { Invoke-ProxyRecipe @{ http_proxy = 'PROXY' } }; Arguments = $null; Documented = $null } }
+        'environment:HTTPS_PROXY' { return @{ Run = { Invoke-ProxyRecipe @{ HTTPS_PROXY = 'PROXY' } }; Arguments = $null; Documented = $null } }
+        'environment:ALL_PROXY' { return @{ Run = { Invoke-ProxyRecipe @{ ALL_PROXY = 'PROXY' } }; Arguments = $null; Documented = $null } }
+        'environment:NO_PROXY' { return @{ Run = { Invoke-ProxyRecipe @{ http_proxy = 'PROXY'; NO_PROXY = 'gap.invalid' } }; Arguments = $null; Documented = $null } }
+        'environment:config-syntax:q-disables' { return @{ Run = $script:RunConfigRecipe; Arguments = @('.curlrc', "write-out = $Hit", @('CURL_HOME'), 'q'); Documented = '' } }
     }
     if ($Item.attributes.kind -eq 'config-path') {
         $name = $Item.attributes.name
@@ -332,10 +337,10 @@ function Get-Recipe($Item) {
         foreach ($p in $placements) {
             if ($name -match $p.Pattern) {
                 $file = $p.File; $variable = $p.Variable
-                return @{ Run = { Invoke-ConfigRecipe $file "write-out = `"$Hit`"" @($variable) }.GetNewClosure(); Documented = $Hit }
+                return @{ Run = $script:RunConfigRecipe; Arguments = @($file, "write-out = `"$Hit`"", @($variable), 'plain'); Documented = $Hit }
             }
         }
-        if ($name -match 'same directory the curl executable') { return @{ Run = { Invoke-ExecutableFolderRecipe }; Documented = $Hit } }
+        if ($name -match 'same directory the curl executable') { return @{ Run = { Invoke-ExecutableFolderRecipe }; Arguments = $null; Documented = $Hit } }
         return $null
     }
     if ($Item.attributes.kind -eq 'config-syntax') {
@@ -345,7 +350,7 @@ function Get-Recipe($Item) {
         $file = if ($slug -eq 'windows-underscore-curlrc') { '_curlrc' } else { '.curlrc' }
         $mode = if ($slug -eq 'stdin' -or $slug -eq 'url-option') { $slug } else { 'plain' }
         $documented = if ($config.Contains($Hit) -and $slug -ne 'dashed-no-separator') { $Hit } else { $null }
-        return @{ Run = { Invoke-ConfigRecipe $file $config @('CURL_HOME') $mode }.GetNewClosure(); Documented = $documented }
+        return @{ Run = $script:RunConfigRecipe; Arguments = @($file, $config, @('CURL_HOME'), $mode); Documented = $documented }
     }
     return $null
 }
@@ -375,7 +380,8 @@ function Measure-Item($Item, [string] $Platform, $Canned) {
         $entry = $Canned.PSObject.Properties[$Item.key]
         $runs = if ($null -ne $entry) { [pscustomobject]@{ Reference = $entry.Value.reference; Candidate = $entry.Value.candidate } } else { [pscustomobject]@{ Reference = $null; Candidate = $null } }
     } else {
-        $runs = & $recipe.Run
+        $runs = & $recipe.Run $recipe.Arguments
+        if ($null -eq $runs) { throw "The recipe for $($Item.key) returned no runs." }
     }
     $result.actual = Format-Run $runs.Candidate
     if ($null -ne $runs.Reference) {
@@ -440,7 +446,7 @@ function Invoke-EnvironmentGap([string] $Upstream, [string] $ReleaseVersion, [st
     if ($OnlyInventory) { return $null }
     $canned = $null
     if (-not [string]::IsNullOrEmpty($CannedPath)) { $canned = [System.IO.File]::ReadAllText($CannedPath) | ConvertFrom-Json }
-    else { . (Join-Path $PSScriptRoot 'Invoke-GapProbe.ps1') -Arguments @() -SelfTest:$false 2>$null | Out-Null }
+    else { . (Join-Path $PSScriptRoot 'GapProbeFunctions.ps1') -Arguments @() -SelfTest:$false 2>$null | Out-Null }
     $measurement = Get-Measurement $inventory $Root $canned
     Write-Utf8File $Out ($measurement | ConvertTo-Json -Depth 8)
     return $measurement
@@ -479,6 +485,19 @@ function Invoke-SelfTest {
         Report ($c.y -eq ($c.match + $c.gap + $c.unmeasured) -and $c.x -eq $c.match -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($measurement.items).Count) 'counts add up'
         $keys = [string[]]@($inventory.items | ForEach-Object { $_.key }); $sorted = [string[]]$keys.Clone(); [Array]::Sort($sorted, [StringComparer]::Ordinal)
         Report ((($keys -join '|') -ceq ($sorted -join '|'))) 'items are sorted by key'
+        # Run every config recipe for real against a stand-in Curl.Console outside this script's repository (BL-1747).
+        . (Join-Path $PSScriptRoot 'GapProbeFunctions.ps1')
+        $script:CandidatePath = Join-Path $PSScriptRoot 'Fixtures/probe/Write-ProbeEcho.ps1'
+        $script:RepositoryRootPath = $temp
+        $ran = $true
+        foreach ($recipeKey in 'environment:config-path:1', 'environment:config-syntax:comment', 'environment:config-syntax:q-disables') {
+            $runs = $null
+            try { $recipe = Get-Recipe $item[$recipeKey]; $runs = & $recipe.Run $recipe.Arguments } catch { $ran = $false }
+            if ($null -eq $runs -or $runs.Candidate.exitCode -ne 7) { $ran = $false }
+        }
+        Report $ran 'the config recipes run for real and reach the explicit Curl.Console'
+        $recipes = @($inventory.items | ForEach-Object { Get-Recipe $_ } | Where-Object { $null -ne $_ })
+        Report ($recipes.Count -gt 0 -and @($recipes | Where-Object { -not ($_.ContainsKey('Run') -and $_.ContainsKey('Arguments') -and $_.ContainsKey('Documented')) }).Count -eq 0) 'every recipe has Run, Arguments and Documented'
     } finally {
         Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     }
