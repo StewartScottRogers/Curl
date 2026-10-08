@@ -8,7 +8,7 @@ depends-on: [BL-1604]
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1686 — Fix AF-0067: CLAUDE.md says Integration tests live only in *.IntegrationTests projects; 17 sit in five *.UnitTests projects
 
@@ -41,12 +41,13 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-07 (lane 1): CLAUDE.md states the rule ADR-0421 decided, and the rollout has since moved the Cli, Console, Core and Ssh tests into their own `*.IntegrationTests` projects (BL-1599, BL-1600 and siblings are Done). The reproduction now gives 4, not 17: the four Curl.Cryptography.UnitTests files (BrainpoolEcdsaTests, Cast128Tests, X25519Tests, X448Tests), which BL-1604 retags to `LongRunning` and which also brings in `CURL_RUN_LONG_RUNNING_TESTS`. BL-1604 is in Doing on another lane and touches Curl.Cryptography.UnitTests, outside this task. Decision: leave CLAUDE.md as it is - softening it to "being rolled out" would make it false again the moment BL-1604 lands. This task depends on BL-1604; once it is Done, rerun the reproduction (expect 0), confirm a `LongRunning` test and the variable exist, and complete.
+- 2026-10-07 (lane 3): BL-1604 is Done. The reproduction now gives 0; Curl.Cryptography.UnitTests carries `TestCategory("LongRunning")` (Cast128Tests) and `RunsOnlyWhenLongRunningTestsAreEnabledAttribute` reads `CURL_RUN_LONG_RUNNING_TESTS`. CLAUDE.md is true of the code as it stands, so it is left unchanged. Build clean, fast tests green.
 
 ## Log
 
@@ -54,3 +55,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Waits on BL-1604: the reproduction's last 4 hits are the Curl.Cryptography.UnitTests tests BL-1604 retags to LongRunning
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Reproduction gives 0 now that BL-1604 retagged the last four; CLAUDE.md is true as written
