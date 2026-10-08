@@ -45,16 +45,41 @@ public sealed class FtpProtocolHandlerAdversarialTests
     // Boundaries
 
     [TestMethod]
-    [DataRow("199 Odd\r\n", 199)]
-    [DataRow("300 Odd\r\n", 300)]
-    [DataRow("600 Odd\r\n", 600)]
-    [DataRow("999 Odd\r\n", 999)]
-    public async Task ExecuteAsync_GreetingCodeOutsideTwoHundreds_FailsWithExit8AndSendsNothing(string greeting, int code)
+    [DataRow("199 Odd\r\n", "Got a 199 ftp-server response when 220 was expected")]
+    [DataRow("300 Odd\r\n", "Got a 300 ftp-server response when 220 was expected")]
+    [DataRow("600 Odd\r\n", "Got a 600 ftp-server response when 220 was expected")]
+    [DataRow("999 Odd\r\n", "Got a 999 ftp-server response when 220 was expected")]
+    [DataRow("099 Odd\r\n", "Got a 099 ftp-server response when 220 was expected")]
+    public async Task ExecuteAsync_GreetingCodeOutsideTwoHundreds_FailsWithExit8AndSendsNothing(string greeting, string message)
     {
         FtpRun run = await RunAsync(greeting);
 
-        AssertFailure(run, CurlExitCode.WeirdServerReply, $"Got a {code} ftp-server response when 220 was expected");
+        AssertFailure(run, CurlExitCode.WeirdServerReply, message);
         Assert.AreEqual(string.Empty, run.Sent);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserAnsweredWithCodeBelow100_FailsWithExit67AndThreeDigitCode()
+    {
+        FtpRun run = await RunAsync(Greeting + "099 No\r\n");
+
+        AssertFailure(run, CurlExitCode.LoginDenied, "Access denied: 099");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PasvAnsweredWithCodeBelow100_FailsWithExit13AndThreeDigitCode()
+    {
+        FtpRun run = await RunAsync(LoggedIn + "500 No\r\n099 No\r\n");
+
+        AssertFailure(run, CurlExitCode.FtpWeirdPasvReply, "Bad PASV/EPSV response: 099");
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RetrAnsweredWithCodeBelow100_FailsWithExit19AndThreeDigitCode()
+    {
+        FtpRun run = await RunAsync(LoggedIn + Epsv + TypeSet + "213 1\r\n099 No\r\n");
+
+        AssertFailure(run, CurlExitCode.FtpCouldntRetrFile, "RETR response: 099");
     }
 
     [TestMethod]

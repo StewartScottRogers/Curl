@@ -264,22 +264,22 @@ internal static class FtpTransferMessages
     /// <param name="code">The greeting's code.</param>
     /// <returns>The message to report.</returns>
     internal static string UnexpectedGreeting(int code) =>
-        Format($"Got a {code} ftp-server response when 220 was expected");
+        Format($"Got a {code:D3} ftp-server response when 220 was expected");
 
     /// <summary>The exit 67 message for a refused <c>USER</c> or <c>PASS</c>.</summary>
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
-    internal static string AccessDenied(int code) => Format($"Access denied: {code}");
+    internal static string AccessDenied(int code) => Format($"Access denied: {code:D3}");
 
     /// <summary>The exit 11 message for an <c>ACCT</c> answered with anything but <c>230</c>.</summary>
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
-    internal static string AccountRejected(int code) => Format($"ACCT rejected by server: {code}");
+    internal static string AccountRejected(int code) => Format($"ACCT rejected by server: {code:D3}");
 
     /// <summary>The exit 84 message for a <c>PRET</c> answered with anything but <c>200</c>.</summary>
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
-    internal static string PretNotAccepted(int code) => Format($"PRET command not accepted: {code}");
+    internal static string PretNotAccepted(int code) => Format($"PRET command not accepted: {code:D3}");
 
     /// <summary>
     /// The exit 6 message, and the first of two <c>-v</c> lines, for a <c>-P</c> name that
@@ -296,7 +296,7 @@ internal static class FtpTransferMessages
     /// <summary>The exit 13 message when neither <c>EPSV</c> nor <c>PASV</c> was accepted.</summary>
     /// <param name="code">The code of the reply to <c>PASV</c>.</param>
     /// <returns>The message to report.</returns>
-    internal static string BadPassiveReply(int code) => Format($"Bad PASV/EPSV response: {code}");
+    internal static string BadPassiveReply(int code) => Format($"Bad PASV/EPSV response: {code:D3}");
 
     /// <summary>
     /// The exit 21 message for a <c>-Q</c> command sent before the transfer, with no prefix
@@ -317,7 +317,7 @@ internal static class FtpTransferMessages
     /// <summary>The exit 19 or 78 message for a refused <c>RETR</c>, <c>LIST</c> or <c>NLST</c>.</summary>
     /// <param name="code">The refusing reply's code.</param>
     /// <returns>The message to report.</returns>
-    internal static string RetrieveRefused(int code) => Format($"RETR response: {code}");
+    internal static string RetrieveRefused(int code) => Format($"RETR response: {code:D3}");
 
     /// <summary>The exit 18 message for a transfer that ended with a code other than 226 or 250.</summary>
     /// <param name="code">The code of the reply that ended the transfer.</param>
