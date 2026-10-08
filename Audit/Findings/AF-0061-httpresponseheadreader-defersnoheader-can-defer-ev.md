@@ -3,8 +3,8 @@ id: AF-0061
 title: HttpResponseHeadReader.DefersNoHeader can defer every header (false -> true) with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs:DefersNoHeader-false:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs:56:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-07: filed proposed.
+- 2026-10-07: proposed -> accepted.
