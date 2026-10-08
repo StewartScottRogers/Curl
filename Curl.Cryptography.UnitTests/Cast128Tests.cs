@@ -70,7 +70,8 @@ public sealed class Cast128Tests
 
     // RFC 2144 Appendix B.2: a million iterations of four encryptions.
     [TestMethod]
-    [TestCategory("Integration")]
+    [TestCategory("LongRunning")]
+    [RunsOnlyWhenLongRunningTestsAreEnabled]
     public void EncryptBlock_Rfc2144AppendixB2FullMaintenanceTest_GivesThePublishedAAndB()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

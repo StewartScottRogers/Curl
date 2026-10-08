@@ -3,8 +3,13 @@
 # README's Integration tests badge. Stewart's request (2026-10-06): run them in CI, but never
 # fail until he changes INTEGRATION_FAILURES_FAIL_THE_RUN below.
 #
-# It is a workflow of its own, not a job in ci.yml, because the Integration tests take far
-# longer than the fast tests (Curl.Cryptography.UnitTests' alone took 27 minutes locally on
+# It also runs the tests marked TestCategory("LongRunning") - Curl.Cryptography.UnitTests'
+# slow, pure-computation known-answer tests (RFC 7748's million-iteration X25519 and X448
+# vectors and RFC 2144's CAST-128 maintenance test), which the fast run skips unless CURL_RUN_LONG_RUNNING_TESTS is 1 (ADR-0421,
+# decision 3) - and reports them with the Integration results.
+#
+# It is a workflow of its own, not a job in ci.yml, because these tests take far longer than
+# the fast tests (the long-running known-answer tests took about 27 minutes locally on
 # 2026-10-06): inside CI they would hold every CI run, and the dark factory's merge to
 # master that waits on it, for half an hour. Its result does not count towards the CI
 # workflow, so nothing here can block a merge.
@@ -45,7 +50,7 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 150
+    timeout-minutes: 270
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +72,17 @@ jobs:
         continue-on-error: true
         timeout-minutes: 120
         run: dotnet test -c Release --no-build --filter "TestCategory=Integration" --logger trx --results-directory "${{ runner.temp }}/integration-results"
+
+      # The long-running known-answer tests, in the same results directory so the report
+      # below counts them with the Integration tests.
+      - name: Long-running tests
+        id: longrunning
+        if: ${{ steps.build.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 120
+        env:
+          CURL_RUN_LONG_RUNNING_TESTS: '1'
+        run: dotnet test -c Release --no-build --filter "TestCategory=LongRunning" --logger trx --results-directory "${{ runner.temp }}/integration-results"
 
       - name: Report Integration tests
         if: ${{ !cancelled() }}
@@ -107,5 +123,5 @@ jobs:
           throw 'push to gource kept being refused'
 
       - name: Fail the run when Integration failures are switched on
-        if: ${{ !cancelled() && env.INTEGRATION_FAILURES_FAIL_THE_RUN == 'true' && steps.integration.outcome != 'success' }}
+        if: ${{ !cancelled() && env.INTEGRATION_FAILURES_FAIL_THE_RUN == 'true' && (steps.integration.outcome != 'success' || steps.longrunning.outcome != 'success') }}
         run: exit 1

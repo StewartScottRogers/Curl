@@ -73,7 +73,8 @@ public sealed class X25519Tests
 
     // RFC 7748 section 5.2, the 1,000,000 iteration vector; minutes, not milliseconds.
     [TestMethod]
-    [TestCategory("Integration")]
+    [TestCategory("LongRunning")]
+    [RunsOnlyWhenLongRunningTestsAreEnabled]
     public void TryComputeSharedSecret_Rfc7748Section52MillionIterations_GivesTheExpectedK()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

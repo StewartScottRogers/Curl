@@ -128,24 +128,10 @@
     <_TestMethodAttributePattern>(?m)^\s*\[[^\]\r\n]*\b(TestMethod|DataTestMethod)\b</_TestMethodAttributePattern>
   </PropertyGroup>
 
-  <!--
-    Files in a *.UnitTests project still allowed to hold Integration tests, as
-    <project>/<path> with forward slashes. Only Curl.Cryptography.UnitTests' four slow,
-    CPU-only vector files remain; ADR-0421's decision 3 reclassifies them as LongRunning in
-    the task that follows BL-1525's speed-up, and that task empties this list.
-  -->
-  <ItemGroup>
-    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/X25519Tests.cs" />
-    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/X448Tests.cs" />
-    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/Cast128Tests.cs" />
-    <IntegrationTestInUnitTestsAllowed Include="Curl.Cryptography.UnitTests/BrainpoolEcdsaTests.cs" />
-  </ItemGroup>
-
   <Target Name="VerifyIntegrationTestPlacement"
           BeforeTargets="CoreCompile"
           Condition="$(MSBuildProjectName.EndsWith('.UnitTests')) Or $(MSBuildProjectName.EndsWith('.IntegrationTests'))">
     <PropertyGroup>
-      <_IntegrationTestInUnitTestsAllowedList>;@(IntegrationTestInUnitTestsAllowed);</_IntegrationTestInUnitTestsAllowedList>
       <_IsUnitTestsProject>$(MSBuildProjectName.EndsWith('.UnitTests'))</_IsUnitTestsProject>
     </PropertyGroup>
     <ItemGroup>
@@ -156,11 +142,8 @@
         <ClassLevelIntegrationAttribute>$([System.Text.RegularExpressions.Regex]::IsMatch($([System.IO.File]::ReadAllText('%(FullPath)')), '$(_ClassLevelIntegrationAttributePattern)'))</ClassLevelIntegrationAttribute>
         <TestMethodAttributes>$([System.Text.RegularExpressions.Regex]::Matches($([System.IO.File]::ReadAllText('%(FullPath)')), '$(_TestMethodAttributePattern)').Count)</TestMethodAttributes>
       </_TestPlacementSource>
-      <_TestPlacementSource>
-        <Allowed>$(_IntegrationTestInUnitTestsAllowedList.Contains(';%(PlacementKey);'))</Allowed>
-      </_TestPlacementSource>
     </ItemGroup>
-    <Error Condition="'$(_IsUnitTestsProject)' == 'true' And '%(_TestPlacementSource.IntegrationAttributes)' != '0' And '%(_TestPlacementSource.Allowed)' != 'True'"
+    <Error Condition="'$(_IsUnitTestsProject)' == 'true' And '%(_TestPlacementSource.IntegrationAttributes)' != '0'"
            File="%(_TestPlacementSource.FullPath)"
            Text="%(_TestPlacementSource.PlacementKey) carries [TestCategory(&quot;Integration&quot;)], but $(MSBuildProjectName) is a unit test project. Integration tests live only in a Curl.&lt;Area&gt;.IntegrationTests project (ADR-0421); move the test there." />
     <Error Condition="'$(_IsUnitTestsProject)' != 'true' And '%(_TestPlacementSource.ClassLevelIntegrationAttribute)' != 'True' And %(_TestPlacementSource.IntegrationAttributes) &lt; %(_TestPlacementSource.TestMethodAttributes)"

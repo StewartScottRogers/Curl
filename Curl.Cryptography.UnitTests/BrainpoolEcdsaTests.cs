@@ -66,9 +66,7 @@ public sealed class BrainpoolEcdsaTests
         AssertEveryWycheproofVector(BrainpoolCurve.BrainpoolP256r1, "wycheproof-ecdsa-brainpoolP256r1-sha256-p1363.txt", "SHA256", 261);
     }
 
-    // Several seconds each in a Debug build, so outside the fast run (ADR-0118, "Tests").
     [TestMethod]
-    [TestCategory("Integration")]
     [DataRow(BrainpoolCurve.BrainpoolP384r1, "wycheproof-ecdsa-brainpoolP384r1-sha384-p1363.txt", "SHA384", 292)]
     [DataRow(BrainpoolCurve.BrainpoolP512r1, "wycheproof-ecdsa-brainpoolP512r1-sha512-p1363.txt", "SHA512", 337)]
     public void VerifyHash_EveryWycheproofP384r1AndP512r1Vector_GivesItsExpectedResult(BrainpoolCurve curve, string resourceName, string hashName, int testCount)
