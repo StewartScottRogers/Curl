@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the security auditor confirms t
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Needs Curl.Protocol.Ssh.UnitTests for its regression tests, which BL-1518 (Doing) touches; fix is written and verified, see Notes
+- 2026-10-07: Backlog -> Doing.
