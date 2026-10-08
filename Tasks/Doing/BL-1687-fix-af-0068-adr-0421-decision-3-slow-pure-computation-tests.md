@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Waits on BL-1604 (retags the four Curl.Cryptography.UnitTests slow tests LongRunning), which the reproduction needs
+- 2026-10-07: Backlog -> Doing.
