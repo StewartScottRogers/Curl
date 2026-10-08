@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-07
 ---
 # BL-1695 — Fix AF-0076: BL-1585's run log on lane 2 ends with no result: claimed 84 seconds before the logs were copied
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 - 2026-10-08: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. AF-0076 no longer reproduces: BL-1585's L2 run log ends with its result line; the audit had copied it mid-run
