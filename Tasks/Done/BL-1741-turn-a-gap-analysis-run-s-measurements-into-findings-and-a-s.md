@@ -8,7 +8,7 @@ depends-on: [BL-1740, BL-1731, BL-1732, BL-1733, BL-1734, BL-1737, BL-1738, BL-1
 touches: [Gap/RunGapAnalysis.ps1]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1741 — Turn a gap analysis run's measurements into findings and a scorecard and Curl tasks in Gap/RunGapAnalysis.ps1
 
@@ -85,14 +85,20 @@ call), and `-NoCommit` (write everything into the gap worktree but skip steps 9 
 
 ## Acceptance criteria
 
-- [ ] `Gap\RunGapAnalysis.cmd -DryRun` prints steps 1 to 11, each with its exact command, and changes nothing.
-- [ ] `-SelfTest` adds `PASS` checks for: the gap worktree is chosen or created from `origin/gap`, else `origin/master`; an analyst that changes the tree is logged and its report dropped; `-NoTasks` skips step 10; `-NoPullRequest` skips the `gh pr create` call. All of these run against faked `git`, `gh` and `claude` commands, so the self-test needs no network.
-- [ ] A real run `Gap\RunGapAnalysis.cmd -Areas exitcodes -NoTasks -NoCommit -AlongsideShift` writes `reports\gap-exitcodes.md`, at least one finding or a scorecard showing none, `history.json` with one new entry, and `data.json`, all in the gap worktree. It commits nothing, pushes nothing and opens no pull request. Afterwards the gap worktree's changes are discarded with `git -C <gap worktree> checkout -- . ; git -C <gap worktree> clean -fd Gap`, and the outcome is recorded in this task's Notes.
-- [ ] The header help documents every step and switch. The script is ASCII only and runs under Windows PowerShell 5.1.
+- [x] `Gap\RunGapAnalysis.cmd -DryRun` prints steps 1 to 11, each with its exact command, and changes nothing.
+- [x] `-SelfTest` adds `PASS` checks for: the gap worktree is chosen or created from `origin/gap`, else `origin/master`; an analyst that changes the tree is logged and its report dropped; `-NoTasks` skips step 10; `-NoPullRequest` skips the `gh pr create` call. All of these run against faked `git`, `gh` and `claude` commands, so the self-test needs no network.
+- [x] (Moved to BL-1793, interactive only: a lane cannot run it, see Notes.) A real run `Gap\RunGapAnalysis.cmd -Areas exitcodes -NoTasks -NoCommit -AlongsideShift` writes `reports\gap-exitcodes.md`, at least one finding or a scorecard showing none, `history.json` with one new entry, and `data.json`, all in the gap worktree. It commits nothing, pushes nothing and opens no pull request. Afterwards the gap worktree's changes are discarded with `git -C <gap worktree> checkout -- . ; git -C <gap worktree> clean -fd Gap`, and the outcome is recorded in this task's Notes.
+- [x] The header help documents every step and switch. The script is ASCII only and runs under Windows PowerShell 5.1.
 
 ## Notes
+
+- Steps 7 to 11 and the gap worktree (step 1) added to `Gap/RunGapAnalysis.ps1`; `-NoTasks`, `-NoPullRequest`, `-NoCommit` added and forwarded by `-NewTab`. Every step prints a `== Step N` header and each command, so `-DryRun` lists steps 1 to 11; checked with `-Areas exitcodes` and with `-NoCommit`, and `git status` showed only the script changed.
+- git, gh, claude and the PowerShell child run through `$script:Commands`, which `-SelfTest` replaces with recording fakes: 16 PASS, 0 FAIL, under Windows PowerShell 5.1. The script is ASCII only (the pull request body's robot is built with `[char]::ConvertFromUtf32`).
+- Choices: an existing local `gap` branch is used before `origin/gap` (so local commits are not lost). With `-NoCommit`, `origin/master` is merged fast-forward only, so the run commits nothing. Tools run from the gap worktree's `Gap/Tools`, so inventories land in its `Gap/Upstream`. If any needed tool is missing there (e.g. `origin/master` behind), the tools beside the script are used and the inventories are copied in. `data.json` goes to `<stamp>\data.json` as the Context's step 8 says. The analyst's tree reset is `git reset --hard` plus `git clean -fd`, which keeps the ignored build output. A run with no new tasks skips the board commit. A second commit `gap: task links <stamp>` carries the findings' task fields.
+- Real-run criterion moved to BL-1793 (`lane: no`): the script's own step-1 refusal stops it under `CURL_DARK_FACTORY_LANE`, which every lane carries, and it starts a paid headless analyst. No such run was done here.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. RunGapAnalysis.ps1 runs the analysts, writes findings, scorecard and dashboard data in the gap worktree, opens the gap PR and files tasks; real run moved to BL-1793
