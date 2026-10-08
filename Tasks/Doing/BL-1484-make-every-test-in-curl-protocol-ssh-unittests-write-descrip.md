@@ -43,3 +43,4 @@ Every test in `Curl.Protocol.Ssh.UnitTests` writes, through BL-1457's shared `Te
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1622..BL-1630 (one per folder group); waits on them, then runs only the whole-project checks.
+- 2026-10-07: Backlog -> Doing.
