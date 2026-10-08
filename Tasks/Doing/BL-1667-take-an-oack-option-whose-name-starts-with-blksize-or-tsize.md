@@ -31,3 +31,4 @@ An option acknowledgement option whose name starts with `blksize` or `tsize` (an
 ## Log
 
 - 2026-10-07: Created by BL-1520.
+- 2026-10-07: Backlog -> Doing.
