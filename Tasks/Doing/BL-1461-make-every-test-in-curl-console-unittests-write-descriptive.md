@@ -43,3 +43,4 @@ Every test in `Curl.Console.UnitTests` writes, through BL-1457's shared `TestDia
 - 2026-10-04: Created.
 - 2026-10-07: Backlog -> Doing.
 - 2026-10-07: Doing -> Backlog. Split into BL-1577 to BL-1596 (twenty file ranges of Curl.Console.UnitTests); waits on them, then runs the whole-project checks
+- 2026-10-07: Backlog -> Doing.
