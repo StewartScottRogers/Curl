@@ -3,12 +3,12 @@ id: AF-0108
 title: BL-1645 cost 3.75 US dollars in one 28-minute run, 3.1 times the median
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1645:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-1786
+tasks: BL-1786
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

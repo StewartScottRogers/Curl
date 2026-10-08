@@ -3,12 +3,12 @@ id: AF-0080
 title: DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte ORs three bytes together, so a key filled only at byte 0 passes
 auditor: quality
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Cryptography.UnitTests/BcryptPbkdfTests.cs:DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-1758
+tasks: BL-1758
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Cryptography.UnitTests/BcryptPbkdfTests.cs -Pattern 'in
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

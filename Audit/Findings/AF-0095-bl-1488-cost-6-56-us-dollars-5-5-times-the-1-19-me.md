@@ -3,12 +3,12 @@ id: AF-0095
 title: BL-1488 cost 6.56 US dollars, 5.5 times the 1.19 median; lane 7's five Sonnet sub-agents used up the session budget
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1488:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-1773
+tasks: BL-1773
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".

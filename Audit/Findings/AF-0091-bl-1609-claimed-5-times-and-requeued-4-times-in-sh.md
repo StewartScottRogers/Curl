@@ -3,12 +3,12 @@ id: AF-0091
 title: BL-1609 claimed 5 times and requeued 4 times in shift 20261007-201432; one run was wasted because lanes may not run git stash list
 auditor: process
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-1609:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-1769
+tasks: BL-1769
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
