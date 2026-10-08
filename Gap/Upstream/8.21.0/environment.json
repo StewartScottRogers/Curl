@@ -1,0 +1,398 @@
+{
+  "area": "environment",
+  "version": "8.21.0",
+  "sources": [
+    "docs/cmdline-opts/_ENVIRONMENT.md",
+    "docs/libcurl/libcurl-env.md",
+    "docs/cmdline-opts/config.md"
+  ],
+  "items": [
+    {
+      "key": "environment:ALL_PROXY",
+      "name": "ALL_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "name": "ALL_PROXY",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:APPDATA",
+      "name": "APPDATA",
+      "introducedIn": null,
+      "attributes": {
+        "name": "APPDATA",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:COLUMNS",
+      "name": "COLUMNS",
+      "introducedIn": null,
+      "attributes": {
+        "name": "COLUMNS",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:CURL_CA_BUNDLE",
+      "name": "CURL_CA_BUNDLE",
+      "introducedIn": null,
+      "attributes": {
+        "name": "CURL_CA_BUNDLE",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:CURL_HOME",
+      "name": "CURL_HOME",
+      "introducedIn": null,
+      "attributes": {
+        "name": "CURL_HOME",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:CURL_SSL_BACKEND",
+      "name": "CURL_SSL_BACKEND",
+      "introducedIn": null,
+      "attributes": {
+        "name": "CURL_SSL_BACKEND",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:HOME",
+      "name": "HOME",
+      "introducedIn": null,
+      "attributes": {
+        "name": "HOME",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:HTTPS_PROXY",
+      "name": "HTTPS_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "name": "HTTPS_PROXY",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:NETRC",
+      "name": "NETRC",
+      "introducedIn": null,
+      "attributes": {
+        "name": "NETRC",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:NO_PROXY",
+      "name": "NO_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "name": "NO_PROXY",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:QLOGDIR",
+      "name": "QLOGDIR",
+      "introducedIn": null,
+      "attributes": {
+        "name": "QLOGDIR",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:SHELL",
+      "name": "SHELL",
+      "introducedIn": null,
+      "attributes": {
+        "name": "SHELL",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:SSLKEYLOGFILE",
+      "name": "SSLKEYLOGFILE",
+      "introducedIn": null,
+      "attributes": {
+        "name": "SSLKEYLOGFILE",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:SSL_CERT_DIR",
+      "name": "SSL_CERT_DIR",
+      "introducedIn": null,
+      "attributes": {
+        "name": "SSL_CERT_DIR",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:SSL_CERT_FILE",
+      "name": "SSL_CERT_FILE",
+      "introducedIn": null,
+      "attributes": {
+        "name": "SSL_CERT_FILE",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:USERPROFILE",
+      "name": "USERPROFILE",
+      "introducedIn": null,
+      "attributes": {
+        "name": "USERPROFILE",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:XDG_CONFIG_HOME",
+      "name": "XDG_CONFIG_HOME",
+      "introducedIn": null,
+      "attributes": {
+        "name": "XDG_CONFIG_HOME",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:[scheme]_proxy",
+      "name": "[scheme]_proxy",
+      "introducedIn": null,
+      "attributes": {
+        "name": "[scheme]_proxy",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:[url-protocol]_PROXY",
+      "name": "[url-protocol]_PROXY",
+      "introducedIn": null,
+      "attributes": {
+        "name": "[url-protocol]_PROXY",
+        "kind": "variable"
+      }
+    },
+    {
+      "key": "environment:config-path:1",
+      "name": "\"$CURL_HOME/.curlrc\"",
+      "introducedIn": null,
+      "attributes": {
+        "name": "\"$CURL_HOME/.curlrc\"",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-path:2",
+      "name": "\"$XDG_CONFIG_HOME/curlrc\" (Added in 7.73.0)",
+      "introducedIn": "7.73.0",
+      "attributes": {
+        "name": "\"$XDG_CONFIG_HOME/curlrc\" (Added in 7.73.0)",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-path:3",
+      "name": "\"$HOME/.curlrc\"",
+      "introducedIn": null,
+      "attributes": {
+        "name": "\"$HOME/.curlrc\"",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-path:4",
+      "name": "Windows: \"%USERPROFILE%\\.curlrc\"",
+      "introducedIn": null,
+      "attributes": {
+        "name": "Windows: \"%USERPROFILE%\\.curlrc\"",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-path:5",
+      "name": "Windows: \"%APPDATA%\\.curlrc\"",
+      "introducedIn": null,
+      "attributes": {
+        "name": "Windows: \"%APPDATA%\\.curlrc\"",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-path:6",
+      "name": "Windows: \"%USERPROFILE%\\Application Data\\.curlrc\"",
+      "introducedIn": null,
+      "attributes": {
+        "name": "Windows: \"%USERPROFILE%\\Application Data\\.curlrc\"",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-path:7",
+      "name": "Non-Windows: use getpwuid to find the home directory",
+      "introducedIn": null,
+      "attributes": {
+        "name": "Non-Windows: use getpwuid to find the home directory",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-path:8",
+      "name": "On Windows, if it finds no *.curlrc* file in the sequence described above, it checks for one in the same directory the curl executable is placed.",
+      "introducedIn": null,
+      "attributes": {
+        "name": "On Windows, if it finds no *.curlrc* file in the sequence described above, it checks for one in the same directory the curl executable is placed.",
+        "kind": "config-path"
+      }
+    },
+    {
+      "key": "environment:config-syntax:backslash-other-letter",
+      "name": "backslash-other-letter",
+      "introducedIn": null,
+      "attributes": {
+        "name": "backslash-other-letter",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:colon-separator",
+      "name": "colon-separator",
+      "introducedIn": null,
+      "attributes": {
+        "name": "colon-separator",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:comment",
+      "name": "comment",
+      "introducedIn": null,
+      "attributes": {
+        "name": "comment",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:dashed-long-option",
+      "name": "dashed-long-option",
+      "introducedIn": null,
+      "attributes": {
+        "name": "dashed-long-option",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:dashed-no-separator",
+      "name": "dashed-no-separator",
+      "introducedIn": null,
+      "attributes": {
+        "name": "dashed-no-separator",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:double-quotes",
+      "name": "double-quotes",
+      "introducedIn": null,
+      "attributes": {
+        "name": "double-quotes",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:equals-separator",
+      "name": "equals-separator",
+      "introducedIn": null,
+      "attributes": {
+        "name": "equals-separator",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:escape-sequences",
+      "name": "escape-sequences",
+      "introducedIn": null,
+      "attributes": {
+        "name": "escape-sequences",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:line-length-limit",
+      "name": "line-length-limit",
+      "introducedIn": null,
+      "attributes": {
+        "name": "line-length-limit",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:one-option-per-line",
+      "name": "one-option-per-line",
+      "introducedIn": null,
+      "attributes": {
+        "name": "one-option-per-line",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:q-disables",
+      "name": "q-disables",
+      "introducedIn": null,
+      "attributes": {
+        "name": "q-disables",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:stdin",
+      "name": "stdin",
+      "introducedIn": null,
+      "attributes": {
+        "name": "stdin",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:url-option",
+      "name": "url-option",
+      "introducedIn": null,
+      "attributes": {
+        "name": "url-option",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:whitespace-separator",
+      "name": "whitespace-separator",
+      "introducedIn": null,
+      "attributes": {
+        "name": "whitespace-separator",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:config-syntax:windows-underscore-curlrc",
+      "name": "windows-underscore-curlrc",
+      "introducedIn": null,
+      "attributes": {
+        "name": "windows-underscore-curlrc",
+        "kind": "config-syntax"
+      }
+    },
+    {
+      "key": "environment:http_proxy",
+      "name": "http_proxy",
+      "introducedIn": null,
+      "attributes": {
+        "name": "http_proxy",
+        "kind": "variable"
+      }
+    }
+  ]
+}

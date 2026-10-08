@@ -1,0 +1,19 @@
+{
+  "$reference": "curl 9.9.9 (fake)",
+  "environment:http_proxy": {
+    "reference": { "exitCode": 0, "stdout": "", "stderr": "", "request": "GET http://gap.invalid/ HTTP/1.1\r\n\r\n" },
+    "candidate": { "exitCode": 0, "stdout": "", "stderr": "", "request": "GET http://gap.invalid/ HTTP/1.1\r\n\r\n" }
+  },
+  "environment:ALL_PROXY": {
+    "reference": { "exitCode": 0, "stdout": "", "stderr": "", "request": "GET http://gap.invalid/ HTTP/1.1\r\n\r\n" },
+    "candidate": { "exitCode": 6, "stdout": "", "stderr": "", "request": "" }
+  },
+  "environment:config-syntax:comment": {
+    "reference": null,
+    "candidate": { "exitCode": 0, "stdout": "", "stderr": "", "request": null }
+  },
+  "environment:config-syntax:escape-sequences": {
+    "reference": null,
+    "candidate": { "exitCode": 0, "stdout": "a", "stderr": "", "request": null }
+  }
+}
