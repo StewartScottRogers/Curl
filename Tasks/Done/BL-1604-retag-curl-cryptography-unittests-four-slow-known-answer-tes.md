@@ -8,7 +8,7 @@ depends-on: [BL-1525, BL-1598, BL-1603]
 touches: [Curl.Cryptography.UnitTests, Directory.Build.props, .github/workflows/integration.yml, .github/integration]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1604 — Retag Curl.Cryptography.UnitTests' four slow known-answer tests from Integration to LongRunning and run them from the Integration workflow
 
@@ -32,16 +32,32 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Cryptography.UnitTests --include=*.cs` finds nothing; each of the four tests named in Context carries `[TestCategory("LongRunning")]` and the condition attribute, unless Notes record it now runs under 3 s in Debug and joined the fast run untagged.
-- [ ] `Directory.Build.props` has no allow-list for `Curl.Cryptography.UnitTests`, and `dotnet build -warnaserror` at the repository root is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green, and its `Curl.Cryptography.UnitTests` summary shows the LongRunning tests skipped, not run.
-- [ ] With `CURL_RUN_LONG_RUNNING_TESTS=1` set, `dotnet test Curl.Cryptography.UnitTests -c Release --filter "TestCategory=LongRunning"` runs them and all pass; Notes record each one's duration.
-- [ ] `.github/workflows/integration.yml` has the LongRunning step with the variable set, and its header comment and `Write-IntegrationTestSummary.ps1` (if changed) are true of what they do.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Cryptography.UnitLibrary`.
+- [x] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Cryptography.UnitTests --include=*.cs` finds nothing; each of the four tests named in Context carries `[TestCategory("LongRunning")]` and the condition attribute, unless Notes record it now runs under 3 s in Debug and joined the fast run untagged.
+- [x] `Directory.Build.props` has no allow-list for `Curl.Cryptography.UnitTests`, and `dotnet build -warnaserror` at the repository root is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green, and its `Curl.Cryptography.UnitTests` summary shows the LongRunning tests skipped, not run.
+- [x] With `CURL_RUN_LONG_RUNNING_TESTS=1` set, `dotnet test Curl.Cryptography.UnitTests -c Release --filter "TestCategory=LongRunning"` runs them and all pass; Notes record each one's duration.
+- [x] `.github/workflows/integration.yml` has the LongRunning step with the variable set, and its header comment and `Write-IntegrationTestSummary.ps1` (if changed) are true of what they do.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Cryptography.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Cryptography.UnitLibrary`.
 
 ## Notes
+
+- Debug timings (2026-10-07, lane 7, other lanes building): Brainpool P-384r1 row 0.9-1 s,
+  P-512r1 row about 2 s - both under 3 s, so per ADR-0421 decision 3 the Brainpool test lost
+  both attributes and joined the fast run untagged. CAST-128 B.2 took 32 s in Debug.
+- Release timings with `CURL_RUN_LONG_RUNNING_TESTS=1`, `--filter "TestCategory=LongRunning"`:
+  CAST-128 B.2 33 s, X25519 1 min 51 s, X448 10 min 51 s; all three passed.
+- The condition attribute is `RunsOnlyWhenLongRunningTestsAreEnabledAttribute` in
+  `Curl.Cryptography.UnitTests`, derived from MSTest's `ConditionBaseAttribute`.
+- `Write-IntegrationTestSummary.ps1` already reads every `*.trx` under the results directory,
+  so it is unchanged. The workflow's job timeout went from 150 to 270 minutes, since the job
+  now holds two 120-minute test steps; the "Fail the run" step looks at both steps' outcome,
+  still only when `INTEGRATION_FAILURES_FAIL_THE_RUN` is `true`.
+- Fast run: `Curl.Cryptography.UnitTests` 1449 passed, 5 skipped before the Brainpool move
+  (3 LongRunning tests skipped after it). Measure-CodeQuality: Curl.Cryptography.UnitLibrary
+  100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Cryptography's slow known-answer tests are LongRunning, skipped unless CURL_RUN_LONG_RUNNING_TESTS=1 and run by the Integration workflow; Brainpool rejoined the fast run
