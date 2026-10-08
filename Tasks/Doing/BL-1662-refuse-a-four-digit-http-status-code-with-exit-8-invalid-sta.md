@@ -34,3 +34,4 @@ A response whose status line is `HTTP/1.1 1000 X` (a status code of four or more
 ## Log
 
 - 2026-10-07: Created.
+- 2026-10-07: Backlog -> Doing.
