@@ -13,7 +13,7 @@ namespace Curl.Protocol.Ssh.Authentication;
 [TestClass]
 [DoNotParallelize]
 [SupportedOSPlatform("windows")]
-public sealed class WindowsPageantWindowTests
+public sealed class WindowsPageantWindowIntegrationTests
 {
     public TestContext TestContext { get; set; } = null!;
 

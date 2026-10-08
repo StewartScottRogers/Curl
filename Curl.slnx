@@ -103,6 +103,7 @@
   <Project Path="Curl.Protocol.Smb.UnitTests/Curl.Protocol.Smb.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Smtp.UnitLibrary/Curl.Protocol.Smtp.UnitLibrary.csproj" />
   <Project Path="Curl.Protocol.Smtp.UnitTests/Curl.Protocol.Smtp.UnitTests.csproj" />
+  <Project Path="Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj" />
   <Project Path="Curl.Protocol.Ssh.UnitLibrary/Curl.Protocol.Ssh.UnitLibrary.csproj" />
   <Project Path="Curl.Protocol.Ssh.UnitTests/Curl.Protocol.Ssh.UnitTests.csproj" />
   <Project Path="Curl.Protocol.Telnet.UnitLibrary/Curl.Protocol.Telnet.UnitLibrary.csproj" />

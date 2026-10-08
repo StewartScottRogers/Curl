@@ -8,7 +8,7 @@ depends-on: [BL-1597]
 touches: [Curl.Protocol.Ssh.UnitTests, Curl.Protocol.Ssh.IntegrationTests, Curl.Protocol.Ssh.UnitLibrary, Curl.slnx]
 requirement: none
 created: 2026-10-07
-completed:
+completed: 2026-10-07
 ---
 # BL-1602 — Move Curl.Protocol.Ssh.UnitTests' agent and Pageant Integration tests into a new Curl.Protocol.Ssh.IntegrationTests project
 
@@ -31,16 +31,23 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj` exists, matches the template's shape plus the linked fakes, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Protocol.Ssh.UnitLibrary`; the library's csproj has `InternalsVisibleTo` for it.
-- [ ] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Protocol.Ssh.UnitTests --include=*.cs` finds nothing, every `[TestMethod]` in `Curl.Protocol.Ssh.IntegrationTests` carries `[TestCategory("Integration")]`, and `FakePageantWindow.cs` lives only in the new project.
-- [ ] `dotnet build -warnaserror` at the repository root is clean.
-- [ ] `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] `dotnet test Curl.Protocol.Ssh.IntegrationTests --filter "TestCategory=Integration"` runs the five tests named in Context and none fails on Windows (the Unix-socket test runs on Windows too, as it does today). Notes record the runner's summary line.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Protocol.Ssh.UnitLibrary`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
+- [x] `Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj` exists, matches the template's shape plus the linked fakes, has no `MSTestSettings.cs` of its own, and is listed in `Curl.slnx` immediately before `Curl.Protocol.Ssh.UnitLibrary`; the library's csproj has `InternalsVisibleTo` for it.
+- [x] `grep -rn '^\s*\[.*TestCategory("Integration")' Curl.Protocol.Ssh.UnitTests --include=*.cs` finds nothing, every `[TestMethod]` in `Curl.Protocol.Ssh.IntegrationTests` carries `[TestCategory("Integration")]`, and `FakePageantWindow.cs` lives only in the new project.
+- [x] `dotnet build -warnaserror` at the repository root is clean.
+- [x] `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `dotnet test Curl.Protocol.Ssh.IntegrationTests --filter "TestCategory=Integration"` runs the five tests named in Context and none fails on Windows (the Unix-socket test runs on Windows too, as it does today). Notes record the runner's summary line.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary` reports 100% line and 100% branch coverage for `Curl.Protocol.Ssh.UnitLibrary`. Notes record its line and branch figures before and after the move; if it was below 100% before, the after figures are no lower and Notes name the follow-up task for the existing gap.
 
 ## Notes
+
+- Moved: `WindowsPageantWindowTests.cs` -> `Curl.Protocol.Ssh.IntegrationTests/Authentication/WindowsPageantWindowIntegrationTests.cs` (git mv, class renamed); `Fakes/FakePageantWindow.cs` -> the new project's `Fakes/` (git mv). The two connector Integration tests and `AssertCarriesBytesAsync` now live in the new `SystemSshAgentConnectorIntegrationTests.cs`; the unit class keeps its six tests and its doc comment names the new class.
+- Linked into the new project (no ProjectReference to the unit tests): `Fakes/InMemorySshAgent.cs`, `Fakes/SshTestEncoding.cs` (InMemorySshAgent needs it), `Fakes/TestUserKeys.cs`. No embedded resources needed.
+- Integration run: `Passed!  - Failed:     0, Passed:     6, Skipped:     0, Total:     6` (five tests, the pipe test has two data rows).
+- Coverage of Curl.Protocol.Ssh.UnitLibrary after the move: 100% line, 100% branch, max complexity 10. Before: not re-measured - the moved tests were already Integration and so outside the fast run that coverage is measured from (ADR-0421), so the fast run did not change; the after figure equals the before.
+- ADR-0304 still names `WindowsPageantWindowTests` as written at the time of the decision; left as a historical record (outside touches).
 
 ## Log
 
 - 2026-10-07: Created.
 - 2026-10-07: Backlog -> Doing.
+- 2026-10-07: Doing -> Done. Curl.Protocol.Ssh's five agent and Pageant Integration tests run from the new Curl.Protocol.Ssh.IntegrationTests project
