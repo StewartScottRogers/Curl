@@ -41,7 +41,27 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 
 ## Notes
 
+- 2026-10-08, lane 2, measured with `Record-CurlExchange.ps1` against Windows curl 8.21.0
+  (`-d @file -H 'Expect: 100-continue'`, 2131-byte body, 403 + `Connection: close`):
+  - Server answers after reading 13 body bytes (`-RespondAfterBodyBytes 13`, what upstream
+    sws does for `skip: 2300` on test1070's 2313-byte body): real curl and Curl both send the
+    head and the body (2308 request bytes each, exit 0). Byte-identical requests.
+  - Server answers right after the head (`-RespondAfterBodyBytes 0`): real curl sends only the
+    177-byte head ("we are done reading and this is set to close, stop send", "abort upload"),
+    and so does Curl. Byte-identical requests, both exit 0.
+- So Curl already does what curl 8.21.0 does. The finding's "differs at byte 176, got the end"
+  is a head-only request, which is what real curl sends too when the server answers before
+  reading any body: the gap harness's sws stand-in evidently answers test1070 before reading
+  the 13 bytes `skip: 2300` leaves it to read. The fix belongs in
+  `Gap/Tools/Measure-UpstreamCases.cs` (honour `skip:` by reading Content-Length minus skip
+  body bytes before replying), and changing the Curl HTTP code to send the body after an early
+  final response would break the match with real curl.
+- No code change made. A lane may neither read Gap/ nor file a task touching it (the audit
+  guard refused both), so this waits for an interactive session to fix the harness and
+  re-measure test1070.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Interactive session: Curl already matches curl 8.21.0 (measured, see Notes); the gap office's upstream-case harness must honour sws skip: before test1070 can match, and lanes may not change it
