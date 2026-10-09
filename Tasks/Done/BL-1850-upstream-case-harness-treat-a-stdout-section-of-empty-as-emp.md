@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-09
 ---
 # BL-1850 — Upstream-case harness: treat a stdout section of %EMPTY as empty output
 
@@ -46,3 +46,4 @@ The gap office's upstream-case measuring tool (the one GF-0019's "Reproduce" lin
 
 - 2026-10-08: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Verify parts of %EMPTY read as empty; test2012-2014 pass and are listed.
