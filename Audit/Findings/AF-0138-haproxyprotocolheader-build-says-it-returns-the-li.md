@@ -3,8 +3,8 @@ id: AF-0138
 title: HaproxyProtocolHeader.Build says it returns the line's ASCII bytes but encodes the PROXY line as UTF-8
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Networking.UnitLibrary/HaproxyProtocolHeader.cs:Build:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitLibrary/HaproxyProtocolHeader.cs -Simple
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
