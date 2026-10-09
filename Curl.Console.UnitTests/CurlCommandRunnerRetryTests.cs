@@ -123,6 +123,34 @@ public sealed class CurlCommandRunnerRetryTests
         CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
     }
 
+    /// <summary>
+    /// Replays upstream test366: a <c>503</c> whose <c>Retry-After: 200</c> ends past
+    /// <c>--retry-max-time 10</c> is not retried, so curl 8.21.0 sends one GET, writes the body,
+    /// warns in two lines wrapped at 79 columns and exits 0 (measured with Record-CurlExchange.ps1
+    /// on 2026-10-08, BL-1844).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryAfterLongerThanRetryMaxTime_SendsOneRequestWarnsAndExitsZero()
+    {
+        const string busy = "HTTP/1.1 503 BAD\r\nDate: Tue, 09 Nov 2010 14:49:00 GMT\r\nContent-Length: 21\r\nRetry-After: 200\r\n\r\nserver not available\n";
+        ScriptedConnector server = new(new[] { busy, Ok }.Select(Encoding.Latin1.GetBytes));
+        string expectedError =
+            "Warning: The Retry-After: time would make this command line exceed the maximum " + NewLine
+            + "Warning: allowed time for retries." + NewLine;
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "http://127.0.0.1:18241/366", "--retry", "2", "--retry-max-time", "10");
+        string[] requestLines = [.. Encoding.Latin1.GetString(server.Written).Split("\r\n").Where(line => line.StartsWith("GET ", StringComparison.Ordinal))];
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedError), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", "server not available\n", StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "GET /366 HTTP/1.1" }, requestLines);
+        Assert.AreEqual(expectedError, StandardErrorText);
+        Assert.AreEqual("server not available\n", StandardOutputText);
+        Assert.IsEmpty(clock.Waits);
+    }
+
     [TestMethod]
     public async Task RunAsync_RetryIntoOutputFile_KeepsOnlyTheLastAttemptsBody()
     {

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1844 — --retry-max-time shorter than a Retry-After gives up as curl 8.21.0 does (upstream test366)
 
@@ -24,12 +24,26 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A unit test pins curl 8.21.0's standard error and exit 0 for test366's exchange.
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] A unit test pins curl 8.21.0's standard error and exit 0 for test366's exchange.
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-08 (lane 1): Measured curl 8.21.0 (mingw, Schannel) with Record-CurlExchange.ps1 on
+  test366's exact response and command line: one GET, stdout `server not available\n`, exit 0,
+  and stderr = the progress meter, then `Warning: The Retry-After: time would make this command
+  line exceed the maximum \r\nWarning: allowed time for retries.\r\n` (the existing
+  `TransferRetryWarning.RetryAfterExceedsMaxTime`, wrapped at 79 columns). Curl already writes
+  the same; no production change. Pinned in
+  `CurlCommandRunnerRetryTests.RunAsync_RetryAfterLongerThanRetryMaxTime_SendsOneRequestWarnsAndExitsZero`
+  (one GET, no wait, that stderr and stdout, exit 0).
+- Upstream test366 itself checks only the request (no stderr or stdout section), so the gap
+  item should measure `match` on the next gap run; the lane cannot read the gap office's
+  measurement (audit guard), so any remaining Linux-build stderr difference is left to that
+  re-measurement.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. test366 exchange pinned: one GET, Retry-After warning, exit 0; Curl already matched curl 8.21.0
