@@ -33,3 +33,4 @@ Curl behaves as curl 8.21.0 does for upstream test3036 (`--no-clobber --output-d
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-09: Backlog -> Doing.
