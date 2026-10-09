@@ -320,6 +320,10 @@ if (-not $InventoryDirectory) { $InventoryDirectory = Join-Path $script:WriteOut
 $inventory = Get-WriteOutInventory $UpstreamRoot $Version
 Write-WriteOutJsonFile (Join-Path (Join-Path $InventoryDirectory $Version) 'writeout.json') $inventory
 if ($InventoryOnly) { exit 0 }
-$commit = (& git -C $script:WriteOutRepositoryRoot rev-parse HEAD).Trim()
+# The commit of the build measured: the tree holding -Candidate, not this tool's own
+# repository, so every area of a run names the same candidateCommit.
+$commitRoot = if ($Candidate) { Split-Path -Parent $Candidate } else { $script:WriteOutRepositoryRoot }
+$commit = "$(& git -C $commitRoot rev-parse HEAD 2>$null)".Trim()
+if (-not $commit) { $commit = "$(& git -C (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) rev-parse HEAD)".Trim() }
 $measurement = Measure-WriteOutGap $inventory $Version $Candidate $ProbeResults $commit
 if ($OutFile) { Write-WriteOutJsonFile $OutFile $measurement } else { $measurement | ConvertTo-Json -Depth 8 }
