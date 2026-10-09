@@ -44,3 +44,4 @@ In Curl.Cli.UnitLibrary and Curl.Console's -D target opening, accept '%' as stde
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
