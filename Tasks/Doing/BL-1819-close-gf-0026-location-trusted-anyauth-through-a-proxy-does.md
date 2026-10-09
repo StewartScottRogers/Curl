@@ -44,3 +44,4 @@ In Curl.Protocol.Http.UnitLibrary's redirect handling (HttpProtocolHandler with 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
