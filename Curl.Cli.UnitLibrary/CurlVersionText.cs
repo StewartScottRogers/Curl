@@ -40,16 +40,24 @@ public static class CurlVersionText
     /// </summary>
     public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL TLS-SRP UnixSockets zstd";
 
+    /// <summary>
+    /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
+    /// Schannel reference build lists it, because NTLM, Negotiate and Kerberos answer through SSPI on
+    /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796).
+    /// </summary>
+    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI TLS-SRP UnixSockets zstd";
+
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
     /// <param name="isMacOS">Whether the running system is macOS (<see cref="OperatingSystem.IsMacOS"/>); read only when <paramref name="isWindows"/> is <see langword="false"/>.</param>
     /// <returns>
-    /// The version line, <see cref="ReleaseDateLine"/>, <see cref="ProtocolsLine"/> and <see cref="FeaturesLine"/>.
+    /// The version line, <see cref="ReleaseDateLine"/>, <see cref="ProtocolsLine"/>, and
+    /// <see cref="WindowsFeaturesLine"/> on Windows or <see cref="FeaturesLine"/> anywhere else.
     /// The version line names the mingw triple and <c>Schannel</c> on Windows, the Apple triple and
     /// <c>SecureTransport</c> on macOS, and the GNU/Linux triple and <c>OpenSSL</c> anywhere else.
     /// </returns>
     public static IReadOnlyList<string> Lines(bool isWindows, bool isMacOS) =>
-        [VersionLine(isWindows, isMacOS), ReleaseDateLine, ProtocolsLine, FeaturesLine];
+        [VersionLine(isWindows, isMacOS), ReleaseDateLine, ProtocolsLine, isWindows ? WindowsFeaturesLine : FeaturesLine];
 
     private static string VersionLine(bool isWindows, bool isMacOS) =>
         isWindows ? "curl 8.21.0 (x86_64-w64-mingw32) libcurl/8.21.0 Schannel"
