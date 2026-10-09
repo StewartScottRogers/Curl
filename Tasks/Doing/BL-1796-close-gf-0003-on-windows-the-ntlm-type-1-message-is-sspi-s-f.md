@@ -59,3 +59,4 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
