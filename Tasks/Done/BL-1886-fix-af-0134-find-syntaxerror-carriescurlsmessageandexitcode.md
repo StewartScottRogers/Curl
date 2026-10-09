@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1886 — Fix AF-0134: Find_SyntaxError_CarriesCurlsMessageAndExitCode asserts nothing: its only assertion is commented out
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The commented-out assertion (the planted line the finding saw) is already live in this tree, so the reproduction gives no match. The finding also noted the test passed when `Find` reported no syntax error at all, since it only formatted `result.ExitCode`; it now also calls `AssertSyntaxError`, pinning the outcome `SyntaxError`, no login or password, and exit code 26 (`ReadError`).
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Test now asserts the syntax-error outcome and curl's message and exit code 26

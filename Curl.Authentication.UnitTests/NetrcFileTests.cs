@@ -178,6 +178,7 @@ public sealed class NetrcFileTests
         diagnostics.Act("message", actual);
         diagnostics.Diff("message", "curl: (26) .netrc error: syntax error", actual);
         diagnostics.Assert("message", "curl: (26) .netrc error: syntax error", actual);
+        AssertSyntaxError(diagnostics, result);
         Assert.AreEqual(
             "curl: (26) .netrc error: syntax error",
             actual);
