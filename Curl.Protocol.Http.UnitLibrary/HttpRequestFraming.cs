@@ -200,11 +200,17 @@ internal sealed class HttpRequestFraming
     /// <see cref="HttpUploadResume" /> applies it in place of <paramref name="resumeFrom" />.
     /// </param>
     /// <returns>The framing.</returns>
-    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null, long? resumeFrom = null, string? rangeText = null, bool resumeFromUnknownOffset = false)
+    /// <param name="convertLineEndings">
+    /// <see langword="true" /> for <c>--crlf</c> (<see cref="ITransferContext.ConvertLineEndings" />):
+    /// the body is read through <see cref="HttpCrlfUploadStream" /> and, its length unknown, sent
+    /// chunked (measured, AF-0125, BL-1875 Notes).
+    /// </param>
+    internal static HttpRequestFraming Of(HttpRequestOptions options, HttpCustomHeader[] customHeaders, bool noBody = false, Stream? upload = null, long? resumeFrom = null, string? rangeText = null, bool resumeFromUnknownOffset = false, bool convertLineEndings = false)
     {
         if (upload is not null)
         {
-            return OfUpload(options, HttpUploadResume.Of(upload, resumeFrom, resumeFromUnknownOffset), upload, customHeaders, rangeText);
+            HttpUploadResume resume = HttpUploadResume.Of(upload, resumeFrom, resumeFromUnknownOffset);
+            return OfUpload(options, resume, upload, customHeaders, rangeText, convertLineEndings);
         }
 
         if (options.Body is not { } body)
@@ -212,7 +218,17 @@ internal sealed class HttpRequestFraming
             return new HttpRequestFraming(options.CustomMethod ?? (noBody ? "HEAD" : "GET"), null, null, false, false, false);
         }
 
-        return OfBody(options.CustomMethod ?? "POST", body, customHeaders, options.Version == HttpVersionPreference.Http10, rangeText: DataRangeOf(body, rangeText));
+        return OfBody(options.CustomMethod ?? "POST", body, customHeaders, options.Version == HttpVersionPreference.Http10, rangeText: DataRangeOf(body, rangeText), convertLineEndings: convertLineEndings);
+    }
+
+    /// <summary>
+    /// Gives <paramref name="body" /> read through <see cref="HttpCrlfUploadStream" />, of unknown
+    /// length, for <c>--crlf</c>.
+    /// </summary>
+    private static StreamBody WithCrlfLineEndings(HttpRequestBody body)
+    {
+        Stream content = body is BytesBody bytes ? new MemoryStream(bytes.Content.ToArray(), writable: false) : ((StreamBody)body).Content;
+        return new StreamBody(new HttpCrlfUploadStream(content), null, body.ContentType);
     }
 
     /// <summary>
@@ -221,10 +237,10 @@ internal sealed class HttpRequestFraming
     /// left to send after the <c>-C</c> offset (<paramref name="resume" />), with the <c>-r</c>
     /// <paramref name="rangeText" /> when there is one.
     /// </summary>
-    private static HttpRequestFraming OfUpload(HttpRequestOptions options, HttpUploadResume resume, Stream upload, HttpCustomHeader[] customHeaders, string? rangeText)
+    private static HttpRequestFraming OfUpload(HttpRequestOptions options, HttpUploadResume resume, Stream upload, HttpCustomHeader[] customHeaders, string? rangeText, bool convertLineEndings)
     {
         StreamBody body = new(upload, resume.Length, string.Empty);
-        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, resume, rangeText);
+        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, resume, rangeText, convertLineEndings);
     }
 
     /// <summary>
@@ -244,10 +260,17 @@ internal sealed class HttpRequestFraming
     /// The <c>-r</c> text to send as <c>Content-Range</c>, or <see langword="null" /> for none;
     /// a resumed upload's own <c>Content-Range</c> takes its place.
     /// </param>
-    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, HttpUploadResume? upload = null, string? rangeText = null)
+    /// <param name="convertLineEndings">
+    /// <see langword="true" /> for <c>--crlf</c>: <paramref name="body" /> is sent through
+    /// <see cref="WithCrlfLineEndings" />, chunked, while curl decides <c>Expect</c> by its
+    /// length before conversion (measured, AF-0125: no <c>Expect</c> for a 10-byte file).
+    /// </param>
+    private static HttpRequestFraming OfBody(string method, HttpRequestBody body, HttpCustomHeader[] customHeaders, bool isHttp10, HttpUploadResume? upload = null, string? rangeText = null, bool convertLineEndings = false)
     {
-        long? length = body is BytesBody bytes ? bytes.Content.Length : ((StreamBody)body).Length;
-        bool wantsExpect = WantsExpect(length, isHttp10);
+        long? unconvertedLength = body is BytesBody bytes ? bytes.Content.Length : ((StreamBody)body).Length;
+        long? length = convertLineEndings ? null : unconvertedLength;
+        body = convertLineEndings ? WithCrlfLineEndings(body) : body;
+        bool wantsExpect = WantsExpect(unconvertedLength, isHttp10);
         bool namesExpect = customHeaders.Any(header => header.Names("Expect"));
         bool asksForChunked = AsksForChunked(customHeaders);
         bool isChunked = length is null || asksForChunked;
