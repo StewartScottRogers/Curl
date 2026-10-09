@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1851 — Close GF-0041: On Windows a scheme-less drive-letter path (Z:/dir/file) is parsed as host and port instead of a path under --proto-default file
 
@@ -35,9 +35,9 @@ In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1146`: Curl answers what curl 8.21.0 answers, `upstream test1146 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1146`: Curl answers what curl 8.21.0 answers, `upstream test1146 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -59,3 +59,4 @@ In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. On Windows a drive-letter path under --proto-default file is now a file URL; test1146's command prints the file, exit 0; no option changed, so --ai-help is unchanged
