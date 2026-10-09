@@ -4,8 +4,8 @@ title: Close GF-0015: --retry does not follow a 429's Retry-After as curl does (
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Console, Curl.Console.UnitTests]
+depends-on: [BL-1842, BL-1843, BL-1844]
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
 completed:
@@ -43,7 +43,24 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 
 ## Notes
 
+- 2026-10-08 (lane 1): Split into BL-1842 (test1633), BL-1843 (test1634) and BL-1844
+  (test366), one per item, because the run's cost cap left no room to measure real curl and
+  fix three behaviours in one run. This task now only checks that all three are Done; tick
+  its boxes from theirs.
+- The upstream cases cannot be read from the gap office's cache in a lane (the audit guard
+  refuses any path under `.../Curl/gap/`); read them from
+  `https://raw.githubusercontent.com/curl/curl/curl-8_21_0/tests/data/test<N>` instead.
+- `touches` now adds Curl.Core.UnitLibrary and Curl.Core.UnitTests: the retry decision and
+  the Retry-After handling live in `Curl.Core.UnitLibrary/TransferRetrier.cs`; no task in
+  Doing named either (checked against origin/work/dark-factory).
+- What the three cases expect, from curl 8.21.0's tests/data: test1633 resends the `-d moo`
+  POST from the first URL after the redirect target's 429 and follows the 301 again (four
+  requests); test1634 retries a 429 under `--fail` and its expected output keeps the 429's
+  head ahead of the 200's; test366 makes one request only (Retry-After 200 > --retry-max-time
+  10) and reference curl exits 0.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Backlog. Split into BL-1842, BL-1843 and BL-1844, one per gap item; waits on them
