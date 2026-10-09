@@ -29,6 +29,19 @@ public sealed class CommandLineUrlFileTests
     }
 
     [TestMethod]
+    public void Parse_UrlAtFileBesidePositionalUrl_MarksOnlyTheFileUrlUnglobbed()
+    {
+        RecordingDataFileReader reader = new() { Files = { ["urls"] = "http://h/{a,b}\n"u8.ToArray() } };
+
+        CommandLineParseResult result = Parse(["--url", "@urls", "http://h/{c,d}"], reader);
+
+        AssertUrls(["http://h/{a,b}", "http://h/{c,d}"], result);
+        bool[] unglobbed = result.Options!.UrlOutputs.Select(output => output.IsUnglobbed).ToArray();
+        Diagnostics.Assert("unglobbed", "True, False", string.Join(", ", unglobbed));
+        CollectionAssert.AreEqual(new[] { true, false }, unglobbed);
+    }
+
+    [TestMethod]
     public void Parse_UrlAtDash_ReadsStandardInput()
     {
         RecordingDataFileReader reader = new() { StandardInput = "http://h/a\nhttp://h/b\n"u8.ToArray() };

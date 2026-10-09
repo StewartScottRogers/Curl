@@ -1585,7 +1585,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Reads the URL at <paramref name="index" /> as a glob, or under <c>-g</c> / <c>--globoff</c>
-    /// as the one URL it is.
+    /// as the one URL it is, as is a URL read from a <c>--url @file</c> (BL-1832).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
@@ -1598,7 +1598,7 @@ internal sealed class CurlCommandRunner(
         [NotNullWhen(true)] out UrlGlob? glob,
         [NotNullWhen(false)] out TransferResult? failure)
     {
-        if (options.GlobOff)
+        if (options.GlobOff || UrlOutputOf(options, index).IsUnglobbed)
         {
             glob = UrlGlob.Unglobbed(options.Urls[index]);
             failure = null;

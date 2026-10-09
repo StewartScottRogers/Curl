@@ -872,7 +872,7 @@ public static class CommandLineOptionTable
 
     /// <summary>
     /// Adds every URL in the file a <c>--url @file</c> value names, or standard input for <c>@-</c>, one
-    /// per line, each saved under its remote name, as curl 8.21.0's <c>parse_url</c> does (BL-1804). A
+    /// per line, each saved under its remote name and never globbed, as curl 8.21.0's <c>parse_url</c> does (BL-1804). A
     /// line that is blank, or whose first non-blank character is <c>#</c>, is skipped, as curl's
     /// <c>my_get_line</c> skips it; a file that cannot be opened is refused with
     /// <see cref="CommandLineRefusal.UrlFileUnreadable"/>.
@@ -893,7 +893,7 @@ public static class CommandLineOptionTable
         {
             string url = line.TrimEnd('\r');
             string content = url.TrimStart(' ', '\t');
-            CommandLineRefusal? refusal = content.Length == 0 || content[0] == '#' ? null : options.AddUrl(url, spelledOption, usesRemoteName: true);
+            CommandLineRefusal? refusal = content.Length == 0 || content[0] == '#' ? null : options.AddUrl(url, spelledOption, readFromUrlFile: true);
             if (refusal is not null)
             {
                 return refusal;
