@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1823 — Close GF-0030: Curl lists GSS-API in Features; the Windows reference build does not
 
@@ -35,13 +35,17 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, drop GSS-API from the Windows Featur
 
 ## Acceptance criteria
 
-- [ ] `features:GSS-API`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `features:GSS-API`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Measured the reference on this machine: curl 8.21.0 Schannel prints `Features: alt-svc AsynchDNS brotli HSTS HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd`, no `GSS-API`.
+- Dropped `GSS-API` from `CurlVersionText.WindowsFeaturesLine` only; Linux and macOS keep it, and Kerberos, SPNEGO and SSPI stay on Windows (ADR-0449). No option changed, so `--ai-help` needs nothing.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. curl -V on Windows no longer lists GSS-API, matching the Schannel reference build (ADR-0449)
