@@ -44,3 +44,4 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrlHost, reject a host whose IDN
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
