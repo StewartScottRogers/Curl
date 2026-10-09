@@ -3,8 +3,8 @@ id: AF-0115
 title: SendUnlessStoppedAsync's '!sent.IsCompleted && StopsSending' can become '||' with no test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:SendUnlessStoppedAsync-and:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:115:&&
 task: none
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
