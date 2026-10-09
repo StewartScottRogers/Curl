@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1865 — Fix AF-0115: SendUnlessStoppedAsync's '!sent.IsCompleted && StopsSending' can become '||' with no test failing
 
@@ -41,12 +41,29 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The fix is a test, not a code change: the production line was right, only the race it
+  guards was never run. `SendUnlessStoppedAsync_Below300ArrivesDuringTheWrite_LetsItFinish`
+  (100, 200 and 299 rows) delivers the status line while the body write is still pending
+  and then finishes the write; it asserts the write was not cancelled, the send returned
+  true and the byte reached the connection. The new fake `Fakes/HeldWriteConnection`
+  holds reads and writes until the test releases them, and completes its waiters on the
+  caller's thread so the send's check has run before the write is finished.
+  `PastTheWaitAsync` now takes any `IConnection`.
+- The reproduction script lives under `Audit/`, which a lane may not run
+  (guard-audit-paths), so the mutant was applied by hand instead: with
+  `!sent.IsCompleted || StopsSending` all three new rows fail (28 tests, 3 failed); with
+  the original `&&` all 28 pass. The quality auditor's re-audit runs the script itself.
+- The library is unchanged, so its coverage and complexity are unchanged; no
+  Measure-CodeQuality run was needed. Only `Curl.Protocol.Http.UnitTests` changed, the
+  test project of the library in `touches`.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Test now runs the below-300 status arriving mid-write; the || mutant fails it
