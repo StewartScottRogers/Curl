@@ -27,7 +27,7 @@ public sealed record HaproxyProtocolHeader(string? ClientIp)
     /// </summary>
     /// <param name="localEndPoint">The connection's local end, <see langword="null" /> when unknown.</param>
     /// <param name="remoteEndPoint">The connection's remote end, <see langword="null" /> over a Unix domain socket.</param>
-    /// <returns>The line's ASCII bytes, ending in CRLF.</returns>
+    /// <returns>The line's UTF-8 bytes (plain ASCII unless a <c>--haproxy-clientip</c> value is not), ending in CRLF.</returns>
     public byte[] Build(IPEndPoint? localEndPoint, IPEndPoint? remoteEndPoint)
     {
         if (remoteEndPoint is null)
