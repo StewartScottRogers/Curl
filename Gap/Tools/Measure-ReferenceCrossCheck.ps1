@@ -22,6 +22,11 @@
     127.0.0.1, %HTTPPORT is -Port (the same for both binaries), %LOGDIR is <work>/<N>.
     A case left out keeps its in-process verdict.
 
+    Working directory. Each binary starts, process directory and all, in the case's own fresh
+    %LOGDIR (as upstream's runner starts it), which is deleted afterwards, so a command such as
+    test 1489's "-D %" writes its file there and never into the directory the run was started
+    from (BL-1840).
+
     Per case, both binaries run through Record-CurlExchange.ps1 with the case's <data> as
     -Response, its <stdin> as -StandardInput, and its client files written fresh into its
     %LOGDIR before each run. The binaries' exit codes, request bytes, stdout and stderr are
@@ -187,6 +192,20 @@ function Get-ReferenceSummary($Ref) {
     return "reference curl exits $($Ref.ExitCode); stdout $($Ref.Stdout.Length) bytes: $(ConvertTo-EscapedBytes ([System.Text.Encoding]::GetEncoding(28591).GetBytes($stdout)))"
 }
 
+# Runs the script block with the whole process, not only PowerShell's location, in the folder:
+# a child started with no WorkingDirectory (Record-CurlExchange.ps1 sets none) inherits the
+# process's directory, and Push-Location alone leaves that where the caller started (BL-1840).
+function Invoke-InScratchDirectory([string] $Directory, [scriptblock] $Script) {
+    $previous = [System.Environment]::CurrentDirectory
+    [System.Environment]::CurrentDirectory = $Directory
+    Push-Location -LiteralPath $Directory
+    try { & $Script }
+    finally {
+        Pop-Location
+        [System.Environment]::CurrentDirectory = $previous
+    }
+}
+
 function Invoke-Recording($Case, [string] $Curl, [string] $LogRoot, [string] $Out) {
     $logDirectory = Join-Path $LogRoot ([string]$Case.number)
     if (Test-Path -LiteralPath $logDirectory) { Remove-Item -LiteralPath $logDirectory -Recurse -Force }
@@ -201,9 +220,13 @@ function Invoke-Recording($Case, [string] $Curl, [string] $LogRoot, [string] $Ou
     $arguments = [string[]](@('--max-time', [string]$CaseTimeLimitSeconds) + @($Case.arguments))
     $response = ConvertTo-EscapedBytes ([Convert]::FromBase64String($Case.response))
     $stdin = ConvertTo-EscapedBytes ([Convert]::FromBase64String($Case.standardInput))
-    Push-Location $logDirectory
-    try { & $recorder -Port $Port -Response $response -Connections 20 -CurlArgs $arguments -OutDirectory $Out -Curl $Curl -StandardInput $stdin | Out-Null }
-    finally { Pop-Location }
+    # The binary starts in the case's own fresh %LOGDIR, as upstream's runner starts it, so a
+    # relative file an upstream command names (-D %, -o out) lands there; the folder is
+    # deleted afterwards and nothing is written into the caller's directory (BL-1840).
+    try {
+        Invoke-InScratchDirectory $logDirectory { & $recorder -Port $Port -Response $response -Connections 20 -CurlArgs $arguments -OutDirectory $Out -Curl $Curl -StandardInput $stdin | Out-Null }
+    }
+    finally { Remove-Item -LiteralPath $logDirectory -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 function Update-Counts($M) {
@@ -231,6 +254,7 @@ function Invoke-CrossCheck {
     }
     $work = $WorkDirectory
     if (-not $work) { $work = Get-DefaultWorkDirectory }
+    $work = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($work)
     New-Item -ItemType Directory -Force -Path $work | Out-Null
     $logRoot = Join-Path $work 'logs'
     $byNumber = @{}
@@ -314,6 +338,32 @@ if ($SelfTest) {
         Report ($s['behaviour:test8'].state -eq 'match') 'progress meter lines in stderr are not a difference'
         Report ($s['behaviour:test9'].state -eq 'match' -and $null -eq $s['behaviour:test9'].reason) 'recordings that differ only in their multipart boundary agree'
         $x = $r.crossCheck
+        $callerDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("crosscheck-selftest-caller-{0}" -f [guid]::NewGuid())
+        $caseDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("crosscheck-selftest-case-{0}" -f [guid]::NewGuid())
+        New-Item -ItemType Directory -Path $callerDirectory, $caseDirectory | Out-Null
+        $processDirectory = [System.Environment]::CurrentDirectory
+        Push-Location -LiteralPath $callerDirectory
+        [System.Environment]::CurrentDirectory = $callerDirectory
+        try {
+            # Upstream test 1489 runs "-D %": a child that writes the file "%" with no working directory set.
+            Invoke-InScratchDirectory $caseDirectory {
+                $writer = New-Object System.Diagnostics.ProcessStartInfo
+                $writer.FileName = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+                $hostPrefix = ''
+                # pwsh installed as a .NET tool runs as dotnet.exe hosting pwsh.dll.
+                if ([System.IO.Path]::GetFileNameWithoutExtension($writer.FileName) -eq 'dotnet') { $hostPrefix = '"' + (Join-Path $PSHOME 'pwsh.dll') + '" ' }
+                $writer.Arguments = $hostPrefix + '-NoProfile -NonInteractive -Command "[System.IO.File]::WriteAllText([string][char]37, 1)"'
+                $writer.UseShellExecute = $false
+                $child = [System.Diagnostics.Process]::Start($writer)
+                $child.WaitForExit()
+            }
+            $restored = ([System.Environment]::CurrentDirectory -eq $callerDirectory) -and ((Get-Location).ProviderPath -eq $callerDirectory)
+            Report ((Test-Path -LiteralPath (Join-Path $caseDirectory '%')) -and -not (Test-Path -LiteralPath (Join-Path $callerDirectory '%')) -and @(Get-ChildItem -LiteralPath $callerDirectory -Force).Count -eq 0 -and $restored) 'a case writing the file "%" lands in its scratch folder, never the caller''s directory, and the directories are restored'
+        } finally {
+            [System.Environment]::CurrentDirectory = $processDirectory
+            Pop-Location
+            Remove-Item -LiteralPath $callerDirectory, $caseDirectory -Recurse -Force -ErrorAction SilentlyContinue
+        }
         Report ($x.crossChecked -eq 6 -and $x.referenceDiverges -eq 1 -and $x.disagreements -eq 2) 'crossChecked 6, referenceDiverges 1, disagreements 2'
         Report ($x.leftOut['not-match-or-gap'] -eq 1 -and $x.leftOut['server-not-http-alone'] -eq 1 -and $x.leftOut['reply-not-one-data'] -eq 1 -and $x.leftOut['not-parsed'] -eq 0 -and $x.leftOut['limit'] -eq 0) 'selection counts each rule'
         Report ($r.counts.match -eq 5 -and $r.counts.gap -eq 3 -and $r.counts.unmeasured -eq 1 -and $r.reasons.'reference-diverges' -eq 1) 'counts and reasons are recomputed'

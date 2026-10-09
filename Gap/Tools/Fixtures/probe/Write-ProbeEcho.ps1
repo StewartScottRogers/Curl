@@ -9,7 +9,8 @@
     Otherwise it prints one JSON object on standard output: Arguments (each argument as
     received), Environment (the variables the probe controls, $null when unset) and
     HomeItems (the names of the items in the folder HOME names; the PowerShell host
-    itself creates an AppData or Microsoft folder there as it starts).
+    itself creates an AppData or Microsoft folder there as it starts) and WorkingDirectory
+    (the folder it started in).
 #>
 if ($args.Count -eq 1 -and $args[0] -eq '--version') {
     [Console]::Out.Write("curl 0.0.1 (probe-echo) libcurl/0.0.1`n")
@@ -23,6 +24,6 @@ $environment = [ordered] @{}
 foreach ($name in $names) { $environment[$name] = [Environment]::GetEnvironmentVariable($name) }
 $homeItems = $null
 if ($env:HOME -and (Test-Path -LiteralPath $env:HOME)) { $homeItems = @(Get-ChildItem -LiteralPath $env:HOME -Force | ForEach-Object { $_.Name }) }
-$report = [ordered] @{ Arguments = @($args); Environment = $environment; HomeItems = $homeItems }
+$report = [ordered] @{ Arguments = @($args); Environment = $environment; HomeItems = $homeItems; WorkingDirectory = [Environment]::CurrentDirectory }
 [Console]::Out.Write((ConvertTo-Json -InputObject $report -Depth 4 -Compress))
 exit 7
