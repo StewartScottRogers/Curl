@@ -3,8 +3,8 @@ id: AF-0137
 title: FeaturesLine doc says GSS-API, HTTP2, HTTP3 and TLS-SRP are listed on every platform; the Windows line drops all four
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Cli.UnitLibrary/CurlVersionText.cs:FeaturesLine:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
