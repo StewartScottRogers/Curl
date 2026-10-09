@@ -17,6 +17,7 @@ public sealed partial class CookieStoreTests
     [DataRow("www.example.com", "Domain=com", DisplayName = "A top-level domain")]
     [DataRow("a.foo.ck", "Domain=foo.ck", DisplayName = "A child of a wildcard rule")]
     [DataRow("a.github.io", "Domain=github.io", DisplayName = "A private-section suffix")]
+    [DataRow("www.example.co.uk.", "Domain=co.uk.", DisplayName = "An ICANN suffix with a trailing dot (upstream test1629)")]
     public void StoreFromResponse_DomainIsAPublicSuffix_DropsTheCookie(string host, string domainAttribute)
     {
         CookieStore store = new();
@@ -32,6 +33,7 @@ public sealed partial class CookieStoreTests
     [TestMethod]
     [DataRow("www.example.co.uk", "Domain=example.co.uk", "example.co.uk", DisplayName = "A registrable domain under an ICANN suffix")]
     [DataRow("www.example.com", "Domain=example.com", "example.com", DisplayName = "A registrable domain under a top-level domain")]
+    [DataRow("www.example.co.uk.", "Domain=example.co.uk.", "example.co.uk.", DisplayName = "A registrable domain with a trailing dot")]
     [DataRow("co.uk", "Domain=co.uk", "co.uk", DisplayName = "A public suffix set by itself")]
     [DataRow("co.uk", "", "co.uk", DisplayName = "A host-only cookie from a public suffix")]
     [DataRow("a.www.ck", "Domain=www.ck", "www.ck", DisplayName = "An exception to a wildcard rule")]
