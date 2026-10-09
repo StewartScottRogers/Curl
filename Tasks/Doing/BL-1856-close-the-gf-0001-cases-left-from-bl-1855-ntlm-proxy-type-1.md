@@ -48,3 +48,4 @@ The eight GF-0001 upstream cases BL-1855 left failing over the in-process `TcpCo
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Split into BL-1857 (CONNECT reply errors) and BL-1858 (NTLM type-1 on Windows, test2043); waits on both
+- 2026-10-08: Backlog -> Doing.
