@@ -35,12 +35,16 @@ In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1629`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 92 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 6\x0D\x0ASet-Cookie: something=1; Domain=co.uk.; Path=/\x0D\x0A\x0D\x0A-foo-\x0A`, so the item measures `match`.
-- [ ] `behaviour:test2015`: Curl answers what curl 8.21.0 answers, `upstream test2015 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1629`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 92 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 6\x0D\x0ASet-Cookie: something=1; Domain=co.uk.; Path=/\x0D\x0A\x0D\x0A-foo-\x0A`, so the item measures `match`.
+- [x] `behaviour:test2015`: moved to BL-1846 (see Notes).
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
+
+- test1629: `PublicSuffixList.IsCookieDomainAcceptable` saw host `www.example.co.uk.` and domain `co.uk.`; with the trailing dot, dropping labels ended at the empty string, so every domain looked longer than the public suffix and was accepted. It now leaves one trailing dot off both before the check, so `co.uk.` is refused as curl refuses it; `Domain=example.co.uk.` from the same host is still kept. Pinned by two new DataRows in `CookieStoreTests.PublicSuffix.cs`.
+- test2015 split off to BL-1846 (decided by Claude under the delegation; a task split, not a behaviour decision, so no ADR): the `-b name=value` string has to be dropped on a cross-host redirect, which only the redirect follower knows about. `CookieStore` cannot tell a redirect hop from a second command-line URL, which must still get the string, so the fix belongs in `Curl.Core.UnitLibrary` / `Curl.Protocol.Http.UnitLibrary` / `Curl.Console`, outside this task's `touches`. The gap's test2015 item closes when BL-1846 lands and a gap run re-measures it.
+- The upstream test files could not be read from a lane (the audit guard refuses any path with the gap office's folder in it), so the host in test1629 was inferred from the evidence: `co.uk.` can only tail-match a host ending in `co.uk.`.
 
 ## Log
 
