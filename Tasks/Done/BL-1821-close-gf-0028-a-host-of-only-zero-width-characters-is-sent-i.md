@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1821 — Close GF-0028: A host of only zero-width characters is sent instead of failing with exit 3
 
@@ -35,13 +35,16 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrlHost, reject a host whose IDN
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test763`: Curl answers what curl 8.21.0 answers, `upstream test763 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test763`: Curl answers what curl 8.21.0 answers, `upstream test763 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- CurlUrlHost.TryNormalizeName now rejects (BadHostname, exit 3) a name made only of dots and characters UTS #46 (transitional) maps to nothing: U+00AD, U+034F, U+180B-U+180F, U+200B-U+200D, U+2060, U+FE00-U+FE0F, U+FEFF. Chosen over checking for an IdnMapping exception because .NET also throws for a%80b and a%FFb, which curl accepts. A zero-width character inside a real name (a U+200B b) is still accepted as before. Supplementary-plane ignorables (U+1BCA0.., U+E0100..) are left out: no upstream case needs them. Measured: curl.exe -sS "http://U+200B U+200C/" now prints "curl: (3) URL rejected: Bad hostname", exit 3. No option changed, so --ai-help is untouched.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. A host of only zero-width characters (U+200B U+200C) is now rejected with exit 3, Bad hostname, as curl 8.21.0 does (test763).
