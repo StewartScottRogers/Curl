@@ -45,7 +45,7 @@ public sealed class LibcurlSourceCodeOptionCoverageTests
     /// <summary>Options curl 8.21.0's Schannel build writes no line for, measured (BL-653, BL-654, BL-1106 and BL-1174 Notes; ADR-0326 for the options the Schannel build refuses).</summary>
     private static readonly string[] WritesNothing =
     [
-        "output", "remote-name", "include", "fail-with-body", "capath", "crlfile", "tls13-ciphers", "curves", "sigalgs",
+        "output", "proxy-http3", "remote-name", "include", "fail-with-body", "capath", "crlfile", "tls13-ciphers", "curves", "sigalgs",
         "cert-status", "engine", "sessionid", "socks5-gssapi-service", "proxy-capath", "proxy-tls13-ciphers",
         "proxy-crlfile", "globoff", "show-error", "progress-bar", "buffer", "trace-time", "trace-ids", "trace-config",
         "stderr", "out-null", "remote-name-all", "remote-header-name", "output-dir", "create-dirs", "clobber",

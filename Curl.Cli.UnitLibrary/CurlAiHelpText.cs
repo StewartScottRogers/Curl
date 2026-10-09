@@ -175,7 +175,7 @@ public static class CurlAiHelpText
         lines.AddRange(OnOffLines(longName));
         lines.Add($"- Repeat: {RepeatMeaning(longName)}");
         lines.AddRange(OtherSpellingLines.TryGetValue(RowName(longName), out string? otherSpelling) ? [otherSpelling] : []);
-        lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName)) ? [] : ["- Not supported by this build yet: curl refuses it with exit 2."]);
+        lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && !row.RefusedWhenTurnedOn) ? [] : ["- Not supported by this build yet: curl refuses it with exit 2."]);
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByWindowsSchannelBuild) ? [SchannelBuildRefusalLine] : []);
         lines.AddRange([string.Empty, CurlManualMarkdown.Escape(entry.Description) + "."]);
         lines.AddRange(CurlManualMarkdown.TryGetOptionMarkdown(longName, out IReadOnlyList<string> manual) ? [string.Empty, .. manual] : []);
