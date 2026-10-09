@@ -44,3 +44,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, add SSPI to the Windows FeaturesLine
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
