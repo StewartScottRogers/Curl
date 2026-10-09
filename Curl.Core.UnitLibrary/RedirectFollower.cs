@@ -370,7 +370,7 @@ public sealed class RedirectFollower(
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true, false);
         }
 
-        if (!CurlUrl.TryParse(target, first.PathAsIs, out next))
+        if (!CurlUrl.TryParse(EncodedForFollow(target), first.PathAsIs, out next))
         {
             return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
         }
@@ -426,6 +426,32 @@ public sealed class RedirectFollower(
         first.Events.ReportInfo(message);
         return (CurlExitCode.UnsupportedProtocol, message, false, true);
     }
+
+    /// <summary>
+    /// The target as curl 8.21.0 follows it (CURLU_URLENCODE with CURLU_ALLOW_SPACE): a space
+    /// becomes <c>+</c> in the query and <c>%20</c> elsewhere, and a raw byte at or above 0x80
+    /// (one Latin-1 character of the header) becomes its own percent escape (BL-1801).
+    /// </summary>
+    internal static string EncodedForFollow(string target)
+    {
+        System.Text.StringBuilder encoded = new(target.Length);
+        int hash = target.IndexOf('#', StringComparison.Ordinal);
+        int question = target.IndexOf('?', StringComparison.Ordinal);
+        int queryEnd = hash < 0 ? target.Length : hash;
+        for (int index = 0; index < target.Length; index++)
+        {
+            encoded.Append(EncodedCharacter(target[index], question >= 0 && index > question && index < queryEnd));
+        }
+
+        return encoded.ToString();
+    }
+
+    private static string EncodedCharacter(char character, bool inQuery) => character switch
+    {
+        ' ' => inQuery ? "+" : "%20",
+        > '~' and <= 'ÿ' => "%" + ((int)character).ToString("X2", CultureInfo.InvariantCulture),
+        _ => character.ToString(),
+    };
 
     private static string UnparsableUrlReason(string target)
     {

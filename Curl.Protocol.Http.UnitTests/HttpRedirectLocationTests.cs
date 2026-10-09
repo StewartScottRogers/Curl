@@ -47,7 +47,9 @@ public sealed class HttpRedirectLocationTests
         Assert.AreEqual(expected, Resolved(expected, RequestUrl, location));
 
     [TestMethod]
-    [DataRow("/ä", "http://example.com:8080/%C3%A4", DisplayName = "non-ASCII as UTF-8")]
+    [DataRow("/ä", "http://example.com:8080/%E4", DisplayName = "a Latin-1 character as its own byte")]
+    [DataRow("/?name=Ø¢ x#a b", "http://example.com:8080/?name=%D8%A2+x#a%20b", DisplayName = "raw UTF-8 bytes and a space in the query (upstream test1138, test40)")]
+    [DataRow("/€", "http://example.com:8080/%E2%82%AC", DisplayName = "a character above Latin-1 as UTF-8")]
     [DataRow("/😀", "http://example.com:8080/%F0%9F%98%80", DisplayName = "surrogate pair as one character")]
     [DataRow("/a%", "http://example.com:8080/a%", DisplayName = "percent at the end")]
     [DataRow("/a%4", "http://example.com:8080/a%4", DisplayName = "percent with one digit")]
