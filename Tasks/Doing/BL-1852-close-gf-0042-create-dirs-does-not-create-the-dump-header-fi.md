@@ -44,3 +44,4 @@ In Curl.Console's CurlCommandRunner.TransferWithHeaderFileAsync, when options.Cr
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
