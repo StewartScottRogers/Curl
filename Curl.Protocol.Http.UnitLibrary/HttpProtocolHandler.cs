@@ -1019,7 +1019,7 @@ public sealed class HttpProtocolHandler(
         ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
-        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection);
+        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = framing.AwaitsContinue
             ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
@@ -1091,7 +1091,8 @@ public sealed class HttpProtocolHandler(
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
-            exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            exchange.Head = await ReadHeadAsync(headReader, newConnection, cancellationToken).ConfigureAwait(false);
+            ThrowIfVersionMismatched(transport, streams is not null || IsSwitchedToHttp2(connection), exchange.Head);
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
             actedOn = headReader.HeadActedOn(exchange.Head);
@@ -1324,17 +1325,55 @@ public sealed class HttpProtocolHandler(
         connection is HttpH2cUpgradeConnection { IsUpgraded: true };
 
     /// <summary>
+    /// Reads the response head; on a reused connection, a reply that cannot begin <c>HTTP/</c>
+    /// fails with exit 8, <c>Invalid status line</c>, as curl 8.21.0 never takes HTTP/0.9 on
+    /// a reused connection (upstream test1479), rather than with exit 1.
+    /// </summary>
+    private static async ValueTask<HttpResponseHead> ReadHeadAsync(HttpResponseHeadReader headReader, bool newConnection, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException failure) when (!newConnection && failure.Message == HttpTransferMessages.Http09NotAllowed)
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
+        }
+    }
+
+    /// <summary>
+    /// Fails a response over HTTP/1.x whose major version differs from the one the connection's
+    /// earlier response named (upstream test471), and else records its version on the
+    /// connection for the next request (<see cref="Http1VersionSeen" />).
+    /// </summary>
+    private static void ThrowIfVersionMismatched(IConnection transport, bool overStreams, HttpResponseHead head)
+    {
+        if (overStreams)
+        {
+            return;
+        }
+
+        Version version = Http1VersionSeen.VersionNamed(head.HeadBytes.Span, head.StatusLine.Version);
+        Http1VersionSeen.ThrowIfMismatched(transport, version);
+        Http1VersionSeen.Record(transport, version);
+    }
+
+    /// <summary>
     /// Formats the request head: the HTTP/1.1 head, asking to upgrade to h2c when
     /// <paramref name="upgradesToH2c" />, or over HTTP/2 or HTTP/3 the same head naming
     /// <c>HTTP/2</c> or <c>HTTP/3</c> in its request line, which is what is reported sent and what the stream
     /// turns into its HEADERS (<see cref="Http2RequestHeaders" />).
     /// </summary>
-    private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams, bool upgradesToH2c)
+    /// <remarks>
+    /// On a connection whose earlier response was HTTP/1.0 the head is formatted as for
+    /// <c>-0</c>, as curl downgrades the connection (upstream test1074).
+    /// </remarks>
+    private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams, bool upgradesToH2c, bool downgradesToHttp10)
     {
         ITransferContext context = plan.Context;
         byte[] head = HttpRequestHeadFormatter.Format(
             context.Url,
-            plan.Options,
+            downgradesToHttp10 ? plan.Options with { Version = HttpVersionPreference.Http10 } : plan.Options,
             context.NoBody,
             plan.Authorization,
             CookieHeaderFor(context),
