@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1822 — Close GF-0029: Curl lists ECH in Features; the Windows reference build does not
 
@@ -35,13 +35,16 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 
 ## Acceptance criteria
 
-- [ ] `features:ECH`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `features:ECH`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Removed `ECH` from `CurlVersionText.WindowsFeaturesLine` only; Linux and macOS keep it, `--ech` still works everywhere (ADR-0448). No option changed, so `--ai-help` needs nothing. Windows tests pinned in CurlVersionTextTests; build clean, fast tests green.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. curl -V on Windows no longer lists ECH, matching the Schannel reference
