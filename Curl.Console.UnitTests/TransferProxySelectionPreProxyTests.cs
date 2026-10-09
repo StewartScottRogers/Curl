@@ -42,6 +42,18 @@ public sealed class TransferProxySelectionPreProxyTests
     }
 
     [TestMethod]
+    [DataRow("--preproxy", "socks5://127.0.0.1:41080")]
+    [DataRow("--noproxy", "other.example")]
+    public void TrySelect_WithAnHttp10ProxyNamingHttpScheme_KeepsHttp10(string option, string value)
+    {
+        // Upstream test 213: curl --proxy1.0 http://A -p sends CONNECT ... HTTP/1.0 (BL-1855).
+        ProxyEndpoint? proxy = Select(out _, option, value, "--proxy1.0", "http://10.0.0.1:3128", "http://h/");
+
+        Diagnostics.Assert("proxy kind", ProxyKind.Http10, proxy?.Kind);
+        Assert.AreEqual(ProxyKind.Http10, proxy?.Kind);
+    }
+
+    [TestMethod]
     public void TrySelect_WithAPreProxyAndProxyUser_GivesTheHttpProxyTheCredential()
     {
         ProxyEndpoint? proxy = Select(out _, "--preproxy", "socks5://127.0.0.1:41080", "-x", "http://10.0.0.1:3128", "-U", "u:p", "http://h/");
