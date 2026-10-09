@@ -3,8 +3,8 @@ id: AF-0132
 title: h2c upgrade's 'afterHead.Length > 0' can become '>= 0' with no test failing: a spurious 'Copied HTTP/2 data ... len=0' -v line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpH2cUpgradeConnection.cs:SwitchAsync-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpH2cUpgradeConnection.cs:179:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
