@@ -108,4 +108,6 @@ internal sealed class CommandLineGlobalState
     public bool FirstOptionOfArgument { get; set; }
 
     public bool ReadingConfigFile { get; set; }
+
+    public System.Text.Encoding? ConfigFileWireTextEncoding { get; set; }
 }

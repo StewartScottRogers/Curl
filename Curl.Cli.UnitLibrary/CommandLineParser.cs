@@ -169,6 +169,11 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(dataFileReader);
 
         CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows };
+        if (isWindows)
+        {
+            options.ConfigFileWireTextEncoding = ConfigFileWireText.WindowsAnsiCodePage(() => System.Text.CodePagesEncodingProvider.Instance.GetEncoding(0));
+        }
+
         if (!SkipsDefaultConfigFile(arguments))
         {
             ConfigFileApplier.ApplyDefaultFile(options, defaultConfigFileCandidates, pathExists, dataFileReader);

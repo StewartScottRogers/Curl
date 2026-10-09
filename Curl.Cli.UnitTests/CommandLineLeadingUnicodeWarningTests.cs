@@ -192,7 +192,6 @@ public sealed class CommandLineLeadingUnicodeWarningTests
                 "Warning: The argument '“host:fake”' starts with a Unicode character. Maybe ",
                 "Warning: ASCII was intended?",
             ]);
-        Diagnostics.Assert("headers", CommandLineParseDiagnostics.QuoteEach(["“host:fake”"]), CommandLineParseDiagnostics.QuoteEach(result.Options?.Headers ?? []));
         Assert.IsTrue(result.IsAccepted);
         CollectionAssert.AreEqual(
             new[]
@@ -201,7 +200,62 @@ public sealed class CommandLineLeadingUnicodeWarningTests
                 "Warning: ASCII was intended?",
             },
             result.WarningLines.ToList());
-        CollectionAssert.AreEqual(new[] { "“host:fake”" }, result.Options.Headers.ToList());
+        Assert.HasCount(1, result.Options.Headers);
+    }
+
+    [TestMethod]
+    public void ConfigFileHeaderUserAgentAndRefererGoOutAsTheFileUtf8BytesOnWindows()
+    {
+        // Measured with real curl 8.21.0 (Windows, Schannel, 2026-10-08): a -K file's “quoted” values are
+        // sent as their UTF-8 bytes E2 80 9C ... E2 80 9D, not the ANSI code page's 93 ... 94 (upstream
+        // test 470), so each is held re-spelled for the ANSI encoder the request side uses (BL-1848).
+        CommandLineParseResult result = ParseConfigFile("-H \"X-A: “quoted”\"\nuser-agent = “agent”\nreferer = “ref”\n", silentFirst: false);
+        Encoding wireEncoding = result.Options!.ConfigFileWireTextEncoding!;
+        string[] sent = [.. result.Options.Headers.Select(wireEncoding.GetBytes).Select(Convert.ToHexString)];
+        string userAgent = Convert.ToHexString(wireEncoding.GetBytes(result.Options.UserAgent!));
+        string referer = Convert.ToHexString(wireEncoding.GetBytes(result.Options.Referer!));
+
+        string[] expected = [Convert.ToHexString(Encoding.UTF8.GetBytes("X-A: “quoted”"))];
+        Diagnostics.Assert("header bytes", string.Join(",", expected), string.Join(",", sent));
+        Diagnostics.Assert("user-agent bytes", Convert.ToHexString(Encoding.UTF8.GetBytes("“agent”")), userAgent);
+        Diagnostics.Assert("referer bytes", Convert.ToHexString(Encoding.UTF8.GetBytes("“ref”")), referer);
+        CollectionAssert.AreEqual(expected, sent);
+        Assert.AreEqual(Convert.ToHexString(Encoding.UTF8.GetBytes("“agent”")), userAgent);
+        Assert.AreEqual(Convert.ToHexString(Encoding.UTF8.GetBytes("“ref”")), referer);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: The argument '“agent”' starts with a Unicode character. Maybe ",
+                "Warning: ASCII was intended?",
+                "Warning: The argument '“ref”' starts with a Unicode character. Maybe ASCII ",
+                "Warning: was intended?",
+            },
+            result.WarningLines.ToList());
+    }
+
+    [TestMethod]
+    public void CommandLineHeaderAndUserAgentAreHeldUnchangedOnWindows()
+    {
+        CommandLineParseResult result = Parse(["-H", "X-A: “quoted”", "-A", "x“agent”", Url], isWindows: true);
+
+        Diagnostics.Assert("headers", CommandLineParseDiagnostics.QuoteEach(["X-A: “quoted”"]), CommandLineParseDiagnostics.QuoteEach(result.Options?.Headers ?? []));
+        CollectionAssert.AreEqual(new[] { "X-A: “quoted”" }, result.Options!.Headers.ToList());
+        Assert.AreEqual("x“agent”", result.Options.UserAgent);
+    }
+
+    [TestMethod]
+    public void ConfigFileHeaderIsHeldUnchangedOffWindows()
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["config.txt"] = Encoding.UTF8.GetBytes("-H \"X-A: “quoted”\"\n");
+        Diagnostics.ArrangeArguments(["-K", "config.txt", Url]);
+
+        CommandLineParseResult result = CommandLineParser.Parse(["-K", "config.txt", Url], _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: false);
+        Diagnostics.ActParse(result);
+
+        Diagnostics.Assert("headers", CommandLineParseDiagnostics.QuoteEach(["X-A: “quoted”"]), CommandLineParseDiagnostics.QuoteEach(result.Options?.Headers ?? []));
+        CollectionAssert.AreEqual(new[] { "X-A: “quoted”" }, result.Options!.Headers.ToList());
+        Assert.IsNull(result.Options.ConfigFileWireTextEncoding);
     }
 
     [TestMethod]

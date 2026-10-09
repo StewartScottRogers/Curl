@@ -288,8 +288,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
         CommandLineOption.Value("header", 'H', AddHeaders),
         CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
-        CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
-        CommandLineOption.Value("referer", 'e', AcceptingEmpty(SetReferer)),
+        CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = options.AsWireText(userAgent))),
+        CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => SetReferer(options, options.AsWireText(referer)))),
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
@@ -1021,7 +1021,7 @@ public static class CommandLineOptionTable
                 options.AddWarningLinesUnlessSilent([notAHeaderWarning(value)]);
             }
 
-            addHeader(value);
+            addHeader(options.AsWireText(value));
             return null;
         }
 

@@ -74,6 +74,22 @@ public sealed class CommandLineOptions
     internal bool ReadingConfigFile { get => globals.ReadingConfigFile; set => globals.ReadingConfigFile = value; }
 
     /// <summary>
+    /// The encoding the request side sends header text in, when it is not the UTF-8 a config file is
+    /// written in: the ANSI code page on Windows (<see cref="ConfigFileWireText"/>); otherwise <see langword="null"/>.
+    /// </summary>
+    public System.Text.Encoding? ConfigFileWireTextEncoding { get => globals.ConfigFileWireTextEncoding; internal set => globals.ConfigFileWireTextEncoding = value; }
+
+    /// <summary>
+    /// <paramref name="value"/> as the request side must hold it to send it as curl 8.21.0 does: while a
+    /// config file is read and <see cref="ConfigFileWireTextEncoding"/> is set, re-spelled so it goes out as
+    /// the file's own bytes (<see cref="ConfigFileWireText.Respell"/>); otherwise unchanged.
+    /// </summary>
+    /// <param name="value">A header, user-agent or referer value.</param>
+    /// <returns>The value to store.</returns>
+    internal string AsWireText(string value) =>
+        ReadingConfigFile && ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(value, wireEncoding) : value;
+
+    /// <summary>
     /// Applies <c>-:</c> / <c>--next</c> read into this group, as curl 8.21.0 does: when this group has a
     /// URL, starts a new group after it, whose per-group options start again from nothing while the
     /// global ones stay shared, and which becomes the <see cref="CurrentGroup"/>. Without a URL it is
