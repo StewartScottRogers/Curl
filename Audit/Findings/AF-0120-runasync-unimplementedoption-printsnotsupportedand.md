@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Console.UnitTests/CurlCommandRunnerUnimplementedOptionTests.cs:RunAsync_UnimplementedOption_PrintsNotSupportedAndExitsTwoWithoutATransfer:ignored-test
 reproduction: none
-task: none
-tasks:
+task: BL-1870
+tasks: BL-1870
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md

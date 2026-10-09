@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:SendUnlessStoppedAsync-and:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:115:&&
-task: none
-tasks:
+task: BL-1865
+tasks: BL-1865
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md

@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/DerCertificateFile.cs:OuterValueEnd-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DerCertificateFile.cs:85:<
-task: none
-tasks:
+task: BL-1868
+tasks: BL-1868
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md

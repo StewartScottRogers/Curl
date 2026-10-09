@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Networking.UnitLibrary/CLAUDE.md:ProjectReferences:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-1880
+tasks: BL-1880
 found: 2026-10-09
 found-at: 64e750b3931ea71536d942080142f37bfc4c9ccf
 scorecard: 2026-10-09_0225.md

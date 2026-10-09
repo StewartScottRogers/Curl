@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitTests/SslStreamTlsProviderTests.SessionTickets.cs:AuthenticateAsClientAsync_SchannelBuildOverTls13_ReportsOnlyReceivedTicketsAndKeepsTheData:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-1873
+tasks: BL-1873
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md

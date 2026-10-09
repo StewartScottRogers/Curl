@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:capacity:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-1876
+tasks: BL-1876
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md

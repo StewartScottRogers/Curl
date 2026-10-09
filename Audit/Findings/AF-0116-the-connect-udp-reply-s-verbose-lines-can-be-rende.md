@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:RequestUdpTunnelAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:244:true
-task: none
-tasks:
+task: BL-1866
+tasks: BL-1866
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md

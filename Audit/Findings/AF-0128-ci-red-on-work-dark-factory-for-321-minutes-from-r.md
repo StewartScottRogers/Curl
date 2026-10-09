@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:logs:37733074018:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-1878
+tasks: BL-1878
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
