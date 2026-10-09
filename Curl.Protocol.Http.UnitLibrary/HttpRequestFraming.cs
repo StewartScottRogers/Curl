@@ -36,9 +36,11 @@ internal sealed class HttpRequestFraming
         bool awaitsContinue,
         bool refusesUnknownLength = false,
         HttpUploadResume? upload = null,
-        string? contentRange = null)
+        string? contentRange = null,
+        bool isAuthProbe = false)
     {
         Method = method;
+        IsAuthProbe = isAuthProbe;
         Body = body;
         KnownLength = knownLength;
         IsChunked = isChunked;
@@ -108,6 +110,13 @@ internal sealed class HttpRequestFraming
     internal string? ContentRange { get; }
 
     /// <summary>
+    /// Gets a value indicating whether this is the Digest probe <see cref="AsAuthProbe" /> makes:
+    /// its <c>Content-Length: 0</c> replaces any <c>-H</c> <c>Content-Length</c> line, as curl
+    /// 8.21.0 sends it (upstream test1284, BL-1835).
+    /// </summary>
+    internal bool IsAuthProbe { get; }
+
+    /// <summary>
     /// Gets the failure a <c>-T</c> upload resumed with <c>-C</c> ends with once connected,
     /// before anything is sent, or <see langword="null" /> when it can be sent
     /// (<see cref="HttpUploadResume" />).
@@ -143,11 +152,11 @@ internal sealed class HttpRequestFraming
     /// 8.21.0 sends first when Digest is the one scheme allowed and no challenge has been
     /// answered yet, holding the body back for the authenticated request (upstream test88,
     /// test175, test1001; ADR-0441). Its <c>Content-Type</c> stays; a <c>-T</c> upload still
-    /// sends none.
+    /// sends none. Its <c>Content-Length: 0</c> replaces any <c>-H</c> one (<see cref="IsAuthProbe" />).
     /// </summary>
     /// <returns>The probe's framing.</returns>
     internal HttpRequestFraming AsAuthProbe() =>
-        new(Method, new BytesBody(ReadOnlyMemory<byte>.Empty, Body!.ContentType), 0, isChunked: false, addsExpect: false, awaitsContinue: false, upload: Upload);
+        new(Method, new BytesBody(ReadOnlyMemory<byte>.Empty, Body!.ContentType), 0, isChunked: false, addsExpect: false, awaitsContinue: false, upload: Upload, isAuthProbe: true);
 
     /// <summary>
     /// Makes the same framing for an HTTP/2 or HTTP/3 stream, where DATA frames carry the body and the
@@ -158,7 +167,7 @@ internal sealed class HttpRequestFraming
     /// </summary>
     /// <returns>The framing of the HTTP/2 or HTTP/3 request.</returns>
     internal HttpRequestFraming ForHttp2OrHttp3() =>
-        new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange);
+        new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange, IsAuthProbe);
 
     /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.

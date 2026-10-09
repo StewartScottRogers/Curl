@@ -54,6 +54,8 @@ internal static class HttpRequestHeadFormatter
 
     private const string ContentTypeName = "Content-Type";
 
+    private const string ContentLengthName = "Content-Length";
+
     private const string FormBoundaryPrefix = "multipart/form-data; boundary=";
 
     /// <summary>
@@ -136,8 +138,8 @@ internal static class HttpRequestHeadFormatter
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
         string? formContentType = FormContentTypeOf(customHeaders, framing);
-        AppendCustomHeaders(head, customHeaders, hostLine is not null, formContentType is not null);
-        AppendCustomHeaders(head, proxyHeaders, hostLine is not null, false);
+        AppendCustomHeaders(head, customHeaders, hostLine is not null, formContentType is not null, framing.IsAuthProbe);
+        AppendCustomHeaders(head, proxyHeaders, hostLine is not null, false, framing.IsAuthProbe);
         AppendBodyHeaders(head, customHeaders, framing, formContentType);
         AppendConnection(head, customHeaders, SendsTe(options, customHeaders), upgradesToH2c);
         head.Append("\r\n");
@@ -327,15 +329,18 @@ internal static class HttpRequestHeadFormatter
     /// leaving out every <c>Host:</c> line when a <c>Host</c> line was already written, and
     /// every value naming <c>Connection</c>, which <see cref="AppendConnection" /> places, and
     /// every value naming <c>Content-Type</c> when <paramref name="leavesOutContentType" />,
-    /// because <see cref="AppendBodyHeaders" /> sends it merged with the form's boundary.
+    /// because <see cref="AppendBodyHeaders" /> sends it merged with the form's boundary, and
+    /// every value naming <c>Content-Length</c> when <paramref name="leavesOutContentLength" />,
+    /// because a Digest probe sends its own <c>Content-Length: 0</c> (BL-1835).
     /// </summary>
-    private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten, bool leavesOutContentType)
+    private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten, bool leavesOutContentType, bool leavesOutContentLength)
     {
         foreach (HttpCustomHeader header in customHeaders)
         {
             if (header.SentLine is { } line
                 && !header.Names(ConnectionName)
                 && !(leavesOutContentType && header.Names(ContentTypeName))
+                && !(leavesOutContentLength && header.Names(ContentLengthName))
                 && !(hostLineWritten && line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)))
             {
                 head.Append(line).Append("\r\n");
@@ -365,7 +370,7 @@ internal static class HttpRequestHeadFormatter
             return;
         }
 
-        AppendUnlessOverridden(head, customHeaders, "Content-Length", ContentLengthOf(framing));
+        AppendUnlessOverridden(head, framing.IsAuthProbe ? [] : customHeaders, ContentLengthName, ContentLengthOf(framing));
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
         AppendAlways(head, ContentTypeName, formContentType);
         AppendUnlessOverridden(head, customHeaders, ContentTypeName, framing.IsUpload ? null : body.ContentType);

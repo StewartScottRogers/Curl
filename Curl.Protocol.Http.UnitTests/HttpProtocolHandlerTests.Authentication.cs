@@ -484,13 +484,38 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.DoesNotContain("Authorization:", requests[1]);
     }
 
-    private static TransferContext DigestPostContext(Stream output) =>
+    /// <summary>
+    /// The probe's <c>Content-Length: 0</c> replaces an <c>-H</c> <c>Content-Length</c> line,
+    /// which goes only with the answer to the challenge, as upstream test1284 expects of curl
+    /// 8.21.0 (BL-1835).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeWithACustomContentLength_SendsContentLengthZeroInItsPlace()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = DigestPostContext(new MemoryStream(), ["Content-Length: 5"]);
+        Diagnostics.Arrange("url, body, schemes, headers", $"{AuthUrl}, -d hello, --digest, -H \"Content-Length: 5\"");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.DoesNotContain("Content-Length: 5", requests[0]);
+        Assert.Contains("Content-Length: 5\r\n", requests[1]);
+        Assert.DoesNotContain("Content-Length: 0", requests[1]);
+    }
+
+    private static TransferContext DigestPostContext(Stream output, IReadOnlyList<string>? headers = null) =>
         new()
         {
             Url = CurlUrl.Parse(AuthUrl),
             Output = output,
             Credentials = new System.Net.NetworkCredential("u", "p"),
-            Http = new HttpRequestOptions { Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"), AuthSchemes = HttpAuthSchemes.Digest },
+            Http = new HttpRequestOptions { Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"), AuthSchemes = HttpAuthSchemes.Digest, Headers = headers ?? [] },
         };
 
     private static TransferContext AuthContext(Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null) =>
