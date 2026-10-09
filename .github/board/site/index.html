@@ -30,7 +30,10 @@
                        anywhere else
 
   Tabs: #tasks (also no hash) shows the task kanban and lanes; #audit shows the audit
-  office's findings as a kanban (BL-1184). Findings are listed from the task branch's
+  office's findings as a kanban (BL-1184), with an accepted finding whose every task is
+  in Tasks/Done (or an archive under it) shown as "Fixed, awaiting re-audit" rather than
+  "Approved": it closes only on its auditor's re-audit (ADR-0422); #gaps shows the gap
+  dashboard (../gaps/) without its own site links. Findings are listed from the task branch's
   tree and the audit branch's tree, the audit branch's copy winning, and their texts are
   read from raw.githubusercontent.com, which costs no API calls; each text is re-read
   only when its blob SHA changes.
@@ -116,7 +119,7 @@
   nav.tabs a { padding: 6px 12px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; color: inherit; text-decoration: none; margin-bottom: -1px; }
   nav.tabs a[aria-selected="true"] { border-color: var(--line); background: Canvas; font-weight: 600; }
   [hidden] { display: none !important; }
-  #audit-board { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; }
+  #audit-board { display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
   #audit-folded { margin-top: 12px; }
   #audit-folded > details { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; margin-bottom: 8px; }
   details.finding { border-top: none; padding: 0; margin-bottom: 6px; border-radius: 4px; background: var(--card); }
@@ -211,7 +214,8 @@ const staleMs = 10 * 60 * 1000;
 const auditBranch = params.get('auditBranch') || 'audit';
 const findingsOverride = params.get('findings') ? new URL(params.get('findings'), location.href).href : null;
 const findingFile = /^Audit\/Findings\/(AF-\d+)(?:-(.*))?\.md$/;
-const findingColumns = [['proposed', 'Waiting for you'], ['accepted', 'Approved'], ['deferred', 'Deferred'], ['blocked', 'Blocked']];
+// 'reaudit' is not a status: it is an accepted finding whose tasks are all Done.
+const findingColumns = [['proposed', 'Waiting for you'], ['accepted', 'Approved'], ['reaudit', 'Fixed, awaiting re-audit'], ['deferred', 'Deferred'], ['blocked', 'Blocked']];
 const findingFolds = [['rejected', 'Rejected'], ['closed', 'Closed']];
 // The moves each status allows (BL-1183): [button label, new status, reason required].
 const findingMoves = {
@@ -581,6 +585,7 @@ async function readFindings(auditTree) {
       finding.severity = fields.severity || '';
       finding.reason = fields.reason || '';
       finding.task = fields.task || '';
+      finding.tasks = (`${fields.tasks || ''} ${fields.task || ''}`.match(/BL-\d+/gi) || []).map(id => id.toUpperCase());
       finding.log = log;
     } catch (error) {
       finding.error = error.message;
@@ -636,6 +641,16 @@ function foldedList(key, label, findings) {
   return details;
 }
 
+// The IDs of tasks in Tasks/Done or any folder under it, from the task branch's tree.
+function doneTaskIds() {
+  const ids = new Set();
+  for (const entry of (latestTree && latestTree.tree) || []) {
+    const match = entry.type === 'blob' && /^Tasks\/Done\/(?:[^/]+\/)?(BL-\d+)[-.]/.exec(entry.path);
+    if (match) ids.add(match[1]);
+  }
+  return ids;
+}
+
 function renderAudit() {
   renderTokenControls();
   if (!latestAudit) return;
@@ -645,7 +660,10 @@ function renderAudit() {
   const typing = active && active.dataset && active.dataset.reasonFor
     ? { id: active.dataset.reasonFor, start: active.selectionStart, end: active.selectionEnd } : null;
   const known = [...findingColumns, ...findingFolds].map(([status]) => status);
-  const withStatus = status => findings.filter(finding => !finding.error && finding.status === status);
+  const done = doneTaskIds();
+  const fixed = finding => finding.status === 'accepted' && (finding.tasks || []).length > 0 && finding.tasks.every(id => done.has(id));
+  const withStatus = status => findings.filter(finding => !finding.error && (
+    status === 'reaudit' ? fixed(finding) : finding.status === status && !(status === 'accepted' && fixed(finding))));
   const proposed = withStatus('proposed').length;
   document.getElementById('tab-audit').textContent = `Audit (${proposed})`;
   document.getElementById('audit-source').textContent = auditBranchFound
