@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1862 — Fix AF-0112: Three Curl.Networking.UnitTests ECH tests fail unmutated: TlsReader.Take advances past the end with no bounds check
 
@@ -62,3 +62,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. AF-0112 does not reproduce: TlsReader.Take already bounds-checks; reproduction passes 37/37, fast tests green
