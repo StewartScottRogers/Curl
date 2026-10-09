@@ -3,12 +3,12 @@ id: AF-0117
 title: RevocationCheckIncomplete '!options.Insecure && RevocationBestEffortTolerates(chain)' can become '||' with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:CaCertificateFileUnusable-and:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/ServerCertificateVerification.cs:129:&&
-task: none
-tasks:
+task: BL-1867
+tasks: BL-1867
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.

@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Refuses a dark factory lane any tool call that reads or changes an audit path.
+    Refuses a dark factory lane any tool call that reads or changes an audit path, and any
+    Edit, Write or MultiEdit of one of the four guard files.
 
 .DESCRIPTION
     A PreToolUse hook for Edit, Write, MultiEdit, NotebookEdit, Read, Grep, Glob, Bash and
@@ -38,7 +39,7 @@
 #>
 if ([string]::IsNullOrEmpty($env:CURL_DARK_FACTORY_LANE)) { exit 0 }
 
-$Refusal = 'Refused by the audit guard: dark factory lanes may not read or change Audit/, .claude/agents/audit-* (ADR-0267), Gap/ or .claude/agents/gap-* (ADR-0433). Leave this to an interactive session.'
+$Refusal = 'Refused by the audit guard: dark factory lanes may not read or change Audit/, .claude/agents/audit-* (ADR-0267), Gap/ or .claude/agents/gap-* (ADR-0433), nor change the guard files (guard-audit-paths.ps1, settings.json, ci.yml, task-board.ps1). Leave this to an interactive session.'
 
 # The guarded folders and the agent-name prefixes that go with them.
 $GuardedFolders = 'Audit|Gap'
@@ -50,6 +51,14 @@ function Test-AuditFilePath([string]$Path) {
     if (-not $Path) { return $false }
     $p = $Path.Replace([string][char]92, '/')
     return ($p -match "(?i)(^|/)($GuardedFolders)(/|$)") -or ($p -match "(?i)(^|/)\.claude/agents/($GuardedAgents)-[^/]*$")
+}
+
+function Test-GuardFilePath([string]$Path) {
+    # One of the guard files that protect the audit paths. Lanes run and read them (every
+    # lane runs task-board.ps1), so only a change to one is refused (BL-1876 slipped through).
+    if (-not $Path) { return $false }
+    $p = $Path.Replace([string][char]92, '/')
+    return $p -match '(?i)(^|/)(\.claude/hooks/guard-audit-paths\.ps1|\.claude/settings\.json|\.github/workflows/ci\.yml|\.claude/skills/task-board/task-board\.ps1)$'
 }
 
 function Test-AuditCommand([string]$Command) {
@@ -78,7 +87,8 @@ catch {
 
 $in = $hook.tool_input
 $refuse = switch ("$($hook.tool_name)") {
-    { $_ -in 'Edit', 'Write', 'MultiEdit', 'Read' } { Test-AuditFilePath "$($in.file_path)"; break }
+    'Read' { Test-AuditFilePath "$($in.file_path)"; break }
+    { $_ -in 'Edit', 'Write', 'MultiEdit' } { (Test-AuditFilePath "$($in.file_path)") -or (Test-GuardFilePath "$($in.file_path)"); break }
     'NotebookEdit' { Test-AuditFilePath "$($in.notebook_path)"; break }
     'Grep' {
         @("$($in.path)", "$($in.glob)", (Join-SearchPath "$($in.path)" "$($in.glob)")) |

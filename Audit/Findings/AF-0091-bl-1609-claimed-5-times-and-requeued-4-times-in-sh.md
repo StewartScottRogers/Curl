@@ -7,8 +7,8 @@ status: accepted
 reason:
 key: process:logs:BL-1609:redone-work
 reproduction: none
-task: BL-1769
-tasks: BL-1769
+task: BL-1861
+tasks: BL-1769, BL-1861
 found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
