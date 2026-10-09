@@ -575,6 +575,93 @@ public sealed class CurlCommandRunnerRetryTests
         Assert.AreEqual("hello", OutputFileText);
     }
 
+    /// <summary>
+    /// Replays upstream test3036: <c>--no-clobber --output-dir present -OJ --retry 1
+    /// --retry-all-errors</c> where <c>present</c> is a file, so the <c>-J</c> file cannot be
+    /// created. curl 8.21.0 reports each attempt on its own: the first fails opening the file as
+    /// the <c>Content-Disposition</c> line names it (52 bytes, that line's length), the second takes
+    /// no name from its headers and fails opening it at its first body write (6 bytes); both warn,
+    /// and the run exits 23 with nothing on standard output (measured with Record-CurlExchange.ps1
+    /// on 2026-10-09, BL-1849 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetriedRemoteHeaderNameUnderAFile_ReportsEachAttemptsOpenFailure()
+    {
+        const string disposed = "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\nContent-Disposition: inline; filename=\"MMM3036MMM\"\r\nContent-Type: text/html\r\n\r\n-foo-\n";
+        const string openWarning = "Warning: Failed to open the file present/MMM3036MMM: No such file or directory";
+        outputFiles.UnwritablePaths.Add("present/MMM3036MMM");
+        Diagnostics.Arrange("unwritable files", "present/MMM3036MMM");
+        ScriptedConnector server = new(new[] { disposed, disposed }.Select(Encoding.Latin1.GetBytes));
+        string expected = "Warning: No remote filename, uses \"curl_response\"" + NewLine
+            + openWarning + NewLine
+            + "curl: (23) client returned ERROR on write of 52 bytes" + NewLine
+            + AllErrorsRetryWarningLine
+            + openWarning + NewLine
+            + "curl: (23) client returned ERROR on write of 6 bytes" + NewLine;
+
+        int exitCode = await RunAsync(
+            server,
+            writesProgressMeter: false,
+            "http://127.0.0.1:18241/", "--no-progress-meter", "--no-clobber", "--output-dir", "present", "-OJ", "--retry", "1", "--retry-all-errors");
+        int requests = Encoding.Latin1.GetString(server.Written).Split("GET / HTTP/1.1").Length - 1;
+
+        Diagnostics.Assert("exit code", (int)CurlExitCode.WriteError, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Diagnostics.Assert("requests", 2, requests);
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Assert.AreEqual(expected, StandardErrorText);
+        Assert.AreEqual(string.Empty, StandardOutputText);
+        Assert.AreEqual(2, requests);
+        Assert.IsEmpty(outputFiles.Written);
+    }
+
+    /// <summary>
+    /// Under <c>-sS</c> the test3036 run keeps each attempt's error line and drops the warnings,
+    /// the open failures' as the retry's, as curl 8.21.0 does (measured with Record-CurlExchange.ps1
+    /// on 2026-10-09, BL-1849 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetriedRemoteHeaderNameUnderAFileSilent_PrintsOnlyEachAttemptsErrorLine()
+    {
+        const string disposed = "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\nContent-Disposition: inline; filename=\"MMM3036MMM\"\r\n\r\n-foo-\n";
+        outputFiles.UnwritablePaths.Add("present/MMM3036MMM");
+        Diagnostics.Arrange("unwritable files", "present/MMM3036MMM");
+        string expected = "curl: (23) client returned ERROR on write of 52 bytes" + NewLine
+            + "curl: (23) client returned ERROR on write of 6 bytes" + NewLine;
+
+        int exitCode = await RunAsync(
+            [disposed, disposed],
+            "http://127.0.0.1:18241/", "-sS", "--no-clobber", "--output-dir", "present", "-OJ", "--retry", "1", "--retry-all-errors");
+
+        Diagnostics.Assert("exit code", (int)CurlExitCode.WriteError, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual((int)CurlExitCode.WriteError, exitCode);
+        Assert.AreEqual(expected, StandardErrorText);
+    }
+
+    /// <summary>
+    /// A retried attempt's progress meter starts once the retry wait is over, as curl 8.21.0's
+    /// does: after a one-second wait the second attempt's status lines show no time spent, where
+    /// progress started before the wait drew an extra <c>00:01</c> line (measured with
+    /// Record-CurlExchange.ps1 on 2026-10-09, a 503 then a 200 into <c>-o</c>, BL-1849 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetriedAttemptsProgressMeter_StartsAfterTheRetryWait()
+    {
+        int exitCode = await RunAsync([Busy, Ok], writesProgressMeter: true, "--retry", "1", "-o", "out.txt", Url);
+        string secondAttempt = StandardErrorText[(StandardErrorText.IndexOf(RetryWarningLine, StringComparison.Ordinal) + RetryWarningLine.Length)..];
+        string expected = "\r  0      0   0      0   0      0      0      0                              0"
+            + "\r100      5 100      5   0      0  4.76M      0                              0"
+            + "\r100      5 100      5   0      0  4.76M      0                              0"
+            + "\r100      5 100      5   0      0  4.76M      0                              0"
+            + NewLine;
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("second attempt's meter", Lf(expected), Lf(secondAttempt));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(expected, secondAttempt);
+    }
+
     [TestMethod]
     public async Task RunAsync_RetriedResumeToStandardOutput_KeepsAndNotesNothing()
     {

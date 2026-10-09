@@ -4602,7 +4602,7 @@ internal sealed class CurlCommandRunner(
         {
             await retryLinesWritten.ConfigureAwait(false);
             RecordSerialAttemptStart();
-            TransferContext context = firstContext ?? createAttemptContext(attemptResumeFrom);
+            TransferContext context = firstContext ?? CreateRetryAttemptContext(options, createAttemptContext, attemptResumeFrom, outputFile);
             firstContext = null;
             TransferResult attemptResult = await FollowWatchingSpeedAsync(follower, context, redirectPolicy).ConfigureAwait(false);
             KeepRetriedConnectionIdWhenReused(context, attemptResult);
@@ -4627,6 +4627,28 @@ internal sealed class CurlCommandRunner(
         await retryLinesWritten.ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Creates the context of an attempt <c>--retry</c> runs again, on fresh progress started now,
+    /// once the retry wait is over, so its meter counts from the attempt's start as curl 8.21.0's
+    /// does: after a one-second wait curl drew no <c>00:01</c> status line for a 6-byte body,
+    /// which progress started before the wait did (measured 2026-10-09, BL-1849 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="createAttemptContext">Creates an attempt's context on the transfer's current progress.</param>
+    /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
+    /// <param name="outputFile">The <c>-o</c> file, or <see langword="null" /> for standard output.</param>
+    /// <returns>The attempt's context.</returns>
+    private TransferContext CreateRetryAttemptContext(
+        CommandLineOptions options,
+        Func<long?, TransferContext> createAttemptContext,
+        long? resumeFrom,
+        DeferredOutputFileStream? outputFile)
+    {
+        StartTransferProgress(options, resumeFrom, toStandardOutput: outputFile is null);
+
+        return createAttemptContext(resumeFrom);
     }
 
     /// <summary>
@@ -4749,8 +4771,8 @@ internal sealed class CurlCommandRunner(
     /// next attempt: the attempt's progress, its failure lines unless <c>-s</c> was given
     /// without <c>-S</c>, then the retry warning unless <c>-s</c> was given, whether or not with
     /// <c>-S</c> (measured 2026-09-27, BL-241 Notes). The attempt's <c>-o</c> bytes are then kept
-    /// or cut back (<see cref="KeepOrThrowAwayAttemptBytesAsync" />) and the next attempt gets
-    /// fresh progress.
+    /// or cut back (<see cref="KeepOrThrowAwayAttemptBytesAsync" />); the next attempt gets fresh
+    /// progress once the retry wait is over (<see cref="CreateRetryAttemptContext" />).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="attempt">The attempt's result.</param>
@@ -4766,6 +4788,11 @@ internal sealed class CurlCommandRunner(
         DeferredOutputFileStream? outputFile)
     {
         bool toStandardOutput = outputFile is null;
+        if (outputFile is not null)
+        {
+            attempt = await SettleRetriedOutputFileAsync(options, attempt, outputFile).ConfigureAwait(false);
+        }
+
         await WriteProgressAsync(options, attempt, offsets.Retried, toStandardOutput).ConfigureAwait(false);
         if (ShowsErrors(options) && attempt.ErrorMessage is not null)
         {
@@ -4777,8 +4804,29 @@ internal sealed class CurlCommandRunner(
         {
             await KeepOrThrowAwayAttemptBytesAsync(options, outputFile, keeps: offsets.Next != offsets.Retried).ConfigureAwait(false);
         }
+    }
 
-        StartTransferProgress(options, offsets.Next, toStandardOutput);
+    /// <summary>
+    /// Reports a retried attempt whose <c>-o</c> file could not be opened as curl 8.21.0 does, for
+    /// that attempt and not only the last: its <c>Warning: Failed to open the file</c> line unless
+    /// <c>-s</c> was given, and the attempt's result made <c>client returned ERROR on write of N
+    /// bytes</c>. With <c>-OJ --output-dir</c> naming a file, curl printed both for each of the two
+    /// attempts, N being the <c>Content-Disposition</c> line's length, then the body's (measured
+    /// 2026-10-09, upstream test 3036, BL-1849 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="attempt">The handler's result for the retried attempt.</param>
+    /// <param name="outputFile">The <c>-o</c> file.</param>
+    /// <returns>The attempt's result as the file settles it (<see cref="DeferredOutputFileStream.SettleRetriedAttempt" />).</returns>
+    private async Task<TransferResult> SettleRetriedOutputFileAsync(CommandLineOptions options, TransferResult attempt, DeferredOutputFileStream outputFile)
+    {
+        (TransferResult settled, string? warning) = outputFile.SettleRetriedAttempt(attempt);
+        if (!options.Silent && warning is not null)
+        {
+            await WriteErrorLineAsync(warning).ConfigureAwait(false);
+        }
+
+        return settled;
     }
 
     /// <summary>
