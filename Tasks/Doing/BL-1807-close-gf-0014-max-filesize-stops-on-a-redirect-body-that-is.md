@@ -45,3 +45,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
