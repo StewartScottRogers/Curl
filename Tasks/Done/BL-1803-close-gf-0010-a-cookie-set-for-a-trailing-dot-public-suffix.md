@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1803 — Close GF-0010: A cookie set for a trailing-dot public suffix is sent, and a -b name=value cookie follows a redirect to another host
 
@@ -50,3 +50,4 @@ In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. test1629 fixed in Curl.Cookies; test2015 split to BL-1846
