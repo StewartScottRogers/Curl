@@ -68,3 +68,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Interactive session: Curl already matches curl 8.21.0 (measured, see Notes); the gap office's upstream-case harness must honour sws skip: before test1070 can match, and lanes may not change it
 - 2026-10-08: Blocked -> Backlog. Interactive: the fix belongs in Curl.Conformance's sws stand-in (product code), so a lane may take it
+- 2026-10-09: Backlog -> Doing.
