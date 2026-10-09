@@ -44,3 +44,4 @@ In Curl.Cli.UnitLibrary's --variable / --expand-* expansion, make the ':json' fu
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
