@@ -44,3 +44,4 @@ In Curl.Protocol.Telnet.UnitLibrary's TelnetProtocolHandler, the -T upload runs 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
