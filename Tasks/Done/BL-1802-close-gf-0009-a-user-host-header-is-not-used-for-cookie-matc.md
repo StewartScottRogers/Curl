@@ -37,7 +37,7 @@ In Curl.Protocol.Http.UnitLibrary (HttpCustomHeader, HttpRequestHeadFormatter) a
 
 - [x] `behaviour:test62`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 94 bytes: HTTP/1.0 200 OK swsclose\x0D\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0D\x0AContent-Type: text/html\x0D\x0A\x0D\x0Aboo\x0A`, so the item measures `match`.
 - [x] `behaviour:test1258`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 136 bytes: HTTP/1.0 200 OK swsclose\x0D\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0D\x0AContent-Type: text/html\x0D\x0ASet-Cookie: I-am=here; domain=localhost;\x0D\x0A\x0D\x0Aboo\x0A`, so the item measures `match`.
-- [x] `behaviour:test184`: moved to BL-1842 (needs Curl.Core and Abstractions, outside this task's touches): Curl answers what curl 8.21.0 answers, `upstream test184 passes`, so the item measures `match`.
+- [x] `behaviour:test184`: moved to BL-1845 (needs Curl.Core and Abstractions, outside this task's touches): Curl answers what curl 8.21.0 answers, `upstream test184 passes`, so the item measures `match`.
 - [x] `behaviour:test461`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 - [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
@@ -46,11 +46,11 @@ In Curl.Protocol.Http.UnitLibrary (HttpCustomHeader, HttpRequestHeadFormatter) a
 
 - `-H host:` (any case, exactly `Host:`) now removes the Host line (test461). `Host:   ` and `Host; y` still send a Host line, as the measured rows in HttpRequestHeadFormatterTests pin.
 - Cookies are matched and stored against the custom Host value's host (`HttpProtocolHandler.CookieUrlOf`, test62 and test1258), as curl's cookiehost does. A Host value that is no valid authority falls back to the URL.
-- test184 (drop the custom Host on a cross-host -L follow) needs RedirectFollower in Curl.Core.UnitLibrary and a flag in Abstractions, outside `touches`; filed as BL-1842 rather than widening this task. No option changed, so --ai-help is unchanged.
+- test184 (drop the custom Host on a cross-host -L follow) needs RedirectFollower in Curl.Core.UnitLibrary and a flag in Abstractions, outside `touches`; filed as BL-1845 rather than widening this task. No option changed, so --ai-help is unchanged.
 - The upstream-case measurement is gap-office tooling the lane guard refuses, so the items are pinned by unit tests; the finding closes only on the next gap run.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
-- 2026-10-08: Doing -> Done. test62, test1258 and test461 fixed and pinned by unit tests; test184 split to BL-1842
+- 2026-10-08: Doing -> Done. test62, test1258 and test461 fixed and pinned by unit tests; test184 split to BL-1845

@@ -1,5 +1,5 @@
 ---
-id: BL-1842
+id: BL-1845
 title: Close GF-0009 test184: drop a user Host: header when -L follows to another host
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-08
 completed:
 ---
-# BL-1842 — Close GF-0009 test184: drop a user Host: header when -L follows to another host
+# BL-1845 — Close GF-0009 test184: drop a user Host: header when -L follows to another host
 
 ## Goal
 
