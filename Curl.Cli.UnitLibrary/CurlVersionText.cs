@@ -37,15 +37,17 @@ public static class CurlVersionText
     /// hand-built handshake with SRP (ADR-0328, BL-1135), after <c>SSL</c> as curl 8.18.0's OpenSSL build lists it.
     /// BL-1417's audit added <c>alt-svc</c>, <c>ECH</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
+    /// <c>threadsafe</c> on every platform, after <c>SSL</c> (and <c>SSPI</c>) as both reference builds list it,
+    /// because Curl's process-wide set-up is thread-safe (ADR-0444, BL-1828).
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL TLS-SRP UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe TLS-SRP UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
     /// Schannel reference build lists it, because NTLM, Negotiate and Kerberos answer through SSPI on
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796).
     /// </summary>
-    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI TLS-SRP UnixSockets zstd";
+    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli ECH GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe TLS-SRP UnixSockets zstd";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
