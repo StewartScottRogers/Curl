@@ -3,8 +3,8 @@ id: AF-0130
 title: Networking CLAUDE.md says the library references Abstractions, Tls, Quic and Kerberos and nothing else, but it also references Curl.Http2.UnitLibrary
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Networking.UnitLibrary/CLAUDE.md:ProjectReferences:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.cspr
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
