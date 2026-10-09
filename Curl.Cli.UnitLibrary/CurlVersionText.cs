@@ -34,13 +34,15 @@ public static class CurlVersionText
 
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
-    /// ignoring case). ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
-    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> on every
-    /// platform now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c>,
-    /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform now that <c>--negotiate</c> is answered
+    /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
+    /// is the Windows line, which drops <c>ECH</c>, <c>GSS-API</c>, <c>HTTP2</c>, <c>HTTP3</c> and <c>TLS-SRP</c>
+    /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
+    /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
+    /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
+    /// <c>Kerberos</c> and <c>SPNEGO</c> on every platform, now that <c>--negotiate</c> is answered
     /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181), and
-    /// <c>HTTP3</c> on every platform now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144), and
-    /// <c>TLS-SRP</c> on every platform now that <c>--tlsuser</c> and <c>--proxy-tlsuser</c> authenticate the
+    /// <c>HTTP3</c> off Windows now that <c>--http3</c> and <c>--http3-only</c> work (ADR-0144), and
+    /// <c>TLS-SRP</c> off Windows now that <c>--tlsuser</c> and <c>--proxy-tlsuser</c> authenticate the
     /// hand-built handshake with SRP (ADR-0328, BL-1135), after <c>SSL</c> as curl 8.18.0's OpenSSL build lists it.
     /// BL-1417's audit added <c>alt-svc</c>, <c>ECH</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
