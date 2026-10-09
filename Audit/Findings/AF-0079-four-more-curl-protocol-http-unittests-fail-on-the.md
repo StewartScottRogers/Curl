@@ -44,6 +44,7 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "FullyQuali
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the dotnet test reproduction: Failed! - Failed: 5, Passed: 3, Total: 8. ExecuteAsync_ServerStallsPastMaxTime_ReportsTheHeadAndTheBodyWritten has 'ASSERT body: expected hello, actual ' (empty), and CopyAsync_DecodeContentAndTheOutputFails_ThrowsExit23WithTheEncodedSize: 'no exception was thrown' (HttpResponseBodyReaderTests.cs:407).
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the dotnet test reproduction (after the AF-0056 build): Passed! Failed 0, Passed 8, Total 8.
+- 2026-10-09 | 2026-10-09_0647.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces no) is set aside: Ran the dotnet test reproduction: 'Passed! - Failed: 0, Passed: 8, Skipped: 0, Total: 8'.
 
 ## Log
 

@@ -3,8 +3,8 @@ id: AF-0125
 title: --crlf is ignored on HTTP uploads: Curl sends LF bytes with Content-Length where curl converts to CRLF and sends chunked
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--crlf:request
 reproduction: none
 task: BL-1875
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0647.md
 ---
 # AF-0125 - --crlf is ignored on HTTP uploads: Curl sends LF bytes with Content-Length where curl converts to CRLF and sends chunked
 
@@ -43,8 +43,10 @@ $o="$env:TEMP\cf-crlf"; New-Item -ItemType Directory -Force $o | Out-Null; [IO.F
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | not re-audited | overlaps planted defect PD-303 in Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction: 'curl 133 / Curl 114'. curl sends 'Transfer-Encoding: chunked' and the chunk 'b\r\nfile body\r\n\r\n0\r\n\r\n'. Curl sends 'Content-Length: 10' and 'file body\n' with a bare LF, so --crlf is still ignored on HTTP upload.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: 'curl 133 / Curl 133'. The request bytes match: PUT /f.txt with Transfer-Encoding: chunked and a chunk 'b\r\nfile body\r\n\r\n0\r\n\r\n', so the LF is converted to CRLF. Reference curl 8.21.0 Schannel.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces.

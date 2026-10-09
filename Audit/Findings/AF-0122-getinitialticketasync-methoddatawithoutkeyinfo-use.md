@@ -43,6 +43,7 @@ Select-String -Path Curl.Kerberos.UnitTests/KerberosKdcClientTests.cs -Pattern '
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Select-String shows KerberosKdcClientTests.cs:245-252: GetInitialTicketAsync_MethodDataWithoutKeyInfo_UsesTheFirstTypeAndDefaultSalt's only assertion is Assert.IsNotNull(kdc.LastTimestamp). It never checks the encryption type or the salt.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the Select-String reproduction: the test now asserts Assert.IsGreaterThan(1, offeredTypes.Count) and Assert.AreEqual(offeredTypes[0], KerberosEncryptedData.Decode(kdc.Requests[1].PreAuthenticationData.Single().Value).EncryptionType), so it checks that the first offered type was used (KerberosKdcClientTests.cs:251-253).
 
 ## Log
 

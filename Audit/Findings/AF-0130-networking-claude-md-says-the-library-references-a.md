@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.cspr
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: the csproj still references Curl.Http2.UnitLibrary (line 9), and (Select-String Curl.Networking.UnitLibrary/CLAUDE.md -SimpleMatch 'Http2').Count is now 2. Lines 7-10 list the Http2 reference (for Http2ProxyTunnelConnection) before 'and nothing else'.
+
 ## Log
 
 - 2026-10-09: filed proposed.

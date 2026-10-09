@@ -43,6 +43,7 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the reproduction. Report-Format.md line 37 still contains 'planned BL-1002', and Test-Path Audit/Tools/Get-AuditorFingerprint.ps1 returned True.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: (Select-String ... 'planned BL-1002').LineNumber returned nothing; Test-Path Audit/Tools/Get-AuditorFingerprint.ps1 returned True. Report-Format.md now describes the fingerprint as 'from Audit/Tools/Get-AuditorFingerprint.ps1, BL-1002'.
 
 ## Log
 

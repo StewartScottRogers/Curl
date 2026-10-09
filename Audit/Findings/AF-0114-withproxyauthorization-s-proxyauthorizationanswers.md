@@ -3,8 +3,8 @@ id: AF-0114
 title: WithProxyAuthorization's proxyAuthorizationAnswersChallenge: true can become false with no test failing
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:WithProxyAuthorization-true:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:2838:true
 task: BL-1864
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: mechanical
+closed-by: 2026-10-09_0647.md
 ---
 # AF-0114 - WithProxyAuthorization's proxyAuthorizationAnswersChallenge: true can become false with no test failing
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the -Site reproduction: survived HttpProtocolHandler.cs:2838 true [WithProxyAuthorization] proxyAuthorizationAnswersChallenge: true -> false. It survived in the seed-0 sample as well.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the -Site reproduction: 'killed    Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:2838 true' (proxyAuthorizationAnswersChallenge: true -> false, member WithProxyAuthorization, outcome killed). Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

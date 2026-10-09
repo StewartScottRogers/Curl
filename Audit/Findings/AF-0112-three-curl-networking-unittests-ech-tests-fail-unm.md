@@ -3,8 +3,8 @@ id: AF-0112
 title: Three Curl.Networking.UnitTests ECH tests fail unmutated: TlsReader.Take advances past the end with no bounds check
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_0647.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0225.md, 2026-10-09_0647.md).
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:Take:failing-test
 reproduction: none
 task: BL-1862
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-09_0225.md, 2026-10-09_0647.md
 ---
 # AF-0112 - Three Curl.Networking.UnitTests ECH tests fail unmutated: TlsReader.Take advances past the end with no bounds check
 
@@ -43,8 +43,10 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo --filter "Name=Authenti
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the dotnet test reproduction on Curl.Networking.UnitTests: Passed! Failed 0, Passed 37, Total 37 (the three ECH tests' data rows). The sampled mutation baseline of Curl.Networking.UnitTests excluded no tests.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the dotnet test reproduction: 'Passed! - Failed: 0, Passed: 37, Skipped: 0, Total: 37' (the filtered ECH tests with their data rows). The Networking mutation baseline also ran with excludedTests empty.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0647.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0225.md, 2026-10-09_0647.md).
