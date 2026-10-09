@@ -72,7 +72,7 @@ internal static class TransferProxySelection
             return false;
         }
 
-        proxy = WithProxyUser(selected, options.ProxyCredentials);
+        proxy = WithProxyUser(WithHttp10Kind(selected, options.Proxy), options.ProxyCredentials);
         return true;
     }
 
@@ -102,7 +102,7 @@ internal static class TransferProxySelection
             return failure is null;
         }
 
-        proxy = WithProxyUser(selected ?? preProxy, options.ProxyCredentials);
+        proxy = WithProxyUser(WithHttp10Kind(selected, options.Proxy) ?? preProxy, options.ProxyCredentials);
         return true;
     }
 
@@ -174,6 +174,14 @@ internal static class TransferProxySelection
     /// <summary>The kind proxy option text with no scheme names: the option's own, or HTTP when none was given.</summary>
     private static ProxyKind KindWithoutSchemeOf(CommandLineProxy? proxyOption) =>
         proxyOption?.KindWithoutScheme ?? ProxyKind.Http;
+
+    /// <summary>
+    /// Keeps <c>--proxy1.0</c>'s HTTP/1.0 for a proxy whose text names <c>http://</c>, as curl's
+    /// <c>parse_proxy</c> leaves the proxy type as HTTP or HTTP/1.0 for that scheme (upstream test
+    /// 213 sends <c>CONNECT … HTTP/1.0</c> for <c>--proxy1.0 http://A</c>, BL-1855).
+    /// </summary>
+    private static ProxyEndpoint? WithHttp10Kind(ProxyEndpoint? proxy, CommandLineProxy? proxyOption) =>
+        proxy is { Kind: ProxyKind.Http } && proxyOption?.KindWithoutScheme == ProxyKind.Http10 ? proxy with { Kind = ProxyKind.Http10 } : proxy;
 
     /// <summary>Replaces the proxy's credential with the <c>-U</c> one, when both are present.</summary>
     private static ProxyEndpoint? WithProxyUser(ProxyEndpoint? proxy, NetworkCredential? proxyUser) =>

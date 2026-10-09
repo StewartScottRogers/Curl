@@ -818,6 +818,7 @@ public sealed class HttpProtocolHandler(
         return new TransferReport
         {
             UsedProxy = plan.Options.ForwardProxy is not null,
+            ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
             Timings = new TransferTimings(plan.Started, connect.Timings, failed, failed, failed, failed),
         };
     }

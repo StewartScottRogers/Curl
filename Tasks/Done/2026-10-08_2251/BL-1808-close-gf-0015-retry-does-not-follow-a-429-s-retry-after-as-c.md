@@ -8,7 +8,7 @@ depends-on: [BL-1842, BL-1843, BL-1844]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1808 — Close GF-0015: --retry does not follow a 429's Retry-After as curl does (resend, --fail, --retry-max-time warning)
 
@@ -35,11 +35,11 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test366`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1633`: Curl answers what curl 8.21.0 answers, `upstream test1633 passes`, so the item measures `match`.
-- [ ] `behaviour:test1634`: Curl answers what curl 8.21.0 answers, `upstream test1634 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test366`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `behaviour:test1633`: Curl answers what curl 8.21.0 answers, `upstream test1633 passes`, so the item measures `match`.
+- [x] `behaviour:test1634`: Curl answers what curl 8.21.0 answers, `upstream test1634 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -59,8 +59,12 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
   head ahead of the 200's; test366 makes one request only (Retry-After 200 > --retry-max-time
   10) and reference curl exits 0.
 
+- 2026-10-08 (lane 1): BL-1842, BL-1843 and BL-1844 are Done with unit tests pinning test1633, test1634 and test366; boxes ticked from theirs. No option changed, so --ai-help needed no change. Build clean and fast tests green.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Split into BL-1842, BL-1843 and BL-1844, one per gap item; waits on them
+- 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. BL-1842, BL-1843 and BL-1844 Done; all three GF-0015 items pinned by unit tests

@@ -258,7 +258,39 @@ internal static class CurlComposition
     /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
     /// <returns>The router.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, which the authenticators and security contexts write their choices to (BL-923); <see langword="null" /> for none.</param>
-    internal static RoutingSecurityContextFactory CreateSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog = null)
+    internal static RoutingSecurityContextFactory CreateSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog = null) =>
+        new(
+            OperatingSystem.IsWindows(),
+            new SystemSecurityContextFactory(),
+            CreateHandBuiltSecurityContextFactory(connector, datagramConnector, diagnosticLog),
+            diagnosticLog);
+
+    /// <summary>
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool)" />
+    /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
+    /// router, with NTLM sent to the hand-built context on every platform when
+    /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
+    /// </summary>
+    /// <param name="connector">Opens TCP connections to a KDC.</param>
+    /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
+    /// <param name="diagnosticLog">The run's diagnostic log.</param>
+    /// <param name="usesHandBuiltNtlm">Whether NTLM is answered by the hand-built context, as curl's non-SSPI build answers it.</param>
+    /// <returns>The factory.</returns>
+    internal static ISecurityContextFactory CreateDialingSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog, bool usesHandBuiltNtlm) =>
+        usesHandBuiltNtlm
+            ? new HandBuiltNtlmSecurityContextFactory(CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog), CreateHandBuiltSecurityContextFactory(connector, datagramConnector, diagnosticLog))
+            : CreateSecurityContextFactory(connector, datagramConnector, diagnosticLog);
+
+    /// <summary>
+    /// Creates ADR-0142's hand-built factory: curl's own NTLM, and SPNEGO and Kerberos over the
+    /// hand-built Kerberos whose KDC exchanges are described on
+    /// <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />.
+    /// </summary>
+    /// <param name="connector">Opens TCP connections to a KDC.</param>
+    /// <param name="datagramConnector">Opens UDP channels to a KDC.</param>
+    /// <param name="diagnosticLog">The run's diagnostic log.</param>
+    /// <returns>The factory.</returns>
+    private static HandBuiltSecurityContextFactory CreateHandBuiltSecurityContextFactory(IConnector connector, IDatagramConnector datagramConnector, IDiagnosticLog? diagnosticLog)
     {
         KerberosKdcSocketTransport kdcTransport = new(datagramConnector, connector, KdcReplyTimeout, TimeProvider.System);
         DnsServerResolver srvResolver = new(new DnsServerResolverOptions(null, null, null, null), TimeProvider.System);
@@ -271,11 +303,7 @@ internal static class CurlComposition
             kdcTransport,
             new KerberosKdcProxyHttpsTransport(connector, KdcProxyExchangeTimeout, TimeProvider.System),
             TimeProvider.System);
-        return new RoutingSecurityContextFactory(
-            OperatingSystem.IsWindows(),
-            new SystemSecurityContextFactory(),
-            new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource(), diagnosticLog),
-            diagnosticLog);
+        return new HandBuiltSecurityContextFactory(sources.CreateTicketSource(), TimeProvider.System, new SystemKerberosRandomSource(), new SystemNtlmRandomSource(), diagnosticLog);
     }
 
     /// <summary>
@@ -1184,6 +1212,11 @@ internal static class CurlComposition
     /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
     /// <param name="writesProgressMeter">Whether the runner writes curl's progress meter and the <c>-#</c> bar.</param>
     /// <param name="writeOutFileOpener">Opens the <c>-w</c> <c>%output{file}</c> targets; <see langword="null" /> for none.</param>
+    /// <param name="usesHandBuiltNtlm">
+    /// Whether NTLM, to the origin and to a CONNECT proxy, is answered by the hand-built context on
+    /// every platform, as curl's non-SSPI build answers it (BL-1858); otherwise ADR-0142's router
+    /// sends it to SSPI on Windows.
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1193,12 +1226,13 @@ internal static class CurlComposition
         IDnsResolver dnsResolver,
         IDatagramConnector datagramConnector,
         bool writesProgressMeter = false,
-        IWriteOutFileOpener? writeOutFileOpener = null)
+        IWriteOutFileOpener? writeOutFileOpener = null,
+        bool usesHandBuiltNtlm = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -1214,7 +1248,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads no environment variables, and the connector's <c>--resolve</c> entries
@@ -1227,6 +1261,7 @@ internal static class CurlComposition
     /// <param name="options">The option group.</param>
     /// <param name="runConnections">The run's connection cache.</param>
     /// <param name="diagnosticLog">The run's diagnostic log.</param>
+    /// <param name="usesHandBuiltNtlm">Whether NTLM is answered by the hand-built context on every platform (<see cref="CreateDialingSecurityContextFactory" />).</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -1235,7 +1270,8 @@ internal static class CurlComposition
         CookieEngine? cookies,
         CommandLineOptions options,
         ConnectionCache runConnections,
-        IDiagnosticLog diagnosticLog)
+        IDiagnosticLog diagnosticLog,
+        bool usesHandBuiltNtlm)
     {
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
@@ -1243,9 +1279,10 @@ internal static class CurlComposition
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, socks5SecurityContexts: proxyContexts);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, TimeProvider.System, runConnections);
-        proxyContexts.Bind(CreateSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog));
+        ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
+        proxyContexts.Bind(securityContexts);
         return new(
-            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.FromCommandLine(options), diagnosticLog: diagnosticLog)),
+            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.FromCommandLine(options), diagnosticLog: diagnosticLog)),
             [],
             cookies,
             new ProxySelector(_ => null),
