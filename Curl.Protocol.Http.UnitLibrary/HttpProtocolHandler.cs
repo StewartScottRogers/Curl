@@ -1110,7 +1110,7 @@ public sealed class HttpProtocolHandler(
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body) };
-            return FailedOutcome(plan, connect, upload, headReader, failure, failed);
+            return FailedOutcome(plan, reusedConnection: !newConnection, upload, headReader, failure, failed);
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
@@ -1611,17 +1611,18 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Builds the outcome of an exchange that failed with <paramref name="failure" />: as
     /// <see cref="StreamRefusedOutcome" /> says when the server refused its HTTP/3 stream; sent
-    /// again once on a fresh connection when its pooled connection died before the response
+    /// again once on a fresh connection when a connection that already carried a request died
+    /// before the response
     /// (<see cref="DiedBeforeResponse" />); and final otherwise.
     /// </summary>
-    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, ConnectResult connect, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
+    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, bool reusedConnection, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
     {
         if (failure.IsStreamRefused)
         {
             return StreamRefusedOutcome(plan, upload, failed, headReader.HasReceived);
         }
 
-        return DiedBeforeResponse(plan, connect, headReader, failure)
+        return DiedBeforeResponse(plan, reusedConnection, headReader, failure)
             ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
             : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
     }
@@ -1668,24 +1669,25 @@ public sealed class HttpProtocolHandler(
             && (!headReader.SwitchedProtocols || headReader.IsSwitchedToHttp2());
 
     /// <summary>
-    /// Decides whether a failed exchange was on a pooled connection that died while idle, so
+    /// Decides whether a failed exchange was on a reused connection that died while idle, so
     /// the request is sent again once on a fresh one, as curl 8.21.0 does (BL-336 Notes): the
-    /// connection was reused, it failed sending or receiving before any byte of the response
+    /// connection was reused, from the pool or by an earlier request of this transfer such as
+    /// the one a 401 answered (BL-1797), it failed sending or receiving before any byte of the response
     /// arrived, the request has not already been sent again for this reason, and its body, if
     /// any, is bytes that can be sent again.
     /// </summary>
-    private static bool DiedBeforeResponse(HttpRequestPlan plan, ConnectResult connect, HttpResponseHeadReader headReader, HttpTransferException failure) =>
+    private static bool DiedBeforeResponse(HttpRequestPlan plan, bool reusedConnection, HttpResponseHeadReader headReader, HttpTransferException failure) =>
         !headReader.HasReceived
             && failure.ExitCode is CurlExitCode.GotNothing or CurlExitCode.SendError or CurlExitCode.RecvError
-            && CanSendAgainOnFreshConnection(plan, connect);
+            && CanSendAgainOnFreshConnection(plan, reusedConnection);
 
     /// <summary>
     /// Decides whether <paramref name="plan" /> may be sent again on a fresh connection: it went
-    /// out on a pooled one, it has not already been sent again, and its body, if any, is bytes
+    /// out on a reused one, it has not already been sent again, and its body, if any, is bytes
     /// that can be sent again.
     /// </summary>
-    private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, ConnectResult connect) =>
-        connect.IsReused
+    private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, bool reusedConnection) =>
+        reusedConnection
             && !plan.SentOnFreshConnection
             && plan.Framing.Body is not StreamBody;
 

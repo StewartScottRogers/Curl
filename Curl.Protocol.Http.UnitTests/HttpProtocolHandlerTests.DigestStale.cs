@@ -85,6 +85,44 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// Upstream tests 64, 2061 and their kin (GF-0004, BL-1797): a Digest <c>401</c> that keeps
+    /// the connection open, after which the server closes it, has its answer written to the
+    /// dead connection, and curl 8.21.0 counts that connection reused, so it sends the answer
+    /// again once on a fresh connection.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_KeptConnectionClosedAfterDigestChallenge_SendsTheAnswerAgainOnAFreshConnection()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection first = new(chunkSize, StaleChallenge("a", stale: false, close: false));
+            TurnTakingConnection second = new(chunkSize, StaleOk);
+            QueueConnector connector = QueueConnector.For(first, second);
+            RecordingTransferEvents events = new();
+            MemoryStream output = new();
+            TransferContext context = StaleContext(output, events: events);
+            Diagnostics.Arrange("url, chunk size", $"{StaleUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "401 nonce a kept open then closed, 200 ok on a fresh connection");
+
+            TransferResult result = await new HttpProtocolHandler(connector, StaleAuthenticator("c1", "c2")).ExecuteAsync(context);
+
+            WriteResult(result);
+            WriteEvents("info lines", events.Info);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("connect count", 2, connector.Targets.Count);
+            Assert.HasCount(2, connector.Targets, $"Chunk size {chunkSize}");
+            Diagnostics.Act("second written", OneLine(second.Written));
+            StringAssert.StartsWith(second.Written, "GET / HTTP/1.1\r\n", $"Chunk size {chunkSize}");
+            StringAssert.Contains(second.Written, "Authorization: Digest username=\"u\", realm=\"r\", nonce=\"a\"", $"Chunk size {chunkSize}");
+            Diagnostics.Assert("died line", DiedRetrying, events.Info.Contains(DiedRetrying) ? DiedRetrying : "(missing)");
+            CollectionAssert.Contains(events.Info, DiedRetrying, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
+            Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
+    /// <summary>
     /// Measured: a run of stale challenges is answered every time - curl 8.21.0 answered 29 in a
     /// row, one per connection, and has no limit of its own - until a response ends it.
     /// </summary>
@@ -184,13 +222,14 @@ public sealed partial class HttpProtocolHandlerTests
             + (authorization is null ? string.Empty : "Authorization: " + authorization + "\r\n")
             + "User-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
 
-    private static TransferContext StaleContext(Stream output, HttpAuthSchemes schemes = HttpAuthSchemes.Digest) =>
+    private static TransferContext StaleContext(Stream output, HttpAuthSchemes schemes = HttpAuthSchemes.Digest, ITransferEvents? events = null) =>
         new()
         {
             Url = CurlUrl.Parse(StaleUrl),
             Output = output,
             Credentials = new NetworkCredential("u", "p"),
             Http = new HttpRequestOptions { AuthSchemes = schemes },
+            Events = events ?? NoTransferEvents.Instance,
         };
 
     private static RankedHttpAuthenticator StaleAuthenticator(params string[] clientNonces)

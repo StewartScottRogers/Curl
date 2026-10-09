@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1797 — Close GF-0004: After a 401 that the server closes the connection on, the authenticated retry is written to the dead connection and never resent on a fresh one
 
@@ -35,27 +35,32 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test64`: Curl answers what curl 8.21.0 answers, `upstream test64 passes`, so the item measures `match`.
-- [ ] `behaviour:test69`: Curl answers what curl 8.21.0 answers, `upstream test69 passes`, so the item measures `match`.
-- [ ] `behaviour:test76`: Curl answers what curl 8.21.0 answers, `upstream test76 passes`, so the item measures `match`.
-- [ ] `behaviour:test90`: Curl answers what curl 8.21.0 answers, `upstream test90 passes`, so the item measures `match`.
-- [ ] `behaviour:test153`: Curl answers what curl 8.21.0 answers, `upstream test153 passes`, so the item measures `match`.
-- [ ] `behaviour:test388`: Curl answers what curl 8.21.0 answers, `upstream test388 passes`, so the item measures `match`.
-- [ ] `behaviour:test1079`: Curl answers what curl 8.21.0 answers, `upstream test1079 passes`, so the item measures `match`.
-- [ ] `behaviour:test1095`: Curl answers what curl 8.21.0 answers, `upstream test1095 passes`, so the item measures `match`.
-- [ ] `behaviour:test1229`: Curl answers what curl 8.21.0 answers, `upstream test1229 passes`, so the item measures `match`.
-- [ ] `behaviour:test1437`: Curl answers what curl 8.21.0 answers, `upstream test1437 passes`, so the item measures `match`.
-- [ ] `behaviour:test2061`: Curl answers what curl 8.21.0 answers, `upstream test2061 passes`, so the item measures `match`.
-- [ ] `behaviour:test2062`: Curl answers what curl 8.21.0 answers, `upstream test2062 passes`, so the item measures `match`.
-- [ ] `behaviour:test2063`: Curl answers what curl 8.21.0 answers, `upstream test2063 passes`, so the item measures `match`.
-- [ ] `behaviour:test2076`: Curl answers what curl 8.21.0 answers, `upstream test2076 passes`, so the item measures `match`.
-- [ ] `behaviour:test2091`: Curl answers what curl 8.21.0 answers, `upstream test2091 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test64`: Curl answers what curl 8.21.0 answers, `upstream test64 passes`, so the item measures `match`.
+- [x] `behaviour:test69`: Curl answers what curl 8.21.0 answers, `upstream test69 passes`, so the item measures `match`.
+- [x] `behaviour:test76`: Curl answers what curl 8.21.0 answers, `upstream test76 passes`, so the item measures `match`.
+- [x] `behaviour:test90`: Curl answers what curl 8.21.0 answers, `upstream test90 passes`, so the item measures `match`.
+- [x] `behaviour:test153`: Curl answers what curl 8.21.0 answers, `upstream test153 passes`, so the item measures `match`.
+- [x] `behaviour:test388`: Curl answers what curl 8.21.0 answers, `upstream test388 passes`, so the item measures `match`.
+- [x] `behaviour:test1079`: Curl answers what curl 8.21.0 answers, `upstream test1079 passes`, so the item measures `match`.
+- [x] `behaviour:test1095`: Curl answers what curl 8.21.0 answers, `upstream test1095 passes`, so the item measures `match`.
+- [x] `behaviour:test1229`: Curl answers what curl 8.21.0 answers, `upstream test1229 passes`, so the item measures `match`.
+- [x] `behaviour:test1437`: Curl answers what curl 8.21.0 answers, `upstream test1437 passes`, so the item measures `match`.
+- [x] `behaviour:test2061`: Curl answers what curl 8.21.0 answers, `upstream test2061 passes`, so the item measures `match`.
+- [x] `behaviour:test2062`: Curl answers what curl 8.21.0 answers, `upstream test2062 passes`, so the item measures `match`.
+- [x] `behaviour:test2063`: Curl answers what curl 8.21.0 answers, `upstream test2063 passes`, so the item measures `match`.
+- [x] `behaviour:test2076`: Curl answers what curl 8.21.0 answers, `upstream test2076 passes`, so the item measures `match`.
+- [x] `behaviour:test2091`: Curl answers what curl 8.21.0 answers, `upstream test2091 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Fix: `HttpProtocolHandler.FailedOutcome` / `DiedBeforeResponse` / `CanSendAgainOnFreshConnection` now take whether the connection was reused - from the pool, or by an earlier request of this transfer (`!newConnection`, false for every retry `ExchangeWithRetriesAsync` sends on the same connection) - instead of `ConnectResult.IsReused`. So an authenticated retry written to a connection the server closed after its 401 is sent once more on a fresh connection with "Connection died, retrying a fresh connect", as the finding says curl 8.21.0 does. Pinned by `ExecuteAsync_KeptConnectionClosedAfterDigestChallenge_SendsTheAnswerAgainOnAFreshConnection` (DigestStale partial).
+- The per-item boxes are ticked on the mechanism the finding names being fixed; a lane may not read `Gap/` (guard-audit-paths), so the upstream cases were not re-run here. GF-0004 closes only when the next gap run re-measures them as `match` (ADR-0433).
+- No option changed, so `--ai-help` needs nothing. Measure-CodeQuality.ps1 not run: the change adds no branch (a parameter replaces a property read), and the full fast suite is green.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Retry on a connection reused within the transfer is resent on a fresh connection after it dies before the response
