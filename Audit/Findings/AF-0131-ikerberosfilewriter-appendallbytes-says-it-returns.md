@@ -42,6 +42,8 @@ Select-String -Path Curl.Kerberos.UnitLibrary/IKerberosFileWriter.cs -SimpleMatc
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: 'when no file exists there' no longer matches IKerberosFileWriter.cs; KerberosDiskFileWriter.cs:24 still catches IOException or UnauthorizedAccessException. The interface's returns doc now says false when 'no file exists there (none is created), or the file cannot be opened or written', which matches the implementation.
+
 ## Log
 
 - 2026-10-09: filed proposed.

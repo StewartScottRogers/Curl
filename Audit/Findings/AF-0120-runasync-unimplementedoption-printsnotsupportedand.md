@@ -43,6 +43,7 @@ dotnet test Curl.Console.UnitTests -c Release -nologo --filter "FullyQualifiedNa
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | not re-audited | Ran the dotnet test reproduction: Passed 2, Skipped 0, so the test was not Inconclusive. The detailed log shows 'ARRANGE first unimplemented option: path-as-is': it ran only because --path-as-is has no row in Curl.Cli.UnitLibrary/CommandLineOptionTable.cs (CurlOptionAliasTable.cs:173 lists it), and curl now refuses --path-as-is with exit 2. This is a product defect, not a fix: RunAsync_PathAsIs_SendsTheDotSegmentsUnsquashed fails on this tree. The test still has its 'if (name is null) Assert.Inconclusive(...)' guard (CurlCommandRunnerUnimplementedOptionTests.cs:48-51), so on a tree where every option is implemented it would be Inconclusive again. The result does not tell.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the dotnet test reproduction: 'Passed! - Failed: 0, Passed: 2, Skipped: 0, Total: 2'. Neither data row is Inconclusive or skipped. The test now runs --<OptionTheSchannelBuildLacks> and asserts exit 2 and curl's 'the installed libcurl version does not support this' stderr.
 
 ## Log
 

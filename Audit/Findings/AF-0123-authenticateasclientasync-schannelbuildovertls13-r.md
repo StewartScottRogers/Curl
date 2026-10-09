@@ -43,6 +43,7 @@ Select-String -Path Curl.Networking.UnitTests/SslStreamTlsProviderTests.SessionT
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Select-String shows SslStreamTlsProviderTests.SessionTickets.cs:28 Assert.IsTrue(messages.TrueForAll(message => !message.Sent && message.Bytes.Span[0] == 4)); with no count check. TrueForAll on an empty list is true, so a run reporting no ticket passes.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the Select-String reproduction: the Windows test (OSCondition Windows), now named ..._ReportsTheReceivedTicketsAndKeepsTheData, asserts Assert.IsNotEmpty(messages) before the TrueForAll check (SslStreamTlsProviderTests.SessionTickets.cs:32-33). The off-Windows twin that accepts an empty list is now honestly named ..._ReportsNothingButReceivedTicketsAndKeepsTheData.
 
 ## Log
 

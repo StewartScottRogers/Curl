@@ -43,6 +43,7 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'Inter
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the reproduction, and both lines matched. task-board.ps1:32 still says 'Interactive-only tasks do not count.', and task-board.ps1:468 still sets '$doing = @($tasks | Where-Object { $_.State -eq 'Doing' })'. The Capacity line adds $doing.Count, so every task in Doing is counted, interactive-only ones included. Only the ready tasks are filtered, through Get-LaneReadyTasks.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: 'Interactive-only tasks do not count' no longer matches; only line 474 '$doing = @($tasks | Where-Object { $_.State -eq 'Doing' })' matches. The capacity help (lines 28-33) now says 'Every task in Doing counts, interactive-only ones included; of the ready tasks, only lane-eligible ones do', which matches the code.
 
 ## Log
 

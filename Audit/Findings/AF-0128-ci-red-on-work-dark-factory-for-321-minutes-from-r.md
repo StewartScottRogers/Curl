@@ -44,6 +44,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | still reported
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the reproduction (-Since 2026-10-08): ciRedSpells lists 2026-10-08T05:41:00Z to 11:01:51Z, 320.85 minutes, runId 37733074018. It is the same incident, still inside a window that starts at a date. The only other spell, 37907205689, lasted 11.52 minutes.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: yes | Ran the reproduction (-Since 2026-10-08). ciRedSpells: 37733074018 320.85 min (the original incident, 711fbdf0), 94826414012 90 min (rests on impossible CI runs, reported as a separate finding), 37907205689 11.52 min, and 37931431648 30.42 min (2026-10-09T12:45:17Z to 13:15:42Z on ea846a2e). By mechanism over this window, CI on work/dark-factory again stayed red for over 30 minutes in one spell: run 37931431648, caused by lane-1 task BL-1876's edit to the guard file task-board.ps1 in shift 20261009-050349. The spell is much shorter than the original 321 minutes, but it still crosses the rule.
 
 ## Log
 

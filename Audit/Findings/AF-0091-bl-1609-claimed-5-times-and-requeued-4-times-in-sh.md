@@ -3,8 +3,8 @@ id: AF-0091
 title: BL-1609 claimed 5 times and requeued 4 times in shift 20261007-201432; one run was wasted because lanes may not run git stash list
 auditor: process
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces.
 key: process:logs:BL-1609:redone-work
 reproduction: none
 task: BL-1861
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0647.md
 ---
 # AF-0091 - BL-1609 claimed 5 times and requeued 4 times in shift 20261007-201432; one run was wasted because lanes may not run git stash list
 
@@ -44,8 +44,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1609 row since 2026-10-07; DarkFactory-20261007-201432-L*.log matched no file and BL-1609-20261007-201432-L9.jsonl does not exist. The logs are not in the copied folder.
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | The redone-work rule crossed again: BL-1850 claims 5, requeues 3, all on lane 9 of shift 20261009-001500 (00:15:10 to 00:49:40, 'Lane stalled; task sent back'). The denied git stash list does not recur: no .jsonl in the window contains 'has been denied'.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction. BL-1609 has no rows in this window, and the logs from shift 20261007-201432 (L*.log, BL-1609-...-L9.jsonl) are not in the copy, so those Select-String calls failed. By mechanism over -Since 2026-10-09 (20 tasks done): tasksClaimedMoreThanOnce 1 (BL-1875 with 2 claims), requeues 1, no task claimed 3 or more times or requeued twice, so the redone-work rule is not crossed. Searching every BL-*.jsonl in the window for 'git stash list[^"]*has been denied' matches only BL-1861-20261009-050349-L5.jsonl, and that match is the task file's own text quoting the pattern, not a refused command. BL-1861 was claimed once and finished Done.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces.

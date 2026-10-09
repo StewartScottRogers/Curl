@@ -43,6 +43,7 @@ Select-String -Path Curl.Protocol.Http.UnitTests/HttpLineReaderTests.cs -Pattern
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Select-String shows HttpLineReaderTests.cs:40 Assert.IsTrue("rest".StartsWith(Encoding.ASCII.GetString(rest), StringComparison.Ordinal)); "rest".StartsWith("") is true, so an empty rest passes.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the Select-String reproduction: no match for 'StartsWith(Encoding'. ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest now asserts Assert.AreEqual(expectedRest, Encoding.ASCII.GetString(rest)), with each data row pinning its exact rest ("", "", "rest").
 
 ## Log
 

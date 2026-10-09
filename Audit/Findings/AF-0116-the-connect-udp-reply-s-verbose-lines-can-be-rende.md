@@ -3,8 +3,8 @@ id: AF-0116
 title: The CONNECT-UDP reply's verbose lines can be rendered as a CONNECT reply's (forConnectUdp: true -> false) with no test failing
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:RequestUdpTunnelAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:244:true
 task: BL-1866
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: mechanical
+closed-by: 2026-10-09_0647.md
 ---
 # AF-0116 - The CONNECT-UDP reply's verbose lines can be rendered as a CONNECT reply's (forConnectUdp: true -> false) with no test failing
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the -Site reproduction: survived TcpConnector.UdpTunnel.cs:244 true [RequestUdpTunnelAsync] forConnectUdp: true -> false. It survived in the seed-0 sample as well.
+- 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the -Site reproduction for Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:244:true (member RequestUdpTunnelAsync): outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0647.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
