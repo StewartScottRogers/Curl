@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cryptography.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1869 — Fix AF-0119: Sntrup761Ring.Decrypt's fallback 'index < W' can become '<= W' with no test failing
 
@@ -41,12 +41,22 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- New `Curl.Cryptography.UnitTests/Sntrup761RingTests.cs` (the test project of the library in
+  `touches`, no other task affected): `Decrypt_DecryptionWithoutWeightW_GivesWOnesThenZeros`
+  decrypts an all-zero ciphertext (weight 0, so the fallback is taken) and pins the result to
+  exactly W ones then P - W zeros.
+- The lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit paths are guarded from
+  lanes), so the mutant was applied by hand: with `index <= W` the new test fails
+  ("Element at index 286 do not match"); reverted, it passes. The quality auditor's re-audit
+  confirms it with the tool.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Test pins Decrypt's weight-w fallback; the index <= W mutant now fails it
