@@ -3,8 +3,8 @@ id: AF-0072
 title: BL-1525 requeued twice in one shift (lanes 1 and 4), three claims in its task Log, each run ending short of a timing target with its code left only in the stash
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.
 key: process:logs:BL-1525:redone-work
 reproduction: none
 task: BL-1755
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0225.md
 ---
 # AF-0072 - BL-1525 requeued twice in one shift (lanes 1 and 4), three claims in its task Log, each run ending short of a timing target with its code left only in the stash
 
@@ -45,8 +45,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: yes | still reported
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: yes | Ran the reproduction: BL-1525 claims 3, outcome done, costUsd 1.7674. Select-String shows L1 claim 11:11:35, stash 11:25:10, REQUEUE 11:25:40 and L4 claim 11:25:58, stash 12:18:27, REQUEUE 12:20:37.
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1525 row, and DarkFactory-20261007-111121-L1.log and -L4.log do not exist in the log folder (only 2026-10-08 logs were copied). Could not tell.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | No 'stash' line in any lane trace this window, and no task requeued for missing a timing target. BL-1850's requeues were 'Lane stalled' and BL-1849's was 'Interactive only'. Shifts in the window finished 3 tasks.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.

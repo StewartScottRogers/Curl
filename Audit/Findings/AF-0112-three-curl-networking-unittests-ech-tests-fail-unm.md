@@ -42,6 +42,8 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo --filter "Name=Authenti
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the dotnet test reproduction on Curl.Networking.UnitTests: Passed! Failed 0, Passed 37, Total 37 (the three ECH tests' data rows). The sampled mutation baseline of Curl.Networking.UnitTests excluded no tests.
+
 ## Log
 
 - 2026-10-08: filed proposed.

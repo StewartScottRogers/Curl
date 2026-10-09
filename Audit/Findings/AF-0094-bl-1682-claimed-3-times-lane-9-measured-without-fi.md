@@ -3,8 +3,8 @@ id: AF-0094
 title: BL-1682 claimed 3 times; lane 9 measured without fixing and lane 2 found it waiting on BL-1715, which its depends-on did not name
 auditor: process
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.
 key: process:logs:BL-1682:redone-work
 reproduction: none
 task: BL-1772
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0225.md
 ---
 # AF-0094 - BL-1682 claimed 3 times; lane 9 measured without fixing and lane 2 found it waiting on BL-1715, which its depends-on did not name
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1682 row; DarkFactory-20261007-201432-L*.log matched no file. Could not tell.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | No task was requeued for an unnamed dependency. The window's requeues are BL-1850 (Lane stalled, 3 times) and BL-1849 (Interactive only: the gap office cache, once).
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.

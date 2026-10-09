@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the -Site reproduction: survived DerCertificateFile.cs:85 < [OuterValueEnd] 'contents.Length < 2' -> '<= 2'. It survived in the seed-0 sample as well.
+
 ## Log
 
 - 2026-10-08: filed proposed.

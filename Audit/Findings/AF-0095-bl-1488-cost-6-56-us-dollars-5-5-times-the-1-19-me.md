@@ -3,8 +3,8 @@ id: AF-0095
 title: BL-1488 cost 6.56 US dollars, 5.5 times the 1.19 median; lane 7's five Sonnet sub-agents used up the session budget
 auditor: process
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.
 key: process:logs:BL-1488:cost-outlier
 reproduction: none
 task: BL-1773
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0225.md
 ---
 # AF-0095 - BL-1488 cost 6.56 US dollars, 5.5 times the 1.19 median; lane 7's five Sonnet sub-agents used up the session budget
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. The top 5 since 2026-10-07 are BL-1858, BL-1833, BL-1730, BL-1735 and BL-1846 (all 1 claim, at most 2.54 USD; median 1.07). BL-1488's runs predate the copied logs, so this could not tell.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Window's costliest tasks: BL-1818 $1.49, BL-1859 $1.19, BL-1850 $0.99, BL-1849 $0.51. The median is $1.09 and none exceeds 3 times it.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.

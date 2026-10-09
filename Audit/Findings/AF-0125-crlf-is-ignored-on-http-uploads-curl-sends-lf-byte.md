@@ -42,6 +42,8 @@ $o="$env:TEMP\cf-crlf"; New-Item -ItemType Directory -Force $o | Out-Null; [IO.F
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | not re-audited | overlaps planted defect PD-303 in Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction: 'curl 133 / Curl 114'. curl sends 'Transfer-Encoding: chunked' and the chunk 'b\r\nfile body\r\n\r\n0\r\n\r\n'. Curl sends 'Content-Length: 10' and 'file body\n' with a bare LF, so --crlf is still ignored on HTTP upload.
+
 ## Log
 
 - 2026-10-08: filed proposed.
