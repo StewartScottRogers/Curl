@@ -44,3 +44,4 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrl query building (used by --ur
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
