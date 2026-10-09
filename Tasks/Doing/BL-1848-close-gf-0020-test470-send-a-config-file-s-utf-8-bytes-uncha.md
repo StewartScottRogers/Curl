@@ -34,3 +34,4 @@ On Windows, a value read from a `-K` config file reaches the wire as the file's 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
