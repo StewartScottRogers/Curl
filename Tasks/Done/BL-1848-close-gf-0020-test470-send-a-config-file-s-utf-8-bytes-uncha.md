@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1848 — Close GF-0020 test470: send a config file's UTF-8 bytes unchanged on Windows
 
@@ -25,13 +25,18 @@ On Windows, a value read from a `-K` config file reaches the wire as the file's 
 
 ## Acceptance criteria
 
-- [ ] A unit test pins that a header and `user-agent` value with U+201C/U+201D read from a config file are sent as their UTF-8 bytes on Windows, with curl's warning.
-- [ ] Command-line arguments still go out in the ANSI code page on Windows (existing tests stay green).
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] A unit test pins that a header and `user-agent` value with U+201C/U+201D read from a config file are sent as their UTF-8 bytes on Windows, with curl's warning.
+- [x] Command-line arguments still go out in the ANSI code page on Windows (existing tests stay green).
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+- Decision (ADR-0446): while a `-K` file is read on a Windows parse, `-H`, `--proxy-header`, `-A` and `-e` values are re-spelled (`ConfigFileWireText.Respell`) so the request side's ANSI encoder sends the file's UTF-8 bytes; the Unicode warning still sees the UTF-8 text. Kept unchanged when the code page cannot carry the bytes (double-byte code pages). Chosen over threading a per-value "from config" flag to the HTTP formatter: one seam in Cli, no change to the request side.
+- Not covered: a `-H @file`'s lines and other config-file values that are not HTTP head text; none is measured as a gap yet.
+- Tests: `CommandLineLeadingUnicodeWarningTests` (header, user-agent and referer bytes; command line unchanged; off Windows unchanged), `ConfigFileWireTextTests`, and `CurlCommandRunnerHeaderEncodingTests.RunAsync_ConfigFileHeaderAndUserAgentOnWindows_SendsTheFileUtf8Bytes` (Windows only: the wire bytes and the warning).
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Config-file -H, --proxy-header, -A and -e text goes out as the file's UTF-8 bytes on Windows (ADR-0446); build clean, fast tests green
