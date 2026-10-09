@@ -16,6 +16,8 @@
     { "number": 9, "kind": "Failed", "detail": "stdout differs at byte 4", "milliseconds": 15 },
     { "number": 10, "kind": "Skipped", "detail": "the harness does not act on <client><tool>", "milliseconds": 1 },
     { "number": 11, "kind": "Skipped", "detail": "the harness has no value for %PWD", "milliseconds": 1 },
-    { "number": 12, "kind": "Skipped", "detail": "the harness has no value for %HTTPSPORT", "milliseconds": 1 }
+    { "number": 12, "kind": "Skipped", "detail": "the harness has no value for %HTTPSPORT", "milliseconds": 1 },
+    { "number": 13, "kind": "Skipped", "detail": "the harness has no value for %PERL", "milliseconds": 1 },
+    { "number": 14, "kind": "Skipped", "detail": "the harness has no value for %PERL, %NOLISTENPORT", "milliseconds": 1 }
   ]
 }

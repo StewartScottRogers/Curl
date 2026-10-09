@@ -25,7 +25,10 @@
       5. <server> names a server other than
          http (or none)                       -> unmeasured, needs-server:<server>
       6. the harness's reason says it has no
-         value for a variable                 -> unmeasured, unknown-variable
+         value for %PERL alone (no perl was
+         found, BL-1839)                      -> unmeasured, no-perl
+         for any other variable (or %PERL
+         with others)                         -> unmeasured, unknown-variable
       7. anything else                        -> unmeasured, harness-unsupported
     A feature written !<name> asks for its absence and never fits rules 3 or 4. Feature
     names compare case-insensitively. A <server> line's first word is the server; any
@@ -136,6 +139,7 @@ function Get-SkippedVerdict($Tags, [string] $Detail, [string[]] $Available) {
     foreach ($server in $Tags.Servers) {
         if (-not ($HarnessServers -contains $server)) { return @('unmeasured', "needs-server:$server") }
     }
+    if ($Detail -eq 'the harness has no value for %PERL') { return @('unmeasured', 'no-perl') }
     if ($Detail -like 'the harness has no value for *') { return @('unmeasured', 'unknown-variable') }
     return @('unmeasured', 'harness-unsupported')
 }
@@ -229,6 +233,8 @@ function Invoke-SelfTest {
         Report (Is 'behaviour:test5' 'unmeasured' 'needs-server:ftp') 'rule 5: a server other than http gives unmeasured needs-server:<server>'
         Report (Is 'behaviour:test12' 'unmeasured' 'needs-server:https') 'rule 5: a certificate after the server name is not part of the reason'
         Report (Is 'behaviour:test6' 'unmeasured' 'unknown-variable') 'rule 6: a harness reason naming a variable gives unmeasured unknown-variable'
+        Report (Is 'behaviour:test13' 'unmeasured' 'no-perl') 'rule 6: no value for %PERL alone gives unmeasured no-perl'
+        Report (Is 'behaviour:test14' 'unmeasured' 'unknown-variable') 'rule 6: no value for %PERL with another variable stays unknown-variable'
         Report ((Is 'behaviour:test7' 'unmeasured' 'harness-unsupported') -and $s['behaviour:test7'].evidence -eq 'the harness does not act on <client><setenv>') 'rule 7: anything else gives unmeasured harness-unsupported with the harness reason as evidence'
         Report (Is 'behaviour:test8' 'match' $null) 'a passed case gives match'
         Report ((Is 'behaviour:test9' 'gap' $null) -and $s['behaviour:test9'].actual -eq 'stdout differs at byte 4' -and (@($s['behaviour:test9'].attributes.keywords) -join ',') -eq 'HTTP,HTTP GET') 'a failed case gives gap with its first difference and keywords'
@@ -238,8 +244,8 @@ function Invoke-SelfTest {
         Report ($null -eq $m.reference -and $m.referenceFallback -eq 'docs' -and $m.targetVersion -eq '9.9.9') 'with no reference, reference is null with the docs fallback'
         $c = $m.counts
         $reasonTotal = 0; foreach ($p in $m.reasons.PSObject.Properties) { $reasonTotal += [int]$p.Value }
-        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 12) 'counts add up to the case count'
-        Report ($reasonTotal -eq ($c.unmeasured + $c.excluded) -and $m.reasons.'libcurl-api' -eq 2 -and $m.reasons.'unknown-variable' -eq 3) 'the per-reason summary adds up to unmeasured plus excluded'
+        Report ($c.x -eq $c.match -and $c.y -eq ($c.match + $c.gap + $c.unmeasured) -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($m.items).Count -and @($m.items).Count -eq 14) 'counts add up to the case count'
+        Report ($reasonTotal -eq ($c.unmeasured + $c.excluded) -and $m.reasons.'libcurl-api' -eq 2 -and $m.reasons.'unknown-variable' -eq 4 -and $m.reasons.'no-perl' -eq 1) 'the per-reason summary adds up to unmeasured plus excluded'
 
         Invoke-Conversion $raw $data @('http', 'IPv6') 'curl 9.9.9 (fake) libcurl/9.9.9' '9.9.9' $out | Out-Null
         $r = [System.IO.File]::ReadAllText($out) | ConvertFrom-Json

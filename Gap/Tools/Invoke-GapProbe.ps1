@@ -32,7 +32,9 @@
     the variable.
 
 .PARAMETER WorkingDirectory
-    The folder both runs start in. Default: the current location.
+    The folder both runs start in. Default: a fresh empty folder under the system temp
+    directory, deleted after each run, so a command line that writes a file (-o, -D, -O)
+    never writes into the caller's directory (BL-1840).
 
 .PARAMETER StandardInput
     Bytes written to each run's standard input, which is then closed. Default: none.

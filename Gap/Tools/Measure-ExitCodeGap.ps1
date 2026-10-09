@@ -18,7 +18,7 @@
       "return" gives the returned text. Adjacent C string literals are concatenated and
       the escapes \" and \\ are decoded. The switch ends at "default:".
 
-    Inventory, <RepositoryRoot>/Gap/Upstream/<Version>/exitcodes.json, keys per code:
+    Inventory, <InventoryDirectory>/<Version>/exitcodes.json, keys per code:
     - exitcodes:<n>           the code exists (every code in libcurl-errors.md).
     - exitcodes:<n>:strerror  curl_easy_strerror's text (only codes with a case in
                               strerror.c).
@@ -57,8 +57,11 @@
 .PARAMETER Version
     The release version. Default: the version in Gap/Baselines/target.json.
 
+.PARAMETER InventoryDirectory
+    The folder the inventory is written under, as <InventoryDirectory>/<Version>/. Default: the Gap/Upstream
+    of the repository this script is in, never the measured -RepositoryRoot.
 .PARAMETER RepositoryRoot
-    The Curl tree read and written. Default: the repository this script is in.
+    The Curl tree measured: read, never written to. Default: the repository this script is in.
 
 .PARAMETER OutFile
     Where to write the area measurement, normally <run>/measurements/exitcodes.json.
@@ -83,6 +86,7 @@ param(
     [string] $UpstreamRoot,
     [string] $Version,
     [string] $RepositoryRoot,
+    [string] $InventoryDirectory,
     [string] $OutFile,
     [switch] $InventoryOnly,
     [switch] $SelfTest
@@ -260,9 +264,10 @@ function Get-Measurement($Inventory, [string] $Root) {
     }
 }
 
-function Invoke-ExitCodeGap([string] $Upstream, [string] $ReleaseVersion, [string] $Root, [string] $Out, [bool] $OnlyInventory) {
+function Invoke-ExitCodeGap([string] $Upstream, [string] $ReleaseVersion, [string] $Root, [string] $Out, [bool] $OnlyInventory, [string] $InventoryDirectory) {
+    if ([string]::IsNullOrEmpty($InventoryDirectory)) { $InventoryDirectory = Join-Path $Root 'Gap/Upstream' }
     $inventory = Get-Inventory $Upstream $ReleaseVersion
-    Write-Utf8File (Join-Path $Root "Gap/Upstream/$ReleaseVersion/exitcodes.json") ($inventory | ConvertTo-Json -Depth 8)
+    Write-Utf8File (Join-Path $InventoryDirectory "$ReleaseVersion/exitcodes.json") ($inventory | ConvertTo-Json -Depth 8)
     if ($OnlyInventory) { return $null }
     $measurement = Get-Measurement $inventory $Root
     Write-Utf8File $Out ($measurement | ConvertTo-Json -Depth 8)
@@ -279,7 +284,7 @@ function Invoke-SelfTest {
     try {
         Copy-Item -Path (Join-Path $fixtures 'repo') -Destination $temp -Recurse
         $out = Join-Path $temp 'measurements/exitcodes.json'
-        Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false | Out-Null
+        Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false $null | Out-Null
         $inventory = [System.IO.File]::ReadAllText((Join-Path $temp 'Gap/Upstream/9.9.9/exitcodes.json')) | ConvertFrom-Json
         $measurement = [System.IO.File]::ReadAllText($out) | ConvertFrom-Json
         $item = @{}; foreach ($i in $inventory.items) { $item[$i.key] = $i }
@@ -300,8 +305,13 @@ function Invoke-SelfTest {
         $c = $measurement.counts
         Report ($c.y -eq ($c.match + $c.gap + $c.unmeasured) -and $c.x -eq $c.match -and ($c.match + $c.gap + $c.unmeasured + $c.excluded) -eq @($measurement.items).Count) 'counts add up'
 
+        $elsewhere = Join-Path $temp 'inventory-elsewhere'
+        Remove-Item -LiteralPath (Join-Path $temp 'Gap/Upstream/9.9.9') -Recurse -Force
+        Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false $elsewhere | Out-Null
+        Report ((Test-Path -LiteralPath (Join-Path $elsewhere '9.9.9/exitcodes.json')) -and -not (Test-Path -LiteralPath (Join-Path $temp 'Gap/Upstream/9.9.9/exitcodes.json'))) 'the inventory goes to -InventoryDirectory, never into the measured tree'
+
         Remove-Item -LiteralPath (Join-Path $temp $ErrorTextSource)
-        Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false | Out-Null
+        Invoke-ExitCodeGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false $null | Out-Null
         $missing = [System.IO.File]::ReadAllText($out) | ConvertFrom-Json
         Report (@($missing.items | Where-Object { $_.state -eq 'unmeasured' -and $_.reason -eq 'source-not-found' }).Count -eq ($missing.counts.y)) 'a missing Curl source gives source-not-found'
     } finally {
@@ -321,7 +331,8 @@ if ([string]::IsNullOrEmpty($UpstreamRoot)) {
 }
 if (-not $InventoryOnly -and [string]::IsNullOrEmpty($OutFile)) { throw 'Give -OutFile, or -InventoryOnly to write the inventory alone.' }
 
-$result = Invoke-ExitCodeGap $UpstreamRoot $Version $RepositoryRoot $OutFile $InventoryOnly.IsPresent
+if ([string]::IsNullOrEmpty($InventoryDirectory)) { $InventoryDirectory = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'Gap/Upstream' }
+$result = Invoke-ExitCodeGap $UpstreamRoot $Version $RepositoryRoot $OutFile $InventoryOnly.IsPresent $InventoryDirectory
 if ($null -ne $result) {
     $c = $result.counts
     Write-Output "exitcodes: match $($c.match), gap $($c.gap), unmeasured $($c.unmeasured), excluded $($c.excluded), X/Y $($c.x)/$($c.y)"

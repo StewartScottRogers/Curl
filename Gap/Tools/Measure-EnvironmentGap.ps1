@@ -17,7 +17,7 @@
       in the document's order; each config-syntax rule below is an item when the sentence
       that states it is found in the document (whitespace folded to one space).
 
-    Inventory, <RepositoryRoot>/Gap/Upstream/<Version>/environment.json, keys:
+    Inventory, <InventoryDirectory>/<Version>/environment.json, keys:
     - environment:<NAME>                 kind variable, the name's case as upstream writes it.
     - environment:config-path:<n>        kind config-path, n the document's number.
     - environment:config-syntax:<slug>   kind config-syntax; q-disables is always present.
@@ -69,6 +69,9 @@
 .PARAMETER Candidate
     The Curl.Console binary. Default: Invoke-GapProbe.ps1's Get-GapCandidateCurl.
 
+.PARAMETER InventoryDirectory
+    The folder the inventory is written under, as <InventoryDirectory>/<Version>/. Default: the Gap/Upstream
+    of the repository this script is in, never the measured -RepositoryRoot.
 .PARAMETER RepositoryRoot
     The Curl tree written to. Default: the repository this script is in.
 
@@ -102,6 +105,7 @@ param(
     [string] $Version,
     [string] $Candidate,
     [string] $RepositoryRoot,
+    [string] $InventoryDirectory,
     [string] $OutFile,
     [switch] $InventoryOnly,
     [string] $ProbeResults,
@@ -440,9 +444,10 @@ function Get-Measurement($Inventory, [string] $Root, $Canned) {
     return $measurement
 }
 
-function Invoke-EnvironmentGap([string] $Upstream, [string] $ReleaseVersion, [string] $Root, [string] $Out, [bool] $OnlyInventory, [string] $CannedPath) {
+function Invoke-EnvironmentGap([string] $Upstream, [string] $ReleaseVersion, [string] $Root, [string] $Out, [bool] $OnlyInventory, [string] $CannedPath, [string] $InventoryDirectory) {
+    if ([string]::IsNullOrEmpty($InventoryDirectory)) { $InventoryDirectory = Join-Path $Root 'Gap/Upstream' }
     $inventory = Get-Inventory $Upstream $ReleaseVersion
-    Write-Utf8File (Join-Path $Root "Gap/Upstream/$ReleaseVersion/environment.json") ($inventory | ConvertTo-Json -Depth 8)
+    Write-Utf8File (Join-Path $InventoryDirectory "$ReleaseVersion/environment.json") ($inventory | ConvertTo-Json -Depth 8)
     if ($OnlyInventory) { return $null }
     $canned = $null
     if (-not [string]::IsNullOrEmpty($CannedPath)) { $canned = [System.IO.File]::ReadAllText($CannedPath) | ConvertFrom-Json }
@@ -461,7 +466,7 @@ function Invoke-SelfTest {
     $temp = New-TempFolder 'environment-selftest-'
     try {
         $out = Join-Path $temp 'measurements/environment.json'
-        Invoke-EnvironmentGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results.json') | Out-Null
+        Invoke-EnvironmentGap (Join-Path $fixtures 'upstream') '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results.json') $null | Out-Null
         $inventory = [System.IO.File]::ReadAllText((Join-Path $temp 'Gap/Upstream/9.9.9/environment.json')) | ConvertFrom-Json
         $measurement = [System.IO.File]::ReadAllText($out) | ConvertFrom-Json
         $item = @{}; foreach ($i in $inventory.items) { $item[$i.key] = $i }
@@ -517,7 +522,8 @@ if ([string]::IsNullOrEmpty($UpstreamRoot)) {
 }
 if (-not $InventoryOnly -and [string]::IsNullOrEmpty($OutFile)) { throw 'Give -OutFile, or -InventoryOnly to write the inventory alone.' }
 
-$result = Invoke-EnvironmentGap $UpstreamRoot $Version $RepositoryRoot $OutFile $InventoryOnly.IsPresent $ProbeResults
+if ([string]::IsNullOrEmpty($InventoryDirectory)) { $InventoryDirectory = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'Gap/Upstream' }
+$result = Invoke-EnvironmentGap $UpstreamRoot $Version $RepositoryRoot $OutFile $InventoryOnly.IsPresent $ProbeResults $InventoryDirectory
 if ($null -ne $result) {
     $c = $result.counts
     Write-Output "environment: match $($c.match), gap $($c.gap), unmeasured $($c.unmeasured), excluded $($c.excluded), X/Y $($c.x)/$($c.y)"

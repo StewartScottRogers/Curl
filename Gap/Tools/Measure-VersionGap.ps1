@@ -15,7 +15,7 @@
       Key features:<name> as upstream spells it; attribute name.
     introducedIn is null: neither document says.
 
-    Inventories, <RepositoryRoot>/Gap/Upstream/<Version>/protocols.json and features.json,
+    Inventories, <InventoryDirectory>/<Version>/protocols.json and features.json,
     hold only what the documents name, so they do not depend on the platform.
 
     Measurement, with a matched reference (Get-GapReferenceCurl names the version):
@@ -43,8 +43,11 @@
 .PARAMETER Version
     The release version. Default: the version in Gap/Baselines/target.json.
 
+.PARAMETER InventoryDirectory
+    The folder the inventory is written under, as <InventoryDirectory>/<Version>/. Default: the Gap/Upstream
+    of the repository this script is in, never the measured -RepositoryRoot.
 .PARAMETER RepositoryRoot
-    The Curl tree written to (its Gap/Upstream folder) and whose commit is recorded.
+    The Curl tree measured: read, never written to, and whose commit is recorded.
     Default: the repository this script is in.
 
 .PARAMETER Candidate
@@ -83,6 +86,7 @@ param(
     [string] $UpstreamRoot,
     [string] $Version,
     [string] $RepositoryRoot,
+    [string] $InventoryDirectory,
     [string] $Candidate,
     [string] $Reference,
     [string] $OutDirectory,
@@ -260,10 +264,11 @@ function Get-Measurement($Inventory, $Answers, [string] $Commit) {
     return $measurement
 }
 
-function Invoke-VersionGap([string] $Upstream, [string] $ReleaseVersion, [string] $Root, [string] $Out, [bool] $OnlyInventory, [string] $Canned, [string] $CandidatePath, [string] $ReferencePath) {
+function Invoke-VersionGap([string] $Upstream, [string] $ReleaseVersion, [string] $Root, [string] $Out, [bool] $OnlyInventory, [string] $Canned, [string] $CandidatePath, [string] $ReferencePath, [string] $InventoryDirectory) {
+    if ([string]::IsNullOrEmpty($InventoryDirectory)) { $InventoryDirectory = Join-Path $Root 'Gap/Upstream' }
     $inventories = Get-Inventories $Upstream $ReleaseVersion
     foreach ($area in 'protocols', 'features') {
-        Write-Utf8File (Join-Path $Root "Gap/Upstream/$ReleaseVersion/$area.json") ($inventories[$area] | ConvertTo-Json -Depth 8)
+        Write-Utf8File (Join-Path $InventoryDirectory "$ReleaseVersion/$area.json") ($inventories[$area] | ConvertTo-Json -Depth 8)
     }
     if ($OnlyInventory) { return $null }
     $answers = if ($Canned) { Get-CannedAnswers $Canned } else { Get-LiveAnswers $CandidatePath $ReferencePath $ReleaseVersion }
@@ -287,7 +292,7 @@ function Invoke-SelfTest {
         New-Item -ItemType Directory -Path $temp | Out-Null
         $upstream = Join-Path $fixtures 'upstream'
         $out = Join-Path $temp 'measurements'
-        Invoke-VersionGap $upstream '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results.json') $null $null | Out-Null
+        Invoke-VersionGap $upstream '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results.json') $null $null $null | Out-Null
         $read = { param([string] $Path) $state = @{}; foreach ($i in ([System.IO.File]::ReadAllText($Path) | ConvertFrom-Json).items) { $state[$i.key] = $i }; $state }
         $protocolInventory = & $read (Join-Path $temp 'Gap/Upstream/9.9.9/protocols.json')
         $featureInventory = & $read (Join-Path $temp 'Gap/Upstream/9.9.9/features.json')
@@ -312,7 +317,7 @@ function Invoke-SelfTest {
         $live = Get-LiveAnswers (Join-Path $PSScriptRoot 'Fixtures/probe/Write-ProbeEcho.ps1') $null '9.9.9'
         Report ($live.Candidate.VersionLine -like '*Arguments*') 'an explicit -Candidate is the binary the live answers come from'
 
-        Invoke-VersionGap $upstream '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results-docs.json') $null $null | Out-Null
+        Invoke-VersionGap $upstream '9.9.9' $temp $out $false (Join-Path $fixtures 'probe-results-docs.json') $null $null $null | Out-Null
         $docs = [System.IO.File]::ReadAllText((Join-Path $out 'protocols.json')) | ConvertFrom-Json
         $docProtocols = & $read (Join-Path $out 'protocols.json')
         $docFeatures = & $read (Join-Path $out 'features.json')
@@ -335,7 +340,8 @@ if ([string]::IsNullOrEmpty($UpstreamRoot)) {
 }
 if (-not $InventoryOnly -and [string]::IsNullOrEmpty($OutDirectory)) { throw 'Give -OutDirectory, or -InventoryOnly to write the inventories alone.' }
 
-$results = Invoke-VersionGap $UpstreamRoot $Version $RepositoryRoot $OutDirectory $InventoryOnly.IsPresent $ProbeResults $Candidate $Reference
+if ([string]::IsNullOrEmpty($InventoryDirectory)) { $InventoryDirectory = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'Gap/Upstream' }
+$results = Invoke-VersionGap $UpstreamRoot $Version $RepositoryRoot $OutDirectory $InventoryOnly.IsPresent $ProbeResults $Candidate $Reference $InventoryDirectory
 if ($null -ne $results) {
     foreach ($area in $results.Keys) {
         $c = $results[$area].counts
