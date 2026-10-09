@@ -3,12 +3,12 @@ id: AF-0133
 title: ConnectToMappings.Unbracket's second '&&' can become '||' with no test failing: --connect-to hosts ending in ']' are stripped, and ']' throws
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/ConnectToMappings.cs:Unbracket-and:surviving-mutant
 reproduction: none
-task: none
-tasks:
+task: BL-1885
+tasks: BL-1885
 found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.

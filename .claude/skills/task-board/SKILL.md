@@ -117,8 +117,10 @@ ones CI's audit guard (`Audit/Guard/Test-AuditPathsUntouched.ps1`) fails the fac
 branch for changing, so a lane must never be given one (BL-1209); that script's
 `-SelfTest` fails if this script's list misses any. A task is **interactive only** when it says `lane: no` or any of its
 `touches` is an audit path; `next` and `capacity` never offer it to anyone, and
-`status` shows it as interactive only. An ancestor such as `.claude` or `*` is not an
-audit path here; the PreToolUse hook (BL-997) and CI (BL-998) catch real writes.
+`status` shows it as interactive only. A folder that holds an audit path or guard file -
+`.claude`, `.claude/skills`, `.claude/agents`, `.github`, `.github/workflows` and the like - is
+one too, since such a touch lets a lane reach them (BL-1876); `*` is not. The PreToolUse hook
+(BL-997) also refuses a lane's Edit or Write of a guard file, and CI (BL-998) catches the rest.
 Interactive sessions, where the variable is absent, are never refused any of this.
 
 Do not work around a refusal. It is telling you something about the task.
