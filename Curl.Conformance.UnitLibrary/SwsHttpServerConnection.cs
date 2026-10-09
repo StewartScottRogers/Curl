@@ -19,8 +19,9 @@ namespace Curl.Conformance;
 /// <para>
 /// Once the server has closed its side, reads drain the replies already sent and then return
 /// 0, and writes are accepted and dropped unrecorded, as a socket write into a closed
-/// connection can succeed without the server ever reading it. A read with no reply waiting
-/// also returns 0: in memory the client is the only writer, so nothing else could arrive;
+/// connection can succeed without the server ever reading it. A read before the client's
+/// first write waits for that write, as sws blocks reading the request. After it, a read
+/// with no reply waiting returns 0: in memory the client is the only writer, so nothing else could arrive;
 /// except after <c>idle</c>, where it waits until cancelled, after <c>stream</c>, where it
 /// reads the streamed text without end, and on an upgraded connection, where it waits for the
 /// server to close it one second after the client last wrote.
@@ -58,6 +59,8 @@ internal sealed class SwsHttpServerConnection : IConnection
     private readonly List<byte> unservedRequestBytes = [];
 
     private readonly List<SwsServerSend> pendingSends = [];
+
+    private readonly TaskCompletionSource firstWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private TimeSpan serverBusyUntil;
 
@@ -119,6 +122,7 @@ internal sealed class SwsHttpServerConnection : IConnection
             ServeCompleteRequests();
         }
 
+        firstWrite.TrySetResult();
         return ValueTask.CompletedTask;
     }
 
@@ -160,8 +164,17 @@ internal sealed class SwsHttpServerConnection : IConnection
         return count;
     }
 
+    // sws blocks reading the request before it answers or closes, so a read before the client has
+    // written anything - a telnet session reads while its -T upload is still on its way - waits for
+    // the first write, then reads as if it came after it (BL-1853).
     private async ValueTask<int> ReadWithNothingSentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        if (!firstWrite.Task.IsCompleted)
+        {
+            await firstWrite.Task.WaitAsync(cancellationToken);
+            return await ReadAsync(buffer, cancellationToken);
+        }
+
         if (streaming)
         {
             return ReadStreamedText(buffer.Span);

@@ -70,7 +70,9 @@ unreadable `Content-Length`, which sws stops reading before the rules; after a r
 containing `swsbounce` the next request gets that part plus one; both states are kept across
 connections. A `CONNECT host:port HTTP/x.y` request with no number in its path is answered
 from `<connect>` / `<connectN>`, and the connection stays open for the tunnelled request.
-Otherwise a read with no reply waiting returns 0, because in memory nothing else can arrive.
+A read before the client's first write waits for that write, as sws blocks reading the
+request (a telnet `-T` session reads while its upload is on its way; BL-1853). Otherwise a
+read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands
 the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),

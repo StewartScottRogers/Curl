@@ -259,6 +259,36 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_BeforeTheFirstWrite_WaitsForTheRequestThenCloses()
+    {
+        Diagnostics.Arrange("reply", "empty, read before the request is written (test1327's telnet -T)");
+        var server = new SwsHttpServerConnector(Case(Reply("data", string.Empty)));
+        IConnection connection = await ConnectAsync(server);
+        Task<string> read = ReadAllAsync(connection);
+        bool waited = !read.IsCompleted;
+
+        await WriteAsync(connection, Get);
+        string reply = await read;
+
+        Assert.AreEqual("True", Observe("read waited", "True", waited.ToString()), "the read waits for the client's first write");
+        Assert.AreEqual(string.Empty, Observe("reply", string.Empty, reply));
+        Assert.AreEqual(Get, Observe("recorded", Get, Text(server.ReceivedBytes)), "the request is recorded before the close");
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_BeforeTheFirstWriteCancelled_ThrowsOperationCanceled()
+    {
+        Diagnostics.Arrange("read", "before any write, cancelled");
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "x\n"))));
+        using var cancellation = new CancellationTokenSource();
+        Task<string> read = ReadOnceAsync(connection, cancellation.Token);
+
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => read);
+    }
+
+    [TestMethod]
     public async Task EmptyPartWithNonewline_SendsNothing()
     {
         Diagnostics.Arrange("part", "data nonewline=\"yes\" with empty content");
