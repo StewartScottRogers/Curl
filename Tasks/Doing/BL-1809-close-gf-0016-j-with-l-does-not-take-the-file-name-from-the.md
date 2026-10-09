@@ -35,13 +35,26 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1642`: Curl answers what curl 8.21.0 answers, `upstream test1642 passes`, so the item measures `match`.
-- [ ] `behaviour:test1643`: Curl answers what curl 8.21.0 answers, `upstream test1643 passes`, so the item measures `match`.
-- [ ] `behaviour:test3036`: Curl answers what curl 8.21.0 answers, `reference curl exits 23; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1642`: Curl answers what curl 8.21.0 answers, `upstream test1642 passes`, so the item measures `match`.
+- [x] `behaviour:test1643`: Curl answers what curl 8.21.0 answers, `upstream test1643 passes`, so the item measures `match`.
+- [ ] `behaviour:test3036`: moved to BL-1849 (see Notes).
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md): no option added or changed.
 
 ## Notes
+
+- `-J -L` without `Content-Disposition`: `RemoteHeaderNameStream`, given `followsRedirects` (`-L`),
+  renames the not yet opened output file after each 3xx response's `Location` (last path segment,
+  query and fragment dropped, still percent-encoded, through `--output-dir` and the Windows
+  sanitizer as any remote name; `RedirectLocationFileName`), via the new
+  `DeferredOutputFileStream.RenameBeforeOpen`. A `Content-Disposition` name, once taken, wins;
+  a `Location` without a file name (`http://host`, `/dir/`) keeps the current name (a sensible
+  default: curl's own URL-name rule gives no name there either). Pinned by
+  `RemoteHeaderNameStreamTests` and `RedirectLocationFileNameTests`.
+- test3036 split into BL-1849 (interactive only): the upstream test data sits in the gap office's
+  cache, which the audit guard refuses to lanes, so this lane could not read what test3036 sends
+  and pin its stderr without guessing.
+- The gap closes only when a later gap analysis re-measures the items (ADR-0433).
 
 ## Log
 
