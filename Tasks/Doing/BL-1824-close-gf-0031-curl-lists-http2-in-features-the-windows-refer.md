@@ -44,3 +44,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
