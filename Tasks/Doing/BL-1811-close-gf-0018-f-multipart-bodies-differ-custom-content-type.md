@@ -47,3 +47,4 @@ In Curl.Cli.UnitLibrary's -F parser and the multipart writer it feeds: merge a u
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
