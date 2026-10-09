@@ -3,8 +3,8 @@ id: AF-0123
 title: AuthenticateAsClientAsync_SchannelBuildOverTls13_ReportsOnlyReceivedTicketsAndKeepsTheData passes when no ticket is reported at all
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/SslStreamTlsProviderTests.SessionTickets.cs:AuthenticateAsClientAsync_SchannelBuildOverTls13_ReportsOnlyReceivedTicketsAndKeepsTheData:weak-assertion
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ Select-String -Path Curl.Networking.UnitTests/SslStreamTlsProviderTests.SessionT
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
