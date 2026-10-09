@@ -37,8 +37,11 @@ namespace Curl.Conformance;
 /// </remarks>
 public sealed class SwsHttpServerConnector : IConnector
 {
-    // Each connection gets the next port above this one as its local end point, so %{local_port} is a number.
-    private const int FirstLocalPort = 49151;
+    // Each connection gets the next port of the ephemeral range (49152 to 65535) as its local end point, wrapping round
+    // after the last, so %{local_port} is a number however many connections a run opens.
+    private const int FirstLocalPort = 49152;
+
+    private const int LocalPortCount = 65536 - FirstLocalPort;
 
     private readonly SwsServerRecording recording = new();
 
@@ -97,7 +100,7 @@ public sealed class SwsHttpServerConnector : IConnector
     /// </summary>
     public void Abandon() => abandonment.Abandon();
 
-    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on; it fails only after <see cref="Abandon"/>.</summary>
+    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on, wrapping round after 65535; it fails only after <see cref="Abandon"/>.</summary>
     /// <param name="target">Ignored: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
@@ -107,7 +110,7 @@ public sealed class SwsHttpServerConnector : IConnector
         abandonment.ThrowIfAbandoned();
         return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)
         {
-            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + Interlocked.Increment(ref connectionsOpened)),
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
         }));
     }
 

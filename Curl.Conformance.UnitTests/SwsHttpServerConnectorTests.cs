@@ -48,6 +48,21 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ConnectionAfterPort65535_WrapsRoundTo49152()
+    {
+        Diagnostics.Arrange("connections opened first", "16384");
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+        for (int opened = 0; opened < 16384; opened++)
+        {
+            await ConnectAsync(server);
+        }
+
+        IConnection wrapped = await ConnectAsync(server);
+
+        Assert.AreEqual("127.0.0.1:49152", Observe("local end point", "127.0.0.1:49152", $"{wrapped.LocalEndPoint}"));
+    }
+
+    [TestMethod]
     [DataRow("data crlf=\"headers\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\n")]
     [DataRow("data crlf=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r\n")]
     [DataRow("data crlf=\"yes\" nonewline=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r")]
