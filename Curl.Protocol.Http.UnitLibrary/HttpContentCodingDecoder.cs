@@ -54,6 +54,15 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
 
     private const byte DeflateMethod = 8;
 
+    private const int StoredBlockType = 0;
+
+    private const int ReservedBlockType = 3;
+
+    /// <summary>
+    /// A raw stored block's first byte and its LEN and NLEN fields.
+    /// </summary>
+    private const int StoredBlockHeaderLength = 5;
+
     private readonly HttpContentInput input = new();
 
     private readonly byte[] output = new byte[OutputSize];
@@ -252,7 +261,39 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
             return null;
         }
 
-        return IsZLibHeader(first) ? ZLib(first[0]) : new DeflateStream(input, CompressionMode.Decompress);
+        return IsZLibHeader(first) ? ZLib(first[0]) : RawDeflate(first);
+    }
+
+    /// <summary>
+    /// Chooses a raw deflate stream for a <c>deflate</c> body without a zlib header, as curl
+    /// does when zlib refuses the header, first failing with zlib's own text for a first block
+    /// zlib refuses at once: a reserved block type, or a stored block whose length and its
+    /// complement disagree (upstream test223, BL-1810).
+    /// </summary>
+    private DeflateStream? RawDeflate(ReadOnlySpan<byte> first)
+    {
+        int blockType = (first[0] >> 1) & 0x03;
+        if (blockType == ReservedBlockType)
+        {
+            throw Corrupt(HttpTransferMessages.InvalidBlockType);
+        }
+
+        if (blockType == StoredBlockType)
+        {
+            if (first.Length < StoredBlockHeaderLength)
+            {
+                return null;
+            }
+
+            int length = first[1] | (first[2] << 8);
+            int complement = first[3] | (first[4] << 8);
+            if (length != (~complement & 0xFFFF))
+            {
+                throw Corrupt(HttpTransferMessages.InvalidStoredBlockLengths);
+            }
+        }
+
+        return new DeflateStream(input, CompressionMode.Decompress);
     }
 
     private GZipStream Gzip(byte method)

@@ -92,6 +92,68 @@ public sealed class HttpContentDecoderTests
     }
 
     /// <summary>
+    /// curl's identity coding answers to <c>none</c> as well, so the body passes through
+    /// (upstream test328, BL-1810).
+    /// </summary>
+    [TestMethod]
+    [DataRow("none")]
+    [DataRow("NONE, identity")]
+    public void For_NoneCoding_ReturnsNull(string contentEncoding)
+    {
+        Diagnostics.Arrange("Content-Encoding", contentEncoding);
+
+        HttpContentDecoder? decoder = HttpContentDecoder.For([Header("Content-Encoding", contentEncoding)]);
+
+        Diagnostics.Act("decoder returned", decoder is not null);
+        Diagnostics.Assert("decoder returned", false, decoder is not null);
+        Assert.IsNull(decoder);
+    }
+
+    /// <summary>
+    /// A <c>deflate</c> body without a zlib header is read as raw deflate, as curl does, and a
+    /// first block zlib refuses at once fails with zlib's own text (upstream test223, BL-1810).
+    /// </summary>
+    [TestMethod]
+    [DataRow("58 DA 18 49 82", "Error while processing content unencoding: invalid stored block lengths", DisplayName = "stored block lengths disagree")]
+    [DataRow("07 00", "Error while processing content unencoding: invalid block type", DisplayName = "reserved block type")]
+    public async Task WriteAsync_BrokenDeflateHeader_ThrowsExit61WithZlibText(string encodedHex, string expectedMessage)
+    {
+        using HttpContentDecoder decoder = HttpContentDecoder.For([Header("Content-Encoding", "deflate")])!;
+        MemoryStream output = new();
+        Diagnostics.Arrange("encoded", encodedHex);
+
+        HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await decoder.WriteAsync(output, Bytes(encodedHex), CancellationToken.None));
+
+        Diagnostics.Act("exit", $"{thrown.ExitCode}: {thrown.Message}");
+        Diagnostics.Assert("message", expectedMessage, thrown.Message);
+        Assert.AreEqual(CurlExitCode.BadContentEncoding, thrown.ExitCode);
+        Assert.AreEqual(expectedMessage, thrown.Message);
+        Assert.AreEqual(0L, output.Length);
+    }
+
+    /// <summary>
+    /// A raw stored block is held until its length and complement have arrived, then decoded.
+    /// </summary>
+    [TestMethod]
+    public async Task WriteAsync_RawStoredBlockByteAtATime_WritesItsContent()
+    {
+        using HttpContentDecoder decoder = HttpContentDecoder.For([Header("Content-Encoding", "deflate")])!;
+        byte[] encoded = Bytes("01 02 00 FD FF 68 69");
+        MemoryStream output = new();
+        Diagnostics.Arrange("encoded", Convert.ToHexString(encoded));
+
+        foreach (byte value in encoded)
+        {
+            await decoder.WriteAsync(output, new[] { value }, CancellationToken.None);
+        }
+
+        Diagnostics.Act("decoded", Convert.ToHexString(output.ToArray()));
+        Diagnostics.Assert("decoded", "6869", Convert.ToHexString(output.ToArray()));
+        Assert.AreEqual("6869", Convert.ToHexString(output.ToArray()));
+    }
+
+    /// <summary>
     /// Measured: <c>Content-Encoding: compress</c> gives
     /// <c>curl: (61) Unrecognized content encoding type</c>.
     /// </summary>

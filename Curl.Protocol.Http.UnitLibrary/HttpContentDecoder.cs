@@ -8,8 +8,8 @@ namespace Curl.Protocol.Http;
 /// </summary>
 /// <remarks>
 /// Every Content-Encoding header's comma-separated codings are read in order, compared
-/// without regard to case, with blanks around each and empty items ignored; <c>identity</c>
-/// is skipped, <c>gzip</c>, <c>x-gzip</c>, <c>deflate</c> and <c>br</c> are decoded, last
+/// without regard to case, with blanks around each and empty items ignored; <c>identity</c> and <c>none</c>
+/// are skipped, <c>gzip</c>, <c>x-gzip</c>, <c>deflate</c> and <c>br</c> are decoded, last
 /// applied first, and any other coding is exit 61
 /// <see cref="HttpTransferMessages.UnrecognizedContentEncoding" /> once the first body byte
 /// arrives: an empty body with an unrecognized coding is no error, as measured. For
@@ -65,13 +65,14 @@ internal sealed class HttpContentDecoder : IDisposable
     /// <summary>
     /// Builds the decoder for <paramref name="codings" />, in the order the server applied
     /// them: the Content-Encoding codings, then, for <c>--tr-encoding</c>, the Transfer-Encoding
-    /// codings other than <c>chunked</c> (BL-315 Notes). <c>identity</c> is skipped, and the
-    /// last applied is decoded first.
+    /// codings other than <c>chunked</c> (BL-315 Notes). <c>identity</c> and its alias
+    /// <c>none</c> are skipped, as curl's identity coding does (upstream test328, BL-1810), and
+    /// the last applied is decoded first.
     /// </summary>
     /// <param name="codings">The codings, each without blanks.</param>
     /// <returns>The decoder, or <see langword="null" /> when there is no coding to decode.</returns>
     internal static HttpContentDecoder? ForCodings(IEnumerable<string> codings) =>
-        Of([.. codings.Where(coding => !Is(coding, "identity")).Select(CodingOf)]);
+        Of([.. codings.Where(coding => !Is(coding, "identity") && !Is(coding, "none")).Select(CodingOf)]);
 
     /// <summary>
     /// Lists every Content-Encoding header's codings in order, without blanks or empty items.
