@@ -44,3 +44,4 @@ In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
