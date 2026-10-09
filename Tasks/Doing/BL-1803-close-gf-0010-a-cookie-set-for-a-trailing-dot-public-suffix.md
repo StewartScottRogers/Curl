@@ -45,3 +45,4 @@ In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
