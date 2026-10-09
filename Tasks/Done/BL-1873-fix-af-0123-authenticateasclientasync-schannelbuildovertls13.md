@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1873 — Fix AF-0123: AuthenticateAsClientAsync_SchannelBuildOverTls13_ReportsOnlyReceivedTicketsAndKeepsTheData passes when no ticket is reported at all
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Measured on Windows: the Schannel test server sends one NewSessionTicket after a TLS 1.3 handshake ("received type 4"). Whether OpenSSL (Linux) or macOS servers send one could not be measured from a Windows lane, so the test is split by platform: the Windows test (renamed `..._ReportsTheReceivedTicketsAndKeepsTheData`) adds `Assert.IsNotEmpty(messages)` beside the TrueForAll; the non-Windows test (`..._ReportsNothingButReceivedTicketsAndKeepsTheData`) keeps only the TrueForAll, and its name now says exactly that an empty list passes.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. TLS 1.3 Schannel-build ticket test now asserts at least one ticket on Windows; off Windows its name says an empty list passes
