@@ -44,3 +44,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, drop GSS-API from the Windows Featur
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
