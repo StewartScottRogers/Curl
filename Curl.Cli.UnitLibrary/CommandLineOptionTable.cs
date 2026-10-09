@@ -866,7 +866,42 @@ public static class CommandLineOptionTable
     private static CommandLineRefusal? AddUrl(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
         value.Length == 0
             ? CommandLineRefusal.BlankArgument(spelledOption)
-            : options.AddUrl(value, spelledOption);
+            : value[0] == '@'
+                ? AddUrlsFromFile(options, value[1..], spelledOption, dataFileReader)
+                : options.AddUrl(value, spelledOption);
+
+    /// <summary>
+    /// Adds every URL in the file a <c>--url @file</c> value names, or standard input for <c>@-</c>, one
+    /// per line, each saved under its remote name, as curl 8.21.0's <c>parse_url</c> does (BL-1804). A
+    /// line that is blank, or whose first non-blank character is <c>#</c>, is skipped, as curl's
+    /// <c>my_get_line</c> skips it; a file that cannot be opened is refused with
+    /// <see cref="CommandLineRefusal.UrlFileUnreadable"/>.
+    /// </summary>
+    private static CommandLineRefusal? AddUrlsFromFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader)
+    {
+        byte[] contents;
+        if (file == "-")
+        {
+            contents = dataFileReader.ReadStandardInput();
+        }
+        else if (!dataFileReader.TryReadFile(file, out contents))
+        {
+            return CommandLineRefusal.UrlFileUnreadable(spelledOption);
+        }
+
+        foreach (string line in System.Text.Encoding.UTF8.GetString(contents).Split('\n'))
+        {
+            string url = line.TrimEnd('\r');
+            string content = url.TrimStart(' ', '\t');
+            CommandLineRefusal? refusal = content.Length == 0 || content[0] == '#' ? null : options.AddUrl(url, spelledOption, usesRemoteName: true);
+            if (refusal is not null)
+            {
+                return refusal;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Records an <c>--etag-save</c> or <c>--etag-compare</c> file as a <see cref="CommandLineOption.FileName"/>

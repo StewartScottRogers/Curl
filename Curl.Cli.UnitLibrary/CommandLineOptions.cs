@@ -2214,11 +2214,17 @@ public sealed class CommandLineOptions
     /// </summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
     /// <param name="spelledOption">The argument as typed: the URL itself, or <c>--url</c>.</param>
+    /// <param name="usesRemoteName">
+    /// <see langword="true"/> for a URL read from a <c>--url @file</c>, which curl 8.21.0 saves under its
+    /// remote name as if <c>-O</c> were paired with it; a <c>-o</c> paired with it still wins.
+    /// </param>
     /// <returns><see langword="null"/>, or the refusal of a second URL beside an etag option.</returns>
-    internal CommandLineRefusal? AddUrl(string url, string spelledOption)
+    internal CommandLineRefusal? AddUrl(string url, string spelledOption, bool usesRemoteName = false)
     {
         urls.Add(url);
-        (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
+        UrlOutput output = urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput();
+        output.Url = url;
+        output.UsesRemoteName |= usesRemoteName;
         return RefuseEtagOptionsWithSeveralUrls(spelledOption);
     }
 

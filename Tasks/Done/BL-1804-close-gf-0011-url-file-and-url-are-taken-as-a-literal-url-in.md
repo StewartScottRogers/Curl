@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1804 — Close GF-0011: --url @file and --url @- are taken as a literal URL instead of a list of URLs to read
 
@@ -35,15 +35,23 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test488`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test489`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test2012`: Curl answers what curl 8.21.0 answers, `upstream test2012 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test488`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `behaviour:test489`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `behaviour:test2012`: Curl answers what curl 8.21.0 answers, `upstream test2012 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Behaviour taken from curl's own source (`parse_url`, `add_url`, `my_get_line` in src/tool_getparam.c and src/tool_parsecfg.c) and upstream tests 488, 489 and 2012: each line of the file (or stdin for `@-`) is one URL, a line that is blank or whose first non-blank character is `#` is skipped, and each URL is saved under its remote name (`useremote`) unless a `-o` is paired with it, `-o` and `-T` pairing in order as for any URL.
+- A file that cannot be opened is refused with exit 26 and only `curl: option --url: error encountered when reading a file`: `parse_url` prints no `Failed to open` line, so it gets its own `CommandLineRefusal.UrlFileUnreadable`.
+- Default taken: a trailing CR is dropped from each line (curl opens the file in text mode, which drops it on Windows), and the bytes are read as UTF-8, as other `@file` values are.
+- `--ai-help`: no change needed; its `--url` section is curl 8.21.0's own manual text, which this change does not alter.
+- Left for BL-1832: curl also sets `noglob` on file URLs; Curl still globs them per option group, which needs `Curl.Console` (outside this task's touches). The three upstream tests use no glob characters in their URLs.
+- The gap closes only when a later gap analysis re-measures the three items; the lane cannot read `Gap/` to rerun it.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. --url @file and --url @- add one URL per line, each saved under its remote name; per-URL noglob left to BL-1832.
