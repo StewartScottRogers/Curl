@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
+touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1817 — Close GF-0024: --url-query passes a user's lower-case %3d through instead of normalising it to %3D
 
@@ -35,13 +35,17 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrl query building (used by --ur
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1221`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1221`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- The query is appended by `QueryUrl` in Curl.Cli.UnitLibrary (for both `--url-query` and `-G`), not by CurlUrl in Curl.Protocol.Abstractions, so the fix went there; Curl.Cli.UnitLibrary and Curl.Cli.UnitTests were added to `touches` (no task in Doing on origin/work/dark-factory names them).
+- Behaviour: curl 8.21.0 sets the appended query with `CURLU_APPENDQUERY`, which upper-cases the hex digits of each complete `%XX` escape in the appended part only; test1221 expects `&%3D%3D`. The URL's own query and incomplete escapes (`%zz`, `%3g`, a trailing `%a`) are left as they are. Pinned in `QueryUrlTests`. Upstream test1221 itself could not be read from this lane (the audit guard refuses paths under `gap/`); the evidence in the finding was used.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. --url-query and -G upper-case the appended query's percent escapes as curl 8.21.0 does (test1221)
