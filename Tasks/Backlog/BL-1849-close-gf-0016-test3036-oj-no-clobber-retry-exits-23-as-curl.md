@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-08
 completed:
@@ -30,7 +31,10 @@ Curl behaves as curl 8.21.0 does for upstream test3036 (`--no-clobber --output-d
 
 ## Notes
 
+- 2026-10-09 (dark factory lane 2): the Context already says this task is interactive only, but the front matter had no `lane: no`, so `next` offered it to a lane. The server exchange test3036 needs (what the server sends, the expected stderr) is only in the gap office's upstream cache, which lanes must not read, and guessing it would pin unmeasured output. Added `lane: no` and returned it to Backlog untouched; no code was changed. An interactive session should read the test case, reproduce it with `Record-CurlExchange.ps1` against the local curl 8.21.0 (Schannel), and pin it.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Interactive only: test3036's exchange is in the gap office's upstream cache, which lanes may not read; added lane: no
