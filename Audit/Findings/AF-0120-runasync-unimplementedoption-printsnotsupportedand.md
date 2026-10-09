@@ -3,8 +3,8 @@ id: AF-0120
 title: RunAsync_UnimplementedOption_PrintsNotSupportedAndExitsTwoWithoutATransfer is always Inconclusive: no option is unimplemented, so it never runs
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Console.UnitTests/CurlCommandRunnerUnimplementedOptionTests.cs:RunAsync_UnimplementedOption_PrintsNotSupportedAndExitsTwoWithoutATransfer:ignored-test
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ dotnet test Curl.Console.UnitTests -c Release -nologo --filter "FullyQualifiedNa
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
