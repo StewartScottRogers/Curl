@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-1888
+tasks: BL-1888
 found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md

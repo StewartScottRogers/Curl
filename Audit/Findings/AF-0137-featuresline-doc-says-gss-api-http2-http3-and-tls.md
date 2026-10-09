@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Cli.UnitLibrary/CurlVersionText.cs:FeaturesLine:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-1889
+tasks: BL-1889
 found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md

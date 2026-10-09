@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Authentication.UnitTests/NetrcFileTests.cs:Find_SyntaxError_CarriesCurlsMessageAndExitCode:no-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-1886
+tasks: BL-1886
 found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md

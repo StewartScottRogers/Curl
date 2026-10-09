@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpH2cUpgradeConnection.cs:SwitchAsync-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpH2cUpgradeConnection.cs:179:>
-task: none
-tasks:
+task: BL-1884
+tasks: BL-1884
 found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
