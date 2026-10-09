@@ -1,3 +1,4 @@
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -40,6 +41,49 @@ public static class InProcessCurl
             standardError,
             standardInput,
             connector,
+            datagramConnector,
+            writesProgressMeter: true,
+            writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(arguments);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="arguments" /> as curl would over the production <see cref="TcpConnector" />,
+    /// built from the command line as the executable builds it, with only the TCP dial and the name
+    /// resolver injected, so a CONNECT tunnel, a HAProxy <c>PROXY</c> line, the <c>.onion</c> refusal
+    /// and the <c>--resolve</c> and <c>--connect-to</c> entries reach the caller's server as they reach a
+    /// real one (BL-1831). Returns curl's exit code.
+    /// </summary>
+    /// <param name="arguments">The command line, without the program name.</param>
+    /// <param name="standardOutput">Where curl writes its standard output.</param>
+    /// <param name="standardError">Where curl writes its standard error.</param>
+    /// <param name="standardInput">What curl reads as its standard input.</param>
+    /// <param name="tcpDialer">Opens every plaintext TCP connection the connector dials.</param>
+    /// <param name="dnsResolver">Resolves every host name the connector looks up.</param>
+    /// <param name="datagramConnector">Opens every UDP channel the transfers make.</param>
+    /// <returns>The exit code curl would end with.</returns>
+    /// <exception cref="ArgumentNullException">Any argument is <see langword="null" />.</exception>
+    public static Task<int> RunAsync(
+        IReadOnlyList<string> arguments,
+        Stream standardOutput,
+        Stream standardError,
+        Stream standardInput,
+        ITcpDialer tcpDialer,
+        IDnsResolver dnsResolver,
+        IDatagramConnector datagramConnector)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(standardOutput);
+        ArgumentNullException.ThrowIfNull(standardError);
+        ArgumentNullException.ThrowIfNull(standardInput);
+        ArgumentNullException.ThrowIfNull(tcpDialer);
+        ArgumentNullException.ThrowIfNull(dnsResolver);
+        ArgumentNullException.ThrowIfNull(datagramConnector);
+        return CurlComposition.CreateRunner(
+            standardOutput,
+            standardError,
+            standardInput,
+            tcpDialer,
+            dnsResolver,
             datagramConnector,
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(arguments);

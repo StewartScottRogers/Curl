@@ -1170,6 +1170,90 @@ internal static class CurlComposition
     }
 
     /// <summary>
+    /// Creates the runner with the production <see cref="TcpConnector" /> each option group gets -
+    /// <see cref="CreateTcpConnector" /> over the group's options, its CONNECT tunnel, HAProxy line,
+    /// <c>.onion</c> refusal, <c>--resolve</c> and <c>--connect-to</c> - with only the TCP dial and
+    /// the name resolver replaced, so those reach an in-process server as they reach a real one (BL-1831).
+    /// Each group's connector sits behind <see cref="CreatePoolingConnector" /> over one run cache.
+    /// </summary>
+    /// <param name="standardOutput">Where a transfer without <c>-o</c> writes its bytes.</param>
+    /// <param name="standardError">Where the <c>curl: (N) message</c> lines go.</param>
+    /// <param name="standardInput">What a <c>telnet</c> transfer sends to the server.</param>
+    /// <param name="tcpDialer">Opens every plaintext TCP connection the connector dials.</param>
+    /// <param name="dnsResolver">Resolves every host name the connector looks up.</param>
+    /// <param name="datagramConnector">Opens the UDP channels TFTP uses.</param>
+    /// <param name="writesProgressMeter">Whether the runner writes curl's progress meter and the <c>-#</c> bar.</param>
+    /// <param name="writeOutFileOpener">Opens the <c>-w</c> <c>%output{file}</c> targets; <see langword="null" /> for none.</param>
+    /// <returns>The runner.</returns>
+    internal static CurlCommandRunner CreateRunner(
+        Stream standardOutput,
+        Stream standardError,
+        Stream standardInput,
+        ITcpDialer tcpDialer,
+        IDnsResolver dnsResolver,
+        IDatagramConnector datagramConnector,
+        bool writesProgressMeter = false,
+        IWriteOutFileOpener? writeOutFileOpener = null)
+    {
+        ConnectionCache runConnections = new(TimeProvider.System);
+        LateBoundDiagnosticLog runLog = new();
+        return new(
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog)),
+            new PhysicalFileSystem(),
+            new PhysicalFileSystem(),
+            standardOutput,
+            standardError,
+            standardInput,
+            OperatingSystem.IsWindows(),
+            writesProgressMeter: writesProgressMeter,
+            writeOutFileOpener: writeOutFileOpener,
+            writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
+            outputPaths: new PhysicalOutputPaths(),
+            runConnectionCache: runConnections,
+            lateBoundDiagnosticLog: runLog);
+    }
+
+    /// <summary>
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?)" />:
+    /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
+    /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
+    /// selector that reads no environment variables, and the connector's <c>--resolve</c> entries
+    /// loaded before each URL as the executable loads them.
+    /// </summary>
+    /// <param name="tcpDialer">Opens every plaintext TCP connection.</param>
+    /// <param name="dnsResolver">Resolves every host name.</param>
+    /// <param name="datagramConnector">Opens the UDP channels.</param>
+    /// <param name="cookies">The run's cookie engine, or <see langword="null" />.</param>
+    /// <param name="options">The option group.</param>
+    /// <param name="runConnections">The run's connection cache.</param>
+    /// <param name="diagnosticLog">The run's diagnostic log.</param>
+    /// <returns>The dispatch.</returns>
+    private static TransferDispatch CreateDialingTransferDispatch(
+        ITcpDialer tcpDialer,
+        IDnsResolver dnsResolver,
+        IDatagramConnector datagramConnector,
+        CookieEngine? cookies,
+        CommandLineOptions options,
+        ConnectionCache runConnections,
+        IDiagnosticLog diagnosticLog)
+    {
+        ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
+        ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
+        LateBoundSecurityContextFactory proxyContexts = new();
+        HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
+        TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, socks5SecurityContexts: proxyContexts);
+        PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, TimeProvider.System, runConnections);
+        proxyContexts.Bind(CreateSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog));
+        return new(
+            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.FromCommandLine(options), diagnosticLog: diagnosticLog)),
+            [],
+            cookies,
+            new ProxySelector(_ => null),
+            poolingConnector,
+            tcpConnector.LoadResolveEntries);
+    }
+
+    /// <summary>
     /// The datagram connector TFTP opens its channel through: over a
     /// <see cref="PoolingConnector" />, one that numbers each open in that pool's sequence, as
     /// curl 8.21.0 numbers a TFTP transfer's connection with the connections before it
