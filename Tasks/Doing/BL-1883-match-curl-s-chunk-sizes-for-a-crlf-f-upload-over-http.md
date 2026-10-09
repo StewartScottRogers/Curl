@@ -31,3 +31,4 @@ BL-1875 (AF-0125) made `--crlf` convert HTTP bodies and send them chunked via `H
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
