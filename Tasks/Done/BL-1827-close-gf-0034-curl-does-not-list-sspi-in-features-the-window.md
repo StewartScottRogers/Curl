@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1827 — Close GF-0034: Curl does not list SSPI in Features; the Windows reference build does
 
@@ -35,13 +35,16 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, add SSPI to the Windows FeaturesLine
 
 ## Acceptance criteria
 
-- [ ] `features:SSPI`: Curl answers what curl 8.21.0 answers, `listed`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `features:SSPI`: Curl answers what curl 8.21.0 answers, `listed`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- 2026-10-08: Already delivered by BL-1796 (commit 6204662fc, ADR-0439, which resolved the ADR-0021 vs ADR-0142 conflict): `CurlVersionText.WindowsFeaturesLine` lists SSPI after SSL and `CurlCommandRunner` picks it when running on Windows; `CurlVersionTextTests` pins it. Verified here: `dotnet run --project Curl.Console -- -V` on Windows prints `Features: ... SSL SSPI TLS-SRP ...`. GF-0034 was most likely measured before BL-1796 landed; the next gap run should measure `features:SSPI` as `match`. No code change needed. Build -warnaserror clean, fast tests green. No option changed, so `--ai-help` is untouched.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Already delivered by BL-1796; curl -V on Windows lists SSPI
