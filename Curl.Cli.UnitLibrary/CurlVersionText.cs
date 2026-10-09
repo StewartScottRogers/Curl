@@ -46,9 +46,11 @@ public static class CurlVersionText
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
     /// Schannel reference build lists it, because NTLM, Negotiate and Kerberos answer through SSPI on
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796), and without <c>ECH</c>, which
-    /// the Schannel reference build does not list, though <c>--ech</c> still works (ADR-0448, BL-1822).
+    /// the Schannel reference build does not list, though <c>--ech</c> still works (ADR-0448, BL-1822), and
+    /// without <c>GSS-API</c>, which the Schannel reference build does not list because Negotiate and
+    /// Kerberos answer through SSPI there (ADR-0449, BL-1823).
     /// </summary>
-    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe TLS-SRP UnixSockets zstd";
+    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTP3 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe TLS-SRP UnixSockets zstd";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
