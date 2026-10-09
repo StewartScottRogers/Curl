@@ -33,3 +33,4 @@ The gap cross-check runs every upstream case in its own temporary folder, so no 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
