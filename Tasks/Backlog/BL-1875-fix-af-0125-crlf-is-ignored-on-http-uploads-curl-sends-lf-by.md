@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary]
+touches: [Curl.Cli.UnitLibrary, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-09
 completed:
@@ -46,7 +46,18 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-09 (lane 4): `CommandLineOptionTable.cs:192` already sets `ConvertLineEndings` and
+  `TransferContextFactory` passes it into the transfer context; the CLI side is correct. Only the
+  File and FTP handlers read it. The fix is in the HTTP handler: when `ConvertLineEndings` is on,
+  convert the upload body (`-T`, `-F` file parts, `--data-binary @file`) LF -> CRLF and send it
+  chunked, as curl does (it cannot know the converted length up front). So `touches` gains
+  `Curl.Protocol.Http.UnitLibrary` and `Curl.Protocol.Http.UnitTests`. BL-1863, in Doing, touches
+  `Curl.Protocol.Http.UnitLibrary`, so the task goes back to Backlog until BL-1863 is Done.
+  Reuse the line-ending logic of `Curl.Protocol.File.UnitLibrary/CrlfUploadConverter.cs` (copy it
+  into the HTTP library; protocols never reference each other).
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary, which BL-1863 (in Doing) touches
