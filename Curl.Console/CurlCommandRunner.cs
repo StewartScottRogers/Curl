@@ -357,6 +357,9 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
+    /// <summary>The <c>-D</c> value that sends the header lines to standard error, as curl 8.10.0 and later do.</summary>
+    private const string StandardErrorHeaderFile = "%";
+
     /// <summary>The <c>--stderr</c> value that sends standard error to standard output.</summary>
     private const string StandardOutputStandardErrorFile = "-";
 
@@ -372,6 +375,19 @@ internal sealed class CurlCommandRunner(
     /// <c>--stderr</c> replaces it with its file or standard output (<see cref="RedirectStandardErrorAsync" />).
     /// </summary>
     private Stream standardError = standardError;
+
+    /// <summary>
+    /// What curl's C <c>stderr</c> is, where <c>-D %</c> writes: the stream the runner was given, until a
+    /// <c>--stderr</c> file replaces it, as curl's <c>freopen</c> does; <c>--stderr -</c> leaves it alone
+    /// (measured 2026-10-08, BL-1815 Notes).
+    /// </summary>
+    private Stream processStandardError = standardError;
+
+    /// <summary><see cref="processStandardError" /> through <see cref="writeGate" />, where <c>-D %</c> writes.</summary>
+    private Stream? gatedProcessStandardError;
+
+    /// <summary>Gets <see cref="processStandardError" /> through <see cref="writeGate" />, where <c>-D %</c> writes.</summary>
+    private Stream GatedProcessStandardError => gatedProcessStandardError ??= writeGate.Guard(processStandardError);
 
     /// <summary>
     /// The file the last successful <c>--stderr</c> opened, which the runner closes when a later one
@@ -958,6 +974,7 @@ internal sealed class CurlCommandRunner(
         await CloseStandardErrorFileAsync().ConfigureAwait(false);
         standardError = file;
         standardErrorFile = file;
+        processStandardError = file;
     }
 
     /// <summary>
@@ -3151,9 +3168,10 @@ internal sealed class CurlCommandRunner(
             return await TransferAsync(dispatch, options, url, uploadFile, transfer, null).ConfigureAwait(false);
         }
 
-        if (headerFile == StandardOutputHeaderFile)
+        if (headerFile is StandardOutputHeaderFile or StandardErrorHeaderFile)
         {
-            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, GatedStandardOutput)
+            Stream headerStream = headerFile == StandardOutputHeaderFile ? GatedStandardOutput : GatedProcessStandardError;
+            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, headerStream)
                 .ConfigureAwait(false);
         }
 

@@ -173,7 +173,9 @@ the `-c` jar written after every `http`/`https` transfer, after its `-w` output,
 outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,
 as curl's cookie engine stays off. Measured on curl 8.21.0 (BL-237 Notes).
-`-D -` sends the handler's header lines to standard output; any other `-D` name is opened
+`-D -` sends the handler's header lines to standard output and `-D %` to standard error, even
+under `-s` - the stream the runner was given, or a `--stderr` file, but never standard output
+for `--stderr -`, as curl 8.21.0's `freopen`ed C `stderr` does (BL-1815); any other `-D` name is opened
 (unsanitized, truncated for the first transfer and appended for the rest) before the transfer,
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the

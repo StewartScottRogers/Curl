@@ -616,7 +616,7 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The <c>-D</c> / <c>--dump-header</c> file, verbatim and unchecked; <see langword="null"/> when
-    /// not given. <c>-</c> means standard output. Nothing is opened or created here. The last value
+    /// not given. <c>-</c> means standard output and <c>%</c> standard error. Nothing is opened or created here. The last value
     /// wins, as in curl 8.21.0.
     /// </summary>
     public string? DumpHeaderFile { get; internal set; }

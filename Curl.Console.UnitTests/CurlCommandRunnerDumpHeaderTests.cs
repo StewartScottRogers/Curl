@@ -64,6 +64,47 @@ public sealed class CurlCommandRunnerDumpHeaderTests
     }
 
     [TestMethod]
+    public async Task RunAsync_DumpHeaderToStandardErrorUnderSilent_WritesTheHeaderLinesToStandardError()
+    {
+        // curl 8.21.0 measured 2026-10-08 (BL-1815, upstream test1489): -D % -s writes the head to stderr.
+        int exitCode = await RunAsync(["-D", "%", "-s", SourceUrl], fileHandler);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(HeaderLines), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", "0123456789", StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(HeaderLines, StandardErrorText);
+        Assert.AreEqual("0123456789", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderToStandardErrorWithStandardErrorToStandardOutput_KeepsTheHeaderLinesOnStandardError()
+    {
+        int exitCode = await RunAsync(["-D", "%", "--stderr", "-", "-s", SourceUrl], fileHandler);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(HeaderLines), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", "0123456789", StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(HeaderLines, StandardErrorText);
+        Assert.AreEqual("0123456789", StandardOutputText);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderToStandardErrorWithStandardErrorFile_WritesTheHeaderLinesToTheFile()
+    {
+        int exitCode = await RunAsync(["-D", "%", "--stderr", "err.txt", "-s", SourceUrl], fileHandler);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("err.txt", Lf(HeaderLines), Lf(WrittenText("err.txt")));
+        Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(HeaderLines, WrittenText("err.txt"));
+        Assert.AreEqual(string.Empty, StandardErrorText);
+        Assert.AreEqual("0123456789", StandardOutputText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_DumpHeaderToFile_WritesTheHeaderLinesToTheFile()
     {
         int exitCode = await RunAsync(["-D", "hd.txt", "-o", "body.txt", SourceUrl], fileHandler);
