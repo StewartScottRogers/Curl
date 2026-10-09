@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests]
+touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1853 — Close GF-0043: A telnet -T upload is sometimes never sent: the upload is cancelled when the peer closes first
 
@@ -35,13 +35,30 @@ In Curl.Protocol.Telnet.UnitLibrary's TelnetProtocolHandler, the -T upload runs 
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1327`: Curl answers what curl 8.21.0 answers, `upstream test1327 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1327`: Curl answers what curl 8.21.0 answers, `upstream test1327 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
+
+- Cause: the sws emulation, not the telnet handler. `SwsHttpServerConnection` answered a
+  read made before the client had written anything with 0 (closed). Curl's telnet session
+  reads at once while its `-T` upload task is still reading the file, so under load the read
+  won, the handler took the close as the end and cancelled the upload, and nothing was
+  recorded. Real sws blocks reading the request before it answers or closes. curl 8.21.0's
+  own telnet loop also ends at the peer's close (FD_CLOSE clears `keepon`), so the handler
+  already matches curl and was left unchanged.
+- Fix: a read before the connection's first write now waits for that write (or
+  cancellation), then reads as before. Pinned by
+  `SwsHttpServerConnectorTests.ReadAsync_BeforeTheFirstWrite_*`; 1327 added to
+  `PassingUpstreamCases.txt` and passes in the ratchet (Conformance: 1131 passed, 0 failed).
+- Touches: added Curl.Conformance.UnitLibrary and Curl.Conformance.UnitTests (the emulation
+  the finding's suggestion names, and the ratchet list). No task in Doing on
+  origin/work/dark-factory named either (BL-1851: Core; BL-1852: Console).
+- Measure-CodeQuality.ps1 not run: the one new branch is covered both ways by the two new tests.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. sws emulation waits for the first write; test1327 passes
