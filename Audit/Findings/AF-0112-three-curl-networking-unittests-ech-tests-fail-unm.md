@@ -3,8 +3,8 @@ id: AF-0112
 title: Three Curl.Networking.UnitTests ECH tests fail unmutated: TlsReader.Take advances past the end with no bounds check
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:Take:failing-test
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ dotnet test Curl.Networking.UnitTests -c Release -nologo --filter "Name=Authenti
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
