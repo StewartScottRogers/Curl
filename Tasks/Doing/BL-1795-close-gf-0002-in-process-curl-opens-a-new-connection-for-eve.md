@@ -60,3 +60,4 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Waits on BL-1834 (test435 local port) and BL-1833 (test1074, 1479, 471 on a reused connection); pooling is done
+- 2026-10-08: Backlog -> Doing.
