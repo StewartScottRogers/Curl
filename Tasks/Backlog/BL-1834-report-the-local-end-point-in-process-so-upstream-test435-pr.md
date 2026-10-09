@@ -1,5 +1,5 @@
 ---
-id: BL-1832
+id: BL-1834
 title: Report the local end point in process so upstream test435 prints a real local port (GF-0002)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-08
 completed:
 ---
-# BL-1832 — Report the local end point in process so upstream test435 prints a real local port (GF-0002)
+# BL-1834 — Report the local end point in process so upstream test435 prints a real local port (GF-0002)
 
 ## Goal
 
