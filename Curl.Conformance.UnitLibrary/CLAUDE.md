@@ -71,7 +71,10 @@ containing `swsbounce` the next request gets that part plus one; both states are
 connections. A `CONNECT host:port HTTP/x.y` request with no number in its path is answered
 from `<connect>` / `<connectN>`, and the connection stays open for the tunnelled request.
 A read before the client's first write waits for that write, as sws blocks reading the
-request (a telnet `-T` session reads while its upload is on its way; BL-1853). Otherwise a
+request (a telnet `-T` session reads while its upload is on its way; BL-1853), and a read while
+an `Expect: 100-continue` request still owes its body waits for the client's next write, since
+sws never answers 100 (test1070). Under `skip: N`, bytes past the request's end are dropped
+unrecorded, as sws's stored request ends there. Otherwise a
 read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands

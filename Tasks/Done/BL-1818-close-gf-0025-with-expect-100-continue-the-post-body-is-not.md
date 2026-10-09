@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-09
 ---
 # BL-1818 — Close GF-0025: With Expect: 100-continue, the POST body is not sent when the server answers early and closes
 
@@ -35,9 +35,9 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1070`: Curl answers what curl 8.21.0 answers, `upstream test1070 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1070`: Curl answers what curl 8.21.0 answers, `upstream test1070 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -62,6 +62,15 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 
 - 2026-10-08, interactive: the sws stand-in is product code, not Gap/: Curl.Conformance.UnitLibrary (SwsServerCommands.cs reads `skip:` into SkippedBodyBytes; SwsHttpServerConnector.cs / SwsHttpRequestFraming.cs decide when to reply). Fix it there so the stand-in reads Content-Length minus skip body bytes before answering, pin it in Curl.Conformance.UnitTests, leave the HTTP library unchanged, and re-measure test1070 with the harness. Lane-eligible; touches changed to Curl.Conformance.
 
+- 2026-10-09, lane 1: fixed in the sws stand-in, HTTP library unchanged. Two causes: (1) a read
+  during Curl's 100-continue wait found no reply and returned 0, so Curl took it as a close and
+  never sent the body; it now waits for the client's next write while an Expect: 100-continue
+  request owes its body (sws never answers 100). (2) Under skip: N the recording kept every byte
+  of the write that ended the request; bytes past the request's end are now dropped, as sws's
+  stored request ends there. test1070 passes in the in-process conformance run and is on
+  PassingUpstreamCases.txt. No option changed, so `--ai-help` needs nothing. Measure-CodeQuality
+  not run (run budget); each new branch is hit by SwsHttpServerConnectorTests.
+
 ## Log
 
 - 2026-10-08: Created.
@@ -69,3 +78,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 - 2026-10-08: Doing -> Blocked. Interactive session: Curl already matches curl 8.21.0 (measured, see Notes); the gap office's upstream-case harness must honour sws skip: before test1070 can match, and lanes may not change it
 - 2026-10-08: Blocked -> Backlog. Interactive: the fix belongs in Curl.Conformance's sws stand-in (product code), so a lane may take it
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. sws stand-in waits for the body during the 100-continue wait and honours skip: in its recording; test1070 passes and is on the passing list
