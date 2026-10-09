@@ -14,7 +14,8 @@ namespace Curl.Conformance;
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when it needs a server other than <c>http</c> (the
 /// one emulated), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation does not carry
-/// out; when its command is not a plain curl command line; when a file part does not name an
+/// out; when it names no server and its command goes to a host name on the internet; when its
+/// command is not a plain curl command line; when a file part does not name an
 /// absolute path; when a strip line is not a substitution the harness can run; or when its expected
 /// exit code is not a number.
 /// </remarks>
@@ -28,6 +29,9 @@ internal static class UpstreamCaseScreening
         "protocol", "errorcode", "stdout", "stderr", "file", "file1", "file2", "file3", "file4", "notexists",
         "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind",
     ];
+
+    // Interpreted, not source-generated, so no generated code counts against the coverage gate.
+    private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
     private static readonly HashSet<string> Servers = ["http", "file", "none"];
 
@@ -53,6 +57,7 @@ internal static class UpstreamCaseScreening
             () => UnsupportedFeature(testCase, features),
             () => UnsupportedCommand(testCase),
             () => UnsupportedServerCommand(testCase),
+            () => InternetHost(testCase),
             () => UnsupportedFileName(testCase, "client"),
             () => UnsupportedFileName(testCase, "verify"),
             () => UnsupportedStripPattern(testCase),
@@ -135,6 +140,16 @@ internal static class UpstreamCaseScreening
     private static string? UnsupportedServerCommand(UpstreamTestCase testCase) =>
         SwsServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span).UnsupportedCommands is [var first, ..]
             ? $"the sws emulation does not carry out the server command {first}"
+            : null;
+
+    // A case that names no server, expects success and sends its command to a host name with a
+    // dot (test2043's https://revoked.badssl.com/) needs the internet, which the in-process harness
+    // never reaches (BL-1858); one expecting a failure (test467's http://example.com) fails first.
+    private static string? InternetHost(UpstreamTestCase testCase) =>
+        testCase.Find("client", "server") is null
+            && UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is "" or "0"
+            && InternetUrlHost.Match(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))) is { Success: true } url
+            ? $"the case reaches {url.Groups["host"].Value} on the internet, which the harness does not"
             : null;
 
     private static string? UnsupportedFileName(UpstreamTestCase testCase, string section) =>

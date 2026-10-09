@@ -99,7 +99,8 @@ public sealed class UpstreamConformanceTests
             new LoopbackOnlyDnsResolver(),
             invocation.DatagramConnector,
             writesProgressMeter: true,
-            writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(invocation.Arguments);
+            writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
+            usesHandBuiltNtlm: true).RunAsync(invocation.Arguments);
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
     private static void DeleteLogDirectory(DirectoryInfo logDirectory)

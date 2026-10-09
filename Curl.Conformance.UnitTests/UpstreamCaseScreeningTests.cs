@@ -96,6 +96,8 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", "the case has no <client><command>")]
     [DataRow("<client>\n<command type=\"perl\">\nx\n</command>\n</client>\n", "the harness does not run a perl command")]
     [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its |")]
+    [DataRow("<client>\n<command>\n--ssl-no-revoke -I https://revoked.badssl.com/\n</command>\n</client>\n", "the case reaches revoked.badssl.com on the internet, which the harness does not")]
+    [DataRow("<client>\n<command>\n-I http://www.example.com:8080/\n</command>\n</client>\n", "the case reaches www.example.com on the internet, which the harness does not")]
     public void FindSkipReason_ClientTheHarnessCannotRun_IsTheReason(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -104,6 +106,20 @@ public sealed class UpstreamCaseScreeningTests
         diagnostics.Act("skip reason", reason);
         diagnostics.Assert("skip reason", expected, reason);
         Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<command>\nhttp://127.0.0.1:8990/x file:///dir/x http://localhost/\n</command>\n</client>\n")]
+    [DataRow("<client>\n<server>\nhttp\n</server>\n<command>\n-x http://127.0.0.1:8990 http://www.example.com/\n</command>\n</client>\n")]
+    [DataRow("<client>\n<command>\n-v%08 http://example.com\n</command>\n</client>\n<verify>\n<errorcode>\n2\n</errorcode>\n</verify>\n")]
+    public void FindSkipReason_NoInternetHostOrAServerNamed_ReturnsNull(string sections)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", sections);
+        string? reason = Screen(sections);
+        diagnostics.Act("skip reason", reason);
+        diagnostics.Assert("skip reason", "null", reason ?? "null");
+        Assert.IsNull(reason);
     }
 
     [TestMethod]
