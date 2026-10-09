@@ -35,3 +35,4 @@ The expected bytes are in `Curl.Conformance.UnitTests/UpstreamTestData/test<N>`.
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
