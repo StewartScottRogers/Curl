@@ -3,8 +3,8 @@ id: AF-0121
 title: SpnegoDecode_EveryTruncationOfAnEncodedResponse_ThrowsOnlySpnegoTokenException passes when a truncation decodes without throwing
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Authentication.UnitTests/AuthenticationAdversarialTests.cs:SpnegoDecode_EveryTruncationOfAnEncodedResponse_ThrowsOnlySpnegoTokenException:weak-assertion
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ Select-String -Path Curl.Authentication.UnitTests/AuthenticationAdversarialTests
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
