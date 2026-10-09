@@ -3,8 +3,8 @@ id: AF-0135
 title: CLAUDE.md says audit-quality, audit-truthfulness and audit-process run on Sonnet; their agent files say opus
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:audit-agent-models:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path CLAUDE.md -Pattern '`audit-(quality|truthfulness|process)` \
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
