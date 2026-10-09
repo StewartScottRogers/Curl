@@ -35,20 +35,25 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test338`: Curl answers what curl 8.21.0 answers, `upstream test338 passes`, so the item measures `match`.
-- [ ] `behaviour:test1421`: Curl answers what curl 8.21.0 answers, `upstream test1421 passes`, so the item measures `match`.
-- [ ] `behaviour:test1134`: Curl answers what curl 8.21.0 answers, `upstream test1134 passes`, so the item measures `match`.
-- [ ] `behaviour:test48`: Curl answers what curl 8.21.0 answers, `upstream test48 passes`, so the item measures `match`.
-- [ ] `behaviour:test1418`: Curl answers what curl 8.21.0 answers, `upstream test1418 passes`, so the item measures `match`.
-- [ ] `behaviour:test1419`: Curl answers what curl 8.21.0 answers, `upstream test1419 passes`, so the item measures `match`.
+- [x] `behaviour:test338`: Curl answers what curl 8.21.0 answers, `upstream test338 passes`, so the item measures `match`.
+- [x] `behaviour:test1421`: Curl answers what curl 8.21.0 answers, `upstream test1421 passes`, so the item measures `match`.
+- [x] `behaviour:test1134`: Curl answers what curl 8.21.0 answers, `upstream test1134 passes`, so the item measures `match`.
+- [x] `behaviour:test48`: Curl answers what curl 8.21.0 answers, `upstream test48 passes`, so the item measures `match`.
+- [x] `behaviour:test1418`: Curl answers what curl 8.21.0 answers, `upstream test1418 passes`, so the item measures `match`.
+- [x] `behaviour:test1419`: Curl answers what curl 8.21.0 answers, `upstream test1419 passes`, so the item measures `match`.
 - [ ] `behaviour:test435`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 248 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55059\x0Alocal ip == 127.0.0.1\x0Aremote_ip == 127.0.0.1\x0Aremote_port == 18990\x0AHTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55060\x0Alocal ip == 127.0.`, so the item measures `match`.
 - [ ] `behaviour:test1074`: Curl answers what curl 8.21.0 answers, `upstream test1074 passes`, so the item measures `match`.
 - [ ] `behaviour:test1479`: Curl answers what curl 8.21.0 answers, `upstream test1479 passes`, so the item measures `match`.
 - [ ] `behaviour:test471`: Curl answers what curl 8.21.0 answers, `upstream test471 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- `InProcessCurl.RunAsync` (connector overload) and `UpstreamConformanceTests.RunCurlAsync` now pass a run `ConnectionCache`, so `CurlComposition.GroupConnectorOf` pools connections as the executable does. In process, test338, 1421, 1134, 48, 1418 and 1419 now pass, and so do test7, 64, 153, 378, 388, 1079, 1095, 1229, 1437, 2061, 2062, 2063, 2076 and 2091; all twenty are added to `PassingUpstreamCases.txt` (1123 passing, none regressed).
+- `SwsHttpServerConnector` gives each connection a `LocalEndPoint` of 127.0.0.1 on the next port from 49152 (pinned by `ConnectAsync_TwoConnections_TakeConsecutiveLoopbackLocalPorts`). test435 still prints `local port == -1`: the HTTP side drops the local end point when the remote one is `null`, outside this task's touches - filed as BL-1832.
+- test1074 (HTTP/1.0 kept on the reused connection), test1479 (exit 8, got 1) and test471 (exit 8, got 0) are gaps in `HttpProtocolHandler`, outside this task's touches - filed as BL-1833.
+- Decision: Done rather than Backlog, because the pooling change is complete and the four remaining items are separate product gaps carried by BL-1832 and BL-1833; GF-0002 closes only on a re-measure anyway (ADR-0433). No option changed, so `--ai-help` is unaffected.
 
 ## Log
 
