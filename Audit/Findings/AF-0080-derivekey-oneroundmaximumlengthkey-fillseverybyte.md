@@ -42,6 +42,8 @@ Select-String -Path Curl.Cryptography.UnitTests/BcryptPbkdfTests.cs -Pattern 'in
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: no match for 'int probe' or 'AreNotEqual(0, probe)'. The test is now DeriveKey_OneRoundMaximumLengthKey_EqualsTheInterleavedBlockHashes (BcryptPbkdfTests.cs:101), which builds the whole 1024-byte expected key from the interleaved block hashes and asserts Assert.AreEqual on the full hex of every byte.
+
 ## Log
 
 - 2026-10-08: filed proposed.

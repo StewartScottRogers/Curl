@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/SystemClientCertificateStoreTests.
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: line 34 Assert.IsNotNull(actual) is now followed by line 35 CollectionAssert.AreEqual(expected, actual), where expected is the sorted thumbprints X509Store lists for the same location and store. The test checks the certificates themselves, not only non-null.
+
 ## Log
 
 - 2026-10-08: filed proposed.

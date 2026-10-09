@@ -3,8 +3,8 @@ id: AF-0068
 title: ADR-0421 decision 3 (slow pure-computation tests become LongRunning with an env-var skip) is not in the code
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).
 key: truthfulness:Documentation/Planning/Decisions/ADR-0421-integration-tests-live-only-in-integrationtests-projects.md:LongRunning:stale-adr
 reproduction: none
 task: BL-1687
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: consecutive
+closed-by: 2026-10-08_0748.md, 2026-10-08_2315.md
 ---
 # AF-0068 - ADR-0421 decision 3 (slow pure-computation tests become LongRunning with an env-var skip) is not in the code
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The count of TestCategory("LongRunning") in *.UnitTests is 3: Cast128Tests.cs:73, X25519Tests.cs:76 and X448Tests.cs:76, each also carrying [RunsOnlyWhenLongRunningTestsAreEnabled], which skips unless CURL_RUN_LONG_RUNNING_TESTS is 1. integration.yml runs them with the variable set. ADR-0421 decision 3 is in the code.
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | The count of TestCategory("LongRunning") in *.UnitTests is 3 (Cast128Tests.cs:73, X25519Tests.cs:76, X448Tests.cs:76 in Curl.Cryptography.UnitTests). The env-var skip exists: RunsOnlyWhenLongRunningTestsAreEnabledAttribute reads CURL_RUN_LONG_RUNNING_TESTS (ADR-0421 decision 3).
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).

@@ -44,6 +44,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-07 | 2026-10-07_1336.md | not re-audited | Ran the reproduction. The top 5 by cost are BL-1474 5.7678, BL-1525 5.254, BL-1473 4.9663, BL-1482 4.7552, BL-1470 4.7313. BL-1458 is absent from the tasks entirely, because the 2026-10-03 to 10-06 shift logs are not in the log folder. The result cannot tell whether it still reproduces; not re-audited.
 - 2026-10-08 | 2026-10-08_0748.md | not re-audited | Ran the reproduction. The 2026-10-06 run logs are gone from the log folder, so BL-1458 is not among the measured tasks; the top 5 are now BL-1488 6.56, BL-1609 5.17, BL-1486 4.65, BL-1585 4.49 and BL-1683 4.42. It has aged out of the data, which does not show it was fixed.
+- 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. The top 5 by cost since 2026-10-03 are BL-1858 2.54, BL-1833 2.46, BL-1730 2.23, BL-1735 2.15 and BL-1846 2.14. BL-1458's runs (before 2026-10-08) are not in the copied log folder, so the absence tells nothing.
 
 ## Log
 

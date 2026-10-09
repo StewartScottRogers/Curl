@@ -3,8 +3,8 @@ id: AF-0078
 title: HttpConnectionPersistence.KeepsHttp10Alive: the close check's slice 'colon + 1' can become 'colon - 1' with no test failing
 auditor: quality
 severity: High
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-08_2315.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpConnectionPersistence.cs:KeepsHttp10Alive-plus1:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpConnectionPersistence.cs:89:+1
 task: BL-1756
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: mechanical
+closed-by: 2026-10-08_2315.md
 ---
 # AF-0078 - HttpConnectionPersistence.KeepsHttp10Alive: the close check's slice 'colon + 1' can become 'colon - 1' with no test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the -Site command: the mutant 'headerLine[(colon + 1)..]' -> 'headerLine[(colon - 1)..]' at HttpConnectionPersistence.cs:89 in KeepsHttp10Alive was killed (resolvedLine 89). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

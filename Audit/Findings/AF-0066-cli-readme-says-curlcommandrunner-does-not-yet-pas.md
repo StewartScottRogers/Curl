@@ -3,8 +3,8 @@ id: AF-0066
 title: Cli README says CurlCommandRunner does not yet pass on Range, ResumeFrom, MaxFileSize, ConnectTimeout or MaxTime; it passes all five
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).
 key: truthfulness:Curl.Cli.UnitLibrary/README.md:CurlCommandRunner:false-statement
 reproduction: none
 task: BL-1685
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: consecutive
+closed-by: 2026-10-08_0748.md, 2026-10-08_2315.md
 ---
 # AF-0066 - Cli README says CurlCommandRunner does not yet pass on Range, ResumeFrom, MaxFileSize, ConnectTimeout or MaxTime; it passes all five
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Cli.UnitLibrary/README.md -SimpleMatch 'does not yet pa
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: no | Select-String for 'does not yet pass on' in Curl.Cli.UnitLibrary/README.md found nothing; TransferContextFactory.cs:164 'MaxFileSize = options.MaxFileSize,' is still there. The false README sentence is gone.
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | 'does not yet pass on' is gone from Curl.Cli.UnitLibrary/README.md, which now says CurlCommandRunner passes on every setting, Range, ResumeFrom, MaxFileSize, ConnectTimeout and MaxTime among them. TransferContextFactory.cs:164 'MaxFileSize = options.MaxFileSize,' still matches.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).
