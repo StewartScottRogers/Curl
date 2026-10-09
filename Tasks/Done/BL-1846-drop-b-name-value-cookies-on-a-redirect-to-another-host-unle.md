@@ -33,7 +33,7 @@ A `-b name=value` cookie string (curl's `CURLOPT_COOKIE`) is sent only to the fi
 ## Notes
 
 - Added `Curl.Protocol.Abstractions.UnitLibrary` and its `.UnitTests` to `touches`: `HttpRequestOptions` and `ICookieStore` live there, and no task in Doing on `origin/work/dark-factory` names them (only BL-1828, `Curl.Cli`).
-- Measurement: `Record-CurlExchange.ps1` hung on the 127.0.0.1 -> localhost redirect, so the rule is libcurl's `Curl_auth_allowed_to_host` (scheme, host and port) plus GF-0010's curl 8.21.0 measurement of test2015; it is the same test `RedirectFollower` uses for `-u` and `-H Cookie:` (ADR-0444).
+- Measurement: `Record-CurlExchange.ps1` hung on the 127.0.0.1 -> localhost redirect, so the rule is libcurl's `Curl_auth_allowed_to_host` (scheme, host and port) plus GF-0010's curl 8.21.0 measurement of test2015; it is the same test `RedirectFollower` uses for `-u` and `-H Cookie:` (ADR-0445).
 - Design: `HttpRequestOptions.SendsCookieStrings` (default on), turned off by `RedirectFollower.HopHttp` when credentials are dropped; `ICookieStore.GetStoredCookieHeader` (default: `GetCookieHeader`) gives the stored cookies alone; `CookieEngine`'s `GroupCookies` and `CookieStringSender` implement it. Two command-line URLs are not follows, so each still gets the string.
 - Tests: `RedirectFollowerTests.FollowAsync_Hop_SendsCookieStringsOnlyToTheFirstOriginOrWhenLocationTrusted`, `HttpProtocolHandlerTests.ExecuteAsync_SendsCookieStringsOff_AsksForTheStoredCookiesAlone`, `CookieEngineTests.GetStoredCookieHeader_*`, `ICookieStoreTests`. Build clean, fast tests green.
 
@@ -41,4 +41,4 @@ A `-b name=value` cookie string (curl's `CURLOPT_COOKIE`) is sent only to the fi
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
-- 2026-10-08: Doing -> Done. -b name=value strings are no longer sent after -L follows a redirect to another scheme, host or port unless --location-trusted (ADR-0444)
+- 2026-10-08: Doing -> Done. -b name=value strings are no longer sent after -L follows a redirect to another scheme, host or port unless --location-trusted (ADR-0445)
