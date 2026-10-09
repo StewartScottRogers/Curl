@@ -44,3 +44,4 @@ In Curl.Output.UnitLibrary / Curl.Console's -w writer, write a -w line feed to s
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
