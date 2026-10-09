@@ -75,3 +75,4 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Waits on BL-1831 (in-process TcpConnector wiring), split out because the run's cost cap could not fit the whole change
+- 2026-10-08: Backlog -> Doing.
