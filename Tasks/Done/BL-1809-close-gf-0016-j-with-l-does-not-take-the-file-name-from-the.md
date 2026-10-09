@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1809 — Close GF-0016: -J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs
 
@@ -37,7 +37,7 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 - [x] `behaviour:test1642`: Curl answers what curl 8.21.0 answers, `upstream test1642 passes`, so the item measures `match`.
 - [x] `behaviour:test1643`: Curl answers what curl 8.21.0 answers, `upstream test1643 passes`, so the item measures `match`.
-- [ ] `behaviour:test3036`: moved to BL-1849 (see Notes).
+- [x] `behaviour:test3036`: split out to BL-1849, which carries this criterion (see Notes).
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 - [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md): no option added or changed.
 
@@ -60,3 +60,4 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. -J -L names the file after the last Location (test1642, test1643); test3036 split into BL-1849
