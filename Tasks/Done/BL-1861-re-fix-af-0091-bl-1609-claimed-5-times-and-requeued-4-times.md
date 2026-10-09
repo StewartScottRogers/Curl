@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1861 — Re-fix AF-0091: BL-1609 claimed 5 times and requeued 4 times in shift 20261007-201432; one run was wasted because lanes may not run git stash list
 
@@ -45,12 +45,17 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The git stash denial from BL-1769 does not recur (the re-audit says so). What recurred is the redone-work rule: BL-1850 claimed 5 times, requeued 3, all on lane 9. A lane already refuses to claim a task it sent back this shift (`requeued.txt`, AF-0072), but it wrote the task there only at the end of a normal loop pass. A lane that died after its run sent the task back (script error, killed process) never wrote it, and the lane restarted in its place had no memory of it, so it claimed the task again.
+- Fix (`RunDarkFactory.ps1`): the lane's `catch` records the task in `requeued.txt` when it is back in Backlog or Parked, and a lane starting up records the task it held when that task is in Backlog, before it integrates or clears it.
+- Reproduction: reads the audit office's tools and the 2026-10-07 logs, which a lane cannot read; the process auditor's re-audit on later shifts is the proof. Build clean, fast tests green.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. A lane that dies after sending a task back, or restarts holding one in Backlog, now records it so no lane claims it again this shift (AF-0091)

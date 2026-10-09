@@ -4865,6 +4865,8 @@ if ($Lane) {
         # those commits now, before a claim resets the worktree and loses them.
         $ahead = [int](git -C $Root rev-list --count "origin/$branch..HEAD" 2>$null)
         $heldState = Get-TaskState $held
+        # Whatever stopped the lane, a task it held that is back in Backlog is not claimed again this shift (AF-0091).
+        if ($heldState -eq 'Backlog') { Add-ShiftRequeued $held }
         if ($ahead -gt 0 -and $heldState -in 'Done', 'Blocked', 'Backlog') {
             $problem = Invoke-Integrate -Id $held -State $heldState
             if ($problem) {
@@ -5029,6 +5031,10 @@ while ($true) {
     # The run's output is in its .jsonl log and the trace; the tab shows only what is next.
     Show-LaneEmpty "$id $outcome at $(Get-Date -Format 'HH:mm'); empty, waiting for the next task. Trace: $TraceFile"
   } catch {
+    # A lane that dies after its run sent the task back never reached Add-ShiftRequeued, and
+    # the lane restarted in its place starts with no memory of it (AF-0091: BL-1850 claimed 5
+    # times on lane 9 of one shift).
+    if ($Lane -and $id -and (Get-TaskState $id) -in 'Backlog', 'Parked') { Add-ShiftRequeued $id }
     $stopWhy = 'script error'
     $stalls += "FACTORY SCRIPT ERROR  $($_.Exception.Message)"
     Write-Trace '-' 'ERROR' (Get-Short $_.Exception.Message) 'Red'
