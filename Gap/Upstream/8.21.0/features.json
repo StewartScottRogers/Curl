@@ -1,241 +1,241 @@
 {
-  "area": "features",
-  "version": "8.21.0",
-  "sources": [
-    "docs/cmdline-opts/version.md"
-  ],
-  "items": [
-    {
-      "key": "features:AsynchDNS",
-      "name": "AsynchDNS",
-      "introducedIn": null,
-      "attributes": {
-        "name": "AsynchDNS"
-      }
-    },
-    {
-      "key": "features:CharConv",
-      "name": "CharConv",
-      "introducedIn": null,
-      "attributes": {
-        "name": "CharConv"
-      }
-    },
-    {
-      "key": "features:Debug",
-      "name": "Debug",
-      "introducedIn": null,
-      "attributes": {
-        "name": "Debug"
-      }
-    },
-    {
-      "key": "features:ECH",
-      "name": "ECH",
-      "introducedIn": null,
-      "attributes": {
-        "name": "ECH"
-      }
-    },
-    {
-      "key": "features:GSS-API",
-      "name": "GSS-API",
-      "introducedIn": null,
-      "attributes": {
-        "name": "GSS-API"
-      }
-    },
-    {
-      "key": "features:HSTS",
-      "name": "HSTS",
-      "introducedIn": null,
-      "attributes": {
-        "name": "HSTS"
-      }
-    },
-    {
-      "key": "features:HTTP2",
-      "name": "HTTP2",
-      "introducedIn": null,
-      "attributes": {
-        "name": "HTTP2"
-      }
-    },
-    {
-      "key": "features:HTTP3",
-      "name": "HTTP3",
-      "introducedIn": null,
-      "attributes": {
-        "name": "HTTP3"
-      }
-    },
-    {
-      "key": "features:HTTPS-proxy",
-      "name": "HTTPS-proxy",
-      "introducedIn": null,
-      "attributes": {
-        "name": "HTTPS-proxy"
-      }
-    },
-    {
-      "key": "features:IDN",
-      "name": "IDN",
-      "introducedIn": null,
-      "attributes": {
-        "name": "IDN"
-      }
-    },
-    {
-      "key": "features:IPv6",
-      "name": "IPv6",
-      "introducedIn": null,
-      "attributes": {
-        "name": "IPv6"
-      }
-    },
-    {
-      "key": "features:Kerberos",
-      "name": "Kerberos",
-      "introducedIn": null,
-      "attributes": {
-        "name": "Kerberos"
-      }
-    },
-    {
-      "key": "features:Largefile",
-      "name": "Largefile",
-      "introducedIn": null,
-      "attributes": {
-        "name": "Largefile"
-      }
-    },
-    {
-      "key": "features:MultiSSL",
-      "name": "MultiSSL",
-      "introducedIn": null,
-      "attributes": {
-        "name": "MultiSSL"
-      }
-    },
-    {
-      "key": "features:NTLM",
-      "name": "NTLM",
-      "introducedIn": null,
-      "attributes": {
-        "name": "NTLM"
-      }
-    },
-    {
-      "key": "features:NTLM_WB",
-      "name": "NTLM_WB",
-      "introducedIn": null,
-      "attributes": {
-        "name": "NTLM_WB"
-      }
-    },
-    {
-      "key": "features:PSL",
-      "name": "PSL",
-      "introducedIn": null,
-      "attributes": {
-        "name": "PSL"
-      }
-    },
-    {
-      "key": "features:SPNEGO",
-      "name": "SPNEGO",
-      "introducedIn": null,
-      "attributes": {
-        "name": "SPNEGO"
-      }
-    },
-    {
-      "key": "features:SSL",
-      "name": "SSL",
-      "introducedIn": null,
-      "attributes": {
-        "name": "SSL"
-      }
-    },
-    {
-      "key": "features:SSLS-EXPORT",
-      "name": "SSLS-EXPORT",
-      "introducedIn": null,
-      "attributes": {
-        "name": "SSLS-EXPORT"
-      }
-    },
-    {
-      "key": "features:SSPI",
-      "name": "SSPI",
-      "introducedIn": null,
-      "attributes": {
-        "name": "SSPI"
-      }
-    },
-    {
-      "key": "features:TLS-SRP",
-      "name": "TLS-SRP",
-      "introducedIn": null,
-      "attributes": {
-        "name": "TLS-SRP"
-      }
-    },
-    {
-      "key": "features:Unicode",
-      "name": "Unicode",
-      "introducedIn": null,
-      "attributes": {
-        "name": "Unicode"
-      }
-    },
-    {
-      "key": "features:UnixSockets",
-      "name": "UnixSockets",
-      "introducedIn": null,
-      "attributes": {
-        "name": "UnixSockets"
-      }
-    },
-    {
-      "key": "features:alt-svc",
-      "name": "alt-svc",
-      "introducedIn": null,
-      "attributes": {
-        "name": "alt-svc"
-      }
-    },
-    {
-      "key": "features:brotli",
-      "name": "brotli",
-      "introducedIn": null,
-      "attributes": {
-        "name": "brotli"
-      }
-    },
-    {
-      "key": "features:gsasl",
-      "name": "gsasl",
-      "introducedIn": null,
-      "attributes": {
-        "name": "gsasl"
-      }
-    },
-    {
-      "key": "features:libz",
-      "name": "libz",
-      "introducedIn": null,
-      "attributes": {
-        "name": "libz"
-      }
-    },
-    {
-      "key": "features:zstd",
-      "name": "zstd",
-      "introducedIn": null,
-      "attributes": {
-        "name": "zstd"
-      }
-    }
-  ]
+    "area":  "features",
+    "version":  "8.21.0",
+    "sources":  [
+                    "docs/cmdline-opts/version.md"
+                ],
+    "items":  [
+                  {
+                      "key":  "features:AsynchDNS",
+                      "name":  "AsynchDNS",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "AsynchDNS"
+                                     }
+                  },
+                  {
+                      "key":  "features:CharConv",
+                      "name":  "CharConv",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "CharConv"
+                                     }
+                  },
+                  {
+                      "key":  "features:Debug",
+                      "name":  "Debug",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "Debug"
+                                     }
+                  },
+                  {
+                      "key":  "features:ECH",
+                      "name":  "ECH",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "ECH"
+                                     }
+                  },
+                  {
+                      "key":  "features:GSS-API",
+                      "name":  "GSS-API",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "GSS-API"
+                                     }
+                  },
+                  {
+                      "key":  "features:HSTS",
+                      "name":  "HSTS",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "HSTS"
+                                     }
+                  },
+                  {
+                      "key":  "features:HTTP2",
+                      "name":  "HTTP2",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "HTTP2"
+                                     }
+                  },
+                  {
+                      "key":  "features:HTTP3",
+                      "name":  "HTTP3",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "HTTP3"
+                                     }
+                  },
+                  {
+                      "key":  "features:HTTPS-proxy",
+                      "name":  "HTTPS-proxy",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "HTTPS-proxy"
+                                     }
+                  },
+                  {
+                      "key":  "features:IDN",
+                      "name":  "IDN",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "IDN"
+                                     }
+                  },
+                  {
+                      "key":  "features:IPv6",
+                      "name":  "IPv6",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "IPv6"
+                                     }
+                  },
+                  {
+                      "key":  "features:Kerberos",
+                      "name":  "Kerberos",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "Kerberos"
+                                     }
+                  },
+                  {
+                      "key":  "features:Largefile",
+                      "name":  "Largefile",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "Largefile"
+                                     }
+                  },
+                  {
+                      "key":  "features:MultiSSL",
+                      "name":  "MultiSSL",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "MultiSSL"
+                                     }
+                  },
+                  {
+                      "key":  "features:NTLM",
+                      "name":  "NTLM",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "NTLM"
+                                     }
+                  },
+                  {
+                      "key":  "features:NTLM_WB",
+                      "name":  "NTLM_WB",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "NTLM_WB"
+                                     }
+                  },
+                  {
+                      "key":  "features:PSL",
+                      "name":  "PSL",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "PSL"
+                                     }
+                  },
+                  {
+                      "key":  "features:SPNEGO",
+                      "name":  "SPNEGO",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "SPNEGO"
+                                     }
+                  },
+                  {
+                      "key":  "features:SSL",
+                      "name":  "SSL",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "SSL"
+                                     }
+                  },
+                  {
+                      "key":  "features:SSLS-EXPORT",
+                      "name":  "SSLS-EXPORT",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "SSLS-EXPORT"
+                                     }
+                  },
+                  {
+                      "key":  "features:SSPI",
+                      "name":  "SSPI",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "SSPI"
+                                     }
+                  },
+                  {
+                      "key":  "features:TLS-SRP",
+                      "name":  "TLS-SRP",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "TLS-SRP"
+                                     }
+                  },
+                  {
+                      "key":  "features:Unicode",
+                      "name":  "Unicode",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "Unicode"
+                                     }
+                  },
+                  {
+                      "key":  "features:UnixSockets",
+                      "name":  "UnixSockets",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "UnixSockets"
+                                     }
+                  },
+                  {
+                      "key":  "features:alt-svc",
+                      "name":  "alt-svc",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "alt-svc"
+                                     }
+                  },
+                  {
+                      "key":  "features:brotli",
+                      "name":  "brotli",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "brotli"
+                                     }
+                  },
+                  {
+                      "key":  "features:gsasl",
+                      "name":  "gsasl",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "gsasl"
+                                     }
+                  },
+                  {
+                      "key":  "features:libz",
+                      "name":  "libz",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "libz"
+                                     }
+                  },
+                  {
+                      "key":  "features:zstd",
+                      "name":  "zstd",
+                      "introducedIn":  null,
+                      "attributes":  {
+                                         "name":  "zstd"
+                                     }
+                  }
+              ]
 }

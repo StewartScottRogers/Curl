@@ -31,6 +31,7 @@ Bring these items to Curl when the target moves to 8.22.0.
 
 ## Measurements
 
+- 2026-10-08_2029: 1 of 1 items are gaps.
 
 ## Log
 

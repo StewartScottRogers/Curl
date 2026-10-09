@@ -32,6 +32,7 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 ## Measurements
 
 - 2026-10-08_1640: 3 of 3 items are gaps.
+- 2026-10-08_2029: 3 of 3 items are gaps.
 
 ## Log
 

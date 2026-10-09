@@ -4,11 +4,11 @@ title: Curl does not list threadsafe in Features; the Windows reference build do
 area: features
 key: features:threadsafe-missing
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-08_2029
 regression: false
 items: [features:threadsafe]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -32,8 +32,10 @@ Record in an ADR whether Curl's transfers are thread-safe in the sense curl mean
 ## Measurements
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
+- 2026-10-08_2029: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
 - 2026-10-08_1731: Filed BL-1828.
+- 2026-10-08_2029: Closed: run 2026-10-08_2029 measured every item as match or excluded.

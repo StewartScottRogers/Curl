@@ -4,11 +4,11 @@ title: --compressed mishandles 'Content-Encoding: none' and a broken deflate hea
 area: behaviour
 key: behaviour:content-encoding-edge-cases
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-08_2029
 regression: false
 items: [behaviour:test223, behaviour:test328]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Http.UnitLibrary's HttpContentCoding / HttpContentDecoder: trea
 ## Measurements
 
 - 2026-10-08_1640: 2 of 2 items are gaps.
+- 2026-10-08_2029: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1810.
+- 2026-10-08_2029: Closed: run 2026-10-08_2029 measured every item as match or excluded.

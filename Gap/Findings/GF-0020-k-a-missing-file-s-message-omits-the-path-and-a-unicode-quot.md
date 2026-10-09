@@ -32,6 +32,7 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 ## Measurements
 
 - 2026-10-08_1640: 2 of 2 items are gaps.
+- 2026-10-08_2029: 2 of 2 items are gaps.
 
 ## Log
 
