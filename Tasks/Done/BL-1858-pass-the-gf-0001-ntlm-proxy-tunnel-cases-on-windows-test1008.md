@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1858 — Pass the GF-0001 NTLM proxy-tunnel cases on Windows (test1008, 1021, 209, 213, 265) and settle test2043
 
@@ -25,13 +25,19 @@ Split from BL-1856. Measured 2026-10-08 on Windows:
 
 ## Acceptance criteria
 
-- [ ] Upstream test1008, test1021, test209, test213 and test265 pass and are listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test2043 passes and is listed, or is skipped by the harness with a stated reason.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] Upstream test1008, test1021, test209, test213 and test265 pass and are listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test2043 passes and is listed, or is skipped by the harness with a stated reason.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+- Decision (ADR-0455): the dialing `CurlComposition.CreateRunner` takes `usesHandBuiltNtlm`; the harness sets it, so NTLM to the origin and through the CONNECT tunnel uses the hand-built context on every platform (`HandBuiltNtlmSecurityContextFactory`). The executable still uses SSPI on Windows.
+- Measured on Windows: test1008, 1021, 209, 213, 265 and the origin-NTLM cases 67, 68, 69, 81 now pass and are listed. test90 still differs (an extra type-1 after a redirect) and is left unlisted.
+- test2043: `UpstreamCaseScreening` now skips a case with no `<server>`, expected exit 0 and an http(s) URL to a dotted host name: "the case reaches revoked.badssl.com on the internet, which the harness does not". Cases expecting a failure (75, 467, 484, 485) keep running.
+- Measure-CodeQuality was not run (time and cost cap); the new class and the new screening rule have unit tests covering every branch.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Upstream NTLM cases 1008, 1021, 209, 213, 265, 67, 68, 69, 81 pass in the harness via hand-built NTLM; test2043 is screened as needing the internet
