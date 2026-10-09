@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1830 — Close GF-0037: Curl lists the smb and smbs schemes in curl -V, and the reference 8.21.0 Windows build does not
 
@@ -35,14 +35,19 @@ Remove smb and smbs from the Protocols: line in CurlVersionText.ProtocolsLine (C
 
 ## Acceptance criteria
 
-- [ ] `protocols:smb`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
-- [ ] `protocols:smbs`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `protocols:smb`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
+- [x] `protocols:smbs`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Decision (ADR-0453, decided by Claude under Stewart's delegation): new `CurlVersionText.WindowsProtocolsLine` without `smb`/`smbs`, written by `Lines` on Windows only. Measured local `curl.exe -V` (8.21.0 Schannel): its `Protocols:` line equals the new constant byte for byte. Linux and macOS keep `ProtocolsLine`, since the finding measured only the Windows reference build; `smb://` and `smbs://` still work everywhere.
+- Added `Curl.Console.UnitTests` to `touches`: four `-V` tests there compared against `ProtocolsLine` and now compare against the running platform's line from `CurlVersionText.Lines`. No other task in Doing on `origin/work/dark-factory` names it.
+- No option changed, so `--ai-help` needs nothing. Measure-CodeQuality not run: the one changed method gains a single branch, both arms covered by `CurlVersionTextTests`.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Windows curl -V omits smb and smbs from Protocols:, as the Schannel 8.21.0 build does (ADR-0453)

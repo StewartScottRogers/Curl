@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Cli;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Testing;
@@ -172,7 +173,8 @@ public sealed class CurlCompositionSshTests
         Diagnostics.Act("exit code", exitCode);
         Diagnostics.Act("standard output", standardOutput);
         Diagnostics.Assert("exit code", 0, exitCode);
-        StringAssert.Contains(standardOutput, "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smb smbs smtp smtps telnet tftp ws wss");
+        StringAssert.Contains(standardOutput, CurlVersionText.Lines(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())[2]);
+        StringAssert.Contains(standardOutput, " rtsp scp sftp ");
         Assert.AreEqual(0, exitCode);
     }
 

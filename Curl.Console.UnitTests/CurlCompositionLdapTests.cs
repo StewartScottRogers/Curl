@@ -187,8 +187,8 @@ public sealed class CurlCompositionLdapTests
         string protocols = Encoding.ASCII.GetString(standardOutput.ToArray()).Split(Environment.NewLine).Single(line => line.StartsWith("Protocols:", StringComparison.Ordinal));
         Diagnostics.Act("exit code", exitCode);
         Diagnostics.Act("protocols line", protocols);
-        Diagnostics.Assert("protocols line", CurlVersionText.ProtocolsLine, protocols);
-        Assert.AreEqual(CurlVersionText.ProtocolsLine, protocols);
+        Diagnostics.Assert("protocols line", CurlVersionText.Lines(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())[2], protocols);
+        Assert.AreEqual(CurlVersionText.Lines(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())[2], protocols);
         StringAssert.Contains(protocols, " ipns ldap ldaps mqtt ");
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);

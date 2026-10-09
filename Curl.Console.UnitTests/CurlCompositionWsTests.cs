@@ -163,9 +163,9 @@ public sealed class CurlCompositionWsTests
 
         string protocols = standardOutput.Split(Environment.NewLine).Single(line => line.StartsWith("Protocols:", StringComparison.Ordinal));
         Diagnostics.Act("protocols line", protocols);
-        Diagnostics.Assert("protocols line", CurlVersionText.ProtocolsLine, protocols);
+        Diagnostics.Assert("protocols line", CurlVersionText.Lines(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())[2], protocols);
         Diagnostics.Assert("exit code", 0, exitCode);
-        Assert.AreEqual(CurlVersionText.ProtocolsLine, protocols);
+        Assert.AreEqual(CurlVersionText.Lines(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())[2], protocols);
         StringAssert.EndsWith(protocols, " telnet tftp ws wss");
         Assert.AreEqual(0, exitCode);
     }
