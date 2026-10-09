@@ -132,6 +132,25 @@ public sealed class ConnectToMappingsTests
     }
 
     [TestMethod]
+    [DataRow("ax]", "x")]
+    [DataRow("]", "a")]
+    public void Map_WithAnUnbracketedHostEndingInAClosingBracket_ComparesTheHostAsWritten(string mappedHost, string urlHost)
+    {
+        // Only a host that both starts with '[' and ends with ']' loses its brackets; curl
+        // compares any other mapping host to the URL's host as written, so these do not match.
+        var mapping = $"{mappedHost}:80:127.0.0.9:9";
+        Diagnostics.Arrange("URL host", urlHost);
+        Diagnostics.Arrange("mapping", mapping);
+        var mappings = new ConnectToMappings([mapping]);
+
+        var destination = mappings.Map(urlHost, 80);
+
+        Diagnostics.Act("destination", destination);
+        Diagnostics.Assert("destination", new ConnectDestination(urlHost, 80, IsMapped: false, ParseError: null), destination);
+        Assert.AreEqual(new ConnectDestination(urlHost, 80, IsMapped: false, ParseError: null), destination);
+    }
+
+    [TestMethod]
     public void Map_UsesTheFirstMatchingMapping()
     {
         // curl --connect-to a:81:127.0.0.1:9 --connect-to a:80:127.0.0.6:9 --connect-to a:80:127.0.0.7:9 http://a/ -> Trying 127.0.0.6:9

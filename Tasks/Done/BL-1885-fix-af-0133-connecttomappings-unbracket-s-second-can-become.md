@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1885 — Fix AF-0133: ConnectToMappings.Unbracket's second '&&' can become '||' with no test failing: --connect-to hosts ending in ']' are stripped, and ']' throws
 
@@ -41,12 +41,25 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The production code was already right; the gap was a missing test. Added
+  `Map_WithAnUnbracketedHostEndingInAClosingBracket_ComparesTheHostAsWritten` to
+  `Curl.Networking.UnitTests/ConnectToMappingsTests.cs` with rows `ax]` vs `x` and `]` vs `a`:
+  both expect the URL's host left unmapped, since curl compares a mapping host that is not
+  wrapped in `[...]` to the URL's host as written. I applied the mutant ('&&' -> '||' before
+  `EndsWith`) by hand: both rows fail (the second because `host[1..^1]` throws), and both
+  pass once it is reverted. I did not run the seeded Invoke-MutationTest sample: it is an
+  audit path, which a lane may not read.
+- `touches` named only the library. The library's own test project `Curl.Networking.UnitTests`
+  was the only file changed. A library task always reaches its test project too, so I did
+  not add it to `touches`.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. A test now kills the AF-0133 mutant; build clean, fast tests green
