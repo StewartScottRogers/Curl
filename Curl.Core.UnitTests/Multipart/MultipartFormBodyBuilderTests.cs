@@ -90,6 +90,38 @@ public sealed class MultipartFormBodyBuilderTests
     }
 
     [TestMethod]
+    public async Task UpstreamTest1315ThreeFilesOneTypedMatchCurl()
+    {
+        // Measured 2026-10-08 (BL-1847), log/test1315.txt holding foo LF:
+        // -F name=value -F "file=@log/test1315.txt,log/test1315.txt;type=magic/content,log/test1315.txt"
+        const string B = "------------------------t0mvyLsCSTbstGTvmA2Z1l";
+        const string Inner = "------------------------DYrKNSMbnJRxIkC7I1djEf";
+        const string Path = "log/test1315.txt";
+        FormFileSystem files = new FormFileSystem().WithFile(Path, "foo\n");
+        MultipartFormBuildResult result = await BuildAsync(
+            files,
+            [B, Inner],
+            Text("name", "value"),
+            Multipart(
+                "file",
+                null,
+                File(null, MultipartFormPartKind.FileUpload, Path),
+                new MultipartFormPart(null, MultipartFormPartKind.FileUpload, Path, "magic/content", null, NoHeaders, NoParts),
+                File(null, MultipartFormPartKind.FileUpload, Path)));
+
+        const string Attachment = "Content-Disposition: attachment; filename=\"test1315.txt\"\r\n";
+        string expected =
+            $"--{B}\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nvalue\r\n"
+            + $"--{B}\r\nContent-Disposition: form-data; name=\"file\"\r\nContent-Type: multipart/mixed; boundary={Inner}\r\n\r\n"
+            + $"--{Inner}\r\n{Attachment}Content-Type: text/plain\r\n\r\nfoo\n\r\n"
+            + $"--{Inner}\r\n{Attachment}Content-Type: magic/content\r\n\r\nfoo\n\r\n"
+            + $"--{Inner}\r\n{Attachment}Content-Type: text/plain\r\n\r\nfoo\n\r\n"
+            + $"--{Inner}--\r\n\r\n"
+            + $"--{B}--\r\n";
+        await AssertBodyAsync(result, expected, 824, B);
+    }
+
+    [TestMethod]
     public async Task NestedMultipartWithATypeMatchesCurl()
     {
         // -F "m=(;type=multipart/alternative" -F x=1 -F y=@t.txt -F "=)" -F z=2

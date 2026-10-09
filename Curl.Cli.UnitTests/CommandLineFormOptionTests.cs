@@ -297,6 +297,50 @@ public sealed class CommandLineFormOptionTests
     }
 
     [TestMethod]
+    public void Parse_UpstreamTest1315ThreeFilesOneTyped_AreAMultipartOfThreeFileUploads()
+    {
+        const string File = "log/test1315.txt";
+        CommandLineParseResult result = Parse(["-F", "name=value", "-F", $"file=@{File},{File};type=magic/content,{File}", Url]);
+
+        AssertAccepted(result);
+        IReadOnlyList<FormPartSpecification> parts = result.Options!.FormParts;
+        Assert.HasCount(2, parts);
+        AssertPart(parts[0], "name", FormPartKind.Text, "value");
+        AssertPart(parts[1], "file", FormPartKind.Multipart, string.Empty);
+        Assert.HasCount(3, parts[1].Parts);
+        AssertPart(parts[1].Parts[0], null, FormPartKind.FileUpload, File);
+        AssertPart(parts[1].Parts[1], null, FormPartKind.FileUpload, File, contentType: "magic/content");
+        AssertPart(parts[1].Parts[2], null, FormPartKind.FileUpload, File);
+    }
+
+    [TestMethod]
+    public void Parse_UpstreamTest1133QuotedFileNamesWithCommaSemicolonAndQuote_KeepTheirCharacters()
+    {
+        const string File = "log/test1133,and;.txt";
+        CommandLineParseResult result = Parse(
+        [
+            "-F", $"file=@\"{File}\";type=mo/foo;filename=\"faker,and;.txt\"",
+            "-F", $"file2=@\"{File}\"",
+            "-F", $"file3=@\"{File}\";type=m/f,\"{File}\"",
+            "-F", "a={\"field1\":\"value1\",\"field2\":\"value2\"}",
+            "-F", "b=\" \\\\value1;type=\\\"whatever\\\" \"; type=text/foo; charset=utf-8 ; filename=param_b",
+            Url,
+        ]);
+
+        AssertAccepted(result);
+        IReadOnlyList<FormPartSpecification> parts = result.Options!.FormParts;
+        Assert.HasCount(5, parts);
+        AssertPart(parts[0], "file", FormPartKind.FileUpload, File, contentType: "mo/foo", fileName: "faker,and;.txt");
+        AssertPart(parts[1], "file2", FormPartKind.FileUpload, File);
+        AssertPart(parts[2], "file3", FormPartKind.Multipart, string.Empty);
+        Assert.HasCount(2, parts[2].Parts);
+        AssertPart(parts[2].Parts[0], null, FormPartKind.FileUpload, File, contentType: "m/f");
+        AssertPart(parts[2].Parts[1], null, FormPartKind.FileUpload, File);
+        AssertPart(parts[3], "a", FormPartKind.Text, "{\"field1\":\"value1\",\"field2\":\"value2\"}");
+        AssertPart(parts[4], "b", FormPartKind.Text, " \\value1;type=\"whatever\" ", contentType: "text/foo; charset=utf-8", fileName: "param_b");
+    }
+
+    [TestMethod]
     public void Parse_OpenedMultipart_TakesThePartsUntilClosed()
     {
         CommandLineParseResult result = Parse(["-F", "a=(;type=multipart/mixed", "-F", "b=c", "-F", "=)", "-F", "d=e", Url]);
