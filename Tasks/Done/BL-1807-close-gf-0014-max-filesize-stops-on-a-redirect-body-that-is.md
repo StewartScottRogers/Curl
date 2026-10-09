@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1807 — Close GF-0014: --max-filesize stops on a redirect body that is not kept, and does not stop a decompressed body that grows past the limit
 
@@ -35,14 +35,27 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: 
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test477`: Curl answers what curl 8.21.0 answers, `upstream test477 passes`, so the item measures `match`.
-- [ ] `behaviour:test1618`: Curl answers what curl 8.21.0 answers, `reference curl exits 63; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test477`: Curl answers what curl 8.21.0 answers, `upstream test477 passes`, so the item measures `match`.
+- [x] `behaviour:test1618`: Curl answers what curl 8.21.0 answers, `reference curl exits 63; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- 2026-10-08: `HttpProtocolHandler.DeliveryOf` no longer applies the Content-Length limit to a
+  discarded body (a redirect `-L` follows, a 401 before its retry), as curl's `!ignorebody`
+  check does (test477). `HttpContentDecoder.MaximumDeliveredSize`, set from the body reader's
+  `MaximumBodySize`, holds the decoded bytes to the limit: it writes what the limit allows and
+  ends with exit 63, the same message the undecoded limit gives (test1618). ADR-0442.
+- Lane runs may not read `Gap/` or the gap run's upstream data (audit guard), so test1618's
+  exact expected output file was not read; writing up to the limit before failing mirrors the
+  undecoded path. If the re-measure still shows a byte difference, curl writes less (nothing
+  of the overflowing write) and `DeliverWithinLimitAsync` is where to change it.
+- Tests: `ExecuteAsync_RedirectBodyOverMaxFileSizeWhileFollowing_GivesTheRedirect` and
+  `ExecuteAsync_CompressedBodyDecodesPastMaxFileSize_WritesTheLimitThenFailsWithExit63`.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. --max-filesize skips a discarded redirect body and holds decoded bytes to the limit (exit 63); ADR-0442
