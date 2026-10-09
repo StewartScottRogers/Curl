@@ -64,14 +64,31 @@ public static class UrlSchemeGuesser
     }
 
     /// <summary>Tells whether <paramref name="url" /> starts with a scheme and <c>:/</c>.</summary>
+    /// <remarks>
+    /// On Windows a single ASCII letter and a colon is a drive prefix, not a scheme, as in
+    /// curl 8.21.0's <c>Curl_is_absolute_url</c>: so <c>Z:/dir/file</c> is given the
+    /// <c>--proto-default</c> (or guessed) scheme, and <c>file://Z:/dir/file</c> names the
+    /// local file <c>Z:/dir/file</c> (upstream test1146).
+    /// </remarks>
     /// <param name="url">The URL as the command line gave it.</param>
     /// <returns><see langword="true" /> when the URL names its own scheme.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
-    public static bool HasScheme(string url)
+    public static bool HasScheme(string url) => HasScheme(url, OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Tells whether <paramref name="url" /> starts with a scheme and <c>:/</c>, reading a single
+    /// ASCII letter and a colon as a drive prefix rather than a scheme when
+    /// <paramref name="runsOnWindows" /> is set.
+    /// </summary>
+    /// <param name="url">The URL as the command line gave it.</param>
+    /// <param name="runsOnWindows"><see langword="true" /> to apply curl's Windows drive-prefix rule.</param>
+    /// <returns><see langword="true" /> when the URL names its own scheme.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="url" /> is <see langword="null" />.</exception>
+    public static bool HasScheme(string url, bool runsOnWindows)
     {
         ArgumentNullException.ThrowIfNull(url);
 
-        if (url.Length == 0 || !char.IsAsciiLetter(url[0]))
+        if (url.Length == 0 || !char.IsAsciiLetter(url[0]) || (runsOnWindows && url.Length > 1 && url[1] == ':'))
         {
             return false;
         }

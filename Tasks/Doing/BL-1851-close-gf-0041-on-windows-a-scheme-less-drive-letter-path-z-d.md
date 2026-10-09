@@ -41,6 +41,20 @@ In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single
 
 ## Notes
 
+- `UrlSchemeGuesser.HasScheme(url)` now calls a new overload `HasScheme(url, runsOnWindows)`
+  with `OperatingSystem.IsWindows()`; on Windows a letter and a colon is a drive prefix,
+  not a scheme, as curl 8.21.0's `Curl_is_absolute_url` does with `guess_scheme` set
+  (`STARTS_WITH_DRIVE_PREFIX`: letter and colon, slash or not). The flag keeps both
+  branches covered on any platform; `[OSCondition]` tests pin each platform's
+  `AddScheme("Z:/dir/file", "file")`. No ADR: it matches curl, no choice was made.
+- `ProxyUrlParser` and `IpfsGatewayRewriter` share `HasScheme`, and curl also guesses
+  schemes there, so they follow the same rule.
+- Checked end to end: `curl --proto-default file Z:/<dir>/t.txt` (and the backslash form)
+  prints the file and exits 0. A path with a space (the temp folder) is still exit 3,
+  `Malformed input to a URL function`, which is curl's answer for a raw space too.
+- `CoreParserAdversarialTests`' `h:/` row became `hx:/`, since `h:/` is now a drive on
+  Windows.
+
 ## Log
 
 - 2026-10-08: Created.

@@ -235,7 +235,7 @@ public sealed class CoreParserAdversarialTests
     }
 
     [TestMethod]
-    [DataRow("h:/")]
+    [DataRow("hx:/")]
     [DataRow("a+b.c-d://x")]
     [DataRow("HTTP://x")]
     public void UrlSchemeGuesser_AnySchemeShapedPrefix_CountsAsAScheme(string url) =>
