@@ -127,7 +127,8 @@
 
     To restart a running shift - to pick up a change to this script, say - run
     `RunDarkFactory.cmd -Restart`. It stops the coordinator first, so nothing restarts the
-    lanes, then each lane as soon as that lane is neither claiming nor integrating, and
+    lanes, then each lane as soon as that lane is neither claiming nor integrating nor
+    within two minutes of taking its task (AF-0129), and
     starts a new shift with the old one's arguments, which adopts the stopped lanes and
     their tasks (BL-895). Only this checkout's shift is touched.
 
@@ -4314,9 +4315,14 @@ if ($AutoLanesReport) {
 function Select-LanesToStop {
     # The lanes -Restart may stop now, from -Phases (lane number -> heartbeat phase, '' when
     # it has none): all but a lane mid-claim, which could leave a task in Doing that no
-    # lane holds, or mid-integration, which could leave a half-finished rebase (BL-895).
-    param([hashtable]$Phases)
-    return @($Phases.Keys | Where-Object { $Phases[$_] -notin 'claim', 'integrate' } | Sort-Object)
+    # lane holds, or mid-integration, which could leave a half-finished rebase (BL-895). A
+    # lane whose run began under two minutes ago (-TaskAgeSeconds: lane number -> seconds
+    # since it took its task) is left to get going too: stopping it leaves a log with no
+    # result and a run that costs a resume for nothing (AF-0129).
+    param([hashtable]$Phases, [hashtable]$TaskAgeSeconds = @{})
+    return @($Phases.Keys | Where-Object {
+        $Phases[$_] -notin 'claim', 'integrate' -and -not ($Phases[$_] -eq 'run' -and $TaskAgeSeconds.ContainsKey($_) -and $TaskAgeSeconds[$_] -lt 120)
+    } | Sort-Object)
 }
 
 if ($TestRestart) {
@@ -4327,7 +4333,10 @@ if ($TestRestart) {
     $none = (Select-LanesToStop @{ 1 = 'claim'; 2 = 'integrate' }).Count
     $ok2 = $none -eq 0
     Write-Host "$(if ($ok2) { 'PASS' } else { 'FAIL' }) nothing stops while every lane claims or integrates: $none" -ForegroundColor $(if ($ok2) { 'Green' } else { 'Red' })
-    exit $(if ($ok -and $ok2) { 0 } else { 1 })
+    $young = (Select-LanesToStop @{ 1 = 'run'; 2 = 'run'; 3 = 'run' } @{ 1 = 8; 2 = 600 }) -join ','
+    $ok3 = $young -ceq '2,3'
+    Write-Host "$(if ($ok3) { 'PASS' } else { 'FAIL' }) a run under two minutes old waits; an older one and one of unknown age stop: $young" -ForegroundColor $(if ($ok3) { 'Green' } else { 'Red' })
+    exit $(if ($ok -and $ok2 -and $ok3) { 0 } else { 1 })
 }
 
 if ($Restart) {
@@ -4356,11 +4365,16 @@ if ($Restart) {
             $phases[$n] = if (Test-Path $beat) { "$((Get-Content $beat -Raw | ConvertFrom-Json).phase)" } else { '' }
         }
         if (-not $phases.Count) { break }
-        foreach ($n in Select-LanesToStop $phases) {
+        $ages = @{}
+        foreach ($n in $phases.Keys) {
+            $taskFile = Get-LaneStatePath $n 'task' $stamp
+            if (Test-Path $taskFile) { $ages[$n] = ((Get-Date) - (Get-Item $taskFile).LastWriteTime).TotalSeconds }
+        }
+        foreach ($n in Select-LanesToStop $phases $ages) {
             taskkill /PID ([int](Get-LaneState $n 'pid' $stamp)) /T /F 2>&1 | Out-Null
             Write-Host "$(Get-Date -Format 'HH:mm:ss') lane $n stopped ($(if ($phases[$n]) { $phases[$n] } else { 'no heartbeat' }); $(Get-LaneState $n 'task' $stamp))"
         }
-        $waiting = @($phases.Keys | Where-Object { $phases[$_] -in 'claim', 'integrate' })
+        $waiting = @($phases.Keys | Where-Object { $phases[$_] -in 'claim', 'integrate' -or ($phases[$_] -eq 'run' -and $ages.ContainsKey($_) -and $ages[$_] -lt 120) })
         if ($waiting.Count) { Start-Sleep -Seconds 5 }
     }
     $where = Start-Detached -Label 'DF shift starting' -Dir $Root -ScriptArgs $forward
