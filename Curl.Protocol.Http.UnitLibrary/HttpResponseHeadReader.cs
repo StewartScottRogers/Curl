@@ -163,6 +163,12 @@ internal sealed class HttpResponseHeadReader
     internal bool AcceptsHttp09 { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the request is a HEAD (<c>-I</c>), which an HTTP/0.9
+    /// answer cannot satisfy even when <see cref="AcceptsHttp09" /> is set.
+    /// </summary>
+    internal bool IsHeadRequest { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether <c>--ignore-content-length</c> leaves Content-Length
     /// unread, so no <see cref="HttpConnectionInfoLines.OverflowContentLength" /> line is written.
     /// </summary>
@@ -268,9 +274,11 @@ internal sealed class HttpResponseHeadReader
             return http09;
         }
 
+        bool afterInformational = false;
         while (true)
         {
-            HttpStatusLine statusLine = await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
+            HttpStatusLine statusLine = await ReadStatusLineAfterAsync(afterInformational, cancellationToken).ConfigureAwait(false);
+            afterInformational = true;
             bool closed;
             try
             {
@@ -414,8 +422,10 @@ internal sealed class HttpResponseHeadReader
     /// <summary>
     /// Gives the head of an HTTP/0.9 response <see cref="AcceptsHttp09" /> accepts, its bytes
     /// so far the start of the body, or <see langword="null" /> when HTTP/0.9 is not accepted
-    /// or the response can still begin <c>HTTP/</c>.
+    /// or the response can still begin <c>HTTP/</c>. A HEAD request's HTTP/0.9 answer fails
+    /// with exit 8, as curl 8.21.0 fails it (upstream test1144, BL-1805).
     /// </summary>
+    /// <exception cref="HttpTransferException">The answer is HTTP/0.9 and <see cref="IsHeadRequest" /> is set (exit 8).</exception>
     private async ValueTask<HttpResponseHead?> ReadHttp09HeadAsync(CancellationToken cancellationToken)
     {
         if (!AcceptsHttp09 || IsHttp2OrHttp3 || !await lines.BeginsOtherThanHttpAsync(cancellationToken).ConfigureAwait(false))
@@ -423,8 +433,30 @@ internal sealed class HttpResponseHeadReader
             return null;
         }
 
+        if (IsHeadRequest)
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
+        }
+
         EndedAtEmptyLine = true;
         return new HttpResponseHead(HttpStatusLine.Http09(), [], ReadOnlyMemory<byte>.Empty, lines.TakeRemaining());
+    }
+
+    /// <summary>
+    /// Reads a status line; after a 1xx head, bytes that cannot begin one are a weird server
+    /// reply (exit 8, <c>Invalid status line</c>) rather than an HTTP/0.9 response (exit 1), as
+    /// curl 8.21.0 fails them (upstream test1480, BL-1805).
+    /// </summary>
+    private async ValueTask<HttpStatusLine> ReadStatusLineAfterAsync(bool afterInformational, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ReadStatusLineAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException failure) when (afterInformational && failure.Message == HttpTransferMessages.Http09NotAllowed)
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
+        }
     }
 
     private async ValueTask<HttpStatusLine> ReadStatusLineAsync(CancellationToken cancellationToken)
@@ -477,8 +509,9 @@ internal sealed class HttpResponseHeadReader
                 return false;
             }
 
+            bool folds = builder.FoldsIntoPendingHeader(line);
             builder.AddLine(line);
-            if (!line.IsContinuation)
+            if (!folds)
             {
                 ReleaseHeldHeader();
                 heldHeaderInfoLine = InfoLineBefore(statusLine, line.Content);

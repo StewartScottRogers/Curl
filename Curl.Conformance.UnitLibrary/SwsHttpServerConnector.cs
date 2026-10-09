@@ -1,3 +1,4 @@
+using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -36,6 +37,12 @@ namespace Curl.Conformance;
 /// </remarks>
 public sealed class SwsHttpServerConnector : IConnector
 {
+    // Each connection gets the next port of the ephemeral range (49152 to 65535) as its local end point, wrapping round
+    // after the last, so %{local_port} is a number however many connections a run opens.
+    private const int FirstLocalPort = 49152;
+
+    private const int LocalPortCount = 65536 - FirstLocalPort;
+
     private readonly SwsServerRecording recording = new();
 
     private readonly SwsServerAbandonment abandonment = new();
@@ -47,6 +54,8 @@ public sealed class SwsHttpServerConnector : IConnector
     private readonly TimeSpan waitAfterReply;
 
     private readonly TimeProvider timeProvider;
+
+    private int connectionsOpened;
 
     /// <summary>Creates a server that answers from <paramref name="testCase"/>'s <c>&lt;reply&gt;</c> section on the system clock.</summary>
     /// <param name="testCase">The test case, parsed after <see cref="UpstreamTestFileExpander"/> has expanded it.</param>
@@ -91,15 +100,19 @@ public sealed class SwsHttpServerConnector : IConnector
     /// </summary>
     public void Abandon() => abandonment.Abandon();
 
-    /// <summary>Opens a new in-memory connection to the server; it fails only after <see cref="Abandon"/>.</summary>
-    /// <param name="target">Ignored: every host and port reaches the same server.</param>
+    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on, wrapping round after 65535, its remote end point 127.0.0.1 at the target's port; it fails only after <see cref="Abandon"/>.</summary>
+    /// <param name="target">Gives only the remote end point's port: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
     /// <exception cref="IOException">The server has been abandoned.</exception>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         abandonment.ThrowIfAbandoned();
-        return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)));
+        return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)
+        {
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, target.Port),
+        }));
     }
 
     private static ReadOnlySpan<byte> ReplyPart(UpstreamTestCase testCase, string name) =>

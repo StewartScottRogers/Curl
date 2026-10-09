@@ -70,14 +70,18 @@ unreadable `Content-Length`, which sws stops reading before the rules; after a r
 containing `swsbounce` the next request gets that part plus one; both states are kept across
 connections. A `CONNECT host:port HTTP/x.y` request with no number in its path is answered
 from `<connect>` / `<connectN>`, and the connection stays open for the tunnelled request.
-Otherwise a read with no reply waiting returns 0, because in memory nothing else can arrive.
+A read before the client's first write waits for that write, as sws blocks reading the
+request (a telnet `-T` session reads while its upload is on its way; BL-1853). Otherwise a
+read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands
 the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),
 asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other
 than `http`, `file` or `none`, a missing feature, a variable with no value, an unsupported
 `<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
-outside the case's log directory), writes `<client><file>` parts into
+outside the case's log directory; `%PWD` has a value only when the caller names a tests
+directory, and a log or tests directory holding a blank is refused, since commands name both
+unquoted, GF-0044), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
 the `sws` emulation and `UnreachableDatagramConnector`. The emulation's clock is the real one

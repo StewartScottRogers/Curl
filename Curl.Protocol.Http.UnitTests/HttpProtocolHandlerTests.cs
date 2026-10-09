@@ -294,6 +294,22 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ConnectWithoutLocalEndPoint_ReportsTheConnectionsOwn()
+    {
+        IPEndPoint local = new(IPAddress.Loopback, 49152);
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(Head + "hello"), 4096, null) { LocalEndPoint = local };
+        QueueConnector connector = new(ConnectResult.Connected(connection));
+        Diagnostics.Arrange("connection local end point, connect local end point, remote end point", $"{local}, none, none");
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("http://example.com/path?q=1", new MemoryStream()));
+
+        WriteResult(result);
+        Diagnostics.Assert("local end point", local, result.Report!.LocalEndPoint);
+        Assert.AreEqual(local, result.Report.LocalEndPoint);
+        Assert.IsNull(result.Report.RemoteEndPoint);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnectWithPeerCertificates_ReportsTheSameChainInOrder()
     {
         ReadOnlyMemory<byte>[] chain = [new byte[] { 0x30, 0x01 }, new byte[] { 0x30, 0x02 }];
@@ -1171,6 +1187,30 @@ public sealed partial class HttpProtocolHandlerTests
     /// <summary>Writes an ACT line with every recorded event, CR and LF shown escaped.</summary>
     private void WriteEvents(string label, IEnumerable<string> lines) =>
         Diagnostics.Act(label, OneLine(string.Join(" | ", lines)));
+
+    [TestMethod]
+    [DataRow("Host: localhost", "http://localhost/we/want/1258")]
+    [DataRow("host: localhost:8990", "http://localhost:8990/we/want/1258")]
+    [DataRow("Host:", "http://127.0.0.1:47/we/want/1258")]
+    [DataRow("Host: a b", "http://127.0.0.1:47/we/want/1258")]
+    public void CookieUrlOf_CustomHost_MatchesCookiesAgainstItsHost(string header, string expected)
+    {
+        CurlUrl url = CurlUrl.Parse("http://127.0.0.1:47/we/want/1258?q=1");
+
+        CurlUrl cookieUrl = HttpProtocolHandler.CookieUrlOf(url, new HttpRequestOptions { Headers = [header] });
+
+        Assert.AreEqual(expected, $"{cookieUrl.Scheme}://{cookieUrl.Host}{(cookieUrl.IsDefaultPort ? "" : $":{cookieUrl.Port}")}{cookieUrl.AbsolutePath}");
+    }
+
+    [TestMethod]
+    public void CookieUrlOf_FollowedToAnotherHost_MatchesCookiesAgainstTheUrlsHost()
+    {
+        CurlUrl url = CurlUrl.Parse("http://yet.another.host/184");
+
+        CurlUrl cookieUrl = HttpProtocolHandler.CookieUrlOf(url, new HttpRequestOptions { Headers = ["Host: another.visitor"], FollowedToAnotherHost = true });
+
+        Assert.AreSame(url, cookieUrl);
+    }
 
     /// <summary>Writes the ASSERT line for two sequences of lines, CR and LF shown escaped.</summary>
     private void WriteExpectedLines(string label, IEnumerable<string> expected, IEnumerable<string> actual) =>

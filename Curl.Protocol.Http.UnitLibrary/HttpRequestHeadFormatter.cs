@@ -52,6 +52,12 @@ internal static class HttpRequestHeadFormatter
 
     private const string ConnectionName = "Connection";
 
+    private const string ContentTypeName = "Content-Type";
+
+    private const string ContentLengthName = "Content-Length";
+
+    private const string FormBoundaryPrefix = "multipart/form-data; boundary=";
+
     /// <summary>
     /// Formats the request head for <paramref name="url" />.
     /// </summary>
@@ -115,7 +121,7 @@ internal static class HttpRequestHeadFormatter
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
         AppendRequestLine(head, framing.Method, url, forwardProxy, options);
-        string? hostLine = FormatHostLine(url, customHeaders);
+        string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         if (hostLine is not null)
         {
             head.Append(hostLine).Append("\r\n");
@@ -131,9 +137,10 @@ internal static class HttpRequestHeadFormatter
         AppendH2cUpgrade(head, upgradesToH2c);
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
-        AppendCustomHeaders(head, customHeaders, hostLine is not null);
-        AppendCustomHeaders(head, proxyHeaders, hostLine is not null);
-        AppendBodyHeaders(head, customHeaders, framing);
+        string? formContentType = FormContentTypeOf(customHeaders, framing);
+        AppendCustomHeaders(head, customHeaders, hostLine is not null, formContentType is not null, framing.IsAuthProbe);
+        AppendCustomHeaders(head, proxyHeaders, hostLine is not null, false, framing.IsAuthProbe);
+        AppendBodyHeaders(head, customHeaders, framing, formContentType);
         AppendConnection(head, customHeaders, SendsTe(options, customHeaders), upgradesToH2c);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
@@ -228,7 +235,7 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Formats the <c>Host</c> line: the first <c>-H</c> value naming <c>Host</c> with its
-    /// name written <c>Host:</c>, or none when that value is exactly <c>Host:</c>, or else
+    /// name written <c>Host:</c>, or none when that value is exactly <c>Host:</c> in any case, or else
     /// the URL's host as written, bracketed if IPv6, with its port unless it is the
     /// default of an <c>http</c> or <c>https</c> URL (<see cref="HttpUrlText.HostHeaderAuthority" />).
     /// </summary>
@@ -238,11 +245,31 @@ internal static class HttpRequestHeadFormatter
         {
             if (header.Names(HostName))
             {
-                return header.Entry == "Host:" ? null : string.Concat("Host:", header.Entry.AsSpan(HostName.Length + 1));
+                return string.Equals(header.Entry, "Host:", StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : string.Concat("Host:", header.Entry.AsSpan(HostName.Length + 1));
             }
         }
 
         return $"Host: {HttpUrlText.HostHeaderAuthority(url)}";
+    }
+
+    /// <summary>
+    /// Gives the value of the first <c>-H</c> value naming <c>Host</c>, its name matched in any
+    /// case, or <see langword="null" /> when none names it, the one that does sends no value, or
+    /// the request is a follow to another host (<see cref="HttpRequestOptions.FollowedToAnotherHost" />).
+    /// </summary>
+    internal static string? CustomHostOf(HttpRequestOptions options)
+    {
+        foreach (HttpCustomHeader header in options.FollowedToAnotherHost ? [] : CustomHeadersOf(options.Headers, options))
+        {
+            if (header.Names(HostName))
+            {
+                return header.Value;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -301,14 +328,20 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// Appends each <c>-H</c> or <c>--proxy-header</c> value that sends a line, in order,
     /// leaving out every <c>Host:</c> line when a <c>Host</c> line was already written, and
-    /// every value naming <c>Connection</c>, which <see cref="AppendConnection" /> places.
+    /// every value naming <c>Connection</c>, which <see cref="AppendConnection" /> places, and
+    /// every value naming <c>Content-Type</c> when <paramref name="leavesOutContentType" />,
+    /// because <see cref="AppendBodyHeaders" /> sends it merged with the form's boundary, and
+    /// every value naming <c>Content-Length</c> when <paramref name="leavesOutContentLength" />,
+    /// because a Digest probe sends its own <c>Content-Length: 0</c> (BL-1835).
     /// </summary>
-    private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten)
+    private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten, bool leavesOutContentType, bool leavesOutContentLength)
     {
         foreach (HttpCustomHeader header in customHeaders)
         {
             if (header.SentLine is { } line
                 && !header.Names(ConnectionName)
+                && !(leavesOutContentType && header.Names(ContentTypeName))
+                && !(leavesOutContentLength && header.Names(ContentLengthName))
                 && !(hostLineWritten && line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)))
             {
                 head.Append(line).Append("\r\n");
@@ -328,19 +361,42 @@ internal static class HttpRequestHeadFormatter
     /// Appends the body's framing headers: <c>Content-Length</c> as
     /// <see cref="ContentLengthOf" /> gives it, <c>Transfer-Encoding: chunked</c> when its
     /// length is unknown, its <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's
-    /// own <c>Expect: 100-continue</c>.
+    /// own <c>Expect: 100-continue</c>. A <c>-F</c> form's <c>Content-Type</c> is
+    /// <paramref name="formContentType" /> when an <c>-H</c> value names one.
     /// </summary>
-    private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
+    private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing, string? formContentType)
     {
         if (framing.Body is not { } body)
         {
             return;
         }
 
-        AppendUnlessOverridden(head, customHeaders, "Content-Length", ContentLengthOf(framing));
+        AppendUnlessOverridden(head, framing.IsAuthProbe ? [] : customHeaders, ContentLengthName, ContentLengthOf(framing));
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
-        AppendUnlessOverridden(head, customHeaders, "Content-Type", framing.IsUpload ? null : body.ContentType);
+        AppendAlways(head, ContentTypeName, formContentType);
+        AppendUnlessOverridden(head, customHeaders, ContentTypeName, framing.IsUpload ? null : body.ContentType);
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
+    }
+
+    /// <summary>
+    /// Gives a <c>-F</c> form's <c>Content-Type</c> when an <c>-H</c> value names one, as curl
+    /// 8.21.0 sends it (upstream tests 277 and 669, BL-1811): the first such value, then
+    /// <c>; boundary=</c> and the form's boundary, in the generated header's place after
+    /// <c>Content-Length</c>, every <c>-H</c> <c>Content-Type</c> line left out. Gives
+    /// <see langword="null" /> when the body is not a <c>multipart/form-data</c> form or no
+    /// <c>-H</c> value names a non-empty <c>Content-Type</c>.
+    /// </summary>
+    private static string? FormContentTypeOf(HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
+    {
+        string? userType = customHeaders
+            .Where(header => header.Names(ContentTypeName))
+            .Select(header => header.Value)
+            .FirstOrDefault(value => !string.IsNullOrEmpty(value));
+        return framing is { Body.ContentType: { } bodyType }
+            && userType is not null
+            && bodyType.StartsWith(FormBoundaryPrefix, StringComparison.Ordinal)
+            ? $"{userType}; boundary={bodyType[FormBoundaryPrefix.Length..]}"
+            : null;
     }
 
     /// <summary>

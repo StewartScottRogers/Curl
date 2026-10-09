@@ -61,10 +61,20 @@ public sealed partial class HttpRequestHeadFormatterTests
     }
 
     [TestMethod]
+    [DataRow("Host: another.visitor\nX-A: 1", DisplayName = "Custom Host left out")]
+    [DataRow("Host:\nX-A: 1", DisplayName = "Host: disabling it ignored")]
+    public void Format_FollowedToAnotherHost_SendsTheUrlsHostInPlaceOfCustomHost(string headers)
+    {
+        // upstream test184: the followed request to yet.another.host sends its own Host (BL-1845).
+        AssertHead("GET / HTTP/1.1\r\n" + DefaultHeaders + "X-A: 1\r\n\r\n", CurlUrl.Parse(Url), new HttpRequestOptions { Headers = headers.Split('\n'), FollowedToAnotherHost = true });
+    }
+
+    [TestMethod]
     [DataRow("Accept:", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Remove Accept")]
     [DataRow("Accept:   ", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Remove Accept, blanks after colon")]
     [DataRow("Accept; y", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Accept; y removes Accept")]
     [DataRow("Host:", "User-Agent: curl/8.21.0\r\nAccept: */*\r\n", DisplayName = "Remove Host")]
+    [DataRow("host:", "User-Agent: curl/8.21.0\r\nAccept: */*\r\n", DisplayName = "Lower-case host: removes Host (upstream test461)")]
     [DataRow("Host:\nHost: x", "User-Agent: curl/8.21.0\r\nAccept: */*\r\nHost: x\r\n", DisplayName = "Removed Host, later Host sent last")]
     [DataRow("X-A:\nX-C:   ", DefaultHeaders, DisplayName = "Removing a header curl does not send")]
     [DataRow("Foo\nX-A: 1", DefaultHeaders + "X-A: 1\r\n", DisplayName = "No colon or semicolon dropped")]
@@ -352,6 +362,39 @@ public sealed partial class HttpRequestHeadFormatterTests
             $"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 100207\r\nContent-Type: multipart/form-data; boundary=b\r\n\r\n",
             CurlUrl.Parse(Url),
             options);
+    }
+
+    [TestMethod]
+    [DataRow("Content-Type: text/info", "text/info", DisplayName = "upstream test277")]
+    [DataRow("Content-type: multipart/form-data; charset=utf-8", "multipart/form-data; charset=utf-8", DisplayName = "upstream test669")]
+    public void Format_FormBodyWithCustomContentType_SendsThatTypeWithTheBoundaryAfterContentLength(string header, string userType)
+    {
+        HttpRequestOptions options = new()
+        {
+            Headers = ["X-A: 1", header, "Content-Type: second"],
+            Body = new StreamBody(new MemoryStream(), 158, "multipart/form-data; boundary=b"),
+        };
+
+        AssertHead(
+            $"POST / HTTP/1.1\r\n{DefaultHeaders}X-A: 1\r\nContent-Length: 158\r\nContent-Type: {userType}; boundary=b\r\n\r\n",
+            CurlUrl.Parse(Url),
+            options);
+    }
+
+    [TestMethod]
+    public void Format_FormBodyWithEmptyCustomContentType_SendsNoContentType()
+    {
+        HttpRequestOptions options = new() { Headers = ["Content-Type:"], Body = new StreamBody(new MemoryStream(), 158, "multipart/form-data; boundary=b") };
+
+        AssertHead($"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 158\r\n\r\n", CurlUrl.Parse(Url), options);
+    }
+
+    [TestMethod]
+    public void Format_NonFormBodyWithCustomContentType_SendsTheCustomLineUnchanged()
+    {
+        HttpRequestOptions options = new() { Headers = ["Content-Type: text/info"], Body = new StreamBody(new MemoryStream(), 3, "text/plain") };
+
+        AssertHead($"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Type: text/info\r\nContent-Length: 3\r\n\r\n", CurlUrl.Parse(Url), options);
     }
 
     [TestMethod]

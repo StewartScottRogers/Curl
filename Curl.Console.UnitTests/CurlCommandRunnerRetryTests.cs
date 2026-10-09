@@ -39,6 +39,8 @@ public sealed class CurlCommandRunnerRetryTests
 
     private static readonly string ServiceUnavailableLine = "curl: (22) The requested URL returned error: 503" + NewLine;
 
+    private static readonly string TooManyRequestsLine = "curl: (22) The requested URL returned error: 429" + NewLine;
+
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
     private readonly InMemoryFileSystem outputFiles = new();
@@ -71,6 +73,82 @@ public sealed class CurlCommandRunnerRetryTests
         Assert.AreEqual(RetryWarningLine, StandardErrorText);
         Assert.AreEqual("busyhello", StandardOutputText);
         CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
+    }
+
+    /// <summary>
+    /// Replays upstream test1633: a <c>-d</c> POST redirected by a <c>301</c> to a <c>429</c> with
+    /// <c>Retry-After: 1</c> is retried from the first URL, so curl 8.21.0 sends the POST with its
+    /// body again and follows the <c>301</c> again, and <c>-i</c> writes all four heads.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryOfARedirectedPostAnswered429_ResendsThePostFromTheFirstUrl()
+    {
+        const string moved = "HTTP/1.1 301 OK\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\nConnection: close\r\nLocation: /16330002\r\n\r\n";
+        const string tooMany = "HTTP/1.1 429 too many requests\r\nRetry-After: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        ScriptedConnector server = new(new[] { moved, tooMany, moved, tooMany }.Select(Encoding.Latin1.GetBytes));
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "http://127.0.0.1:18241/1633", "-d", "moo", "--retry", "1", "-L", "-i");
+        string[] requestLines = [.. Encoding.Latin1.GetString(server.Written).Split("\r\n").Where(line => line.StartsWith("POST ", StringComparison.Ordinal) || line.StartsWith("GET ", StringComparison.Ordinal) || line.StartsWith("moo", StringComparison.Ordinal))];
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", moved + tooMany + moved + tooMany, StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "POST /1633 HTTP/1.1", "mooGET /16330002 HTTP/1.1", "POST /1633 HTTP/1.1", "mooGET /16330002 HTTP/1.1" }, requestLines);
+        Assert.AreEqual(moved + tooMany + moved + tooMany, StandardOutputText);
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
+    }
+
+    /// <summary>
+    /// Replays upstream test1634: under <c>--fail</c> a <c>429</c> with <c>Retry-After: 1</c> is
+    /// retried, and with the <c>-i</c> runtests adds curl 8.21.0 writes the <c>429</c>'s head but
+    /// not its body, then the <c>200</c>'s head and body, and exits 0 (tests/data/test1634's datacheck).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryUnderFailOfA429WithRetryAfter_KeepsThe429sHeadAndWritesTheRetrysResponse()
+    {
+        const string tooManyHead = "HTTP/1.1 429 too many requests swsbounce\r\nRetry-After: 1\r\nContent-Length: 4\r\n\r\n";
+        const string okHead = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n";
+        ScriptedConnector server = new(new[] { tooManyHead + "moo\n", okHead + "hey\n" }.Select(Encoding.Latin1.GetBytes));
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "http://127.0.0.1:18241/1634", "--retry", "1", "--fail", "-i");
+        string[] requestLines = [.. Encoding.Latin1.GetString(server.Written).Split("\r\n").Where(line => line.StartsWith("GET ", StringComparison.Ordinal))];
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", tooManyHead + okHead + "hey\n", StandardOutputText);
+        Diagnostics.Diff("stderr", Lf(TooManyRequestsLine + RetryWarningLine), Lf(StandardErrorText));
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "GET /1634 HTTP/1.1", "GET /1634 HTTP/1.1" }, requestLines);
+        Assert.AreEqual(tooManyHead + okHead + "hey\n", StandardOutputText);
+        Assert.AreEqual(TooManyRequestsLine + RetryWarningLine, StandardErrorText);
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
+    }
+
+    /// <summary>
+    /// Replays upstream test366: a <c>503</c> whose <c>Retry-After: 200</c> ends past
+    /// <c>--retry-max-time 10</c> is not retried, so curl 8.21.0 sends one GET, writes the body,
+    /// warns in two lines wrapped at 79 columns and exits 0 (measured with Record-CurlExchange.ps1
+    /// on 2026-10-08, BL-1844).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryAfterLongerThanRetryMaxTime_SendsOneRequestWarnsAndExitsZero()
+    {
+        const string busy = "HTTP/1.1 503 BAD\r\nDate: Tue, 09 Nov 2010 14:49:00 GMT\r\nContent-Length: 21\r\nRetry-After: 200\r\n\r\nserver not available\n";
+        ScriptedConnector server = new(new[] { busy, Ok }.Select(Encoding.Latin1.GetBytes));
+        string expectedError =
+            "Warning: The Retry-After: time would make this command line exceed the maximum " + NewLine
+            + "Warning: allowed time for retries." + NewLine;
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "http://127.0.0.1:18241/366", "--retry", "2", "--retry-max-time", "10");
+        string[] requestLines = [.. Encoding.Latin1.GetString(server.Written).Split("\r\n").Where(line => line.StartsWith("GET ", StringComparison.Ordinal))];
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stderr", Lf(expectedError), Lf(StandardErrorText));
+        Diagnostics.Diff("stdout", "server not available\n", StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "GET /366 HTTP/1.1" }, requestLines);
+        Assert.AreEqual(expectedError, StandardErrorText);
+        Assert.AreEqual("server not available\n", StandardOutputText);
+        Assert.IsEmpty(clock.Waits);
     }
 
     [TestMethod]

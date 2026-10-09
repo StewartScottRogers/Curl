@@ -308,17 +308,40 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// A stream body has been read by the time the 401 arrives and cannot be sent again, so
-    /// the 401 is the result (BL-181 Notes, ADR-0034).
+    /// A seekable stream body, as a <c>-T</c> file or a <c>-F</c> form is, is rewound and sent
+    /// whole again with the answer to the 401, as upstream test1030 expects of curl 8.21.0.
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_ChallengeToAStreamBody_ReturnsThe401()
+    public async Task ExecuteAsync_ChallengeToASeekableStreamBody_SendsTheBodyAgain()
     {
         TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
         ScriptedAuthenticator authenticator = new(null, DigestValue);
         MemoryStream output = new();
         TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
-        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte stream body");
+        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte seekable stream body");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.AreEqual(2, connection.Written.Split("\r\n\r\nhello").Length - 1, connection.Written);
+        Assert.Contains("Authorization: " + DigestValue, connection.Written);
+    }
+
+    /// <summary>
+    /// A stream body that cannot seek, as stdin cannot, has been read by the time the 401
+    /// arrives and cannot be sent again, so the 401 is the result (BL-181 Notes, ADR-0034).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToAnUnseekableStreamBody_ReturnsThe401()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new UnseekableStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte unseekable stream body");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 
@@ -410,6 +433,90 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(2, authenticator.Calls.Count);
         Assert.IsTrue(authenticator.Calls[1].Request.ServerCertificate.IsEmpty);
     }
+
+    /// <summary>
+    /// With <c>--digest</c> the first POST is a probe with an empty body and
+    /// <c>Content-Length: 0</c>; the body goes only with the answer to the challenge, as
+    /// upstream test1001 and test2058 expect of curl 8.21.0 (ADR-0441).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestPostBeforeAChallenge_SendsAnEmptyProbeFirst()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        MemoryStream output = new();
+        TransferContext context = DigestPostContext(output);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.DoesNotContain("hello", requests[0]);
+        Assert.Contains("Authorization: " + DigestValue, requests[1]);
+        Assert.EndsWith("Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello", requests[1]);
+    }
+
+    /// <summary>
+    /// A probe answered with a 2xx instead of a challenge is followed by the same POST with its
+    /// body and no credentials, as upstream test175 expects of curl 8.21.0 (ADR-0441).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeAnsweredWithoutAChallenge_SendsTheBodyNext()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok", OkHead + "ok");
+        MemoryStream output = new();
+        TransferContext context = DigestPostContext(output);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest, a server asking for no auth");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, null)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.EndsWith("\r\n\r\nhello", requests[1]);
+        Assert.DoesNotContain("Authorization:", requests[1]);
+    }
+
+    /// <summary>
+    /// The probe's <c>Content-Length: 0</c> replaces an <c>-H</c> <c>Content-Length</c> line,
+    /// which goes only with the answer to the challenge, as upstream test1284 expects of curl
+    /// 8.21.0 (BL-1835).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeWithACustomContentLength_SendsContentLengthZeroInItsPlace()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = DigestPostContext(new MemoryStream(), ["Content-Length: 5"]);
+        Diagnostics.Arrange("url, body, schemes, headers", $"{AuthUrl}, -d hello, --digest, -H \"Content-Length: 5\"");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.DoesNotContain("Content-Length: 5", requests[0]);
+        Assert.Contains("Content-Length: 5\r\n", requests[1]);
+        Assert.DoesNotContain("Content-Length: 0", requests[1]);
+    }
+
+    private static TransferContext DigestPostContext(Stream output, IReadOnlyList<string>? headers = null) =>
+        new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"), AuthSchemes = HttpAuthSchemes.Digest, Headers = headers ?? [] },
+        };
 
     private static TransferContext AuthContext(Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null) =>
         new() { Url = CurlUrl.Parse(AuthUrl), Output = output, HeaderOutput = headerOutput, Http = options };

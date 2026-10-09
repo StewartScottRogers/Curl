@@ -35,6 +35,34 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TwoConnections_TakeConsecutiveLoopbackLocalPorts()
+    {
+        Diagnostics.Arrange("reply parts", "data=first");
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+
+        IConnection first = await ConnectAsync(server);
+        IConnection second = await ConnectAsync(server);
+
+        Assert.AreEqual("127.0.0.1:49152", Observe("first local end point", "127.0.0.1:49152", $"{first.LocalEndPoint}"));
+        Assert.AreEqual("127.0.0.1:49153", Observe("second local end point", "127.0.0.1:49153", $"{second.LocalEndPoint}"));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ConnectionAfterPort65535_WrapsRoundTo49152()
+    {
+        Diagnostics.Arrange("connections opened first", "16384");
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+        for (int opened = 0; opened < 16384; opened++)
+        {
+            await ConnectAsync(server);
+        }
+
+        IConnection wrapped = await ConnectAsync(server);
+
+        Assert.AreEqual("127.0.0.1:49152", Observe("local end point", "127.0.0.1:49152", $"{wrapped.LocalEndPoint}"));
+    }
+
+    [TestMethod]
     [DataRow("data crlf=\"headers\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\n")]
     [DataRow("data crlf=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r\n")]
     [DataRow("data crlf=\"yes\" nonewline=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r")]
@@ -231,6 +259,36 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_BeforeTheFirstWrite_WaitsForTheRequestThenCloses()
+    {
+        Diagnostics.Arrange("reply", "empty, read before the request is written (test1327's telnet -T)");
+        var server = new SwsHttpServerConnector(Case(Reply("data", string.Empty)));
+        IConnection connection = await ConnectAsync(server);
+        Task<string> read = ReadAllAsync(connection);
+        bool waited = !read.IsCompleted;
+
+        await WriteAsync(connection, Get);
+        string reply = await read;
+
+        Assert.AreEqual("True", Observe("read waited", "True", waited.ToString()), "the read waits for the client's first write");
+        Assert.AreEqual(string.Empty, Observe("reply", string.Empty, reply));
+        Assert.AreEqual(Get, Observe("recorded", Get, Text(server.ReceivedBytes)), "the request is recorded before the close");
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_BeforeTheFirstWriteCancelled_ThrowsOperationCanceled()
+    {
+        Diagnostics.Arrange("read", "before any write, cancelled");
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "x\n"))));
+        using var cancellation = new CancellationTokenSource();
+        Task<string> read = ReadOnceAsync(connection, cancellation.Token);
+
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => read);
+    }
+
+    [TestMethod]
     public async Task EmptyPartWithNonewline_SendsNothing()
     {
         Diagnostics.Arrange("part", "data nonewline=\"yes\" with empty content");
@@ -413,14 +471,13 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    public async Task Connection_IsPlainAndHasNoAddress()
+    public async Task Connection_IsPlainAndReachesLoopbackAtTheTargetPort()
     {
         Diagnostics.Arrange("target", "plain connection to 127.0.0.1:8990");
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "first\n"))));
 
         Assert.IsFalse(ObserveValue("IsSecure", false, connection.IsSecure));
-        Assert.IsNull(connection.RemoteEndPoint);
-        Diagnostics.Assert("RemoteEndPoint is null", true, connection.RemoteEndPoint is null);
+        Assert.AreEqual("127.0.0.1:8990", Observe("remote end point", "127.0.0.1:8990", $"{connection.RemoteEndPoint}"));
         await connection.FlushAsync(CancellationToken.None);
         await connection.DisposeAsync();
     }

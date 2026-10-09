@@ -41,6 +41,13 @@ public sealed class UrlOutput
     public bool DiscardsBody { get; internal set; }
 
     /// <summary>
+    /// <see langword="true"/> when <see cref="Url"/> was read from a <c>--url @file</c> (or <c>@-</c>), which
+    /// curl 8.21.0's <c>parse_url</c> adds with globbing off: its <c>{a,b}</c> and <c>[1-3]</c> are requested
+    /// as written, whatever <c>-g</c> / <c>--globoff</c> says (BL-1832).
+    /// </summary>
+    public bool IsUnglobbed { get; internal set; }
+
+    /// <summary>
     /// <see langword="true"/> when an <c>-o</c>, <c>-O</c>, <c>--out-null</c> or <c>--no-remote-name</c> has been paired
     /// with this entry, so the next such option pairs with the entry after it.
     /// </summary>

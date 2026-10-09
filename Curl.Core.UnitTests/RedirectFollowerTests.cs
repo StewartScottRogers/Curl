@@ -68,6 +68,28 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://example.net/tes t case=/6620002", "http://example.net/tes%20t%20case=/6620002", DisplayName = "space in the path (upstream test662)")]
+    [DataRow("http://h/a b?n=d a#f g", "http://h/a%20b?n=d+a#f%20g", DisplayName = "space in the query is +")]
+    [DataRow("http://h/#x?a b", "http://h/#x?a%20b", DisplayName = "question mark in the fragment")]
+    [DataRow("http://h/?n=Ø¢", "http://h/?n=%D8%A2", DisplayName = "raw bytes as themselves (upstream test1138)")]
+    [DataRow("http://h/x~", "http://h/x~", DisplayName = "ASCII unchanged")]
+    public void EncodedForFollow_Target_EncodesAsCurlFollows(string target, string expected) =>
+        Assert.AreEqual(expected, RedirectFollower.EncodedForFollow(target));
+
+    [TestMethod]
+    public async Task FollowAsync_AbsoluteLocationWithSpace_FollowsItEncoded()
+    {
+        ScriptedHandler handler = new(
+            Redirect(302, "http://127.0.0.1:18203/b c"),
+            Ok(200, 5));
+
+        TransferResult result = await Follow(handler, Context(Location()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("http://127.0.0.1:18203/b%20c", handler.Contexts[1].Url.OriginalString);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_TwoRedirectsThenOk_ReachesEachTargetAndReportsCountAndEffectiveUrl()
     {
         ScriptedHandler handler = new(
@@ -111,6 +133,23 @@ public sealed class RedirectFollowerTests
             handler.Contexts.Select(context => context.Http!.Referer).ToArray());
         Diagnostics.Assert("result.Report!.Referer", "https://h.example/b", result.Report!.Referer);
         Assert.AreEqual("https://h.example/b", result.Report!.Referer);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopToAnotherHost_MarksOnlyThatHopFollowedToAnotherHost()
+    {
+        // curl's http_host keeps a custom Host only while a follow stays on the first host name,
+        // whatever its port or scheme (upstream test184, BL-1845).
+        ScriptedHandler handler = new(
+            Redirect(302, "http://YET.another.host/b"),
+            Redirect(302, "https://127.0.0.1:9/c"),
+            Ok(200, 0));
+
+        await Follow(handler, Context(Location()));
+
+        CollectionAssert.AreEqual(
+            new[] { false, true, false },
+            handler.Contexts.Select(context => context.Http!.FollowedToAnotherHost).ToArray());
     }
 
     [TestMethod]
@@ -225,6 +264,21 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(3002, handler.Contexts[1].Http!.ResponseHeadersStored);
         Diagnostics.Assert("handler.Contexts[2].Http!.ResponseHeadersStored", 4000, handler.Contexts[2].Http!.ResponseHeadersStored);
         Assert.AreEqual(4000, handler.Contexts[2].Http!.ResponseHeadersStored);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_HopsPickedAuthScheme_IsSentToTheNextHop()
+    {
+        // libcurl keeps the scheme --anyauth picked across redirects (upstream test1088, BL-1819).
+        TransferResult first = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { AuthSchemePicked = HttpAuthSchemes.Basic } };
+        ScriptedHandler handler = new(first, Ok(200, 0));
+
+        await Follow(handler, Context(Location()));
+
+        Diagnostics.Assert("handler.Contexts[0].Http!.AuthSchemePicked", HttpAuthSchemes.None, handler.Contexts[0].Http!.AuthSchemePicked);
+        Assert.AreEqual(HttpAuthSchemes.None, handler.Contexts[0].Http!.AuthSchemePicked);
+        Diagnostics.Assert("handler.Contexts[1].Http!.AuthSchemePicked", HttpAuthSchemes.Basic, handler.Contexts[1].Http!.AuthSchemePicked);
+        Assert.AreEqual(HttpAuthSchemes.Basic, handler.Contexts[1].Http!.AuthSchemePicked);
     }
 
     [TestMethod]
@@ -786,6 +840,23 @@ public sealed class RedirectFollowerTests
         Assert.AreEqual(HttpVersionPreference.Http11, handler.Contexts[1].Http!.Version);
         Diagnostics.Assert("looked.Single().Host", "localhost", looked.Single().Host);
         Assert.AreEqual("localhost", looked.Single().Host);
+    }
+
+    [TestMethod]
+    [DataRow("http://127.0.0.1:18203/next", false, true)]
+    [DataRow("http://localhost:18203/next", true, true)]
+    [DataRow("http://localhost:18203/next", false, false)]
+    [DataRow("http://127.0.0.1:9/next", false, false)]
+    [DataRow("https://127.0.0.1:18203/next", false, false)]
+    public async Task FollowAsync_Hop_SendsCookieStringsOnlyToTheFirstOriginOrWhenLocationTrusted(string target, bool trusted, bool expected)
+    {
+        // curl -b test=yes -L to another host sends no Cookie (upstream test2015, BL-1846).
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, Context(Location(), url: First), new RedirectPolicy { LocationTrusted = trusted });
+
+        Diagnostics.Assert("hop sends cookie strings", $"True, {expected}", string.Join(", ", handler.Contexts.Select(context => context.Http!.SendsCookieStrings)));
+        CollectionAssert.AreEqual(new[] { true, expected }, handler.Contexts.Select(context => context.Http!.SendsCookieStrings).ToArray());
     }
 
     [TestMethod]

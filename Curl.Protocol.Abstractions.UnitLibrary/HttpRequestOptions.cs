@@ -64,6 +64,22 @@ public sealed record HttpRequestOptions
     public bool AutoReferer { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether this request is a followed redirect to a host other
+    /// than the first URL's, which sends the URL's own <c>Host</c> and matches cookies against
+    /// it, leaving out any <c>-H</c> <c>Host</c> value, as curl 8.21.0's <c>http_host</c> does
+    /// (upstream test184, BL-1845).
+    /// </summary>
+    public bool FollowedToAnotherHost { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether this request sends the <c>-b name=value</c> strings
+    /// beside the stored cookies: <see langword="true" /> unless it is a followed redirect to
+    /// another scheme, host or port without <c>--location-trusted</c>, where curl 8.21.0's
+    /// <c>Curl_auth_allowed_to_host</c> leaves them out (upstream test2015, BL-1846).
+    /// </summary>
+    public bool SendsCookieStrings { get; init; } = true;
+
+    /// <summary>
     /// Gets the request body from the <c>-d</c> and <c>-F</c> families, already encoded,
     /// or <see langword="null" /> to send none.
     /// </summary>
@@ -97,6 +113,17 @@ public sealed record HttpRequestOptions
     /// heads and trailers - toward its limit of 5000 (measured, BL-1448 Notes).
     /// </summary>
     public int ResponseHeadersStored { get; init; }
+
+    /// <summary>
+    /// Gets the scheme a server picked for an earlier hop of the transfer, the earlier hop's
+    /// <see cref="TransferReport.AuthSchemePicked" />, or <see cref="HttpAuthSchemes.None" /> for
+    /// the first request. When it is one of <see cref="AuthSchemes" />, the hop sends it as
+    /// though it were the one scheme allowed, as libcurl 8.21.0 keeps its picked scheme across
+    /// the redirects it follows: <c>--anyauth --location-trusted</c> answers a Basic challenge,
+    /// then sends Basic to the redirect's new host before any challenge (upstream test1088,
+    /// BL-1819).
+    /// </summary>
+    public HttpAuthSchemes AuthSchemePicked { get; init; }
 
     /// <summary>
     /// Gets how a status of 400 or above ends the transfer; <see cref="HttpFailMode.None" />

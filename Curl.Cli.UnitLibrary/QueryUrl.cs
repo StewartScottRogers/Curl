@@ -4,8 +4,8 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Appends the query a command line asks for to a URL, the way curl 8.21.0 does for <c>-G</c> /
-/// <c>--get</c> and <c>--url-query</c>. Pure string work: the URL is neither parsed, validated nor
-/// normalised here; that is the URL layer's job (ADR-0004), so a query with a space in it is left
+/// <c>--get</c> and <c>--url-query</c>. Pure string work: the appended query's percent escapes are upper-cased, as
+/// curl's URL API does, but the URL is neither parsed, validated nor otherwise normalised here; that is the URL layer's job (ADR-0004), so a query with a space in it is left
 /// for the URL layer to reject, as curl 8.21.0 rejects it with exit 3.
 /// </summary>
 public static class QueryUrl
@@ -38,7 +38,29 @@ public static class QueryUrl
         string? query = options.DataInQuery && options.PostData is { } body
             ? Encoding.UTF8.GetString(body.Span)
             : options.UrlQuery;
-        return query is null ? url : AppendQuery(url, query);
+        return query is null ? url : AppendQuery(url, UpperCasePercentEscapes(query));
+    }
+
+    /// <summary>
+    /// Upper-cases the hex digits of every complete percent escape in <paramref name="query"/>, as curl
+    /// 8.21.0's URL API does to a query appended with <c>CURLU_APPENDQUERY</c>: upstream test1221's
+    /// <c>--url-query "+%3d%3d"</c> requests <c>%3D%3D</c>. A <c>%</c> not followed by two hex digits
+    /// is left as it is.
+    /// </summary>
+    private static string UpperCasePercentEscapes(string query)
+    {
+        StringBuilder normalised = new(query);
+        for (int index = 0; index + 2 < normalised.Length; index++)
+        {
+            if (normalised[index] == '%' && char.IsAsciiHexDigit(normalised[index + 1]) && char.IsAsciiHexDigit(normalised[index + 2]))
+            {
+                normalised[index + 1] = char.ToUpperInvariant(normalised[index + 1]);
+                normalised[index + 2] = char.ToUpperInvariant(normalised[index + 2]);
+                index += 2;
+            }
+        }
+
+        return normalised.ToString();
     }
 
     private static string AppendQuery(string url, string query)

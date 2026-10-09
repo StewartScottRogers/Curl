@@ -7,8 +7,9 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false)
     {
+        RefusedWhenTurnedOn = refusedWhenTurnedOn;
         LongName = longName;
         ShortName = shortName;
         TakesValue = takesValue;
@@ -70,6 +71,35 @@ public sealed class CommandLineOption
     /// build refuses the option with exit 2, and so does Curl when it reads as that build.
     /// </summary>
     public bool RefusedByWindowsSchannelBuild { get; }
+
+    /// <summary>
+    /// <see langword="true"/> for a row built with <see cref="UnsupportedFlagTurnedOffQuietly"/>: turning the
+    /// flag on is refused on every build, so the option is not supported, though its <c>--no-</c> spelling is accepted.
+    /// </summary>
+    public bool RefusedWhenTurnedOn { get; }
+
+    /// <summary>
+    /// Creates a row for a flag that turning on is refused with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> on every build, while its <c>--no-</c>
+    /// spelling is accepted and changes nothing: curl 8.21.0 checks the feature only when the flag is turned
+    /// on (<c>--proxy-http3</c> refused, <c>--no-proxy-http3</c> accepted, measured with the Schannel build on
+    /// 2026-10-08, BL-1829).
+    /// </summary>
+    /// <param name="longName">The long name without its leading <c>--</c> or <c>--no-</c>.</param>
+    /// <returns>The row.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="longName"/> is <see langword="null"/>.</exception>
+    public static CommandLineOption UnsupportedFlagTurnedOffQuietly(string longName)
+    {
+        ArgumentNullException.ThrowIfNull(longName);
+
+        return new CommandLineOption(
+            longName,
+            null,
+            takesValue: false,
+            (_, _, spelledOption, _, _) => CommandLineRefusal.InstalledLibcurlDoesNotSupport(spelledOption),
+            (_, _, _, _, _) => null,
+            refusedWhenTurnedOn: true);
+    }
 
     /// <summary>
     /// Returns this row refused with <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> whenever
@@ -213,7 +243,8 @@ public sealed class CommandLineOption
     /// An applier that first adds <see cref="CommandLineWarning.ArgumentStartsWithUnicode(string)"/>, unless
     /// <c>-s</c> / <c>--silent</c> has been read already, when the value starts with a character in
     /// U+2000-U+203F and the value is read as UTF-8: the parse reads its arguments so (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>)
-    /// or it comes from a <c>-K</c> file, whose lines are UTF-8 bytes on every platform (BL-1438),
+    /// or it comes from a <c>-K</c> file, whose lines are UTF-8 bytes on every platform (BL-1438), or it
+    /// is an <c>--expand-</c> value led by a variable's bytes (<see cref="CommandLineOptions.ApplyingValueLedByVariableBytes"/>, BL-1814),
     /// and then runs <paramref name="apply"/>. curl 8.21.0's <c>getparameter</c> checks every option value
     /// this way before using it, except a deprecated option's, so each value row but
     /// <see cref="NoFunctionValue"/> is built with it (BL-1224).
@@ -221,7 +252,7 @@ public sealed class CommandLineOption
     private static CommandLineOptionApplier WarnAboutLeadingUnicodeThen(CommandLineOptionApplier apply) =>
         (options, value, spelledOption, pathExists, dataFileReader) =>
         {
-            if ((options.ReadsArgumentsAsUtf8 || options.ReadingConfigFile) && value.Length > 0 && value[0] is >= ' ' and <= '‿')
+            if ((options.ReadsArgumentsAsUtf8 || options.ReadingConfigFile || options.ApplyingValueLedByVariableBytes) && value.Length > 0 && value[0] is >= ' ' and <= '‿')
             {
                 options.AddWarningLinesUnlessSilent(CommandLineWarning.ArgumentStartsWithUnicode(value));
             }

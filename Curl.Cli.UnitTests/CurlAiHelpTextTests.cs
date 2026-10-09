@@ -171,7 +171,7 @@ public sealed class CurlAiHelpTextTests
     public void TryGetMarkdown_OptionThisBuildDoesNotParse_SaysSo()
     {
         string unparsed = HelpLongNames("all")
-            .First(name => !name.StartsWith("no-", StringComparison.Ordinal) && !CommandLineOptionTable.Rows.Any(row => row.LongName == name));
+            .First(name => !name.StartsWith("no-", StringComparison.Ordinal) && !CommandLineOptionTable.Rows.Any(row => row.LongName == name && !row.RefusedWhenTurnedOn));
         Diagnostics.Arrange("first unparsed option", "--" + unparsed);
         string section = WrittenOptionSection(WrittenAllMarkdown(), unparsed);
 

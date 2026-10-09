@@ -157,6 +157,7 @@ public sealed class HttpChunkedDecoderTests
     [DataRow("5\r\nhello\r\n0\r\nX-T: 1\rx\r\n\r\n", "hello", 56, "Malformed encoding found in chunked-encoding", DisplayName = "Carriage return inside a trailer")]
     [DataRow("5\r\nhello\r\n0\r\n\rX\r\n", "hello", 56, "Malformed encoding found in chunked-encoding", DisplayName = "Carriage return starting a trailer")]
     [DataRow("5\r\nhello\r\n0\r\nnocolon\r\n\r\n", "hello", 8, "Header without colon", DisplayName = "Trailer without a colon")]
+    [DataRow("5\r\nhello\r\n0\r\nX-T: a\0b\r\n\r\n", "hello", 8, "Nul byte in header", DisplayName = "NUL byte in a trailer")]
     [DataRow("5\r\nhello\r\n0\r\nX-T: 1\r\n  more\r\n\r\n", "hello", 8, "Header without colon", DisplayName = "Trailer continuation line")]
     [DataRow("7FFFFFFFFFFFFFFF\r\nhello", "hello", 18, "transfer closed with outstanding read data remaining", DisplayName = "Largest size, closed")]
     [DataRow("5\r\nhel", "hel", 18, "transfer closed with outstanding read data remaining", DisplayName = "Closed inside the data")]

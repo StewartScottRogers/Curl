@@ -74,6 +74,30 @@ public sealed class CommandLineOptions
     internal bool ReadingConfigFile { get => globals.ReadingConfigFile; set => globals.ReadingConfigFile = value; }
 
     /// <summary>
+    /// <see langword="true"/> while <see cref="CommandLineParser"/> applies an <c>--expand-</c> value whose
+    /// first byte came from a variable's content rather than from the argument as typed: those bytes are
+    /// read as UTF-8 on every platform, so curl 8.21.0's leading-Unicode check sees them as UTF-8 even on
+    /// the Windows build, whose typed arguments are in the ANSI code page (BL-1814, upstream test268).
+    /// </summary>
+    internal bool ApplyingValueLedByVariableBytes { get => globals.ApplyingValueLedByVariableBytes; set => globals.ApplyingValueLedByVariableBytes = value; }
+
+    /// <summary>
+    /// The encoding the request side sends header text in, when it is not the UTF-8 a config file is
+    /// written in: the ANSI code page on Windows (<see cref="ConfigFileWireText"/>); otherwise <see langword="null"/>.
+    /// </summary>
+    public System.Text.Encoding? ConfigFileWireTextEncoding { get => globals.ConfigFileWireTextEncoding; internal set => globals.ConfigFileWireTextEncoding = value; }
+
+    /// <summary>
+    /// <paramref name="value"/> as the request side must hold it to send it as curl 8.21.0 does: while a
+    /// config file is read and <see cref="ConfigFileWireTextEncoding"/> is set, re-spelled so it goes out as
+    /// the file's own bytes (<see cref="ConfigFileWireText.Respell"/>); otherwise unchanged.
+    /// </summary>
+    /// <param name="value">A header, user-agent or referer value.</param>
+    /// <returns>The value to store.</returns>
+    internal string AsWireText(string value) =>
+        ReadingConfigFile && ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(value, wireEncoding) : value;
+
+    /// <summary>
     /// Applies <c>-:</c> / <c>--next</c> read into this group, as curl 8.21.0 does: when this group has a
     /// URL, starts a new group after it, whose per-group options start again from nothing while the
     /// global ones stay shared, and which becomes the <see cref="CurrentGroup"/>. Without a URL it is
@@ -616,7 +640,7 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// The <c>-D</c> / <c>--dump-header</c> file, verbatim and unchecked; <see langword="null"/> when
-    /// not given. <c>-</c> means standard output. Nothing is opened or created here. The last value
+    /// not given. <c>-</c> means standard output and <c>%</c> standard error. Nothing is opened or created here. The last value
     /// wins, as in curl 8.21.0.
     /// </summary>
     public string? DumpHeaderFile { get; internal set; }
@@ -2214,11 +2238,19 @@ public sealed class CommandLineOptions
     /// </summary>
     /// <param name="url">A positional argument or a <c>--url</c> value.</param>
     /// <param name="spelledOption">The argument as typed: the URL itself, or <c>--url</c>.</param>
+    /// <param name="readFromUrlFile">
+    /// <see langword="true"/> for a URL read from a <c>--url @file</c>, which curl 8.21.0 saves under its
+    /// remote name as if <c>-O</c> were paired with it (a <c>-o</c> paired with it still wins) and takes as
+    /// written, never expanding a glob in it.
+    /// </param>
     /// <returns><see langword="null"/>, or the refusal of a second URL beside an etag option.</returns>
-    internal CommandLineRefusal? AddUrl(string url, string spelledOption)
+    internal CommandLineRefusal? AddUrl(string url, string spelledOption, bool readFromUrlFile = false)
     {
         urls.Add(url);
-        (urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput()).Url = url;
+        UrlOutput output = urlOutputs.Find(output => output.Url is null) ?? AddUrlOutput();
+        output.Url = url;
+        output.UsesRemoteName |= readFromUrlFile;
+        output.IsUnglobbed = readFromUrlFile;
         return RefuseEtagOptionsWithSeveralUrls(spelledOption);
     }
 

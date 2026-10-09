@@ -49,6 +49,25 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_SendsCookieStringsOff_AsksForTheStoredCookiesAlone()
+    {
+        // A followed redirect to another origin sends only stored cookies (upstream test2015, BL-1846).
+        const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\nCookie: j=k\r\n\r\n";
+        ScriptedConnection connection = Connection(EmptyOkHead, 65536, expected);
+        ScriptedCookieStore store = new("j=k");
+        Diagnostics.Arrange("url, sends cookie strings", $"{CookieUrl}, false");
+
+        TransferResult result = await CookieHandler(QueueConnector.For(connection), store)
+            .ExecuteAsync(CookieContext(CookieUrl, new HttpRequestOptions { SendsCookieStrings = false }));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code, stored-only requests, full requests", (CurlExitCode.Ok, 1, 0), (result.ExitCode, store.StoredOnlyRequests.Count, store.Requests.Count));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(1, store.StoredOnlyRequests);
+        Assert.IsEmpty(store.Requests);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_CookieStoreGivesNull_SendsNoCookieHeader()
     {
         const string expected = "GET / HTTP/1.1\r\nHost: 127.0.0.1:18082\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";

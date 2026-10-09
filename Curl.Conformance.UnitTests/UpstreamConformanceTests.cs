@@ -1,5 +1,6 @@
 using System.Globalization;
 using Curl.Console;
+using Curl.Networking;
 using Curl.Testing;
 
 namespace Curl.Conformance;
@@ -96,6 +97,7 @@ public sealed class UpstreamConformanceTests
             invocation.StandardInput,
             invocation.Connector,
             invocation.DatagramConnector,
+            runConnections: new ConnectionCache(TimeProvider.System),
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(invocation.Arguments);
 

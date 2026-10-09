@@ -315,6 +315,52 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_TestsDirectoryWithABlank_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        diagnostics.Arrange("tests directory", "C:/Users/Stewart Rogers/tests");
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, CreateLogDirectory(), "C:/Users/Stewart Rogers/tests"));
+        diagnostics.Act("exception parameter", exception.ParamName);
+        diagnostics.Assert("exception parameter", "testsDirectory", exception.ParamName);
+        Assert.AreEqual("testsDirectory", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_TestsDirectory_IsPwdWithForwardSlashes()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n--output-dir %PWD/not-there\n</command>\n</client>\n</testcase>\n";
+
+        diagnostics.Arrange("tests directory", "Z:\\curl\\tests");
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), "Z:\\curl\\tests");
+        diagnostics.Act("arguments", string.Join(" | ", arguments ?? []));
+
+        diagnostics.Assert("arguments", "--output-dir | Z:/curl/tests/not-there", string.Join(" | ", arguments ?? []));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "--output-dir", "Z:/curl/tests/not-there" }, arguments!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoTestsDirectory_SkipsACaseUsingPwd()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\n--output-dir %PWD/not-there\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NullLogDirectory_Throws()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

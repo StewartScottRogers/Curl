@@ -50,6 +50,10 @@ public sealed class QueryUrlTests
     [DataRow(Url, new[] { "-G", "-d", "", "--url-query", "b" }, Url)]
     [DataRow(Url + "?x#f", new[] { "--url-query", "b" }, Url + "?x&b#f")]
     [DataRow(Url, new[] { "-d", "a" }, Url)]
+    [DataRow(Url, new[] { "--url-query", "=", "--url-query", "+%3d%3d" }, Url + "?&%3D%3D")]
+    [DataRow(Url, new[] { "-G", "-d", "a=%2f%Ab" }, Url + "?a=%2F%AB")]
+    [DataRow(Url, new[] { "--url-query", "+%zz%3g%a" }, Url + "?%zz%3g%a")]
+    [DataRow(Url + "?x=%3d", new[] { "--url-query", "+%3d" }, Url + "?x=%3d&%3D")]
     public void Append_ParsedCommandLine_BuildsTheUrlCurlRequests(string url, string[] arguments, string expectedUrl)
     {
         CommandLineParseResult result = Parse([.. arguments, url], new RecordingDataFileReader());

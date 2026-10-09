@@ -35,7 +35,7 @@ public sealed class HttpContentCodingDecoderTests
     /// Measured: <c>00 01 02 …</c> as gzip gives <c>incorrect header check</c>, and
     /// <c>1F 8B 07</c> gives <c>unknown compression method</c>. A zlib header naming method 7
     /// (<c>77 09</c>) fails the same way, as zlib reports it. Corrupt data past a good header,
-    /// and corrupt Brotli (measured), give curl's generic exit 61 text (ADR-0031).
+    /// and corrupt Brotli (measured), give curl's generic exit 61 text (ADR-0031); raw deflate here is a dynamic block, since a reserved or broken stored first block gets zlib's own text (BL-1810).
     /// </summary>
     [TestMethod]
     [DataRow("gzip", "000102030405060708090A0B", "Error while processing content unencoding: incorrect header check", DisplayName = "gzip: not a gzip or zlib header")]
@@ -43,7 +43,7 @@ public sealed class HttpContentCodingDecoderTests
     [DataRow("gzip", "7709000000", "Error while processing content unencoding: unknown compression method", DisplayName = "gzip: zlib header with method 7")]
     [DataRow("deflate", "7709000000", "Error while processing content unencoding: unknown compression method", DisplayName = "deflate: zlib header with method 7")]
     [DataRow("gzip", "1F8B080000000000000AFFFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "gzip: corrupt data")]
-    [DataRow("deflate", "FFFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "deflate: corrupt raw data")]
+    [DataRow("deflate", "FDFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "deflate: corrupt raw data")]
     [DataRow("br", "FFFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "br: corrupt data")]
     public void Decode_CorruptBody_ThrowsExit61WithTheMeasuredMessage(string coding, string encoded, string message)
     {

@@ -169,6 +169,40 @@ public sealed class CurlCommandRunnerWriteOutTests
     }
 
     [TestMethod]
+    public async Task RunAsync_HeadersToStandardOutputWithAnOutputFileOnWindows_WritesALineFeed()
+    {
+        int exitCode = await RunOkAndFailingAsync(runsOnWindows: true, "-s", "-o", "a", "-D", "-", "-w", ExitCode, "ok://h/x");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "0\n", StandardOutputText);
+        StringAssert.EndsWith(StandardOutputText, "0\n");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HeadersToStandardOutputUnderUseAsciiAfterAFailureOnWindows_WritesALineFeed()
+    {
+        int exitCode = await RunOkAndFailingAsync(runsOnWindows: true, "-s", "-B", "-o", "a", "-D", "-", "-w", ExitCode, "fail://h/x");
+
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Assert.AreEqual(7, exitCode);
+        Diagnostics.Diff("stdout", "7\n", StandardOutputText);
+        StringAssert.EndsWith(StandardOutputText, "7\n");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ALaterGroupWithHeadersToStandardOutput_KeepsTheEarlierLineFeed()
+    {
+        int exitCode = await RunOkAndFailingAsync(
+            runsOnWindows: true, "-s", "-o", "a", "-w", ExitCode, "ok://h/x", "--next", "-s", "-o", "b", "-D", "-", "ok://h/y");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("stdout", "0\n", StandardOutputText);
+        StringAssert.StartsWith(StandardOutputText, "0\n");
+    }
+
+    [TestMethod]
     public async Task RunAsync_UnsupportedOrMalformedUrl_PrintsNoScheme()
     {
         await RunOkAndFailingAsync(

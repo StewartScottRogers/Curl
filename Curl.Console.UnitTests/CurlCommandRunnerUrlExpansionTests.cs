@@ -296,6 +296,21 @@ public sealed class CurlCommandRunnerUrlExpansionTests
     }
 
     [TestMethod]
+    public async Task RunAsync_UrlAtFileHoldingAGlob_RequestsItOnceUnexpandedBesideAnExpandedPositionalGlob()
+    {
+        dataFiles.Files["urls"] = Encoding.UTF8.GetBytes("http://h/{a,b}\n");
+
+        int exitCode = await RunAsync(["-o", "out", "--url", "@urls", "http://h/{c,d}"]);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("http handler URLs", "http://h/{a,b}, http://h/c, http://h/d", HandledUrls(http));
+        CollectionAssert.AreEqual(
+            new[] { "http://h/{a,b}", "http://h/c", "http://h/d" },
+            http.Contexts.Select(context => context.Url.OriginalString).ToArray());
+    }
+
+    [TestMethod]
     public async Task RunAsync_IpfsGlobWithGatewayOption_FetchesEachGatewayUrl()
     {
         int exitCode = await RunAsync(

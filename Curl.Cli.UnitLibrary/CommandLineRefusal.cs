@@ -142,6 +142,20 @@ public sealed class CommandLineRefusal
     public static CommandLineRefusal BlankArgument(string spelledOption) =>
         Create(spelledOption, "blank argument where content is expected");
 
+    /// <summary>
+    /// Refuses a <c>--url @file</c> whose file cannot be opened. curl 8.21.0's <c>parse_url</c> prints no
+    /// <c>Failed to open</c> line before it, unlike <see cref="DataFileUnreadable"/>.
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>--url</c>.</param>
+    /// <returns>A refusal reading <c>error encountered when reading a file</c>, exit 26.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal UrlFileUnreadable(string spelledOption)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+
+        return new CommandLineRefusal(CurlExitCode.ReadError, [], spelledOption, ReadErrorReason);
+    }
+
     /// <summary>Refuses a numeric option value that is not a well-formed number.</summary>
     /// <param name="spelledOption">The whole argument as typed.</param>
     /// <returns>A refusal reading <c>expected a proper numerical parameter</c>.</returns>

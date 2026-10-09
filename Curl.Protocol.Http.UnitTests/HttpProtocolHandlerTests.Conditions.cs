@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
@@ -272,6 +274,33 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(416, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
             Diagnostics.Assert("time condition unmet", false, result.TimeConditionUnmet);
             Assert.IsFalse(result.TimeConditionUnmet, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ResumeAnswered416UnderFail_SucceedsWithNoBody()
+    {
+        const string head = "HTTP/1.1 416 Requested Range Not Satisfiable\r\nContent-Length: 4\r\nContent-Range: bytes */87\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            TransferContext context = new TransferContext
+            {
+                Url = ConditionUrl(19820),
+                Output = output,
+                ResumeFrom = 87,
+                Http = new HttpRequestOptions { Fail = HttpFailMode.Fail },
+            };
+            Diagnostics.Arrange("resume from, fail, chunk size", $"87, -f, {chunkSize}");
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(head + "bad\n", chunkSize, RangeRequest(19820, "87-"))))
+                .ExecuteAsync(context);
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("body bytes", 0, output.Length);
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
         }
     }
 
@@ -684,6 +713,72 @@ public sealed partial class HttpProtocolHandlerTests
             Diagnostics.Assert("bytes transferred", 10L, result.BytesTransferred);
             Assert.AreEqual(10L, result.BytesTransferred, $"Chunk size {chunkSize}");
         }
+    }
+
+    /// <summary>
+    /// Upstream test477 (BL-1807): <c>--max-filesize 5 -L</c> against a 301 whose 26-byte body is
+    /// discarded; curl 8.21.0 follows it rather than failing with exit 63.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectBodyOverMaxFileSizeWhileFollowing_GivesTheRedirect()
+    {
+        MemoryStream output = new();
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(477),
+            Output = output,
+            MaxFileSize = 5,
+            Http = new HttpRequestOptions { FollowRedirects = true },
+        };
+        string response = "HTTP/1.1 301 Moved\r\nLocation: /4770002\r\nContent-Length: 26\r\n\r\nRedirect to /4770002 :-)\r\n";
+        Diagnostics.Arrange("max file size, follow, response", "5, True, 301 with Content-Length 26");
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(response, 65536))).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("redirect url", "http://127.0.0.1:477/4770002", result.Report!.RedirectUrl ?? "(null)");
+        Assert.EndsWith("/4770002", result.Report!.RedirectUrl ?? string.Empty);
+        Diagnostics.Assert("output length", 0L, output.Length);
+        Assert.AreEqual(0L, output.Length);
+    }
+
+    /// <summary>
+    /// Upstream test1618 (BL-1807): <c>--compressed --max-filesize=1000</c> against a small body
+    /// that decodes to far more; the decoded bytes are held to the limit and the transfer ends
+    /// with exit 63.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedBodyDecodesPastMaxFileSize_WritesTheLimitThenFailsWithExit63()
+    {
+        MemoryStream compressed = new();
+        using (GZipStream gzip = new(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
+        {
+            gzip.Write(new byte[100_000]);
+        }
+
+        string body = Encoding.Latin1.GetString(compressed.ToArray());
+        string response = $"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: {body.Length}\r\n\r\n{body}";
+        MemoryStream output = new();
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18802),
+            Output = output,
+            MaxFileSize = 1000,
+            Http = new HttpRequestOptions { Compressed = true },
+        };
+        Diagnostics.Arrange("max file size, encoded length, decoded length", $"1000, {body.Length}, 100000");
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(response, 65536))).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Diff("error message", "Exceeded the maximum allowed file size (1000) with 1000 bytes", result.ErrorMessage ?? string.Empty);
+        Assert.AreEqual("Exceeded the maximum allowed file size (1000) with 1000 bytes", result.ErrorMessage);
+        Diagnostics.Assert("output length", 1000L, output.Length);
+        Assert.AreEqual(1000L, output.Length);
     }
 
     [TestMethod]

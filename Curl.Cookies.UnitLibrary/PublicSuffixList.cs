@@ -37,20 +37,25 @@ internal sealed class PublicSuffixList
     /// <summary>
     /// libpsl's <c>psl_is_cookie_domain_acceptable</c>, behind curl's length limit: a host of more than
     /// <see cref="LongestHost"/> characters sets no cookie; otherwise a host may set a cookie for itself, or
-    /// for a parent domain longer than the public suffix the host ends in.
+    /// for a parent domain longer than the public suffix the host ends in. One trailing dot is left off both
+    /// first, so <c>Domain=co.uk.</c> from <c>www.example.co.uk.</c> is refused as a public suffix, as curl
+    /// 8.21.0 refuses it (upstream test1629, BL-1803).
     /// </summary>
     /// <param name="host">The request host.</param>
     /// <param name="cookieDomain">The cookie's domain: the host itself, or a parent of it in any case.</param>
     public bool IsCookieDomainAcceptable(string host, string cookieDomain)
     {
-        string lowerHost = host.ToLowerInvariant();
-        string lowerDomain = cookieDomain.ToLowerInvariant();
+        string lowerHost = WithoutTrailingDot(host).ToLowerInvariant();
+        string lowerDomain = WithoutTrailingDot(cookieDomain).ToLowerInvariant();
         return lowerHost.Length <= LongestHost
             && (lowerHost == lowerDomain || lowerDomain.Length > UnregistrableSuffix(lowerHost).Length);
     }
 
+    /// <summary><paramref name="name"/> without its one trailing dot, or unchanged when it has none.</summary>
+    private static string WithoutTrailingDot(string name) => name.EndsWith('.') ? name[..^1] : name;
+
     /// <summary>
-    /// libpsl's <c>psl_unregistrable_domain</c>: the longest public suffix <paramref name="host"/> ends in,
+    /// libpsl's <c>psl_unregistrable_domain</c>:the longest public suffix <paramref name="host"/> ends in,
     /// found by dropping labels from the left until what is left is a public suffix.
     /// </summary>
     private string UnregistrableSuffix(string host)

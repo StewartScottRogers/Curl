@@ -355,6 +355,45 @@ public sealed class HttpResponseHeadReaderTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_FirstHeaderStartsWithBlanks_TakesItWithoutTheBlanks()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            Diagnostics.Arrange("scripted response", $"HTTP/1.1 200 OK, first header '  X-A: 1', then B, chunk size {chunkSize}");
+            ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n  X-A: 1\r\nB: 2\r\n\r\n"), chunkSize);
+
+            HttpResponseHead head = await new HttpResponseHeadReader(connection).ReadAsync(CancellationToken.None);
+            string names = string.Join(",", head.Headers.Select(header => $"{header.Name}={header.Value}"));
+            Diagnostics.Act("headers", names);
+
+            Diagnostics.Assert("headers", "X-A=1,B=2", names);
+            Assert.AreEqual("X-A=1,B=2", names, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 100 Continue\r\n\r\nnot a status line\r\n", DisplayName = "Body after a 100")]
+    [DataRow("HTTP/1.1 100 Continue\r\nA: 1\r\n\r\nxyz", DisplayName = "Body after a 100 with a header")]
+    public async Task ReadAsync_NoStatusLineAfterInformationalHead_ReturnsWeirdServerReply(string response)
+    {
+        await AssertFailsEveryWayAsync(response, CurlExitCode.WeirdServerReply, "Invalid status line");
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_Http09AnswerToHeadRequest_ReturnsWeirdServerReply()
+    {
+        Diagnostics.Arrange("scripted response", "body only, HTTP/0.9 accepted, HEAD request");
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes("just a body\n"), 65536);
+
+        HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
+            async () => await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true, IsHeadRequest = true }.ReadAsync(CancellationToken.None));
+
+        Diagnostics.Act("thrown", $"{thrown.GetType().Name}, exit code {thrown.ExitCode}, message '{thrown.Message}'");
+        Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, thrown.ExitCode);
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
+    }
+
+    [TestMethod]
     [DataRow("HTTP/1.1 200 OK\rX-A: 1\r\n\r\n", DisplayName = "In the status line")]
     [DataRow("HTTP/1.1 200 OK\r\nX-A: 1\rfoo\r\n\r\n", DisplayName = "In a header line")]
     public async Task ReadAsync_CarriageReturnInsideALine_ReturnsWeirdServerReply(string response)

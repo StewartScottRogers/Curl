@@ -357,6 +357,9 @@ internal sealed class CurlCommandRunner(
     /// <summary>The <c>-D</c> value that sends the header lines to standard output.</summary>
     private const string StandardOutputHeaderFile = "-";
 
+    /// <summary>The <c>-D</c> value that sends the header lines to standard error, as curl 8.10.0 and later do.</summary>
+    private const string StandardErrorHeaderFile = "%";
+
     /// <summary>The <c>--stderr</c> value that sends standard error to standard output.</summary>
     private const string StandardOutputStandardErrorFile = "-";
 
@@ -372,6 +375,19 @@ internal sealed class CurlCommandRunner(
     /// <c>--stderr</c> replaces it with its file or standard output (<see cref="RedirectStandardErrorAsync" />).
     /// </summary>
     private Stream standardError = standardError;
+
+    /// <summary>
+    /// What curl's C <c>stderr</c> is, where <c>-D %</c> writes: the stream the runner was given, until a
+    /// <c>--stderr</c> file replaces it, as curl's <c>freopen</c> does; <c>--stderr -</c> leaves it alone
+    /// (measured 2026-10-08, BL-1815 Notes).
+    /// </summary>
+    private Stream processStandardError = standardError;
+
+    /// <summary><see cref="processStandardError" /> through <see cref="writeGate" />, where <c>-D %</c> writes.</summary>
+    private Stream? gatedProcessStandardError;
+
+    /// <summary>Gets <see cref="processStandardError" /> through <see cref="writeGate" />, where <c>-D %</c> writes.</summary>
+    private Stream GatedProcessStandardError => gatedProcessStandardError ??= writeGate.Guard(processStandardError);
 
     /// <summary>
     /// The file the last successful <c>--stderr</c> opened, which the runner closes when a later one
@@ -958,6 +974,7 @@ internal sealed class CurlCommandRunner(
         await CloseStandardErrorFileAsync().ConfigureAwait(false);
         standardError = file;
         standardErrorFile = file;
+        processStandardError = file;
     }
 
     /// <summary>
@@ -1568,7 +1585,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Reads the URL at <paramref name="index" /> as a glob, or under <c>-g</c> / <c>--globoff</c>
-    /// as the one URL it is.
+    /// as the one URL it is, as is a URL read from a <c>--url @file</c> (BL-1832).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
     /// <param name="index">The URL's position on the command line.</param>
@@ -1581,7 +1598,7 @@ internal sealed class CurlCommandRunner(
         [NotNullWhen(true)] out UrlGlob? glob,
         [NotNullWhen(false)] out TransferResult? failure)
     {
-        if (options.GlobOff)
+        if (options.GlobOff || UrlOutputOf(options, index).IsUnglobbed)
         {
             glob = UrlGlob.Unglobbed(options.Urls[index]);
             failure = null;
@@ -2499,14 +2516,25 @@ internal sealed class CurlCommandRunner(
     /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). Where <c>-w</c> or <c>--trace-ids</c> prints
     /// it, a transfer
     /// under <c>-B</c> / <c>--use-ascii</c> never does: curl leaves standard output in text mode
-    /// for it (measured 2026-10-01, BL-961 Notes).
+    /// for it (measured 2026-10-01, BL-961 Notes). A transfer under <c>-D -</c> always does, even
+    /// under <c>-B</c> and even when it fails: curl sets standard output to binary for the header
+    /// output as it sets the transfer up (ADR-0443, BL-1816).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
     private static bool SwitchesStandardOutputToBinary(CommandLineOptions options, UrlTransfer transfer, TransferResult result) =>
-        !options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
+        DumpsHeadersToStandardOutput(options)
+        || (!options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure));
+
+    /// <summary>
+    /// Tells whether the option group sends its header lines to standard output (<c>-D -</c>).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns><see langword="true" /> under <c>-D -</c>.</returns>
+    private static bool DumpsHeadersToStandardOutput(CommandLineOptions options) =>
+        options.DumpHeaderFile == StandardOutputHeaderFile;
 
     /// <summary>
     /// Gives the output entry of the URL at <paramref name="index" />: the parser gives every URL
@@ -2549,19 +2577,14 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The option group.</param>
     /// <param name="first">The position of the first URL looked at.</param>
     /// <returns>
-    /// <see langword="true" /> when one of those URLs saves no file; never under <c>-B</c>, which
-    /// leaves standard output in text mode.
+    /// <see langword="true" /> when one of those URLs saves no file, unless under <c>-B</c>, which
+    /// leaves standard output in text mode; and always when there is one under <c>-D -</c>.
     /// </returns>
     private static bool UrlFromSwitchesStandardOutputToBinary(CommandLineOptions options, int first)
     {
-        if (options.UseAscii)
-        {
-            return false;
-        }
-
         for (int later = first; later < options.Urls.Count; later++)
         {
-            if (!WritesToFile(options, later))
+            if (DumpsHeadersToStandardOutput(options) || (!options.UseAscii && !WritesToFile(options, later)))
             {
                 return true;
             }
@@ -3151,9 +3174,10 @@ internal sealed class CurlCommandRunner(
             return await TransferAsync(dispatch, options, url, uploadFile, transfer, null).ConfigureAwait(false);
         }
 
-        if (headerFile == StandardOutputHeaderFile)
+        if (headerFile is StandardOutputHeaderFile or StandardErrorHeaderFile)
         {
-            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, GatedStandardOutput)
+            Stream headerStream = headerFile == StandardOutputHeaderFile ? GatedStandardOutput : GatedProcessStandardError;
+            return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, headerStream)
                 .ConfigureAwait(false);
         }
 
@@ -3162,9 +3186,10 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Opens the <c>-D</c> file (truncated for the first transfer, appended to after it), performs
-    /// the transfer with its header lines going there, and closes the file; reports the file
-    /// when it cannot be opened.
+    /// Creates the <c>-D</c> file's leading directories under <c>--create-dirs</c>, as curl 8.21.0
+    /// does (upstream test 3031, BL-1852), opens the file (truncated for the first transfer,
+    /// appended to after it), performs the transfer with its header lines going there, and closes
+    /// the file; reports a directory that cannot be created, or the file when it cannot be opened.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
@@ -3184,6 +3209,12 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         string headerFile)
     {
+        if (options.CreateDirectories
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, headerFile, runsOnWindows) is { } failure)
+        {
+            return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
+        }
+
         FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(
                 headerFile,
@@ -3411,7 +3442,7 @@ internal sealed class CurlCommandRunner(
     {
         if (uploadFile is null || UploadUrl.IsStandardInput(uploadFile))
         {
-            Stream? standardInputUpload = uploadFile is null ? null : standardInput;
+            Stream? standardInputUpload = uploadFile is null ? null : new StandardInputUploadStream(standardInput);
             return await TransferUploadingAsync(dispatch, options, url, standardInputUpload, transfer, headerOutput)
                 .ConfigureAwait(false);
         }
@@ -4304,7 +4335,7 @@ internal sealed class CurlCommandRunner(
         OutputFileTarget target,
         DeferredOutputFileStream output) =>
         target.TakesContentDispositionName
-            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteNamePath(options, name))
+            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteNamePath(options, name), options.FollowRedirects)
             : null;
 
     /// <summary>

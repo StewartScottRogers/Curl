@@ -228,7 +228,8 @@ internal sealed class HttpChunkedDecoder
 
     /// <summary>
     /// Ends a trailer line: the empty line ends the body, and any other line is kept for
-    /// header output.
+    /// header output. A line holding a NUL byte fails with exit 8, <c>Nul byte in header</c>, as
+    /// a head line does (upstream test2106, BL-1805).
     /// </summary>
     private void EndTrailerLine()
     {
@@ -241,6 +242,11 @@ internal sealed class HttpChunkedDecoder
         if (trailerLine.Length + LineEnding.Length >= MaximumTrailerLineLength)
         {
             throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TrailerTooLarge);
+        }
+
+        if (Array.IndexOf(trailerLine.GetBuffer(), (byte)0, 0, (int)trailerLine.Length) >= 0)
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
         }
 
         if (Array.IndexOf(trailerLine.GetBuffer(), (byte)':', 0, (int)trailerLine.Length) < 0)

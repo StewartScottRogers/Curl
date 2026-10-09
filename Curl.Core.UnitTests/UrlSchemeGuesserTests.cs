@@ -83,6 +83,55 @@ public sealed class UrlSchemeGuesserTests
         Assert.IsFalse(hasScheme);
     }
 
+    // Upstream test1146 (curl 8.21.0): on Windows a drive prefix is not a scheme, so
+    // --proto-default file makes Z:/dir/file the file URL file://Z:/dir/file.
+    [TestMethod]
+    [DataRow("Z:/dir/file")]
+    [DataRow("c:\\dir\\file")]
+    [DataRow("Z://host/x")]
+    public void HasScheme_DrivePrefixOnWindows_IsFalse(string url)
+    {
+        Assert.IsFalse(Has(url, runsOnWindows: true));
+    }
+
+    [TestMethod]
+    [DataRow("Z:/dir/file")]
+    [DataRow("Z://host/x")]
+    public void HasScheme_DrivePrefixOffWindows_IsTrue(string url)
+    {
+        Assert.IsTrue(Has(url, runsOnWindows: false));
+    }
+
+    [TestMethod]
+    [DataRow("ab:/x")]
+    [DataRow("http://x")]
+    public void HasScheme_TwoLetterSchemeOnWindows_IsTrue(string url)
+    {
+        Assert.IsTrue(Has(url, runsOnWindows: true));
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void AddScheme_DrivePathUnderProtoDefaultFileOnWindows_IsAFileUrl()
+    {
+        Assert.AreEqual("file://Z:/dir/file", Add("Z:/dir/file", "file", "file://Z:/dir/file"));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void AddScheme_DrivePathUnderProtoDefaultFileOffWindows_KeepsTheLetterAsScheme()
+    {
+        Assert.AreEqual("Z:/dir/file", Add("Z:/dir/file", "file", "Z:/dir/file"));
+    }
+
+    [TestMethod]
+    public void HasSchemeWithPlatform_Null_Throws()
+    {
+        WriteNullCall("HasScheme(null, true)");
+        var exception = Assert.ThrowsExactly<ArgumentNullException>(() => UrlSchemeGuesser.HasScheme(null!, runsOnWindows: true));
+        WriteException(exception);
+    }
+
     [TestMethod]
     public void AddGuessedScheme_Null_Throws()
     {
@@ -161,6 +210,18 @@ public sealed class UrlSchemeGuesserTests
 
         diagnostics.Act("with scheme", actual);
         diagnostics.Assert("with scheme", expected, actual);
+        return actual;
+    }
+
+    private bool Has(string url, bool runsOnWindows)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("url", url);
+        diagnostics.Arrange("runs on Windows", runsOnWindows);
+
+        var actual = UrlSchemeGuesser.HasScheme(url, runsOnWindows);
+
+        diagnostics.Act("has scheme", actual);
         return actual;
     }
 

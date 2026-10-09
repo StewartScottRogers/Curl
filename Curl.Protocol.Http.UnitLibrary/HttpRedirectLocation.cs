@@ -19,8 +19,8 @@ namespace Curl.Protocol.Http;
 /// <para>
 /// Any other value is a reference resolved by RFC 3986 section 5.2: scheme-relative
 /// (<c>//host/x</c>), absolute-path (<c>/x</c>), relative-path (<c>x</c>, <c>../x</c>),
-/// query-only (<c>?q</c>) and fragment-only (<c>#f</c>). Before resolving, its spaces and
-/// non-ASCII characters are percent-encoded and its percent escapes uppercased, as curl does
+/// query-only (<c>?q</c>) and fragment-only (<c>#f</c>). Before resolving, its spaces (<c>+</c> in
+/// the query, <c>%20</c> elsewhere) and non-ASCII bytes are percent-encoded and its percent escapes uppercased, as curl does
 /// to a relative <c>Location</c> and not to an absolute one.
 /// </para>
 /// </remarks>
@@ -195,15 +195,18 @@ internal static class HttpRedirectLocation
     }
 
     /// <summary>
-    /// Percent-encodes a relative reference's spaces and non-ASCII characters as UTF-8 and
+    /// Percent-encodes a relative reference's spaces (<c>+</c> in the query) and its bytes above 0x7E, each as itself, and
     /// uppercases the hexadecimal digits of its percent escapes, as curl 8.21.0 does.
     /// </summary>
     private static string Encode(string reference)
     {
         StringBuilder encoded = new(reference.Length);
+        int hash = reference.IndexOf('#', StringComparison.Ordinal);
+        int question = reference.IndexOf('?', StringComparison.Ordinal);
+        int queryEnd = hash < 0 ? reference.Length : hash;
         for (int index = 0; index < reference.Length;)
         {
-            index += AppendEncoded(encoded, reference, index);
+            index += AppendEncoded(encoded, reference, index, question >= 0 && index > question && index < queryEnd);
         }
 
         return encoded.ToString();
@@ -213,13 +216,19 @@ internal static class HttpRedirectLocation
     /// Appends the character at <paramref name="index" />, encoded, and returns how many
     /// characters it took: three for a percent escape, two for a surrogate pair, one otherwise.
     /// </summary>
-    private static int AppendEncoded(StringBuilder encoded, string value, int index)
+    private static int AppendEncoded(StringBuilder encoded, string value, int index, bool inQuery)
     {
         char character = value[index];
         if (character == '%' && IsEscape(value, index))
         {
             encoded.Append('%').Append(char.ToUpperInvariant(value[index + 1])).Append(char.ToUpperInvariant(value[index + 2]));
             return 3;
+        }
+
+        if (character == ' ' && inQuery)
+        {
+            encoded.Append('+');
+            return 1;
         }
 
         if (character is ' ' or > '~')
@@ -240,6 +249,13 @@ internal static class HttpRedirectLocation
     /// </summary>
     private static int AppendEscaped(StringBuilder encoded, string value, int index)
     {
+        // A header value is read as Latin-1, one character per byte: each byte is escaped as itself.
+        if (value[index] <= 'ÿ')
+        {
+            encoded.Append('%').Append(((int)value[index]).ToString("X2", CultureInfo.InvariantCulture));
+            return 1;
+        }
+
         int length = char.IsSurrogatePair(value, index) ? 2 : 1;
         foreach (byte octet in Encoding.UTF8.GetBytes(value, index, length))
         {

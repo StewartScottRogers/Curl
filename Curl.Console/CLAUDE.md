@@ -125,7 +125,10 @@ curl's `create_dir_hierarchy` does (BL-1433). Under `-J` a remote-named file's h
 `RemoteHeaderNameStream`, which opens the file under the first `Content-Disposition`
 `filename=` (`ContentDispositionFileName`) of a 2xx or 3xx response before the lines go on; a
 name already taken is refused with `File exists` and exit 23. Measured on curl 8.21.0
-(BL-239 Notes).
+(BL-239 Notes). Under `-L`, until a `Content-Disposition` names it, each 3xx response's
+`Location` renames the not yet opened file after the last path segment of the URL it points
+at (`RedirectLocationFileName`), so `-J -L -O` with no `Content-Disposition` names the file
+after the last URL followed, as upstream tests 1642 and 1643 expect (BL-1809).
 
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)
@@ -170,8 +173,11 @@ the `-c` jar written after every `http`/`https` transfer, after its `-w` output,
 outcome, and after no other scheme's (`-c -` prints it to standard output each time, in the
 mode standard output is in). With nothing but `-b` strings, received cookies are not stored,
 as curl's cookie engine stays off. Measured on curl 8.21.0 (BL-237 Notes).
-`-D -` sends the handler's header lines to standard output; any other `-D` name is opened
+`-D -` sends the handler's header lines to standard output and `-D %` to standard error, even
+under `-s` - the stream the runner was given, or a `--stderr` file, but never standard output
+for `--stderr -`, as curl 8.21.0's `freopen`ed C `stderr` does (BL-1815); any other `-D` name is opened
 (unsanitized, truncated for the first transfer and appended for the rest) before the transfer,
+its leading directories first made under `--create-dirs` as for `-o` (upstream test 3031, BL-1852),
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
 `-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and
@@ -428,7 +434,7 @@ cannot be opened included), with `TransferWriteOutVariables` as its values. Its 
 follows the `WriteOutTimeDialect` the runner is given: `CurlComposition.WriteOutTimeDialectFor`
 passes `WindowsCRuntime` on Windows and `Glibc` elsewhere (ADR-0078, BL-387). On Windows the
 line feeds it writes to standard error, and to standard output while curl's standard output
-would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0081).
+would still be in text mode, go through `LineFeedToCrLfStream` as CR LF (ADR-0081); `-D -` puts standard output in binary mode for its whole option group, `-B` or not (ADR-0443, BL-1816).
 `%output{file}` targets go through the runner's `IWriteOutFileOpener`: `CurlComposition`
 passes `DiskWriteOutFileOpener`, which opens each file shared for writing (truncated, or
 appended for `%output{>>file}`), in text mode on Windows, and refuses one it cannot open;

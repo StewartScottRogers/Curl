@@ -76,7 +76,9 @@ not yet wired into `Curl.Console` (BL-241).
 
 `UrlSchemeGuesser` gives a URL typed without a scheme the one curl 8.21.0 guesses: the
 scheme its host prefix implies (`ftp.`, `dict.`, `ldap.`, `imap.`, `smtp.`, `pop3.`, any
-case), otherwise `http`. It only prepends `<scheme>://`; rejecting a malformed URL is left
+case), otherwise `http`. On Windows a single letter and a colon is a drive prefix, not a
+scheme, so `--proto-default file Z:/dir/file` fetches `file://Z:/dir/file` (BL-1851,
+upstream test1146). It only prepends `<scheme>://`; rejecting a malformed URL is left
 to the URL parser. It is not yet wired into `Curl.Console`.
 
 `ProxySelector` chooses the `ProxyEndpoint` curl 8.21.0 would use for a URL from `-x`,

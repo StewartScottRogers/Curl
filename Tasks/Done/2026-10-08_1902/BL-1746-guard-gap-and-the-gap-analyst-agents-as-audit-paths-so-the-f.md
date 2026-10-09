@@ -9,7 +9,7 @@ touches: [.claude/hooks/guard-audit-paths.ps1, .claude/skills/task-board/task-bo
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1746 — Guard Gap/ and the gap analyst agents as audit paths so the factory cannot move its own yardstick
 
@@ -61,14 +61,18 @@ the extension, so do not edit ADR-0267.
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` passes, including the new `Gap/` and `gap-*` cases and the cross-check against `task-board.ps1`.
-- [ ] With `CURL_DARK_FACTORY_LANE=1` set, `task-board.ps1 new -Title x -Touches Gap/Tools/x.ps1` is refused without `-NoLane`, and `status` shows an existing task touching `Gap/README.md` as interactive only.
-- [ ] The hook refuses a lane's `Read` of `Gap/README.md` and `.claude/agents/gap-options.md`, and allows `Gaps.md` and `.claude/agents/gapper.md`. Show this by running the hook script with a sample tool-call JSON on standard input, as its existing tests do.
-- [ ] `SKILL.md`, `Audit/README.md` and `CLAUDE.md` name `Gap/` and `.claude/agents/gap-*` as audit paths.
-- [ ] The change reached `master` through a green `audit` pull request, and `work/dark-factory` has merged `master`. Record the pull request's number in this task's Notes.
+- [x] `powershell -NoProfile -File Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` passes, including the new `Gap/` and `gap-*` cases and the cross-check against `task-board.ps1`.
+- [x] With `CURL_DARK_FACTORY_LANE=1` set, `task-board.ps1 new -Title x -Touches Gap/Tools/x.ps1` is refused without `-NoLane`, and `status` shows an existing task touching `Gap/README.md` as interactive only.
+- [x] The hook refuses a lane's `Read` of `Gap/README.md` and `.claude/agents/gap-options.md`, and allows `Gaps.md` and `.claude/agents/gapper.md`. Show this by running the hook script with a sample tool-call JSON on standard input, as its existing tests do.
+- [x] `SKILL.md`, `Audit/README.md` and `CLAUDE.md` name `Gap/` and `.claude/agents/gap-*` as audit paths.
+- [x] The change reached `master` through a green `audit` pull request, and `work/dark-factory` has merged `master`. Record the pull request's number in this task's Notes.
 
 ## Notes
+
+- 2026-10-08: Merged to master in pull request #78 (CI green on Windows, Linux and macOS), after work/dark-factory's Gap changes reached master in #76; master merged into work/dark-factory. Self-test 18 of 18 PASS. As a lane, the task board refuses `new -Touches Gap/Tools/x.ps1` and `.claude/agents/gap-options.md`, allows `Gaps.md` and `-NoLane`, and `status` shows a task touching `Gap/README.md` as interactive only. The hook refuses Read of `Gap/README.md`, `gap/readme.md`, `.claude/agents/gap-options.md`, Glob `Gap/**`, Grep path `Gap`, and Bash or PowerShell into Gap; it allows `Gaps.md`, `.claude/agents/gapper.md` and a commit message saying "gap analysis". Not changed (outside this task): `Test-AuditDue.ps1`, `New-TasksFromAcceptedFindings.ps1` and a `RunDarkFactory.ps1` comment still know only the Audit paths.
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Merged in PR #78 with CI green on all three platforms

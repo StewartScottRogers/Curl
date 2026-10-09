@@ -187,6 +187,19 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void Parse_NoProxyHttp3OnEitherBuild_IsAccepted(bool isWindows)
+    {
+        // curl --no-proxy-http3 -s http://127.0.0.1:1/ (curl 8.21.0 Schannel, 2026-10-08) -> exit 7, nothing about the option
+        Diagnostics.Arrange("is windows", isWindows);
+        CommandLineParseResult result = Parse(["-s", "--no-proxy-http3", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows));
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Assert.IsTrue(result.IsAccepted);
+    }
+
+    [TestMethod]
     public void AiHelp_ProxyHttp3Section_SaysItIsRefusedEverywhere()
     {
         string section = AiHelpSection("## --proxy-http3\n");

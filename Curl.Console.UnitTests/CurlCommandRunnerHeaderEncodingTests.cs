@@ -56,6 +56,52 @@ public sealed class CurlCommandRunnerHeaderEncodingTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task RunAsync_ConfigFileHeaderAndUserAgentOnWindows_SendsTheFileUtf8Bytes()
+    {
+        // Measured with real curl 8.21.0 (Windows, Schannel, 2026-10-08): a -K file's values go out as the
+        // file's own bytes, E2 80 9C ... E2 80 9D, not the ANSI code page's 93 ... 94 (upstream test 470, BL-1848).
+        ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")]);
+        InMemoryDataFileReader configFiles = new();
+        configFiles.Files["k.txt"] = Encoding.UTF8.GetBytes("-H \"X-A: “quoted”\"\nuser-agent = “agent”\n");
+        MemoryStream standardError = new();
+
+        Diagnostics.Arrange("command line", "curl -sS -K k.txt " + Url);
+        Diagnostics.Bytes("config file k.txt", configFiles.Files["k.txt"]);
+
+        int exitCode;
+        using (Diagnostics.Phase("run"))
+        {
+            exitCode = await new CurlCommandRunner(
+                    _ => new TransferDispatch(new ProtocolDispatcher(
+                        CurlComposition.CreateProtocolHandlers(server, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), new PassThroughTlsProvider(), new LoopbackDnsResolver()))),
+                    new InMemoryFileSystem(),
+                    new InMemoryFileSystem(),
+                    new MemoryStream(),
+                    standardError,
+                    new MemoryStream(),
+                    runsOnWindows: true,
+                    configFileReader: configFiles)
+                .RunAsync(["-K", "k.txt", Url]);
+        }
+
+        string request = Encoding.Latin1.GetString(server.Written);
+        string header = Encoding.Latin1.GetString(Encoding.UTF8.GetBytes("X-A: “quoted”\r\n"));
+        string userAgent = Encoding.Latin1.GetString(Encoding.UTF8.GetBytes("User-Agent: “agent”\r\n"));
+        string warning = Encoding.UTF8.GetString(standardError.ToArray());
+        Diagnostics.Act("exit code", exitCode);
+        Diagnostics.Bytes("request", server.Written);
+        Diagnostics.Act("standard error", warning);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("request contains the header's UTF-8 bytes", true, request.Contains(header, StringComparison.Ordinal));
+        Diagnostics.Assert("request contains the user agent's UTF-8 bytes", true, request.Contains(userAgent, StringComparison.Ordinal));
+        Assert.AreEqual(0, exitCode);
+        Assert.Contains(header, request);
+        Assert.Contains(userAgent, request);
+        Assert.Contains("Warning: The argument '“agent”' starts with a Unicode character.", warning);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NonAsciiHeaderOffWindows_SendsUtf8()
     {
         ScriptedConnector server = new([Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")]);

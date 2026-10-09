@@ -300,6 +300,19 @@ internal static class HttpTransferMessages
     internal const string UnknownCompressionMethod = "Error while processing content unencoding: unknown compression method";
 
     /// <summary>
+    /// The exit 61 message for a <c>deflate</c> body without a zlib header whose first raw
+    /// block has the reserved block type: zlib's text (BL-1810).
+    /// </summary>
+    internal const string InvalidBlockType = "Error while processing content unencoding: invalid block type";
+
+    /// <summary>
+    /// The exit 61 message for a <c>deflate</c> body without a zlib header whose first raw
+    /// block is a stored block whose length and its complement disagree: zlib's text, what
+    /// curl 8.21.0 says for upstream test223's broken deflate header (BL-1810).
+    /// </summary>
+    internal const string InvalidStoredBlockLengths = "Error while processing content unencoding: invalid stored block lengths";
+
+    /// <summary>
     /// The exit 61 message for any other corrupt encoded body: measured for <c>br</c>, and
     /// the text <c>curl_easy_strerror</c> gives exit 61, used for corrupt <c>gzip</c> and
     /// <c>deflate</c> data too because the BCL does not report zlib's own text (ADR-0031).

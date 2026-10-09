@@ -19,6 +19,14 @@ internal static class CurlUrlHost
     /// </summary>
     private const string CharactersRejectedInName = "!\"#$%&'()*+,/:;<=>?@[\\]^`{|}";
 
+    /// <summary>
+    /// A dot and the characters IDNA (UTS #46, transitional) maps to nothing; see
+    /// <see cref="IsMappedToNothingOrDot" />.
+    /// </summary>
+    private const string CharactersMappedToNothingOrDot =
+        ".­͏᠋᠌᠍᠎᠏​‌‍⁠"
+        + "︀︁︂︃︄︅︆︇︈︉︊︋︌︍︎️﻿";
+
     /// <summary>The longest zone id curl keeps; a longer one is rejected.</summary>
     private const int MaximumZoneIdLength = 15;
 
@@ -79,7 +87,7 @@ internal static class CurlUrlHost
     {
         normalized = idnHost = string.Empty;
         string? decoded = PercentDecode(host);
-        if (decoded is null || decoded.Any(IsRejectedInName))
+        if (decoded is null || decoded.Any(IsRejectedInName) || decoded.All(IsMappedToNothingOrDot))
         {
             return false;
         }
@@ -124,6 +132,16 @@ internal static class CurlUrlHost
 
     private static bool IsRejectedInName(char character) =>
         character <= ' ' || CharactersRejectedInName.Contains(character);
+
+    /// <summary>
+    /// Whether IDNA (UTS #46, transitional) maps <paramref name="character" /> to nothing -
+    /// soft hyphen, combining grapheme joiner, Mongolian variation selectors, zero-width
+    /// space, non-joiner and joiner, word joiner, variation selectors and the byte order
+    /// mark - or it is a dot. A name made only of these converts to an empty name, which
+    /// curl 8.21.0 rejects with exit 3 (upstream test 763).
+    /// </summary>
+    private static bool IsMappedToNothingOrDot(char character) =>
+        CharactersMappedToNothingOrDot.Contains(character);
 
     /// <summary>
     /// Converts a host name that is not ASCII to punycode. A name <see cref="IdnMapping" />

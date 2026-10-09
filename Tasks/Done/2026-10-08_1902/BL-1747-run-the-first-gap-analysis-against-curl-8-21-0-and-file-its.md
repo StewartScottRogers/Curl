@@ -9,7 +9,7 @@ touches: [Gap/Findings, Gap/Scorecards, Gap/Upstream, Gap/Baselines, Tasks/Backl
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1747 — Run the first gap analysis against curl 8.21.0 and file its tasks
 
@@ -51,14 +51,25 @@ shifts or with `-AlongsideShift`. Read `Gap/README.md` (BL-1745) first.
 
 ## Acceptance criteria
 
-- [ ] `Gap/Scorecards/` on `master` holds the first scorecard, with all seven areas measured on Windows, and `Gap/Scorecards/history.json` holds its entry.
-- [ ] `Gap/Findings/` on `master` holds the run's findings, each with evidence, `introduced-in`, severity and suggestion.
-- [ ] Every open target-scope finding names a task in `task`, and each such task is in `Tasks/Backlog` with no `lane: no`.
-- [ ] The release watcher's run recorded the 8.22.0 release gaps, and the dashboard shows the run's scores and the release banner.
-- [ ] This task's Notes record each area's X of Y, the overall score, the number of findings and tasks filed, and the scorecard's file name, so Stewart can read the result here.
+- [x] `Gap/Scorecards/` on `master` holds the first scorecard, with all seven areas measured on Windows, and `Gap/Scorecards/history.json` holds its entry.
+- [x] `Gap/Findings/` on `master` holds the run's findings, each with evidence, `introduced-in`, severity and suggestion.
+- [x] Every open target-scope finding names a task in `task`, and each such task is in `Tasks/Backlog` with no `lane: no`.
+- [x] The release watcher's run recorded the 8.22.0 release gaps, and the dashboard shows the run's scores and the release banner.
+- [x] This task's Notes record each area's X of Y, the overall score, the number of findings and tasks filed, and the scorecard's file name, so Stewart can read the result here.
 
 ## Notes
+
+- 2026-10-08: First gap analysis, run 2026-10-08_1640, Windows, target curl 8.21.0, commit 0fcab815. Scorecard `Gap/Scorecards/2026-10-08_1640.md`, merged to master in PR #80 (CI green on all three platforms); master merged into work/dark-factory.
+  - options 567 of 573 (99.0%), protocols 27 of 29 (93.1%), features 16 of 23 (69.6%), writeout 138 of 138 (100%), exitcodes 259 of 259 (100%), environment 24 of 42 (57.1%; 18 unmeasured), behaviour 578 of 1326 (43.6%; 605 unmeasured, 687 excluded). Overall 1609 of 2390 (67.3%).
+  - Behaviour sanity check: 561 harness passes against `PassingUpstreamCases.txt`'s 559, then 578 matches after the reference cross-check.
+  - 37 target findings, 37 lane-eligible tasks filed (none `lane: no`, none touching `Gap/`). The release watcher (run 37865797629) recorded curl 8.22.0 with 3 new gaps (`scope: newest`). The dashboard https://stewartscottrogers.github.io/Curl/gaps/ shows this run and newest 8.22.0.
+  - Fixed on the way, each through a green audit PR: the probe ignored `-Candidate` and environment recipes could not run (PR #79); options and writeout stamped the tool repository's commit (PR #81, this run's two stamps corrected by hand before its scorecard was written).
+  - Follow-ups: BL-1839 (79 unknown-variable cases), BL-1840 (cross-check wrote `%` into the main checkout and stopped a shift starting), BL-1841 (the options analyst wrote into the tree, so options filed no findings this run).
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. First gap analysis running (herdr tab); finished interactively once its gap pull request merges, so Doing holds nothing orphaned
+- 2026-10-08: Blocked -> Doing.
+- 2026-10-08: Doing -> Done. First gap analysis merged in PR #80 with CI green; dashboard live

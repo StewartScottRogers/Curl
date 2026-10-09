@@ -432,6 +432,7 @@ public sealed class CurlUrlTests
     [DataRow("http://h~x/", "http", "h~x")]
     [DataRow("http://a%7Fb/", "http", "a\u007fb")]
     [DataRow("http://a%80b/", "http", "a\ufffdb")]
+    [DataRow("http://a\u200bb/", "http", "a\u200bb")]
     [DataRow("example.com", "http", "example.com")]
     [DataRow("x:81", "http", "x")]
     [DataRow("ftpx.y", "http", "ftpx.y")]

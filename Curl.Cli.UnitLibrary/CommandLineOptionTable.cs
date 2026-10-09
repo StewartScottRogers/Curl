@@ -217,6 +217,7 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("ssl-auto-client-cert", null, (options, on) => options.AutoClientCertificate = on),
         CommandLineOption.NegatableFlag("proxy-insecure", null, (options, on) => options.ProxyInsecure = on),
         CommandLineOption.NegatableFlag("proxy-http2", null, (options, on) => options.ProxyHttp2 = on).RefusedBySchannelBuild(),
+        CommandLineOption.UnsupportedFlagTurnedOffQuietly("proxy-http3"),
         CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("proxy-cert", null, (options, certificate) => options.ProxyClientCertificate = certificate),
@@ -288,8 +289,8 @@ public static class CommandLineOptionTable
         CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
         CommandLineOption.Value("header", 'H', AddHeaders),
         CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
-        CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = userAgent)),
-        CommandLineOption.Value("referer", 'e', AcceptingEmpty(SetReferer)),
+        CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = options.AsWireText(userAgent))),
+        CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => SetReferer(options, options.AsWireText(referer)))),
         CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
@@ -866,7 +867,42 @@ public static class CommandLineOptionTable
     private static CommandLineRefusal? AddUrl(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
         value.Length == 0
             ? CommandLineRefusal.BlankArgument(spelledOption)
-            : options.AddUrl(value, spelledOption);
+            : value[0] == '@'
+                ? AddUrlsFromFile(options, value[1..], spelledOption, dataFileReader)
+                : options.AddUrl(value, spelledOption);
+
+    /// <summary>
+    /// Adds every URL in the file a <c>--url @file</c> value names, or standard input for <c>@-</c>, one
+    /// per line, each saved under its remote name and never globbed, as curl 8.21.0's <c>parse_url</c> does (BL-1804). A
+    /// line that is blank, or whose first non-blank character is <c>#</c>, is skipped, as curl's
+    /// <c>my_get_line</c> skips it; a file that cannot be opened is refused with
+    /// <see cref="CommandLineRefusal.UrlFileUnreadable"/>.
+    /// </summary>
+    private static CommandLineRefusal? AddUrlsFromFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader)
+    {
+        byte[] contents;
+        if (file == "-")
+        {
+            contents = dataFileReader.ReadStandardInput();
+        }
+        else if (!dataFileReader.TryReadFile(file, out contents))
+        {
+            return CommandLineRefusal.UrlFileUnreadable(spelledOption);
+        }
+
+        foreach (string line in System.Text.Encoding.UTF8.GetString(contents).Split('\n'))
+        {
+            string url = line.TrimEnd('\r');
+            string content = url.TrimStart(' ', '\t');
+            CommandLineRefusal? refusal = content.Length == 0 || content[0] == '#' ? null : options.AddUrl(url, spelledOption, readFromUrlFile: true);
+            if (refusal is not null)
+            {
+                return refusal;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Records an <c>--etag-save</c> or <c>--etag-compare</c> file as a <see cref="CommandLineOption.FileName"/>
@@ -986,7 +1022,7 @@ public static class CommandLineOptionTable
                 options.AddWarningLinesUnlessSilent([notAHeaderWarning(value)]);
             }
 
-            addHeader(value);
+            addHeader(options.AsWireText(value));
             return null;
         }
 

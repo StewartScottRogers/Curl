@@ -278,7 +278,7 @@ public sealed class HttpProtocolHandler(
             options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
             context.Credentials,
             options.BearerToken,
-            options.AuthSchemes,
+            AllowedSchemesOf(options),
             IsProxy: false)
         {
             Events = context.Events,
@@ -291,8 +291,10 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder proxyAuthorizationLines = new();
         string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
-        HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
+        bool probes = SendsDigestProbe(framing, authRequest, authorization) || (proxyAuthRequest is not null && SendsDigestProbe(framing, proxyAuthRequest, proxyAuthorization));
+        HttpRequestPlan plan = new(context, options, probes ? framing.AsAuthProbe() : framing, authRequest, authorization)
         {
+            ProbedFraming = probes ? framing : null,
             AuthorizationFailure = authorizationFailure,
             AuthorizationInfoLines = authorizationLines.Lines,
             Started = started,
@@ -309,6 +311,55 @@ public sealed class HttpProtocolHandler(
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
         return plan.OpenedConnection ? WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines) : result;
     }
+
+    /// <summary>
+    /// Decides whether the first request goes as a probe with an empty body
+    /// (<see cref="HttpRequestFraming.AsAuthProbe" />): one with a body, sent where Digest is the
+    /// one scheme allowed, with credentials and no value made yet, as curl 8.21.0 holds a POST's
+    /// or PUT's body back until the Digest challenge is answered (upstream test88, test175,
+    /// test1001; ADR-0441).
+    /// </summary>
+    private static bool SendsDigestProbe(HttpRequestFraming framing, HttpAuthRequest request, string? authorization) =>
+        framing.Body is not null
+            && request.AllowedSchemes == HttpAuthSchemes.Digest
+            && request.Credential is not null
+            && authorization is null;
+
+    /// <summary>
+    /// Gives the schemes the origin request may answer with: the scheme an earlier hop's server
+    /// picked (<see cref="HttpRequestOptions.AuthSchemePicked" />) alone when it is one of
+    /// <see cref="HttpRequestOptions.AuthSchemes" />, as libcurl 8.21.0 keeps its picked scheme
+    /// across redirects and so sends Basic before any challenge (upstream test1088, BL-1819);
+    /// otherwise every scheme allowed.
+    /// </summary>
+    private static HttpAuthSchemes AllowedSchemesOf(HttpRequestOptions options) =>
+        options.AuthSchemePicked != HttpAuthSchemes.None && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
+            ? options.AuthSchemePicked
+            : options.AuthSchemes;
+
+    /// <summary>
+    /// Gives the scheme a server picked for the request <paramref name="plan" /> sends: the
+    /// scheme of an <c>Authorization</c> value that answers a challenge, or else the one the
+    /// transfer's earlier hop picked (BL-1819).
+    /// </summary>
+    private static HttpAuthSchemes AuthSchemePickedBy(HttpRequestPlan plan) =>
+        plan.AuthorizationAnswersChallenge && SchemeOfAuthorization(plan.Authorization) is var scheme && scheme != HttpAuthSchemes.None
+            ? scheme
+            : plan.Options.AuthSchemePicked;
+
+    /// <summary>
+    /// Gives the scheme an <c>Authorization</c> value starts with, or
+    /// <see cref="HttpAuthSchemes.None" /> for none or one this handler does not pick.
+    /// </summary>
+    private static HttpAuthSchemes SchemeOfAuthorization(string? authorization) =>
+        authorization?.Split(' ', 2)[0] switch
+        {
+            "Basic" => HttpAuthSchemes.Basic,
+            "Digest" => HttpAuthSchemes.Digest,
+            "NTLM" => HttpAuthSchemes.Ntlm,
+            "Negotiate" => HttpAuthSchemes.Negotiate,
+            _ => HttpAuthSchemes.None,
+        };
 
     /// <summary>
     /// Makes the first request's <c>Proxy-Authorization</c> value for a forward proxy, the
@@ -1004,7 +1055,7 @@ public sealed class HttpProtocolHandler(
         ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
-        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection);
+        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = framing.AwaitsContinue
             ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
@@ -1026,6 +1077,7 @@ public sealed class HttpProtocolHandler(
             TimeProvider = context.TimeProvider,
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
+            AuthSchemePicked = AuthSchemePickedBy(plan),
         };
         HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
         HttpResponseBodyReader body = new(responseConnection)
@@ -1050,13 +1102,14 @@ public sealed class HttpProtocolHandler(
             HeaderReceived = (statusLine, header) =>
             {
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
-                cookiesStored = StoreCookie(context, header, cookiesStored);
+                cookiesStored = StoreCookie(context, options, header, cookiesStored);
                 StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
                 StoreHsts(context, options.HstsStore, header);
             },
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
             AcceptsHttp09 = options.AllowHttp09Reply,
+            IsHeadRequest = context.NoBody,
             IgnoresContentLength = options.IgnoreContentLength,
             IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
@@ -1076,7 +1129,8 @@ public sealed class HttpProtocolHandler(
             ReportRequestSent(context.Events, framing, upload, bodyLeftUnsent);
             exchangeLog.RequestSent(framing.Method, context.Url.AbsolutePath, request);
             exchange.RequestSent = context.TimeProvider.GetTimestamp();
-            exchange.Head = await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            exchange.Head = await ReadHeadAsync(headReader, newConnection, cancellationToken).ConfigureAwait(false);
+            ThrowIfVersionMismatched(transport, streams is not null || IsSwitchedToHttp2(connection), exchange.Head);
             HttpHeadRefusal? refusal = headReader.Refusal;
             exchange.Head = HeadCurlRead(exchange.Head, refusal);
             actedOn = headReader.HeadActedOn(exchange.Head);
@@ -1090,7 +1144,7 @@ public sealed class HttpProtocolHandler(
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             headReader.ReleaseDeferredHeaders();
-            HttpFailMode fail = FailModeOf(options, retry);
+            HttpFailMode fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
@@ -1110,7 +1164,7 @@ public sealed class HttpProtocolHandler(
             TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
                 with
             { Report = exchange.Report(body) };
-            return FailedOutcome(plan, connect, upload, headReader, failure, failed);
+            return FailedOutcome(plan, reusedConnection: !newConnection, upload, headReader, failure, failed);
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
@@ -1145,10 +1199,14 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gives how <c>-f</c> or <c>--fail-with-body</c> applies to a response: as asked, unless
-    /// the handler answers it with <paramref name="retry" />, which no failing mode stops.
+    /// the handler answers it with <paramref name="retry" />, which no failing mode stops, or
+    /// it is a 416 to a resumed GET, which curl 8.21.0 takes as a file already downloaded
+    /// (<see cref="HttpDownloadConditions.IsResumeAlreadyComplete" />).
     /// </summary>
-    private static HttpFailMode FailModeOf(HttpRequestOptions options, HttpRequestPlan? retry) =>
-        retry is null ? options.Fail : HttpFailMode.None;
+    private static HttpFailMode FailModeOf(HttpRequestPlan plan, HttpRequestPlan? retry, HttpResponseHead head) =>
+        retry is null && !HttpDownloadConditions.IsResumeAlreadyComplete(plan.Context, plan.Framing.Body is not null, head)
+            ? plan.Options.Fail
+            : HttpFailMode.None;
 
     /// <summary>
     /// Tells whether the response's body is read and discarded rather than delivered: when the
@@ -1309,20 +1367,58 @@ public sealed class HttpProtocolHandler(
         connection is HttpH2cUpgradeConnection { IsUpgraded: true };
 
     /// <summary>
+    /// Reads the response head; on a reused connection, a reply that cannot begin <c>HTTP/</c>
+    /// fails with exit 8, <c>Invalid status line</c>, as curl 8.21.0 never takes HTTP/0.9 on
+    /// a reused connection (upstream test1479), rather than with exit 1.
+    /// </summary>
+    private static async ValueTask<HttpResponseHead> ReadHeadAsync(HttpResponseHeadReader headReader, bool newConnection, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await headReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException failure) when (!newConnection && failure.Message == HttpTransferMessages.Http09NotAllowed)
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
+        }
+    }
+
+    /// <summary>
+    /// Fails a response over HTTP/1.x whose major version differs from the one the connection's
+    /// earlier response named (upstream test471), and else records its version on the
+    /// connection for the next request (<see cref="Http1VersionSeen" />).
+    /// </summary>
+    private static void ThrowIfVersionMismatched(IConnection transport, bool overStreams, HttpResponseHead head)
+    {
+        if (overStreams)
+        {
+            return;
+        }
+
+        Version version = Http1VersionSeen.VersionNamed(head.HeadBytes.Span, head.StatusLine.Version);
+        Http1VersionSeen.ThrowIfMismatched(transport, version);
+        Http1VersionSeen.Record(transport, version);
+    }
+
+    /// <summary>
     /// Formats the request head: the HTTP/1.1 head, asking to upgrade to h2c when
     /// <paramref name="upgradesToH2c" />, or over HTTP/2 or HTTP/3 the same head naming
     /// <c>HTTP/2</c> or <c>HTTP/3</c> in its request line, which is what is reported sent and what the stream
     /// turns into its HEADERS (<see cref="Http2RequestHeaders" />).
     /// </summary>
-    private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams, bool upgradesToH2c)
+    /// <remarks>
+    /// On a connection whose earlier response was HTTP/1.0 the head is formatted as for
+    /// <c>-0</c>, as curl downgrades the connection (upstream test1074).
+    /// </remarks>
+    private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams, bool upgradesToH2c, bool downgradesToHttp10)
     {
         ITransferContext context = plan.Context;
         byte[] head = HttpRequestHeadFormatter.Format(
             context.Url,
-            plan.Options,
+            downgradesToHttp10 ? plan.Options with { Version = HttpVersionPreference.Http10 } : plan.Options,
             context.NoBody,
             plan.Authorization,
-            CookieHeaderFor(context),
+            CookieHeaderFor(context, plan.Options),
             plan.ForwardProxy is not null,
             plan.ProxyAuthorization,
             HttpRangeHeader.ValueFor(context, plan.Framing.Body is not null),
@@ -1611,17 +1707,18 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Builds the outcome of an exchange that failed with <paramref name="failure" />: as
     /// <see cref="StreamRefusedOutcome" /> says when the server refused its HTTP/3 stream; sent
-    /// again once on a fresh connection when its pooled connection died before the response
+    /// again once on a fresh connection when a connection that already carried a request died
+    /// before the response
     /// (<see cref="DiedBeforeResponse" />); and final otherwise.
     /// </summary>
-    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, ConnectResult connect, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
+    private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, bool reusedConnection, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
     {
         if (failure.IsStreamRefused)
         {
             return StreamRefusedOutcome(plan, upload, failed, headReader.HasReceived);
         }
 
-        return DiedBeforeResponse(plan, connect, headReader, failure)
+        return DiedBeforeResponse(plan, reusedConnection, headReader, failure)
             ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
             : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
     }
@@ -1668,24 +1765,25 @@ public sealed class HttpProtocolHandler(
             && (!headReader.SwitchedProtocols || headReader.IsSwitchedToHttp2());
 
     /// <summary>
-    /// Decides whether a failed exchange was on a pooled connection that died while idle, so
+    /// Decides whether a failed exchange was on a reused connection that died while idle, so
     /// the request is sent again once on a fresh one, as curl 8.21.0 does (BL-336 Notes): the
-    /// connection was reused, it failed sending or receiving before any byte of the response
+    /// connection was reused, from the pool or by an earlier request of this transfer such as
+    /// the one a 401 answered (BL-1797), it failed sending or receiving before any byte of the response
     /// arrived, the request has not already been sent again for this reason, and its body, if
     /// any, is bytes that can be sent again.
     /// </summary>
-    private static bool DiedBeforeResponse(HttpRequestPlan plan, ConnectResult connect, HttpResponseHeadReader headReader, HttpTransferException failure) =>
+    private static bool DiedBeforeResponse(HttpRequestPlan plan, bool reusedConnection, HttpResponseHeadReader headReader, HttpTransferException failure) =>
         !headReader.HasReceived
             && failure.ExitCode is CurlExitCode.GotNothing or CurlExitCode.SendError or CurlExitCode.RecvError
-            && CanSendAgainOnFreshConnection(plan, connect);
+            && CanSendAgainOnFreshConnection(plan, reusedConnection);
 
     /// <summary>
     /// Decides whether <paramref name="plan" /> may be sent again on a fresh connection: it went
-    /// out on a pooled one, it has not already been sent again, and its body, if any, is bytes
+    /// out on a reused one, it has not already been sent again, and its body, if any, is bytes
     /// that can be sent again.
     /// </summary>
-    private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, ConnectResult connect) =>
-        connect.IsReused
+    private static bool CanSendAgainOnFreshConnection(HttpRequestPlan plan, bool reusedConnection) =>
+        reusedConnection
             && !plan.SentOnFreshConnection
             && plan.Framing.Body is not StreamBody;
 
@@ -1771,15 +1869,17 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Applies <c>--max-filesize</c> to the head's Content-Length, then decides what becomes of
-    /// a body that is not being discarded (<see cref="HttpDownloadConditions" />).
+    /// Applies <c>--max-filesize</c> to the head's Content-Length of a body that is kept, then
+    /// decides what becomes of it (<see cref="HttpDownloadConditions" />). A discarded body - a
+    /// redirect <c>-L</c> follows, a 401 before its retry - is not held to the limit, as curl
+    /// 8.21.0 holds only the body it keeps to it (upstream test477, BL-1807).
     /// </summary>
     /// <exception cref="HttpTransferException">
     /// The Content-Length is over the limit (exit 63), or a resume was not honoured (exit 33).
     /// </exception>
     private static HttpBodyDelivery DeliveryOf(HttpRequestPlan plan, HttpResponseHead head, bool discardsBody)
     {
-        HttpDownloadConditions.ThrowIfContentLengthExceeds(plan.Context.MaxFileSize, head);
+        HttpDownloadConditions.ThrowIfContentLengthExceeds(discardsBody ? null : plan.Context.MaxFileSize, head);
         return discardsBody ? HttpBodyDelivery.Deliver : HttpDownloadConditions.Decide(plan.Context, plan.Framing.Body is not null, head);
     }
 
@@ -1916,11 +2016,26 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Asks the cookie store for the <c>Cookie</c> value to send to the transfer's URL, or
-    /// gives <see langword="null" /> when cookies are off. The store reports a limit that cut
-    /// the value short to the transfer's events, before the request's header lines, as curl does.
+    /// gives <see langword="null" /> when cookies are off: the stored cookies alone when
+    /// <see cref="HttpRequestOptions.SendsCookieStrings" /> is off (BL-1846). The store reports a
+    /// limit that cut the value short to the transfer's events, before the request's header
+    /// lines, as curl does.
     /// </summary>
-    private string? CookieHeaderFor(ITransferContext context) =>
-        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
+    private string? CookieHeaderFor(ITransferContext context, HttpRequestOptions options) =>
+        options.SendsCookieStrings
+            ? CookieStore?.GetCookieHeader(CookieUrlOf(context.Url, options), TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events)
+            : CookieStore?.GetStoredCookieHeader(CookieUrlOf(context.Url, options), TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
+
+    /// <summary>
+    /// Gives the URL cookies are matched and stored against: <paramref name="url" /> with the
+    /// host of a <c>-H</c> <c>Host</c> value in its place, as curl takes its cookie host from a
+    /// custom <c>Host</c> header, or <paramref name="url" /> itself when there is none.
+    /// </summary>
+    internal static CurlUrl CookieUrlOf(CurlUrl url, HttpRequestOptions options) =>
+        HttpRequestHeadFormatter.CustomHostOf(options) is { } host
+        && CurlUrl.TryParse($"{url.Scheme}://{host}{url.AbsolutePath}", false, out CurlUrl? cookieUrl)
+            ? cookieUrl
+            : url;
 
     /// <summary>
     /// Hands <paramref name="header" />, when it is a <c>Set-Cookie</c> header and cookies are
@@ -1928,12 +2043,13 @@ public sealed class HttpProtocolHandler(
     /// in any head of the response, 1xx heads' included (measured, BL-468 Notes).
     /// </summary>
     /// <param name="context">The transfer.</param>
+    /// <param name="options">The request's options, whose <c>-H</c> <c>Host</c> value gives the cookie host (<see cref="CookieUrlOf" />).</param>
     /// <param name="header">A whole header of the response.</param>
     /// <param name="storedFromResponse">How many cookies the store has stored from this request's responses.</param>
     /// <returns>The count the store gives back, or <paramref name="storedFromResponse" /> when the store is not asked.</returns>
-    private int StoreCookie(ITransferContext context, HttpResponseHeader header, int storedFromResponse) =>
+    private int StoreCookie(ITransferContext context, HttpRequestOptions options, HttpResponseHeader header, int storedFromResponse) =>
         CookieStore is { } store && string.Equals(header.Name, "Set-Cookie", StringComparison.OrdinalIgnoreCase)
-            ? store.StoreFromResponse(context.Url, header.Value, storedFromResponse, context.TimeProvider.GetUtcNow(), context.Events)
+            ? store.StoreFromResponse(CookieUrlOf(context.Url, options), header.Value, storedFromResponse, context.TimeProvider.GetUtcNow(), context.Events)
             : storedFromResponse;
 
     /// <summary>
@@ -2013,12 +2129,19 @@ public sealed class HttpProtocolHandler(
         EndUnchallengedAuthorizations(plan, head.StatusLine.StatusCode);
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
+            RewindForResend(plan, upload);
             return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan));
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
+            RewindForResend(plan, upload);
             return authorized;
+        }
+
+        if (plan.ProbedFraming is not null && head.StatusLine.StatusCode is >= 200 and < 300)
+        {
+            return plan.WithProbedBody();
         }
 
         if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
@@ -2030,6 +2153,21 @@ public sealed class HttpProtocolHandler(
         ThrowIfRedirectLimitReached(plan);
         ReportUploadAbandoned(plan.Context.Events, upload, bodyLeftUnsent);
         return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent);
+    }
+
+    /// <summary>
+    /// Seeks a stream body that <paramref name="upload" /> began reading back to where it
+    /// began, so an authentication retry sends it again whole, as curl 8.21.0 rewinds a
+    /// <c>-T</c> file or a <c>-F</c> form before it answers a 401 or 407 (upstream test1030,
+    /// test259). Only a seekable stream reaches here (<see cref="MayRetry" />); a body of bytes
+    /// needs nothing.
+    /// </summary>
+    private static void RewindForResend(HttpRequestPlan plan, HttpRequestBodyWriter upload)
+    {
+        if (plan.Framing.Body is StreamBody stream)
+        {
+            upload.Rewound(stream);
+        }
     }
 
     /// <summary>
@@ -2236,10 +2374,13 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether <paramref name="head" /> may be answered with a retry at all: a
-    /// <paramref name="statusCode" /> response to a request whose body is not a stream.
+    /// <paramref name="statusCode" /> response to a request whose body can be sent again: bytes,
+    /// none, or a stream that can seek back to its start, as a <c>-T</c> file or a <c>-F</c> form
+    /// of files can, which curl 8.21.0 rewinds and resends whole (upstream test1030, test259); not
+    /// a stream that cannot, such as stdin (ADR-0034).
     /// </summary>
     private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head, int statusCode) =>
-        head.StatusLine.StatusCode == statusCode && plan.Framing.Body is not StreamBody;
+        head.StatusLine.StatusCode == statusCode && (plan.Framing.Body is not StreamBody stream || stream.Content.CanSeek);
 
     /// <summary>
     /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,
@@ -2431,6 +2572,12 @@ public sealed class HttpProtocolHandler(
         internal int RedirectCount { get; init; }
 
         /// <summary>
+        /// Gets the scheme a server picked for the exchange's request, the report's
+        /// <see cref="TransferReport.AuthSchemePicked" /> (BL-1819).
+        /// </summary>
+        internal HttpAuthSchemes AuthSchemePicked { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -2466,9 +2613,10 @@ public sealed class HttpProtocolHandler(
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
+                AuthSchemePicked = AuthSchemePicked,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
-                LocalEndPoint = connect.LocalEndPoint,
+                LocalEndPoint = connect.LocalEndPoint ?? connection.LocalEndPoint as IPEndPoint,
                 PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
                 Timings = new TransferTimings(
@@ -2649,7 +2797,22 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptProxyAuthorization">The <c>Proxy-Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithAuthorization(string authorization, IReadOnlyList<string> infoLines, string? keptProxyAuthorization) =>
-            With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
+            With(ProbedFraming ?? Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines, endsProbe: true);
+
+        /// <summary>
+        /// Gets the framing the probe (<see cref="HttpRequestFraming.AsAuthProbe" />) held back, sent
+        /// once a challenge is answered or the probe drew a 2xx; <see langword="null" /> when this
+        /// request is no probe.
+        /// </summary>
+        public HttpRequestFraming? ProbedFraming { get; init; }
+
+        /// <summary>
+        /// Makes the same request with the body the probe held back and no credentials, which
+        /// curl 8.21.0 sends when the probe drew a 2xx instead of a challenge (upstream test175).
+        /// </summary>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan WithProbedBody() =>
+            With(ProbedFraming!, Authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, endsProbe: true);
 
         /// <summary>
         /// Makes the retry that answers a challenge the authenticator refused to answer: it
@@ -2671,7 +2834,7 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptAuthorization">The <c>Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithProxyAuthorization(string proxyAuthorization, string? keptAuthorization) =>
-            With(Framing, keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
+            With(ProbedFraming ?? Framing, keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true, endsProbe: true);
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
@@ -2746,9 +2909,11 @@ public sealed class HttpProtocolHandler(
             string? proxyAuthorization,
             bool proxyAuthorizationAnswersChallenge,
             IReadOnlyList<string>? authorizationInfoLines = null,
-            HttpTransferException? authorizationFailure = null) =>
+            HttpTransferException? authorizationFailure = null,
+            bool endsProbe = false) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
+                ProbedFraming = endsProbe ? null : ProbedFraming,
                 Started = Started,
                 Deadline = Deadline,
                 Progress = Progress,

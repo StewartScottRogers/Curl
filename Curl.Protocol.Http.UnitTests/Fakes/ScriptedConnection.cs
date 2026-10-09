@@ -70,6 +70,11 @@ public sealed class ScriptedConnection : IConnection
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint => null;
 
+    /// <summary>
+    /// Gets the connection's own local end point; <see langword="null" /> unless set.
+    /// </summary>
+    public EndPoint? LocalEndPoint { get; init; }
+
     /// <summary>Gets every byte written so far, in order.</summary>
     public byte[] Written => written.ToArray();
 
