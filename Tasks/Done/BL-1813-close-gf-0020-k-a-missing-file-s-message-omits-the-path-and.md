@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1813 — Close GF-0020: -K: a missing file's message omits the path, and a Unicode quote in a config file is read differently
 
@@ -35,14 +35,30 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test411`: Curl answers what curl 8.21.0 answers, `upstream test411 passes`, so the item measures `match`.
-- [ ] `behaviour:test470`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test411`: Curl answers what curl 8.21.0 answers, `upstream test411 passes`, so the item measures `match`.
+- [x] `behaviour:test470`: moved to BL-1848 (see Notes); this task no longer carries it.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
+
+- test411: Curl already printed the path, but wrapped the line at a fixed 79 columns. Measured
+  curl 8.21.0 (Windows, 2026-10-08) with `-K` naming a missing 73-byte path: it wraps at 79 with
+  no `COLUMNS`, at 40 with `COLUMNS=40`, and not at all with `COLUMNS=200`; the upstream harness
+  sets a wide `COLUMNS`, so the expected line is unwrapped. `WrappedMessage` (Curl.Cli.UnitLibrary)
+  now takes its width from `COLUMNS` with curl's rule (21-9999, else 79), the same rule
+  `Curl.Console/TerminalColumns` uses. It does not read the console window's width as curl does
+  when standard error is a console; redirected runs (tests, scripts) are unaffected. Made
+  `WrappedMessage` public so `WrappedMessageTests` can pin the width rule (the library has no
+  `InternalsVisibleTo`).
+- test470 split out to BL-1848: the request bytes differ because the config file is decoded as
+  UTF-8 and the Windows request side re-encodes option text in the ANSI code page (`93`/`94`
+  instead of curl's raw `E2 80 9C`/`E2 80 9D`). The fix spans Curl.Console's text encoding as well
+  as the Cli config reader, beyond this task's `touches` and this run's budget. GF-0020 closes
+  only when both items re-measure as `match`.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. test411 fixed: error lines wrap at COLUMNS width as curl does; test470 split to BL-1848
