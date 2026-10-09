@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1825 — Close GF-0032: Curl lists HTTP3 in Features; the Windows reference build does not
 
@@ -35,13 +35,16 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 
 ## Acceptance criteria
 
-- [ ] `features:HTTP3`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `features:HTTP3`: Curl answers what curl 8.21.0 answers, `not listed`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Measured the reference on this machine: curl 8.21.0 (x86_64-w64-mingw32, Schannel) `-V` Features line has no HTTP3. Dropped HTTP3 from `CurlVersionText.WindowsFeaturesLine` only; Linux and macOS keep it, and `--http3` still works everywhere (ADR-0451, following ADR-0450 for HTTP2). Pipeline feature reduced to a one-constant change, so no architect stage. No option changed, so `--ai-help` needs no change. Lines_Windows_JoinedWithCrlf_AreTheBytesTheAdrRecords pins the new bytes.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. curl -V on Windows no longer lists HTTP3, matching the Schannel reference build
