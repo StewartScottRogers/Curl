@@ -44,3 +44,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentRange: t
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
