@@ -2516,14 +2516,25 @@ internal sealed class CurlCommandRunner(
     /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). Where <c>-w</c> or <c>--trace-ids</c> prints
     /// it, a transfer
     /// under <c>-B</c> / <c>--use-ascii</c> never does: curl leaves standard output in text mode
-    /// for it (measured 2026-10-01, BL-961 Notes).
+    /// for it (measured 2026-10-01, BL-961 Notes). A transfer under <c>-D -</c> always does, even
+    /// under <c>-B</c> and even when it fails: curl sets standard output to binary for the header
+    /// output as it sets the transfer up (ADR-0443, BL-1816).
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when standard output is now in binary mode.</returns>
     private static bool SwitchesStandardOutputToBinary(CommandLineOptions options, UrlTransfer transfer, TransferResult result) =>
-        !options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure);
+        DumpsHeadersToStandardOutput(options)
+        || (!options.UseAscii && !transfer.WritesToFile && !ReferenceEquals(result, CannotOpenHeaderFileFailure));
+
+    /// <summary>
+    /// Tells whether the option group sends its header lines to standard output (<c>-D -</c>).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns><see langword="true" /> under <c>-D -</c>.</returns>
+    private static bool DumpsHeadersToStandardOutput(CommandLineOptions options) =>
+        options.DumpHeaderFile == StandardOutputHeaderFile;
 
     /// <summary>
     /// Gives the output entry of the URL at <paramref name="index" />: the parser gives every URL
@@ -2566,19 +2577,14 @@ internal sealed class CurlCommandRunner(
     /// <param name="options">The option group.</param>
     /// <param name="first">The position of the first URL looked at.</param>
     /// <returns>
-    /// <see langword="true" /> when one of those URLs saves no file; never under <c>-B</c>, which
-    /// leaves standard output in text mode.
+    /// <see langword="true" /> when one of those URLs saves no file, unless under <c>-B</c>, which
+    /// leaves standard output in text mode; and always when there is one under <c>-D -</c>.
     /// </returns>
     private static bool UrlFromSwitchesStandardOutputToBinary(CommandLineOptions options, int first)
     {
-        if (options.UseAscii)
-        {
-            return false;
-        }
-
         for (int later = first; later < options.Urls.Count; later++)
         {
-            if (!WritesToFile(options, later))
+            if (DumpsHeadersToStandardOutput(options) || (!options.UseAscii && !WritesToFile(options, later)))
             {
                 return true;
             }
