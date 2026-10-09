@@ -297,6 +297,10 @@ if (-not $InventoryDirectory) { $InventoryDirectory = Join-Path $script:OptionRe
 $inventory = Get-OptionInventory $UpstreamRoot $Version
 Write-OptionJsonFile (Join-Path (Join-Path $InventoryDirectory $Version) 'options.json') $inventory
 if ($InventoryOnly) { exit 0 }
-$commit = (& git -C $script:OptionRepositoryRoot rev-parse HEAD).Trim()
+# The commit of the build measured: the tree holding -Candidate, not this tool's own
+# repository, so every area of a run names the same candidateCommit.
+$commitRoot = if ($Candidate) { Split-Path -Parent $Candidate } else { $script:OptionRepositoryRoot }
+$commit = "$(& git -C $commitRoot rev-parse HEAD 2>$null)".Trim()
+if (-not $commit) { $commit = "$(& git -C (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) rev-parse HEAD)".Trim() }
 $measurement = Measure-OptionGap $inventory $Version $Candidate $ProbeResults $commit
 if ($OutFile) { Write-OptionJsonFile $OutFile $measurement } else { $measurement | ConvertTo-Json -Depth 8 }
