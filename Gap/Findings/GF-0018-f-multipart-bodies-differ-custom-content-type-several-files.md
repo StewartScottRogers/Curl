@@ -32,6 +32,7 @@ In Curl.Cli.UnitLibrary's -F parser and the multipart writer it feeds: merge a u
 ## Measurements
 
 - 2026-10-08_1640: 4 of 4 items are gaps.
+- 2026-10-08_2029: 3 of 4 items are gaps.
 
 ## Log
 

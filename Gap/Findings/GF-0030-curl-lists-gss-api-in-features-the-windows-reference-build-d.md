@@ -32,6 +32,7 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, drop GSS-API from the Windows Featur
 ## Measurements
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
+- 2026-10-08_2029: 1 of 1 items are gaps.
 
 ## Log
 

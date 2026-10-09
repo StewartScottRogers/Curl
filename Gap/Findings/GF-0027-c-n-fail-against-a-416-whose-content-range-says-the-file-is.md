@@ -4,11 +4,11 @@ title: -C N --fail against a 416 whose Content-Range says the file is complete e
 area: behaviour
 key: behaviour:resume-complete-file-with-fail
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-08_2029
 regression: false
 items: [behaviour:test194]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentRange: t
 ## Measurements
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
+- 2026-10-08_2029: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1820.
+- 2026-10-08_2029: Closed: run 2026-10-08_2029 measured every item as match or excluded.

@@ -4,11 +4,11 @@ title: A user Host: header is not used for cookie matching, is kept on a redirec
 area: behaviour
 key: behaviour:custom-host-header-handling
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-08_2029
 regression: false
 items: [behaviour:test62, behaviour:test1258, behaviour:test184, behaviour:test461]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Http.UnitLibrary (HttpCustomHeader, HttpRequestHeadFormatter) a
 ## Measurements
 
 - 2026-10-08_1640: 4 of 4 items are gaps.
+- 2026-10-08_2029: 0 of 4 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1802.
+- 2026-10-08_2029: Closed: run 2026-10-08_2029 measured every item as match or excluded.

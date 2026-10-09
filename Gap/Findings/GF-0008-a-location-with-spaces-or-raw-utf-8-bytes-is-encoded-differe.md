@@ -4,11 +4,11 @@ title: A Location with spaces or raw UTF-8 bytes is encoded differently from cur
 area: behaviour
 key: behaviour:redirect-location-url-encoding
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-08_2029
 regression: false
 items: [behaviour:test40, behaviour:test662, behaviour:test663, behaviour:test1138]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Http.UnitLibrary's HttpRedirectLocation (with CurlUrl in Curl.P
 ## Measurements
 
 - 2026-10-08_1640: 4 of 4 items are gaps.
+- 2026-10-08_2029: 0 of 4 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1801.
+- 2026-10-08_2029: Closed: run 2026-10-08_2029 measured every item as match or excluded.

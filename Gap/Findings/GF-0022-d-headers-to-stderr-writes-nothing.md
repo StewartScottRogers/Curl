@@ -4,11 +4,11 @@ title: -D % (headers to stderr) writes nothing
 area: behaviour
 key: behaviour:dump-header-to-stderr
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-08_2029
 regression: false
 items: [behaviour:test1489]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Cli.UnitLibrary and Curl.Console's -D target opening, accept '%' as stde
 ## Measurements
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
+- 2026-10-08_2029: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1815.
+- 2026-10-08_2029: Closed: run 2026-10-08_2029 measured every item as match or excluded.
