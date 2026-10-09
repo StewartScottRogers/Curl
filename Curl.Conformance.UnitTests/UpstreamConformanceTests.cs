@@ -53,26 +53,22 @@ public sealed class UpstreamConformanceTests
         diagnostics.Arrange("upstream case number", testNumber);
         diagnostics.Arrange("case is on the passing list", isListed);
         byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
-        DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         UpstreamCaseOutcome outcome;
-        try
+        using (diagnostics.Phase("run case through curl"))
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeLimit);
-            using (diagnostics.Phase("run case through curl"))
+            outcome = await RunCaseOnceAsync(testNumber, testFile);
+        }
+
+        // A stall of the whole CI runner can hold a listed case past a time limit that it
+        // finishes in milliseconds elsewhere (test1484, BL-1859), so a listed case that ran out of
+        // time gets one more attempt; a case that really hangs runs out of time again and fails.
+        if (isListed && RanOutOfTime(outcome))
+        {
+            diagnostics.Act("first attempt ran out of time", outcome.Detail);
+            using (diagnostics.Phase("run case through curl again"))
             {
-                outcome = await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName)).WaitAsync(CaseHangLimit);
+                outcome = await RunCaseOnceAsync(testNumber, testFile);
             }
-        }
-        catch (TimeoutException)
-        {
-            // A failure of the case, judged like any other: a listed case fails the row, an
-            // unlisted one is Inconclusive, so a loaded machine stretching an unlisted case's real
-            // retry waits (test3035, BL-1359) cannot fail the fast suite.
-            outcome = UpstreamCaseOutcome.Failed($"the case did not finish within {CaseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds");
-        }
-        finally
-        {
-            DeleteLogDirectory(logDirectory);
         }
 
         UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(testNumber, outcome, isListed);
@@ -89,6 +85,35 @@ public sealed class UpstreamConformanceTests
                 break;
         }
     }
+
+    private static async Task<UpstreamCaseOutcome> RunCaseOnceAsync(int testNumber, byte[] testFile)
+    {
+        DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
+        try
+        {
+            UpstreamCaseRunner runner = new(RunCurlAsync, OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeLimit);
+            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName)).WaitAsync(CaseHangLimit);
+        }
+        catch (TimeoutException)
+        {
+            // A failure of the case, judged like any other: a listed case fails the row, an
+            // unlisted one is Inconclusive, so a loaded machine stretching an unlisted case's real
+            // retry waits (test3035, BL-1359) cannot fail the fast suite.
+            return UpstreamCaseOutcome.Failed(CaseHangLimitMessage);
+        }
+        finally
+        {
+            DeleteLogDirectory(logDirectory);
+        }
+    }
+
+    private static readonly string CaseHangLimitMessage =
+        $"the case did not finish within {CaseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds";
+
+    // The runner's own words for a curl run past TimeLimit, and this class's for a case past CaseHangLimit.
+    private static bool RanOutOfTime(UpstreamCaseOutcome outcome) =>
+        outcome.Kind == UpstreamCaseOutcomeKind.Failed
+        && (outcome.Detail == CaseHangLimitMessage || outcome.Detail.StartsWith("curl did not finish within ", StringComparison.Ordinal));
 
     private static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
         CurlComposition.CreateRunner(
