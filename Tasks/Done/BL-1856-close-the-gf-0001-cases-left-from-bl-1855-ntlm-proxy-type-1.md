@@ -8,7 +8,7 @@ depends-on: [BL-1857, BL-1858]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1856 — Close the GF-0001 cases left from BL-1855: NTLM proxy type-1 through the tunnel, CONNECT reply errors, test2043 revocation
 
@@ -28,20 +28,21 @@ The eight GF-0001 upstream cases BL-1855 left failing over the in-process `TcpCo
 
 ## Acceptance criteria
 
-- [ ] Upstream test1008 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test1021 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test209 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test265 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test213 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test217 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test750 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test1715 passes and is listed in `PassingUpstreamCases.txt`.
-- [ ] Upstream test2043 passes and is listed, or is skipped by the harness with a stated reason.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] Upstream test1008 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test1021 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test209 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test265 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test213 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test217 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test750 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test1715 passes and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test2043 passes and is listed, or is skipped by the harness with a stated reason.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
 
 - 2026-10-08 (lane 1): measured the nine cases (all still Inconclusive, unlisted). Split the work into BL-1857 (CONNECT reply errors: test217, test750, test1715, in Curl.Networking) and BL-1858 (NTLM type-1 on Windows: test1008, 1021, 209, 213, 265; and test2043), with the measured causes in each. This run's budget could not cover the fixes; BL-1856 closes once both are Done.
+- 2026-10-08 (lane 1, second claim): BL-1857 and BL-1858 are Done. test1008, 1021, 209, 213, 217, 265, 750 and 1715 are listed in `PassingUpstreamCases.txt` and pass; test2043 is screened by `UpstreamCaseScreening` as needing the internet (`UpstreamCaseScreeningTests.cs`). Verified: `dotnet build -warnaserror` clean, fast tests green. No code change needed here.
 
 ## Log
 
@@ -49,3 +50,4 @@ The eight GF-0001 upstream cases BL-1855 left failing over the in-process `TcpCo
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Split into BL-1857 (CONNECT reply errors) and BL-1858 (NTLM type-1 on Windows, test2043); waits on both
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Eight GF-0001 cases pass and are listed (via BL-1857, BL-1858); test2043 screened as needing the internet
