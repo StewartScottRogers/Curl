@@ -32,6 +32,7 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 ## Measurements
 
 - 2026-10-08_1640: 28 of 28 items are gaps.
+- 2026-10-08_2029: 28 of 28 items are gaps.
 
 ## Log
 

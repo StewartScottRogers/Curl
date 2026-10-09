@@ -32,6 +32,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 ## Measurements
 
 - 2026-10-08_1640: 15 of 15 items are gaps.
+- 2026-10-08_2029: 3 of 15 items are gaps.
 
 ## Log
 

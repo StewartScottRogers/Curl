@@ -4,11 +4,11 @@ title: --url-query passes a user's lower-case %3d through instead of normalising
 area: behaviour
 key: behaviour:url-query-escape-case
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-08_2029
 regression: false
 items: [behaviour:test1221]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrl query building (used by --ur
 ## Measurements
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
+- 2026-10-08_2029: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1817.
+- 2026-10-08_2029: Closed: run 2026-10-08_2029 measured every item as match or excluded.
