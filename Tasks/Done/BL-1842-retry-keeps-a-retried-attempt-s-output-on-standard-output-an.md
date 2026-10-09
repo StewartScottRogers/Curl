@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1842 — --retry keeps a retried attempt's output on standard output and resends a -d POST from the first URL under -L (upstream test1633)
 
@@ -25,12 +25,23 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A Curl.Console unit test replays test1633's exchange and pins the four requests (POST with `moo` twice) and the stdout of curl 8.21.0.
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] A Curl.Console unit test replays test1633's exchange and pins the four requests (POST with `moo` twice) and the stdout of curl 8.21.0.
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-08 (lane 1): Measured with `Record-CurlExchange.ps1 -Connections 4` (four
+  connections are needed; with the default one the recorder hangs), answering 301, 429, 301,
+  429 as test1633 does, under `-d moo --retry 1 -L -i` (runtests adds `--include`, which is
+  why test1633's datacheck holds the heads). curl 8.21.0: four requests (POST /1633 with `moo`,
+  GET /16330002, the same again), all four heads on stdout, one `Retrying in 1 second` warning,
+  exit 0. Curl's current build, through the same recorder, sent and wrote the same bytes and
+  exited 0, so no production change was needed: the gap measure's stop at byte 177 no longer
+  reproduces on this commit. `CurlCommandRunnerRetryTests.RunAsync_RetryOfARedirectedPostAnswered429_ResendsThePostFromTheFirstUrl`
+  now pins the four requests, the stdout and the one 1-second wait. Curl.Core needed no change.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Test1633's exchange pinned; Curl already matches curl 8.21.0 byte for byte

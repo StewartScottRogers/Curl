@@ -73,6 +73,29 @@ public sealed class CurlCommandRunnerRetryTests
         CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
     }
 
+    /// <summary>
+    /// Replays upstream test1633: a <c>-d</c> POST redirected by a <c>301</c> to a <c>429</c> with
+    /// <c>Retry-After: 1</c> is retried from the first URL, so curl 8.21.0 sends the POST with its
+    /// body again and follows the <c>301</c> again, and <c>-i</c> writes all four heads.
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryOfARedirectedPostAnswered429_ResendsThePostFromTheFirstUrl()
+    {
+        const string moved = "HTTP/1.1 301 OK\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\nConnection: close\r\nLocation: /16330002\r\n\r\n";
+        const string tooMany = "HTTP/1.1 429 too many requests\r\nRetry-After: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        ScriptedConnector server = new(new[] { moved, tooMany, moved, tooMany }.Select(Encoding.Latin1.GetBytes));
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "http://127.0.0.1:18241/1633", "-d", "moo", "--retry", "1", "-L", "-i");
+        string[] requestLines = [.. Encoding.Latin1.GetString(server.Written).Split("\r\n").Where(line => line.StartsWith("POST ", StringComparison.Ordinal) || line.StartsWith("GET ", StringComparison.Ordinal) || line.StartsWith("moo", StringComparison.Ordinal))];
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", moved + tooMany + moved + tooMany, StandardOutputText);
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "POST /1633 HTTP/1.1", "mooGET /16330002 HTTP/1.1", "POST /1633 HTTP/1.1", "mooGET /16330002 HTTP/1.1" }, requestLines);
+        Assert.AreEqual(moved + tooMany + moved + tooMany, StandardOutputText);
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
+    }
+
     [TestMethod]
     public async Task RunAsync_RetryIntoOutputFile_KeepsOnlyTheLastAttemptsBody()
     {
