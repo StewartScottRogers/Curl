@@ -58,3 +58,4 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
