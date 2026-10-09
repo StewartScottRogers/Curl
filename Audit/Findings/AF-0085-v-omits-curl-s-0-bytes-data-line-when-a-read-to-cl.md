@@ -42,6 +42,8 @@ $o="$env:TEMP\af-icl"; $a=@('-v','--ignore-content-length','http://127.0.0.1:509
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: 'curl: 1 / Curl: 1'. Both -v traces contain one 'bytes data]' line, and both exit 0.
+
 ## Log
 
 - 2026-10-08: filed proposed.

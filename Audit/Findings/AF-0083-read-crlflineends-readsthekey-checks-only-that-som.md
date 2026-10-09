@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Ssh.UnitTests/Keys/SshPrivateKeyReaderTests.cs
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: Read_CrLfLineEnds_ReadsTheKey now takes expected = SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob and asserts the public key blob (line 303) and Assert.IsInstanceOfType<RsaSshPrivateKey>(key) (line 304).
+
 ## Log
 
 - 2026-10-08: filed proposed.

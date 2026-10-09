@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. The top 5 since 2026-10-07 are BL-1858, BL-1833, BL-1730, BL-1735 and BL-1846 (all 1 claim, at most 2.54 USD; median 1.07). BL-1488's runs predate the copied logs, so this could not tell.
+
 ## Log
 
 - 2026-10-08: filed proposed.

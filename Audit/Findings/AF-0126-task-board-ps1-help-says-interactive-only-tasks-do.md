@@ -1,0 +1,47 @@
+---
+id: AF-0126
+title: task-board.ps1 help says interactive-only tasks do not count toward capacity, but every task in Doing is counted
+auditor: truthfulness
+severity: Low
+status: proposed
+reason:
+key: truthfulness:.claude/skills/task-board/task-board.ps1:capacity:false-help
+reproduction: none
+task: none
+tasks:
+found: 2026-10-08
+found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
+scorecard: 2026-10-08_2315.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0126 - task-board.ps1 help says interactive-only tasks do not count toward capacity, but every task in Doing is counted
+
+## Summary
+
+Low finding from the truthfulness auditor at `.claude/skills/task-board/task-board.ps1:32`: task-board.ps1 help says interactive-only tasks do not count toward capacity, but every task in Doing is counted. Reported by an auditor flagged unreliable in 2026-10-08_2315.md.
+
+## Evidence
+
+Location: `.claude/skills/task-board/task-board.ps1:32`
+
+Help, 'capacity' command (lines 27-32): 'How many tasks the board could have running at once right now: the tasks in Doing, plus the ready tasks that could start beside them ... The dark factory's -Lanes Auto caps its lane count with it. Interactive-only tasks do not count.' Code (lines 467 and 483): '$doing = @($tasks | Where-Object { $_.State -eq ''Doing'' })' and 'Capacity {0}' = $doing.Count + $picked.Count. Only the ready tasks added on top (Get-LaneReadyTasks) leave out interactive-only ones; an interactive-only task in Doing (lane: no, or touches an audit path) is counted. So the capacity that -Lanes Auto caps its lanes with goes up by one for each interactive session's task in Doing, which the help says cannot happen.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'Interactive-only tasks do not count','$doing = @($tasks | Where-Object { $_.State -eq ''Doing'' })'
+```
+
+- Expected: Either the help says interactive-only tasks already in Doing are counted, or the $doing count leaves out tasks whose LaneAllowed is false.
+- Actual: task-board.ps1:32 '... Interactive-only tasks do not count.' and task-board.ps1:467 '$doing = @($tasks | Where-Object { $_.State -eq 'Doing' })' with no LaneAllowed filter, summed into 'Capacity {0}' at line 483.
+
+## Re-audits
+
+## Log
+
+- 2026-10-08: filed proposed.

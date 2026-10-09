@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1609 row since 2026-10-07; DarkFactory-20261007-201432-L*.log matched no file and BL-1609-20261007-201432-L9.jsonl does not exist. The logs are not in the copied folder.
+
 ## Log
 
 - 2026-10-08: filed proposed.

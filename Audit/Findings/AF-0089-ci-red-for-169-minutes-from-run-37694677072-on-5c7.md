@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. ciRedSpells holds only the 37733074018 spell. Run 37694677072 is not in ci-runs.json (ciRunsFrom 2026-10-07T23:41:08Z), and DarkFactory-20261007-111121.log does not exist. The spell lies before the saved CI history, so this could not tell.
+
 ## Log
 
 - 2026-10-08: filed proposed.
