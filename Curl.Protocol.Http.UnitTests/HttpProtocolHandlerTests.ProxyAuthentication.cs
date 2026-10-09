@@ -442,13 +442,14 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// A 407 to a request whose body is a stream is the result, as a 401 to one is (ADR-0034):
-    /// the stream cannot be sent again.
+    /// A 407 to a request whose body is a seekable stream, as a <c>-T</c> file or a <c>-F</c>
+    /// form is, is answered with the body rewound and sent whole again (upstream test1071's shape).
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_407ToAStreamBody_ReturnsIt()
+    public async Task ExecuteAsync_407ToASeekableStreamBody_SendsTheBodyAgain()
     {
-        TurnTakingConnection connection = new(65536, ProxyBasicChallengeHead + "PPP");
+        TurnTakingConnection first = new(65536, ProxyBasicChallengeHead + "PPP");
+        TurnTakingConnection second = new(65536, ClosingOkHead + "ok");
         MemoryStream output = new();
         TransferContext context = new()
         {
@@ -456,8 +457,36 @@ public sealed partial class HttpProtocolHandlerTests
             Output = output,
             Http = new HttpRequestOptions { ForwardProxy = ChallengingProxy, Body = new StreamBody(new MemoryStream("hi"u8.ToArray()), 2, "application/octet-stream") },
         };
+        Diagnostics.Arrange("scripted responses", OneLine(ProxyBasicChallengeHead + "PPP") + " then " + OneLine(ClosingOkHead + "ok"));
+        Diagnostics.Arrange("request body", "seekable stream, 2 bytes");
+
+        TransferResult result = await ProxyChallengeHandler(QueueConnector.For(first, second), HttpAuthSchemes.Any).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.EndsWith("\r\n\r\nhi", second.Written);
+        Assert.Contains("Proxy-Authorization: ", second.Written);
+    }
+
+    /// <summary>
+    /// A 407 to a request whose body is a stream that cannot seek is the result, as a 401 to
+    /// one is (ADR-0034): the stream cannot be sent again.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_407ToAnUnseekableStreamBody_ReturnsIt()
+    {
+        TurnTakingConnection connection = new(65536, ProxyBasicChallengeHead + "PPP");
+        MemoryStream output = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(ProxyAuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { ForwardProxy = ChallengingProxy, Body = new StreamBody(new UnseekableStream("hi"u8.ToArray()), 2, "application/octet-stream") },
+        };
         Diagnostics.Arrange("scripted response", OneLine(ProxyBasicChallengeHead + "PPP"));
-        Diagnostics.Arrange("request body", "stream, 2 bytes");
+        Diagnostics.Arrange("request body", "unseekable stream, 2 bytes");
 
         TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Any).ExecuteAsync(context);
 

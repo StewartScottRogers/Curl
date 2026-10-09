@@ -308,17 +308,40 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// A stream body has been read by the time the 401 arrives and cannot be sent again, so
-    /// the 401 is the result (BL-181 Notes, ADR-0034).
+    /// A seekable stream body, as a <c>-T</c> file or a <c>-F</c> form is, is rewound and sent
+    /// whole again with the answer to the 401, as upstream test1030 expects of curl 8.21.0.
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_ChallengeToAStreamBody_ReturnsThe401()
+    public async Task ExecuteAsync_ChallengeToASeekableStreamBody_SendsTheBodyAgain()
     {
         TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
         ScriptedAuthenticator authenticator = new(null, DigestValue);
         MemoryStream output = new();
         TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
-        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte stream body");
+        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte seekable stream body");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.AreEqual(2, connection.Written.Split("\r\n\r\nhello").Length - 1, connection.Written);
+        Assert.Contains("Authorization: " + DigestValue, connection.Written);
+    }
+
+    /// <summary>
+    /// A stream body that cannot seek, as stdin cannot, has been read by the time the 401
+    /// arrives and cannot be sent again, so the 401 is the result (BL-181 Notes, ADR-0034).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToAnUnseekableStreamBody_ReturnsThe401()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new UnseekableStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("url, body", $"{AuthUrl}, a 5-byte unseekable stream body");
 
         TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
 

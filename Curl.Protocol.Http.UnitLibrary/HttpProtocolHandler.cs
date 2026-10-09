@@ -2015,11 +2015,13 @@ public sealed class HttpProtocolHandler(
         EndUnchallengedAuthorizations(plan, head.StatusLine.StatusCode);
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
+            RewindForResend(plan, upload);
             return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan));
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
+            RewindForResend(plan, upload);
             return authorized;
         }
 
@@ -2032,6 +2034,21 @@ public sealed class HttpProtocolHandler(
         ThrowIfRedirectLimitReached(plan);
         ReportUploadAbandoned(plan.Context.Events, upload, bodyLeftUnsent);
         return plan.WithoutExpect(upload.Rewound(plan.Framing.Body!), keepsCustomWait: !bodyLeftUnsent);
+    }
+
+    /// <summary>
+    /// Seeks a stream body that <paramref name="upload" /> began reading back to where it
+    /// began, so an authentication retry sends it again whole, as curl 8.21.0 rewinds a
+    /// <c>-T</c> file or a <c>-F</c> form before it answers a 401 or 407 (upstream test1030,
+    /// test259). Only a seekable stream reaches here (<see cref="MayRetry" />); a body of bytes
+    /// needs nothing.
+    /// </summary>
+    private static void RewindForResend(HttpRequestPlan plan, HttpRequestBodyWriter upload)
+    {
+        if (plan.Framing.Body is StreamBody stream)
+        {
+            upload.Rewound(stream);
+        }
     }
 
     /// <summary>
@@ -2238,10 +2255,13 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether <paramref name="head" /> may be answered with a retry at all: a
-    /// <paramref name="statusCode" /> response to a request whose body is not a stream.
+    /// <paramref name="statusCode" /> response to a request whose body can be sent again: bytes,
+    /// none, or a stream that can seek back to its start, as a <c>-T</c> file or a <c>-F</c> form
+    /// of files can, which curl 8.21.0 rewinds and resends whole (upstream test1030, test259); not
+    /// a stream that cannot, such as stdin (ADR-0034).
     /// </summary>
     private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head, int statusCode) =>
-        head.StatusLine.StatusCode == statusCode && plan.Framing.Body is not StreamBody;
+        head.StatusLine.StatusCode == statusCode && (plan.Framing.Body is not StreamBody stream || stream.Content.CanSeek);
 
     /// <summary>
     /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,
