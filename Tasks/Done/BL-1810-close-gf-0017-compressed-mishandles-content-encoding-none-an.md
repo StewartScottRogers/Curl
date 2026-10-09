@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1810 — Close GF-0017: --compressed mishandles 'Content-Encoding: none' and a broken deflate header
 
@@ -35,14 +35,21 @@ In Curl.Protocol.Http.UnitLibrary's HttpContentCoding / HttpContentDecoder: trea
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test223`: Curl answers what curl 8.21.0 answers, `reference curl exits 61; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test328`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test223`: Curl answers what curl 8.21.0 answers, `reference curl exits 61; stdout 0 bytes: `, so the item measures `match`.
+- [x] `behaviour:test328`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- `Content-Encoding: none` is now skipped like `identity`: curl's identity coding carries `none` as its alias (content_encoding.c), so test328's body passes through unchanged.
+- A `deflate` body without a valid zlib header goes to raw deflate, as curl does after zlib's "incorrect header check". zlib refuses some first blocks at once, and their errors now carry zlib's own text with exit 61: a reserved block type gives "invalid block type", and a stored block whose LEN and NLEN disagree gives "invalid stored block lengths". A broken zlib header keeps method 8 in its low nibble, so raw deflate reads it as a stored block. That makes test223's message "Error while processing content unencoding: invalid stored block lengths". Other corrupt raw data keeps the generic text (ADR-0031).
+- Not measured against test223's own bytes: the dark-factory audit guard refuses lanes any path under the gap office's upstream cache. The message comes from zlib's inflate.c. If the next gap run still shows test223 as a gap, the cause is a later zlib error, such as a dynamic-block error, that needs the same treatment.
+- No option changed, so `--ai-help` needs no change.
+- No ADR: this follows the existing rule (match curl's text) and makes no new design choice.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Content-Encoding none passes through; broken deflate header fails exit 61 with zlib's text
