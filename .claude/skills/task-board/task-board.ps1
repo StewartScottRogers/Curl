@@ -19,8 +19,9 @@
                path - Audit, Audit/..., .claude/agents/audit-*, Gap, Gap/...,
                .claude/agents/gap-*, or one of the guard files
                .claude/hooks/guard-audit-paths.ps1, .claude/settings.json,
-               .github/workflows/ci.yml and .claude/skills/task-board/task-board.ps1
-               (Test-AuditPath) - is never offered either: it is interactive only,
+               .github/workflows/ci.yml and .claude/skills/task-board/task-board.ps1,
+               or a folder that holds any of them (.claude, .claude/skills, .github and
+               the like) (Test-AuditPath) - is never offered either: it is interactive only,
                run by naming it (/task-run BL-###).
                Inside a dark factory shift (CURL_DARK_FACTORY_LANE set), 'new'
                refuses an audit-path task without -NoLane and 'move -To Doing'

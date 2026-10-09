@@ -3,12 +3,12 @@ id: AF-0139
 title: CI red on work/dark-factory for 30.42 minutes from run 37931431648 on ea846a2e: lane task BL-1876 edited the guard file .claude/skills/task-board/task-board.ps1
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:37931431648:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-1891
+tasks: BL-1891
 found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
