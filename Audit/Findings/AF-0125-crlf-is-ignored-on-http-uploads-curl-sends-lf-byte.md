@@ -3,8 +3,8 @@ id: AF-0125
 title: --crlf is ignored on HTTP uploads: Curl sends LF bytes with Content-Length where curl converts to CRLF and sends chunked
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--crlf:request
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ $o="$env:TEMP\cf-crlf"; New-Item -ItemType Directory -Force $o | Out-Null; [IO.F
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
