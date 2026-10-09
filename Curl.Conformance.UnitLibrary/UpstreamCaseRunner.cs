@@ -19,7 +19,7 @@ namespace Curl.Conformance;
 /// </para>
 /// <para>
 /// <c>%LOGDIR</c> is the absolute log directory with forward slashes, so cases can run in
-/// parallel, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
+/// parallel, <c>%PWD</c> is the tests directory the caller names, with forward slashes, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
 /// names the file. As upstream does, standard output and standard error are saved to
 /// <c>%LOGDIR/stdout%TESTNUMBER</c> and <c>%LOGDIR/stderr%TESTNUMBER</c> before the comparison,
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
@@ -59,21 +59,31 @@ public sealed class UpstreamCaseRunner(
     /// An empty directory of the case's own, <c>%LOGDIR</c>, by an absolute path with no blank in it;
     /// the caller deletes it.
     /// </param>
+    /// <param name="testsDirectory">
+    /// The release's <c>tests</c> folder, <c>%PWD</c>, by an absolute path with no blank in it, as
+    /// <c>runtests.pl</c>'s working directory; <see langword="null"/> leaves <c>%PWD</c> without a
+    /// value, so a case that uses it is skipped.
+    /// </param>
     /// <returns>Whether the case passed, failed with its first difference, or was skipped with its reason.</returns>
     /// <exception cref="ArgumentException">
-    /// <paramref name="logDirectory"/> holds a blank, which would split every command that names
-    /// <c>%LOGDIR</c> unquoted, as upstream's relative <c>log/</c> never does.
+    /// <paramref name="logDirectory"/> or <paramref name="testsDirectory"/> holds a blank, which
+    /// would split every command that names <c>%LOGDIR</c> or <c>%PWD</c> unquoted (test3009's
+    /// <c>--output-dir %PWD/not-there</c>, GF-0044), as upstream's relative <c>log/</c> never does.
     /// </exception>
-    public async Task<UpstreamCaseOutcome> RunAsync(int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory)
+    public async Task<UpstreamCaseOutcome> RunAsync(int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(logDirectory);
-        if (logDirectory.Any(char.IsWhiteSpace))
-        {
-            throw new ArgumentException($"The log directory {logDirectory} holds a blank; upstream's commands name it unquoted.", nameof(logDirectory));
-        }
+        RefuseABlank(logDirectory, "log directory", nameof(logDirectory));
+        RefuseABlank(testsDirectory ?? string.Empty, "tests directory", nameof(testsDirectory));
 
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
-        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile.Span, Variables(testNumber, logDirectoryVariable), platform.Features, ReadIncludedFile);
+        Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
+        if (testsDirectory is not null)
+        {
+            variables["PWD"] = testsDirectory.Replace('\\', '/');
+        }
+
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile.Span, variables, platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
         if (!parsed.IsParsed)
         {
@@ -84,6 +94,14 @@ public sealed class UpstreamCaseRunner(
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(parsed.TestCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable).ConfigureAwait(false);
+    }
+
+    private static void RefuseABlank(string directory, string description, string parameterName)
+    {
+        if (directory.Any(char.IsWhiteSpace))
+        {
+            throw new ArgumentException($"The {description} {directory} holds a blank; upstream's commands name it unquoted.", parameterName);
+        }
     }
 
     private Dictionary<string, string> Variables(int testNumber, string logDirectory) =>

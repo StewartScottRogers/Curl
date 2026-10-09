@@ -79,7 +79,9 @@ the file for an `UpstreamCurlPlatform` (the features Curl reports and its null d
 asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other
 than `http`, `file` or `none`, a missing feature, a variable with no value, an unsupported
 `<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
-outside the case's log directory), writes `<client><file>` parts into
+outside the case's log directory; `%PWD` has a value only when the caller names a tests
+directory, and a log or tests directory holding a blank is refused, since commands name both
+unquoted, GF-0044), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
 the `sws` emulation and `UnreachableDatagramConnector`. The emulation's clock is the real one

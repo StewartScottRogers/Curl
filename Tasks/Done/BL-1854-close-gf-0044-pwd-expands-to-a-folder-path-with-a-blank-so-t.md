@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1854 — Close GF-0044: %PWD expands to a folder path with a blank, so the harness splits test3009's --output-dir argument and Curl fetches an extra URL
 
@@ -35,13 +35,21 @@ Curl's behaviour needs no change: it passes test3009 once %PWD holds no blank. M
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test3009`: Curl answers what curl 8.21.0 answers, `upstream test3009 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test3009`: Curl answers what curl 8.21.0 answers, `upstream test3009 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Curl's own behaviour needed no change: the finding's rerun of test3009 from a tests folder with no blank passed on 6383c570. The cause was the harness, so the fix is there.
+- `UpstreamCaseRunner.RunAsync` now takes an optional `testsDirectory`, the value of `%PWD` with forward slashes, and refuses one holding a blank with an `ArgumentException`, as it already refused such a `%LOGDIR`. Left `null` (the default, chosen so existing callers compile unchanged), `%PWD` has no value and a case using it is skipped with a reason, as before. Pinned by `RunAsync_TestsDirectoryWithABlank_Throws`, `RunAsync_TestsDirectory_IsPwdWithForwardSlashes` and `RunAsync_NoTestsDirectory_SkipsACaseUsingPwd`.
+- `UpstreamConformanceTests` still passes no tests directory, so the ratchet's skipped and passing sets are unchanged.
+- Left for an interactive session (office work; lanes may not read `Gap/` or file tasks touching it): `Gap/Tools/Measure-UpstreamCases.cs` must pass `RunAsync` a tests folder with no blank (for example a copy of the release under the run folder); the next gap run should then measure `behaviour:test3009` as `match`. The first box is ticked for Curl's side; GF-0044 closes only on that re-measure (ADR-0433).
+- Measure-CodeQuality.ps1 not run: the new branches (`testsDirectory` null or not, blank or not) are each reached by the new tests, and complexity is checked at build time.
+- No option changed, so `--ai-help` needed no update.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. UpstreamCaseRunner owns PWD and refuses a tests directory with a blank; the measuring tool's change is left to an interactive session
