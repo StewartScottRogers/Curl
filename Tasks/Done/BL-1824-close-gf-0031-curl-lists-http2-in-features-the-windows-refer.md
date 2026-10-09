@@ -41,7 +41,7 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 
 ## Notes
 
-- Measured `C:WindowsSystem32rl.exe -V` (8.21.0 Schannel): its Features line has no HTTP2. Dropped HTTP2 from `CurlVersionText.WindowsFeaturesLine` only; Linux and macOS keep it. No option changed, so `--ai-help` is unaffected. ADR-0450 records it. Delivered directly rather than the full /feature pipeline: a one-constant change, same shape as BL-1822 and BL-1823.
+- Measured the Windows inbox `curl.exe -V` (8.21.0 Schannel): its Features line has no HTTP2. Dropped HTTP2 from `CurlVersionText.WindowsFeaturesLine` only; Linux and macOS keep it. No option changed, so `--ai-help` is unaffected. ADR-0450 records it. Delivered directly rather than the full /feature pipeline: a one-constant change, same shape as BL-1822 and BL-1823.
 
 ## Log
 
