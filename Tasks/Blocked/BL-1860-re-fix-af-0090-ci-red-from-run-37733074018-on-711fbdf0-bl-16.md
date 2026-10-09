@@ -50,7 +50,11 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- BL-1768's fix is still in place: `RunDarkFactory.ps1` pulls the shift branch after the final CI watch (the `git pull --ff-only` before `task-board next`), so a `-Continuous` shift hands over to CI-fix tasks it just filed.
+- The re-audit "reproduces: yes" is the same historical incident (2026-10-08 logs) re-read because `-Since` is a date; those logs cannot change. The 179 vs 321 minute miscount is in `Audit/Tools/Measure-FactoryProcess.ps1`, an audit path no lane may read or change. No further change to `RunDarkFactory.ps1` is possible, so the reproduction cannot be made to give a different result.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Blocked. Stewart: close AF-0090 as closed-how stewart (fix is in place; the reproduction reads fixed historical logs and the miscount is in an audit path)
