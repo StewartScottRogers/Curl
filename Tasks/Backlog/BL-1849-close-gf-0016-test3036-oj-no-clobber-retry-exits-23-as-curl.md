@@ -6,7 +6,6 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
-lane: no
 requirement: none
 created: 2026-10-08
 completed:

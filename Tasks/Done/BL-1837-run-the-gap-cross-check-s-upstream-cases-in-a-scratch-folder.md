@@ -9,7 +9,7 @@ touches: [Gap/Tools/Measure-ReferenceCrossCheck.ps1]
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1837 — Run the gap cross-check's upstream cases in a scratch folder, never the main checkout
 
@@ -23,10 +23,12 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] Superseded by BL-1840 (Done 2026-10-08), which runs the cross-check's upstream cases in a scratch folder; run 2026-10-08_2029 left the main checkout clean.
 
 ## Notes
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing. Interactive: closing as a duplicate
+- 2026-10-08: Doing -> Done. Superseded by BL-1840, Done 2026-10-08

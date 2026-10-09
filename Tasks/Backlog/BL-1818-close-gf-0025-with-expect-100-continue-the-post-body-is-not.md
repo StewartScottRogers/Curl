@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
 completed:
@@ -60,8 +60,11 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
   guard refused both), so this waits for an interactive session to fix the harness and
   re-measure test1070.
 
+- 2026-10-08, interactive: the sws stand-in is product code, not Gap/: Curl.Conformance.UnitLibrary (SwsServerCommands.cs reads `skip:` into SkippedBodyBytes; SwsHttpServerConnector.cs / SwsHttpRequestFraming.cs decide when to reply). Fix it there so the stand-in reads Content-Length minus skip body bytes before answering, pin it in Curl.Conformance.UnitTests, leave the HTTP library unchanged, and re-measure test1070 with the harness. Lane-eligible; touches changed to Curl.Conformance.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Blocked. Interactive session: Curl already matches curl 8.21.0 (measured, see Notes); the gap office's upstream-case harness must honour sws skip: before test1070 can match, and lanes may not change it
+- 2026-10-08: Blocked -> Backlog. Interactive: the fix belongs in Curl.Conformance's sws stand-in (product code), so a lane may take it

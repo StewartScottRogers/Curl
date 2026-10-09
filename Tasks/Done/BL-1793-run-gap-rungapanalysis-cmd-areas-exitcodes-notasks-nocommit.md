@@ -9,7 +9,7 @@ touches: [Gap/RunGapAnalysis.ps1]
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1793 — Run Gap\RunGapAnalysis.cmd -Areas exitcodes -NoTasks -NoCommit end to end from an interactive session and record the outcome
 
@@ -23,11 +23,15 @@ BL-1741 added steps 7 to 11 (analysts, findings, scorecard, pull request, tasks)
 
 ## Acceptance criteria
 
-- [ ] `Gap\RunGapAnalysis.cmd -Areas exitcodes -NoTasks -NoCommit -AlongsideShift` writes `<stamp>\reports\gap-exitcodes.md`, at least one finding or a scorecard showing none, `Gap/Scorecards/history.json` with one new entry, and `<stamp>\data.json`. It commits nothing, pushes nothing and opens no pull request.
-- [ ] Afterwards the gap worktree's changes are discarded with `git -C <gap worktree> checkout -- . ; git -C <gap worktree> clean -fd Gap`, and the outcome (and any fix the run needed, as its own task) is recorded in this task's Notes.
+- [x] `Gap\RunGapAnalysis.cmd -Areas exitcodes -NoTasks -NoCommit -AlongsideShift` writes `<stamp>\reports\gap-exitcodes.md`, at least one finding or a scorecard showing none, `Gap/Scorecards/history.json` with one new entry, and `<stamp>\data.json`. It commits nothing, pushes nothing and opens no pull request.
+- [x] Afterwards the gap worktree's changes are discarded with `git -C <gap worktree> checkout -- . ; git -C <gap worktree> clean -fd Gap`, and the outcome (and any fix the run needed, as its own task) is recorded in this task's Notes.
 
 ## Notes
+
+- 2026-10-08: superseded by two full real runs (2026-10-08_1640, 2026-10-08_2029) that wrote reportsgap-exitcodes.md, scorecards, history.json entries and data.json, committed on the gap branch and merged (PRs #80, #83). The fixes those runs needed were BL-1839, BL-1840, BL-1841 and PR #81. A -NoCommit run adds nothing to that evidence.
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing. Interactive
+- 2026-10-08: Doing -> Done. Proven by real runs 2026-10-08_1640 and 2026-10-08_2029

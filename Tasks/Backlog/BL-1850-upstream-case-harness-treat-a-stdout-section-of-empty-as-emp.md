@@ -3,10 +3,9 @@ id: BL-1850
 title: Upstream-case harness: treat a stdout section of %EMPTY as empty output
 priority: High
 assignee: Claude
-pipeline: direct
+pipeline: feature
 depends-on: []
-touches: []
-lane: no
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
 completed:
@@ -19,7 +18,7 @@ The gap office's upstream-case measuring tool (the one GF-0019's "Reproduce" lin
 
 ## Context
 
-- Filed by a dark factory lane under BL-1812, which may not read or change the gap office's files (ADR-0433), so this is interactive only.
+- Filed by a dark factory lane under BL-1812. The comparison lives in Curl.Conformance.UnitLibrary (UpstreamCaseRunner and its verify-section reading), not in Gap/, so a lane may do it; Gap/Tools/Measure-UpstreamCases.cs only calls it.
 - In upstream's test format, `%EMPTY` in a section means the section is empty. GF-0019 reports test2013/test2014 as "expected '%EMPTY', got the end": the tool compares the literal text `%EMPTY` with Curl's (correctly) empty stdout.
 - BL-1812 measured curl 8.21.0 and Curl on both commands on 2026-10-08: both write nothing to stdout, send the same three (test2013) or two (test2014) requests byte for byte, and write the same output files. Nothing in Curl needs to change.
 - Any other `%`-variable upstream allows in a verify section may need the same treatment; check the tool's substitution list.

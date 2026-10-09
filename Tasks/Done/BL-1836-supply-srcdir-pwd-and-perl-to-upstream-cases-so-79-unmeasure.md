@@ -9,7 +9,7 @@ touches: [Gap/Tools/Measure-UpstreamCases.cs]
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1836 — Supply %SRCDIR, %PWD and %PERL to upstream cases so 79 unmeasured behaviour cases are measured
 
@@ -23,10 +23,12 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] Superseded by BL-1839 (Done 2026-10-08), which supplies %SRCDIR, %PWD and %PERL in Measure-UpstreamCases.cs; run 2026-10-08_2029 measured them.
 
 ## Notes
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing. Interactive: closing as a duplicate
+- 2026-10-08: Doing -> Done. Superseded by BL-1839, Done 2026-10-08
