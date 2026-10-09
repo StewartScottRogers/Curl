@@ -248,6 +248,9 @@ public sealed partial class KerberosKdcClientTests
 
         using KerberosCredential credential = await GetTicketGrantingTicketAsync(kdc);
 
+        IReadOnlyList<int> offeredTypes = kdc.Requests[1].Body.EncryptionTypes;
+        Assert.IsGreaterThan(1, offeredTypes.Count);
+        Assert.AreEqual(offeredTypes[0], KerberosEncryptedData.Decode(kdc.Requests[1].PreAuthenticationData.Single().Value).EncryptionType);
         Assert.IsNotNull(kdc.LastTimestamp);
     }
 

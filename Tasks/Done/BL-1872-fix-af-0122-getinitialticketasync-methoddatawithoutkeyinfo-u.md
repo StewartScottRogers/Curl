@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Kerberos.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1872 — Fix AF-0122: GetInitialTicketAsync_MethodDataWithoutKeyInfo_UsesTheFirstTypeAndDefaultSalt never checks which encryption type was used
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts that the `PA-ENC-TIMESTAMP` in the second AS-REQ is encrypted in
+  the first encryption type that request offers, and first that the request offers more
+  than one type, so a client that picked the second offered type fails it. The non-null
+  `LastTimestamp` assertion stays: it is what shows the default salt was used.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. UsesTheFirstTypeAndDefaultSalt now asserts the timestamp's encryption type is the first one offered
