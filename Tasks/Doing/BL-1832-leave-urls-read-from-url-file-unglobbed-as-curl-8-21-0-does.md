@@ -33,3 +33,4 @@ A URL read from `--url @file` or `--url @-` is taken as written, its `{a,b}` and
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
