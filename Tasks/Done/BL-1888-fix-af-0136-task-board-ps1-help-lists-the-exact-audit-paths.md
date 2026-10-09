@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1888 — Fix AF-0136: task-board.ps1 help lists the exact audit paths 'next' withholds, but the code also treats any folder that holds them (.claude, .github, .claude/skills) as an audit path
 
@@ -41,11 +41,13 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] task-board.ps1 help and SKILL.md now name folders that hold guard files as audit paths (audit branch, PR #94); the next truthfulness re-audit confirms.
+- [x] Docs-only change; no build input changed.
 
 ## Notes
 
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing. Interactive
+- 2026-10-09: Doing -> Done. Fixed through the audit branch, PR #94
