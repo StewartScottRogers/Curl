@@ -79,6 +79,26 @@ Follow the key rule in [Report-Format.md](Report-Format.md). `<where>` is `logs`
 and kinds are `redone-work`, `ci-red`, `overlap-wait`, `empty-queue`, `cost-outlier`,
 `unfinished-run` and `lost-work`.
 
+## Re-audits
+
+A process finding records an incident in an earlier audit's window, and the logs of that
+window are not copied again: this audit's log copy holds only what was written since the
+previous scorecard. So a process finding is re-audited by its mechanism, not its incident
+(decided by Claude under Stewart's delegation, 2026-10-09, after 25 of 26 process re-audits
+came back "not re-audited" and could never close):
+
+- Run its rule (the `Rule` its key names: redone work, CI red, overlap waits, empty queue,
+  cost outliers, unfinished runs) over this audit's window with the finding's
+  `Measure-FactoryProcess.ps1` command, and look for the same cause the finding names (for
+  example a task requeued because its lane failed to integrate after a rebase, or a run
+  ending seconds after its claim with no result).
+- `"reproduces": true` when the window shows that cause crossing the rule again; name the
+  new task, lane and time as evidence.
+- `"reproduces": false` when the window holds at least one shift that finished a task and
+  the rule, run over it, shows no case of that cause; give the rule's numbers as evidence.
+- `"reproduces": null` only when the window holds no shift that finished a task, so it
+  cannot tell.
+
 ## Method counts
 
 Run every step above on every audit; re-audits come on top, never instead. Report `method.rulesChecked` in `metrics` ([Report-Format.md](Report-Format.md#method-counts)): a report without them marks you unreliable (BL-1364).
