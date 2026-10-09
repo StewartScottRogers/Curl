@@ -4,7 +4,7 @@ title: Close GF-0001: In process, Curl never runs TcpConnector: no CONNECT tunne
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1831]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
@@ -68,7 +68,10 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 
 ## Notes
 
+- 2026-10-08 (lane 1): Split. The run had a $2 cost cap, too small for the whole change. The wiring half (a TCP-dial and name-resolver seam so `InProcessCurl` runs `CurlComposition.CreateTcpConnector`, as built in `CreateTransports`) is BL-1831. What is left here: switch `Curl.Conformance.UnitTests` `UpstreamConformanceTests.RunCurlAsync` to that path, rerun the 28 upstream cases with `Gap/Tools/Measure-UpstreamCases.cs`, and file any case that still fails as a `TcpConnector` product gap.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Backlog. Waits on BL-1831 (in-process TcpConnector wiring), split out because the run's cost cap could not fit the whole change
