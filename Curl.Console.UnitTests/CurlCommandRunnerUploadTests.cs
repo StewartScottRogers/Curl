@@ -317,6 +317,51 @@ public sealed class CurlCommandRunnerUploadTests
     }
 
     [TestMethod]
+    public async Task RunAsync_UploadGlobWithTwoUrlsAndTwoOutputs_WritesBothOutputFilesAndNothingToStdout()
+    {
+        // upstream test2013, measured on curl 8.21.0 on 2026-10-08 (BL-1812 Notes): the glob's
+        // transfers share the first URL's --output, the second URL takes the second.
+        files.ExistingContent["upload1"] = Encoding.ASCII.GetBytes("first!\n");
+        files.ExistingContent["upload2"] = Encoding.ASCII.GetBytes("second\n");
+
+        int exitCode = await RunAsync(
+            "-T", "upload{1,2}", "http://h/2013", "http://h/20130002", "--silent", "--output=first-out", "--output=second-out");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff(
+            "dispatched URLs",
+            "http://h/2013\nhttp://h/2013\nhttp://h/20130002",
+            string.Join("\n", dispatched.Select(transfer => transfer.Url)));
+        CollectionAssert.AreEqual(
+            new[] { "http://h/2013", "http://h/2013", "http://h/20130002" },
+            dispatched.Select(transfer => transfer.Url).ToArray());
+        Diagnostics.Assert("third upload is null", true, dispatched[2].Upload is null);
+        Assert.IsNull(dispatched[2].Upload);
+        Diagnostics.Diff("written files", "first-out, second-out", string.Join(", ", files.Written.Keys.Order(StringComparer.Ordinal)));
+        CollectionAssert.AreEqual(new[] { "first-out", "second-out" }, files.Written.Keys.Order(StringComparer.Ordinal).ToArray());
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Assert.AreEqual(0L, standardOutput.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NamedUploadGlobWithOutputNamedByIt_WritesOneOutputFilePerUploadAndNothingToStdout()
+    {
+        // upstream test2014, measured on curl 8.21.0 on 2026-10-08 (BL-1812 Notes).
+        files.ExistingContent["upload1"] = Encoding.ASCII.GetBytes("first!\n");
+        files.ExistingContent["upload2"] = Encoding.ASCII.GetBytes("second\n");
+
+        int exitCode = await RunAsync("-T", "upload{<hej>1,2}", "http://h/2014", "--silent", "--output=out-#<hej>");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode);
+        Diagnostics.Diff("written files", "out-1, out-2", string.Join(", ", files.Written.Keys.Order(StringComparer.Ordinal)));
+        CollectionAssert.AreEqual(new[] { "out-1", "out-2" }, files.Written.Keys.Order(StringComparer.Ordinal).ToArray());
+        Diagnostics.Bytes("stdout", standardOutput.ToArray());
+        Assert.AreEqual(0L, standardOutput.Length);
+    }
+
+    [TestMethod]
     public async Task RunAsync_UploadGlobWithUrlGlob_TakesTheUploadFilesAsTheOuterLoop()
     {
         await RunAsync("-T", "{local.txt,sub/in.txt}", "http://h/{x,y}/");
