@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1798 — Close GF-0005: With --anyauth or --proxy-anyauth, a -T upload or -F form that draws a 401/407 is never resent with credentials
 
@@ -35,15 +35,15 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test154`: Curl answers what curl 8.21.0 answers, `upstream test154 passes`, so the item measures `match`.
-- [ ] `behaviour:test155`: Curl answers what curl 8.21.0 answers, `upstream test155 passes`, so the item measures `match`.
-- [ ] `behaviour:test258`: Curl answers what curl 8.21.0 answers, `upstream test258 passes`, so the item measures `match`.
-- [ ] `behaviour:test259`: Curl answers what curl 8.21.0 answers, `upstream test259 passes`, so the item measures `match`.
-- [ ] `behaviour:test1030`: Curl answers what curl 8.21.0 answers, `upstream test1030 passes`, so the item measures `match`.
-- [ ] `behaviour:test1071`: Curl answers what curl 8.21.0 answers, `upstream test1071 passes`, so the item measures `match`.
-- [ ] `behaviour:test1075`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test154`: Curl answers what curl 8.21.0 answers, `upstream test154 passes`, so the item measures `match`.
+- [x] `behaviour:test155`: Curl answers what curl 8.21.0 answers, `upstream test155 passes`, so the item measures `match`.
+- [x] `behaviour:test258`: Curl answers what curl 8.21.0 answers, `upstream test258 passes`, so the item measures `match`.
+- [x] `behaviour:test259`: Curl answers what curl 8.21.0 answers, `upstream test259 passes`, so the item measures `match`.
+- [x] `behaviour:test1030`: Curl answers what curl 8.21.0 answers, `upstream test1030 passes`, so the item measures `match`.
+- [x] `behaviour:test1071`: Curl answers what curl 8.21.0 answers, `upstream test1071 passes`, so the item measures `match`.
+- [x] `behaviour:test1075`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -62,3 +62,4 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. A 401/407 to a seekable -T or -F stream body is now answered with the body rewound and resent (ADR-0440)
