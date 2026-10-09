@@ -1113,6 +1113,13 @@ function showTab() {
   // The gap dashboard loads only when its tab is first opened.
   const frame = document.getElementById('gaps-frame');
   if (shown === 'gaps' && !frame.src) {
+    // The dashboard's own site links would be a second row of tabs here; the board's are enough.
+    frame.addEventListener('load', () => {
+      const siteLinks = frame.contentDocument?.querySelector('nav.tabs');
+      if (siteLinks) {
+        siteLinks.style.display = 'none';
+      }
+    });
     frame.src = frame.dataset.src;
   }
 }
