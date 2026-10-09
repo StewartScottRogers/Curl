@@ -184,4 +184,13 @@ public sealed record TransferReport
     /// counts toward its limit of 5000 (measured, BL-1448 Notes). 0 for a transfer that is not HTTP.
     /// </summary>
     public int ResponseHeadersStored { get; init; }
+
+    /// <summary>
+    /// Gets the HTTP authentication scheme the transfer's last request to the origin was sent
+    /// with after a server picked it - by answering its challenge, or inherited from an earlier
+    /// hop's <see cref="HttpRequestOptions.AuthSchemePicked" /> - which a followed redirect
+    /// carries to its next hop (upstream test1088, BL-1819). <see cref="HttpAuthSchemes.None" />
+    /// when no server picked one, or for a transfer that is not HTTP.
+    /// </summary>
+    public HttpAuthSchemes AuthSchemePicked { get; init; }
 }

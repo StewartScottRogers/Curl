@@ -80,6 +80,12 @@ namespace Curl.Core;
 /// of 5000, as curl 8.21.0's do (measured, BL-1448 Notes).
 /// </para>
 /// <para>
+/// Every hop after the first is sent the previous hop's
+/// <see cref="TransferReport.AuthSchemePicked" /> as
+/// <see cref="HttpRequestOptions.AuthSchemePicked" />, so a scheme <c>--anyauth</c> settled on
+/// is sent to the next hop before any challenge, as libcurl 8.21.0 does (upstream test1088, BL-1819).
+/// </para>
+/// <para>
 /// Every hop after the first carries the chain's start as
 /// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
 /// curl's does, rather than each hop (measured, BL-299 Notes).
@@ -218,7 +224,7 @@ public sealed class RedirectFollower(
             log.Followed(responseCode, target, bodyDropped, methodDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 

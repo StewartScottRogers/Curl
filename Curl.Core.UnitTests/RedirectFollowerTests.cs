@@ -250,6 +250,21 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_HopsPickedAuthScheme_IsSentToTheNextHop()
+    {
+        // libcurl keeps the scheme --anyauth picked across redirects (upstream test1088, BL-1819).
+        TransferResult first = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { AuthSchemePicked = HttpAuthSchemes.Basic } };
+        ScriptedHandler handler = new(first, Ok(200, 0));
+
+        await Follow(handler, Context(Location()));
+
+        Diagnostics.Assert("handler.Contexts[0].Http!.AuthSchemePicked", HttpAuthSchemes.None, handler.Contexts[0].Http!.AuthSchemePicked);
+        Assert.AreEqual(HttpAuthSchemes.None, handler.Contexts[0].Http!.AuthSchemePicked);
+        Diagnostics.Assert("handler.Contexts[1].Http!.AuthSchemePicked", HttpAuthSchemes.Basic, handler.Contexts[1].Http!.AuthSchemePicked);
+        Assert.AreEqual(HttpAuthSchemes.Basic, handler.Contexts[1].Http!.AuthSchemePicked);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_HopResendsReachTheLimit_Exits47BeforeTheNextHop()
     {
         TransferResult resent = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { RedirectCount = 3 } };

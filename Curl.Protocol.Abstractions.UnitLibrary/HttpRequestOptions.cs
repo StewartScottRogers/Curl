@@ -99,6 +99,17 @@ public sealed record HttpRequestOptions
     public int ResponseHeadersStored { get; init; }
 
     /// <summary>
+    /// Gets the scheme a server picked for an earlier hop of the transfer, the earlier hop's
+    /// <see cref="TransferReport.AuthSchemePicked" />, or <see cref="HttpAuthSchemes.None" /> for
+    /// the first request. When it is one of <see cref="AuthSchemes" />, the hop sends it as
+    /// though it were the one scheme allowed, as libcurl 8.21.0 keeps its picked scheme across
+    /// the redirects it follows: <c>--anyauth --location-trusted</c> answers a Basic challenge,
+    /// then sends Basic to the redirect's new host before any challenge (upstream test1088,
+    /// BL-1819).
+    /// </summary>
+    public HttpAuthSchemes AuthSchemePicked { get; init; }
+
+    /// <summary>
     /// Gets how a status of 400 or above ends the transfer; <see cref="HttpFailMode.None" />
     /// when neither <c>-f</c> nor <c>--fail-with-body</c> was given.
     /// </summary>

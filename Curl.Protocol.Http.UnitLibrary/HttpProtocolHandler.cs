@@ -278,7 +278,7 @@ public sealed class HttpProtocolHandler(
             options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
             context.Credentials,
             options.BearerToken,
-            options.AuthSchemes,
+            AllowedSchemesOf(options),
             IsProxy: false)
         {
             Events = context.Events,
@@ -324,6 +324,42 @@ public sealed class HttpProtocolHandler(
             && request.AllowedSchemes == HttpAuthSchemes.Digest
             && request.Credential is not null
             && authorization is null;
+
+    /// <summary>
+    /// Gives the schemes the origin request may answer with: the scheme an earlier hop's server
+    /// picked (<see cref="HttpRequestOptions.AuthSchemePicked" />) alone when it is one of
+    /// <see cref="HttpRequestOptions.AuthSchemes" />, as libcurl 8.21.0 keeps its picked scheme
+    /// across redirects and so sends Basic before any challenge (upstream test1088, BL-1819);
+    /// otherwise every scheme allowed.
+    /// </summary>
+    private static HttpAuthSchemes AllowedSchemesOf(HttpRequestOptions options) =>
+        options.AuthSchemePicked != HttpAuthSchemes.None && (options.AuthSchemes & options.AuthSchemePicked) == options.AuthSchemePicked
+            ? options.AuthSchemePicked
+            : options.AuthSchemes;
+
+    /// <summary>
+    /// Gives the scheme a server picked for the request <paramref name="plan" /> sends: the
+    /// scheme of an <c>Authorization</c> value that answers a challenge, or else the one the
+    /// transfer's earlier hop picked (BL-1819).
+    /// </summary>
+    private static HttpAuthSchemes AuthSchemePickedBy(HttpRequestPlan plan) =>
+        plan.AuthorizationAnswersChallenge && SchemeOfAuthorization(plan.Authorization) is var scheme && scheme != HttpAuthSchemes.None
+            ? scheme
+            : plan.Options.AuthSchemePicked;
+
+    /// <summary>
+    /// Gives the scheme an <c>Authorization</c> value starts with, or
+    /// <see cref="HttpAuthSchemes.None" /> for none or one this handler does not pick.
+    /// </summary>
+    private static HttpAuthSchemes SchemeOfAuthorization(string? authorization) =>
+        authorization?.Split(' ', 2)[0] switch
+        {
+            "Basic" => HttpAuthSchemes.Basic,
+            "Digest" => HttpAuthSchemes.Digest,
+            "NTLM" => HttpAuthSchemes.Ntlm,
+            "Negotiate" => HttpAuthSchemes.Negotiate,
+            _ => HttpAuthSchemes.None,
+        };
 
     /// <summary>
     /// Makes the first request's <c>Proxy-Authorization</c> value for a forward proxy, the
@@ -1041,6 +1077,7 @@ public sealed class HttpProtocolHandler(
             TimeProvider = context.TimeProvider,
             ResponseConnection = timedConnection,
             RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
+            AuthSchemePicked = AuthSchemePickedBy(plan),
         };
         HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
         HttpResponseBodyReader body = new(responseConnection)
@@ -2527,6 +2564,12 @@ public sealed class HttpProtocolHandler(
         internal int RedirectCount { get; init; }
 
         /// <summary>
+        /// Gets the scheme a server picked for the exchange's request, the report's
+        /// <see cref="TransferReport.AuthSchemePicked" /> (BL-1819).
+        /// </summary>
+        internal HttpAuthSchemes AuthSchemePicked { get; init; }
+
+        /// <summary>
         /// Gets or sets the moment the first request byte was about to be sent,
         /// <see langword="null" /> until then.
         /// </summary>
@@ -2562,6 +2605,7 @@ public sealed class HttpProtocolHandler(
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
+                AuthSchemePicked = AuthSchemePicked,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
                 LocalEndPoint = connect.LocalEndPoint ?? connection.LocalEndPoint as IPEndPoint,
