@@ -64,3 +64,4 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Split into BL-1842, BL-1843 and BL-1844, one per gap item; waits on them
+- 2026-10-08: Backlog -> Doing.
