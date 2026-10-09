@@ -4,7 +4,7 @@ title: Close GF-0002: In process, Curl opens a new connection for every request,
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1832, BL-1833]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
@@ -53,9 +53,10 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - `InProcessCurl.RunAsync` (connector overload) and `UpstreamConformanceTests.RunCurlAsync` now pass a run `ConnectionCache`, so `CurlComposition.GroupConnectorOf` pools connections as the executable does. In process, test338, 1421, 1134, 48, 1418 and 1419 now pass, and so do test7, 64, 153, 378, 388, 1079, 1095, 1229, 1437, 2061, 2062, 2063, 2076 and 2091; all twenty are added to `PassingUpstreamCases.txt` (1123 passing, none regressed).
 - `SwsHttpServerConnector` gives each connection a `LocalEndPoint` of 127.0.0.1 on the next port from 49152 (pinned by `ConnectAsync_TwoConnections_TakeConsecutiveLoopbackLocalPorts`). test435 still prints `local port == -1`: the HTTP side drops the local end point when the remote one is `null`, outside this task's touches - filed as BL-1832.
 - test1074 (HTTP/1.0 kept on the reused connection), test1479 (exit 8, got 1) and test471 (exit 8, got 0) are gaps in `HttpProtocolHandler`, outside this task's touches - filed as BL-1833.
-- Decision: Done rather than Backlog, because the pooling change is complete and the four remaining items are separate product gaps carried by BL-1832 and BL-1833; GF-0002 closes only on a re-measure anyway (ADR-0433). No option changed, so `--ai-help` is unaffected.
+- The pooling change is committed (build clean, fast tests green). The board refuses Done with four items unticked, so the task waits in Backlog on BL-1832 and BL-1833; once both are Done, re-run the conformance tests, tick the four items and close it. No option changed, so `--ai-help` is unaffected.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Backlog. Waits on BL-1832 (test435 local port) and BL-1833 (test1074, 1479, 471 on a reused connection); pooling is done
