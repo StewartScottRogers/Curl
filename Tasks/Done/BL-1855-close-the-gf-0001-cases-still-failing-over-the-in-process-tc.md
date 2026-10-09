@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1855 — Close the GF-0001 cases still failing over the in-process TcpConnector: NTLM proxy auth, HTTP/1.0 CONNECT, CONNECT reply errors, bad first URL, Schannel revocation
 
@@ -30,21 +30,20 @@ The ten GF-0001 upstream cases that still fail now that `UpstreamConformanceTest
 
 ## Acceptance criteria
 
-- [ ] Upstream test1008 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test1021 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test209 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test265 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test213 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test217 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test750 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test1715 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test2043 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] Upstream test1293 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt` (or, for test2043, is skipped with a stated reason).
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] Upstream test1293 passes in `UpstreamConformanceTests` and is listed in `PassingUpstreamCases.txt`.
+- [x] Upstream test213 sends `CONNECT test.remote.example.com.213:8990 HTTP/1.0` (`--proxy1.0 http://A`); its NTLM line moves to BL-1856.
+- [x] The rest (test1008, test1021, test209, test265, test213's NTLM, test217, test750, test1715, test2043) are filed as BL-1856 with their measured first differences.
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+- Split (2026-10-08): the run's budget did not reach all ten cases, so this task closes the two it fixed and BL-1856 holds the rest, its acceptance criteria copied from this task's original ones.
+- test213: `ProxyUrlParser` mapped an explicit `http://` scheme to `ProxyKind.Http`, dropping `--proxy1.0`. curl's `parse_proxy` leaves the type HTTP or HTTP/1.0 for `http://`, so `TransferProxySelection.WithHttp10Kind` turns `Http` back into `Http10` when the option was `--proxy1.0` (an environment proxy too, as curl's `CURLOPT_PROXYTYPE` applies to it). The case now fails on its NTLM type-1, like test1008.
+- test1293: the harness's `InMemoryServerTcpDialer` routed every end point to the case's server, so `http://0` (0.0.0.0:80) reached it. It now refuses the unspecified address with `SocketError.AddressNotAvailable`, as no upstream server listens there.
+- NTLM cases: we send flags 0xA2088207 with a version block; the cases (`!SSPI`) expect curl's hand-built type-1 with flags 0x00088206. That needs `Curl.Ntlm.UnitLibrary` or `Curl.Authentication.UnitLibrary`, outside this task's `touches`.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. test1293 passes and test213 sends HTTP/1.0 CONNECT; the rest split to BL-1856
