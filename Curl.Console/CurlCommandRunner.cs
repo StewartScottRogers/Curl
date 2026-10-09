@@ -3411,7 +3411,7 @@ internal sealed class CurlCommandRunner(
     {
         if (uploadFile is null || UploadUrl.IsStandardInput(uploadFile))
         {
-            Stream? standardInputUpload = uploadFile is null ? null : standardInput;
+            Stream? standardInputUpload = uploadFile is null ? null : new StandardInputUploadStream(standardInput);
             return await TransferUploadingAsync(dispatch, options, url, standardInputUpload, transfer, headerOutput)
                 .ConfigureAwait(false);
         }
