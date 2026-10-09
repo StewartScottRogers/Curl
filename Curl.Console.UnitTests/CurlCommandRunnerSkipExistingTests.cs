@@ -13,7 +13,7 @@ namespace Curl.Console;
 /// <see cref="InMemoryFileSystem" />. Every expectation was measured on 2026-09-28 with curl 8.21.0
 /// (mingw, Schannel) against a loopback server answering with a 5-byte <c>hello</c> body (BL-493
 /// Notes): a transfer whose output file exists makes no connection, writes nothing, draws no
-/// progress meter and exits 0, printing a note only under <c>-v</c>, and the next URL still runs.
+/// progress meter and exits 0, printing a note only under <c>-v</c> or a trace option, and the next URL still runs.
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerSkipExistingTests
@@ -81,6 +81,30 @@ public sealed class CurlCommandRunnerSkipExistingTests
         Assert.AreEqual(
             expectedNote,
             StandardErrorText);
+    }
+
+    /// <summary>
+    /// Pins the note under the trace options upstream's test harness adds to every curl it runs
+    /// (upstream tests 994, 996 and 1491, GF-0013): curl 8.21.0 with <c>-s --trace-ascii -
+    /// --trace-time</c> writes the note to standard error and nothing to standard output
+    /// (measured 2026-10-08, BL-1806 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_SkipExistingFilePresentSilentTraceAscii_PrintsTheNote()
+    {
+        outputFiles.ExistingPaths.Add("there");
+
+        int exitCode = await RunAsync([Ok], "-s", "-o", "there", "--skip-existing", "--trace-ascii", "-", "--trace-time", Url);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Assert.AreEqual(0, exitCode);
+        Diagnostics.Assert("connection count", 0, server.Targets.Count);
+        Assert.IsEmpty(server.Targets);
+        string expectedNote = @"Note: skips transfer, ""there"" exists locally" + NewLine;
+        Diagnostics.Diff("stderr", Lf(expectedNote), Lf(StandardErrorText));
+        Assert.AreEqual(expectedNote, StandardErrorText);
+        Diagnostics.Diff("stdout", string.Empty, StandardOutputText);
+        Assert.AreEqual(string.Empty, StandardOutputText);
     }
 
     [TestMethod]
