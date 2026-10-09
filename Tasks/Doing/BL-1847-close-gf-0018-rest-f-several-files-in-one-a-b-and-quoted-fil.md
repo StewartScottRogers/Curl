@@ -47,3 +47,4 @@ finding GF-0018 that BL-1811 left, so a later gap analysis measures `behaviour:t
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
