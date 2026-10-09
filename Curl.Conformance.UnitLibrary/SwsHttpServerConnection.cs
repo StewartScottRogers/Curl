@@ -88,7 +88,7 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     public bool IsSecure => false;
 
-    public EndPoint? RemoteEndPoint => null;
+    public EndPoint? RemoteEndPoint { get; init; }
 
     public EndPoint? LocalEndPoint { get; init; }
 

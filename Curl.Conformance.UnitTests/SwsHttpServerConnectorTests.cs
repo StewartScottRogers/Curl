@@ -441,14 +441,13 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    public async Task Connection_IsPlainAndHasNoAddress()
+    public async Task Connection_IsPlainAndReachesLoopbackAtTheTargetPort()
     {
         Diagnostics.Arrange("target", "plain connection to 127.0.0.1:8990");
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "first\n"))));
 
         Assert.IsFalse(ObserveValue("IsSecure", false, connection.IsSecure));
-        Assert.IsNull(connection.RemoteEndPoint);
-        Diagnostics.Assert("RemoteEndPoint is null", true, connection.RemoteEndPoint is null);
+        Assert.AreEqual("127.0.0.1:8990", Observe("remote end point", "127.0.0.1:8990", $"{connection.RemoteEndPoint}"));
         await connection.FlushAsync(CancellationToken.None);
         await connection.DisposeAsync();
     }

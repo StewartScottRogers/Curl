@@ -100,8 +100,8 @@ public sealed class SwsHttpServerConnector : IConnector
     /// </summary>
     public void Abandon() => abandonment.Abandon();
 
-    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on, wrapping round after 65535; it fails only after <see cref="Abandon"/>.</summary>
-    /// <param name="target">Ignored: every host and port reaches the same server.</param>
+    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on, wrapping round after 65535, its remote end point 127.0.0.1 at the target's port; it fails only after <see cref="Abandon"/>.</summary>
+    /// <param name="target">Gives only the remote end point's port: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
     /// <exception cref="IOException">The server has been abandoned.</exception>
@@ -111,6 +111,7 @@ public sealed class SwsHttpServerConnector : IConnector
         return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)
         {
             LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, target.Port),
         }));
     }
 
