@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | still reported
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the reproduction (-Since 2026-10-08): ciRedSpells lists 2026-10-08T05:41:00Z to 11:01:51Z, 320.85 minutes, runId 37733074018. It is the same incident, still inside a window that starts at a date. The only other spell, 37907205689, lasted 11.52 minutes.
+
 ## Log
 
 - 2026-10-08: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0080
 title: DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte ORs three bytes together, so a key filled only at byte 0 passes
 auditor: quality
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).
 key: quality:Curl.Cryptography.UnitTests/BcryptPbkdfTests.cs:DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte:name-lies
 reproduction: none
 task: BL-1758
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-08_2315.md, 2026-10-09_0225.md
 ---
 # AF-0080 - DeriveKey_OneRoundMaximumLengthKey_FillsEveryByte ORs three bytes together, so a key filled only at byte 0 passes
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Cryptography.UnitTests/BcryptPbkdfTests.cs -Pattern 'in
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: no match for 'int probe' or 'AreNotEqual(0, probe)'. The test is now DeriveKey_OneRoundMaximumLengthKey_EqualsTheInterleavedBlockHashes (BcryptPbkdfTests.cs:101), which builds the whole 1024-byte expected key from the interleaved block hashes and asserts Assert.AreEqual on the full hex of every byte.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | The Select-String pattern 'int probe|AreNotEqual\(0, probe\)' finds no match. The test is now DeriveKey_OneRoundMaximumLengthKey_EqualsTheInterleavedBlockHashes (BcryptPbkdfTests.cs:101). It compares the hex of every byte of the 1024-byte key with a reference built from ComputeHash (Assert.AreEqual of the two hex strings).
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).

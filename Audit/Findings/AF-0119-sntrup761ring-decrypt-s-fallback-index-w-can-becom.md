@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the -Site reproduction: survived Sntrup761Ring.cs:238 < [Decrypt] 'int fallback = index < W ? 1 : 0;' -> '<= W'. It survived in the seed-0 sample of Curl.Cryptography.UnitLibrary as well.
+
 ## Log
 
 - 2026-10-08: filed proposed.

@@ -42,6 +42,8 @@ Select-String -Path Curl.Kerberos.UnitTests/KerberosKdcClientTests.cs -Pattern '
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Select-String shows KerberosKdcClientTests.cs:245-252: GetInitialTicketAsync_MethodDataWithoutKeyInfo_UsesTheFirstTypeAndDefaultSalt's only assertion is Assert.IsNotNull(kdc.LastTimestamp). It never checks the encryption type or the salt.
+
 ## Log
 
 - 2026-10-08: filed proposed.

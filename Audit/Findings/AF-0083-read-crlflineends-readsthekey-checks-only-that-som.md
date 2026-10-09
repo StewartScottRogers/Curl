@@ -3,8 +3,8 @@ id: AF-0083
 title: Read_CrLfLineEnds_ReadsTheKey checks only that some key came back, not that it is the RSA key in the file
 auditor: quality
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).
 key: quality:Curl.Protocol.Ssh.UnitTests/Keys/SshPrivateKeyReaderTests.cs:Read_CrLfLineEnds_ReadsTheKey:weak-assertion
 reproduction: none
 task: BL-1761
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-08_2315.md, 2026-10-09_0225.md
 ---
 # AF-0083 - Read_CrLfLineEnds_ReadsTheKey checks only that some key came back, not that it is the RSA key in the file
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Protocol.Ssh.UnitTests/Keys/SshPrivateKeyReaderTests.cs
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: Read_CrLfLineEnds_ReadsTheKey now takes expected = SshPublicKeyFile.Parse(TestUserKeys.RsaPublicKeyFile).Key!.Blob and asserts the public key blob (line 303) and Assert.IsInstanceOfType<RsaSshPrivateKey>(key) (line 304).
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Read_CrLfLineEnds_ReadsTheKey (SshPrivateKeyReaderTests.cs:294) asserts IsInstanceOfType<RsaSshPrivateKey>, KeyType "ssh-rsa" and CollectionAssert.AreEqual of the public key blob against TestUserKeys.RsaPublicKeyFile.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).

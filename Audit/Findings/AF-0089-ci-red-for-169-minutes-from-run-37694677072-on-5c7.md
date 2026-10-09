@@ -3,8 +3,8 @@ id: AF-0089
 title: CI red for 169 minutes from run 37694677072 on 5c771af7; the fix was pushed at 23:03Z but every CI run was cancelled for two hours
 auditor: process
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.
 key: process:logs:CI-37694677072:ci-red
 reproduction: none
 task: BL-1767
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0225.md
 ---
 # AF-0089 - CI red for 169 minutes from run 37694677072 on 5c771af7; the fix was pushed at 23:03Z but every CI run was cancelled for two hours
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. ciRedSpells holds only the 37733074018 spell. Run 37694677072 is not in ci-runs.json (ciRunsFrom 2026-10-07T23:41:08Z), and DarkFactory-20261007-111121.log does not exist. The spell lies before the saved CI history, so this could not tell.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | The only spell that started in the window's shifts is 37907205689, at 11.52 minutes. Its fix task BL-1859 was filed 24 seconds after the failure and Done 6 minutes later, and run 37908458929 then passed without cancelled runs in between. The 320.85-minute spell 37733074018 is AF-0090/AF-0128's earlier incident, not a new case of a fix whose CI runs were cancelled for hours.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.

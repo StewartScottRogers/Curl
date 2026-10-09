@@ -3,8 +3,8 @@ id: AF-0099
 title: BL-1683 cost 4.42 US dollars, 3.7 times the median, over two runs; the first was stashed and requeued for a held project
 auditor: process
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.
 key: process:logs:BL-1683:cost-outlier
 reproduction: none
 task: BL-1777
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0225.md
 ---
 # AF-0099 - BL-1683 cost 4.42 US dollars, 3.7 times the median, over two runs; the first was stashed and requeued for a held project
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1683 row; its runs are not in the copied log folder.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | No cost outlier and no stash-and-requeue in the window. The most expensive task is BL-1818 at $1.49 (median $1.09), and BL-1849's requeue cost $0.51.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.

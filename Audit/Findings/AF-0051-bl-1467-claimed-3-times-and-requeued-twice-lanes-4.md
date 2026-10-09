@@ -3,8 +3,8 @@ id: AF-0051
 title: BL-1467 claimed 3 times and requeued twice: lanes 4 and 5 each failed to integrate after rebasing onto other lanes' work
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.
 key: process:logs:BL-1467:redone-work
 reproduction: none
 task: BL-1678
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0225.md
 ---
 # AF-0051 - BL-1467 claimed 3 times and requeued twice: lanes 4 and 5 each failed to integrate after rebasing onto other lanes' work
 
@@ -45,8 +45,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 - 2026-10-07 | 2026-10-07_1336.md | not re-audited | Ran the reproduction. Measure-FactoryProcess.ps1 -Since 2026-10-03 has no task BL-1467: the log folder holds only shift 20261007-111121. Select-String failed with 'Cannot find path ...\logs\DarkFactory-20261006-200306-L4.log because it does not exist' (the L5 log is missing too). The result cannot tell; not re-audited.
 - 2026-10-08 | 2026-10-08_0748.md | not re-audited | Ran the reproduction. The log folder no longer holds DarkFactory-20261006-200306-L4.log or -L5.log (Select-String: path does not exist), and the measured tasks (229, all from shifts since 2026-10-07) do not include BL-1467. The command cannot tell either way.
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. Measure-FactoryProcess -Since 2026-10-03 returns no BL-1467 row, because the copied log folder holds only 2026-10-08 logs (303 files). Select-String failed: DarkFactory-20261006-200306-L4.log and -L5.log do not exist in ..\logs. Could not tell.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | The 2026-10-06 lane logs are not in this copy, so the finding was judged by its cause. Over the window (-Since 2026-10-03 and 2026-10-08 give the same result), shifts 20261008-231745 and 20261009-015443 finished BL-1818, BL-1850 and BL-1859. No lane failed to integrate after a rebase: every run ends 'verify build and fast tests green on the shared branch' then 'push integrated'. There are no PARKED lines. The redone task BL-1850 was requeued for 'Lane stalled', and BL-1849 once for 'Interactive only'.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.

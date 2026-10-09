@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the -Site reproduction: survived HttpContinueWaitConnection.cs:115 && [SendUnlessStoppedAsync] '!sent.IsCompleted && StopsSending' -> '||'. It survived in the seed-0 sample as well.
+
 ## Log
 
 - 2026-10-08: filed proposed.
