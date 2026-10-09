@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1815 — Close GF-0022: -D % (headers to stderr) writes nothing
 
@@ -35,13 +35,25 @@ In Curl.Cli.UnitLibrary and Curl.Console's -D target opening, accept '%' as stde
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1489`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1489`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Measured real curl 8.21.0 (Windows Schannel build) on 2026-10-08 with Record-CurlExchange.ps1
+  against `HTTP/1.1 200 OK\r\nContent-Length: 3\r\nX: y\r\n\r\nabc`:
+  - `-D % -s URL`: stderr is the head byte for byte (CR LF kept, no text-mode doubling), stdout `abc`, exit 0.
+  - `-D % --stderr - -s URL`: the head still goes to stderr, not stdout; stdout is only `abc`.
+  - `-D % --stderr <file> -s URL`: the head goes to the file; stderr is empty.
+  So `%` means curl's C `stderr`, which `--stderr <file>` `freopen`s and `--stderr -` does not.
+  The runner keeps that as `processStandardError` beside the `standardError` its own lines use.
+- `--ai-help` needed no change: its `--dump-header` entry already carries curl's manual text
+  ("Starting in curl 8.10.0, specify "%" ... writes the output to stderr").
+- No ADR: matching measured curl, no design choice beyond it.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. -D % writes the received head to standard error even under -s, as curl 8.21.0 does (upstream test1489).
