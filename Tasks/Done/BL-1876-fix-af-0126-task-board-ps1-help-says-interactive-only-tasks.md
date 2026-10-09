@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1876 — Fix AF-0126: task-board.ps1 help says interactive-only tasks do not count toward capacity, but every task in Doing is counted
 
@@ -52,3 +52,4 @@ Decided: fix the help, not the code. Tasks already in Doing are real running wor
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Help text now says every task in Doing counts
