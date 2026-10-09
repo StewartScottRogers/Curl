@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1863 — Fix AF-0113: SendBodyAsync's no-body 'return false' can become 'return true' with no test failing
 
@@ -41,12 +41,28 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: new test `ExecuteAsync_417ToARequestWithNoBody_ReturnsItWithoutResending` in
+  `Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ExpectationFailed.cs`: a bodyless GET
+  answered by a keep-alive 417 ends with the 417, exit 0, one request written, the 417 head in
+  `-D`, nothing on stdout. No production change; the code was right, only untested.
+- Added `Curl.Protocol.Http.UnitTests` to `touches`: the fix is a test, and no task in Doing on
+  `origin/work/dark-factory` (BL-1862 Curl.Tls.UnitLibrary, BL-1866 Curl.Networking.UnitLibrary)
+  names it.
+- The audit guard refuses lanes `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied
+  by hand instead: with line 2433 `return false;` changed to `return true;` the new test fails at
+  `Assert.AreEqual(getHead, connection.Written)` (the mutant resends); with the original line it
+  passes. The quality auditor's re-audit runs the tool itself.
+- Not re-measured against real curl: curl sends no body and so never takes its 417 resend path
+  (it needs `expect100` or a cut-short upload); the request bytes are the plain GET head the
+  other tests in this project already pin.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Bodyless request answered by a keep-alive 417 is now tested; the AF-0113 mutant is killed
