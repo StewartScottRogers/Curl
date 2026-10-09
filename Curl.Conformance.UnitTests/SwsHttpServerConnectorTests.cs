@@ -346,16 +346,36 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
-    [DataRow("no-expect\n", "Content-Length: 3\r\n")]
-    [DataRow("", "Expect: 100-continue\r\nContent-Length: 3\r\n")]
-    public async Task ExpectContinue_WithoutNoExpectOrWithoutTheHeader_ReadsTheBody(string serverCommands, string headers)
+    public async Task ExpectContinue_WithoutTheHeader_ReadsTheBody()
     {
-        Diagnostics.Arrange("servercmd", serverCommands);
-        Diagnostics.Arrange("headers", headers);
-        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", serverCommands))));
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", "no-expect\n"))));
 
-        Assert.AreEqual(string.Empty, Observe("reply to headers", string.Empty, await ExchangeAsync(connection, $"PUT /1234 HTTP/1.1\r\n{headers}\r\n")));
+        Assert.AreEqual(string.Empty, Observe("reply to headers", string.Empty, await ExchangeAsync(connection, "PUT /1234 HTTP/1.1\r\nContent-Length: 3\r\n\r\n")));
         Assert.AreEqual("posted\n", Observe("reply to body", "posted\n", await ExchangeAsync(connection, "abc")));
+    }
+
+    [TestMethod]
+    public async Task ExpectContinue_ReadBeforeTheBody_WaitsForTheBodyAndAnswersIt()
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"))));
+        await WriteAsync(connection, "PUT /1234 HTTP/1.1\r\nExpect: 100-continue\r\nContent-Length: 3\r\n\r\n");
+
+        Task<string> read = ReadOnceAsync(connection);
+        bool answeredBeforeTheBody = read.IsCompleted;
+        await WriteAsync(connection, "abc");
+
+        Assert.IsFalse(answeredBeforeTheBody, "sws never answers 100 Continue, so the read waits for the body");
+        Assert.AreEqual("posted\n", Observe("reply to body", "posted\n", await read));
+    }
+
+    [TestMethod]
+    public async Task Skip_BytesPastTheSkippedRequest_AreNotRecorded()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "posted\n"), Reply("servercmd", "skip: 3\n")));
+        IConnection connection = await ConnectAsync(server);
+
+        Assert.AreEqual("posted\n", Observe("reply", "posted\n", await ExchangeAsync(connection, "POST /1234 HTTP/1.1\r\nContent-Length: 5\r\n\r\nabcde")));
+        Assert.AreEqual("POST /1234 HTTP/1.1\r\nContent-Length: 5\r\n\r\nab", Observe("recorded", "POST /1234 HTTP/1.1\r\nContent-Length: 5\r\n\r\nab", Text(server.ReceivedBytes)));
     }
 
     [TestMethod]

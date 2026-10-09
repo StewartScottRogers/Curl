@@ -9,7 +9,7 @@ touches: [.claude/agents/gap-options.md, Gap/Instructions]
 lane: no
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1838 — Stop the gap-options analyst writing into the measured tree
 
@@ -23,10 +23,12 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] Superseded by BL-1841 (Done 2026-10-08), which makes RunGapAnalysis.ps1 check the measured tree before the analysts run and refuse a changed one; run 2026-10-08_2029's tree was unchanged.
 
 ## Notes
 
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing. Interactive: closing as a duplicate
+- 2026-10-08: Doing -> Done. Superseded by BL-1841, Done 2026-10-08

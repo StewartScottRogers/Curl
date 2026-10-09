@@ -50,6 +50,18 @@ internal static class SwsHttpRequestFraming
     }
 
     /// <summary>
+    /// Whether <paramref name="received"/> holds a request's complete headers with
+    /// <c>Expect: 100-continue</c> and no complete request yet: the client is waiting to send the body.
+    /// </summary>
+    /// <param name="received">The bytes received and not yet served.</param>
+    /// <returns>Whether the request's body is still owed after an <c>Expect: 100-continue</c>.</returns>
+    public static bool AwaitsExpectedBody(ReadOnlySpan<byte> received)
+    {
+        int headersEnd = received.IndexOf("\r\n\r\n"u8);
+        return headersEnd >= 0 && Encoding.Latin1.GetString(received[..headersEnd]).Split("\r\n").Any(line => IsHeader(line, ExpectContinuePrefix));
+    }
+
+    /// <summary>
     /// Whether sws reads a complete request's headers through to its <c>Authorization:</c>
     /// rules: it returns before them at a <c>Transfer-Encoding: chunked</c> header, and at a
     /// <c>Content-Length</c> it cannot read while it has no length yet.

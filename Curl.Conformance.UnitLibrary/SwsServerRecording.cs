@@ -44,6 +44,15 @@ internal sealed class SwsServerRecording
         }
     }
 
+    /// <summary>Forgets the last bytes recorded, ones sws never read into its protocol dump.</summary>
+    /// <param name="count">How many of the last bytes to forget.</param>
+    public void Forget(int count)
+    {
+        lock (gate)
+        {
+            bytes.RemoveRange(bytes.Count - count, count);
+        }
+    }
     /// <summary>Arms the monitor, as sws does when it reads <c>connection-monitor</c> for a request.</summary>
     public void ArmDisconnectMonitor()
     {

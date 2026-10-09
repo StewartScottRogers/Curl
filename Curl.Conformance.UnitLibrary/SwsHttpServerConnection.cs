@@ -62,6 +62,8 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     private readonly TaskCompletionSource firstWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private TaskCompletionSource nextWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     private TimeSpan serverBusyUntil;
 
     private bool readsRequests = true;
@@ -123,6 +125,9 @@ internal sealed class SwsHttpServerConnection : IConnection
         }
 
         firstWrite.TrySetResult();
+        TaskCompletionSource written = nextWrite;
+        nextWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        written.TrySetResult();
         return ValueTask.CompletedTask;
     }
 
@@ -166,12 +171,20 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     // sws blocks reading the request before it answers or closes, so a read before the client has
     // written anything - a telnet session reads while its -T upload is still on its way - waits for
-    // the first write, then reads as if it came after it (BL-1853).
+    // the first write, then reads as if it came after it (BL-1853). sws never answers 100 Continue,
+    // so a read while an Expect: 100-continue request still owes its body waits for the client's
+    // next write - the body curl sends once its wait for 100 ends - as sws blocks reading it (test1070).
     private async ValueTask<int> ReadWithNothingSentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         if (!firstWrite.Task.IsCompleted)
         {
             await firstWrite.Task.WaitAsync(cancellationToken);
+            return await ReadAsync(buffer, cancellationToken);
+        }
+
+        if (readsRequests && SwsHttpRequestFraming.AwaitsExpectedBody(unservedRequestBytes.ToArray()))
+        {
+            await nextWrite.Task.WaitAsync(cancellationToken);
             return await ReadAsync(buffer, cancellationToken);
         }
 
@@ -274,7 +287,19 @@ internal sealed class SwsHttpServerConnection : IConnection
         {
             SwsHttpReply reply = replySelector.Select(unservedRequestBytes.GetRange(0, requestLength).ToArray());
             unservedRequestBytes.RemoveRange(0, requestLength);
+            ForgetBytesPastSkippedRequest();
             Serve(reply, upgradesConnection);
+        }
+    }
+
+    // Under skip: N, sws ends the request it stores at the bytes it was told to read, so what the
+    // client wrote past them never reaches the protocol dump (test1070).
+    private void ForgetBytesPastSkippedRequest()
+    {
+        if (serverCommands.SkippedBodyBytes > 0)
+        {
+            recording.Forget(unservedRequestBytes.Count);
+            unservedRequestBytes.Clear();
         }
     }
 
