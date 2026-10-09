@@ -3,8 +3,8 @@ id: AF-0050
 title: task-board.ps1 help lists the audit paths without the four guard files the code also treats as audit paths
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-help
 reproduction: none
 task: BL-1677
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 5a627a2fb4baf7b4b2662dc309939ec576dcad20
 scorecard: 2026-10-07_0844.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: consecutive
+closed-by: 2026-10-08_0748.md, 2026-10-08_2315.md
 ---
 # AF-0050 - task-board.ps1 help lists the audit paths without the four guard files the code also treats as audit paths
 
@@ -44,8 +44,10 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'path \(Au
 
 - 2026-10-07 | 2026-10-07_1336.md | reproduces: yes | Ran the reproduction. It matches task-board.ps1:19 'path (Audit, Audit/..., .claude/agents/audit-*), is never offered' and task-board.ps1:209 "'.github/workflows/ci.yml',". The help still lists only the three audit-path forms, while Test-AuditPath (lines 205-216) also treats the four guard files (.claude/hooks/guard-audit-paths.ps1, .claude/settings.json, .github/workflows/ci.yml, .claude/skills/task-board/task-board.ps1) as audit paths.
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The pattern for the old help text 'path (Audit, Audit/..., .claude/agents/audit-*)' no longer matches. Only the code line task-board.ps1:212 '.github/workflows/ci.yml', matched. The help (lines 18-22) now lists all four guard files: .claude/hooks/guard-audit-paths.ps1, .claude/settings.json, .github/workflows/ci.yml and .claude/skills/task-board/task-board.ps1.
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | The help pattern 'path (Audit, Audit/..., .claude/agents/audit-*)' no longer matches. The help's 'next' entry (lines 18-23) now lists Audit, Audit/..., .claude/agents/audit-*, Gap, Gap/..., .claude/agents/gap-* and all four guard files, the same as Test-AuditPath's $guardFiles (lines 210-215). Only the code line 214 ''.github/workflows/ci.yml'' matched.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).

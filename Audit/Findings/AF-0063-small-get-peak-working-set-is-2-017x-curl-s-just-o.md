@@ -3,8 +3,8 @@ id: AF-0063
 title: small-get peak working set is 2.017x curl's (just over the 2x threshold)
 auditor: performance
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_2315.md: the reproduction no longer reproduces.
 key: performance:Curl.Console:small-get:memory-heavier-than-curl
 reproduction: none
 task: BL-1682
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: reliable-reaudit
+closed-by: 2026-10-08_2315.md
 ---
 # AF-0063 - small-get peak working set is 2.017x curl's (just over the 2x threshold)
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_0748.md | not re-audited | Ran the reproduction: small-get curl medianPeakWorkingSetBytes read 0 (it exited before the first memory sample) and the candidate read 9326592. A ratio against 0 cannot be formed, so the 2.017x claim can be neither confirmed nor refuted.
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran Measure-Performance.ps1 with 20 iterations: small-get medianPeakWorkingSetBytes is 0 for both curl and the candidate. Both runs exit before the first 10 ms memory sample, so there is no 2.017x ratio and nothing over the 2x threshold. Wall time is 38.5 ms for both.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0071
 title: Report-Format.md calls seven audit tools 'planned' that already exist in Audit/Tools
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).
 key: truthfulness:Audit/Instructions/Report-Format.md:planned-tools:false-statement
 reproduction: none
 task: BL-1690
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: consecutive
+closed-by: 2026-10-08_0748.md, 2026-10-08_2315.md
 ---
 # AF-0071 - Report-Format.md calls seven audit tools 'planned' that already exist in Audit/Tools
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The count of '(planned' in Audit/Instructions/Report-Format.md is 0; Test-Path Audit/Tools/Write-AuditFindings.ps1 is True. The tools are no longer called planned.
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | The count of '(planned' in Report-Format.md is 0; Test-Path Audit/Tools/Write-AuditFindings.ps1 is True. One leftover ', planned BL-1002' for Get-AuditorFingerprint.ps1 on line 37 is outside this reproduction, so I filed it as a new finding.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).

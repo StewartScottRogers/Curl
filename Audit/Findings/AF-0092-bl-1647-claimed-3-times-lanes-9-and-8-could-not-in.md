@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1647 row; DarkFactory-20261007-111121-L*.log matched no file. Could not tell.
+
 ## Log
 
 - 2026-10-08: filed proposed.

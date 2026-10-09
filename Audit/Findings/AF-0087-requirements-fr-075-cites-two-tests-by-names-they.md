@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | The old-name count is 0 and Requirements.md no longer cites the old name (no line number). FR-075 now cites ReadAsync_ConnectionResetWhileReadingTheHead_ReturnsRecvErrorWithTheWinsockWords/...SocketErrorsOwnWords and CopyAsync_PeerResetsMidBody_ThrowsExit56WithTheWinsockWordsAfterWritingWhatArrived/...SocketErrorsOwnWords..., and all four exist.
+
 ## Log
 
 - 2026-10-08: filed proposed.

@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | The test-name count is 0 and Requirements.md no longer cites it (no line number). FR-085 now gives the Winsock words on Windows, the OS socket-error text elsewhere and 'Failed sending data to the peer' with no socket error. It cites ExecuteAsync_SocketErrorFailsASend_FailsWithExit55AndTheWinsockWords, ..._AndTheSocketErrorsOwnWords and ExecuteAsync_SendFailsWithNoSocketError_FailsWithExit55AndCurlsGenericText, and all three exist in HttpProtocolHandlerTests.Timeouts.cs.
+
 ## Log
 
 - 2026-10-08: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0067
 title: CLAUDE.md says Integration tests live only in *.IntegrationTests projects; 17 sit in five *.UnitTests projects
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).
 key: truthfulness:CLAUDE.md:IntegrationTestPlacement:false-statement
 reproduction: none
 task: BL-1686
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: consecutive
+closed-by: 2026-10-08_0748.md, 2026-10-08_2315.md
 ---
 # AF-0067 - CLAUDE.md says Integration tests live only in *.IntegrationTests projects; 17 sit in five *.UnitTests projects
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The reproduction's count of [TestCategory("Integration")] lines in *.UnitTests projects is 0. Directory.Build.props' VerifyIntegrationTestPlacement target enforces the rule at build time.
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | The count of [TestCategory("Integration")] lines in *.UnitTests projects is 0.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).

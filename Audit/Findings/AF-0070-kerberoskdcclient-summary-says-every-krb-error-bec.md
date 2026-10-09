@@ -3,8 +3,8 @@ id: AF-0070
 title: KerberosKdcClient summary says every KRB-ERROR becomes a KerberosKdcException; KDC_ERR_PREAUTH_REQUIRED does not
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).
 key: truthfulness:Curl.Kerberos.UnitLibrary/KerberosKdcClient.cs:KerberosKdcClient:false-doc-comment
 reproduction: none
 task: BL-1689
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-08
+closed-how: consecutive
+closed-by: 2026-10-08_0748.md, 2026-10-08_2315.md
 ---
 # AF-0070 - KerberosKdcClient summary says every KRB-ERROR becomes a KerberosKdcException; KDC_ERR_PREAUTH_REQUIRED does not
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Kerberos.UnitLibrary/KerberosKdcClient.cs -SimpleMatch 
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_0748.md | reproduces: no | The reproduction still finds KerberosKdcClient.cs:186 'if (error.ErrorCode != KerberosErrorMessage.PreAuthenticationRequired)', but the class summary (lines 13-16) now reads 'Every KRB-ERROR becomes a KerberosKdcException, except the KDC_ERR_PREAUTH_REQUIRED answering the first AS-REQ, which instead sends a second AS-REQ with PA-ENC-TIMESTAMP ...'. The doc and the code agree.
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | The code line still matches (KerberosKdcClient.cs:186), but the summary (lines 13-16) now says: 'Every KRB-ERROR becomes a KerberosKdcException, except the KDC_ERR_PREAUTH_REQUIRED answering the first AS-REQ, which instead sends a second AS-REQ with PA-ENC-TIMESTAMP'. The doc now matches the code.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-08: accepted -> closed. Re-audit 2026-10-08_2315.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_0748.md, 2026-10-08_2315.md).

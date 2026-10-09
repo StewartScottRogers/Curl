@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Ssh.UnitTests/Keys/SshPrivateKeyReaderTests.cs
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: Read_TextBeforeTheBlock_ReadsTheKey now asserts the key type (line 319) and public key blob (line 320) against SshPublicKeyFile.Parse(TestUserKeys.EcdsaP256PublicKeyFile).Key.
+
 ## Log
 
 - 2026-10-08: filed proposed.

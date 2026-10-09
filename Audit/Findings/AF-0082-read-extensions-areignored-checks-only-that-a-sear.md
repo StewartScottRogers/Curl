@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Ldap.UnitTests/OpenLdapUrlReaderTests.cs -Patt
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: Read_Extensions_AreIgnored now reads both the URL with extensions and the same URL without them and asserts Assert.AreEqual on BaseObject, CollectionAssert.AreEqual on Attributes, and Assert.AreEqual on Scope and Filter.
+
 ## Log
 
 - 2026-10-08: filed proposed.

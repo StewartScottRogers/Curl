@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Neither the ADR text 'stat` off Windows' nor the code ternary matches any more. FileProtocolHandler.cs:371-374 now picks Win32SourceLastWriteReader on Windows, PosixSourceLastWriteReader on Linux and macOS, and NoRawSourceLastWriteReader elsewhere. ADR-0410 lines 65-71 describe statx/fgetattrlist off Windows (BL-1790), which matches.
+
 ## Log
 
 - 2026-10-08: filed proposed.
