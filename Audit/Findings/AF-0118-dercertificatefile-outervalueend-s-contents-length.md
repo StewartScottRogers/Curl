@@ -3,8 +3,8 @@ id: AF-0118
 title: DerCertificateFile.OuterValueEnd's 'contents.Length < 2' can become '<= 2' with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/DerCertificateFile.cs:OuterValueEnd-lt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DerCertificateFile.cs:85:<
 task: none
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
