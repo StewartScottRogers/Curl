@@ -290,6 +290,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         string[] decodedCodings = [.. contentCodings.Concat(transferCodings)];
         Log.BodyFramed(framing, decodedCodings);
         contentDecoder = HttpContentDecoder.ForCodings(decodedCodings);
+        contentDecoder?.MaximumDeliveredSize = MaximumBodySize;
         ExpectedLength = framing.ContentLength;
         Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         try

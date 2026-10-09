@@ -1828,15 +1828,17 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Applies <c>--max-filesize</c> to the head's Content-Length, then decides what becomes of
-    /// a body that is not being discarded (<see cref="HttpDownloadConditions" />).
+    /// Applies <c>--max-filesize</c> to the head's Content-Length of a body that is kept, then
+    /// decides what becomes of it (<see cref="HttpDownloadConditions" />). A discarded body - a
+    /// redirect <c>-L</c> follows, a 401 before its retry - is not held to the limit, as curl
+    /// 8.21.0 holds only the body it keeps to it (upstream test477, BL-1807).
     /// </summary>
     /// <exception cref="HttpTransferException">
     /// The Content-Length is over the limit (exit 63), or a resume was not honoured (exit 33).
     /// </exception>
     private static HttpBodyDelivery DeliveryOf(HttpRequestPlan plan, HttpResponseHead head, bool discardsBody)
     {
-        HttpDownloadConditions.ThrowIfContentLengthExceeds(plan.Context.MaxFileSize, head);
+        HttpDownloadConditions.ThrowIfContentLengthExceeds(discardsBody ? null : plan.Context.MaxFileSize, head);
         return discardsBody ? HttpBodyDelivery.Deliver : HttpDownloadConditions.Decide(plan.Context, plan.Framing.Body is not null, head);
     }
 
