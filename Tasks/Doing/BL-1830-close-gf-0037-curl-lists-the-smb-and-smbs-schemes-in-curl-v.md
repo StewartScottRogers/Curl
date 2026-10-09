@@ -45,3 +45,4 @@ Remove smb and smbs from the Protocols: line in CurlVersionText.ProtocolsLine (C
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
