@@ -50,3 +50,4 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
