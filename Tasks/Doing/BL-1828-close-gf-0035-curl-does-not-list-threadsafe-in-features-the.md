@@ -44,3 +44,4 @@ Record in an ADR whether Curl's transfers are thread-safe in the sense curl mean
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
