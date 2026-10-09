@@ -1188,6 +1188,20 @@ public sealed partial class HttpProtocolHandlerTests
     private void WriteEvents(string label, IEnumerable<string> lines) =>
         Diagnostics.Act(label, OneLine(string.Join(" | ", lines)));
 
+    [TestMethod]
+    [DataRow("Host: localhost", "http://localhost/we/want/1258")]
+    [DataRow("host: localhost:8990", "http://localhost:8990/we/want/1258")]
+    [DataRow("Host:", "http://127.0.0.1:47/we/want/1258")]
+    [DataRow("Host: a b", "http://127.0.0.1:47/we/want/1258")]
+    public void CookieUrlOf_CustomHost_MatchesCookiesAgainstItsHost(string header, string expected)
+    {
+        CurlUrl url = CurlUrl.Parse("http://127.0.0.1:47/we/want/1258?q=1");
+
+        CurlUrl cookieUrl = HttpProtocolHandler.CookieUrlOf(url, new HttpRequestOptions { Headers = [header] });
+
+        Assert.AreEqual(expected, $"{cookieUrl.Scheme}://{cookieUrl.Host}{(cookieUrl.IsDefaultPort ? "" : $":{cookieUrl.Port}")}{cookieUrl.AbsolutePath}");
+    }
+
     /// <summary>Writes the ASSERT line for two sequences of lines, CR and LF shown escaped.</summary>
     private void WriteExpectedLines(string label, IEnumerable<string> expected, IEnumerable<string> actual) =>
         Diagnostics.Assert(label, OneLine(string.Join(" | ", expected)), OneLine(string.Join(" | ", actual)));

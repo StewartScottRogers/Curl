@@ -65,6 +65,7 @@ public sealed partial class HttpRequestHeadFormatterTests
     [DataRow("Accept:   ", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Remove Accept, blanks after colon")]
     [DataRow("Accept; y", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Accept; y removes Accept")]
     [DataRow("Host:", "User-Agent: curl/8.21.0\r\nAccept: */*\r\n", DisplayName = "Remove Host")]
+    [DataRow("host:", "User-Agent: curl/8.21.0\r\nAccept: */*\r\n", DisplayName = "Lower-case host: removes Host (upstream test461)")]
     [DataRow("Host:\nHost: x", "User-Agent: curl/8.21.0\r\nAccept: */*\r\nHost: x\r\n", DisplayName = "Removed Host, later Host sent last")]
     [DataRow("X-A:\nX-C:   ", DefaultHeaders, DisplayName = "Removing a header curl does not send")]
     [DataRow("Foo\nX-A: 1", DefaultHeaders + "X-A: 1\r\n", DisplayName = "No colon or semicolon dropped")]

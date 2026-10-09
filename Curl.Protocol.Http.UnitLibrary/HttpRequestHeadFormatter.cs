@@ -228,7 +228,7 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Formats the <c>Host</c> line: the first <c>-H</c> value naming <c>Host</c> with its
-    /// name written <c>Host:</c>, or none when that value is exactly <c>Host:</c>, or else
+    /// name written <c>Host:</c>, or none when that value is exactly <c>Host:</c> in any case, or else
     /// the URL's host as written, bracketed if IPv6, with its port unless it is the
     /// default of an <c>http</c> or <c>https</c> URL (<see cref="HttpUrlText.HostHeaderAuthority" />).
     /// </summary>
@@ -238,11 +238,30 @@ internal static class HttpRequestHeadFormatter
         {
             if (header.Names(HostName))
             {
-                return header.Entry == "Host:" ? null : string.Concat("Host:", header.Entry.AsSpan(HostName.Length + 1));
+                return string.Equals(header.Entry, "Host:", StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : string.Concat("Host:", header.Entry.AsSpan(HostName.Length + 1));
             }
         }
 
         return $"Host: {HttpUrlText.HostHeaderAuthority(url)}";
+    }
+
+    /// <summary>
+    /// Gives the value of the first <c>-H</c> value naming <c>Host</c>, its name matched in any
+    /// case, or <see langword="null" /> when none names it or the one that does sends no value.
+    /// </summary>
+    internal static string? CustomHostOf(HttpRequestOptions options)
+    {
+        foreach (HttpCustomHeader header in CustomHeadersOf(options.Headers, options))
+        {
+            if (header.Names(HostName))
+            {
+                return header.Value;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

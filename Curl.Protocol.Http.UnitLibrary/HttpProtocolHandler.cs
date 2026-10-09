@@ -1065,7 +1065,7 @@ public sealed class HttpProtocolHandler(
             HeaderReceived = (statusLine, header) =>
             {
                 ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
-                cookiesStored = StoreCookie(context, header, cookiesStored);
+                cookiesStored = StoreCookie(context, options, header, cookiesStored);
                 StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
                 StoreHsts(context, options.HstsStore, header);
             },
@@ -1376,7 +1376,7 @@ public sealed class HttpProtocolHandler(
             downgradesToHttp10 ? plan.Options with { Version = HttpVersionPreference.Http10 } : plan.Options,
             context.NoBody,
             plan.Authorization,
-            CookieHeaderFor(context),
+            CookieHeaderFor(context, plan.Options),
             plan.ForwardProxy is not null,
             plan.ProxyAuthorization,
             HttpRangeHeader.ValueFor(context, plan.Framing.Body is not null),
@@ -1975,8 +1975,19 @@ public sealed class HttpProtocolHandler(
     /// gives <see langword="null" /> when cookies are off. The store reports a limit that cut
     /// the value short to the transfer's events, before the request's header lines, as curl does.
     /// </summary>
-    private string? CookieHeaderFor(ITransferContext context) =>
-        CookieStore?.GetCookieHeader(context.Url, TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
+    private string? CookieHeaderFor(ITransferContext context, HttpRequestOptions options) =>
+        CookieStore?.GetCookieHeader(CookieUrlOf(context.Url, options), TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
+
+    /// <summary>
+    /// Gives the URL cookies are matched and stored against: <paramref name="url" /> with the
+    /// host of a <c>-H</c> <c>Host</c> value in its place, as curl takes its cookie host from a
+    /// custom <c>Host</c> header, or <paramref name="url" /> itself when there is none.
+    /// </summary>
+    internal static CurlUrl CookieUrlOf(CurlUrl url, HttpRequestOptions options) =>
+        HttpRequestHeadFormatter.CustomHostOf(options) is { } host
+        && CurlUrl.TryParse($"{url.Scheme}://{host}{url.AbsolutePath}", false, out CurlUrl? cookieUrl)
+            ? cookieUrl
+            : url;
 
     /// <summary>
     /// Hands <paramref name="header" />, when it is a <c>Set-Cookie</c> header and cookies are
@@ -1984,12 +1995,13 @@ public sealed class HttpProtocolHandler(
     /// in any head of the response, 1xx heads' included (measured, BL-468 Notes).
     /// </summary>
     /// <param name="context">The transfer.</param>
+    /// <param name="options">The request's options, whose <c>-H</c> <c>Host</c> value gives the cookie host (<see cref="CookieUrlOf" />).</param>
     /// <param name="header">A whole header of the response.</param>
     /// <param name="storedFromResponse">How many cookies the store has stored from this request's responses.</param>
     /// <returns>The count the store gives back, or <paramref name="storedFromResponse" /> when the store is not asked.</returns>
-    private int StoreCookie(ITransferContext context, HttpResponseHeader header, int storedFromResponse) =>
+    private int StoreCookie(ITransferContext context, HttpRequestOptions options, HttpResponseHeader header, int storedFromResponse) =>
         CookieStore is { } store && string.Equals(header.Name, "Set-Cookie", StringComparison.OrdinalIgnoreCase)
-            ? store.StoreFromResponse(context.Url, header.Value, storedFromResponse, context.TimeProvider.GetUtcNow(), context.Events)
+            ? store.StoreFromResponse(CookieUrlOf(context.Url, options), header.Value, storedFromResponse, context.TimeProvider.GetUtcNow(), context.Events)
             : storedFromResponse;
 
     /// <summary>
