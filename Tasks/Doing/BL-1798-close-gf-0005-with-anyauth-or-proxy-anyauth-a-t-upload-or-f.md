@@ -47,6 +47,17 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 
 ## Notes
 
+- `HttpProtocolHandler.MayRetry` now accepts a stream body that can seek, and
+  `RewindForResend` seeks it back before a 401 or 407 retry (ADR-0440). Unseekable streams
+  (stdin) keep ADR-0034's behaviour: the challenge is the result.
+- Tests: `ExecuteAsync_ChallengeToASeekableStreamBody_SendsTheBodyAgain`,
+  `ExecuteAsync_ChallengeToAnUnseekableStreamBody_ReturnsThe401`,
+  `ExecuteAsync_407ToASeekableStreamBody_SendsTheBodyAgain`,
+  `ExecuteAsync_407ToAnUnseekableStreamBody_ReturnsIt`.
+- Not re-measured with `Gap/Tools/Measure-UpstreamCases.cs`: the audit guard refuses lanes
+  any read of `Gap/`. The gap closes on the next gap analysis run (ADR-0433).
+- No option changed, so `--ai-help` needs nothing.
+
 ## Log
 
 - 2026-10-08: Created.
