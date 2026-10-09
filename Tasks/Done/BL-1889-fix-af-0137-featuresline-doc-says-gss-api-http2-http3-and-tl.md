@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1889 — Fix AF-0137: FeaturesLine doc says GSS-API, HTTP2, HTTP3 and TLS-SRP are listed on every platform; the Windows line drops all four
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. FeaturesLine doc now names which platforms list HTTP2, HTTP3, GSS-API and TLS-SRP (off Windows only)
