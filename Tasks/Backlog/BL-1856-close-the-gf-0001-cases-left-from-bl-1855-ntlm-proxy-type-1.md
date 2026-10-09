@@ -4,7 +4,7 @@ title: Close the GF-0001 cases left from BL-1855: NTLM proxy type-1 through the 
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1857, BL-1858]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
@@ -41,7 +41,10 @@ The eight GF-0001 upstream cases BL-1855 left failing over the in-process `TcpCo
 
 ## Notes
 
+- 2026-10-08 (lane 1): measured the nine cases (all still Inconclusive, unlisted). Split the work into BL-1857 (CONNECT reply errors: test217, test750, test1715, in Curl.Networking) and BL-1858 (NTLM type-1 on Windows: test1008, 1021, 209, 213, 265; and test2043), with the measured causes in each. This run's budget could not cover the fixes; BL-1856 closes once both are Done.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Backlog. Split into BL-1857 (CONNECT reply errors) and BL-1858 (NTLM type-1 on Windows, test2043); waits on both
