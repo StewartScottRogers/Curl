@@ -316,6 +316,36 @@ public sealed class CurlCommandRunnerDumpHeaderTests
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderWithCreateDirs_CreatesTheFilesDirectoryAndWritesTheHeaders()
+    {
+        int exitCode = await RunAsync(["--create-dirs", "-D", "tmp/sub/out.txt", "-o", "body.txt", SourceUrl], fileHandler);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("created directories", "tmp,tmp/sub", string.Join(",", outputFiles.CreatedDirectories));
+        Diagnostics.Diff("tmp/sub/out.txt", Lf(HeaderLines), Lf(WrittenText("tmp/sub/out.txt")));
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "tmp", "tmp/sub" }, outputFiles.CreatedDirectories);
+        Assert.AreEqual(HeaderLines, WrittenText("tmp/sub/out.txt"));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_DumpHeaderWithCreateDirsAndAnUncreatableDirectory_ReportsItAndExits23()
+    {
+        outputFiles.UncreatableDirectories.Add("tmp");
+        Diagnostics.Arrange("uncreatable directory", "tmp");
+
+        int exitCode = await RunAsync(["--create-dirs", "-D", "tmp/out.txt", "-o", "body.txt", SourceUrl], fileHandler);
+
+        Diagnostics.Assert("exit code", 23, exitCode);
+        Diagnostics.Diff("stderr", "curl: Error creating directory tmp\ncurl: (23) Failed writing received data to disk/application\n", Lf(StandardErrorText));
+        Assert.AreEqual(23, exitCode);
+        Assert.AreEqual(
+            "curl: Error creating directory tmp" + NewLine + "curl: (23) Failed writing received data to disk/application" + NewLine,
+            StandardErrorText);
+        Assert.IsFalse(outputFiles.Written.ContainsKey("body.txt"));
+    }
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private string WrittenText(string path) => Encoding.ASCII.GetString(outputFiles.Written[path].ToArray());
@@ -330,7 +360,7 @@ public sealed class CurlCommandRunnerDumpHeaderTests
         int exitCode;
         using (Diagnostics.Phase("run"))
         {
-            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput ?? this.standardOutput, standardError, new MemoryStream(), runsOnWindows)
+            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher([handler])), outputFiles, outputFiles, standardOutput ?? this.standardOutput, standardError, new MemoryStream(), runsOnWindows, outputPaths: outputFiles)
                 .RunAsync(arguments);
         }
 

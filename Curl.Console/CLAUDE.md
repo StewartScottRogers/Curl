@@ -177,6 +177,7 @@ as curl's cookie engine stays off. Measured on curl 8.21.0 (BL-237 Notes).
 under `-s` - the stream the runner was given, or a `--stderr` file, but never standard output
 for `--stderr -`, as curl 8.21.0's `freopen`ed C `stderr` does (BL-1815); any other `-D` name is opened
 (unsanitized, truncated for the first transfer and appended for the rest) before the transfer,
+its leading directories first made under `--create-dirs` as for `-o` (upstream test 3031, BL-1852),
 and one that cannot be opened prints `curl: Failed to open <file>` and stops the run with
 exit 23. `-i` and `-I` send the header lines to the body output too (standard output or the
 `-o` file); with `-D` as well, `HeaderLineTeeStream` writes each line to the `-D` output and

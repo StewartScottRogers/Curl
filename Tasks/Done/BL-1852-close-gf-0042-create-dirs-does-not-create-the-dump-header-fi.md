@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1852 — Close GF-0042: --create-dirs does not create the --dump-header file's folder, so the transfer fails with exit 23 before any request
 
@@ -35,13 +35,18 @@ In Curl.Console's CurlCommandRunner.TransferWithHeaderFileAsync, when options.Cr
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test3031`: Curl answers what curl 8.21.0 answers, `upstream test3031 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test3031`: Curl answers what curl 8.21.0 answers, `upstream test3031 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- `TransferWithHeaderFileAsync` now makes the `-D` file's leading directories under `--create-dirs` with `OutputFileDirectories.CreateLeadingDirectories`, the creator `-o` and `--etag-save` use, so a directory that cannot be made prints `curl: Error creating directory <dir>` and exits 23 as they do. Chose that shared creator (and its errno-worded failures) rather than a new one: curl 8.21.0's `tool_operate` calls the same `create_dir_hierarchy` for the header file.
+- Measured on the built binary: `curl -sS --dump-header <scratch>/tmp/out.txt --create-dirs http://127.0.0.1:1/x` now creates `tmp/` and `out.txt` and goes on to connect (exit 7), where it printed `Failed to open` and exit 23 before; so the test3031 request is now sent. The item closes only when a later gap run measures it `match`.
+- No option added or changed, so `--ai-help` is unchanged.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. -D file's folders made under --create-dirs; fast tests green

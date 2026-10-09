@@ -3186,9 +3186,10 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Opens the <c>-D</c> file (truncated for the first transfer, appended to after it), performs
-    /// the transfer with its header lines going there, and closes the file; reports the file
-    /// when it cannot be opened.
+    /// Creates the <c>-D</c> file's leading directories under <c>--create-dirs</c>, as curl 8.21.0
+    /// does (upstream test 3031, BL-1852), opens the file (truncated for the first transfer,
+    /// appended to after it), performs the transfer with its header lines going there, and closes
+    /// the file; reports a directory that cannot be created, or the file when it cannot be opened.
     /// </summary>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The accepted command line.</param>
@@ -3208,6 +3209,12 @@ internal sealed class CurlCommandRunner(
         UrlTransfer transfer,
         string headerFile)
     {
+        if (options.CreateDirectories
+            && OutputFileDirectories.CreateLeadingDirectories(OutputPaths, headerFile, runsOnWindows) is { } failure)
+        {
+            return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
+        }
+
         FileOpenResult opened = await fileSystem
             .OpenForWriteAsync(
                 headerFile,
