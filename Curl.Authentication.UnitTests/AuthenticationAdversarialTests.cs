@@ -262,14 +262,9 @@ public sealed class AuthenticationAdversarialTests
 
         for (int length = 0; length < whole.Length; length++)
         {
-            try
-            {
-                _ = SpnegoNegotiationResponse.Decode(whole.AsMemory(0, length));
-            }
-            catch (SpnegoTokenException)
-            {
-                // The documented refusal.
-            }
+            ReadOnlyMemory<byte> truncated = whole.AsMemory(0, length);
+
+            Assert.ThrowsExactly<SpnegoTokenException>(() => SpnegoNegotiationResponse.Decode(truncated), $"A {length}-byte truncation decoded without throwing.");
         }
     }
 

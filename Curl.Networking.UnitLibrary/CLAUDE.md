@@ -6,7 +6,8 @@ Sockets, DNS, TLS via SslStream, proxy and SOCKS handling, connection reuse: the
 production implementations of the transport contracts in
 `Curl.Protocol.Abstractions.UnitLibrary` (ADR-0005). It references that project,
 `Curl.Tls.UnitLibrary`, the hand-built TLS client (ADR-0120, ADR-0140), `Curl.Quic.UnitLibrary`,
-the hand-built QUIC client (ADR-0180), and `Curl.Kerberos.UnitLibrary`, whose KDC transport and SRV lookup it implements, and nothing
+the hand-built QUIC client (ADR-0180), `Curl.Http2.UnitLibrary`, whose `Http2Connection` carries the CONNECT stream of
+an h2 HTTPS proxy tunnel (`Http2ProxyTunnelConnection`), and `Curl.Kerberos.UnitLibrary`, whose KDC transport and SRV lookup it implements, and nothing
 else: `KerberosKdcSocketTransport` moves a KDC's UDP datagram through an `IDatagramConnector`
 (one-second reply wait) and its TCP stream through an `IConnector` (the stream owns and
 disposes the connection, `ConnectionStream`'s `ownsConnection`), and `KerberosDnsSrvLookup`

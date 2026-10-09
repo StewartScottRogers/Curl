@@ -44,7 +44,6 @@ internal sealed class RemoteHeaderNameStream(
     /// <summary>The start of a status line.</summary>
     private static ReadOnlySpan<byte> StatusLinePrefix => "HTTP/"u8;
 
-    private bool namesFile = true;
     private int statusClass;
 
     /// <inheritdoc />
@@ -129,12 +128,11 @@ internal sealed class RemoteHeaderNameStream(
             return;
         }
 
-        if (!namesFile || statusClass is not (2 or 3) || ContentDispositionFileName.Find(line) is not { } fileName)
+        if (output.NamedByContentDisposition || statusClass is not (2 or 3) || ContentDispositionFileName.Find(line) is not { } fileName)
         {
             return;
         }
 
-        namesFile = false;
         if (!await TryOpenAsync(pathOf(fileName), line.Length, cancellationToken).ConfigureAwait(false))
         {
             throw new IOException($"Could not create the output file {output.Path}.");
@@ -149,7 +147,7 @@ internal sealed class RemoteHeaderNameStream(
     /// <returns><see langword="true" /> when the line was a <c>Location</c> that renamed the file.</returns>
     private bool RenamesAfterLocation(byte[] line)
     {
-        if (!followsRedirects || !namesFile || statusClass != 3 || RedirectLocationFileName.Find(line) is not { } redirected)
+        if (!followsRedirects || output.NamedByContentDisposition || statusClass != 3 || RedirectLocationFileName.Find(line) is not { } redirected)
         {
             return false;
         }

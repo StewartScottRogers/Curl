@@ -99,6 +99,15 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// </summary>
     internal string? OpenFailureWarning { get; private set; }
 
+    /// <summary>
+    /// Gets a value indicating whether a <c>Content-Disposition</c> header has named the file
+    /// (<see cref="TryOpenUnderNameAsync" />), whether or not it could then be opened. It lasts
+    /// for the whole transfer, <c>--retry</c> attempts included, as curl 8.21.0's
+    /// <c>honor_cd_filename</c> does: a later attempt takes no name from its headers and opens
+    /// the named file on its first body write (upstream test 3036, BL-1849).
+    /// </summary>
+    internal bool NamedByContentDisposition { get; private set; }
+
     /// <inheritdoc />
     public override bool CanRead => false;
 
@@ -221,9 +230,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     {
         if (failedWriteLength is { } length)
         {
-            return TransferResult.Failure(
-                CurlExitCode.WriteError,
-                "client returned ERROR on write of " + length.ToString(CultureInfo.InvariantCulture) + " bytes");
+            return WriteFailure(length);
         }
 
         bool createsEmptyFile = file is null && result.IsSuccess && !result.TimeConditionUnmet;
@@ -233,6 +240,39 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             ? new TransferResult(CurlExitCode.WriteError, 0)
             : result;
     }
+
+    /// <summary>
+    /// Settles an attempt <c>--retry</c> is about to run again, as curl 8.21.0 reports each attempt
+    /// on its own: when the file could not be opened during it, the attempt's result becomes curl's
+    /// <c>client returned ERROR on write of N bytes</c> and <see cref="OpenFailureWarning" /> is handed
+    /// over to be printed with it; both are then cleared, so the next attempt's open is reported
+    /// for that attempt alone (upstream test 3036, BL-1849).
+    /// </summary>
+    /// <param name="attempt">The handler's result for the retried attempt.</param>
+    /// <returns>
+    /// The attempt's result, or the write failure when the file could not be opened, and the
+    /// open-failure warning to print, or <see langword="null" /> for none.
+    /// </returns>
+    internal (TransferResult Result, string? Warning) SettleRetriedAttempt(TransferResult attempt)
+    {
+        string? warning = OpenFailureWarning;
+        TransferResult result = failedWriteLength is { } length ? WriteFailure(length) : attempt;
+        OpenFailureWarning = null;
+        failedWriteLength = null;
+
+        return (result, warning);
+    }
+
+    /// <summary>
+    /// Gives curl's exit 23 result for a write of <paramref name="length" /> bytes the file could
+    /// not take because it could not be opened.
+    /// </summary>
+    /// <param name="length">The size of the write that failed.</param>
+    /// <returns><c>client returned ERROR on write of N bytes</c>, exit 23.</returns>
+    private static TransferResult WriteFailure(long length) =>
+        TransferResult.Failure(
+            CurlExitCode.WriteError,
+            "client returned ERROR on write of " + length.ToString(CultureInfo.InvariantCulture) + " bytes");
 
     /// <summary>
     /// Opens the file now rather than on the first write, as curl 8.21.0 does for a resumed
@@ -277,6 +317,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     internal async ValueTask<bool> TryOpenUnderNameAsync(string newPath, int headerLineLength, CancellationToken cancellationToken)
     {
         Path = newPath;
+        NamedByContentDisposition = true;
         openMode = clobber == true ? FileWriteMode.Truncate : FileWriteMode.CreateNew;
         if (newPath.Length == 0)
         {

@@ -228,6 +228,39 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// A request with no body never waited for <c>100 Continue</c>, so a keep-alive 417 is
+    /// its result, exit 0, with the 417 head in <c>-D</c> and nothing sent again: curl 8.21.0
+    /// resends without <c>Expect</c> only a body it held back or cut short (AF-0113).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_417ToARequestWithNoBody_ReturnsItWithoutResending()
+    {
+        const string getHead = "GET /p HTTP/1.1\r\nHost: 127.0.0.1:18260\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            TurnTakingConnection connection = new(chunkSize, ExpectationFailedHead, OkHead + "ok");
+            QueueConnector connector = QueueConnector.For(connection);
+            MemoryStream output = new();
+            MemoryStream headerOutput = new();
+            Diagnostics.Arrange("url, chunk size", $"{ExpectUrl}, {chunkSize}");
+            Diagnostics.Arrange("scripted responses", "keep-alive 417, then 200 ok");
+
+            TransferResult result = await Handler(connector).ExecuteAsync(ExpectContext(new HttpRequestOptions(), output, headerOutput));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("written", getHead, connection.Written);
+            Assert.AreEqual(getHead, connection.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("header output", ExpectationFailedHead, Latin1(headerOutput.ToArray()));
+            Assert.AreEqual(ExpectationFailedHead, Latin1(headerOutput.ToArray()), $"Chunk size {chunkSize}");
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+            Assert.AreEqual(417, result.Report!.ResponseCode, $"Chunk size {chunkSize}");
+            Assert.HasCount(1, connector.Targets, $"Chunk size {chunkSize}");
+        }
+    }
+
     private static HttpRequestOptions BigBodyOptions() =>
         new() { Body = new BytesBody(System.Text.Encoding.Latin1.GetBytes(BigBody), "application/x-www-form-urlencoded") };
 

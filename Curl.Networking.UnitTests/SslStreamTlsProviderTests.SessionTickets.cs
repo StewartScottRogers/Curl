@@ -15,8 +15,29 @@ namespace Curl.Networking;
 /// </summary>
 public sealed partial class SslStreamTlsProviderTests
 {
+    // Windows' Schannel test server sends a NewSessionTicket after a TLS 1.3 handshake, so there
+    // the provider must report at least one (AF-0123): an empty list would mean it stopped reporting.
     [TestMethod]
-    public async Task AuthenticateAsClientAsync_SchannelBuildOverTls13_ReportsOnlyReceivedTicketsAndKeepsTheData()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task AuthenticateAsClientAsync_SchannelBuildOverTls13_ReportsTheReceivedTicketsAndKeepsTheData()
+    {
+        await AssertTls13IsAvailableAsync();
+
+        var (messages, echoed) = await EchoOverAsync(matchesSchannelBuild: true, SslProtocols.Tls13);
+
+        Diagnostics.Assert("echoed", "hello", echoed);
+        Diagnostics.Assert("at least one ticket reported", true, messages.Count > 0);
+        Diagnostics.Assert("all received NewSessionTicket", true, messages.TrueForAll(message => !message.Sent && message.Bytes.Span[0] == 4));
+        Assert.AreEqual("hello", echoed);
+        Assert.IsNotEmpty(messages);
+        Assert.IsTrue(messages.TrueForAll(message => !message.Sent && message.Bytes.Span[0] == 4));
+    }
+
+    // Elsewhere whether the test server sends a ticket is the platform's choice, so an empty list
+    // passes: the test pins only that nothing but received tickets is reported.
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task AuthenticateAsClientAsync_SchannelBuildOverTls13_ReportsNothingButReceivedTicketsAndKeepsTheData()
     {
         await AssertTls13IsAvailableAsync();
 

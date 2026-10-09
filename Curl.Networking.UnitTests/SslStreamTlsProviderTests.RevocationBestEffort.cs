@@ -68,6 +68,41 @@ public sealed partial class SslStreamTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
+    // AF-0117: a verified handshake without --ssl-revoke-best-effort must not report the
+    // revocation check incomplete, or every TLS connection logs the warning.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WhenVerifiedWithoutRevocationCheckBestEffort_DoesNotReportTheCheckIncomplete()
+    {
+        using var root = CreateRootAuthority();
+        using var leaf = CreateServerLeaf(root, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var caFile = WriteCaFile("root.pem", root.ExportCertificatePem());
+        var capturing = new HandshakeCapturingTransferEvents(new RecordingTransferEvents());
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = Task.Run(async () =>
+        {
+            await using var sslStream = new SslStream(server);
+            await sslStream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions { ServerCertificate = leaf });
+            _ = await sslStream.ReadAtLeastAsync(new byte[1], 1, throwOnEndOfStream: false);
+        });
+        IHandshakeReportingTlsProvider provider = new SslStreamTlsProvider(new TlsClientOptions(CaCertificateFile: caFile), OpenSslBuild);
+        Diagnostics.Arrange("TLS settings", $"CA file holding {root.Subject} {root.Thumbprint}, no revoke best effort, OpenSSL build");
+        Diagnostics.Arrange("server certificate", $"{leaf.Subject} {leaf.Thumbprint}, issued by {leaf.Issuer}");
+
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, capturing, false, [], CancellationToken.None);
+        }
+
+        ActResult(result);
+        Diagnostics.Act("revocation check incomplete", capturing.RevocationCheckIncomplete);
+        Diagnostics.Assert("revocation check incomplete", false, capturing.RevocationCheckIncomplete);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.IsFalse(capturing.RevocationCheckIncomplete);
+        await result.Connection!.DisposeAsync();
+        await IgnoreFailureAsync(serverTask);
+    }
+
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public async Task AuthenticateAsClientAsync_WithAnUntrustedRootAndRevocationCheckBestEffortInTheSchannelBuild_StillFailsWithExit60()

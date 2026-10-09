@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http.Fakes;
 using Curl.Testing;
 
@@ -309,6 +310,31 @@ public sealed class HttpContinueWaitConnectionTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.1 100 Continue\r\n\r\n", DisplayName = "100 Continue after the wait")]
+    [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", DisplayName = "200")]
+    [DataRow("HTTP/1.1 299 Odd\r\nContent-Length: 0\r\n\r\n", DisplayName = "299, the highest that does not stop")]
+    public async Task SendUnlessStoppedAsync_Below300ArrivesDuringTheWrite_LetsItFinish(string response)
+    {
+        HeldWriteConnection inner = new(Encoding.Latin1.GetBytes(response));
+        HttpContinueWaitConnection connection = await PastTheWaitAsync(inner);
+        Diagnostics.Arrange("response", Visible(response));
+
+        Task<bool> send = connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None).AsTask();
+        Assert.IsFalse(send.IsCompleted);
+        inner.DeliverResponse();
+        inner.FinishWrites();
+        bool sent = await send;
+        Diagnostics.Act("send", sent);
+
+        Diagnostics.Assert("write cancelled", false, inner.WriteCancelled);
+        Assert.IsFalse(inner.WriteCancelled);
+        Assert.IsTrue(sent);
+        Assert.IsFalse(connection.StopsSending);
+        Assert.AreEqual("a", Encoding.Latin1.GetString(inner.Written));
+        Assert.AreEqual(response, await ReadAllAsync(connection));
+    }
+
+    [TestMethod]
     public async Task SendUnlessStoppedAsync_Cancelled_Throws()
     {
         GatedConnection inner = new(Encoding.Latin1.GetBytes(Final), 65536, 1) { StallsWritesOnceReleased = true };
@@ -328,7 +354,7 @@ public sealed class HttpContinueWaitConnectionTests
     /// <summary>
     /// Wraps <paramref name="inner" /> and lets its wait for <c>100 Continue</c> run out.
     /// </summary>
-    private static async Task<HttpContinueWaitConnection> PastTheWaitAsync(GatedConnection inner)
+    private static async Task<HttpContinueWaitConnection> PastTheWaitAsync(IConnection inner)
     {
         FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
         HttpContinueWaitConnection connection = new(inner);

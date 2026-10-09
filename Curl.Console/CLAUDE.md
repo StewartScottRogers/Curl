@@ -322,7 +322,12 @@ Each attempt `--retry` runs again is a transfer of its own, as in curl 8.21.0: i
 `%{xfer_id}` (`RunningTransferState.RetryTransferId`) and a new `%{conn_id}`, unless an `http` or
 `https` attempt reports it opened no connection, when it keeps the retried attempt's; so 503, 503,
 200 prints `2 2` on closed connections and `2 0` on one kept alive, and the next URL counts on from
-there (BL-799). The `--trace-ids` markers keep the first attempt's `xfer_id`.
+there (BL-799). The `--trace-ids` markers keep the first attempt's `xfer_id`. A retried attempt
+whose `-o` file could not be opened is reported for itself (`DeferredOutputFileStream.SettleRetriedAttempt`):
+its `Warning: Failed to open the file` line and `client returned ERROR on write of N bytes`, before
+the retry warning. A `-J` name lasts for the whole transfer (`NamedByContentDisposition`, curl's
+`honor_cd_filename`), so a later attempt opens that file at its first body write. Each attempt's
+progress meter starts once the retry wait is over (upstream test 3036, BL-1849).
 
 Under `-Y`/`--speed-limit` or `-y`/`--speed-time` each attempt gets a `Curl.Core`
 `LowSpeedWatchdog` on the runner's clock: `TransferContextFactory` wraps the output and the

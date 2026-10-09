@@ -118,6 +118,22 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_WhenThe101ReplyCarriesAContentLength_SaysItIgnoresItInACONNECTUDPResponse()
+    {
+        // curl ignores a 101's Content-Length only for CONNECT-UDP and names the method in the line (BL-1399).
+        var proxy = new CapsuleQuicProxyConnection("HTTP/1.1 101 Switching Protocols\r\nContent-Length: 5\r\nCapsule-Protocol: ?1\r\n\r\n", Server());
+        var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("proxy reply", "101 with Content-Length: 5");
+
+        var result = await ConnectMultiplexedAsync(TunnelConnector(_ => proxy), TunnelTarget(events));
+
+        await using var connection = result.Connection!;
+        ActEvents(events);
+        Diagnostics.Assert("has the ignoring line", true, events.Info.Contains("Ignoring Content-Length in CONNECT-UDP 101 response"));
+        CollectionAssert.Contains(events.Info, "Ignoring Content-Length in CONNECT-UDP 101 response");
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_WhenTheProxyClosesBeforeItsReplyEnds_FailsWithRecvError()
     {
         var proxy = new CapsuleQuicProxyConnection(string.Empty, null);
