@@ -160,11 +160,16 @@
 <nav class="tabs" role="tablist">
   <a id="tab-tasks" href="#tasks" role="tab" aria-controls="panel-tasks">Tasks</a>
   <a id="tab-audit" href="#audit" role="tab" aria-controls="panel-audit">Audit</a>
+  <a id="tab-gaps" href="#gaps" role="tab" aria-controls="panel-gaps">Gaps</a>
 </nav>
 <div id="messages"></div>
 <div id="panel-tasks" role="tabpanel" aria-labelledby="tab-tasks">
 <section id="lanes"></section>
 <main id="board"></main>
+</div>
+<div id="panel-gaps" role="tabpanel" aria-labelledby="tab-gaps" hidden>
+<p class="muted">The gap analysis dashboard: Curl measured against upstream curl (ADR-0433). <a href="../gaps/">Open it full page</a>.</p>
+<iframe id="gaps-frame" title="Gap analysis dashboard" data-src="../gaps/" style="width:100%;height:80vh;border:0"></iframe>
 </div>
 <div id="panel-audit" role="tabpanel" aria-labelledby="tab-audit" hidden>
 <p id="audit-source" class="muted"></p>
@@ -1100,11 +1105,16 @@ async function releaseFindings(ids, all) {
 }
 
 function showTab() {
-  const audit = location.hash === '#audit';
-  document.getElementById('panel-tasks').hidden = audit;
-  document.getElementById('panel-audit').hidden = !audit;
-  document.getElementById('tab-tasks').setAttribute('aria-selected', String(!audit));
-  document.getElementById('tab-audit').setAttribute('aria-selected', String(audit));
+  const shown = ['#audit', '#gaps'].includes(location.hash) ? location.hash.slice(1) : 'tasks';
+  for (const name of ['tasks', 'audit', 'gaps']) {
+    document.getElementById(`panel-${name}`).hidden = name !== shown;
+    document.getElementById(`tab-${name}`).setAttribute('aria-selected', String(name === shown));
+  }
+  // The gap dashboard loads only when its tab is first opened.
+  const frame = document.getElementById('gaps-frame');
+  if (shown === 'gaps' && !frame.src) {
+    frame.src = frame.dataset.src;
+  }
 }
 
 function clockTime(date, withSeconds) {
