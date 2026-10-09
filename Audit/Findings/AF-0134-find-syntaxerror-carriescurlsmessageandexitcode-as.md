@@ -3,8 +3,8 @@ id: AF-0134
 title: Find_SyntaxError_CarriesCurlsMessageAndExitCode asserts nothing: its only assertion is commented out
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Authentication.UnitTests/NetrcFileTests.cs:Find_SyntaxError_CarriesCurlsMessageAndExitCode:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Authentication.UnitTests/NetrcFileTests.cs -SimpleMatch
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
