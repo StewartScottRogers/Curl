@@ -38,3 +38,4 @@ Curl behaves as curl 8.21.0 does for upstream test3036 (`--no-clobber --output-d
 - 2026-10-08: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Interactive only: test3036's exchange is in the gap office's upstream cache, which lanes may not read; added lane: no
+- 2026-10-09: Backlog -> Doing. Interactive session claims it
