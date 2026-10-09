@@ -45,3 +45,4 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
