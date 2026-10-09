@@ -139,6 +139,17 @@ internal sealed class HttpRequestFraming
         new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: keepsCustomWait && AwaitsContinue && !AddsExpect, RefusesUnknownLength, Upload, ContentRange);
 
     /// <summary>
+    /// Makes the same request with an empty body and <c>Content-Length: 0</c>: the probe curl
+    /// 8.21.0 sends first when Digest is the one scheme allowed and no challenge has been
+    /// answered yet, holding the body back for the authenticated request (upstream test88,
+    /// test175, test1001; ADR-0441). Its <c>Content-Type</c> stays; a <c>-T</c> upload still
+    /// sends none.
+    /// </summary>
+    /// <returns>The probe's framing.</returns>
+    internal HttpRequestFraming AsAuthProbe() =>
+        new(Method, new BytesBody(ReadOnlyMemory<byte>.Empty, Body!.ContentType), 0, isChunked: false, addsExpect: false, awaitsContinue: false, upload: Upload);
+
+    /// <summary>
     /// Makes the same framing for an HTTP/2 or HTTP/3 stream, where DATA frames carry the body and the
     /// stream's end ends it: never chunked, and with no <c>Expect: 100-continue</c> of curl's
     /// own and no wait for <c>100 Continue</c>, as curl 8.21.0 sends a 2 MB <c>-T</c> upload over

@@ -291,8 +291,10 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder proxyAuthorizationLines = new();
         string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
-        HttpRequestPlan plan = new(context, options, framing, authRequest, authorization)
+        bool probes = SendsDigestProbe(framing, authRequest, authorization) || (proxyAuthRequest is not null && SendsDigestProbe(framing, proxyAuthRequest, proxyAuthorization));
+        HttpRequestPlan plan = new(context, options, probes ? framing.AsAuthProbe() : framing, authRequest, authorization)
         {
+            ProbedFraming = probes ? framing : null,
             AuthorizationFailure = authorizationFailure,
             AuthorizationInfoLines = authorizationLines.Lines,
             Started = started,
@@ -309,6 +311,19 @@ public sealed class HttpProtocolHandler(
             : await ConnectAndExchangeAsync(plan, earlier: null).ConfigureAwait(false);
         return plan.OpenedConnection ? WithFirstAuthorizationFailure(result, authRequest, authorizationLines.Lines) : result;
     }
+
+    /// <summary>
+    /// Decides whether the first request goes as a probe with an empty body
+    /// (<see cref="HttpRequestFraming.AsAuthProbe" />): one with a body, sent where Digest is the
+    /// one scheme allowed, with credentials and no value made yet, as curl 8.21.0 holds a POST's
+    /// or PUT's body back until the Digest challenge is answered (upstream test88, test175,
+    /// test1001; ADR-0441).
+    /// </summary>
+    private static bool SendsDigestProbe(HttpRequestFraming framing, HttpAuthRequest request, string? authorization) =>
+        framing.Body is not null
+            && request.AllowedSchemes == HttpAuthSchemes.Digest
+            && request.Credential is not null
+            && authorization is null;
 
     /// <summary>
     /// Makes the first request's <c>Proxy-Authorization</c> value for a forward proxy, the
@@ -2025,6 +2040,11 @@ public sealed class HttpProtocolHandler(
             return authorized;
         }
 
+        if (plan.ProbedFraming is not null && head.StatusLine.StatusCode is >= 200 and < 300)
+        {
+            return plan.WithProbedBody();
+        }
+
         if (!RetriesWithoutExpect(plan, head, bodyLeftUnsent || upload.CutShort))
         {
             return null;
@@ -2671,7 +2691,22 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptProxyAuthorization">The <c>Proxy-Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithAuthorization(string authorization, IReadOnlyList<string> infoLines, string? keptProxyAuthorization) =>
-            With(Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
+            With(ProbedFraming ?? Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines, endsProbe: true);
+
+        /// <summary>
+        /// Gets the framing the probe (<see cref="HttpRequestFraming.AsAuthProbe" />) held back, sent
+        /// once a challenge is answered or the probe drew a 2xx; <see langword="null" /> when this
+        /// request is no probe.
+        /// </summary>
+        public HttpRequestFraming? ProbedFraming { get; init; }
+
+        /// <summary>
+        /// Makes the same request with the body the probe held back and no credentials, which
+        /// curl 8.21.0 sends when the probe drew a 2xx instead of a challenge (upstream test175).
+        /// </summary>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan WithProbedBody() =>
+            With(ProbedFraming!, Authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, endsProbe: true);
 
         /// <summary>
         /// Makes the retry that answers a challenge the authenticator refused to answer: it
@@ -2693,7 +2728,7 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptAuthorization">The <c>Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithProxyAuthorization(string proxyAuthorization, string? keptAuthorization) =>
-            With(Framing, keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
+            With(ProbedFraming ?? Framing, keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true, endsProbe: true);
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
@@ -2768,9 +2803,11 @@ public sealed class HttpProtocolHandler(
             string? proxyAuthorization,
             bool proxyAuthorizationAnswersChallenge,
             IReadOnlyList<string>? authorizationInfoLines = null,
-            HttpTransferException? authorizationFailure = null) =>
+            HttpTransferException? authorizationFailure = null,
+            bool endsProbe = false) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
+                ProbedFraming = endsProbe ? null : ProbedFraming,
                 Started = Started,
                 Deadline = Deadline,
                 Progress = Progress,

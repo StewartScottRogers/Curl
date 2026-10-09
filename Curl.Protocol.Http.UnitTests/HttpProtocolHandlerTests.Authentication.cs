@@ -434,6 +434,65 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsTrue(authenticator.Calls[1].Request.ServerCertificate.IsEmpty);
     }
 
+    /// <summary>
+    /// With <c>--digest</c> the first POST is a probe with an empty body and
+    /// <c>Content-Length: 0</c>; the body goes only with the answer to the challenge, as
+    /// upstream test1001 and test2058 expect of curl 8.21.0 (ADR-0441).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestPostBeforeAChallenge_SendsAnEmptyProbeFirst()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        MemoryStream output = new();
+        TransferContext context = DigestPostContext(output);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.DoesNotContain("hello", requests[0]);
+        Assert.Contains("Authorization: " + DigestValue, requests[1]);
+        Assert.EndsWith("Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello", requests[1]);
+    }
+
+    /// <summary>
+    /// A probe answered with a 2xx instead of a challenge is followed by the same POST with its
+    /// body and no credentials, as upstream test175 expects of curl 8.21.0 (ADR-0441).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeAnsweredWithoutAChallenge_SendsTheBodyNext()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok", OkHead + "ok");
+        MemoryStream output = new();
+        TransferContext context = DigestPostContext(output);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --digest, a server asking for no auth");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, null)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Length: 0\r\n", requests[0]);
+        Assert.EndsWith("\r\n\r\nhello", requests[1]);
+        Assert.DoesNotContain("Authorization:", requests[1]);
+    }
+
+    private static TransferContext DigestPostContext(Stream output) =>
+        new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = output,
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { Body = new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"), AuthSchemes = HttpAuthSchemes.Digest },
+        };
+
     private static TransferContext AuthContext(Stream output, Stream? headerOutput = null, HttpRequestOptions? options = null) =>
         new() { Url = CurlUrl.Parse(AuthUrl), Output = output, HeaderOutput = headerOutput, Http = options };
 }
