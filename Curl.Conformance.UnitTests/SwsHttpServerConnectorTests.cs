@@ -35,6 +35,19 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TwoConnections_TakeConsecutiveLoopbackLocalPorts()
+    {
+        Diagnostics.Arrange("reply parts", "data=first");
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+
+        IConnection first = await ConnectAsync(server);
+        IConnection second = await ConnectAsync(server);
+
+        Assert.AreEqual("127.0.0.1:49152", Observe("first local end point", "127.0.0.1:49152", $"{first.LocalEndPoint}"));
+        Assert.AreEqual("127.0.0.1:49153", Observe("second local end point", "127.0.0.1:49153", $"{second.LocalEndPoint}"));
+    }
+
+    [TestMethod]
     [DataRow("data crlf=\"headers\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\n")]
     [DataRow("data crlf=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r\n")]
     [DataRow("data crlf=\"yes\" nonewline=\"yes\"", "HTTP/1.1 200 OK\r\nA: b\r\n\r\nbody\r")]

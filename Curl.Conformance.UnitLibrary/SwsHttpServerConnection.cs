@@ -90,6 +90,8 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     public EndPoint? RemoteEndPoint => null;
 
+    public EndPoint? LocalEndPoint { get; init; }
+
     private TimeSpan Now => timeProvider.GetElapsedTime(openedAt);
 
     private TimeSpan UpgradedTrafficClosesAt =>

@@ -1,3 +1,4 @@
+using System.Net;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -36,6 +37,9 @@ namespace Curl.Conformance;
 /// </remarks>
 public sealed class SwsHttpServerConnector : IConnector
 {
+    // Each connection gets the next port above this one as its local end point, so %{local_port} is a number.
+    private const int FirstLocalPort = 49151;
+
     private readonly SwsServerRecording recording = new();
 
     private readonly SwsServerAbandonment abandonment = new();
@@ -47,6 +51,8 @@ public sealed class SwsHttpServerConnector : IConnector
     private readonly TimeSpan waitAfterReply;
 
     private readonly TimeProvider timeProvider;
+
+    private int connectionsOpened;
 
     /// <summary>Creates a server that answers from <paramref name="testCase"/>'s <c>&lt;reply&gt;</c> section on the system clock.</summary>
     /// <param name="testCase">The test case, parsed after <see cref="UpstreamTestFileExpander"/> has expanded it.</param>
@@ -91,7 +97,7 @@ public sealed class SwsHttpServerConnector : IConnector
     /// </summary>
     public void Abandon() => abandonment.Abandon();
 
-    /// <summary>Opens a new in-memory connection to the server; it fails only after <see cref="Abandon"/>.</summary>
+    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on; it fails only after <see cref="Abandon"/>.</summary>
     /// <param name="target">Ignored: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
@@ -99,7 +105,10 @@ public sealed class SwsHttpServerConnector : IConnector
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         abandonment.ThrowIfAbandoned();
-        return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)));
+        return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)
+        {
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + Interlocked.Increment(ref connectionsOpened)),
+        }));
     }
 
     private static ReadOnlySpan<byte> ReplyPart(UpstreamTestCase testCase, string name) =>

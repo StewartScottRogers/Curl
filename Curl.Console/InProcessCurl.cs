@@ -7,7 +7,8 @@ namespace Curl.Console;
 /// Runs one curl command line in process, over connectors the caller supplies, for tools outside
 /// the test projects that cannot reach <c>Curl.Console</c>'s internal types - such as the gap
 /// office's file-based app <c>Gap/Tools/Measure-UpstreamCases.cs</c> (BL-1728, BL-1750).
-/// It builds the same runner as <c>UpstreamConformanceTests.RunCurlAsync</c>: the progress meter
+/// It builds the same runner as <c>UpstreamConformanceTests.RunCurlAsync</c>: one run connection cache, so a later request
+/// or URL reuses a kept-alive connection as the executable does (BL-1795), the progress meter
 /// on, and every <c>%output{}</c> target of a <c>-w</c> template written to disk, with each line
 /// feed as CR LF on Windows (ADR-0081).
 /// </summary>
@@ -42,6 +43,7 @@ public static class InProcessCurl
             standardInput,
             connector,
             datagramConnector,
+            runConnections: new ConnectionCache(TimeProvider.System),
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(arguments);
     }
