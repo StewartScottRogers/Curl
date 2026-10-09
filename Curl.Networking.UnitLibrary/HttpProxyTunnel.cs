@@ -211,9 +211,23 @@ internal static class HttpProxyTunnel
             return ParseReply(header, forConnectUdp);
         }
 
+        if (lineStart == 0 && !StartsWithHttpVersion(header))
+        {
+            return HttpProxyTunnelReply.Failed(InvalidResponseHeader) with { FailureExitCode = CurlExitCode.BadFunctionArgument };
+        }
+
         lineStart = header.Count;
         return null;
     }
+
+    /// <summary>
+    /// The message curl 8.21.0 fails a reply with, exit 43, once its first line has ended and
+    /// does not start with <c>HTTP/</c> (measured, upstream test750, BL-1857).
+    /// </summary>
+    internal const string InvalidResponseHeader = "Invalid response header";
+
+    private static bool StartsWithHttpVersion(List<byte> header) =>
+        System.Runtime.InteropServices.CollectionsMarshal.AsSpan(header).StartsWith("HTTP/"u8);
 
     // The line from lineStart to the LF just read holds nothing but that LF, or a CR and it.
     private static bool IsEmptyLine(List<byte> header, int lineStart) =>
