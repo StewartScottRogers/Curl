@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Kerberos.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1881 — Fix AF-0131: IKerberosFileWriter.AppendAllBytes says it returns false only when no file exists, but its implementation returns false on any I/O or access failure
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fixed the interface doc rather than the implementation: `KerberosDiskFileWriter` (Curl.Console, outside `touches`) treating any I/O or access failure as a failed store matches MIT ignoring `krb5_cc_store_cred`'s failure, so the doc now names every false case (no file, cannot be opened or written, possibly part-appended). `CredentialCacheStore` mapping false to `KerberosFileError.NotFound` is ignored by its caller as MIT ignores it, so it was left alone.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. IKerberosFileWriter.AppendAllBytes now documents every false case; reproduction gives the expected result
