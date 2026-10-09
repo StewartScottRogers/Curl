@@ -162,6 +162,14 @@ function Invoke-GapRun {
         [byte[]] $StandardInput,
         [int] $TimeoutSeconds
     )
+    # A run without a working directory gets a fresh empty one, never the caller's: a
+    # command line that writes a file (-o, -D, -O) must not write into the checkout (BL-1840).
+    $scratchDirectory = $null
+    if (-not $WorkingDirectory) {
+        $scratchDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('gap-probe-cwd-' + [guid]::NewGuid().ToString('N'))
+        [void] (New-Item -ItemType Directory -Path $scratchDirectory)
+        $WorkingDirectory = $scratchDirectory
+    }
     $emptyHome = Join-Path ([System.IO.Path]::GetTempPath()) ('gap-probe-' + [guid]::NewGuid().ToString('N'))
     [void] (New-Item -ItemType Directory -Path $emptyHome)
     try {
@@ -174,7 +182,7 @@ function Invoke-GapRun {
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
         $startInfo.CreateNoWindow = $true
-        if ($WorkingDirectory) { $startInfo.WorkingDirectory = $WorkingDirectory } else { $startInfo.WorkingDirectory = (Get-Location).ProviderPath }
+        $startInfo.WorkingDirectory = $WorkingDirectory
 
         $kept = @{}
         foreach ($name in 'PATH', 'SystemRoot', 'TEMP', 'TMP') {
@@ -229,6 +237,7 @@ function Invoke-GapRun {
         }
     } finally {
         Remove-Item -LiteralPath $emptyHome -Recurse -Force -ErrorAction SilentlyContinue
+        if ($scratchDirectory) { Remove-Item -LiteralPath $scratchDirectory -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }
 
@@ -250,7 +259,8 @@ function Invoke-GapProbe {
         Variables to add or override; a $null value removes the variable.
 
     .PARAMETER WorkingDirectory
-        The folder both runs start in. Default: the current location.
+        The folder both runs start in. Default: a fresh empty folder under the system temp
+        directory, deleted after each run (BL-1840).
 
     .PARAMETER StandardInput
         Bytes written to each run's standard input.
@@ -324,6 +334,10 @@ function Invoke-GapProbeSelfTest {
     & $report 'an -Environment entry is passed and a $null entry removes the variable' $environmentPassed ("candidate stdout: " + [System.Text.Encoding]::UTF8.GetString($removal.Candidate.Stdout))
 
     $slow = Invoke-GapProbe -Arguments @('--probe-sleep', '30') -CandidatePath $echo -ReferencePath $echo -TargetVersion '9.9.9' -TimeoutSeconds 2
+    $callerDirectory = (Get-Location).ProviderPath
+    $startedIn = $echoed.WorkingDirectory
+    & $report 'a run without -WorkingDirectory starts in a fresh folder, not the caller''s, and the folder is deleted afterwards' ($startedIn -and $startedIn -ne $callerDirectory -and (Split-Path $startedIn -Leaf) -like 'gap-probe-cwd-*' -and -not (Test-Path -LiteralPath $startedIn)) ('started in: ' + $startedIn)
+
     & $report 'a run past -TimeoutSeconds reports TimedOut' ($slow.Candidate.TimedOut -and $null -eq $slow.Candidate.ExitCode) ("TimedOut=$($slow.Candidate.TimedOut) ExitCode=$($slow.Candidate.ExitCode)")
 
     $other = Get-GapReferenceCurl -Path $echo -TargetVersion '8.21.0'

@@ -35,14 +35,16 @@
        #:project line builds the Curl.Console next to it into the harness, so it is run
        from the tree to measure the tree. A tool that fails is logged, its area is reported
        as not measured, and the run goes on with the next area.
-    7. Each measured area's analyst runs headless, the way the dark factory runs agents:
+    7. First the tree is checked: a measurement step that changed it is logged with the files
+       and the tree reset, so no analyst is blamed for it. Each measured area's analyst runs
+       headless, the way the dark factory runs agents:
        claude -p --agent gap-<area> --model <model: of .claude/agents/gap-<area>.md>
        --dangerously-skip-permissions --output-format stream-json --verbose, with a prompt
        on standard input naming the run folder, measurement file, tree, release folder, run
        stamp and the area's existing findings (id, key, status, items) from the gap
        worktree's Gap/Findings. The result event's text is saved to
        <stamp>\reports\gap-<area>.md and its total_cost_usd logged. An analyst that leaves
-       the tree changed (git status --porcelain not empty) is logged, the tree is reset
+       the tree changed (git status --porcelain not empty; the files are logged) is logged, the tree is reset
        (git reset --hard, git clean -fd) and its report dropped, so its gaps fall to the
        ungrouped finding.
     8. In the gap worktree: Write-GapFindings.ps1 -RunDirectory <stamp> -Stamp <stamp>, then
@@ -255,8 +257,20 @@ function Get-GapAreaFindings {
     return $lines
 }
 
-function Invoke-GapAnalyst {
-    # Step 7 for one area: runs gap-<area> headless with the prompt on standard input, saves
+function Get-GapTreeChanges {
+    # The lines of git status --porcelain of the measured tree; empty when it is untouched.
+    param([string] $Tree)
+    return @(Invoke-GapQuery 'git' @('-C', $Tree, 'status', '--porcelain') | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() })
+}
+
+function Reset-GapTree {
+    # Puts the measured tree back to its commit: git reset --hard, then git clean -fd.
+    param([string] $ResetName, [string] $CleanName, [string] $Tree)
+    Invoke-GapStep $ResetName 'git' @('-C', $Tree, 'reset', '--hard') | Out-Null
+    Invoke-GapStep $CleanName 'git' @('-C', $Tree, 'clean', '-fd') | Out-Null
+}
+
+function Invoke-GapAnalyst {    # Step 7 for one area: runs gap-<area> headless with the prompt on standard input, saves
     # its reply to $ReportFile and logs its cost. An analyst that leaves the measured tree
     # changed is logged, the tree is reset and its report dropped. Returns what happened.
     param([string] $Area, [string] $Prompt, [string] $Tree, [string] $ReportFile)
@@ -269,10 +283,10 @@ function Invoke-GapAnalyst {
         try { $result = $line | ConvertFrom-Json } catch { }
     }
     if ($result) { Write-GapLog ("Analyst gap-{0} cost {1:N4} USD." -f $Area, [double]$result.total_cost_usd) }
-    if (@(Invoke-GapQuery 'git' @('-C', $Tree, 'status', '--porcelain') | Where-Object { $_.Trim() }).Count -gt 0) {
-        Write-GapLog "Analyst gap-$Area wrote to the measured tree; tree reset and its report dropped." 'Red'
-        Invoke-GapStep "reset-$Area" 'git' @('-C', $Tree, 'reset', '--hard') | Out-Null
-        Invoke-GapStep "clean-$Area" 'git' @('-C', $Tree, 'clean', '-fd') | Out-Null
+    $changes = @(Get-GapTreeChanges $Tree)
+    if ($changes.Count -gt 0) {
+        Write-GapLog "Analyst gap-$Area wrote to the measured tree ($($changes -join '; ')); tree reset and its report dropped." 'Red'
+        Reset-GapTree "reset-$Area" "clean-$Area" $Tree
         if (Test-Path -LiteralPath $ReportFile) { Remove-Item -LiteralPath $ReportFile -Force }
         return 'changed the tree'
     }
@@ -391,6 +405,7 @@ function Invoke-GapSelfTest {
         $script:FakeStatus = @(' M Curl.Console/Program.cs')
         $outcome = Invoke-GapAnalyst 'exitcodes' 'prompt' $scratch $reportFile
         & $report 'an analyst that changes the tree is logged, the tree reset and its report dropped' ($outcome -eq 'changed the tree' -and -not (Test-Path $reportFile) -and @($script:FakeCalls | Where-Object { $_ -like '*reset --hard*' }).Count -eq 1)
+        & $report 'a changed tree is reported with its files' ((Get-GapTreeChanges $scratch) -contains 'M Curl.Console/Program.cs')
         $script:FakeStatus = @()
         $outcome = Invoke-GapAnalyst 'exitcodes' 'prompt' $scratch $reportFile
         & $report 'an analyst that leaves the tree alone has its report saved' ($outcome -eq 'report written' -and (Test-Path $reportFile))
@@ -569,6 +584,15 @@ foreach ($tool in $selection.Tools) {
 }
 
 Write-Host '== Step 7: the analysts'
+# A measurement tool that changed the tree must not be blamed on the first analyst: check the
+# tree before any analyst runs, say which files changed, and reset it.
+if (-not $DryRun) {
+    $beforeAnalysts = @(Get-GapTreeChanges $tree)
+    if ($beforeAnalysts.Count -gt 0) {
+        Write-GapLog "A measurement step changed the measured tree before any analyst ran ($($beforeAnalysts -join '; ')); tree reset." 'Red'
+        Reset-GapTree 'reset-measured' 'clean-measured' $tree
+    }
+}
 $reports = Join-Path $runDirectory 'reports'
 if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $reports | Out-Null }
 $analysts = [ordered]@{}

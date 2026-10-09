@@ -27,6 +27,19 @@
 // Curl's working folder during the run is that log folder, so a case's relative output file
 // (upstream runs curl from tests/) is deleted with it.
 //
+// Host variables (BL-1839): the runner supplies %HOSTIP, %HTTPPORT, %LOGDIR and the like, but not
+// the three that name the machine, so this tool replaces them in each case's bytes before the
+// runner reads it, with the values upstream's runtests.pl (servers.pm subvariables) gives them:
+//   %SRCDIR  the release's tests folder (the parent of <tests/data folder>), forward slashes;
+//   %PWD     the folder runtests.pl runs from, which is that same tests folder, so %PWD/../docs
+//            is the release's docs folder; "%PWD/%LOGDIR" is first reduced to "%LOGDIR", because
+//            upstream's %LOGDIR is relative ("log") and here it is already absolute;
+//   %PERL    the perl found on PATH, or else the one of the Git for Windows that provides git
+//            (<git root>/usr/bin/perl.exe), by an absolute path with forward slashes. With no perl
+//            %PERL stays as written, so the runner skips the case for it and the converter
+//            (ConvertTo-BehaviourMeasurement.ps1) files it as unmeasured, no-perl.
+// "--self-test" instead checks these substitutions and prints a PASS or FAIL line per check.
+//
 // Known limit: UpstreamCaseRunner.CurlVersion is the constant "8.21.0", so %VERSION in a newer
 // release's cases is substituted with 8.21.0 until retargeting (BL-1748) changes it.
 #:project ../../Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj
@@ -36,6 +49,11 @@ using System.Globalization;
 using System.Text.Json;
 using Curl.Conformance;
 using Curl.Console;
+
+if (IsSelfTestRequest(args))
+{
+    return RunSelfTest();
+}
 
 if (args.Length is < 2 or > 3)
 {
@@ -78,6 +96,8 @@ UpstreamCurlPlatform platform = OperatingSystem.IsWindows() ? UpstreamCurlPlatfo
 DateTimeOffset startedAt = DateTimeOffset.Now;
 Directory.CreateDirectory(logFolder);
 string commit = ReadCommit();
+string testsFolder = (Path.GetDirectoryName(testDataFolder.TrimEnd('\\', '/')) ?? testDataFolder).Replace('\\', '/');
+string? perl = FindPerl();
 
 // Some cases name a file relative to curl's working folder (upstream runs them from tests/,
 // e.g. "-o %"); run them all from the log folder so such files go where the run deletes them,
@@ -94,28 +114,10 @@ await Parallel.ForEachAsync(
     async (index, _) =>
     {
         int number = ordered[index];
-        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(testDataFolder, $"test{number}"));
+        byte[] testFile = SubstituteHostVariables(await File.ReadAllBytesAsync(Path.Combine(testDataFolder, $"test{number}")), testsFolder, perl);
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}"));
         Stopwatch stopwatch = Stopwatch.StartNew();
-        UpstreamCaseOutcome outcome;
-        try
-        {
-            UpstreamCaseRunner runner = new(RunCurlAsync, platform, TimeProvider.System, timeLimit);
-            outcome = await Task.Run(() => runner.RunAsync(number, testFile, logDirectory.FullName)).WaitAsync(caseHangLimit);
-        }
-        catch (TimeoutException)
-        {
-            outcome = UpstreamCaseOutcome.Failed($"the case did not finish within {caseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds");
-        }
-        catch (Exception exception) when (exception is not OutOfMemoryException)
-        {
-            outcome = UpstreamCaseOutcome.Failed($"the harness threw {exception.GetType().Name}: {exception.Message}");
-        }
-        finally
-        {
-            DeleteLogDirectory(logDirectory);
-        }
-
+        UpstreamCaseOutcome outcome = await RunCaseAsync(number, testFile, logDirectory, platform, timeLimit, caseHangLimit);
         results[index] = (number, outcome, stopwatch.ElapsedMilliseconds);
         int done = Interlocked.Increment(ref finished);
         if (done % 100 == 0 || done == ordered.Length)
@@ -163,6 +165,98 @@ static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
         invocation.StandardInput,
         invocation.Connector,
         invocation.DatagramConnector);
+
+// Runs one case in its own log folder, which is deleted afterwards, and judges a hang or a throw failed.
+static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile, DirectoryInfo logDirectory, UpstreamCurlPlatform platform, TimeSpan timeLimit, TimeSpan caseHangLimit)
+{
+    try
+    {
+        UpstreamCaseRunner runner = new(RunCurlAsync, platform, TimeProvider.System, timeLimit);
+        return await Task.Run(() => runner.RunAsync(number, testFile, logDirectory.FullName)).WaitAsync(caseHangLimit);
+    }
+    catch (TimeoutException)
+    {
+        return UpstreamCaseOutcome.Failed($"the case did not finish within {caseHangLimit.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds");
+    }
+    catch (Exception exception) when (exception is not OutOfMemoryException)
+    {
+        return UpstreamCaseOutcome.Failed($"the harness threw {exception.GetType().Name}: {exception.Message}");
+    }
+    finally
+    {
+        DeleteLogDirectory(logDirectory);
+    }
+}
+
+// Replaces %SRCDIR, %PWD and %PERL in a case's bytes (one character per byte, so binary data
+// survives); a null perl leaves %PERL as written.
+static byte[] SubstituteHostVariables(byte[] testFile, string testsFolder, string? perl)
+{
+    string text = System.Text.Encoding.Latin1.GetString(testFile);
+    if (!text.Contains('%', StringComparison.Ordinal))
+    {
+        return testFile;
+    }
+
+    text = text.Replace("%PWD/%LOGDIR", "%LOGDIR", StringComparison.Ordinal)
+        .Replace("%SRCDIR", testsFolder, StringComparison.Ordinal)
+        .Replace("%PWD", testsFolder, StringComparison.Ordinal);
+    if (perl is not null)
+    {
+        text = text.Replace("%PERL", perl, StringComparison.Ordinal);
+    }
+
+    return System.Text.Encoding.Latin1.GetBytes(text);
+}
+
+// A perl on PATH, else the perl of the Git for Windows that provides git; null when there is none.
+static string? FindPerl()
+{
+    string[] names = OperatingSystem.IsWindows() ? ["perl.exe"] : ["perl"];
+    List<string> candidates = [.. (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+        .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .SelectMany(folder => names.Select(name => Path.Combine(folder.Trim('"'), name)))];
+    if (OperatingSystem.IsWindows())
+    {
+        foreach (string folder in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (File.Exists(Path.Combine(folder.Trim('"'), "git.exe")))
+            {
+                // <git root>\cmd\git.exe or <git root>\bin\git.exe or <git root>\mingw64\bin\git.exe
+                for (DirectoryInfo? root = new DirectoryInfo(folder.Trim('"')).Parent; root is not null; root = root.Parent)
+                {
+                    candidates.Add(Path.Combine(root.FullName, "usr", "bin", "perl.exe"));
+                }
+            }
+        }
+    }
+
+    string? found = candidates.FirstOrDefault(File.Exists);
+    return found is null ? null : Path.GetFullPath(found).Replace('\\', '/');
+}
+
+static bool IsSelfTestRequest(string[] arguments) => arguments is ["--self-test"];
+
+static int RunSelfTest()
+{
+    bool failed = false;
+    void Check(bool passed, string check)
+    {
+        Console.WriteLine($"{(passed ? "PASS" : "FAIL")} {check}");
+        failed |= !passed;
+    }
+
+    string Substitute(string line, string? perl) =>
+        System.Text.Encoding.Latin1.GetString(SubstituteHostVariables(System.Text.Encoding.Latin1.GetBytes(line), "/rel/tests", perl));
+
+    Check(Substitute("%SRCDIR/data/data-xml1 %SRCDIR/..", null) == "/rel/tests/data/data-xml1 /rel/tests/..", "%SRCDIR is the tests folder, wherever it stands");
+    Check(Substitute("%PWD/../docs/ %FILE_PWD", null) == "/rel/tests/../docs/ %FILE_PWD", "%PWD is the tests folder and %FILE_PWD is left to the runner");
+    Check(Substitute("--proto-default file %PWD/%LOGDIR/test%TESTNUMBER.txt", null) == "--proto-default file %LOGDIR/test%TESTNUMBER.txt", "%PWD/%LOGDIR is reduced to the absolute %LOGDIR");
+    Check(Substitute("%PERL %SRCDIR/x.pl", "/usr/bin/perl") == "/usr/bin/perl /rel/tests/x.pl", "%PERL is the perl found");
+    Check(Substitute("%PERL -e 1", null) == "%PERL -e 1", "with no perl, %PERL stays as written for the runner to skip");
+    Check(Substitute("http://%HOSTIP:%HTTPPORT/1 100%", "/usr/bin/perl") == "http://%HOSTIP:%HTTPPORT/1 100%", "other variables and a lone percent are untouched");
+    return failed ? 1 : 0;
+}
 
 // The commit of the checkout the app runs from, or "unknown" where git cannot tell.
 static string ReadCommit()
