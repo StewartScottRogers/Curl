@@ -117,6 +117,22 @@ internal static class HttpDownloadConditions
             or (HttpBodyDelivery.TimeConditionUnmet, NotModified);
 
     /// <summary>
+    /// Determines whether a response is a 416 to a resumed GET - a <c>-C</c> offset, no
+    /// <c>-I</c> and no request body - which curl 8.21.0's <c>http_should_fail</c> takes as a
+    /// file already completely downloaded, not a failure, so <c>-f</c> and
+    /// <c>--fail-with-body</c> pass it whatever its <c>Content-Range</c> says (upstream test194).
+    /// </summary>
+    /// <param name="context">The transfer.</param>
+    /// <param name="sendsBody"><see langword="true" /> when the request has a body.</param>
+    /// <param name="head">The final response's head.</param>
+    /// <returns><see langword="true" /> for a 416 to a resumed GET.</returns>
+    internal static bool IsResumeAlreadyComplete(ITransferContext context, bool sendsBody, HttpResponseHead head) =>
+        head.StatusLine.StatusCode == RangeNotSatisfiable
+            && context.ResumeFrom.GetValueOrDefault() > 0
+            && !context.NoBody
+            && !sendsBody;
+
+    /// <summary>
     /// Determines whether a document last modified at <paramref name="documentTime" /> meets
     /// <paramref name="condition" />: newer than its time for <c>-z date</c>, older for
     /// <c>-z -date</c>, so an equal time meets neither; an unknown time always meets it.

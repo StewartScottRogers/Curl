@@ -208,6 +208,23 @@ public sealed class HttpDownloadConditionsTests
     }
 
     [TestMethod]
+    [DataRow(416, 87L, false, false, true, DisplayName = "416 to a resumed GET")]
+    [DataRow(404, 87L, false, false, false, DisplayName = "404 to a resumed GET")]
+    [DataRow(416, 0L, false, false, false, DisplayName = "416 without a resume")]
+    [DataRow(416, 87L, true, false, false, DisplayName = "416 to a resumed HEAD")]
+    [DataRow(416, 87L, false, true, false, DisplayName = "416 to a resumed request with a body")]
+    public void IsResumeAlreadyComplete_OnlyA416ToAResumedGet(int statusCode, long resumeFrom, bool noBody, bool sendsBody, bool expected)
+    {
+        Diagnostics.Arrange("status, -C, -I, sends body", $"{statusCode}, {resumeFrom}, {noBody}, {sendsBody}");
+
+        bool complete = HttpDownloadConditions.IsResumeAlreadyComplete(Context(resumeFrom: resumeFrom, noBody: noBody), sendsBody, Head(statusCode, "Content-Range: bytes */87"));
+
+        Diagnostics.Act("already complete", complete);
+        Diagnostics.Assert("already complete", expected, complete);
+        Assert.AreEqual(expected, complete);
+    }
+
+    [TestMethod]
     public void IsMet_UnknownDocumentTime_IsMet()
     {
         Diagnostics.Arrange("document time", "unknown");

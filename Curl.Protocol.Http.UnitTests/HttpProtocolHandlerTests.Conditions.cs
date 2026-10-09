@@ -278,6 +278,33 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ResumeAnswered416UnderFail_SucceedsWithNoBody()
+    {
+        const string head = "HTTP/1.1 416 Requested Range Not Satisfiable\r\nContent-Length: 4\r\nContent-Range: bytes */87\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            TransferContext context = new TransferContext
+            {
+                Url = ConditionUrl(19820),
+                Output = output,
+                ResumeFrom = 87,
+                Http = new HttpRequestOptions { Fail = HttpFailMode.Fail },
+            };
+            Diagnostics.Arrange("resume from, fail, chunk size", $"87, -f, {chunkSize}");
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(head + "bad\n", chunkSize, RangeRequest(19820, "87-"))))
+                .ExecuteAsync(context);
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Diagnostics.Assert("body bytes", 0, output.Length);
+            Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ResumeAtTheEnd_WritesNoBodyAndSucceeds()
     {
         MemoryStream output = new();

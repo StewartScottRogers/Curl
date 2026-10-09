@@ -1144,7 +1144,7 @@ public sealed class HttpProtocolHandler(
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             headReader.ReleaseDeferredHeaders();
-            HttpFailMode fail = FailModeOf(options, retry);
+            HttpFailMode fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
@@ -1199,10 +1199,14 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Gives how <c>-f</c> or <c>--fail-with-body</c> applies to a response: as asked, unless
-    /// the handler answers it with <paramref name="retry" />, which no failing mode stops.
+    /// the handler answers it with <paramref name="retry" />, which no failing mode stops, or
+    /// it is a 416 to a resumed GET, which curl 8.21.0 takes as a file already downloaded
+    /// (<see cref="HttpDownloadConditions.IsResumeAlreadyComplete" />).
     /// </summary>
-    private static HttpFailMode FailModeOf(HttpRequestOptions options, HttpRequestPlan? retry) =>
-        retry is null ? options.Fail : HttpFailMode.None;
+    private static HttpFailMode FailModeOf(HttpRequestPlan plan, HttpRequestPlan? retry, HttpResponseHead head) =>
+        retry is null && !HttpDownloadConditions.IsResumeAlreadyComplete(plan.Context, plan.Framing.Body is not null, head)
+            ? plan.Options.Fail
+            : HttpFailMode.None;
 
     /// <summary>
     /// Tells whether the response's body is read and discarded rather than delivered: when the
