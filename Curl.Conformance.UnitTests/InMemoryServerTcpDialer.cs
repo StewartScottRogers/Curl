@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
@@ -14,6 +15,13 @@ internal sealed class InMemoryServerTcpDialer(IConnector server) : ITcpDialer
 {
     public async ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
     {
+        // No server listens on the unspecified address: upstream test 1293's first URL, http://0,
+        // must fail to connect rather than reach the case's server (BL-1855).
+        if (endPoint.Address.Equals(IPAddress.Any) || endPoint.Address.Equals(IPAddress.IPv6Any))
+        {
+            throw new SocketException((int)SocketError.AddressNotAvailable);
+        }
+
         ConnectResult connected = await server
             .ConnectAsync(new ConnectTarget(endPoint.Address.ToString(), endPoint.Port, false), cancellationToken);
 
