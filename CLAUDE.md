@@ -170,12 +170,12 @@ An independent team of AI auditors audits the dark factory and the code it produ
 outside the factory's reach (ADR-0267; `Audit/README.md` maps the folder). Six read-only
 auditors, each reading `Audit/Instructions/Auditor-Rules.md` and its own method there:
 
-- `audit-quality` (Sonnet): tests whose names lie, weak assertions, mutants no test kills.
+- `audit-quality` (Opus): tests whose names lie, weak assertions, mutants no test kills.
 - `audit-security` (Opus): fuzzing, constant-time secret comparisons, secrets in output.
 - `audit-performance` (Sonnet): Curl's native build against real curl on six transfers.
 - `audit-conformance` (Opus): generated command lines through real curl and Curl.
-- `audit-truthfulness` (Sonnet): names, doc comments, documents, ADRs and script help.
-- `audit-process` (Sonnet): the factory's logs, git history and CI runs.
+- `audit-truthfulness` (Opus): names, doc comments, documents, ADRs and script help.
+- `audit-process` (Opus): the factory's logs, git history and CI runs.
 
 `audit-seeder` (Sonnet) plants known defects from the encoded catalogue in
 `Audit/PlantedDefects/` before each audit, at least one per auditor, so each auditor's
