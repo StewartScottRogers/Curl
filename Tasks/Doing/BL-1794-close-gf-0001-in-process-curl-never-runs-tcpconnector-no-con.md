@@ -71,3 +71,4 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
