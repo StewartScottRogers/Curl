@@ -41,10 +41,22 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-09 (lane 1): No code change needed. On this tree `TlsReader.Take` already
+  refuses a read past the end (`end - position < count` records `DecodeError`); the check
+  has been there since BL-698 (`git log` on `TlsReader.cs` shows only BL-698 and BL-1713).
+  The finding's tree had `Take` without it, and the matching `Curl.Tls.UnitTests` failures
+  it lists (`ATruncatedBodyIsADecodeError` and the rest) fit a missing bounds check, so the
+  audited tree most likely carried an audit-seeder planted defect. A lane cannot read
+  `Audit/` to confirm that.
+  Measured: the finding's reproduction gives `Passed! - Failed: 0, Passed: 37, Total: 37`;
+  `dotnet build` is clean, and the fast tests pass, `Curl.Tls.UnitTests` 1320/1320 included.
+  The existing truncation tests in `Curl.Tls.UnitTests` already kill this mutant, so no new
+  test was added. The quality auditor's re-audit closes the finding.
 
 ## Log
 
