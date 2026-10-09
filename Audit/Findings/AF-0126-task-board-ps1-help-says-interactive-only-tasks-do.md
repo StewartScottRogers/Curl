@@ -3,8 +3,8 @@ id: AF-0126
 title: task-board.ps1 help says interactive-only tasks do not count toward capacity, but every task in Doing is counted
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:capacity:false-help
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'Inter
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
