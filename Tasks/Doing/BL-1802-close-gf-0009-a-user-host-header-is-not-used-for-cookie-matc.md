@@ -47,3 +47,4 @@ In Curl.Protocol.Http.UnitLibrary (HttpCustomHeader, HttpRequestHeadFormatter) a
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
