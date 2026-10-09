@@ -39,6 +39,8 @@ public sealed class CurlCommandRunnerRetryTests
 
     private static readonly string ServiceUnavailableLine = "curl: (22) The requested URL returned error: 503" + NewLine;
 
+    private static readonly string TooManyRequestsLine = "curl: (22) The requested URL returned error: 429" + NewLine;
+
     private readonly MemoryStream standardOutput = new();
     private readonly MemoryStream standardError = new();
     private readonly InMemoryFileSystem outputFiles = new();
@@ -93,6 +95,31 @@ public sealed class CurlCommandRunnerRetryTests
         Assert.AreEqual(0, exitCode);
         CollectionAssert.AreEqual(new[] { "POST /1633 HTTP/1.1", "mooGET /16330002 HTTP/1.1", "POST /1633 HTTP/1.1", "mooGET /16330002 HTTP/1.1" }, requestLines);
         Assert.AreEqual(moved + tooMany + moved + tooMany, StandardOutputText);
+        CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
+    }
+
+    /// <summary>
+    /// Replays upstream test1634: under <c>--fail</c> a <c>429</c> with <c>Retry-After: 1</c> is
+    /// retried, and with the <c>-i</c> runtests adds curl 8.21.0 writes the <c>429</c>'s head but
+    /// not its body, then the <c>200</c>'s head and body, and exits 0 (tests/data/test1634's datacheck).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryUnderFailOfA429WithRetryAfter_KeepsThe429sHeadAndWritesTheRetrysResponse()
+    {
+        const string tooManyHead = "HTTP/1.1 429 too many requests swsbounce\r\nRetry-After: 1\r\nContent-Length: 4\r\n\r\n";
+        const string okHead = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n";
+        ScriptedConnector server = new(new[] { tooManyHead + "moo\n", okHead + "hey\n" }.Select(Encoding.Latin1.GetBytes));
+
+        int exitCode = await RunAsync(server, writesProgressMeter: false, "http://127.0.0.1:18241/1634", "--retry", "1", "--fail", "-i");
+        string[] requestLines = [.. Encoding.Latin1.GetString(server.Written).Split("\r\n").Where(line => line.StartsWith("GET ", StringComparison.Ordinal))];
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("stdout", tooManyHead + okHead + "hey\n", StandardOutputText);
+        Diagnostics.Diff("stderr", Lf(TooManyRequestsLine + RetryWarningLine), Lf(StandardErrorText));
+        Assert.AreEqual(0, exitCode);
+        CollectionAssert.AreEqual(new[] { "GET /1634 HTTP/1.1", "GET /1634 HTTP/1.1" }, requestLines);
+        Assert.AreEqual(tooManyHead + okHead + "hey\n", StandardOutputText);
+        Assert.AreEqual(TooManyRequestsLine + RetryWarningLine, StandardErrorText);
         CollectionAssert.AreEqual(new[] { TimeSpan.FromSeconds(1) }, clock.Waits.ToArray());
     }
 

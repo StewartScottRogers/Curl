@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1843 — --retry --fail on a 429 with Retry-After retries and keeps the 429's head (upstream test1634)
 
@@ -25,12 +25,23 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] A Curl.Console unit test replays test1634's exchange and pins curl 8.21.0's output and exit code.
-- [ ] `dotnet build` is clean and the fast tests are green.
+- [x] A Curl.Console unit test replays test1634's exchange and pins curl 8.21.0's output and exit code.
+- [x] `dotnet build` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-08 (lane 1): Curl already matched test1634 on this commit, so no production change
+  was needed (Curl.Core untouched). `CurlCommandRunnerRetryTests.RunAsync_RetryUnderFailOfA429WithRetryAfter_KeepsThe429sHeadAndWritesTheRetrysResponse`
+  replays the exchange under `--retry 1 --fail -i` (runtests adds `-i`) and pins two GETs, one
+  1-second wait, exit 0 and stdout byte for byte as upstream's datacheck (the 429's head with no
+  `moo`, then the 200's head and `hey`). The gap measure's `200 OK`-first output no longer
+  reproduces. Choice: stdout is pinned from curl 8.21.0's own datacheck rather than a fresh
+  `Record-CurlExchange.ps1` run, which the run's cost cap left no room for; stderr (the
+  `(22) ... 429` line, then the retry warning) follows the order measured for a 503 under
+  `-f --retry` in BL-241, which runs the same code path.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. Test1634's exchange pinned; Curl already matches curl 8.21.0's datacheck
