@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1875 — Fix AF-0125: --crlf is ignored on HTTP uploads: Curl sends LF bytes with Content-Length where curl converts to CRLF and sends chunked
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -56,9 +56,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
   Reuse the line-ending logic of `Curl.Protocol.File.UnitLibrary/CrlfUploadConverter.cs` (copy it
   into the HTTP library; protocols never reference each other).
 
+- 2026-10-09 (lane 1): Added `HttpCrlfUploadStream` (LF -> CRLF, non-seekable) in the HTTP library;
+  `HttpRequestFraming.Of` takes `convertLineEndings` (from `ITransferContext.ConvertLineEndings`)
+  and sends a `-T`, `-d` or `-F` body through it, chunked. Measured: curl sends no `Expect` for the
+  converted 10-byte file, so `Expect` is decided by the length before conversion. Reproduction now
+  gives curl 133 / Curl 133, identical bytes; `--data-binary @f.txt` identical too. `-F` is 425 vs
+  414 bytes (chunk boundaries differ), filed as BL-1883. Curl.Cli.UnitLibrary needed no change.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary, which BL-1863 (in Doing) touches
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. --crlf HTTP uploads converted and chunked; reproduction matches curl
