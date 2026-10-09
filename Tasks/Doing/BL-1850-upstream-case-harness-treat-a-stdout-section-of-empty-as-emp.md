@@ -33,3 +33,4 @@ The gap office's upstream-case measuring tool (the one GF-0019's "Reproduce" lin
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-09: Backlog -> Doing.
