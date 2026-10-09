@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1870 — Fix AF-0120: RunAsync_UnimplementedOption_PrintsNotSupportedAndExitsTwoWithoutATransfer is always Inconclusive: no option is unimplemented, so it never runs
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Every curl 8.21.0 option now has a `CommandLineOptionTable` row, so the parser's generic unimplemented-option refusal (`RefuseUnlistedName`) cannot be reached from a real option name and the test always went Inconclusive. The same refusal bytes and exit 2 come from the Windows Schannel build's refusal of `--http3` - the very command line the class comment says was measured (curl 8.21.0, 2026-09-28) - so the test now runs the runner with `parsesAsWindowsBuild: true` and `--http3` (and `-s --http3`) on every platform. The test name is kept so the finding's reproduction filter still selects it; to the Schannel build `--http3` is an unimplemented option.
+- Reproduction after the fix: Passed 2, Skipped 0. Build clean; fast tests green.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Test now drives the Schannel build's --http3 refusal; reproduction passes 2 of 2

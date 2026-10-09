@@ -7,12 +7,12 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins what the runner prints for a real curl option Curl does not implement yet (ADR-0137): the
-/// standard-error bytes <c>curl: option --&lt;name&gt;: the installed libcurl version does not support this</c>
+/// Pins what the runner prints for a real curl option the build it acts as does not implement (ADR-0137):
+/// the standard-error bytes <c>curl: option --http3: the installed libcurl version does not support this</c>
 /// and the try-help line, exit 2, no transfer, and the same with <c>-s</c> first, as the Windows system
-/// curl 8.21.0 prints for <c>--http3</c> and <c>-s --http3</c> (measured 2026-09-28). The option is the
-/// first name in <see cref="CurlOptionAliasTable"/> without a <see cref="CommandLineOptionTable"/> row, so
-/// the test follows the set as it shrinks.
+/// curl 8.21.0 (Schannel) prints for <c>--http3</c> and <c>-s --http3</c> (measured 2026-09-28). Every curl
+/// 8.21.0 option now has a <see cref="CommandLineOptionTable"/> row, so the runner reads the command line as
+/// the Windows Schannel build, which lacks HTTP/3, on every platform (AF-0120).
 /// </summary>
 [TestClass]
 public sealed class CurlCommandRunnerUnimplementedOptionTests
@@ -26,10 +26,7 @@ public sealed class CurlCommandRunnerUnimplementedOptionTests
     private readonly MemoryStream standardInput = new();
     private readonly InMemoryFileSystem fileSystem = new();
 
-    private static string? FirstUnimplementedName =>
-        CurlOptionAliasTable.Aliases
-            .Select(alias => alias.Name)
-            .FirstOrDefault(name => !CommandLineOptionTable.Rows.Any(row => row.LongName == name));
+    private const string OptionTheSchannelBuildLacks = "http3";
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -42,13 +39,9 @@ public sealed class CurlCommandRunnerUnimplementedOptionTests
     [DataRow(true)]
     public async Task RunAsync_UnimplementedOption_PrintsNotSupportedAndExitsTwoWithoutATransfer(bool silent)
     {
-        string? name = FirstUnimplementedName;
-        Diagnostics.Arrange("first unimplemented option", name ?? "(none)");
+        string name = OptionTheSchannelBuildLacks;
+        Diagnostics.Arrange("option the windows schannel build lacks", name);
         Diagnostics.Arrange("silent", silent);
-        if (name is null)
-        {
-            Assert.Inconclusive("Every curl 8.21.0 option has a row: nothing is unimplemented.");
-        }
 
         RecordingProtocolHandler file = RecordingProtocolHandler.WritingPath("file");
         string[] silentOption = silent ? ["-s"] : [];
@@ -84,7 +77,7 @@ public sealed class CurlCommandRunnerUnimplementedOptionTests
         int exitCode;
         using (Diagnostics.Phase("run"))
         {
-            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false)
+            exitCode = await new CurlCommandRunner(_ => new TransferDispatch(new ProtocolDispatcher(handlers)), fileSystem, fileSystem, standardOutput, standardError, standardInput, runsOnWindows: false, parsesAsWindowsBuild: true)
                 .RunAsync(arguments);
         }
 
