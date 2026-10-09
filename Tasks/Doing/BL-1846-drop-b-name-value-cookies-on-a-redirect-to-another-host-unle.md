@@ -35,3 +35,4 @@ A `-b name=value` cookie string (curl's `CURLOPT_COOKIE`) is sent only to the fi
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
