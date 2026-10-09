@@ -31,3 +31,4 @@ BL-1795 gave `SwsHttpServerConnection` a `LocalEndPoint` (127.0.0.1, 49152 and u
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
