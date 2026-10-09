@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Blocked. Stewart: AF-0128 is a past 321-minute red spell in historical logs (no shift ran overnight); its reproduction needs the audit office's tool and logs outside a lane's reach, and no RunDarkFactory.ps1 change can alter that history - reject the finding or re-audit it interactively?
