@@ -29,7 +29,8 @@
                tasks in Doing, plus the ready tasks that could start beside them,
                picked in 'next' order so no two overlap in touches. One line,
                parseable with '^Capacity (\d+):'. The dark factory's -Lanes Auto
-               caps its lane count with it. Interactive-only tasks do not count.
+               caps its lane count with it. Every task in Doing counts, interactive-
+               only ones included; of the ready tasks, only lane-eligible ones do.
       next-id  The next free task ID.
       new      Create a task in Backlog from TASK-TEMPLATE.md. -NoLane writes
                'lane: no' so no dark factory lane is offered it.
