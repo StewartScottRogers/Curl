@@ -302,6 +302,43 @@ public sealed class CommandLineLeadingUnicodeWarningTests
         Assert.AreEqual(!OperatingSystem.IsWindows(), result.Options!.ReadsArgumentsAsUtf8);
     }
 
+    [TestMethod]
+    public void ExpandedDataLedByVariableFileBytesStartingWithLeftDoubleQuoteIsWarnedAboutOnWindows()
+    {
+        // Upstream test268, measured with curl 8.21.0 (Schannel, Windows) on 2026-10-08: the file's
+        // E2 80 9C bytes lead the expanded value, so the warning names it although typed arguments never warn.
+        CommandLineParseResult result = ParseWithVariableFile(["--variable", "hello@junk", "--expand-data", "{{hello:json}}", Url]);
+
+        AssertAcceptedWithWarnings(result, WarningFor("“"));
+        Diagnostics.Bytes("post data", result.Options?.PostData?.ToArray() ?? []);
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(WarningFor("“").ToList(), result.WarningLines.ToList());
+        CollectionAssert.AreEqual(new byte[] { 0xE2, 0x80, 0x9C }, result.Options.PostData!.Value.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("“{{hello}}", DisplayName = "typed text leads the reference")]
+    [DataRow("x{{hello}}", DisplayName = "ASCII leads the reference")]
+    [DataRow("“x", DisplayName = "no reference at all")]
+    public void ExpandedDataLedByTypedTextIsNotWarnedAboutOnWindows(string template)
+    {
+        CommandLineParseResult result = ParseWithVariableFile(["--variable", "hello@junk", "--expand-data", template, Url]);
+
+        AssertAcceptedWithWarnings(result, []);
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void ValueAfterAnExpandedValueLedByVariableBytesIsNotWarnedAboutOnWindows()
+    {
+        CommandLineParseResult result = ParseWithVariableFile(["--variable", "hello@junk", "--expand-data", "{{hello}}", "-H", LeftQuoteHeader, Url]);
+
+        AssertAcceptedWithWarnings(result, WarningFor("“"));
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual(WarningFor("“").ToList(), result.WarningLines.ToList());
+    }
+
     private void AssertAcceptedWithWarnings(CommandLineParseResult result, IReadOnlyList<string> warningLines)
     {
         Diagnostics.Assert("accepted", true, result.IsAccepted);
@@ -313,6 +350,19 @@ public sealed class CommandLineLeadingUnicodeWarningTests
         Diagnostics.ArrangeArguments(arguments);
         Diagnostics.Arrange("parse as Windows", isWindows);
         CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), new RecordingDataFileReader(), isWindows);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    /// <summary>Parses as the Windows build, with the file <c>junk</c> holding U+201C as UTF-8, as upstream test268 writes it.</summary>
+    private CommandLineParseResult ParseWithVariableFile(IReadOnlyList<string> arguments)
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["junk"] = [0xE2, 0x80, 0x9C];
+        Diagnostics.Bytes("file junk", reader.Files["junk"]);
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("parse as Windows", true);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: true);
         Diagnostics.ActParse(result);
         return result;
     }

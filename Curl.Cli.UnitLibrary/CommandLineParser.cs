@@ -456,7 +456,9 @@ public static class CommandLineParser
 
     /// <summary>
     /// Expands <paramref name="template"/> and applies the result, first taking the next argument when
-    /// <paramref name="valueIsNextArgument"/> and the expansion was not refused.
+    /// <paramref name="valueIsNextArgument"/> and the expansion was not refused. A value whose template opens
+    /// with a reference that was replaced (<see cref="VariableExpansion.Expand"/> then returns a new string)
+    /// is applied with <see cref="CommandLineOptions.ApplyingValueLedByVariableBytes"/> set.
     /// </summary>
     private static CommandLineRefusal? ApplyExpandedValue(CommandLineOptions options, CommandLineOption option, string argument, string template, bool valueIsNextArgument, ArgumentReader reader)
     {
@@ -471,7 +473,10 @@ public static class CommandLineParser
             reader.TryTakeNext(out _);
         }
 
-        return option.Apply(options, value, argument, reader.PathExists, reader.DataFileReader);
+        options.ApplyingValueLedByVariableBytes = template.StartsWith("{{", StringComparison.Ordinal) && !ReferenceEquals(value, template);
+        refusal = option.Apply(options, value, argument, reader.PathExists, reader.DataFileReader);
+        options.ApplyingValueLedByVariableBytes = false;
+        return refusal;
     }
 
     private static CommandLineRefusal? ParseShortBundle(CommandLineOptions options, string argument, ArgumentReader reader)

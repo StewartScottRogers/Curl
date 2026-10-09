@@ -74,6 +74,14 @@ public sealed class CommandLineOptions
     internal bool ReadingConfigFile { get => globals.ReadingConfigFile; set => globals.ReadingConfigFile = value; }
 
     /// <summary>
+    /// <see langword="true"/> while <see cref="CommandLineParser"/> applies an <c>--expand-</c> value whose
+    /// first byte came from a variable's content rather than from the argument as typed: those bytes are
+    /// read as UTF-8 on every platform, so curl 8.21.0's leading-Unicode check sees them as UTF-8 even on
+    /// the Windows build, whose typed arguments are in the ANSI code page (BL-1814, upstream test268).
+    /// </summary>
+    internal bool ApplyingValueLedByVariableBytes { get => globals.ApplyingValueLedByVariableBytes; set => globals.ApplyingValueLedByVariableBytes = value; }
+
+    /// <summary>
     /// The encoding the request side sends header text in, when it is not the UTF-8 a config file is
     /// written in: the ANSI code page on Windows (<see cref="ConfigFileWireText"/>); otherwise <see langword="null"/>.
     /// </summary>
