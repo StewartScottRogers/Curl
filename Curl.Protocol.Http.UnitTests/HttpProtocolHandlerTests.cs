@@ -294,6 +294,22 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_ConnectWithoutLocalEndPoint_ReportsTheConnectionsOwn()
+    {
+        IPEndPoint local = new(IPAddress.Loopback, 49152);
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes(Head + "hello"), 4096, null) { LocalEndPoint = local };
+        QueueConnector connector = new(ConnectResult.Connected(connection));
+        Diagnostics.Arrange("connection local end point, connect local end point, remote end point", $"{local}, none, none");
+
+        TransferResult result = await Handler(connector).ExecuteAsync(Context("http://example.com/path?q=1", new MemoryStream()));
+
+        WriteResult(result);
+        Diagnostics.Assert("local end point", local, result.Report!.LocalEndPoint);
+        Assert.AreEqual(local, result.Report.LocalEndPoint);
+        Assert.IsNull(result.Report.RemoteEndPoint);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ConnectWithPeerCertificates_ReportsTheSameChainInOrder()
     {
         ReadOnlyMemory<byte>[] chain = [new byte[] { 0x30, 0x01 }, new byte[] { 0x30, 0x02 }];

@@ -2549,7 +2549,7 @@ public sealed class HttpProtocolHandler(
                 ResponseHeadersStored = body.HeadersStored,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
-                LocalEndPoint = connect.LocalEndPoint,
+                LocalEndPoint = connect.LocalEndPoint ?? connection.LocalEndPoint as IPEndPoint,
                 PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
                 Timings = new TransferTimings(
