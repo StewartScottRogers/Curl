@@ -296,6 +296,19 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     }
 
     /// <summary>
+    /// Names the file <paramref name="newPath" /> when it is not open yet, as curl 8.21.0 names a
+    /// <c>-J -L</c> file after the last <c>Location</c> it follows; an open file keeps its name.
+    /// </summary>
+    /// <param name="newPath">The file to open on the first write.</param>
+    internal void RenameBeforeOpen(string newPath)
+    {
+        if (file is null)
+        {
+            Path = newPath;
+        }
+    }
+
+    /// <summary>
     /// Records that the file could not be opened for a reason found before the open, such as a
     /// <c>-J</c> name arriving for a file a <c>-C</c> resume already opened.
     /// </summary>

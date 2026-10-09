@@ -15,6 +15,11 @@ namespace Curl.Console;
 /// <c>-I</c>, both, or <see langword="null" /> for nowhere.
 /// </param>
 /// <param name="pathOf">Turns the header's file name into the path to open: sanitized and put under <c>--output-dir</c>.</param>
+/// <param name="followsRedirects">
+/// <c>-L</c> was given: until a <c>Content-Disposition</c> names the file, each <c>Location</c>
+/// of a 3xx response renames it after the last segment of the URL it points at
+/// (<see cref="RedirectLocationFileName" />), as curl 8.21.0 does (upstream tests 1642, 1643).
+/// </param>
 /// <remarks>
 /// <para>
 /// Measured on Windows with curl 8.21.0 on 2026-09-27 (BL-239 Notes): the name is taken from a
@@ -33,7 +38,8 @@ namespace Curl.Console;
 internal sealed class RemoteHeaderNameStream(
     DeferredOutputFileStream output,
     Stream? headerOutput,
-    Func<string, string> pathOf) : Stream
+    Func<string, string> pathOf,
+    bool followsRedirects = false) : Stream
 {
     /// <summary>The start of a status line.</summary>
     private static ReadOnlySpan<byte> StatusLinePrefix => "HTTP/"u8;
@@ -118,6 +124,11 @@ internal sealed class RemoteHeaderNameStream(
             return;
         }
 
+        if (RenamesAfterLocation(line))
+        {
+            return;
+        }
+
         if (!namesFile || statusClass is not (2 or 3) || ContentDispositionFileName.Find(line) is not { } fileName)
         {
             return;
@@ -128,6 +139,24 @@ internal sealed class RemoteHeaderNameStream(
         {
             throw new IOException($"Could not create the output file {output.Path}.");
         }
+    }
+
+    /// <summary>
+    /// Under <c>-L</c>, renames the not yet opened output file after a 3xx response's
+    /// <c>Location</c> line, unless a <c>Content-Disposition</c> already named it.
+    /// </summary>
+    /// <param name="line">One header line, its line feed included.</param>
+    /// <returns><see langword="true" /> when the line was a <c>Location</c> that renamed the file.</returns>
+    private bool RenamesAfterLocation(byte[] line)
+    {
+        if (!followsRedirects || !namesFile || statusClass != 3 || RedirectLocationFileName.Find(line) is not { } redirected)
+        {
+            return false;
+        }
+
+        output.RenameBeforeOpen(pathOf(redirected));
+
+        return true;
     }
 
     /// <summary>

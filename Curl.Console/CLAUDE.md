@@ -125,7 +125,10 @@ curl's `create_dir_hierarchy` does (BL-1433). Under `-J` a remote-named file's h
 `RemoteHeaderNameStream`, which opens the file under the first `Content-Disposition`
 `filename=` (`ContentDispositionFileName`) of a 2xx or 3xx response before the lines go on; a
 name already taken is refused with `File exists` and exit 23. Measured on curl 8.21.0
-(BL-239 Notes).
+(BL-239 Notes). Under `-L`, until a `Content-Disposition` names it, each 3xx response's
+`Location` renames the not yet opened file after the last path segment of the URL it points
+at (`RedirectLocationFileName`), so `-J -L -O` with no `Content-Disposition` names the file
+after the last URL followed, as upstream tests 1642 and 1643 expect (BL-1809).
 
 `TransferContextFactory` builds each transfer's context from the parsed options; the
 context carries the `-r` text as given (`RangeText`, which the HTTP handler sends verbatim)

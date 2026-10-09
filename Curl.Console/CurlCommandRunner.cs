@@ -4304,7 +4304,7 @@ internal sealed class CurlCommandRunner(
         OutputFileTarget target,
         DeferredOutputFileStream output) =>
         target.TakesContentDispositionName
-            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteNamePath(options, name))
+            ? chosen => new RemoteHeaderNameStream(output, chosen, name => RemoteNamePath(options, name), options.FollowRedirects)
             : null;
 
     /// <summary>

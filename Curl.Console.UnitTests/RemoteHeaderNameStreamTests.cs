@@ -201,6 +201,79 @@ public sealed class RemoteHeaderNameStreamTests
         Assert.ThrowsExactly<NotSupportedException>(() => stream.SetLength(0));
     }
 
+    [TestMethod]
+    public async Task WriteAsync_FollowedLocationsWithoutName_NameTheFileAfterTheLastLocation()
+    {
+        DeferredOutputFileStream output = new(files, "1643", FileWriteMode.Truncate);
+        RemoteHeaderNameStream stream = new(output, null, name => "od/" + name, followsRedirects: true);
+        Diagnostics.Arrange("responses", "301 to /16430002, 302 to /16430003?x=1, 200 with no Content-Disposition");
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 301 Moved\r\nLocation: /16430002\r\n\r\n"));
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 302 Found\r\nlocation: /16430003?x=1\r\n\r\n"));
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nLocation: /ignored\r\n\r\n"));
+        ActOutput(output);
+
+        Diagnostics.Assert("output path / open", "od/16430003 / False", $"{output.Path} / {output.IsOpen}");
+        Assert.AreEqual("od/16430003", output.Path);
+        Assert.IsFalse(output.IsOpen);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_LocationAfterName_KeepsTheName()
+    {
+        DeferredOutputFileStream output = new(files, "u.txt", FileWriteMode.Truncate);
+        RemoteHeaderNameStream stream = new(output, null, name => name, followsRedirects: true);
+        Diagnostics.Arrange("response", "302 naming x.txt, then Location: /other");
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 302 Found\r\n" + Disposition + "Location: /other\r\n"));
+        ActOutput(output);
+
+        Diagnostics.Assert("output path", "x.txt", output.Path);
+        Assert.AreEqual("x.txt", output.Path);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_LocationNotFollowed_KeepsTheUrlName()
+    {
+        DeferredOutputFileStream output = new(files, "u.txt", FileWriteMode.Truncate);
+        RemoteHeaderNameStream stream = new(output, null, name => name);
+        Diagnostics.Arrange("response, no -L", "302 to /other");
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 302 Found\r\nLocation: /other\r\n"));
+        ActOutput(output);
+
+        Diagnostics.Assert("output path", "u.txt", output.Path);
+        Assert.AreEqual("u.txt", output.Path);
+    }
+
+    [TestMethod]
+    public async Task WriteAsync_LocationWithoutFileName_KeepsTheUrlName()
+    {
+        DeferredOutputFileStream output = new(files, "u.txt", FileWriteMode.Truncate);
+        RemoteHeaderNameStream stream = new(output, null, name => name, followsRedirects: true);
+        Diagnostics.Arrange("response", "302 to http://host and a 302 header that is not Location");
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 302 Found\r\nServer: x\r\nLocation: http://host\r\n"));
+        ActOutput(output);
+
+        Diagnostics.Assert("output path", "u.txt", output.Path);
+        Assert.AreEqual("u.txt", output.Path);
+    }
+
+    [TestMethod]
+    public async Task RenameBeforeOpen_OpenFile_KeepsItsName()
+    {
+        DeferredOutputFileStream output = new(files, "u.txt", FileWriteMode.Truncate);
+        await output.WriteAsync(Encoding.ASCII.GetBytes("body"));
+        Diagnostics.Arrange("file", "u.txt, already open");
+
+        output.RenameBeforeOpen("v.txt");
+        ActOutput(output);
+
+        Diagnostics.Assert("output path", "u.txt", output.Path);
+        Assert.AreEqual("u.txt", output.Path);
+    }
+
     private void ActOutput(DeferredOutputFileStream output)
     {
         Diagnostics.Act("output path", output.Path);
