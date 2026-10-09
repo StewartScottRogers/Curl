@@ -45,6 +45,18 @@ public sealed class ScriptedCookieStore(params string?[] cookieHeaders) : ICooki
         return answers.TryDequeue(out string? answer) ? answer : null;
     }
 
+    /// <summary>
+    /// Gets the URL of each <see cref="GetStoredCookieHeader" /> call, in order.
+    /// </summary>
+    public List<CurlUrl> StoredOnlyRequests { get; } = [];
+
+    /// <inheritdoc />
+    public string? GetStoredCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events)
+    {
+        StoredOnlyRequests.Add(url);
+        return answers.TryDequeue(out string? answer) ? answer : null;
+    }
+
     /// <inheritdoc />
     public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events)
     {

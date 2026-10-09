@@ -232,6 +232,9 @@ internal sealed class CookieEngine
         public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
             store.GetCookieHeader(url, secure, now, cookieStrings, events);
 
+        public string? GetStoredCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
+            store.GetCookieHeader(url, secure, now, events);
+
         public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events) =>
             store.StoreFromResponse(url, setCookieHeader, storedFromResponse, now, events);
     }
@@ -245,6 +248,9 @@ internal sealed class CookieEngine
     {
         public string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
             cookieStrings.Count == 0 ? null : string.Join("; ", cookieStrings);
+
+        public string? GetStoredCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
+            null;
 
         public int StoreFromResponse(CurlUrl url, string setCookieHeader, int storedFromResponse, DateTimeOffset now, ITransferEvents events) =>
             storedFromResponse;

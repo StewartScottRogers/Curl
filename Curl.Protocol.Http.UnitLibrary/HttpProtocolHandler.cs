@@ -2016,11 +2016,15 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Asks the cookie store for the <c>Cookie</c> value to send to the transfer's URL, or
-    /// gives <see langword="null" /> when cookies are off. The store reports a limit that cut
-    /// the value short to the transfer's events, before the request's header lines, as curl does.
+    /// gives <see langword="null" /> when cookies are off: the stored cookies alone when
+    /// <see cref="HttpRequestOptions.SendsCookieStrings" /> is off (BL-1846). The store reports a
+    /// limit that cut the value short to the transfer's events, before the request's header
+    /// lines, as curl does.
     /// </summary>
     private string? CookieHeaderFor(ITransferContext context, HttpRequestOptions options) =>
-        CookieStore?.GetCookieHeader(CookieUrlOf(context.Url, options), TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
+        options.SendsCookieStrings
+            ? CookieStore?.GetCookieHeader(CookieUrlOf(context.Url, options), TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events)
+            : CookieStore?.GetStoredCookieHeader(CookieUrlOf(context.Url, options), TargetOf(context.Url).UseTls, context.TimeProvider.GetUtcNow(), context.Events);
 
     /// <summary>
     /// Gives the URL cookies are matched and stored against: <paramref name="url" /> with the

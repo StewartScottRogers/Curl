@@ -33,6 +33,24 @@ public interface ICookieStore
     string? GetCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events);
 
     /// <summary>
+    /// Returns the value of the <c>Cookie</c> header to send to <paramref name="url" /> from the
+    /// stored cookies alone, without the <c>-b name=value</c> strings a store adds of its own, for
+    /// a request whose <see cref="HttpRequestOptions.SendsCookieStrings" /> is
+    /// <see langword="false" />. A store that adds no strings gives
+    /// <see cref="GetCookieHeader" />'s value.
+    /// </summary>
+    /// <param name="url">The URL the request is sent to.</param>
+    /// <param name="secure"><see langword="true" /> when the request travels over TLS.</param>
+    /// <param name="now">The time that decides which cookies have expired.</param>
+    /// <param name="events">Where the store reports a limit that cut the header short.</param>
+    /// <returns>
+    /// The header value without the header name, or <see langword="null" /> when no stored
+    /// cookie matches.
+    /// </returns>
+    string? GetStoredCookieHeader(CurlUrl url, bool secure, DateTimeOffset now, ITransferEvents events) =>
+        GetCookieHeader(url, secure, now, events);
+
+    /// <summary>
     /// Stores the cookie from one <c>Set-Cookie</c> header of a response to a request for
     /// <paramref name="url" />, as the header arrives, so its <c>-v</c> line is reported before
     /// the header line is.

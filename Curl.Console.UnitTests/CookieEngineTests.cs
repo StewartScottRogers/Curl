@@ -72,6 +72,39 @@ public sealed class CookieEngineTests
         Assert.AreEqual("sess=s1", cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance));
     }
 
+    [TestMethod]
+    public void GetStoredCookieHeader_CookieStringOnly_SendsNothing()
+    {
+        // curl -b test=yes -L to another host sends no Cookie (upstream test2015, BL-1846).
+        Diagnostics.Arrange("command line", $"-b test=yes {Url}");
+        CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-b", "test=yes", Url))!;
+
+        string? cookieHeader = cookies.HandlerStore.GetStoredCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("cookie header", cookieHeader ?? "<null>");
+
+        Diagnostics.Assert("cookie header", "<null>", cookieHeader ?? "<null>");
+        Assert.IsNull(cookieHeader);
+    }
+
+    [TestMethod]
+    public async Task GetStoredCookieHeader_CookieFileAndString_SendsOnlyTheFilesCookies()
+    {
+        InMemoryFileSystem fileSystem = new();
+        fileSystem.ExistingContent["jar.txt"] =
+            Encoding.Latin1.GetBytes("# Netscape HTTP Cookie File\n127.0.0.1\tFALSE\t/\tFALSE\t0\tsess\ts1\n");
+        Diagnostics.Arrange("command line", $"-b jar.txt -b test=yes {Url}");
+        CookieEngine cookies = CookieEngine.FromCommandLine(Parse("-b", "jar.txt", "-b", "test=yes", Url))!;
+
+        await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
+        string? stored = cookies.HandlerStore.GetStoredCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        string? full = cookies.HandlerStore.GetCookieHeader(CurlUrl.Parse(Url), false, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("stored, full", $"{stored}, {full}");
+
+        Diagnostics.Assert("stored, full", "sess=s1, sess=s1; test=yes", $"{stored}, {full}");
+        Assert.AreEqual("sess=s1", stored);
+        Assert.AreEqual("sess=s1; test=yes", full);
+    }
+
     private static CommandLineOptions Parse(params string[] arguments)
     {
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);

@@ -72,6 +72,14 @@ public sealed record HttpRequestOptions
     public bool FollowedToAnotherHost { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether this request sends the <c>-b name=value</c> strings
+    /// beside the stored cookies: <see langword="true" /> unless it is a followed redirect to
+    /// another scheme, host or port without <c>--location-trusted</c>, where curl 8.21.0's
+    /// <c>Curl_auth_allowed_to_host</c> leaves them out (upstream test2015, BL-1846).
+    /// </summary>
+    public bool SendsCookieStrings { get; init; } = true;
+
+    /// <summary>
     /// Gets the request body from the <c>-d</c> and <c>-F</c> families, already encoded,
     /// or <see langword="null" /> to send none.
     /// </summary>

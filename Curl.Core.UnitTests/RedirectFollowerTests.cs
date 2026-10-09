@@ -843,6 +843,23 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://127.0.0.1:18203/next", false, true)]
+    [DataRow("http://localhost:18203/next", true, true)]
+    [DataRow("http://localhost:18203/next", false, false)]
+    [DataRow("http://127.0.0.1:9/next", false, false)]
+    [DataRow("https://127.0.0.1:18203/next", false, false)]
+    public async Task FollowAsync_Hop_SendsCookieStringsOnlyToTheFirstOriginOrWhenLocationTrusted(string target, bool trusted, bool expected)
+    {
+        // curl -b test=yes -L to another host sends no Cookie (upstream test2015, BL-1846).
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+
+        await Follow(handler, Context(Location(), url: First), new RedirectPolicy { LocationTrusted = trusted });
+
+        Diagnostics.Assert("hop sends cookie strings", $"True, {expected}", string.Join(", ", handler.Contexts.Select(context => context.Http!.SendsCookieStrings)));
+        CollectionAssert.AreEqual(new[] { true, expected }, handler.Contexts.Select(context => context.Http!.SendsCookieStrings).ToArray());
+    }
+
+    [TestMethod]
     [DataRow("http://127.0.0.1:18203/next", false)]
     [DataRow("HTTP://127.0.0.1:80/", false)]
     [DataRow("http://localhost:18203/next", true)]
