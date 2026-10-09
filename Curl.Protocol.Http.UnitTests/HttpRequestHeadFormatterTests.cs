@@ -356,6 +356,39 @@ public sealed partial class HttpRequestHeadFormatterTests
     }
 
     [TestMethod]
+    [DataRow("Content-Type: text/info", "text/info", DisplayName = "upstream test277")]
+    [DataRow("Content-type: multipart/form-data; charset=utf-8", "multipart/form-data; charset=utf-8", DisplayName = "upstream test669")]
+    public void Format_FormBodyWithCustomContentType_SendsThatTypeWithTheBoundaryAfterContentLength(string header, string userType)
+    {
+        HttpRequestOptions options = new()
+        {
+            Headers = ["X-A: 1", header, "Content-Type: second"],
+            Body = new StreamBody(new MemoryStream(), 158, "multipart/form-data; boundary=b"),
+        };
+
+        AssertHead(
+            $"POST / HTTP/1.1\r\n{DefaultHeaders}X-A: 1\r\nContent-Length: 158\r\nContent-Type: {userType}; boundary=b\r\n\r\n",
+            CurlUrl.Parse(Url),
+            options);
+    }
+
+    [TestMethod]
+    public void Format_FormBodyWithEmptyCustomContentType_SendsNoContentType()
+    {
+        HttpRequestOptions options = new() { Headers = ["Content-Type:"], Body = new StreamBody(new MemoryStream(), 158, "multipart/form-data; boundary=b") };
+
+        AssertHead($"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 158\r\n\r\n", CurlUrl.Parse(Url), options);
+    }
+
+    [TestMethod]
+    public void Format_NonFormBodyWithCustomContentType_SendsTheCustomLineUnchanged()
+    {
+        HttpRequestOptions options = new() { Headers = ["Content-Type: text/info"], Body = new StreamBody(new MemoryStream(), 3, "text/plain") };
+
+        AssertHead($"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Type: text/info\r\nContent-Length: 3\r\n\r\n", CurlUrl.Parse(Url), options);
+    }
+
+    [TestMethod]
     public void Format_BodyWithCustomMethodAndNoContentType_SendsThatMethodAndNoContentType()
     {
         HttpRequestOptions options = new() { CustomMethod = "PUT", Body = new BytesBody("x=1"u8.ToArray(), string.Empty) };

@@ -52,6 +52,10 @@ internal static class HttpRequestHeadFormatter
 
     private const string ConnectionName = "Connection";
 
+    private const string ContentTypeName = "Content-Type";
+
+    private const string FormBoundaryPrefix = "multipart/form-data; boundary=";
+
     /// <summary>
     /// Formats the request head for <paramref name="url" />.
     /// </summary>
@@ -131,9 +135,10 @@ internal static class HttpRequestHeadFormatter
         AppendH2cUpgrade(head, upgradesToH2c);
         AppendAlways(head, "Cookie", cookie);
         AppendTimeCondition(head, customHeaders, timeCondition);
-        AppendCustomHeaders(head, customHeaders, hostLine is not null);
-        AppendCustomHeaders(head, proxyHeaders, hostLine is not null);
-        AppendBodyHeaders(head, customHeaders, framing);
+        string? formContentType = FormContentTypeOf(customHeaders, framing);
+        AppendCustomHeaders(head, customHeaders, hostLine is not null, formContentType is not null);
+        AppendCustomHeaders(head, proxyHeaders, hostLine is not null, false);
+        AppendBodyHeaders(head, customHeaders, framing, formContentType);
         AppendConnection(head, customHeaders, SendsTe(options, customHeaders), upgradesToH2c);
         head.Append("\r\n");
         return Encoding.Latin1.GetBytes(head.ToString());
@@ -320,14 +325,17 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// Appends each <c>-H</c> or <c>--proxy-header</c> value that sends a line, in order,
     /// leaving out every <c>Host:</c> line when a <c>Host</c> line was already written, and
-    /// every value naming <c>Connection</c>, which <see cref="AppendConnection" /> places.
+    /// every value naming <c>Connection</c>, which <see cref="AppendConnection" /> places, and
+    /// every value naming <c>Content-Type</c> when <paramref name="leavesOutContentType" />,
+    /// because <see cref="AppendBodyHeaders" /> sends it merged with the form's boundary.
     /// </summary>
-    private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten)
+    private static void AppendCustomHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, bool hostLineWritten, bool leavesOutContentType)
     {
         foreach (HttpCustomHeader header in customHeaders)
         {
             if (header.SentLine is { } line
                 && !header.Names(ConnectionName)
+                && !(leavesOutContentType && header.Names(ContentTypeName))
                 && !(hostLineWritten && line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)))
             {
                 head.Append(line).Append("\r\n");
@@ -347,9 +355,10 @@ internal static class HttpRequestHeadFormatter
     /// Appends the body's framing headers: <c>Content-Length</c> as
     /// <see cref="ContentLengthOf" /> gives it, <c>Transfer-Encoding: chunked</c> when its
     /// length is unknown, its <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's
-    /// own <c>Expect: 100-continue</c>.
+    /// own <c>Expect: 100-continue</c>. A <c>-F</c> form's <c>Content-Type</c> is
+    /// <paramref name="formContentType" /> when an <c>-H</c> value names one.
     /// </summary>
-    private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
+    private static void AppendBodyHeaders(StringBuilder head, HttpCustomHeader[] customHeaders, HttpRequestFraming framing, string? formContentType)
     {
         if (framing.Body is not { } body)
         {
@@ -358,8 +367,30 @@ internal static class HttpRequestHeadFormatter
 
         AppendUnlessOverridden(head, customHeaders, "Content-Length", ContentLengthOf(framing));
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
-        AppendUnlessOverridden(head, customHeaders, "Content-Type", framing.IsUpload ? null : body.ContentType);
+        AppendAlways(head, ContentTypeName, formContentType);
+        AppendUnlessOverridden(head, customHeaders, ContentTypeName, framing.IsUpload ? null : body.ContentType);
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
+    }
+
+    /// <summary>
+    /// Gives a <c>-F</c> form's <c>Content-Type</c> when an <c>-H</c> value names one, as curl
+    /// 8.21.0 sends it (upstream tests 277 and 669, BL-1811): the first such value, then
+    /// <c>; boundary=</c> and the form's boundary, in the generated header's place after
+    /// <c>Content-Length</c>, every <c>-H</c> <c>Content-Type</c> line left out. Gives
+    /// <see langword="null" /> when the body is not a <c>multipart/form-data</c> form or no
+    /// <c>-H</c> value names a non-empty <c>Content-Type</c>.
+    /// </summary>
+    private static string? FormContentTypeOf(HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
+    {
+        string? userType = customHeaders
+            .Where(header => header.Names(ContentTypeName))
+            .Select(header => header.Value)
+            .FirstOrDefault(value => !string.IsNullOrEmpty(value));
+        return framing is { Body.ContentType: { } bodyType }
+            && userType is not null
+            && bodyType.StartsWith(FormBoundaryPrefix, StringComparison.Ordinal)
+            ? $"{userType}; boundary={bodyType[FormBoundaryPrefix.Length..]}"
+            : null;
     }
 
     /// <summary>
