@@ -95,9 +95,9 @@ public sealed class UpstreamConformanceTests
             invocation.StandardOutput,
             invocation.StandardError,
             invocation.StandardInput,
-            invocation.Connector,
+            new InMemoryServerTcpDialer(invocation.Connector),
+            new LoopbackOnlyDnsResolver(),
             invocation.DatagramConnector,
-            runConnections: new ConnectionCache(TimeProvider.System),
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(invocation.Arguments);
 
