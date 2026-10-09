@@ -50,7 +50,44 @@ internal sealed class HttpCrlfUploadStream(Stream source) : Stream
     public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Fills <paramref name="buffer" /> until the source ends, as curl fills its upload buffer
+    /// before sending a chunk: a <c>-F</c> body, read one part at a time, goes out as one chunk
+    /// (measured, BL-1883).
+    /// </remarks>
     public override int Read(Span<byte> buffer)
+    {
+        int filled = 0;
+        int read;
+        do
+        {
+            read = ReadOnce(buffer[filled..]);
+            filled += read;
+        }
+        while (read > 0 && filled < buffer.Length);
+
+        return filled;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>Fills <paramref name="buffer" /> until the source ends, as <see cref="Read(Span{byte})" /> does.</remarks>
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        int filled = 0;
+        int read;
+        do
+        {
+            read = await ReadOnceAsync(buffer[filled..], cancellationToken).ConfigureAwait(false);
+            filled += read;
+        }
+        while (read > 0 && filled < buffer.Length);
+
+        return filled;
+    }
+
+    /// <summary>Converts what one read of the source gives into <paramref name="buffer" />.</summary>
+    /// <returns>The number of bytes written; 0 only when the source has ended or <paramref name="buffer" /> is empty.</returns>
+    private int ReadOnce(Span<byte> buffer)
     {
         if (TryGivePending(buffer, out int given))
         {
@@ -61,8 +98,9 @@ internal sealed class HttpCrlfUploadStream(Stream source) : Stream
         return Convert(raw.AsSpan(0, source.Read(raw)), buffer);
     }
 
-    /// <inheritdoc />
-    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    /// <summary>Converts what one read of the source gives into <paramref name="buffer" />.</summary>
+    /// <returns>The number of bytes written; 0 only when the source has ended or <paramref name="buffer" /> is empty.</returns>
+    private async ValueTask<int> ReadOnceAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         if (TryGivePending(buffer.Span, out int given))
         {

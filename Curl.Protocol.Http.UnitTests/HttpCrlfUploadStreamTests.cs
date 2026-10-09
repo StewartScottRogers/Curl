@@ -137,7 +137,38 @@ public sealed class HttpCrlfUploadStreamTests
         Assert.AreEqual(3L, framing.KnownLength);
     }
 
+    [TestMethod]
+    public async Task ReadAsync_SourceGivingOneByteAtATime_FillsTheBufferInOneRead()
+    {
+        using HttpCrlfUploadStream stream = new(new OneByteAtATimeStream("a\nb"));
+        byte[] buffer = new byte[16];
+
+        int read = await stream.ReadAsync(buffer, TestContext.CancellationToken);
+
+        Assert.AreEqual("a\r\nb", Encoding.ASCII.GetString(buffer, 0, read));
+    }
+
+    [TestMethod]
+    public void Read_SourceGivingOneByteAtATime_FillsTheBufferInOneRead()
+    {
+        using HttpCrlfUploadStream stream = new(new OneByteAtATimeStream("a\nb"));
+        byte[] buffer = new byte[16];
+
+        int read = stream.Read(buffer, 0, buffer.Length);
+
+        Assert.AreEqual("a\r\nb", Encoding.ASCII.GetString(buffer, 0, read));
+    }
+
     private static MemoryStream Source(string text) => new(Encoding.ASCII.GetBytes(text));
+
+    /// <summary>A source that, like a <c>-F</c> body read part by part, gives less than asked for.</summary>
+    private sealed class OneByteAtATimeStream(string text) : MemoryStream(Encoding.ASCII.GetBytes(text))
+    {
+        public override int Read(Span<byte> buffer) => base.Read(buffer[..Math.Min(1, buffer.Length)]);
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            base.ReadAsync(buffer[..Math.Min(1, buffer.Length)], cancellationToken);
+    }
 
     private async Task<string> ReadAllAsync(Stream stream, int bufferSize)
     {
