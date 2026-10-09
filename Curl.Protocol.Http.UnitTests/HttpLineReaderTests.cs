@@ -16,10 +16,10 @@ public sealed class HttpLineReaderTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [DataRow(1, DisplayName = "1-byte reads")]
-    [DataRow(3, DisplayName = "3-byte reads, CRLF split across them")]
-    [DataRow(65536, DisplayName = "One read")]
-    public async Task ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest(int chunkSize)
+    [DataRow(1, "", DisplayName = "1-byte reads, nothing read past the second line")]
+    [DataRow(3, "", DisplayName = "3-byte reads, CRLF split across them, nothing read past the second line")]
+    [DataRow(65536, "rest", DisplayName = "One read, the whole rest buffered")]
+    public async Task ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest(int chunkSize, string expectedRest)
     {
         HttpLineReader reader = new(new ScriptedConnection(Encoding.ASCII.GetBytes("ab\r\nc\nrest"), chunkSize));
         Diagnostics.Arrange("chunk size", chunkSize);
@@ -37,7 +37,8 @@ public sealed class HttpLineReaderTests
         Diagnostics.Diff("second line", "c\n", Encoding.ASCII.GetString(second!));
         Assert.AreEqual("ab\r\n", Encoding.ASCII.GetString(first!));
         Assert.AreEqual("c\n", Encoding.ASCII.GetString(second!));
-        Assert.IsTrue("rest".StartsWith(Encoding.ASCII.GetString(rest), StringComparison.Ordinal));
+        Diagnostics.Diff("rest", expectedRest, Encoding.ASCII.GetString(rest));
+        Assert.AreEqual(expectedRest, Encoding.ASCII.GetString(rest));
     }
 
     [TestMethod]

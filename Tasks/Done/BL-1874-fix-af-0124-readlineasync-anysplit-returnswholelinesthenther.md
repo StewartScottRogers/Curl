@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1874 — Fix AF-0124: ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest accepts an empty rest
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now takes the expected rest as a second `DataRow` value and asserts it exactly with `Assert.AreEqual`. `HttpLineReader.ReadLineAsync` scans its buffer before reading again, so 1-byte and 3-byte reads have read nothing past the second line (rest is empty) and the single 64 KiB read has buffered all of `rest`. A `TakeRemaining` that dropped buffered bytes now fails the one-read row.
+- The reproduction `Select-String ... -Pattern 'StartsWith(Encoding'` now finds nothing. `Curl.Protocol.Http.UnitTests` builds clean and passes (1961 passed, 18 skipped); only that test project changed.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Rest assertion is exact per chunk size; reproduction no longer matches; Http unit tests green
