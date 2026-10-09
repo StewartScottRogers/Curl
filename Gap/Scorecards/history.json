@@ -1,0 +1,12 @@
+[
+  {
+    "stamp": "2026-10-08_1640",
+    "commit": "0fcab8154bc9edd94631a50dfe69b45e56103d61",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.21.0",
+    "areas": { "options": { "x": 567, "y": 573 }, "protocols": { "x": 27, "y": 29 }, "features": { "x": 16, "y": 23 }, "writeout": { "x": 138, "y": 138 }, "exitcodes": { "x": 259, "y": 259 }, "environment": { "x": 24, "y": 42 }, "behaviour": { "x": 578, "y": 1326 } },
+    "overall": { "x": 1609, "y": 2390 },
+    "newest": { "x": 1609, "y": 2390 }
+  }
+]
