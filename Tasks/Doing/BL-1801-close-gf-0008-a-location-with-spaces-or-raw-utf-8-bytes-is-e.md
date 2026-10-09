@@ -47,3 +47,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpRedirectLocation (with CurlUrl in Curl.P
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
