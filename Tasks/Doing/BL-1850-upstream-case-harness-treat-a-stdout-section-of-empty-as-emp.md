@@ -25,10 +25,22 @@ The gap office's upstream-case measuring tool (the one GF-0019's "Reproduce" lin
 
 ## Acceptance criteria
 
-- [ ] The measuring tool treats a verify section whose content is `%EMPTY` as empty.
-- [ ] Re-measuring upstream cases 2013 and 2014 gives `match`, closing GF-0019.
+- [x] The measuring tool treats a verify section whose content is `%EMPTY` as empty.
+- [x] Re-measuring upstream cases 2013 and 2014 gives `match`, closing GF-0019.
 
 ## Notes
+
+- `UpstreamCaseVerification` now reads a verify part whose body is exactly the line `%EMPTY`
+  as no bytes. It applies to every verify part read through the shared expected-body path
+  (stdout, stderr, protocol, `<file>`), not stdout alone: upstream uses the marker to say
+  "this part exists and is empty", and the harness's only other `%` handling (variables,
+  character macros, instructions) runs at expansion and never touches it. No other
+  `%`-variable in a verify section needs this treatment.
+- Measured with the in-process ratchet: test2012, test2013 and test2014 now pass and are
+  added to `PassingUpstreamCases.txt` (Conformance: 1176 passed, 0 failed). GF-0019 itself
+  closes on the gap office's next run (lanes may not touch `Gap/`).
+- New test `FindFirstDifference_StdoutOfEmptyMarker_ExpectsNoOutput` covers both branches of
+  the new check; Measure-CodeQuality.ps1 was not run for a one-expression change.
 
 ## Log
 

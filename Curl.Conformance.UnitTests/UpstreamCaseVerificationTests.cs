@@ -133,6 +133,19 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_StdoutOfEmptyMarker_ExpectsNoOutput()
+    {
+        string sections = "<verify>\n<stdout>\n%EMPTY\n</stdout>\n</verify>\n";
+
+        string? matching = Verify(sections, Run(standardOutput: ""));
+        string? differing = Verify(sections, Run(standardOutput: "%EMPTY\n"));
+
+        ExpectDifference(null, matching);
+        Assert.IsNull(matching);
+        Assert.IsNotNull(differing);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_StdoutThatDiffers_NamesIt()
     {
         string? difference = Verify("<verify>\n<stdout>\na\n</stdout>\n</verify>\n", Run(standardOutput: "b\n"));

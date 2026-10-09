@@ -22,6 +22,7 @@ namespace Curl.Conformance;
 /// <c>&lt;errorcode&gt;</c>, 0 when absent.
 /// </para>
 /// <para>
+/// A verify part whose body is the line <c>%EMPTY</c> expects no bytes at all.
 /// Expected bodies have <c>nonewline</c> and <c>crlf</c> applied. Under <c>mode="text"</c> both
 /// sides are normalized to CRLF, as upstream does on platforms that translate text, so the
 /// comparison does not depend on the platform's line endings. A stripped line that ends up empty
@@ -102,7 +103,7 @@ internal static class UpstreamCaseVerification
         testCase.Find("verify", name) is { } part
             ? UpstreamFirstDifference.Describe(
                 $"<verify><{name}>",
-                Normalized(UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(part.Content.ToArray(), part), part), part),
+                Normalized(UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(Body(part), part), part), part),
                 Normalized(Strip(output, [], Substitutions(testCase, stripPartName)), part))
             : null;
 
@@ -135,7 +136,12 @@ internal static class UpstreamCaseVerification
     // nonewline before crlf, as runtests.pl chomps the last line before subnewlines: forcing CRLF
     // first would leave a carriage return the request never ends in.
     private static byte[] Expected(UpstreamTestSection part) =>
-        UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(part.Content.ToArray(), part), part);
+        UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(Body(part), part), part);
+
+    // A verify part holding only %EMPTY expects nothing (test2012 to test2014): the part has to
+    // exist to be checked, and an empty one would not mark it as meant to be empty.
+    private static byte[] Body(UpstreamTestSection part) =>
+        part.Content.Span.SequenceEqual("%EMPTY\n"u8) ? [] : part.Content.ToArray();
 
     private static byte[] Normalized(byte[] body, UpstreamTestSection? part) =>
         part?.GetAttribute("mode") == "text" ? UpstreamTestSectionLineEndings.NormalizeText(body) : body;
