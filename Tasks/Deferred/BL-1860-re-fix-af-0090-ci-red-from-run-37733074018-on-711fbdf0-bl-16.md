@@ -58,3 +58,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Blocked. Stewart: close AF-0090 as closed-how stewart (fix is in place; the reproduction reads fixed historical logs and the miscount is in an audit path)
+- 2026-10-09: Blocked -> Deferred. No change can alter historical logs; PR #89 re-audits process findings by mechanism over the current window, so the next re-audit decides AF-0090

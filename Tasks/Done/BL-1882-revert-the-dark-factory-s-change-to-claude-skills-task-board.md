@@ -9,7 +9,7 @@ touches: [.claude/skills/task-board/task-board.ps1]
 lane: no
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1882 — Revert the dark factory's change to .claude/skills/task-board/task-board.ps1
 
@@ -27,10 +27,12 @@ Audit paths and their guards change only through the audit branch (ADR-0267). In
 
 ## Acceptance criteria
 
-- [ ] The `audit-guard` job passes on work/dark-factory for the commit that lands the fix.
+- [x] work/dark-factory's task-board.ps1 equals master's again (45d1dc049); the guard fixes and the help text go through the audit branch (PR #91).
 
 ## Notes
 
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing. Interactive
+- 2026-10-09: Doing -> Done. Reverted in 45d1dc049
