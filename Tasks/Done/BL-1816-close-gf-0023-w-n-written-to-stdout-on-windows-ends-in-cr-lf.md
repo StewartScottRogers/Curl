@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1816 — Close GF-0023: -w '\n' written to stdout on Windows ends in CR LF where upstream expects LF
 
@@ -35,13 +35,18 @@ In Curl.Output.UnitLibrary / Curl.Console's -w writer, write a -w line feed to s
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1341`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 277 bytes: HTTP/1.1 200 OK\x0D\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0D\x0AServer: test-server/fake\x0D\x0AContent-Length: 6\x0D\x0AConnection: close\x0D\x0AContent-Type: text/html\x0D\x0AContent-Disposition: filename=name1341; charset=funny; op`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1341`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 277 bytes: HTTP/1.1 200 OK\x0D\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0D\x0AServer: test-server/fake\x0D\x0AContent-Length: 6\x0D\x0AConnection: close\x0D\x0AContent-Type: text/html\x0D\x0AContent-Disposition: filename=name1341; charset=funny; op`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Measured 2026-10-08, curl 8.21.0 (Windows, Schannel): `-s -o NUL -D - -w "%{exitcode}\n" file:///nonexist/x` writes `37` LF, also under `-B`; without `-D -` it writes `37` CR LF. curl sets standard output binary for `-D -` header output at transfer setup, so the Windows reference curl agrees with upstream test 1341: no reference divergence.
+- Fix in `Curl.Console` only (`CurlCommandRunner.SwitchesStandardOutputToBinary` and `UrlFromSwitchesStandardOutputToBinary`); `Curl.Output` needed no change. Decision recorded in ADR-0443. No option changed, so `--ai-help` is unaffected.
+- Not modelled: `-D %` likewise sets standard error binary in curl; left as ADR-0443 says.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. -D - now switches standard output to binary, so -w line feeds stay LF on Windows as test 1341 expects
