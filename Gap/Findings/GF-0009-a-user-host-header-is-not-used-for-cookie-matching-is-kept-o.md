@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test62, behaviour:test1258, behaviour:test184, behaviour:test461]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
-task:
-tasks: []
+task: BL-1802
+tasks: [BL-1802]
 ---
 # GF-0009 - A user Host: header is not used for cookie matching, is kept on a redirect to another host, and a lower-case 'host:' does not remove it
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary (HttpCustomHeader, HttpRequestHeadFormatter) a
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1802.

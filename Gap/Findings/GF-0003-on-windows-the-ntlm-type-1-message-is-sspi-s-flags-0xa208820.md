@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test67, behaviour:test68, behaviour:test81, behaviour:test89, behaviour:test91, behaviour:test150, behaviour:test162, behaviour:test169, behaviour:test170, behaviour:test176, behaviour:test239, behaviour:test243, behaviour:test267, behaviour:test776, behaviour:test1215, behaviour:test775]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
-task:
-tasks: []
+task: BL-1796
+tasks: [BL-1796]
 ---
 # GF-0003 - On Windows the NTLM type-1 message is SSPI's (flags 0xa2088207 plus VERSION), but curl -V does not list SSPI, so the !SSPI cases run and differ
 
@@ -36,3 +36,4 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1796.

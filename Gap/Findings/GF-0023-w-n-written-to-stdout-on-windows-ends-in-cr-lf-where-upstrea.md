@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1341]
 touches: [Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1816
+tasks: [BL-1816]
 ---
 # GF-0023 - -w '\n' written to stdout on Windows ends in CR LF where upstream expects LF
 
@@ -36,3 +36,4 @@ In Curl.Output.UnitLibrary / Curl.Console's -w writer, write a -w line feed to s
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1816.

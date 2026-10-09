@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [options:--dns-interface, options:--dns-ipv4-addr, options:--dns-ipv6-addr, options:--dns-servers, options:--ech, options:--proxy-http3:no-form]
 touches: []
-task:
-tasks: []
+task: BL-1829
+tasks: [BL-1829]
 ---
 # GF-0036 - Gap items gap-options left in no group
 
@@ -41,3 +41,4 @@ Group these items under their causes in the next gap-options report.
 ## Log
 
 - 2026-10-08_1640: Opened for items gap-options left in no group.
+- 2026-10-08_1731: Filed BL-1829.

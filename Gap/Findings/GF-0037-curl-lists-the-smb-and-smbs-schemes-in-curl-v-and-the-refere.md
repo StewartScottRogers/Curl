@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [protocols:smb, protocols:smbs]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1830
+tasks: [BL-1830]
 ---
 # GF-0037 - Curl lists the smb and smbs schemes in curl -V, and the reference 8.21.0 Windows build does not
 
@@ -36,3 +36,4 @@ Remove smb and smbs from the Protocols: line in CurlVersionText.ProtocolsLine (C
 ## Log
 
 - 2026-10-08_1640: Opened by gap-protocols.
+- 2026-10-08_1731: Filed BL-1830.

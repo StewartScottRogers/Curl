@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test763]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
-task:
-tasks: []
+task: BL-1821
+tasks: [BL-1821]
 ---
 # GF-0028 - A host of only zero-width characters is sent instead of failing with exit 3
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrlHost, reject a host whose IDN
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1821.

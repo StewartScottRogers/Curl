@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test40, behaviour:test662, behaviour:test663, behaviour:test1138]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
-task:
-tasks: []
+task: BL-1801
+tasks: [BL-1801]
 ---
 # GF-0008 - A Location with spaces or raw UTF-8 bytes is encoded differently from curl, or rejected
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpRedirectLocation (with CurlUrl in Curl.P
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1801.

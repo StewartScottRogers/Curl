@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1489]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1815
+tasks: [BL-1815]
 ---
 # GF-0022 - -D % (headers to stderr) writes nothing
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary and Curl.Console's -D target opening, accept '%' as stde
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1815.

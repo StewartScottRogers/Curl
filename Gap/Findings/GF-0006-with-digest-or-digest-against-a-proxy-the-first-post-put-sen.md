@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test88, behaviour:test175, behaviour:test177, behaviour:test245, behaviour:test246, behaviour:test1001, behaviour:test1002, behaviour:test1284, behaviour:test1285, behaviour:test2058, behaviour:test2059, behaviour:test2060, behaviour:test2067, behaviour:test2068, behaviour:test2069]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-1799
+tasks: [BL-1799]
 ---
 # GF-0006 - With --digest (or Digest against a proxy), the first POST/PUT sends its body instead of Content-Length: 0
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1799.

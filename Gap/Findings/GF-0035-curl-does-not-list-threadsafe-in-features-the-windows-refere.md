@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [features:threadsafe]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1828
+tasks: [BL-1828]
 ---
 # GF-0035 - Curl does not list threadsafe in Features; the Windows reference build does
 
@@ -36,3 +36,4 @@ Record in an ADR whether Curl's transfers are thread-safe in the sense curl mean
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
+- 2026-10-08_1731: Filed BL-1828.

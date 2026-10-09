@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1629, behaviour:test2015]
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
-task:
-tasks: []
+task: BL-1803
+tasks: [BL-1803]
 ---
 # GF-0010 - A cookie set for a trailing-dot public suffix is sent, and a -b name=value cookie follows a redirect to another host
 
@@ -36,3 +36,4 @@ In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1803.

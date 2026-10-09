@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test194]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-1820
+tasks: [BL-1820]
 ---
 # GF-0027 - -C N --fail against a 416 whose Content-Range says the file is complete exits 22 instead of 0
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentRange: t
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1820.

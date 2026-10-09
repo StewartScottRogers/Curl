@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test994, behaviour:test996, behaviour:test1491]
 touches: [Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1806
+tasks: [BL-1806]
 ---
 # GF-0013 - --skip-existing skips the transfer silently; curl writes 'Note: skips transfer, "<file>" exists locally'
 
@@ -36,3 +36,4 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1806.

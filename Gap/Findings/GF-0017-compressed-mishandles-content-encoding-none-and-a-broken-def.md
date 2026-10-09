@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test223, behaviour:test328]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-1810
+tasks: [BL-1810]
 ---
 # GF-0017 - --compressed mishandles 'Content-Encoding: none' and a broken deflate header
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpContentCoding / HttpContentDecoder: trea
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1810.

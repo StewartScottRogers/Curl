@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [features:HTTP3]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1825
+tasks: [BL-1825]
 ---
 # GF-0032 - Curl lists HTTP3 in Features; the Windows reference build does not
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
+- 2026-10-08_1731: Filed BL-1825.

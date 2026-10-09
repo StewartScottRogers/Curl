@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1008, behaviour:test1021, behaviour:test1060, behaviour:test1061, behaviour:test206, behaviour:test209, behaviour:test213, behaviour:test217, behaviour:test265, behaviour:test287, behaviour:test718, behaviour:test749, behaviour:test750, behaviour:test1715, behaviour:test94, behaviour:test440, behaviour:test441, behaviour:test493, behaviour:test1455, behaviour:test3201, behaviour:test3220, behaviour:test1471, behaviour:test1472, behaviour:test20, behaviour:test3019, behaviour:test3020, behaviour:test2043, behaviour:test1293]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Conformance.UnitTests]
-task:
-tasks: []
+task: BL-1794
+tasks: [BL-1794]
 ---
 # GF-0001 - In process, Curl never runs TcpConnector: no CONNECT tunnel, no HAProxy header, no .onion refusal, no name-resolution or --resolve/--connect-to failures
 
@@ -36,3 +36,4 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1794.

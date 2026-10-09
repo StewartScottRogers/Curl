@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1070]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-1818
+tasks: [BL-1818]
 ---
 # GF-0025 - With Expect: 100-continue, the POST body is not sent when the server answers early and closes
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1818.

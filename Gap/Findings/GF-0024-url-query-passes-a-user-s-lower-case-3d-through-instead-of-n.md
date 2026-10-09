@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1221]
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests]
-task:
-tasks: []
+task: BL-1817
+tasks: [BL-1817]
 ---
 # GF-0024 - --url-query passes a user's lower-case %3d through instead of normalising it to %3D
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrl query building (used by --ur
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1817.

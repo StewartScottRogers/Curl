@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test411, behaviour:test470]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1813
+tasks: [BL-1813]
 ---
 # GF-0020 - -K: a missing file's message omits the path, and a Unicode quote in a config file is read differently
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1813.

@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test268]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1814
+tasks: [BL-1814]
 ---
 # GF-0021 - --variable ... {{name:json}} encodes a Unicode string differently (stderr)
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary's --variable / --expand-* expansion, make the ':json' fu
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1814.

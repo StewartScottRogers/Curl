@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [features:ECH]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1822
+tasks: [BL-1822]
 ---
 # GF-0029 - Curl lists ECH in Features; the Windows reference build does not
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
+- 2026-10-08_1731: Filed BL-1822.

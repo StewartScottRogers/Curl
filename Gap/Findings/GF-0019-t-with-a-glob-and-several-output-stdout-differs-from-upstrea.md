@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test2013, behaviour:test2014]
 touches: [Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1812
+tasks: [BL-1812]
 ---
 # GF-0019 - -T with a glob and several --output: stdout differs from upstream's %EMPTY expectation
 
@@ -36,3 +36,4 @@ First confirm against the reference curl what test2013/2014 write to stdout with
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1812.

@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test277, behaviour:test669, behaviour:test1133, behaviour:test1315]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-1811
+tasks: [BL-1811]
 ---
 # GF-0018 - -F multipart bodies differ: custom Content-Type, several files in one -F, quoted file names with , ; "
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary's -F parser and the multipart writer it feeds: merge a u
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1811.

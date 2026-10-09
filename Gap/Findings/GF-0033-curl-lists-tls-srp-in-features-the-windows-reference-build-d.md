@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [features:TLS-SRP]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1826
+tasks: [BL-1826]
 ---
 # GF-0033 - Curl lists TLS-SRP in Features; the Windows reference build does not
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
+- 2026-10-08_1731: Filed BL-1826.

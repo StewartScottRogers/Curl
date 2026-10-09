@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [features:GSS-API]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1823
+tasks: [BL-1823]
 ---
 # GF-0030 - Curl lists GSS-API in Features; the Windows reference build does not
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, drop GSS-API from the Windows Featur
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
+- 2026-10-08_1731: Filed BL-1823.

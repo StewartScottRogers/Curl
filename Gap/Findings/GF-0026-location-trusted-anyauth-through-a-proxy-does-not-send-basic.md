@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1088]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task:
-tasks: []
+task: BL-1819
+tasks: [BL-1819]
 ---
 # GF-0026 - --location-trusted --anyauth through a proxy does not send Basic credentials to the redirect's new host
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary's redirect handling (HttpProtocolHandler with 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1819.

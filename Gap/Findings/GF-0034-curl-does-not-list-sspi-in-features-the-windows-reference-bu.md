@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [features:SSPI]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1827
+tasks: [BL-1827]
 ---
 # GF-0034 - Curl does not list SSPI in Features; the Windows reference build does
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, add SSPI to the Windows FeaturesLine
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
+- 2026-10-08_1731: Filed BL-1827.

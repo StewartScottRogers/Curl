@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test60, behaviour:test98, behaviour:test1068, behaviour:test1069, behaviour:test1072, behaviour:test1073]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1800
+tasks: [BL-1800]
 ---
 # GF-0007 - -T - (stdin) is read whole and sent with Content-Length, not chunked; no Expect: 100-continue, and no exit 25 under HTTP/1.0
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
+- 2026-10-08_1731: Filed BL-1800.
