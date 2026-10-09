@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1884 — Fix AF-0132: h2c upgrade's 'afterHead.Length > 0' can become '>= 0' with no test failing: a spurious 'Copied HTTP/2 data ... len=0' -v line
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `ExecuteAsync_Http2UpgradeAnswered101WithNoFramesInTheSameRead_ReportsNoBytesCopied` (HttpProtocolHandlerTests.H2cUpgrade.cs): with 1-byte reads the 101 head ends its own read, and the test asserts no "Copied HTTP/2 data" line is reported. The production guard was already right; only the test was missing.
+- Verified by hand: with `afterHead.Length >= 0` applied the new test fails (Assert.IsNull), so the mutant is killed; reverted. The mutation-test script itself was not run, since lanes are refused the audit office folder; the re-audit runs it.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. New h2c test pins that no 'Copied HTTP/2 data' line appears when the 101 head ends its read; kills the >= mutant at HttpH2cUpgradeConnection.cs:179.

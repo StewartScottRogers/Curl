@@ -112,6 +112,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http2UpgradeAnswered101WithNoFramesInTheSameRead_ReportsNoBytesCopied()
+    {
+        byte[] response = [.. Encoding.Latin1.GetBytes(SwitchingProtocolsHead), .. Convert.FromHexString(UpgradedResponseFrames)];
+        RecordingTransferEvents events = new();
+
+        Diagnostics.Arrange("url, chunk size", "http://127.0.0.1:48717/, 1");
+        Diagnostics.Arrange("response", "101 Switching Protocols ending a read of its own, then HTTP/2 frames");
+        Diagnostics.Bytes("response bytes", response);
+
+        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection(response, 1)))
+            .ExecuteAsync(UpgradeContext("http://127.0.0.1:48717/", new MemoryStream(), null, events));
+
+        WriteResult(result);
+        WriteEvents("info", events.Info);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.Contains(events.Info, HttpConnectionInfoLines.SwitchingToHttp2);
+        string? copiedLine = events.Info.Find(line => line.StartsWith("Copied HTTP/2 data", StringComparison.Ordinal));
+        Diagnostics.Assert("copied line", "(none)", copiedLine ?? "(none)");
+        Assert.IsNull(copiedLine, "curl writes no 'Copied HTTP/2 data ... len=0' line when nothing followed the 101 head in its read");
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http2UpgradeIgnored_ReadsTheHttp11ResponseAndKeepsTheConnection()
     {
         // curl --http2 -v http://127.0.0.1:48716/ against a server answering 200 over HTTP/1.1.
