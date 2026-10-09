@@ -1072,6 +1072,7 @@ public sealed class HttpProtocolHandler(
             FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
             IsHttp2OrHttp3 = requestStream is not null,
             AcceptsHttp09 = options.AllowHttp09Reply,
+            IsHeadRequest = context.NoBody,
             IgnoresContentLength = options.IgnoreContentLength,
             IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),

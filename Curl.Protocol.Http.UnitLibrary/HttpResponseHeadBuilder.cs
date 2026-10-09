@@ -62,8 +62,9 @@ internal sealed class HttpResponseHeadBuilder
     /// </summary>
     /// <param name="line">A non-empty line after the status line.</param>
     /// <exception cref="HttpTransferException">
-    /// The line holds a NUL byte (exit 8, <c>Nul byte in header</c>); or has no colon, or
-    /// continues a header that is not there (exit 8, <c>Header without colon</c>); or is a
+    /// The line holds a NUL byte (exit 8, <c>Nul byte in header</c>); or has no colon once any
+    /// leading blanks of a line with no header to fold into are dropped (exit 8,
+    /// <c>Header without colon</c>); or is a
     /// second <c>Location</c> header that differs from the first (exit 8,
     /// <c>Multiple Location headers</c>); or the heads grew past <see cref="MaximumHeadSize" />
     /// (exit 56); or a folded line reached <see cref="HttpLineReader.MaximumLineLength" /> (exit 100).
@@ -75,20 +76,21 @@ internal sealed class HttpResponseHeadBuilder
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
         }
 
-        if (line.IsContinuation)
+        if (FoldsIntoPendingHeader(line))
         {
             Fold(line);
             return;
         }
 
         CommitPendingHeader();
-        if (!line.Content.Contains(':', StringComparison.Ordinal))
+        string content = line.Content.TrimStart([' ', '\t']);
+        if (!content.Contains(':', StringComparison.Ordinal))
         {
             throw HeaderWithoutColon();
         }
 
-        KeepLocation(ToHeader(line.Content));
-        pendingHeader.Clear().Append(line.Content);
+        KeepLocation(ToHeader(content));
+        pendingHeader.Clear().Append(content);
         pendingTerminator = line.Terminator;
         hasPendingHeader = true;
     }
@@ -119,13 +121,18 @@ internal sealed class HttpResponseHeadBuilder
     internal HttpResponseHead Build(HttpStatusLine statusLine, byte[] bodyPrefix) =>
         new(statusLine, [.. headers], Encoding.Latin1.GetBytes(headText.ToString()), bodyPrefix);
 
+    /// <summary>
+    /// Determines whether a header line folds into the header before it: it is a continuation
+    /// line and a header of the current head is pending. A continuation line with no header
+    /// before it is a header of its own, its leading blanks dropped, as curl 8.21.0's
+    /// <c>Curl_headers_push</c> takes it rather than failing (measured, upstream test1473, BL-1805).
+    /// </summary>
+    /// <param name="line">A non-empty line after the status line.</param>
+    /// <returns><see langword="true" /> when the line folds into the pending header.</returns>
+    internal bool FoldsIntoPendingHeader(HttpLine line) => line.IsContinuation && hasPendingHeader;
+
     private void Fold(HttpLine line)
     {
-        if (!hasPendingHeader)
-        {
-            throw HeaderWithoutColon();
-        }
-
         while (HttpLine.IsBlank(pendingHeader[^1]))
         {
             pendingHeader.Length--;
