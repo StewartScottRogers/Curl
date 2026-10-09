@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test3031]
 touches: [Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1852
+tasks: [BL-1852]
 ---
 # GF-0042 - --create-dirs does not create the --dump-header file's folder, so the transfer fails with exit 23 before any request
 
@@ -36,3 +36,4 @@ In Curl.Console's CurlCommandRunner.TransferWithHeaderFileAsync, when options.Cr
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
+- 2026-10-08_2131: Filed BL-1852.

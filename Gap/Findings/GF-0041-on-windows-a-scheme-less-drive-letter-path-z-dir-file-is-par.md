@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1146]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
-task:
-tasks: []
+task: BL-1851
+tasks: [BL-1851]
 ---
 # GF-0041 - On Windows a scheme-less drive-letter path (Z:/dir/file) is parsed as host and port instead of a path under --proto-default file
 
@@ -36,3 +36,4 @@ In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
+- 2026-10-08_2131: Filed BL-1851.

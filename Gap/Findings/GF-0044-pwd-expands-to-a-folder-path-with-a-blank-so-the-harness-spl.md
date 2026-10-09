@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test3009]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
-task:
-tasks: []
+task: BL-1854
+tasks: [BL-1854]
 ---
 # GF-0044 - %PWD expands to a folder path with a blank, so the harness splits test3009's --output-dir argument and Curl fetches an extra URL
 
@@ -36,3 +36,4 @@ Curl's behaviour needs no change: it passes test3009 once %PWD holds no blank. M
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
+- 2026-10-08_2131: Filed BL-1854.

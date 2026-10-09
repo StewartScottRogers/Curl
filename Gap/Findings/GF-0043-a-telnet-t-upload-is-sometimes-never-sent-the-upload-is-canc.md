@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1327]
 touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests]
-task:
-tasks: []
+task: BL-1853
+tasks: [BL-1853]
 ---
 # GF-0043 - A telnet -T upload is sometimes never sent: the upload is cancelled when the peer closes first
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Telnet.UnitLibrary's TelnetProtocolHandler, the -T upload runs 
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
+- 2026-10-08_2131: Filed BL-1853.
