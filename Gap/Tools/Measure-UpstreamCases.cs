@@ -34,6 +34,9 @@
 //   %PWD     the folder runtests.pl runs from, which is that same tests folder, so %PWD/../docs
 //            is the release's docs folder; "%PWD/%LOGDIR" is first reduced to "%LOGDIR", because
 //            upstream's %LOGDIR is relative ("log") and here it is already absolute;
+//            when the tests folder's path holds a blank (a cache under C:\Users\<first last>),
+//            the release is first copied to <out.json's folder>/upstream-release and both name
+//            the copy, since an unquoted blank splits the command line (GF-0044);
 //   %PERL    the perl found on PATH, or else the one of the Git for Windows that provides git
 //            (<git root>/usr/bin/perl.exe), by an absolute path with forward slashes. With no perl
 //            %PERL stays as written, so the runner skips the case for it and the converter
@@ -96,7 +99,8 @@ UpstreamCurlPlatform platform = OperatingSystem.IsWindows() ? UpstreamCurlPlatfo
 DateTimeOffset startedAt = DateTimeOffset.Now;
 Directory.CreateDirectory(logFolder);
 string commit = ReadCommit();
-string testsFolder = (Path.GetDirectoryName(testDataFolder.TrimEnd('\\', '/')) ?? testDataFolder).Replace('\\', '/');
+string releaseCopy = Path.Combine(Path.GetDirectoryName(outputPath)!, "upstream-release");
+string testsFolder = NameTestsFolder((Path.GetDirectoryName(testDataFolder.TrimEnd('\\', '/')) ?? testDataFolder).Replace('\\', '/'), releaseCopy);
 string? perl = FindPerl();
 
 // Some cases name a file relative to curl's working folder (upstream runs them from tests/,
@@ -128,6 +132,7 @@ await Parallel.ForEachAsync(
 
 Environment.CurrentDirectory = startingFolder;
 DeleteLogDirectory(new DirectoryInfo(logFolder));
+DeleteLogDirectory(new DirectoryInfo(releaseCopy));
 DateTimeOffset finishedAt = DateTimeOffset.Now;
 
 await using (FileStream output = File.Create(outputPath))
@@ -276,6 +281,35 @@ static string ReadCommit()
     catch (System.ComponentModel.Win32Exception)
     {
         return "unknown";
+    }
+}
+
+// The tests folder %PWD and %SRCDIR name. An unquoted one holding a blank splits the command
+// line (test3009, GF-0044), so then the release is copied to releaseCopy, which holds no blank
+// when the log folder beside it holds none, and the copy's tests folder is named instead.
+static string NameTestsFolder(string testsFolder, string releaseCopy)
+{
+    if (!testsFolder.Contains(' ', StringComparison.Ordinal))
+    {
+        return testsFolder;
+    }
+
+    CopyFolder(Path.GetDirectoryName(testsFolder)!, releaseCopy);
+    return Path.Combine(releaseCopy, Path.GetFileName(testsFolder)).Replace('\\', '/');
+}
+
+// Copies a folder and everything under it, replacing what is already there.
+static void CopyFolder(string source, string destination)
+{
+    foreach (string folder in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+    {
+        Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, folder)));
+    }
+
+    Directory.CreateDirectory(destination);
+    foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+    {
+        File.Copy(file, Path.Combine(destination, Path.GetRelativePath(source, file)), overwrite: true);
     }
 }
 
