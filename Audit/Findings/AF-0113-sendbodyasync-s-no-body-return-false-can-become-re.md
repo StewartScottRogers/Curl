@@ -3,12 +3,12 @@ id: AF-0113
 title: SendBodyAsync's no-body 'return false' can become 'return true' with no test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:SendBodyAsync-false:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:2433:false
-task: none
-tasks:
+task: BL-1863
+tasks: BL-1863
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.

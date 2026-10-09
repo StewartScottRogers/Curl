@@ -3,12 +3,12 @@ id: AF-0127
 title: Report-Format.md still calls Get-AuditorFingerprint.ps1 'planned BL-1002' though it exists
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Audit/Instructions/Report-Format.md:Get-AuditorFingerprint:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-1877
+tasks: BL-1877
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
@@ -47,3 +47,4 @@ Run from the repository root:
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.

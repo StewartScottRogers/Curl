@@ -3,12 +3,12 @@ id: AF-0131
 title: IKerberosFileWriter.AppendAllBytes says it returns false only when no file exists, but its implementation returns false on any I/O or access failure
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Kerberos.UnitLibrary/IKerberosFileWriter.cs:AppendAllBytes:false-doc-comment
 reproduction: none
-task: none
-tasks:
+task: BL-1881
+tasks: BL-1881
 found: 2026-10-09
 found-at: 64e750b3931ea71536d942080142f37bfc4c9ccf
 scorecard: 2026-10-09_0225.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Kerberos.UnitLibrary/IKerberosFileWriter.cs -SimpleMatc
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.

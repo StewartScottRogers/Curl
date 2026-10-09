@@ -29,7 +29,8 @@
                tasks in Doing, plus the ready tasks that could start beside them,
                picked in 'next' order so no two overlap in touches. One line,
                parseable with '^Capacity (\d+):'. The dark factory's -Lanes Auto
-               caps its lane count with it. Interactive-only tasks do not count.
+               caps its lane count with it. Every task in Doing counts, interactive-
+               only ones included; of the ready tasks, only lane-eligible ones do.
       next-id  The next free task ID.
       new      Create a task in Backlog from TASK-TEMPLATE.md. -NoLane writes
                'lane: no' so no dark factory lane is offered it.
@@ -214,6 +215,11 @@ function Test-AuditPath([string] $TouchPath) {
         '.github/workflows/ci.yml',
         '.claude/skills/task-board/task-board.ps1'
     )
+    # A folder that holds a guard file or an auditor or analyst agent (".claude", ".github",
+    # ".claude/skills" and the like) counts too: such a touch lets a lane reach them (BL-1876).
+    $p = $TouchPath.Replace([string][char]92, '/').TrimEnd('/')
+    $holders = @($guardFiles + '.claude/agents/audit-x' + '.claude/agents/gap-x' | Where-Object { $_.StartsWith("$p/", [StringComparison]::OrdinalIgnoreCase) })
+    if ($p -and $holders.Count -gt 0) { return $true }
     return $TouchPath -ieq 'Audit' -or
         $TouchPath.StartsWith('Audit/', [StringComparison]::OrdinalIgnoreCase) -or
         $TouchPath -ilike '.claude/agents/audit-*' -or

@@ -3,12 +3,12 @@ id: AF-0128
 title: CI red on work/dark-factory for 321 minutes from run 37733074018 on 711fbdf0
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:37733074018:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-1878
+tasks: BL-1878
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
@@ -48,3 +48,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.

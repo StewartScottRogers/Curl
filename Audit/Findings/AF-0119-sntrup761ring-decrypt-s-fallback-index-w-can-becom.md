@@ -3,12 +3,12 @@ id: AF-0119
 title: Sntrup761Ring.Decrypt's fallback 'index < W' can become '<= W' with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cryptography.UnitLibrary/Sntrup761Ring.cs:Decrypt-lt:surviving-mutant
 reproduction: mutation Curl.Cryptography.UnitLibrary/Sntrup761Ring.cs:238:<
-task: none
-tasks:
+task: BL-1869
+tasks: BL-1869
 found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
