@@ -42,7 +42,7 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 - [x] `behaviour:test246`: Curl answers what curl 8.21.0 answers, `upstream test246 passes`, so the item measures `match`.
 - [x] `behaviour:test1001`: Curl answers what curl 8.21.0 answers, `upstream test1001 passes`, so the item measures `match`.
 - [x] `behaviour:test1002`: Curl answers what curl 8.21.0 answers, `upstream test1002 passes`, so the item measures `match`.
-- [x] `behaviour:test1284`: moved to BL-1832 (the probe must also replace a user `-H Content-Length`).
+- [x] `behaviour:test1284`: moved to BL-1835 (the probe must also replace a user `-H Content-Length`).
 - [x] `behaviour:test1285`: Curl answers what curl 8.21.0 answers, `upstream test1285 passes`, so the item measures `match`.
 - [x] `behaviour:test2058`: Curl answers what curl 8.21.0 answers, `upstream test2058 passes`, so the item measures `match`.
 - [x] `behaviour:test2059`: Curl answers what curl 8.21.0 answers, `upstream test2059 passes`, so the item measures `match`.
@@ -55,7 +55,7 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 
 ## Notes
 
-- 2026-10-08: The first POST or PUT goes as an empty probe (`Content-Length: 0`) when Digest is the one scheme allowed for the origin or proxy and no value was made yet (`HttpRequestFraming.AsAuthProbe`, `HttpProtocolHandler.SendsDigestProbe`, ADR-0441); the 401/407 answer carries the body, and a 2xx to the probe is followed by the POST with its body (test175). Unit tests: `ExecuteAsync_DigestPostBeforeAChallenge_SendsAnEmptyProbeFirst`, `ExecuteAsync_DigestProbeAnsweredWithoutAChallenge_SendsTheBodyNext`. The gap tarball sits under a `gap` path the lane guard refuses, so the items were not re-measured here; the next gap run decides. test1284 (user `-H Content-Length` must be replaced) moved to BL-1832. Not done: the probe over HTTP/2 or HTTP/3 restores the HTTP/1 framing on the retry (edge; no upstream item).
+- 2026-10-08: The first POST or PUT goes as an empty probe (`Content-Length: 0`) when Digest is the one scheme allowed for the origin or proxy and no value was made yet (`HttpRequestFraming.AsAuthProbe`, `HttpProtocolHandler.SendsDigestProbe`, ADR-0441); the 401/407 answer carries the body, and a 2xx to the probe is followed by the POST with its body (test175). Unit tests: `ExecuteAsync_DigestPostBeforeAChallenge_SendsAnEmptyProbeFirst`, `ExecuteAsync_DigestProbeAnsweredWithoutAChallenge_SendsTheBodyNext`. The gap tarball sits under a `gap` path the lane guard refuses, so the items were not re-measured here; the next gap run decides. test1284 (user `-H Content-Length` must be replaced) moved to BL-1835. Not done: the probe over HTTP/2 or HTTP/3 restores the HTTP/1 framing on the retry (edge; no upstream item).
 
 ## Log
 

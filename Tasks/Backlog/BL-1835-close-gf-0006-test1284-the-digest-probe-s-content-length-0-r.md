@@ -1,5 +1,5 @@
 ---
-id: BL-1832
+id: BL-1835
 title: Close GF-0006 test1284: the Digest probe's Content-Length: 0 replaces a user -H Content-Length
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-08
 completed:
 ---
-# BL-1832 — Close GF-0006 test1284: the Digest probe's Content-Length: 0 replaces a user -H Content-Length
+# BL-1835 — Close GF-0006 test1284: the Digest probe's Content-Length: 0 replaces a user -H Content-Length
 
 ## Goal
 
