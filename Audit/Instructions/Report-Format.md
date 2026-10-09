@@ -34,7 +34,7 @@ anything not in the block is lost to them. The rules every auditor follows are i
 | --- | --- | --- |
 | `auditor` | string | The auditor's name: `quality`, `security`, `performance`, `conformance`, `truthfulness` or `process`. |
 | `commit` | string | The full 40-character SHA of the commit the prompt names as audited, copied from the prompt. |
-| `fingerprint` | string | The auditor fingerprint the prompt gives (64 lowercase hex characters, from `Audit/Tools/Get-AuditorFingerprint.ps1`, planned BL-1002), copied from the prompt. |
+| `fingerprint` | string | The auditor fingerprint the prompt gives (64 lowercase hex characters, from `Audit/Tools/Get-AuditorFingerprint.ps1`, BL-1002), copied from the prompt. |
 | `findings` | array | One object per finding, in the order found. |
 | `reaudits` | array | One object per finding the prompt listed for re-audit, each exactly once. |
 | `metrics` | object | The auditor's measurements, named as in [Metrics](#metrics). |
