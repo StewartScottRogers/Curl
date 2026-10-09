@@ -3,8 +3,8 @@ id: AF-0122
 title: GetInitialTicketAsync_MethodDataWithoutKeyInfo_UsesTheFirstTypeAndDefaultSalt never checks which encryption type was used
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Kerberos.UnitTests/KerberosKdcClientTests.cs:GetInitialTicketAsync_MethodDataWithoutKeyInfo_UsesTheFirstTypeAndDefaultSalt:weak-assertion
 reproduction: none
 task: none
@@ -47,3 +47,4 @@ Select-String -Path Curl.Kerberos.UnitTests/KerberosKdcClientTests.cs -Pattern '
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
