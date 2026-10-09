@@ -3,8 +3,8 @@ id: AF-0116
 title: The CONNECT-UDP reply's verbose lines can be rendered as a CONNECT reply's (forConnectUdp: true -> false) with no test failing
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:RequestUdpTunnelAsync-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:244:true
 task: none
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-08: filed proposed.
+- 2026-10-09: proposed -> accepted.
