@@ -121,7 +121,7 @@ internal static class HttpRequestHeadFormatter
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
         AppendRequestLine(head, framing.Method, url, forwardProxy, options);
-        string? hostLine = FormatHostLine(url, customHeaders);
+        string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         if (hostLine is not null)
         {
             head.Append(hostLine).Append("\r\n");
@@ -256,11 +256,12 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Gives the value of the first <c>-H</c> value naming <c>Host</c>, its name matched in any
-    /// case, or <see langword="null" /> when none names it or the one that does sends no value.
+    /// case, or <see langword="null" /> when none names it, the one that does sends no value, or
+    /// the request is a follow to another host (<see cref="HttpRequestOptions.FollowedToAnotherHost" />).
     /// </summary>
     internal static string? CustomHostOf(HttpRequestOptions options)
     {
-        foreach (HttpCustomHeader header in CustomHeadersOf(options.Headers, options))
+        foreach (HttpCustomHeader header in options.FollowedToAnotherHost ? [] : CustomHeadersOf(options.Headers, options))
         {
             if (header.Names(HostName))
             {

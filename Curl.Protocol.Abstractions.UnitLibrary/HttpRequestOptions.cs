@@ -64,6 +64,14 @@ public sealed record HttpRequestOptions
     public bool AutoReferer { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether this request is a followed redirect to a host other
+    /// than the first URL's, which sends the URL's own <c>Host</c> and matches cookies against
+    /// it, leaving out any <c>-H</c> <c>Host</c> value, as curl 8.21.0's <c>http_host</c> does
+    /// (upstream test184, BL-1845).
+    /// </summary>
+    public bool FollowedToAnotherHost { get; init; }
+
+    /// <summary>
     /// Gets the request body from the <c>-d</c> and <c>-F</c> families, already encoded,
     /// or <see langword="null" /> to send none.
     /// </summary>

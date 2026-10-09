@@ -136,6 +136,23 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_HopToAnotherHost_MarksOnlyThatHopFollowedToAnotherHost()
+    {
+        // curl's http_host keeps a custom Host only while a follow stays on the first host name,
+        // whatever its port or scheme (upstream test184, BL-1845).
+        ScriptedHandler handler = new(
+            Redirect(302, "http://YET.another.host/b"),
+            Redirect(302, "https://127.0.0.1:9/c"),
+            Ok(200, 0));
+
+        await Follow(handler, Context(Location()));
+
+        CollectionAssert.AreEqual(
+            new[] { false, true, false },
+            handler.Contexts.Select(context => context.Http!.FollowedToAnotherHost).ToArray());
+    }
+
+    [TestMethod]
     public async Task FollowAsync_WithoutAutoReferer_SendsEveryHopTheGivenRefererAndReportsIt()
     {
         ScriptedHandler handler = new(Redirect(302, Next), Ok(200, 0));

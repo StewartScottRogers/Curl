@@ -61,6 +61,15 @@ public sealed partial class HttpRequestHeadFormatterTests
     }
 
     [TestMethod]
+    [DataRow("Host: another.visitor\nX-A: 1", DisplayName = "Custom Host left out")]
+    [DataRow("Host:\nX-A: 1", DisplayName = "Host: disabling it ignored")]
+    public void Format_FollowedToAnotherHost_SendsTheUrlsHostInPlaceOfCustomHost(string headers)
+    {
+        // upstream test184: the followed request to yet.another.host sends its own Host (BL-1845).
+        AssertHead("GET / HTTP/1.1\r\n" + DefaultHeaders + "X-A: 1\r\n\r\n", CurlUrl.Parse(Url), new HttpRequestOptions { Headers = headers.Split('\n'), FollowedToAnotherHost = true });
+    }
+
+    [TestMethod]
     [DataRow("Accept:", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Remove Accept")]
     [DataRow("Accept:   ", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Remove Accept, blanks after colon")]
     [DataRow("Accept; y", "Host: 127.0.0.1:18091\r\nUser-Agent: curl/8.21.0\r\n", DisplayName = "Accept; y removes Accept")]

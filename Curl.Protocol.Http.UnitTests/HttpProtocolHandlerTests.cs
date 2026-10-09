@@ -1202,6 +1202,16 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(expected, $"{cookieUrl.Scheme}://{cookieUrl.Host}{(cookieUrl.IsDefaultPort ? "" : $":{cookieUrl.Port}")}{cookieUrl.AbsolutePath}");
     }
 
+    [TestMethod]
+    public void CookieUrlOf_FollowedToAnotherHost_MatchesCookiesAgainstTheUrlsHost()
+    {
+        CurlUrl url = CurlUrl.Parse("http://yet.another.host/184");
+
+        CurlUrl cookieUrl = HttpProtocolHandler.CookieUrlOf(url, new HttpRequestOptions { Headers = ["Host: another.visitor"], FollowedToAnotherHost = true });
+
+        Assert.AreSame(url, cookieUrl);
+    }
+
     /// <summary>Writes the ASSERT line for two sequences of lines, CR and LF shown escaped.</summary>
     private void WriteExpectedLines(string label, IEnumerable<string> expected, IEnumerable<string> actual) =>
         Diagnostics.Assert(label, OneLine(string.Join(" | ", expected)), OneLine(string.Join(" | ", actual)));

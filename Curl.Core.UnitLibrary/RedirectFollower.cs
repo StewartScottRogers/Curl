@@ -642,7 +642,10 @@ public sealed class RedirectFollower(
             MaxTime = first.MaxTime,
             OperationStarted = operationStarted,
             Proxy = hopProxy.Proxy,
-            Http = HopAltSvc(first.Url, url, HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials), selectHopAltSvc),
+            Http = HopAltSvc(first.Url, url, HopHttp(previousUrl, http, hopProxy.ForwardProxy, bodyDropped, sendCredentials), selectHopAltSvc) with
+            {
+                FollowedToAnotherHost = !string.Equals(first.Url.Host, url.Host, StringComparison.OrdinalIgnoreCase),
+            },
             TimeProvider = first.TimeProvider,
             CancellationToken = first.CancellationToken,
             Progress = first.Progress,
