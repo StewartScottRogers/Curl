@@ -44,6 +44,7 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "Name=CopyA
 
 - 2026-10-08 | 2026-10-08_0748.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the dotnet test command: 'Failed! - Failed: 3, Passed: 0'. LargeReadToCloseBody shows 'ASSERT write sizes: expected 16384, 16384, 7232, actual ' (nothing written in pieces). OutputFailsOnALargeBody shows 'Expected exception of exact type HttpTransferException but no exception was thrown'. Cause: HttpResponseBodyReader.cs:321-351 buffers into 'MemoryStream held' and copies it once in finally.
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the dotnet test reproduction: Failed! - Failed: 3, Passed: 0, Total: 3. E.g. CopyAsync_OutputFailsAfterAcceptingSomeBytes_ReportsThemAndTheBytesBefore: 'Expected exception of exact type HttpTransferException but no exception was thrown' (HttpResponseBodyReaderTests.cs:215). The same 3 tests were left out as baseline failures by the Http mutation run.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the dotnet test reproduction: Passed! Failed 0, Passed 3, Total 3 (Curl.Protocol.Http.UnitTests). The sampled mutation baseline of Curl.Protocol.Http.UnitTests also excluded no failing tests.
 
 ## Log
 

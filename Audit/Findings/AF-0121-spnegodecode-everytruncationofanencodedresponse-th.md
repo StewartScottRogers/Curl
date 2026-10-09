@@ -42,6 +42,8 @@ Select-String -Path Curl.Authentication.UnitTests/AuthenticationAdversarialTests
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Select-String shows AuthenticationAdversarialTests.cs:259-274 unchanged: a loop over truncations whose try/catch (SpnegoTokenException) has no Assert.Fail after Decode, so a truncation that decodes without throwing still passes.
+
 ## Log
 
 - 2026-10-08: filed proposed.

@@ -44,6 +44,7 @@ $o="$env:TEMP\af-if"; $a=@('--interface','@f.txt','--negotiate','-s','-S','http:
 
 - 2026-10-08 | 2026-10-08_0748.md | not re-audited | overlaps planted defect PD-301 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction (--interface @f.txt --negotiate -s -S): both exit 45. curl stderr 'curl: (45) Failed to connect to 127.0.0.1:50998 after 1 ms: Failed binding local connection end'; Curl's stderr is the same except 'after 34 ms'. Curl no longer reports the Negotiate SSPI failure.
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | overlaps planted defect PD-301 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: both stderr files read 'curl: (45) Failed to connect to 127.0.0.1:<port> after <n> ms: Failed binding local connection end'. Both exit 45. Only the elapsed time differs. No Negotiate/SSPI text appears.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the reproduction: both stderr files read 'curl: (45) Failed to connect to 127.0.0.1:50998 after <n> ms: Failed binding local connection end' (only the elapsed time differs), and both exit 45. Neither mentions the Negotiate SSPI failure.
 
 ## Log
 

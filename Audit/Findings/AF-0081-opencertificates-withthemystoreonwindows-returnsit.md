@@ -3,8 +3,8 @@ id: AF-0081
 title: OpenCertificates_WithTheMyStoreOnWindows_ReturnsItsCertificates checks only that the result is not null
 auditor: quality
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).
 key: quality:Curl.Networking.UnitTests/SystemClientCertificateStoreTests.cs:OpenCertificates_WithTheMyStoreOnWindows_ReturnsItsCertificates:weak-assertion
 reproduction: none
 task: BL-1759
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-08_2315.md, 2026-10-09_0225.md
 ---
 # AF-0081 - OpenCertificates_WithTheMyStoreOnWindows_ReturnsItsCertificates checks only that the result is not null
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitTests/SystemClientCertificateStoreTests.
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Ran the Select-String: line 34 Assert.IsNotNull(actual) is now followed by line 35 CollectionAssert.AreEqual(expected, actual), where expected is the sorted thumbprints X509Store lists for the same location and store. The test checks the certificates themselves, not only non-null.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Select-String shows SystemClientCertificateStoreTests.cs:34 Assert.IsNotNull(actual); followed by :35 CollectionAssert.AreEqual(expected, actual), where expected is the sorted thumbprints X509Store lists for the same location and MY store.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).

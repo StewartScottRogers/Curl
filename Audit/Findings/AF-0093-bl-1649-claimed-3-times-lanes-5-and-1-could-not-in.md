@@ -3,8 +3,8 @@ id: AF-0093
 title: BL-1649 claimed 3 times; lanes 5 and 1 could not integrate because fast tests failed after rebasing
 auditor: process
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.
 key: process:logs:BL-1649:redone-work
 reproduction: none
 task: BL-1771
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_0225.md
 ---
 # AF-0093 - BL-1649 claimed 3 times; lanes 5 and 1 could not integrate because fast tests failed after rebasing
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1649 row; DarkFactory-20261007-111121-L*.log matched no file. Could not tell.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | No lane failed fast tests after rebasing this window. BL-1818, BL-1850 and BL-1859 each integrated on their first verify, and there are no PARKED lines.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: the reproduction no longer reproduces.

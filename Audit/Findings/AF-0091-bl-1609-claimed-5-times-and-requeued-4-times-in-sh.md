@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | Ran the reproduction. There is no BL-1609 row since 2026-10-07; DarkFactory-20261007-201432-L*.log matched no file and BL-1609-20261007-201432-L9.jsonl does not exist. The logs are not in the copied folder.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | The redone-work rule crossed again: BL-1850 claims 5, requeues 3, all on lane 9 of shift 20261009-001500 (00:15:10 to 00:49:40, 'Lane stalled; task sent back'). The denied git stash list does not recur: no .jsonl in the window contains 'has been denied'.
 
 ## Log
 

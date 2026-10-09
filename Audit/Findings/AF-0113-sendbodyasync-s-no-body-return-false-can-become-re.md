@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the -Site reproduction: survived Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs:2433 false [SendBodyAsync] 'return false;' -> 'return true;', excludedTests empty. The seed-0 sample of the library hit the same site, and it survived there too.
+
 ## Log
 
 - 2026-10-08: filed proposed.

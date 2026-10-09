@@ -44,6 +44,7 @@ $o="$env:TEMP\af-put"; $a=@('-d','a=1','-T','CLAUDE.md','http://127.0.0.1:50999/
 
 - 2026-10-08 | 2026-10-08_0748.md | not re-audited | overlaps planted defect PD-301 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction (-d a=1 -T CLAUDE.md): output 'curl 2 / Curl 2'. Both wrote the same two lines: 'Warning: You can only select one HTTP request method! You asked for both PUT ' / 'Warning: (-T, --upload-file) and POST (-d, --data).'
 - 2026-10-08 | 2026-10-08_2315.md | not re-audited | overlaps planted defect PD-301 in Curl.Console/CurlCommandRunner.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction against curl 8.21.0 Schannel: 'curl 2 / Curl 2'. Both print 'Warning: You can only select one HTTP request method! You asked for both PUT (-T, --upload-file) and POST (-d, --data).'
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the reproduction against curl 8.21.0 Schannel: 'curl 2 / Curl 2'. Both print 'Warning: You can only select one HTTP request method! You asked for both PUT' / 'Warning: (-T, --upload-file) and POST (-d, --data).'
 
 ## Log
 

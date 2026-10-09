@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Http.UnitTests/HttpLineReaderTests.cs -Pattern
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Select-String shows HttpLineReaderTests.cs:40 Assert.IsTrue("rest".StartsWith(Encoding.ASCII.GetString(rest), StringComparison.Ordinal)); "rest".StartsWith("") is true, so an empty rest passes.
+
 ## Log
 
 - 2026-10-08: filed proposed.

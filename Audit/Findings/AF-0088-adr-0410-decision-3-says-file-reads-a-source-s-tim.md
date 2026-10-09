@@ -3,8 +3,8 @@ id: AF-0088
 title: ADR-0410 decision 3 says file:// reads a source's time with stat off Windows; off Windows the code reads nothing
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).
 key: truthfulness:Documentation/Planning/Decisions/ADR-0410-remote-file-times-travel-as-unix-seconds-so-r-can-stamp-and-cap-times-past-year-9999.md:SourceLastWriteReader:stale-adr
 reproduction: none
 task: BL-1766
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-08_2315.md, 2026-10-09_0225.md
 ---
 # AF-0088 - ADR-0410 decision 3 says file:// reads a source's time with stat off Windows; off Windows the code reads nothing
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-08 | 2026-10-08_2315.md | reproduces: no | Neither the ADR text 'stat` off Windows' nor the code ternary matches any more. FileProtocolHandler.cs:371-374 now picks Win32SourceLastWriteReader on Windows, PosixSourceLastWriteReader on Linux and macOS, and NoRawSourceLastWriteReader elsewhere. ADR-0410 lines 65-71 describe statx/fgetattrlist off Windows (BL-1790), which matches.
+- 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the reproduction, and neither Select-String matched. ADR-0410 now describes statx on Linux and fgetattrlist on macOS (BL-1790, around line 69). FileProtocolHandler.cs:371-374 now picks Win32SourceLastWriteReader on Windows, PosixSourceLastWriteReader (SourceLastWriteReaders.cs:89) on Linux or macOS, and NoRawSourceLastWriteReader otherwise.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_0225.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-08_2315.md, 2026-10-09_0225.md).
