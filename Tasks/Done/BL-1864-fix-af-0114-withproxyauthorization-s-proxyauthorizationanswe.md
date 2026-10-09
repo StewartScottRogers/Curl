@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1864 — Fix AF-0114: WithProxyAuthorization's proxyAuthorizationAnswersChallenge: true can become false with no test failing
 
@@ -41,12 +41,24 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- New test `ExecuteAsync_ProxyHandshakeContinuedTwice_TellsTheSecondContinuationItsValueAnsweredAChallenge`
+  (`Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ProxyNtlmAndNegotiate.cs`), the proxy
+  mirror of the origin's `ExecuteAsync_HandshakeContinuedTwice_...`: two 407s then 200 through
+  `HandshakeAuthenticator`; the second continuation must be told its value answered a
+  challenge (`sentBeforeAnyChallenge: false`). That is the flag's effect through
+  `AnswerChallengesAsync`. The `Proxy auth using` line does not depend on the flag for a
+  value that names its scheme, so the continuation is the observable pinned.
+- Mutant checked by hand (lanes may not run `Audit/Tools`): flipping line 2838 to `false`
+  fails the new test at index 1 (expected False); reverted, it passes. No production change
+  was needed; `touches` covers the library, the test sits in its `.UnitTests` project.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. A proxy handshake test now pins that the retry after a 407 answers a challenge; the AF-0114 mutant fails it.

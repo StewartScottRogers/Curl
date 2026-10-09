@@ -88,6 +88,30 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// A proxy handshake whose second leg draws another 407 is continued as one that answered
+    /// a challenge: the retry after the first 407 tells the authenticator its value was not
+    /// sent before any challenge, so a multi-leg proxy handshake is not restarted (AF-0114).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyHandshakeContinuedTwice_TellsTheSecondContinuationItsValueAnsweredAChallenge()
+    {
+        TurnTakingConnection connection = new(65536, ProxyNtlmChallengeHead, ProxyNtlmChallengeHead, ProxyOkHead + "ok");
+        HandshakeAuthenticator authenticator = new("NTLM T1", ["NTLM T2", "NTLM T3"]);
+        MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "407 NTLM type 2, 407 NTLM type 2, then 200 ok; continuations NTLM T2 then NTLM T3");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator, null, HttpAuthSchemes.Ntlm).ExecuteAsync(ProxyChallengeContext(output));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Assert("continuations", "NTLM T1 True | NTLM T2 False", string.Join(" | ", authenticator.Continuations.Select(continuation => $"{continuation.Sent} {continuation.SentBeforeAnyChallenge}")));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        CollectionAssert.AreEqual(new[] { "NTLM T1", "NTLM T2" }, authenticator.Continuations.Select(continuation => continuation.Sent).ToArray());
+        CollectionAssert.AreEqual(new[] { true, false }, authenticator.Continuations.Select(continuation => continuation.SentBeforeAnyChallenge).ToArray());
+    }
+
+    /// <summary>
     /// <c>--proxy-negotiate</c> sends the context's first token up front, as measured curl steps
     /// a context before its first request, and answers the proxy's token in a 407 with the same
     /// context's next token on the same connection, for <c>HTTP</c> on the proxy's host.
