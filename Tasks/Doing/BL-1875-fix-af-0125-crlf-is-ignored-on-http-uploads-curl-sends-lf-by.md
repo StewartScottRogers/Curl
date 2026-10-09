@@ -61,3 +61,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary, which BL-1863 (in Doing) touches
+- 2026-10-09: Backlog -> Doing.
