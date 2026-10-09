@@ -267,12 +267,10 @@ public sealed class HttpProxyTunnelTests
     [DataRow("HTTP/1.1 299 Odd\r\nX-A: b\r\n\r\n", 299)]
     [DataRow("HTTP/1.1 200 OK\n\n", 200)]
     [DataRow("HTTP/1.1 200 OK\r\nX: a\rb\n\r\n", 200)]
-    [DataRow("garbage\r\n\r\n", 0)]
     [DataRow("HTTP/1.1\r\nX: 200\r\n\r\n", 0)]
     [DataRow("HTTP/1.1 2000 OK\r\n\r\n", 0)]
     [DataRow("HTTP/1.1 2x0 Odd\r\n\r\n", 0)]
     [DataRow("HTTP/1.1 20\r\n\r\n", 0)]
-    [DataRow("FTP/1.1 200 OK\r\n\r\n", 0)]
     public async Task ReadReplyAsync_ReturnsTheStatusCodeOrZeroWhenTheReplyIsNotHttp(string reply, int expected)
     {
         // Measured: "HTTP/1.1 2000 OK" and "HTTP/1.1\r\nX: 200" are both "response 0" to curl.
@@ -371,6 +369,23 @@ public sealed class HttpProxyTunnelTests
         Diagnostics.Assert("head is empty", true, result.Head.IsEmpty);
         Assert.AreEqual(CurlExitCode.RecvError, result.FailureExitCode);
         Assert.AreEqual("Proxy CONNECT aborted", result.FailureMessage);
+        Assert.IsTrue(result.Head.IsEmpty);
+    }
+
+    [TestMethod]
+    public async Task ReadReplyAsync_WhenTheFirstLineDoesNotStartWithHttp_FailsWithInvalidResponseHeader()
+    {
+        // Upstream test750: curl 8.21.0 fails the reply once its first line ends, exit 43.
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes("<html>\r\n<head>\r\n"));
+        ArrangeReply("<html>\r\n<head>\r\n");
+
+        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
+
+        ActReply(result);
+        Diagnostics.Assert("failure exit code", CurlExitCode.BadFunctionArgument, result.FailureExitCode);
+        Diagnostics.Assert("failure message", "Invalid response header", result.FailureMessage);
+        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.FailureExitCode);
+        Assert.AreEqual("Invalid response header", result.FailureMessage);
         Assert.IsTrue(result.Head.IsEmpty);
     }
 

@@ -1763,7 +1763,10 @@ public sealed partial class TcpConnector(
 
         if (string.IsNullOrEmpty(answer))
         {
-            return (null, false, null);
+            // curl 8.21.0 reads an unanswered 407's chunked body before it gives up, so a
+            // malformed one is exit 56, not exit 7 (measured, upstream test1715, BL-1857).
+            var unreadable = reply.IsChunked ? await DiscardChunkedBodyAsync(connection, tunnel.Target.Events, cancellationToken).ConfigureAwait(false) : null;
+            return (null, false, unreadable);
         }
 
         return reply.LeavesConnectionReusable
@@ -1800,12 +1803,22 @@ public sealed partial class TcpConnector(
             return (answer, await HttpProxyTunnel.DiscardBodyAsync(connection, reply.ContentLength, cancellationToken).ConfigureAwait(false), null);
         }
 
+        var failure = await DiscardChunkedBodyAsync(connection, events, cancellationToken).ConfigureAwait(false);
+        return failure is null
+            ? (answer, true, null)
+            : (null, false, failure);
+    }
+
+    /// <summary>
+    /// Discards a reply's chunked body with its <c>-v</c> lines, returning <see langword="null" />
+    /// once it has ended, else the exit 56 failure curl 8.21.0 gives up with (BL-862 Notes).
+    /// </summary>
+    private static async ValueTask<ConnectResult?> DiscardChunkedBodyAsync(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
+    {
         events.ReportInfo(ConnectTunnelVerboseLines.IgnoreChunkedBody);
         var failure = await HttpProxyTunnel.DiscardChunkedBodyAsync(connection, cancellationToken).ConfigureAwait(false);
         ConnectTunnelVerboseLines.ReportChunkedBodyEnd(events, failure);
-        return failure is null
-            ? (answer, true, null)
-            : (null, false, ConnectResult.Failed(CurlExitCode.RecvError, failure));
+        return failure is null ? null : ConnectResult.Failed(CurlExitCode.RecvError, failure);
     }
 
     /// <summary>
@@ -1902,7 +1915,7 @@ public sealed partial class TcpConnector(
     private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
         reply.FailureMessage is { } failureMessage
             ? ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage)
-            : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}");
+            : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}", null, 0, reply.StatusCode);
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
         DialedSocket dialed,

@@ -95,11 +95,12 @@ public sealed class UpstreamConformanceTests
             invocation.StandardOutput,
             invocation.StandardError,
             invocation.StandardInput,
-            invocation.Connector,
+            new InMemoryServerTcpDialer(invocation.Connector),
+            new LoopbackOnlyDnsResolver(),
             invocation.DatagramConnector,
-            runConnections: new ConnectionCache(TimeProvider.System),
             writesProgressMeter: true,
-            writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(invocation.Arguments);
+            writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
+            usesHandBuiltNtlm: true).RunAsync(invocation.Arguments);
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
     private static void DeleteLogDirectory(DirectoryInfo logDirectory)

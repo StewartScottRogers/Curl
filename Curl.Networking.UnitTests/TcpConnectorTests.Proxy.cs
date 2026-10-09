@@ -88,7 +88,6 @@ public sealed partial class TcpConnectorTests
     [DataRow("HTTP/1.1 403 Forbidden\r\n\r\n", 403)]
     [DataRow("HTTP/1.1 300 Odd\r\n\r\n", 300)]
     [DataRow("HTTP/1.1 100 Continue\r\n\r\n", 100)]
-    [DataRow("garbage\r\n\r\n", 0)]
     public async Task ConnectAsync_WhenTheProxyAnswersOutside2xx_FailsWithCouldntConnectAndDisposesTheConnection(string reply, int statusCode)
     {
         // curl -p -x 127.0.0.1:18261 http://example.com/ answered 407 -> curl: (7) CONNECT tunnel failed, response 407

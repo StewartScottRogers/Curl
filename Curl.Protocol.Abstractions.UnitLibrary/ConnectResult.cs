@@ -55,9 +55,9 @@ public sealed class ConnectResult
     public IPEndPoint? LocalEndPoint { get; private init; }
 
     /// <summary>
-    /// Gets the status code of the proxy's reply to the CONNECT that opened a tunnel, the
-    /// source of <c>%{http_connect}</c>; <c>0</c> when there was no CONNECT or the connect
-    /// failed.
+    /// Gets the status code of the proxy's reply to the CONNECT that opened a tunnel, or of a
+    /// failed connect's last CONNECT reply, the source of <c>%{http_connect}</c>; <c>0</c> when
+    /// there was no CONNECT or no reply status.
     /// </summary>
     public int ProxyConnectResponseCode { get; private init; }
 
@@ -251,6 +251,10 @@ public sealed class ConnectResult
     /// curl's number for the connection the connect tried, counted from <c>0</c>; <c>0</c>
     /// when not numbered.
     /// </param>
+    /// <param name="proxyConnectResponseCode">
+    /// The status code of the proxy's reply to a CONNECT that did not open the tunnel, which
+    /// curl 8.21.0 still reports as <c>%{http_connect}</c> (BL-1857); <c>0</c> when none.
+    /// </param>
     /// <returns>A result with no <see cref="Connection" />.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="exitCode" /> is <see cref="CurlExitCode.Ok" />, which is not a
@@ -260,7 +264,8 @@ public sealed class ConnectResult
         CurlExitCode exitCode,
         string errorMessage,
         ConnectTimings? timings,
-        long connectionNumber = 0)
+        long connectionNumber = 0,
+        int proxyConnectResponseCode = 0)
     {
         if (exitCode == CurlExitCode.Ok)
         {
@@ -270,7 +275,12 @@ public sealed class ConnectResult
                 "A failed connect cannot report CurlExitCode.Ok; use ConnectResult.Connected instead.");
         }
 
-        return new ConnectResult(null, exitCode, errorMessage) { Timings = timings, ConnectionNumber = connectionNumber };
+        return new ConnectResult(null, exitCode, errorMessage)
+        {
+            Timings = timings,
+            ConnectionNumber = connectionNumber,
+            ProxyConnectResponseCode = proxyConnectResponseCode,
+        };
     }
 
     /// <summary>

@@ -8,7 +8,7 @@ depends-on: [BL-1834, BL-1833]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1795 — Close GF-0002: In process, Curl opens a new connection for every request, so connection-reuse cases see [DISCONNECT], local port -1 and the wrong verdict for the second response
 
@@ -41,10 +41,10 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - [x] `behaviour:test48`: Curl answers what curl 8.21.0 answers, `upstream test48 passes`, so the item measures `match`.
 - [x] `behaviour:test1418`: Curl answers what curl 8.21.0 answers, `upstream test1418 passes`, so the item measures `match`.
 - [x] `behaviour:test1419`: Curl answers what curl 8.21.0 answers, `upstream test1419 passes`, so the item measures `match`.
-- [ ] `behaviour:test435`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 248 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55059\x0Alocal ip == 127.0.0.1\x0Aremote_ip == 127.0.0.1\x0Aremote_port == 18990\x0AHTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55060\x0Alocal ip == 127.0.`, so the item measures `match`.
-- [ ] `behaviour:test1074`: Curl answers what curl 8.21.0 answers, `upstream test1074 passes`, so the item measures `match`.
-- [ ] `behaviour:test1479`: Curl answers what curl 8.21.0 answers, `upstream test1479 passes`, so the item measures `match`.
-- [ ] `behaviour:test471`: Curl answers what curl 8.21.0 answers, `upstream test471 passes`, so the item measures `match`.
+- [x] `behaviour:test435`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 248 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55059\x0Alocal ip == 127.0.0.1\x0Aremote_ip == 127.0.0.1\x0Aremote_port == 18990\x0AHTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55060\x0Alocal ip == 127.0.`, so the item measures `match`.
+- [x] `behaviour:test1074`: Curl answers what curl 8.21.0 answers, `upstream test1074 passes`, so the item measures `match`.
+- [x] `behaviour:test1479`: Curl answers what curl 8.21.0 answers, `upstream test1479 passes`, so the item measures `match`.
+- [x] `behaviour:test471`: Curl answers what curl 8.21.0 answers, `upstream test471 passes`, so the item measures `match`.
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 - [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
@@ -55,8 +55,12 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - test1074 (HTTP/1.0 kept on the reused connection), test1479 (exit 8, got 1) and test471 (exit 8, got 0) are gaps in `HttpProtocolHandler`, outside this task's touches - filed as BL-1833.
 - The pooling change is committed (build clean, fast tests green). The board refuses Done with four items unticked, so the task waits in Backlog on BL-1834 and BL-1833; once both are Done, re-run the conformance tests, tick the four items and close it. No option changed, so `--ai-help` is unaffected.
 
+- 2026-10-08: BL-1834 and BL-1833 are Done and put test435, 471, 1074 and 1479 on `PassingUpstreamCases.txt`; build clean and fast tests green (Curl.Conformance.UnitTests 1152 passed, 0 failed), so the four items are ticked.
+
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Waits on BL-1834 (test435 local port) and BL-1833 (test1074, 1479, 471 on a reused connection); pooling is done
+- 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. All ten GF-0002 cases pass in process: pooling here, local port in BL-1834, HTTP/1.0 reuse in BL-1833

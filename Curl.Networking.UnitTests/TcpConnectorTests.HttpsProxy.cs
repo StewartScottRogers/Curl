@@ -201,6 +201,42 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenTheProxyRefusesConnect_ReportsTheRefusingStatusAsTheConnectResponseCode()
+    {
+        // Upstream test217: a 405 to CONNECT is exit 7 and still %{http_connect} 405.
+        var proxyTls = new ScriptedConnection(
+            Encoding.Latin1.GetBytes("HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\n\r\n"));
+        var connector = CreateHttpsProxyConnector(new SequencedTlsProvider(ConnectResult.Connected(proxyTls)));
+
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpsProxy });
+
+        Diagnostics.Assert("connect response code", 405, result.ProxyConnectResponseCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(405, result.ProxyConnectResponseCode);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAnUnanswered407HasAMalformedChunkedBody_FailsWithExit56()
+    {
+        // Upstream test1715: no credential answers the 407, and curl still reads its chunked body,
+        // whose malformed chunk is exit 56 rather than the tunnel's exit 7.
+        var proxyTls = new ScriptedConnection(Encoding.Latin1.GetBytes(
+            "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 13\r\nTransfer-Encoding: chunked\r\n\r\nsome content\n"));
+        var connector = CreateHttpsProxyConnector(new SequencedTlsProvider(ConnectResult.Connected(proxyTls)));
+
+        var result = await ConnectLoggedAsync(
+            connector,
+            new ConnectTarget("example.com", 443, UseTls: true) { Proxy = HttpsProxy });
+
+        Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
+        Assert.IsNull(result.Connection);
+        Assert.IsTrue(proxyTls.IsDisposed);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheHandshakeToTheTargetThroughAnHttpsProxyFails_ReturnsTheProvidersFailure()
     {
         // The proxy answered 200, then sent plaintext where the target's TLS was due:
