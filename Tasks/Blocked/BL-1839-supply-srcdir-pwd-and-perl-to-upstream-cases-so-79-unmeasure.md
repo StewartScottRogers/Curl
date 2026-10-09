@@ -36,3 +36,4 @@ Upstream cases whose command lines use `%SRCDIR`, `%PWD` or `%PERL` are run and 
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Being worked interactively on branch audit-bl-1839; parked so Doing holds nothing orphaned between shifts

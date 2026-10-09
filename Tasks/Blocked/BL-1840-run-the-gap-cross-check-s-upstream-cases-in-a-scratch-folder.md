@@ -34,3 +34,4 @@ The gap cross-check runs every upstream case in its own temporary folder, so no 
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Being worked interactively on branch audit-bl-1840; parked so Doing holds nothing orphaned between shifts

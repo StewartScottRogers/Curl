@@ -35,3 +35,4 @@ The gap-options analyst reports without changing the measured tree, so the optio
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Blocked. Being worked interactively on branch audit-bl-1841; parked so Doing holds nothing orphaned between shifts
