@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Blocked. Stewart: the fix edits a file in the audit office folder, which lanes may not touch; run this task interactively on the audit branch.
