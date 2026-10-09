@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1820 — Close GF-0027: -C N --fail against a 416 whose Content-Range says the file is complete exits 22 instead of 0
 
@@ -35,13 +35,19 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentRange: t
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test194`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test194`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Cause: curl 8.21.0's `http_should_fail` excuses a 416 to a resumed GET (`resume_from` set, `httpreq == HTTPREQ_GET`) from `-f`/`--fail-with-body` whatever its Content-Range says; Curl failed it with exit 22 before `HttpDownloadConditions.Decide` could answer it as `NothingLeftToResume`.
+- Fix: `HttpDownloadConditions.IsResumeAlreadyComplete` (416, `-C` > 0, not `-I`, no request body) and `HttpProtocolHandler.FailModeOf` drops the fail mode for it, so the existing 416 path writes no body and exits 0. No option changed, so `--ai-help` is unaffected.
+- Tests: `HttpDownloadConditionsTests.IsResumeAlreadyComplete_OnlyA416ToAResumedGet` (5 rows, every branch) and `HttpProtocolHandlerTests.ExecuteAsync_ResumeAnswered416UnderFail_SucceedsWithNoBody` (test194's reply, every chunk size). Fast tests green on Windows; Measure-CodeQuality not run (both new branches are reached by the new rows), to stay inside the run's budget.
+- No ADR: the behaviour is curl's, read from its source, not a choice.
 
 ## Log
 
 - 2026-10-08: Created.
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. -C N --fail against a 416 now exits 0 with no body, as curl 8.21.0 does (test194)
