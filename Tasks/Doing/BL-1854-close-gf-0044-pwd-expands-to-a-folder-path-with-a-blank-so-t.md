@@ -44,3 +44,4 @@ Curl's behaviour needs no change: it passes test3009 once %PWD holds no blank. M
 ## Log
 
 - 2026-10-08: Created.
+- 2026-10-08: Backlog -> Doing.
