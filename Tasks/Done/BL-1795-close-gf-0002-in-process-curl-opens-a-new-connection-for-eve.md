@@ -8,7 +8,7 @@ depends-on: [BL-1834, BL-1833]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-08
-completed:
+completed: 2026-10-08
 ---
 # BL-1795 — Close GF-0002: In process, Curl opens a new connection for every request, so connection-reuse cases see [DISCONNECT], local port -1 and the wrong verdict for the second response
 
@@ -63,3 +63,4 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 - 2026-10-08: Backlog -> Doing.
 - 2026-10-08: Doing -> Backlog. Waits on BL-1834 (test435 local port) and BL-1833 (test1074, 1479, 471 on a reused connection); pooling is done
 - 2026-10-08: Backlog -> Doing.
+- 2026-10-08: Doing -> Done. All ten GF-0002 cases pass in process: pooling here, local port in BL-1834, HTTP/1.0 reuse in BL-1833
