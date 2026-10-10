@@ -32,3 +32,4 @@ BL-1930 added `UpstreamPerlOneLiner.Run(arguments, operatingSystemName)` in Curl
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
