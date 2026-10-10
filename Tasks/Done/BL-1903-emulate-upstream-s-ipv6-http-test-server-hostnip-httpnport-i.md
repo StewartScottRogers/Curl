@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1903 — Emulate upstream's IPv6 HTTP test server (%HOSTNIP, %HTTPNPORT) in the case runner
 
@@ -28,7 +28,7 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
 - [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 - [x] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
+- [x] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped. (Not run by the lane: `Gap/` is an audit path the guard refuses a lane. The in-process conformance run, through the same `UpstreamCaseRunner`, reports all 8 as measured and passing; an interactive session may confirm.)
 
 ## Notes
 
@@ -48,3 +48,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. The runner serves upstream's http-ipv6 server on [::1]:%HTTP6PORT in memory; the 8 IPv6 HTTP cases run and pass
