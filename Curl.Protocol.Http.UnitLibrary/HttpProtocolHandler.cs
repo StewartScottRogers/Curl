@@ -1159,6 +1159,7 @@ public sealed class HttpProtocolHandler(
             HttpFailMode fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
+            ReportAuthRetryRewind(plan, actedOn, retry);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
             ReportUploadStopped(context.Events, upload, retry, discardsBody);
             delivery = DeliveryOf(plan, actedOn, discardsBody);
@@ -1571,6 +1572,24 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Reports <c>Need to rewind upload for next request</c> when a 401 or 407 is answered with
+    /// <paramref name="retry" /> and the request sent a body that is not empty, as curl 8.21.0
+    /// writes it after the head's last header, before <c>Ignoring the response-body</c>, for a
+    /// <c>-T</c> file, a <c>-F</c> form or <c>-d</c> data, and not for an empty one (measured,
+    /// BL-2001 Notes).
+    /// </summary>
+    private static void ReportAuthRetryRewind(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry)
+    {
+        if (retry is not null
+            && head.StatusLine.StatusCode is 401 or 407
+            && plan.Framing.Body is not null
+            && plan.Framing.KnownLength != 0)
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
+        }
+    }
+
+    /// <summary>
     /// Reports that a body is read only to be discarded, as curl 8.21.0 does before the
     /// head's empty line (measured, BL-449 Notes): <c>Ignoring the response-body</c> when the
     /// body is discarded - a redirect <c>-L</c> follows, or a response answered with a retry -
@@ -1913,7 +1932,7 @@ public sealed class HttpProtocolHandler(
         bool discardsBody,
         CancellationToken cancellationToken)
     {
-        if (delivery != HttpBodyDelivery.Deliver && !discardsBody)
+        if ((delivery != HttpBodyDelivery.Deliver && !discardsBody) || AbandonsBody(plan, head, requestStream, delivery, discardsBody))
         {
             return ValueTask.CompletedTask;
         }
@@ -1921,6 +1940,23 @@ public sealed class HttpProtocolHandler(
         return discardsBody && requestStream is Http2StreamConnection http2Stream
             ? http2Stream.AbandonResponseAsync(cancellationToken)
             : CopyBodyAsync(plan, head, body, requestStream, discardsBody, cancellationToken);
+    }
+
+    /// <summary>
+    /// Decides whether an HTTP/1.x body discarded for a retry or a followed redirect is not read
+    /// at all because the connection closes after it, as curl 8.21.0 stops reading once the head
+    /// is in when it has a new request to make and the connection is to close anyway - so a 401
+    /// with <c>Connection: close</c> and no length is answered at once, not when the server
+    /// closes (measured, BL-2001 Notes). A 416's ignored body (<paramref name="delivery" /> not
+    /// <see cref="HttpBodyDelivery.Deliver" />) is still read.
+    /// </summary>
+    private static bool AbandonsBody(HttpRequestPlan plan, HttpResponseHead head, IHttpStreamConnection? requestStream, HttpBodyDelivery delivery, bool discardsBody)
+    {
+        HttpRequestOptions options = plan.Options;
+        return discardsBody
+            && delivery == HttpBodyDelivery.Deliver
+            && requestStream is null
+            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding);
     }
 
     /// <summary>

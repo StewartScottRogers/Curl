@@ -141,6 +141,60 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.IsFalse(events.Events.Any(line => line.StartsWith("* Connection died", StringComparison.Ordinal)));
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToABodyVerbose_WritesNeedToRewindBeforeIgnoringTheBody()
+    {
+        // curl 8.21.0 --anyauth -u u:p -d abc -v against a keep-alive 401: "Need to rewind upload
+        // for next request" follows the last header, before "Ignoring the response-body"
+        // (measured, BL-2001 Notes).
+        HttpRequestOptions options = new() { AuthSchemes = HttpAuthSchemes.Any, Body = new BytesBody("abc"u8.ToArray(), "application/x-www-form-urlencoded") };
+
+        RecordingTransferEvents events = await AuthRetryEventsAsync(options, new ScriptedTokenSource(), KeepAliveDigestChallenge, OkHead + "ok");
+
+        List<string> lines = [.. events.Events.Select(line => line.Split("\r\n")[0])];
+        int ignoring = lines.IndexOf("* Ignoring the response-body");
+        Diagnostics.Assert("line before Ignoring the response-body", "* Need to rewind upload for next request", lines[ignoring - 1]);
+        Assert.AreEqual("< Content-Length: 4", lines[ignoring - 2]);
+        Assert.AreEqual("* Need to rewind upload for next request", lines[ignoring - 1]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ChallengeToAnEmptyBodyVerbose_WritesNoNeedToRewind()
+    {
+        // curl 8.21.0 --anyauth -u u:p -d '' -v writes no rewind line (measured, BL-2001 Notes).
+        HttpRequestOptions options = new() { AuthSchemes = HttpAuthSchemes.Any, Body = new BytesBody(Array.Empty<byte>(), "application/x-www-form-urlencoded") };
+
+        RecordingTransferEvents events = await AuthRetryEventsAsync(options, new ScriptedTokenSource(), KeepAliveDigestChallenge, OkHead + "ok");
+
+        Diagnostics.Assert("rewind lines", 0, events.Events.Count(line => line.Contains("Need to rewind", StringComparison.Ordinal)));
+        Assert.DoesNotContain("* Need to rewind upload for next request", events.Events);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ClosingChallengeWithoutALengthOnAHeldConnection_ResendsWithoutReadingItsBody()
+    {
+        // curl 8.21.0 --anyauth -u u:p -T file against a 401 with Connection: close and no
+        // Content-Length whose server keeps the connection open: curl stops reading after the
+        // head and resends at once on a new connection (measured, BL-2001 Notes; upstream test1030).
+        HeldOpenConnection held = new(new TurnTakingConnection(65536, "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: " + Challenge + "\r\nConnection: close\r\n\r\nnope"));
+        TurnTakingConnection fresh = new(65536, OkHead + "ok");
+        QueueConnector connector = QueueConnector.For(held, fresh);
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new MemoryStream("hello"u8.ToArray()), 5, "application/octet-stream") });
+        Diagnostics.Arrange("url, body, first connection", $"{AuthUrl}, a 5-byte seekable stream body, held open after a closing 401");
+
+        TransferResult result = await new HttpProtocolHandler(connector, authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+        Assert.HasCount(2, connector.Targets);
+        StringAssert.Contains(fresh.Written, "Authorization: " + DigestValue);
+        StringAssert.EndsWith(fresh.Written, "\r\n\r\nhello");
+    }
+
     /// <summary>
     /// Gives curl 8.21.0's <c>-v</c> lines for <c>--digest</c> or <c>--ntlm -u u:p -v</c>
     /// against <paramref name="challenge" /> on a connection kept open, then a <c>200</c>, as
@@ -194,5 +248,30 @@ public sealed partial class HttpProtocolHandlerTests
         List<string> lines = [.. events.Events.Select(line => line.Split("\r\n")[0])];
         int secondSent = lines.FindIndex(lines.IndexOf("* Request completely sent off") + 1, line => line == "* Request completely sent off");
         return lines[..(secondSent + 1)];
+    }
+
+    /// <summary>
+    /// A connection whose server keeps it open after its scripted responses: a read past them
+    /// fails the test instead of reporting the peer closed, as it would wait forever.
+    /// </summary>
+    private sealed class HeldOpenConnection(TurnTakingConnection inner) : IConnection
+    {
+        public bool IsSecure => inner.IsSecure;
+
+        public EndPoint? RemoteEndPoint => inner.RemoteEndPoint;
+
+        public bool HasPeerClosed => false;
+
+        public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            int read = await inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return read > 0 ? read : throw new InvalidOperationException("Read past the response on a connection the server holds open.");
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => inner.WriteAsync(buffer, cancellationToken);
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 }
