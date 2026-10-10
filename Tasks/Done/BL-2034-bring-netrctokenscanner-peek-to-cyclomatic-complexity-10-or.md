@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2034 — Bring NetrcTokenScanner.Peek to cyclomatic complexity 10 or less
 
@@ -34,3 +34,4 @@ Extracted the NUL line skip from `Peek` into `SkipToEndOfLine`. Measured: 0 fail
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Peek complexity cut by extracting SkipToEndOfLine; 0 failing members
