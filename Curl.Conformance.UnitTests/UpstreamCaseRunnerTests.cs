@@ -383,6 +383,24 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_CaseUsingProxyport_RunsItWithTheProxyPort()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[]? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = [.. invocation.Arguments];
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp\n</server>\n<command option=\"no-output,no-include\">\n-x %HOSTIP:%PROXYPORT http://example.com/\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("arguments", "-x 127.0.0.1:8992 http://example.com/", string.Join(' ', arguments ?? []));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "-x", "127.0.0.1:" + UpstreamCaseRunner.ProxyPort, "http://example.com/" }, arguments);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoCertificateDirectory_SkipsACaseUsingCertdir()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

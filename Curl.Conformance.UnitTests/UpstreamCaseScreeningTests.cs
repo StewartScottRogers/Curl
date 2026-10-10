@@ -76,6 +76,37 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow(80)]
+    [DataRow(83)]
+    [DataRow(95)]
+    [DataRow(150)]
+    [DataRow(184)]
+    [DataRow(194)]
+    [DataRow(275)]
+    [DataRow(744)]
+    [DataRow(1078)]
+    [DataRow(1184)]
+    [DataRow(1288)]
+    [DataRow(1297)]
+    [DataRow(1428)]
+    [DataRow(1904)]
+    [DataRow(2050)]
+    [DataRow(2107)]
+    [DataRow(3028)]
+    public void FindSkipReason_ProxyCaseGivenTheRunnersProxyPort_IsNotSkippedForProxyPort(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["HTTPPORT"] = UpstreamCaseRunner.HttpPort, ["PROXYPORT"] = UpstreamCaseRunner.ProxyPort, ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason ?? "(none)");
+        Assert.DoesNotContain("%PROXYPORT", reason ?? string.Empty);
+    }
+
+    [TestMethod]
     public void FindSkipReason_NoListenPortGivenTheRunnersValue_IsNotTheReason()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

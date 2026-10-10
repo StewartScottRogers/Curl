@@ -75,6 +75,9 @@ for upstream's `http-proxy` server (BL-1924): they are served the same way but r
 `ProxyReceivedBytes`, compared with `<verify><proxy>` after `<strip>` / `<strippart>` as
 `<verify><protocol>` is; after a `CONNECT` such a connection records into `ReceivedBytes`, as
 upstream's HTTP server logs the tunnelled request. Screening lets `http-proxy` cases run.
+No case is skipped for `%PROXYPORT` any more (BL-1897): 17 proxy cases are measured (80, 83, 95,
+150, 184, 194, 275, 744, 1078, 1184, 1288, 1297, 1428, 1904, 2050, 2107, 3028), and the other
+`%PROXYPORT` cases skip for another reason (a `<tool>`, `<setenv>`, a feature or another server's port).
 A read before the client's first write waits for that write, as sws blocks reading the
 request (a telnet `-T` session reads while its upload is on its way; BL-1853), and a read while
 an `Expect: 100-continue` request still owes its body waits for the client's next write, since
