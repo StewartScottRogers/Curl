@@ -215,6 +215,45 @@ public sealed class Pop3ProtocolHandlerLoginTests
     }
 
     [TestMethod]
+    [DataRow(true, "AUTH EXTERNAL =\r\n", DisplayName = "upstream test886: --sasl-ir, = on the line")]
+    [DataRow(false, "AUTH EXTERNAL\r\n=\r\n", DisplayName = "upstream test884: = after the continuation")]
+    public async Task ExecuteAsync_ExternalNamedAndOfferedWithoutUser_AuthenticatesWithAnEmptyUserName(bool initialResponse, string sent)
+    {
+        // curl 8.21.0's tests 884 and 886: pop3://;AUTH=EXTERNAL@host/884, no -u (BL-1989).
+        var sasl = new ScriptedSaslAuthenticator(("EXTERNAL", [string.Empty]));
+        string replies = initialResponse ? "+OK\r\n" : "+ \r\n+OK\r\n";
+        Pop3Run run = await RunAsync(
+            Greeting + "+OK\r\nSASL EXTERNAL\r\n.\r\n" + replies + ListReply + Bye,
+            noCredential: true,
+            mail: new MailRequestOptions { LoginOptions = "AUTH=EXTERNAL", SaslInitialResponse = initialResponse },
+            sasl: sasl);
+
+        Diagnostics.Diff("sent", Capa + sent + List + Quit, run.Sent);
+        Assert.AreEqual(Capa + sent + List + Quit, run.Sent);
+        Assert.IsNull(sasl.Requests.Single().Credential);
+        Assert.AreEqual("EXTERNAL", sasl.Requests.Single().RequiredMechanism);
+    }
+
+    [TestMethod]
+    [DataRow("+OK\r\nSASL PLAIN\r\n.\r\n", "AUTH=EXTERNAL", DisplayName = "EXTERNAL named but not offered")]
+    [DataRow("-ERR no\r\n", "AUTH=EXTERNAL", DisplayName = "EXTERNAL named, CAPA refused")]
+    [DataRow("+OK\r\nSASL EXTERNAL\r\n.\r\n", "AUTH=PLAIN", DisplayName = "EXTERNAL offered, PLAIN named")]
+    [DataRow("+OK\r\nSASL EXTERNAL\r\n.\r\n", null, DisplayName = "EXTERNAL offered, no login options")]
+    public async Task ExecuteAsync_NoUserAndNoNamedExternalOffered_SendsNoLogin(string capaReply, string? loginOptions)
+    {
+        var sasl = new ScriptedSaslAuthenticator(("EXTERNAL", [string.Empty]));
+        Pop3Run run = await RunAsync(
+            Greeting + capaReply + ListReply + Bye,
+            noCredential: true,
+            mail: new MailRequestOptions { LoginOptions = loginOptions },
+            sasl: sasl);
+
+        Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
+        Assert.AreEqual(Capa + List + Quit, run.Sent);
+        Assert.IsEmpty(sasl.Requests);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_LaterChallengeThatIsNotBase64_ReachesTheExchangeEmpty()
     {
         var sasl = PlainAndLogin();

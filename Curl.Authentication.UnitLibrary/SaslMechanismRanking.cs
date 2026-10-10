@@ -41,7 +41,7 @@ internal static class SaslMechanismRanking
 
     // Each mechanism in curl's preference order, with whether the request can use it and
     // whether it runs on a security context: EXTERNAL only when AUTH=EXTERNAL names it and the
-    // password is empty; GSSAPI only with a user name naming a domain or realm, or an empty one
+    // password is empty or there is no credential; GSSAPI only with a user name naming a domain or realm, or an empty one
     // (curl's Curl_auth_user_contains_domain); the bearer mechanisms only with a token; the
     // others only with a user and no token (measured, ADR-0123, ADR-0139).
     private static readonly (string Name, Func<SaslRequest, bool> CanUse, bool RunsOnSecurityContext)[] CurlPreferenceOrder =
@@ -78,10 +78,12 @@ internal static class SaslMechanismRanking
     private static bool IsAllowed(string mechanism, string? requiredMechanism) =>
         requiredMechanism is null or AnyMechanism || string.Equals(mechanism, requiredMechanism, StringComparison.OrdinalIgnoreCase);
 
+    // curl's Curl_sasl_start checks only that the password is empty; with no credential at
+    // all Curl_sasl_can_authenticate still lets EXTERNAL start, its message the empty user
+    // name (upstream tests 838, 884 and 943, BL-1989).
     private static bool CanUseExternal(SaslRequest request) =>
         string.Equals(request.RequiredMechanism, External, StringComparison.OrdinalIgnoreCase)
-            && request.Credential is { } credential
-            && credential.Password.Length == 0;
+            && (request.Credential?.Password ?? string.Empty).Length == 0;
 
     // curl's Curl_auth_user_contains_domain: a '\', '/' or '@' that is neither the first nor
     // the last character; an empty user name passes too, the default credentials.

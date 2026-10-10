@@ -16,7 +16,9 @@ namespace Curl.Protocol.Pop3;
 /// <param name="context">The transfer, for its credentials, mail options and host.</param>
 /// <remarks>
 /// <list type="bullet">
-/// <item>Without credentials and without a bearer token, nothing is sent. With a bearer
+/// <item>Without credentials and without a bearer token, nothing is sent, unless
+/// <c>AUTH=EXTERNAL</c> names EXTERNAL and <c>CAPA</c> offers it: then SASL EXTERNAL is tried
+/// with an empty user name, sent as <c>=</c> (BL-1989). With a bearer
 /// token alone, only SASL is tried; no mechanism chosen is exit 67 <c>Login denied</c>.</item>
 /// <item>SASL <c>AUTH</c> first, when <c>CAPA</c> lists <c>SASL</c> mechanisms and the
 /// authenticator chooses one. Under <c>--sasl-ir</c> the initial response goes on the
@@ -104,7 +106,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     /// <exception cref="InvalidDataException">A response line reached 65536 bytes.</exception>
     public async ValueTask<TransferResult?> LogInAsync(Pop3LoginOptions options, Pop3Capabilities? capabilities, string? apopTimestamp)
     {
-        if (context.Credentials is null && mail.BearerToken is null)
+        if (context.Credentials is null && mail.BearerToken is null && !OffersNamedExternal(options, capabilities))
         {
             return null;
         }
@@ -116,6 +118,17 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
             ? result
             : await LogInWithoutSaslAsync(options, capabilities, apopTimestamp, outcome == SaslOutcome.Cancelled).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Whether <c>AUTH=EXTERNAL</c> names EXTERNAL and <c>CAPA</c> offers it, which lets curl
+    /// 8.21.0 authenticate with no user name (<c>Curl_sasl_can_authenticate</c>; upstream
+    /// tests 884 and 886, BL-1989).
+    /// </summary>
+    private static bool OffersNamedExternal(Pop3LoginOptions options, Pop3Capabilities? capabilities) =>
+        options.Method != Pop3LoginMethod.Any
+            && ExternalMechanism.Equals(options.RequiredMechanism, StringComparison.OrdinalIgnoreCase)
+            && capabilities is not null
+            && capabilities.SaslMechanisms.Contains(ExternalMechanism, StringComparer.OrdinalIgnoreCase);
 
     private static TransferResult LoginDenied() =>
         TransferResult.Failure(CurlExitCode.LoginDenied, Pop3SessionMessages.LoginDenied);
