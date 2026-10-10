@@ -8,7 +8,7 @@ depends-on: [BL-1930]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1933 — Run %PERL one-liner prechecks and postchecks through UpstreamPerlOneLiner in the upstream case runner
 
@@ -39,3 +39,4 @@ BL-1930 added `UpstreamPerlOneLiner.Run(arguments, operatingSystemName)` in Curl
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Prechecks and postchecks run through UpstreamPerlOneLiner; seven more upstream cases pass
