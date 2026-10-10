@@ -452,6 +452,60 @@ public sealed partial class HandBuiltTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
+    // An ECH offer is TLS 1.3 alone, so a TLS 1.2 ServerHello is refused with protocol_version
+    // and exit 35, as curl 8.21.0 on OpenSSL 4.0.0 refuses it (measured, BL-1950).
+    [TestMethod]
+    [DataRow("true")]
+    [DataRow("hard")]
+    [DataRow(null)]
+    public async Task AuthenticateAsClientAsync_WithAnEchOfferAnsweredByATls12ServerHello_FailsWithExit35UnsupportedProtocol(string? mode)
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = Task.Run(async () =>
+        {
+            var header = new byte[5];
+            await server.ReadExactlyAsync(header);
+            var body = new byte[(header[3] << 8) | header[4]];
+            await server.ReadExactlyAsync(body);
+            await server.WriteAsync(Tls12ServerHelloRecord());
+            var answer = new MemoryStream();
+            await server.CopyToAsync(answer);
+            return ((byte[])[.. header, .. body], answer.ToArray());
+        });
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("Ech", mode ?? "(none)");
+        Diagnostics.Arrange("EchConfigList", EchConfigListBase64());
+        Diagnostics.Arrange("server answer", "TLS 1.2 ServerHello, TLS_AES_128_GCM_SHA256");
+
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await Provider(new TlsClientOptions(Insecure: true, Ech: mode, EchConfigList: EchConfigListBase64()), OpenSslBuild)
+                .AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), EchHost, new RecordingTransferEvents(), false, Http11, CancellationToken.None);
+        }
+
+        var (hello, answer) = await serverTask;
+        var versions = ExtensionData(DecodeClientHello(hello), TlsExtensionType.SupportedVersions);
+        ActConnectResult(result);
+        Diagnostics.Bytes("supported_versions", versions);
+        Diagnostics.Bytes("client answer", answer);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("error message", "TLS connect error: error:0A000102:SSL routines::unsupported protocol", result.ErrorMessage);
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual("TLS connect error: error:0A000102:SSL routines::unsupported protocol", result.ErrorMessage);
+        CollectionAssert.AreEqual(new byte[] { 0x02, 0x03, 0x04 }, versions);
+        CollectionAssert.AreEqual(HandBuiltTlsProvider.ProtocolVersionAlertRecord.ToArray(), answer);
+    }
+
+    // A TLS 1.2 ServerHello (no supported_versions) picking TLS_AES_128_GCM_SHA256, as the
+    // BL-1950 measurement's canned server sent it.
+    private static byte[] Tls12ServerHelloRecord()
+    {
+        byte[] body = [0x03, 0x03, .. Enumerable.Repeat((byte)0x11, 32), 0x00, 0x13, 0x01, 0x00, 0x00, 0x05, 0xff, 0x01, 0x00, 0x01, 0x00];
+        byte[] message = [0x02, 0x00, 0x00, (byte)body.Length, .. body];
+        return [0x16, 0x03, 0x03, 0x00, (byte)message.Length, .. message];
+    }
+
     // A rejecting server's retry_configs: the list, then the inner and outer names, before
     // exit 101 (measured with curl 8.21.0 and OpenSSL 4.0.0, BL-1171).
     [TestMethod]
