@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1963 — Fix AF-0144: large-get (50 MiB download) median wall time is 1.47x curl's
 
@@ -65,3 +65,4 @@ The finding closes only when a later re-audit by the performance auditor confirm
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. HTTP/1.x bodies read in curl's 100 KiB receive size, written in 16 KiB pieces; 50 MiB download no longer 1.5x curl locally
