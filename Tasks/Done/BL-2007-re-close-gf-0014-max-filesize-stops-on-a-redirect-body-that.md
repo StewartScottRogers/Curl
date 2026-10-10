@@ -49,7 +49,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: 
   it exits 63 with `Would have exceeded max file size` and creates no file; at 20000 it writes
   the first whole 16384-byte decoded piece and none of the next. `HttpContentDecoder` now
   refuses a decoded piece that would cross the limit before writing any of it, with that
-  message; Curl matches at both limits. ADR-0470 (amends ADR-0442).
+  message; Curl matches at both limits. ADR-0471 (amends ADR-0442).
 - test477 could not be reproduced: Content-Length, chunked, close-delimited and kept-alive
   (one connection) 301 bodies over the limit with `-L --max-filesize 5` all send
   `GET /4770002` and match real curl. The upstream case data is behind the audit guard, so a
@@ -64,4 +64,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: 
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
-- 2026-10-10: Doing -> Done. a --compressed body decoding past --max-filesize writes none of the crossing piece and exits 63 'Would have exceeded max file size', as curl 8.21.0; ADR-0470
+- 2026-10-10: Doing -> Done. a --compressed body decoding past --max-filesize writes none of the crossing piece and exits 63 'Would have exceeded max file size', as curl 8.21.0; ADR-0471
