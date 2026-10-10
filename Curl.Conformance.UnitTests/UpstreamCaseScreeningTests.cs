@@ -183,6 +183,26 @@ public sealed class UpstreamCaseScreeningTests
         Assert.DoesNotContain("the harness does not run the Perl", reason ?? "");
     }
 
+    [TestMethod]
+    [DataRow("<client>\n<precheck>\n%PERL %SRCDIR/libtest/test613.pl prepare /log/test613.dir\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\n%PERL %SRCDIR/libtest/test613.pl postprocess /log/test1445.dir /log/curl1445.out 946728000\n</postcheck>\n</verify>\n")]
+    public void FindSkipReason_Test613ScriptLines_AreNotPerlTheHarnessDoesNotRun(string sections)
+    {
+        string? reason = Screen(RunnableClient + sections);
+
+        Assert.DoesNotContain("the harness does not run the Perl", reason ?? "");
+    }
+
+    [TestMethod]
+    [DataRow("test1013.pl", "%PERL %SRCDIR/libtest/test1013.pl ../curl-config /log/stdout1014 features > /log/result1014")]
+    [DataRow("test1022.pl", "%PERL %SRCDIR/libtest/test1022.pl ../curl-config /log/stdout1023 vernum")]
+    public void FindSkipReason_CurlConfigComparisonScript_NamesCurlConfigAsTheReason(string script, string line)
+    {
+        string? reason = Screen(RunnableClient + $"<verify>\n<postcheck>\n{line}\n</postcheck>\n</verify>\n");
+
+        Assert.AreEqual($"{script} compares with ../curl-config, which Curl does not ship", reason);
+    }
+
     private static string? Screen(string sections) =>
         UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features);
 

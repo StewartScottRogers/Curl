@@ -9,7 +9,8 @@ namespace Curl.Conformance;
 /// </summary>
 /// <remarks>
 /// A case is skipped when its expansion stopped at a stray <c>%else</c> or <c>%endif</c> or left
-/// something unresolved; when it has a part the harness
+/// something unresolved; when its postcheck runs test1013.pl or test1022.pl, which compare with
+/// <c>../curl-config</c>; when it has a part the harness
 /// does not act on (a <c>&lt;tool&gt;</c> libtest, a <c>&lt;precheck&gt;</c>, a <c>&lt;setenv&gt;</c>,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when it needs a server other than <c>http</c> (the
 /// one emulated), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
@@ -35,6 +36,8 @@ internal static class UpstreamCaseScreening
 
     private static readonly HashSet<string> Servers = ["http", "http-proxy", "file", "none", .. LineProtocolServerConnector.EmulatedServers];
 
+    private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
+
     private static readonly string[] FileParts = ["file", "file1", "file2", "file3", "file4"];
 
     private static readonly string[] SubstitutionParts = ["strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4"];
@@ -51,6 +54,7 @@ internal static class UpstreamCaseScreening
             () => expansion.ConditionError,
             () => UnresolvedVariable(expansion),
             () => UnsupportedInstruction(expansion),
+            () => CurlConfigComparison(testCase),
             () => UnsupportedPart(testCase, "client", ClientParts),
             () => UnsupportedPart(testCase, "verify", VerifyParts),
             () => UnsupportedServer(testCase),
@@ -136,6 +140,13 @@ internal static class UpstreamCaseScreening
             ? $"the command needs a shell for its {syntax}"
             : null;
     }
+
+    // test1013.pl and test1022.pl compare curl --version with ../curl-config, a script of the
+    // upstream build that Curl does not ship (BL-1932), so their cases cannot be measured.
+    private static string? CurlConfigComparison(UpstreamTestCase testCase) =>
+        CurlConfigScript.Match(UpstreamTestPartBodies.Text(testCase.Find("verify", "postcheck"))) is { Success: true } script
+            ? $"{script.Value} compares with ../curl-config, which Curl does not ship"
+            : null;
 
     private static string? UnsupportedServerCommand(UpstreamTestCase testCase) =>
         SwsServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span).UnsupportedCommands is [var first, ..]

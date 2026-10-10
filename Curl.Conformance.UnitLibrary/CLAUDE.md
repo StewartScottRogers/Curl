@@ -143,8 +143,15 @@ to a file, and test1683's numbered-file write and verify loops; `$^O` is passed 
 upstream's `tests/libtest/test610.pl` for a `%PERL` line whose program is `test610.pl`: its
 `mkdir`, `rmdir`, `rm`, `move` and `gone` verbs, chained on one line and stopping at the first
 failure with Perl's `die "$!"` exit code (2 missing, 17 exists, 39 not empty, 255 for `gone` on
-an existing path), and the usage or `Unsupported command` text with exit 1. Nothing calls either
-yet: running prechecks and postchecks through them is BL-1933. The result is an
+an existing path), and the usage or `Unsupported command` text with exit 1.
+`UpstreamTest613Script` (BL-1932) emulates `tests/libtest/test613.pl` the same way: `prepare`
+makes the listed folder (`asubdir`, `plainfile.txt` and `emptyfile.txt` last written
+946728000, the read-only `rofile.txt` 978264000), and `postprocess` removes it (Perl's `die`
+exit code when it will not go), then exits 1 unless a named file was last written at a given
+time, or rewrites a listing into test613.pl's canonical form sorted from its 57th character.
+Screening skips a case whose postcheck runs test1013.pl or test1022.pl, naming the
+`../curl-config` they compare with, which Curl does not ship. Nothing calls the three
+emulations yet: running prechecks and postchecks through them is BL-1933. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list.
