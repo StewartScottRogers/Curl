@@ -30,3 +30,4 @@ Split from BL-1936 (BL-1929's measurement, 2026-10-09). Split methods (a lookup 
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
