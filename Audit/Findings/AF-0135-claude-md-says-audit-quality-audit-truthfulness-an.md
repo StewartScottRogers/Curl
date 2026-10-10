@@ -3,8 +3,8 @@ id: AF-0135
 title: CLAUDE.md says audit-quality, audit-truthfulness and audit-process run on Sonnet; their agent files say opus
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:audit-agent-models:false-statement
 reproduction: none
 task: BL-1887
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0135 - CLAUDE.md says audit-quality, audit-truthfulness and audit-process run on Sonnet; their agent files say opus
 
@@ -43,8 +43,10 @@ Select-String -Path CLAUDE.md -Pattern '`audit-(quality|truthfulness|process)` \
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: CLAUDE.md:173, 177 and 178 now read `audit-quality` (Opus), `audit-truthfulness` (Opus) and `audit-process` (Opus); .claude/agents/audit-quality.md, audit-truthfulness.md and audit-process.md all say 'model: opus'.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | CLAUDE.md:173, 177 and 178 now read `audit-quality` (Opus), `audit-truthfulness` (Opus), `audit-process` (Opus); the three agent files each say 'model: opus'. They agree.
 
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.

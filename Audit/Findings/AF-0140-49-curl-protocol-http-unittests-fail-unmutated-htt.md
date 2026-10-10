@@ -3,8 +3,8 @@ id: AF-0140
 title: 49 Curl.Protocol.Http.UnitTests fail unmutated: HttpResponseBodyReader counts every length-delimited/read-to-close body byte twice in BytesWritten
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:CopyFramedAsync:failing-test
 reproduction: none
 task: BL-1919
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 4653e86a969768525b597bcfec718242ead0959f
 scorecard: 2026-10-09_1435.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0140 - 49 Curl.Protocol.Http.UnitTests fail unmutated: HttpResponseBodyReader counts every length-delimited/read-to-close body byte twice in BytesWritten
 
@@ -42,7 +42,10 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "FullyQuali
 
 ## Re-audits
 
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | Ran the reproduction: Passed! - Failed: 0, Passed: 7, Total: 7 for FullyQualifiedName~CopyAsync_Body_IsWrittenToTheOutput on the unmutated tree.
+
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0136
 title: task-board.ps1 help lists the exact audit paths 'next' withholds, but the code also treats any folder that holds them (.claude, .github, .claude/skills) as an audit path
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-help
 reproduction: none
 task: BL-1888
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0136 - task-board.ps1 help lists the exact audit paths 'next' withholds, but the code also treats any folder that holds them (.claude, .github, .claude/skills) as an audit path
 
@@ -43,8 +43,10 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'whose
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_1435.md | not re-audited | Ran the reproduction: it still prints task-board.ps1:18 ('... or whose touches name an audit') and :220 ('(BL-1876)'), as it would have in the defective tree, so its output does not tell. Reading the help, lines 18-23 now add 'or a folder that holds any of them (.claude, .claude/skills, .github and the like) (Test-AuditPath)', which matches Test-AuditPath's $holders check (lines 220-223). The defect looks fixed, but the reproduction cannot tell. A distinguishing one would be: Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'or a folder that holds any of them'.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | task-board.ps1 help (lines 18-24) now says an audit path includes 'a folder that holds any of them (.claude, .claude/skills, .github and the like) (Test-AuditPath)', matching Test-AuditPath's BL-1876 holder check at line 220. The help no longer lists only the exact paths.
 
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.

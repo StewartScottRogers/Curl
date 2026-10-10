@@ -3,8 +3,8 @@ id: AF-0085
 title: -v omits curl's '{ [0 bytes data]' line when a read-to-close HTTP body ends with an empty read (e.g. --ignore-content-length on an empty body)
 auditor: conformance
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-10_0123.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0225.md, 2026-10-10_0123.md).
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:--verbose-read-to-close-empty-body:stderr
 reproduction: none
 task: BL-1763
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: consecutive
+closed-by: 2026-10-09_0225.md, 2026-10-10_0123.md
 ---
 # AF-0085 - -v omits curl's '{ [0 bytes data]' line when a read-to-close HTTP body ends with an empty read (e.g. --ignore-content-length on an empty body)
 
@@ -46,8 +46,10 @@ $o="$env:TEMP\af-icl"; $a=@('-v','--ignore-content-length','http://127.0.0.1:509
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the reproduction: 'curl: 1 / Curl: 1'. Diffing the two stderr files shows only the ephemeral source port on the '* Established connection' line.
 - 2026-10-09 | 2026-10-09_0647.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: 'curl: 1 / Curl: 1'. Curl's -v --ignore-content-length output now carries the '[0 bytes data]' line, and both exit 0. Reference curl 8.21.0 Schannel.
 - 2026-10-09 | 2026-10-09_1435.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: 'curl: 1 / Curl: 1' - both -v outputs carry one 'bytes data]' line for --ignore-content-length on the empty body; both exit 0. Reference curl 8.21.0 Schannel.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | Ran the reproduction against curl 8.21.0 (Schannel): 'curl: 1 / Curl: 1'. A full diff of the two -v stderr files differs only in curl's ephemeral source port on the '* Established connection' line.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0225.md, 2026-10-10_0123.md).

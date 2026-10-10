@@ -3,8 +3,8 @@ id: AF-0134
 title: Find_SyntaxError_CarriesCurlsMessageAndExitCode asserts nothing: its only assertion is commented out
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: quality:Curl.Authentication.UnitTests/NetrcFileTests.cs:Find_SyntaxError_CarriesCurlsMessageAndExitCode:no-assertion
 reproduction: none
 task: BL-1886
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0134 - Find_SyntaxError_CarriesCurlsMessageAndExitCode asserts nothing: its only assertion is commented out
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Authentication.UnitTests/NetrcFileTests.cs -SimpleMatch
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the Select-String for '// Assert.AreEqual(' in NetrcFileTests.cs: no match. Find_SyntaxError_CarriesCurlsMessageAndExitCode now calls AssertSyntaxError(diagnostics, result) and Assert.AreEqual("curl: (26) .netrc error: syntax error", actual).
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | Ran the reproduction: Select-String found no match. Find_SyntaxError_CarriesCurlsMessageAndExitCode now ends with AssertSyntaxError(diagnostics, result) and Assert.AreEqual("curl: (26) .netrc error: syntax error", actual).
 
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.

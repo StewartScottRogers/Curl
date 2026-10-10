@@ -3,8 +3,8 @@ id: AF-0138
 title: HaproxyProtocolHeader.Build says it returns the line's ASCII bytes but encodes the PROXY line as UTF-8
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Networking.UnitLibrary/HaproxyProtocolHeader.cs:Build:false-doc-comment
 reproduction: none
 task: BL-1890
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0138 - HaproxyProtocolHeader.Build says it returns the line's ASCII bytes but encodes the PROXY line as UTF-8
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitLibrary/HaproxyProtocolHeader.cs -Simple
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: 'ASCII bytes' no longer matches in Curl.Networking.UnitLibrary/HaproxyProtocolHeader.cs. Line 42 still uses Encoding.UTF8.GetBytes, and the doc (line 30) now says 'The line's UTF-8 bytes (plain ASCII unless a --haproxy-clientip value is not), ending in CRLF'. That agrees with the code.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | 'ASCII bytes' no longer matches. HaproxyProtocolHeader.Build's <returns> now reads 'The line's UTF-8 bytes (plain ASCII unless a --haproxy-clientip value is not), ending in CRLF', matching Encoding.UTF8.GetBytes at line 42.
 
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
