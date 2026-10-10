@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: performance:large-get:slower-than-curl
 reproduction: none
-task: none
-tasks:
+task: BL-1963
+tasks: BL-1963
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md

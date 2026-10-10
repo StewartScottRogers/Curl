@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/OpenSslVerifyResult.cs:IsAnyNotYetValid-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslVerifyResult.cs:131:true
-task: none
-tasks:
+task: BL-1961
+tasks: BL-1961
 found: 2026-10-10
 found-at: 1b27494521dec4bdaa3fe60c8dc7a3fc73874253
 scorecard: 2026-10-10_0123.md
