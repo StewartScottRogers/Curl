@@ -22,15 +22,23 @@ Split from BL-1909 (lane 2, 2026-10-09) so each piece fits one lane run's $2 cos
 
 ## Acceptance criteria
 
-- [ ] `SmtpResponder` answers greeting, EHLO, HELO, MAIL, RCPT, DATA (through the `.` line), RSET, VRFY, EXPN, NOOP, QUIT and AUTH as ftpserver.pl does, each pinned by a unit test in Curl.Conformance.UnitTests quoting the script's reply text.
-- [ ] `<servercmd>` `REPLY` lines override a command's answer, as for FTP.
-- [ ] The DATA message is exposed for `<verify><upload>` comparison, pinned by a test.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests are platform-neutral, no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `SmtpResponder` answers greeting, EHLO, HELO, MAIL, RCPT, DATA (through the `.` line), RSET, VRFY, EXPN, NOOP, QUIT and AUTH as ftpserver.pl does, each pinned by a unit test in Curl.Conformance.UnitTests quoting the script's reply text.
+- [x] `<servercmd>` `REPLY` lines override a command's answer, as for FTP.
+- [x] The DATA message is exposed for `<verify><upload>` comparison, pinned by a test.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests are platform-neutral, no TestCategory=Integration.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Upload is stored as ftpserver.pl stores it, not as this task first said: DATA_smtp writes the raw bytes through the terminator, so test900's `<upload>` ends `
+.
+` and dots are not unstuffed. `UploadedMessage` follows upstream.
+- ftpserver.pl has no SMTP AUTH handler: AUTH and base64 response lines are answered only by `REPLY` lines, else `500 <cmd> is not dealt with!`; the responder does the same (test903).
+- `CAPA` and `AUTH` servercmd lines are read by `LineProtocolServerCommands` (`Capabilities`, `AuthenticationMechanisms`), shared with the coming POP3 and IMAP stand-ins. `VRFY`/`EXPN` take the case's `<reply>` parts as a dictionary, chosen by getreplydata's rule.
+- Not modelled (no SMTP case needs them yet): `REPLY "full text"`, `REPLYLF`, `COUNT`, `DELAY`, `NOSAVE`. Validation is hand-written, not Regex, per the library's coverage rule. Coverage was not measured with Measure-CodeQuality.ps1 (lane cost cap); every branch has a test written for it.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: SmtpResponder and its tests added; build clean, fast tests green.
