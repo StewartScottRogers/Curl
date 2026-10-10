@@ -1,5 +1,5 @@
 ---
-id: BL-2010
+id: BL-2013
 title: Make the gap and audit task filers allocate IDs from the latest board and dedupe before pushing
 priority: High
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2010 — Make the gap and audit task filers allocate IDs from the latest board and dedupe before pushing
+# BL-2013 — Make the gap and audit task filers allocate IDs from the latest board and dedupe before pushing
 
 ## Goal
 
