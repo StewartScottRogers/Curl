@@ -290,6 +290,24 @@ public sealed class SmtpProtocolHandlerSendFailureTests
     private static byte[] Bytes(string text) => Encoding.Latin1.GetBytes(text);
 
     /// <summary>A whole upload's conversation, one reply per read, whose writes fail from the given one on.</summary>
+    [TestMethod]
+    public async Task ExecuteAsync_MessageReadRefused_FailsWithExit26AfterDataAndSendsNoQuit()
+    {
+        // A -F message whose 7bit part holds a byte above 127 (upstream test649, BL-1988):
+        // curl 8.21.0 sends the envelope and DATA, then fails with exit 26 and sends no QUIT.
+        ScriptedConnection connection = new(Bytes(Greeting), Bytes(EhloReply), Bytes(Ok), Bytes(Ok), Bytes(StartData), Bytes(Accepted), Bytes(Bye));
+        TransferContext context = MailContext(new RecordingTransferEvents(), upload: new RefusingReadStream());
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, connection);
+
+        Diagnostics.AssertValues("exit code", CurlExitCode.ReadError, run.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.ReadError, run.Result.ExitCode);
+        Diagnostics.AssertValues("error message", "read error getting mime data", run.Result.ErrorMessage);
+        Assert.AreEqual("read error getting mime data", run.Result.ErrorMessage);
+        Diagnostics.Diff("sent", Ehlo + Envelope, run.Sent);
+        Assert.AreEqual(Ehlo + Envelope, run.Sent);
+    }
+
     private static ScriptedConnection Conversation(int writesBeforeFailure, Exception failure) =>
         new(Bytes(Greeting), Bytes(EhloReply), Bytes(Ok), Bytes(Ok), Bytes(StartData), Bytes(Accepted), Bytes(Bye))
         {
@@ -297,13 +315,25 @@ public sealed class SmtpProtocolHandlerSendFailureTests
             WriteFailure = failure,
         };
 
-    private static TransferContext MailContext(RecordingTransferEvents events, CancellationToken cancellationToken = default) => new()
+    private static TransferContext MailContext(RecordingTransferEvents events, CancellationToken cancellationToken = default, Stream? upload = null) => new()
     {
         Url = CurlUrl.Parse(Url),
         Output = Stream.Null,
         Events = events,
-        Upload = new MemoryStream("one\r\n"u8.ToArray()),
+        Upload = upload ?? new MemoryStream("one\r\n"u8.ToArray()),
         Mail = new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
         CancellationToken = cancellationToken,
     };
+
+    /// <summary>A seekable upload of known length whose every read is refused, as a 7bit part's byte above 127 refuses it.</summary>
+    private sealed class RefusingReadStream : MemoryStream
+    {
+        public RefusingReadStream()
+            : base(new byte[8])
+        {
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            throw new RequestBodyReadFailedException("read error getting mime data");
+    }
 }

@@ -46,6 +46,12 @@ internal static class MultipartPartHeaders
     /// sent as it is; the part's own <c>Content-Transfer-Encoding</c> header replaces it.
     /// </param>
     /// <param name="nameEscaping">How the name and file name are escaped inside their quotes.</param>
+    /// <param name="forMail">
+    /// Whether the part is in a mail message rather than a form, laid out as libcurl 8.21.0's
+    /// <c>MIMESTRATEGY_MAIL</c> lays it (measured, BL-1988): a default <c>text/plain</c> goes
+    /// unlabelled even with a file name, and a labelled part that is not a multipart and has no
+    /// encoder is sent with <c>Content-Transfer-Encoding: 8bit</c>.
+    /// </param>
     /// <param name="contentType">The content type the part was sent with, or <see langword="null" /> when it was sent without one.</param>
     /// <returns>Every header line, each ending CRLF, followed by the CRLF that ends the block.</returns>
     internal static string Format(
@@ -54,10 +60,11 @@ internal static class MultipartPartHeaders
         string? boundary,
         string? transferEncoding,
         MultipartNameEscaping nameEscaping,
+        bool forMail,
         out string? contentType)
     {
         string? fileName = FileNameOf(part);
-        contentType = ChooseContentType(part, fileName);
+        contentType = ChooseContentType(part, fileName, forMail);
         StringBuilder block = new();
         if (FindHeaderValue(part.Headers, ContentDispositionLabel) is null)
         {
@@ -65,7 +72,7 @@ internal static class MultipartPartHeaders
         }
 
         AppendContentType(block, contentType, boundary);
-        AppendTransferEncoding(block, part.Headers, transferEncoding);
+        AppendTransferEncoding(block, part.Headers, transferEncoding ?? MailTransferEncoding(part, contentType, forMail));
 
         foreach (string header in part.Headers.Where(header => !IsHeader(header, ContentTypeLabel)))
         {
@@ -87,7 +94,14 @@ internal static class MultipartPartHeaders
         && contentType.StartsWith(expected, StringComparison.OrdinalIgnoreCase)
         && (contentType.Length == expected.Length || "\t\r\n ;".Contains(contentType[expected.Length], StringComparison.Ordinal));
 
-    private static string? ChooseContentType(MultipartFormPart part, string? fileName)
+    /// <summary>
+    /// Gets the transfer encoding a mail part without an encoder is labelled with: <c>8bit</c>
+    /// for a part with a content type that is not a multipart, otherwise none.
+    /// </summary>
+    private static string? MailTransferEncoding(MultipartFormPart part, string? contentType, bool forMail) =>
+        forMail && contentType is not null && part.Kind != MultipartFormPartKind.Multipart ? "8bit" : null;
+
+    private static string? ChooseContentType(MultipartFormPart part, string? fileName, bool forMail)
     {
         string? customContentType = part.ContentType ?? FindHeaderValue(part.Headers, ContentTypeLabel);
         if (customContentType is not null)
@@ -96,7 +110,7 @@ internal static class MultipartPartHeaders
         }
 
         string? contentType = DefaultContentType(part, fileName);
-        bool plainTextGoesUnlabelled = part.Kind != MultipartFormPartKind.Multipart && fileName is null;
+        bool plainTextGoesUnlabelled = part.Kind != MultipartFormPartKind.Multipart && (forMail || fileName is null);
         return plainTextGoesUnlabelled && IsContentType(contentType, "text/plain") ? null : contentType;
     }
 

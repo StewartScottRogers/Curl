@@ -83,6 +83,12 @@ internal sealed class SmtpMailTransaction(
         {
             result = TransferResult.Failure(CurlExitCode.SendError, failure.Message);
         }
+        catch (RequestBodyReadFailedException failure)
+        {
+            // A -F message whose 7bit part holds a byte above 127 fails the read that reaches
+            // it, after DATA, as curl 8.21.0 fails it: exit 26 and no QUIT (BL-1988).
+            result = TransferResult.Failure(CurlExitCode.ReadError, failure.Message);
+        }
 
         return result with
         {
