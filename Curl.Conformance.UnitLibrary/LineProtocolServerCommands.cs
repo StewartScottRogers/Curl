@@ -39,48 +39,68 @@ internal sealed class LineProtocolServerCommands
     /// <returns>The replies, by command name, and the capabilities and mechanisms.</returns>
     public static LineProtocolServerCommands Read(ReadOnlySpan<byte> serverCommands)
     {
+        List<string> lines = [.. Encoding.Latin1.GetString(serverCommands).Split('\n').Select(rawLine => rawLine.TrimEnd('\r'))];
+        List<(string Keyword, string Argument)> keywordLines = ReadKeywordLines(lines);
+        return new LineProtocolServerCommands(
+            ReadReplies(lines),
+            ReadCapabilities(keywordLines),
+            LastArgument(keywordLines, "AUTH ")?.Split(' ') ?? [],
+            LastArgument(keywordLines, "POSTFETCH ") ?? string.Empty);
+    }
+
+    private static Dictionary<string, byte[]> ReadReplies(List<string> lines)
+    {
         Dictionary<string, byte[]> replies = new(StringComparer.OrdinalIgnoreCase);
-        string[] capabilities = [];
-        string[] authenticationMechanisms = [];
-        string postFetch = string.Empty;
-        foreach (string rawLine in Encoding.Latin1.GetString(serverCommands).Split('\n'))
+        foreach (string line in lines)
         {
-            string line = rawLine.TrimEnd('\r');
-            if (line.Split(' ', 3) is ["REPLY", var command, var text])
+            if (TryReadReply(line, out string command, out byte[] reply))
             {
-                replies[command] = Encoding.Latin1.GetBytes(text + "\r\n");
-            }
-            else if (TryFindArgument(line, "POSTFETCH ", out string postFetchText))
-            {
-                postFetch = postFetchText;
-            }
-            else if (TryFindArgument(line, "CAPA ", out string capabilityList))
-            {
-                capabilities = SplitOutsideQuotes(capabilityList);
-            }
-            else if (TryFindArgument(line, "AUTH ", out string mechanismList))
-            {
-                authenticationMechanisms = mechanismList.Split(' ');
+                replies[command] = reply;
             }
         }
 
-        return new LineProtocolServerCommands(replies, capabilities, authenticationMechanisms, postFetch);
+        return replies;
     }
 
+    private static List<(string Keyword, string Argument)> ReadKeywordLines(List<string> lines) =>
+        [.. lines.Where(line => !TryReadReply(line, out _, out _)).Select(FindKeywordLine).OfType<(string, string)>()];
+
+    private static string[] ReadCapabilities(List<(string Keyword, string Argument)> keywordLines) =>
+        LastArgument(keywordLines, "CAPA ") is { } capabilityList ? SplitOutsideQuotes(capabilityList) : [];
     /// <summary>Finds the reply <c>&lt;servercmd&gt;</c> gives for a command.</summary>
     /// <param name="command">The command name, such as <c>PASV</c>.</param>
     /// <param name="reply">The reply bytes, with their CRLF, when one is given.</param>
     /// <returns>Whether <c>&lt;servercmd&gt;</c> gives a reply for the command.</returns>
     public bool TryFindReply(string command, out byte[] reply) => replies.TryGetValue(command, out reply!);
 
-    /// <summary>Matches ftpserver.pl's unanchored <c>/KEYWORD (.*)/</c>: the text after the keyword's first appearance.</summary>
-    private static bool TryFindArgument(string line, string keyword, out string argument)
+    /// <summary>Reads <c>REPLY &lt;command&gt; &lt;text&gt;</c>: the command and the text with its CRLF.</summary>
+    private static bool TryReadReply(string line, out string command, out byte[] reply)
     {
-        int at = line.IndexOf(keyword, StringComparison.Ordinal);
-        argument = at < 0 ? string.Empty : line[(at + keyword.Length)..];
-        return at >= 0;
+        bool isReply = line.Split(' ', 3) is ["REPLY", _, _];
+        string[] fields = line.Split(' ', 3);
+        command = isReply ? fields[1] : string.Empty;
+        reply = isReply ? Encoding.Latin1.GetBytes(fields[2] + "\r\n") : [];
+        return isReply;
     }
 
+    /// <summary>Finds the first of <c>POSTFETCH</c>, <c>CAPA</c> and <c>AUTH</c> a line holds, as the first matching branch of ftpserver.pl's chain does.</summary>
+    private static (string Keyword, string Argument)? FindKeywordLine(string line)
+    {
+        foreach (string keyword in new[] { "POSTFETCH ", "CAPA ", "AUTH " })
+        {
+            int at = line.IndexOf(keyword, StringComparison.Ordinal);
+            if (at >= 0)
+            {
+                return (keyword, line[(at + keyword.Length)..]);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The argument of the last line for a keyword (a later line replaces an earlier one), or <see langword="null"/> when there is none.</summary>
+    private static string? LastArgument(List<(string Keyword, string Argument)> keywordLines, string keyword) =>
+        keywordLines.LastOrDefault(keywordLine => keywordLine.Keyword == keyword).Argument;
     /// <summary>Splits on spaces outside double quotes and strips a value's enclosing quotes, as for <c>CAPA "SIZE 32"</c>.</summary>
     private static string[] SplitOutsideQuotes(string list)
     {

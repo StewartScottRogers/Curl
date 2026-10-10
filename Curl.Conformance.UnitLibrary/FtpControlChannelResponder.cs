@@ -92,12 +92,7 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
     /// <summary>Splits a line the way ftpserver.pl's <c>^([A-Z]{3,4})(\s(.*))?$</c> does, letters in either case.</summary>
     private static bool TrySplitCommand(string commandLine, out string command, out string argument)
     {
-        int letters = 0;
-        while (letters < commandLine.Length && letters < 5 && char.IsAsciiLetter(commandLine[letters]))
-        {
-            letters++;
-        }
-
+        int letters = commandLine.Take(5).TakeWhile(char.IsAsciiLetter).Count();
         bool endsAfterLetters = letters == commandLine.Length || char.IsWhiteSpace(commandLine[letters]);
         command = commandLine[..letters];
         argument = letters < commandLine.Length ? commandLine[(letters + 1)..] : string.Empty;

@@ -18,13 +18,18 @@ internal static class LineProtocolReplyData
     /// <returns>The part's text, decoded as Latin-1; empty when there is no such part.</returns>
     public static string Select(IReadOnlyDictionary<string, byte[]> replyParts, string? name)
     {
-        string digits = new([.. (name ?? string.Empty).SkipWhile(character => !char.IsAsciiDigit(character)).TakeWhile(char.IsAsciiDigit)]);
-        long number = long.TryParse(digits, out long parsed) ? parsed : 0;
+        long number = ReadNumber(name ?? string.Empty);
         if (number > 10000 && replyParts.TryGetValue("data" + (number % 10000), out byte[]? numbered) && numbered.Length > 0)
         {
             return Encoding.Latin1.GetString(numbered);
         }
 
         return replyParts.TryGetValue("data", out byte[]? data) ? Encoding.Latin1.GetString(data) : string.Empty;
+    }
+
+    private static long ReadNumber(string name)
+    {
+        string digits = new([.. name.SkipWhile(character => !char.IsAsciiDigit(character)).TakeWhile(char.IsAsciiDigit)]);
+        return long.TryParse(digits, out long parsed) ? parsed : 0;
     }
 }
