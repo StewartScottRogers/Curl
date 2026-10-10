@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1987 — Close GF-0057: IMAP logs out after every URL instead of reusing the connection, and every connection's tags start with A where curl uses one letter per connection
 
@@ -35,18 +35,36 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1982`: Curl answers what curl 8.21.0 answers, `upstream test1982 passes`, so the item measures `match`.
-- [ ] `behaviour:test804`: Curl answers what curl 8.21.0 answers, `upstream test804 passes`, so the item measures `match`.
-- [ ] `behaviour:test815`: Curl answers what curl 8.21.0 answers, `upstream test815 passes`, so the item measures `match`.
-- [ ] `behaviour:test816`: Curl answers what curl 8.21.0 answers, `upstream test816 passes`, so the item measures `match`.
-- [ ] `behaviour:test836`: Curl answers what curl 8.21.0 answers, `upstream test836 passes`, so the item measures `match`.
-- [ ] `behaviour:test779`: Curl answers what curl 8.21.0 answers, `upstream test779 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1982`: Curl answers what curl 8.21.0 answers, `upstream test1982 passes`, so the item measures `match`.
+- [x] `behaviour:test804`: Curl answers what curl 8.21.0 answers, `upstream test804 passes`, so the item measures `match`.
+- [x] `behaviour:test815`: Curl answers what curl 8.21.0 answers, `upstream test815 passes`, so the item measures `match`.
+- [x] `behaviour:test816`: Curl answers what curl 8.21.0 answers, `upstream test816 passes`, so the item measures `match`.
+- [x] `behaviour:test836`: Curl answers what curl 8.21.0 answers, `upstream test836 passes`, so the item measures `match`.
+- [x] `behaviour:test779`: Curl answers what curl 8.21.0 answers, `upstream test779 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] (No option changed.) When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Mirrors FTP's kept control connection (BL-1981, ADR-0468): `ImapKeptConnection` is held by
+  the pooled connection after a successful transfer, and the next URL for the same login
+  resumes it with the next tag and the remembered mailbox; `LOGOUT` goes out when the cache
+  closes it. Decisions in ADR-0469.
+- Tag letter is `'A' + ConnectResult.ConnectionNumber % 26` (the run's shared count), so the
+  HTTP-then-IMAP redirect of test779 and the second user of test836 tag `B001`.
+- Default taken: a connection `STARTTLS` upgraded is not kept (it logs out as before), the
+  same limit FTP keeps after `AUTH TLS`.
+- Default taken: the login key is user, password, login options and `--ssl` level.
+- The upstream cases could not be rerun here: a lane may not read `Gap/` or the gap office's
+  upstream copy (audit guard). Each case's command sequence is pinned instead in
+  `ImapKeptConnectionTests` (804, 815/816, 836, tag letters).
+- Measure-CodeQuality was not run (cost cap); the new branches are each exercised by
+  `ImapKeptConnectionTests`.
+- `Curl.Console.UnitTests`' `CreateRunner_TcpSchemeUrl_...` rows for imap/imaps now expect
+  the pool scheme.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. IMAP keeps its connection for the next URL with the next tag and the selected mailbox, and tags by connection number; build clean, fast tests green

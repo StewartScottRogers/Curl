@@ -43,7 +43,7 @@ public sealed class ImapProtocolHandlerSessionTests
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18143, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18143, false) { PoolScheme = "imap" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsTrue(run.Connection.IsDisposed);
     }
 
@@ -54,8 +54,8 @@ public sealed class ImapProtocolHandlerSessionTests
 
         ConnectTarget target = run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance };
         Diagnostics.Act("target", target.ToString());
-        Diagnostics.Assert("target", new ConnectTarget("127.0.0.1", 143, false), target);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 143, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Diagnostics.Assert("target", new ConnectTarget("127.0.0.1", 143, false) { PoolScheme = "imap" }, target);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 143, false) { PoolScheme = "imap" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
     [TestMethod]
@@ -87,7 +87,7 @@ public sealed class ImapProtocolHandlerSessionTests
 
         Diagnostics.Diff("sent", Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(Capability + "A002 LIST \"\" *\r\nA003 LOGOUT\r\n", run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 993, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 993, true) { PoolScheme = "imaps" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
         Diagnostics.Assert("result", TransferResult.Success(0), run.Result);
         Assert.AreEqual(TransferResult.Success(0), run.Result);

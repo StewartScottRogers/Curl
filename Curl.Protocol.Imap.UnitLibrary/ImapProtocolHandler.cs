@@ -15,8 +15,11 @@ namespace Curl.Protocol.Imap;
 /// unless the URL names one), through <see cref="ITransferContext.Proxy" /> when one is set;
 /// an <c>imaps</c> connection is TLS from its first byte (ADR-0121 §4). A failed connect is
 /// returned as the connector reported it. Commands are tagged <c>A001</c>, <c>A002</c>, ...
-/// as <see cref="ImapControlChannel" /> describes, and the conversation and the exit code of
-/// each failure are described on <see cref="ImapSession" />.
+/// as <see cref="ImapControlChannel" /> describes, the letter <c>B</c> on the run's second
+/// connection and so on, and the conversation and the exit code of each failure are described
+/// on <see cref="ImapSession" />. A successful transfer leaves its connection, logged in, to the
+/// run's connection cache, and the next URL for the same host, port and login carries on with
+/// its next tag; <c>LOGOUT</c> is sent when the cache closes it (<see cref="ImapKeptConnection" />, BL-1987).
 /// </para>
 /// <para>
 /// A URL naming no message sends <c>LIST</c>, one with a search query <c>SEARCH</c>, and
@@ -102,8 +105,10 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             Proxy = context.Proxy,
             Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
+            PoolScheme = url.Scheme,
         };
-        ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        string loginKey = ImapKeptConnection.LoginKeyOf(context);
+        ConnectResult connected = await ConnectAsync(target, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
             return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage)
@@ -114,8 +119,11 @@ public sealed class ImapProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            var session = new ImapSession(
-                new ImapControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, saslAuthenticator, context, implicitTls, connectEvents.Opened);
+            ImapKeptConnection? reused = connected.IsReused ? connection.Session as ImapKeptConnection : null;
+            ImapKeptConnection kept = reused ?? new ImapKeptConnection(connection, loginKey, TagLetterOf(connected.ConnectionNumber), context.TimeProvider);
+            var channel = new ImapControlChannel(
+                connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput, kept.TagLetter, kept.CommandsSent);
+            var session = new ImapSession(channel, tlsProvider, saslAuthenticator, context, implicitTls, connectEvents.Opened, kept, reused is not null);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {
@@ -126,6 +134,31 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             return result;
         }
     }
+
+    /// <summary>
+    /// Connects, which the run's connection cache may serve from a connection a previous URL
+    /// left intact (BL-1987); one kept for another login is closed, with its <c>LOGOUT</c>, and
+    /// the connect tried again, as curl 8.21.0 reuses an IMAP connection only for the same login
+    /// (upstream test 836).
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
+    {
+        ConnectResult connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        while (connected is { IsReused: true, Connection: { Session: ImapKeptConnection kept } connection } && !kept.Serves(loginKey))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+
+        return connected;
+    }
+
+    /// <summary>
+    /// The letter connection <paramref name="connectionNumber" />'s tags start with: <c>A</c>
+    /// plus the number modulo 26, as curl 8.21.0's <c>imap.c</c> makes it, so a run's second
+    /// connection is tagged <c>B001</c>, ... (upstream tests 779 and 836).
+    /// </summary>
+    internal static char TagLetterOf(long connectionNumber) => (char)('A' + (connectionNumber % 26));
 
     /// <summary>
     /// Writes the lines curl 8.21.0's <c>-v</c> ends an IMAP transfer with (BL-559): a failure's
