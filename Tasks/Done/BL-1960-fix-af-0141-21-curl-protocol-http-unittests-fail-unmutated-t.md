@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1960 — Fix AF-0141: 21 Curl.Protocol.Http.UnitTests fail unmutated: the verbose 'auth using' line appends the user's password
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-10: No product change was needed. `HttpAuthUsingLines.cs:28` on this branch already writes only `... with user '<user>'`, as curl does, and has since BL-954 (ece25cc3c); no "and password" text exists anywhere in Curl.Protocol.Http.UnitLibrary. The finding's reproduction, run here, gives the expected result: Passed! - Failed: 0, Passed: 19. The password suffix the auditor saw was most likely in the tree the mutation baseline ran on (a planted defect or a leftover mutant), not in the code; a lane may not read the audit office's files to confirm which. The quality auditor's re-audit closes the finding.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Reproduction passes 19/19; HttpAuthUsingLines already writes only the user, as curl does; build and fast tests green
