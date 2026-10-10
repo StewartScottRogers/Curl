@@ -4,7 +4,7 @@ title: Close GF-0046: SOCKS4/5 proxies and --interface are never used in process
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1997]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
 requirement: none
 created: 2026-10-10
@@ -52,7 +52,19 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 
 ## Notes
 
+- 2026-10-10 (lane 3): Parked behind BL-1997. Nine of the twelve items (702-705, 716,
+  728, 729, 1084, 1085) already pass in the conformance ratchet
+  (`Curl.Conformance.UnitTests/PassingUpstreamCases.txt`); the gap tool fails them only
+  because `InProcessCurl` never builds `TcpConnector`, which is exactly BL-1997's
+  rewiring (Re-close GF-0001). The finding's own suggestion is to re-measure after that
+  rewiring and only then fix what still keeps test713-715 (FTP via SOCKS5 / HTTP tunnel /
+  preproxy with --connect-to) from finishing. Those three cases are not in
+  `Curl.Conformance.UnitTests/UpstreamTestData`, and the gap tool lives under `Gap/`,
+  which a lane may not run, so nothing can be measured here before BL-1997 lands. BL-1997
+  also touches Curl.Networking.UnitLibrary, so the two could not run side by side anyway.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Waits on BL-1997 (InProcessCurl runs TcpConnector); re-measure GF-0046 after it, then fix what still stops test713-715
