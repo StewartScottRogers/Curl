@@ -30,3 +30,4 @@ BL-1943's measurement (2026-10-09) found three members failing that BL-1943 did 
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
