@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-09
 ---
 # BL-1919 — Fix AF-0140: 49 Curl.Protocol.Http.UnitTests fail unmutated: HttpResponseBodyReader counts every length-delimited/read-to-close body byte twice in BytesWritten
 
@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-10: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. AF-0140 reproduction passes; no code change needed (see Notes)
