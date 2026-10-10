@@ -17,7 +17,9 @@ namespace Curl.Authentication;
 /// curl's own NTLM is (elsewhere): a Type 2 message it cannot read ends the transfer on the
 /// 401, exit 0, and a <see cref="SecurityContextStatus.Refused" /> answer, which is a Type 3
 /// message past curl's 1024-byte buffer, fails it with exit 100 (BL-849) and the message curl
-/// prints for the check that refused it (BL-1128).
+/// prints for the check that refused it (BL-1128). A <see cref="HandBuiltNtlmSecurityContext" />
+/// fails as curl's own NTLM does whatever this says, since a run that answers NTLM with it is
+/// the non-SSPI build (BL-1999).
 /// </param>
 /// <remarks>
 /// It keeps no context between legs. Type 3 comes from a new context stepped through its
@@ -75,8 +77,8 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// <param name="cancellationToken">Cancels the context's steps.</param>
     /// <returns>The header value, or <see langword="null" /> to send none.</returns>
     /// <exception cref="HttpAuthenticationFailedException">
-    /// The context cannot answer the Type 2 message and <c>matchesSspiBuild</c> is set
-    /// (exit 94), or it is not set and the context refuses the answer because the Type 3 message
+    /// The context cannot answer the Type 2 message and <c>matchesSspiBuild</c> is set and the
+    /// context is not the hand-built one (exit 94), or otherwise the context refuses the answer because the Type 3 message
     /// would not fit curl's buffer (exit 100).
     /// </exception>
     public async ValueTask<string?> CreateAuthorizationAsync(HttpAuthRequest request, string? sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
@@ -210,7 +212,7 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
             return header;
         }
 
-        if (matchesSspiBuild)
+        if (matchesSspiBuild && context is not HandBuiltNtlmSecurityContext)
         {
             request.Events.ReportInfo(NtlmHandshakeLines.Type3Failure(authenticate.Status));
             throw Failed(CurlExitCode.AuthError, AuthErrorMessage);

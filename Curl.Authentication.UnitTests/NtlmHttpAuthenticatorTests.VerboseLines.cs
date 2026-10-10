@@ -268,8 +268,12 @@ public sealed partial class NtlmHttpAuthenticatorTests
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("matches SSPI build", true);
         diagnostics.Arrange("target info", "offset 48, length 16, message length 48");
+        diagnostics.Arrange("scripted statuses", "ContinueNeeded, MalformedToken (SSPI's SEC_E_INVALID_TOKEN)");
         RecordingInfoEvents events = new();
-        NtlmHttpAuthenticator authenticator = new(new HandBuiltNtlmContexts(), matchesSspiBuild: true);
+        ScriptedSecurityContextFactory sspi = new(new ScriptedSecurityContext(
+            new SecurityContextStep(SecurityContextStatus.ContinueNeeded, Convert.FromBase64String(HandBuiltNtlmSecurityContextTests.CurlType1)),
+            new SecurityContextStep(SecurityContextStatus.MalformedToken, [])));
+        NtlmHttpAuthenticator authenticator = new(sspi, matchesSspiBuild: true);
 
         HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
             () => authenticator.CreateAuthorizationAsync(Request(events), SentType1, sentBeforeAnyChallenge: true, [ChallengeWithTargetInformationAt(48, 16, 48)], CancellationToken.None).AsTask());
