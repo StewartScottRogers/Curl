@@ -124,6 +124,20 @@ asynchronously only, what the other writes, and reads 0 once the other end is di
 drained. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
 reject an ephemeral server key.
 
+`HttpsServerConnector` (BL-1912) stands in for upstream's HTTPS server, `sws` behind stunnel, on
+port 8989, the runner's `%HTTPSPORT`, which has a value only when the caller names a certificate
+directory: a `TlsServerConnection` runs `TlsServerStream` over an `InMemoryDuplexStream` pair with
+the certificate the case's `<server>` line `https [file]` names from `%CERTDIR/certs/`
+(`test-localhost.pem` when none, loaded by `LoadCertificate`), offers no ALPN and asks for no client
+certificate, as stunnel does, and relays the decrypted requests to an `sws` emulation connection in
+turns (request bytes in, every reply byte out), so they land in its `ReceivedBytes` for
+`<verify><protocol>`; once sws closes the connection it sends close_notify, as stunnel does. It
+sits between `FtpServerConnector` and `NoListenPortConnector`. Screening lets `https` cases run,
+but skips one that also names `http-proxy` until the proxy stand-in tunnels to it (BL-1915). On
+Windows 25 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 414, 417, 474,
+1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042,
+323 and 1244 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
+
 `UpstreamTestCertificateGenerator` (BL-1923) writes the files cases read through
 `%CERTDIR/certs/`, as upstream's `tests/certs/genserv.pl` does with OpenSSL at build time,
 from the vendored `.prm` files (read by `UpstreamCertificateParameters`) and the BCL only: a

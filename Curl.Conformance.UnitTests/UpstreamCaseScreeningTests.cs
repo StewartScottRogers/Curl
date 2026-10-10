@@ -167,7 +167,7 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    public void FindSkipReason_CertdirGivenAValue_IsNotTheReasonButTheTlsServerIs()
+    public void FindSkipReason_CertdirGivenAValue_IsNotTheReasonAndNeitherIsTheHttpsServer()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         byte[] file = "<testcase>\n<client>\n<server>\nhttps test-localhost.pem\n</server>\n<command>\n--cacert %CERTDIR/certs/test-ca.crt https://localhost/\n</command>\n</client>\n</testcase>\n"u8.ToArray();
@@ -179,9 +179,7 @@ public sealed class UpstreamCaseScreeningTests
         diagnostics.Act("skip reason", reason);
 
         diagnostics.Assert("skip reason does not name %CERTDIR", false, reason?.Contains("%CERTDIR", StringComparison.Ordinal) ?? false);
-        Assert.IsNotNull(reason);
-        Assert.DoesNotContain("%CERTDIR", reason);
-        Assert.Contains("https", reason);
+        Assert.IsNull(reason, "the https server is emulated (BL-1912)");
     }
 
     [TestMethod]
@@ -354,5 +352,43 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = Screen(RunnableClient + $"<{section}>\n<{name}>\n{line}\n</{name}>\n</{section}>\n");
 
         Assert.AreEqual($"the harness does not interpret the <{section}><{name}> line {line}", reason);
+    }
+
+    [TestMethod]
+    [DataRow("https", "test-localhost.pem")]
+    [DataRow("https test-localhost-san-first.pem", "test-localhost-san-first.pem")]
+    public void HttpsCertificateFile_HttpsServerLine_NamesTheCertificate(string serverLine, string expected)
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From($"<client>\n<server>\nhttp\n{serverLine}\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        Assert.AreEqual(expected, UpstreamCaseScreening.HttpsCertificateFile(testCase));
+        Assert.IsNull(UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features));
+    }
+
+    [TestMethod]
+    public void HttpsCertificateFile_NoHttpsServer_IsNull()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttp\nhttps a b\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        Assert.IsNull(UpstreamCaseScreening.HttpsCertificateFile(testCase));
+        Assert.AreEqual("the harness does not emulate the https a b server", UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features));
+    }
+
+    [TestMethod]
+    public void FindSkipReason_HttpsThroughTheHttpProxy_IsTheReason()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttps\nhttp-proxy\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features);
+
+        Assert.AreEqual("the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)", reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_HttpProxyWithoutHttps_IsNotSkippedForTheTunnel()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttp-proxy\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        Assert.IsNull(UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features));
     }
 }

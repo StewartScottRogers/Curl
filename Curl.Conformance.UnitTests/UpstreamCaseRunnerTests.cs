@@ -748,4 +748,59 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(expectedKind, outcome.Kind, outcome.Detail);
         Assert.AreEqual(expectedDetail, outcome.Detail ?? "");
     }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task RunAsync_HttpsCaseWithACertificateDirectory_ServesTlsOnTheHttpsPort()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        string[]? arguments = null;
+        int read = -1;
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            arguments = [.. invocation.Arguments];
+            ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsServerConnector.HttpsPort, false), CancellationToken.None);
+            await using IConnection connection = connected.Connection!;
+            await connection.WriteAsync("GET / HTTP/1.1\r\n\r\n"u8.ToArray(), CancellationToken.None);
+            read = await connection.ReadAsync(new byte[16], CancellationToken.None);
+            return 0;
+        });
+        string testFile = "<testcase>\n<client>\n<server>\nhttps\n</server>\n<command option=\"no-output,no-include\">\nhttps://localhost:%HTTPSPORT/\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+        diagnostics.Act("arguments", string.Join(' ', arguments ?? []));
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "https://localhost:" + UpstreamCaseRunner.HttpsPort + "/" }, arguments);
+        Assert.AreEqual(0, read, "a plain-text request to the TLS server ends the connection");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsCaseWithoutACertificateDirectory_SkipsForTheHttpsPort()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttps\n</server>\n<command>\nhttps://localhost:%HTTPSPORT/\n</command>\n</client>\n</testcase>\n");
+
+        Assert.AreEqual("the harness has no value for %HTTPSPORT", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsCaseNotNamingTheHttpsPortWithoutACertificateDirectory_Runs()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttps\n</server>\n<command option=\"no-output,no-include\">\nhttp://localhost/\n</command>\n</client>\n</testcase>\n");
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
 }

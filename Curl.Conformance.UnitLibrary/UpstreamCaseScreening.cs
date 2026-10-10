@@ -63,6 +63,7 @@ internal static class UpstreamCaseScreening
             () => UninterpretedCheck(testCase, "client", "precheck"),
             () => UninterpretedCheck(testCase, "verify", "postcheck"),
             () => UnsupportedServer(testCase),
+            () => HttpsThroughProxy(testCase),
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
             () => UnsupportedFeature(testCase, features),
@@ -119,8 +120,37 @@ internal static class UpstreamCaseScreening
             ? $"the harness does not interpret the <{section}><{name}> line {line}"
             : null;
 
+    /// <summary>
+    /// The certificate file the case's HTTPS server presents, from its <c>&lt;server&gt;</c> line
+    /// <c>https</c> (<see cref="HttpsServerConnector.DefaultCertificateFile"/>) or
+    /// <c>https &lt;file&gt;</c>, as upstream's <c>servers.pm</c> reads it; <see langword="null"/>
+    /// when the case names no HTTPS server.
+    /// </summary>
+    /// <param name="testCase">The parsed, expanded case.</param>
+    /// <returns>The file name under <c>%CERTDIR/certs/</c>, or <see langword="null"/>.</returns>
+    public static string? HttpsCertificateFile(UpstreamTestCase testCase)
+    {
+        ArgumentNullException.ThrowIfNull(testCase);
+        return UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Select(HttpsCertificateFile).FirstOrDefault(file => file is not null);
+    }
+
+    private static string? HttpsCertificateFile(string serverLine) =>
+        serverLine.Split(' ', StringSplitOptions.RemoveEmptyEntries) switch
+        {
+            ["https"] => HttpsServerConnector.DefaultCertificateFile,
+            ["https", var file] => file,
+            _ => null,
+        };
+
+    // The http-proxy stand-in relays no CONNECT tunnel to the HTTPS stand-in yet (BL-1915), so a
+    // case naming both would send its TLS handshake to the sws emulation as a request.
+    private static string? HttpsThroughProxy(UpstreamTestCase testCase) =>
+        HttpsCertificateFile(testCase) is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http-proxy")
+            ? "the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)"
+            : null;
+
     private static string? UnsupportedServer(UpstreamTestCase testCase) =>
-        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server)) is { } server
+        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server) && HttpsCertificateFile(server) is null) is { } server
             ? $"the harness does not emulate the {server} server"
             : null;
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
 
@@ -28,7 +29,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c> is <see cref="HttpsPort"/> when a certificate directory is named, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -78,6 +79,9 @@ public sealed class UpstreamCaseRunner(
     /// libtest, which screening skips for that reason, so no RTSP server stands behind it (ADR-0457).
     /// </summary>
     public const string RtspPort = "8996";
+
+    /// <summary>The value of <c>%HTTPSPORT</c> when the caller names a certificate directory: connections to this port reach the sws emulation through TLS, <see cref="HttpsServerConnector"/>, presenting the certificate the case's <c>https</c> server line names from <c>%CERTDIR/certs/</c>.</summary>
+    public const string HttpsPort = "8989";
 
     /// <summary>The value of <c>%NOLISTENPORT</c>: connections to this port are refused, <see cref="NoListenPortConnector"/>.</summary>
     public const string NoListenPort = "47";
@@ -131,6 +135,7 @@ public sealed class UpstreamCaseRunner(
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
         AddDirectoryVariable(variables, "PWD", testsDirectory);
         AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
+        AddHttpsPort(variables, certificateDirectory);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
@@ -142,7 +147,7 @@ public sealed class UpstreamCaseRunner(
         return (UpstreamCaseScreening.FindSkipReason(expansion, parsed.TestCase, platform.Features)
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(parsed.TestCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
-            : await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable).ConfigureAwait(false);
+            : await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable, certificateDirectory).ConfigureAwait(false);
     }
 
     private static void RefuseABlank(string directory, string description, string parameterName)
@@ -158,6 +163,15 @@ public sealed class UpstreamCaseRunner(
         if (directory is not null)
         {
             variables[name] = directory.Replace('\\', '/');
+        }
+    }
+
+    // Upstream's HTTPS server presents a certificate from %CERTDIR/certs/, so %HTTPSPORT has a value only with it.
+    private static void AddHttpsPort(Dictionary<string, string> variables, string? certificateDirectory)
+    {
+        if (certificateDirectory is not null)
+        {
+            variables["HTTPSPORT"] = HttpsPort;
         }
     }
 
@@ -187,7 +201,7 @@ public sealed class UpstreamCaseRunner(
             ["HTTP6PORT"] = Http6Port,
         };
 
-    private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory)
+    private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory, string? certificateDirectory)
     {
         if (PrecheckSkipReason(testCase) is { } skipReason)
         {
@@ -208,7 +222,7 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(server));
+        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(HttpsServer(testCase, server, certificateDirectory)));
         SmtpServerConnector smtp = new(testCase, ftp);
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
@@ -248,6 +262,12 @@ public sealed class UpstreamCaseRunner(
 
         return variables;
     }
+
+    // A case naming the https server (`https` or `https <certificate file>`) reaches it on %HTTPSPORT, which has a value only with a certificate directory.
+    private static IConnector HttpsServer(UpstreamTestCase testCase, SwsHttpServerConnector server, string? certificateDirectory) =>
+        UpstreamCaseScreening.HttpsCertificateFile(testCase) is { } certificateFile && certificateDirectory is not null
+            ? new HttpsServerConnector(server, HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", certificateFile)), server)
+            : server;
 
     private static TimeProvider ServerClock(List<string> arguments) =>
         CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();

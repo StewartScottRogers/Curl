@@ -100,6 +100,9 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     public bool IsSecure => false;
 
+    /// <summary>Whether the server still reads requests on the connection: false once a reply closed it or it started streaming or carrying upgraded traffic.</summary>
+    public bool ReadsRequests => readsRequests;
+
     public EndPoint? RemoteEndPoint { get; init; }
 
     public EndPoint? LocalEndPoint { get; init; }
