@@ -38,3 +38,4 @@ origin's Digest answer. Read the case in `Curl.Conformance.UnitTests/UpstreamTes
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
