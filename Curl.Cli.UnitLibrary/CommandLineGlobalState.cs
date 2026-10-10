@@ -47,6 +47,8 @@ internal sealed class CommandLineGlobalState
 
     public bool ActsAsWindowsSchannelBuild { get; set; }
 
+    public Func<string, string?> ReadEnvironmentVariable { get; set; } = Environment.GetEnvironmentVariable;
+
     public bool Silent { get; set; }
 
     public bool ShowError { get; set; }

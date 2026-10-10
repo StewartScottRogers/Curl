@@ -56,6 +56,9 @@ public static class CommandLineParser
 
     private const string ExpansionPrefix = "expand-";
 
+    /// <summary>Reads this process's environment, for the overloads given no reader of their own.</summary>
+    private static readonly Func<string, string?> ProcessEnvironmentVariable = Environment.GetEnvironmentVariable;
+
     /// <summary>Parses <paramref name="arguments"/>, the command line without the program name.</summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <returns>
@@ -154,21 +157,42 @@ public static class CommandLineParser
     /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
     /// <returns>As the overload without <paramref name="isWindows"/> returns.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch, isWindows, ProcessEnvironmentVariable);
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> as the overload without <paramref name="readEnvironmentVariable"/>
+    /// does, but imports a <c>--variable %name</c> through <paramref name="readEnvironmentVariable"/> rather
+    /// than from this process's environment, so a run given its own environment sees it there too (BL-1943).
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <param name="dataFileReader">Reads the default config file, and every file an option names.</param>
+    /// <param name="defaultConfigFileSearch">Lists where to look for the default config file; <see cref="DefaultConfigFileSearch.ForProcess"/> for this process.</param>
+    /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
+    /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null"/> when it is not set.</param>
+    /// <returns>As the overload without <paramref name="readEnvironmentVariable"/> returns.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows);
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows)
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable);
+
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
         ArgumentNullException.ThrowIfNull(passwordPrompt);
         ArgumentNullException.ThrowIfNull(dataFileReader);
+        ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
 
-        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows };
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ReadEnvironmentVariable = readEnvironmentVariable };
         if (isWindows)
         {
             options.ConfigFileWireTextEncoding = ConfigFileWireText.WindowsAnsiCodePage(() => System.Text.CodePagesEncodingProvider.Instance.GetEncoding(0));

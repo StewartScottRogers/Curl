@@ -270,6 +270,12 @@ public sealed class CommandLineOptions
     /// </summary>
     public bool ActsAsWindowsSchannelBuild { get => globals.ActsAsWindowsSchannelBuild; internal set => globals.ActsAsWindowsSchannelBuild = value; }
 
+    /// <summary>
+    /// Reads an environment variable for <c>--variable %name</c>; <see langword="null"/> when it is not set.
+    /// This process's environment unless <see cref="CommandLineParser"/> is given the run's own reader (BL-1943).
+    /// </summary>
+    internal Func<string, string?> ReadEnvironmentVariable { get => globals.ReadEnvironmentVariable; set => globals.ReadEnvironmentVariable = value; }
+
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }
 
