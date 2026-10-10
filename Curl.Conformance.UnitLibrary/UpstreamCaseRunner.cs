@@ -26,7 +26,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -48,6 +48,9 @@ public sealed class UpstreamCaseRunner(
 
     /// <summary>The value of <c>%SOCKSPORT</c>: connections to this port reach the socksd emulation, <see cref="SocksServerConnector"/>.</summary>
     public const string SocksPort = "8994";
+
+    /// <summary>The value of <c>%MQTTPORT</c>: connections to this port reach the mqttd emulation, <see cref="MqttServerConnector"/>, whose protocol dump follows the sws emulation's received bytes for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
+    public const string MqttPort = "8998";
 
     /// <summary>The value of <c>%NOLISTENPORT</c>: connections to this port are refused, <see cref="NoListenPortConnector"/>.</summary>
     public const string NoListenPort = "47";
@@ -139,6 +142,7 @@ public sealed class UpstreamCaseRunner(
             ["HTTPPORT"] = HttpPort,
             ["PROXYPORT"] = ProxyPort,
             ["SOCKSPORT"] = SocksPort,
+            ["MQTTPORT"] = MqttPort,
             ["NOLISTENPORT"] = NoListenPort,
             ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
             ["LOGDIR"] = logDirectory,
@@ -171,7 +175,8 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, new SocksServerConnector(testCase, new NoListenPortConnector(server)), new UnreachableDatagramConnector());
+        MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, new NoListenPortConnector(server)));
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, new UnreachableDatagramConnector());
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -180,7 +185,7 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), server.ReceivedBytes.ToArray(), File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [])
+        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. mqtt.ProtocolLog.Span], File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [])
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
         };
