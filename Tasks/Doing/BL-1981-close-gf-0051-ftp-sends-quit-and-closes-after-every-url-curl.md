@@ -55,3 +55,4 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
