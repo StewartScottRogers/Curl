@@ -88,7 +88,12 @@ blocks reading a command. A reply that closes the connection makes later reads r
 drops the rest of the client's bytes unrecorded; `ReceivedBytes` records every byte read, across
 connections, for `<verify><protocol>` (the shared `SwsServerRecording`).
 `LineProtocolServerCommands` reads `<servercmd>`'s `REPLY <command> <text>` lines for the
-responders to look up by command name. `EmulatedServers` lists the `<server>` names whose cases
+responders to look up by command name. `FtpControlChannelResponder` (BL-1920) is the FTP
+control channel's responder: the `220` curl banner (or `REPLY welcome`), a `REPLY` line's text,
+else ftpserver.pl's display text, `PWD` as `CWD` moved it, `500 <command> is not dealt with!`
+otherwise, and `500 Unrecognized command` with a close for a line that is not a three- or
+four-letter command; `ReceivedCommandLines` keeps each line with its CRLF. The data-connection
+commands are BL-1906 to BL-1908's, and wiring it into `UpstreamCaseRunner` is BL-1905's. `EmulatedServers` lists the `<server>` names whose cases
 `UpstreamCaseScreening` lets run; it is empty until a protocol task adds its stand-in's name.
 
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands

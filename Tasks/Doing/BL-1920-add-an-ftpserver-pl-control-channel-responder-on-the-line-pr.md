@@ -22,11 +22,15 @@ First slice of BL-1905, split off because the whole of BL-1905 does not fit one 
 
 ## Acceptance criteria
 
-- [ ] A responder class in Curl.Conformance.UnitLibrary sends the 220 greeting, answers the login and control commands with ftpserver.pl's default replies, and lets REPLY servercmd lines override a command's reply; unit tests in Curl.Conformance.UnitTests pin each.
-- [ ] The responder records each received command line in the order and form ftpserver.pl writes to its protocol log.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] A responder class in Curl.Conformance.UnitLibrary sends the 220 greeting, answers the login and control commands with ftpserver.pl's default replies, and lets REPLY servercmd lines override a command's reply; unit tests in Curl.Conformance.UnitTests pin each.
+- [x] The responder records each received command line in the order and form ftpserver.pl writes to its protocol log.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Behaviour read from tests/ftpserver.pl in the curl-8.21.0 tarball (scratch folder outside the repo): display texts, banner, `500 <cmd> is not dealt with!`, `500 Unrecognized command` + close for a line not matching `^([A-Z]{3,4})(\s(.*))?$`, PWD_ftp/CWD_ftp/switch_directory.
+- Kept ftpserver.pl's quirks: display text is looked up by the command as written and the handler by its upper case, so `cwd x` moves the directory and sends nothing, `user` gets the not-dealt-with answer; `..` strips only an alphanumeric last segment.
+- Choices: `REPLY` lookup reuses `LineProtocolServerCommands` (case-insensitive, CRLF appended; ftpserver.pl's `REPLYLF`, quoted full-text `REPLY "CMD ARG"`, `COUNT` and `DELAY` are not read yet - left for BL-1905 when cases need them). The protocol log is `ReceivedCommandLines` (each line + CRLF, as ftpserver.pl writes server.input); the connector's `ReceivedBytes` already records the raw bytes across connections. Commands with data-connection handlers (PASV, EPSV, RETR, SIZE, MDTM, STOR...) answer only by REPLY/display text/not-dealt-with until BL-1906..BL-1908.
 
 ## Log
 
