@@ -3,8 +3,8 @@ id: AF-0149
 title: CI red 30.42 min after a lane changed guard file task-board.ps1 on work/dark-factory (run 37931431648)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:CI-run-37931431648:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
