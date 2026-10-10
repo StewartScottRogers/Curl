@@ -27,6 +27,8 @@ BL-1929's measurement (2026-10-09) found 28 failing members, none in BL-1929's f
 
 ## Notes
 
+- 2026-10-09: 28 members across 5 clusters is more than one run's budget; split into BL-1937..BL-1941. This task stays as the final check that Measure-CodeQuality reports 0 failing members.
+
 ## Log
 
 - 2026-10-09: Created.
