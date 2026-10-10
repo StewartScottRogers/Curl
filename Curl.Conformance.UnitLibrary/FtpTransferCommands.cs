@@ -1,13 +1,16 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Text;
 
 namespace Curl.Conformance;
 
 /// <summary>
-/// The passive-mode data-transfer commands of upstream's <c>tests/ftpserver.pl</c> (at
-/// <c>curl-8_21_0</c>) for one control connection: <c>PASV</c> and <c>EPSV</c> open an
-/// <see cref="FtpDataConnection"/> on <see cref="FtpServerConnector.PassivePort"/>; <c>RETR</c>,
-/// <c>LIST</c> and <c>NLST</c> send into it and close it; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>
+/// The data-transfer commands of upstream's <c>tests/ftpserver.pl</c> (at <c>curl-8_21_0</c>)
+/// for one control connection: <c>PASV</c> and <c>EPSV</c> open an <see cref="FtpDataConnection"/>
+/// on <see cref="FtpServerConnector.PassivePort"/>, and <c>PORT</c> and <c>EPRT</c> connect one to
+/// the port curl listens on; <c>RETR</c>, <c>LIST</c> and <c>NLST</c> send into it and close it,
+/// and <c>STOR</c> and <c>APPE</c> hand it over as the upload, whose bytes are what ftpserver.pl
+/// writes to its upload file; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>
 /// answer from the case's <c>&lt;reply&gt;</c> parts. Each answer is what ftpserver.pl's handler
 /// sends after the command's display text. A file name loads the case's data when, as
 /// ftpserver.pl reads it, it names a test number: ftpserver.pl then loads that test's file, which
@@ -19,11 +22,23 @@ internal sealed class FtpTransferCommands
 
     private const string FileTransferComplete = "226 File transfer complete\r\n";
 
+    private const string GimmeGimme = "125 Gimme gimme gimme!\r\n";
+
+    private const string SillyYou = "500 silly you, go away\r\n";
+
+    private static readonly Regex PortArgument = new(@"(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)", RegexOptions.CultureInvariant);
+
+    private static readonly Regex EprtArgument = new(@"(\d+)\|([^\|]+)\|(\d+)", RegexOptions.CultureInvariant);
+
     private static readonly byte[] NameList = Encoding.Latin1.GetBytes("file\r\nwith space\r\nfake\r\n..\r\n ..\r\nfunny\r\nREADME\r\n");
 
     private readonly UpstreamTestCase testCase;
 
     private readonly Action<FtpDataConnection> openPassive;
+
+    private readonly Func<int, FtpDataConnection?> connectActive;
+
+    private readonly Action<FtpDataConnection> receiveUpload;
 
     private readonly string[] serverCommandLines;
 
@@ -38,16 +53,24 @@ internal sealed class FtpTransferCommands
     /// <summary>Creates the commands for one control connection.</summary>
     /// <param name="testCase">The expanded case whose <c>&lt;reply&gt;</c> parts are served.</param>
     /// <param name="openPassive">Called with each data connection <c>PASV</c> or <c>EPSV</c> opens, for the client to connect to.</param>
-    public FtpTransferCommands(UpstreamTestCase testCase, Action<FtpDataConnection> openPassive)
+    /// <param name="connectActive">Connects to the port <c>PORT</c> or <c>EPRT</c> names, returning the server's end, or <see langword="null"/> when nothing listens there.</param>
+    /// <param name="receiveUpload">Called with the data connection each <c>STOR</c> or <c>APPE</c> uploads into.</param>
+    public FtpTransferCommands(UpstreamTestCase testCase, Action<FtpDataConnection> openPassive, Func<int, FtpDataConnection?> connectActive, Action<FtpDataConnection> receiveUpload)
     {
         this.testCase = testCase;
         this.openPassive = openPassive;
+        this.connectActive = connectActive;
+        this.receiveUpload = receiveUpload;
         serverCommandLines = UpstreamTestPartBodies.Lines(testCase.Find("reply", "servercmd"));
         weirdRetrieve = HasServerCommand("RETRWEIRDO");
         handlers = new(StringComparer.Ordinal)
         {
             ["PASV"] = _ => OpenPassive(extended: false),
             ["EPSV"] = _ => OpenPassive(extended: true),
+            ["PORT"] = Port,
+            ["EPRT"] = ExtendedPort,
+            ["STOR"] = Store,
+            ["APPE"] = Store,
             ["LIST"] = _ => Transfer(Listing(), AsciiTransferComplete),
             ["NLST"] = _ => Transfer(NameList, AsciiTransferComplete),
             ["RETR"] = Retrieve,
@@ -86,6 +109,46 @@ internal sealed class FtpTransferCommands
         return extended
             ? $"229 Entering Passive Mode (|||{port}|)\r\n"
             : $"227 Entering Passive Mode ({address},{port / 256},{port % 256})\r\n";
+    }
+
+    // ftpserver.pl's PORT_ftp: a PORT line it cannot read gets 500 after the display text, and a
+    // readable one nothing more; it then connects to the port, ignoring the address.
+    private string Port(string argument)
+    {
+        Match match = PortArgument.Match(argument);
+        return match.Success
+            ? ConnectActive((LeadingNumber(match.Groups[5].Value) << 8) + LeadingNumber(match.Groups[6].Value), string.Empty)
+            : SillyYou;
+    }
+
+    private string ExtendedPort(string argument)
+    {
+        Match match = EprtArgument.Match(argument);
+        return match.Success
+            ? ConnectActive(LeadingNumber(match.Groups[3].Value), "200 Thanks for dropping by. We contact you later\r\n")
+            : SillyYou;
+    }
+
+    // Port 0 or one past 65535 starts no data connection, and the client waits for one.
+    private string ConnectActive(long port, string answer)
+    {
+        dataConnection = port is > 0 and <= 65535 ? connectActive((int)port) : null;
+        return answer;
+    }
+
+    // ftpserver.pl's STOR_ftp reads the upload until the client closes the data connection, then
+    // sends the <servercmd> STOR line's text or 226; here the client's bytes are kept as it writes them.
+    private string Store(string argument)
+    {
+        if (dataConnection is null)
+        {
+            return string.Empty;
+        }
+
+        receiveUpload(dataConnection);
+        dataConnection = null;
+        string? storeResponse = serverCommandLines.FirstOrDefault(line => line.StartsWith("STOR ", StringComparison.Ordinal));
+        return GimmeGimme + (storeResponse is null ? FileTransferComplete : storeResponse[5..] + "\r\n");
     }
 
     // Without a data connection ftpserver.pl sends nothing after the display text.

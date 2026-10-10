@@ -37,7 +37,7 @@ internal static class UpstreamCaseScreening
 
     private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, "sftp", "scp"];
 
-    private static readonly Regex FtpDataConnectionCommand = new(@"^(?:PORT|EPRT|LPRT|STOR|APPE)\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
+    private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
@@ -154,21 +154,21 @@ internal static class UpstreamCaseScreening
             ? $"the harness does not emulate the {server} server"
             : null;
 
-    // The FTP stand-in serves passive-mode downloads and listings (BL-1906); a case whose protocol
-    // log shows an active-mode data connection or an upload waits for BL-1907, and one listing
-    // ftpserver.pl's simulated wildcard directory is not emulated.
+    // The FTP stand-in serves passive and active mode, downloads, listings and uploads (BL-1906,
+    // BL-1907); a case whose protocol log shows LPRT, which curl sends only after EPRT is refused
+    // and ftpserver.pl does not deal with, or ftpserver.pl's simulated wildcard directory is not emulated.
     private static string? FtpDataConnection(UpstreamTestCase testCase) =>
         FtpDataConnectionCommand.Match(UpstreamTestPartBodies.Text(testCase.Find("verify", "protocol"))) is { Success: true } command
             ? $"the FTP stand-in does not carry out the case's {command.Value}"
             : null;
 
-    // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1917, BL-1918); any other server's case
+    // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd and FTP stand-ins and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1907, BL-1917, BL-1918); any other server's case
     // verifying <upload> keeps a reason.
-    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "scp", "sftp"];
+    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "ftp", "scp", "sftp"];
 
     private static string? UploadOffMailServer(UpstreamTestCase testCase) =>
         testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(UploadingServers).Any()
-            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers"
+            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, scp and sftp servers"
             : null;
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)

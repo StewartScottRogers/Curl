@@ -126,7 +126,7 @@ public sealed class FtpTransferCommandsTests
     [TestMethod]
     public void TryAnswer_OtherCommand_IsNotATransferCommand()
     {
-        bool answered = Create(string.Empty, []).TryAnswer("STOR", "1", out string answer);
+        bool answered = Create(string.Empty, []).TryAnswer("LPRT", "1", out string answer);
 
         Assert.IsFalse(answered);
         Assert.AreEqual(string.Empty, answer);
@@ -177,7 +177,7 @@ public sealed class FtpTransferCommandsTests
     [TestMethod]
     [DataRow("LIST", "150 here comes a directory\r\n")]
     [DataRow("SIZE 1", "550 1: No such file or directory.\r\n")]
-    [DataRow("STOR 1", "500 STOR is not dealt with!\r\n")]
+    [DataRow("LPRT 1", "500 LPRT is not dealt with!\r\n")]
     public void Responder_WithTransferCommands_AnswersAfterTheDisplayText(string line, string expected)
     {
         FtpControlChannelResponder responder = new(LineProtocolServerCommands.Read([]), Create(string.Empty, []));
@@ -187,8 +187,83 @@ public sealed class FtpTransferCommandsTests
         Assert.AreEqual(expected, Encoding.Latin1.GetString(reply.Bytes.Span));
     }
 
+    [TestMethod]
+    [DataRow("PORT", "127,0,0,1,35,46", "")]
+    [DataRow("PORT", "x127,0,0,1,35,46x", "")]
+    [DataRow("EPRT", "|1|127.0.0.1|9006|", "200 Thanks for dropping by. We contact you later\r\n")]
+    public async Task TryAnswer_ActiveCommandThenRetr_SendsTheDataOverTheConnectionCurlAccepts(string command, string argument, string expected)
+    {
+        FtpActiveModeListener listener = new();
+        ListenResult listening = await listener.ListenAsync(new ListenTarget(System.Net.IPAddress.Loopback, 0, 0), TestContext.CancellationToken);
+        FtpTransferCommands commands = new(ParsedTestCase.From("<reply>\n<data>\nhello\n</data>\n</reply>\n"), _ => { }, listener.Connect, _ => { });
+
+        string answer = Answer(commands, command, argument);
+        string retrieved = Answer(commands, "RETR", "1");
+        ConnectResult accepted = await listening.PendingConnection!.AcceptAsync(TestContext.CancellationToken);
+
+        Assert.AreEqual(expected, answer);
+        Assert.AreEqual("150 Binary data connection for 1 () (6 bytes).\r\n226 File transfer complete\r\n", retrieved);
+        Assert.AreEqual("hello\n", await ReadToEndAsync(accepted.Connection!));
+        Assert.AreEqual(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, FtpActiveModeListener.FirstPort), listening.PendingConnection.LocalEndPoint);
+        Assert.IsNull(listener.Connect(FtpActiveModeListener.FirstPort));
+    }
+
+    [TestMethod]
+    [DataRow("PORT", "127,0,0,1", "500 silly you, go away\r\n")]
+    [DataRow("EPRT", "|1|", "500 silly you, go away\r\n")]
+    [DataRow("PORT", "127,0,0,1,0,0", "")]
+    [DataRow("EPRT", "|1|127.0.0.1|65536|", "200 Thanks for dropping by. We contact you later\r\n")]
+    [DataRow("PORT", "127,0,0,1,35,47", "")]
+    public void TryAnswer_ActiveCommandReachingNoListener_LeavesNoDataConnection(string command, string argument, string expected)
+    {
+        List<int> connected = [];
+        FtpTransferCommands commands = new(ParsedTestCase.From("<reply>\n</reply>\n"), _ => { }, port => { connected.Add(port); return null; }, _ => { });
+
+        string answer = Answer(commands, command, argument);
+
+        Assert.AreEqual(expected, answer);
+        Assert.AreEqual(string.Empty, Answer(commands, "STOR", "1"));
+        Assert.HasCount(argument.EndsWith("35,47", StringComparison.Ordinal) ? 1 : 0, connected);
+    }
+
+    [TestMethod]
+    [DataRow("STOR", "", "125 Gimme gimme gimme!\r\n226 File transfer complete\r\n")]
+    [DataRow("APPE", "<servercmd>\nSTOR 552 disk full\n</servercmd>\n", "125 Gimme gimme gimme!\r\n552 disk full\r\n")]
+    public async Task TryAnswer_UploadAfterPasv_HandsTheDataConnectionOverAsTheUpload(string command, string reply, string expected)
+    {
+        List<FtpDataConnection> opened = [];
+        List<FtpDataConnection> uploads = [];
+        FtpTransferCommands commands = new(ParsedTestCase.From($"<reply>\n{reply}</reply>\n"), opened.Add, _ => null, uploads.Add);
+        Answer(commands, "PASV", string.Empty);
+
+        string answer = Answer(commands, command, "1");
+        await opened[0].WriteAsync(Encoding.Latin1.GetBytes("up"), TestContext.CancellationToken);
+        await opened[0].WriteAsync(Encoding.Latin1.GetBytes("load"), TestContext.CancellationToken);
+
+        Assert.AreEqual(expected, answer);
+        Assert.AreSame(opened[0], uploads.Single());
+        Assert.AreEqual("upload", Encoding.Latin1.GetString(uploads[0].ReceivedBytes));
+        Assert.AreEqual(string.Empty, Answer(commands, command, "1"));
+    }
+
+    [TestMethod]
+    public async Task FtpServerConnector_StorOverActiveMode_RecordsTheUploadedBytes()
+    {
+        FtpServerConnector server = new(ParsedTestCase.From("<reply>\n</reply>\n"), new NoListenPortConnector(null!));
+        Assert.IsTrue(server.UploadedBytes.IsEmpty);
+        ListenResult listening = await server.ActiveModeListener.ListenAsync(new ListenTarget(System.Net.IPAddress.Loopback, 9010, 9010), TestContext.CancellationToken);
+        ConnectResult control = await server.ConnectAsync(new ConnectTarget("127.0.0.1", FtpServerConnector.FtpPort, false), TestContext.CancellationToken);
+        IConnection connection = control.Connection!;
+        await connection.WriteAsync(Encoding.Latin1.GetBytes("PORT 127,0,0,1,35,50\r\nSTOR 1\r\n"), TestContext.CancellationToken);
+        ConnectResult accepted = await listening.PendingConnection!.AcceptAsync(TestContext.CancellationToken);
+        await accepted.Connection!.WriteAsync(Encoding.Latin1.GetBytes("uploaded bytes\n"), TestContext.CancellationToken);
+        await listening.PendingConnection.DisposeAsync();
+
+        Assert.AreEqual("uploaded bytes\n", Encoding.Latin1.GetString(server.UploadedBytes.Span));
+    }
+
     private static FtpTransferCommands Create(string reply, List<FtpDataConnection> opened) =>
-        new(ParsedTestCase.From($"<reply>\n{reply}</reply>\n"), opened.Add);
+        new(ParsedTestCase.From($"<reply>\n{reply}</reply>\n"), opened.Add, _ => null, _ => { });
 
     private static string Answer(FtpTransferCommands commands, string command, string argument)
     {

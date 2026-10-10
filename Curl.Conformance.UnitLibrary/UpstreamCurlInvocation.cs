@@ -43,6 +43,9 @@ public sealed class UpstreamCurlInvocation(
     /// <summary>Every UDP channel.</summary>
     public IDatagramConnector DatagramConnector { get; } = datagramConnector;
 
+    /// <summary>Gets the listener curl's active-mode FTP (<c>-P</c>) listens on: the FTP stand-in's in-memory one, which <c>PORT</c> and <c>EPRT</c> connect to; <see langword="null"/> for curl's own TCP listener.</summary>
+    public IConnectionListener? ConnectionListener { get; init; }
+
     /// <summary>
     /// The whole environment the run reads, as the case's <c>&lt;client&gt;&lt;setenv&gt;</c> sets it;
     /// a variable not in it is unset for the run.
