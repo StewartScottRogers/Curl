@@ -33,3 +33,4 @@ Split from BL-1896 (part 1 of its context). Read Curl.Conformance.UnitLibrary\CL
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
