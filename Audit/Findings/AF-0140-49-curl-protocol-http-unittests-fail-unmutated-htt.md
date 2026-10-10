@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:CopyFramedAsync:failing-test
 reproduction: none
-task: none
-tasks:
+task: BL-1919
+tasks: BL-1919
 found: 2026-10-09
 found-at: 4653e86a969768525b597bcfec718242ead0959f
 scorecard: 2026-10-09_1435.md
