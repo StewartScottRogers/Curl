@@ -32,7 +32,21 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2, parked at the run's cost cap): the work in progress is uncommitted and stashed by the shift.
+  Done: `TftpServerConnector` (port 8996, transfer port 8997, `ProtocolLog` = tftpd's `server.input` dump,
+  `FindFile` per tftpd's `validate_access`, `writedelay: N` in seconds) and `TftpServerChannel` (no OACK, as
+  tftpd never sends one; 512-byte blocks; netascii LF->CRLF, CR->CR NUL; ERROR 2 "Access violation", ERROR 4
+  "Illegal TFTP operation"); the runner wires `%TFTPPORT`, passes the connector as the datagram connector and
+  appends its dump to the protocol bytes; screening admits `tftp`. The library builds clean with -warnaserror.
+  Left: `Curl.Conformance.UnitTests/TftpServerConnectorTests.cs` has split string literals at lines 44 and 92-95
+  (a sed edit put a real newline after `hello` / `three`; each should end `\n"`). Fix them and run the tests,
+  then measure coverage (`Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`), update
+  `UnreachableDatagramConnector`'s summary (it no longer waits "until a TFTP emulation exists") and the library's
+  CLAUDE.md. Upload cases (test285, test286, test1243) still skip, naming `<verify><upload>`: uploads are not
+  recorded yet.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Parked at the run's cost cap: emulation built, tests need their split literals fixed, then coverage and CLAUDE.md (see Notes)
