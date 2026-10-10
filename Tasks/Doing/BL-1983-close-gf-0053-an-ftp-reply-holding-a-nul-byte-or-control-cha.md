@@ -46,3 +46,4 @@ In Curl.Protocol.Ftp.UnitLibrary's control-reply reader, fail with exit 8 (weird
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
