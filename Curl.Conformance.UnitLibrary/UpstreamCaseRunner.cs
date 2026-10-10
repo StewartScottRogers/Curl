@@ -257,8 +257,8 @@ public sealed class UpstreamCaseRunner(
         UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span, .. tftp.ProtocolLog.Span], ReadOutputFile(outputFile))
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
-            // A case reaches one mail server, so at most one of these holds a message.
-            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span],
+            // A case reaches one uploading server, so at most one of these holds an upload.
+            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span],
         };
         return Judge(testCase, run);
     }

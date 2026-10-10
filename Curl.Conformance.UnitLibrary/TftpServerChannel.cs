@@ -19,7 +19,8 @@ namespace Curl.Conformance;
 /// into CR NUL; a write request is acknowledged block by block until a block shorter than 512
 /// bytes. A request whose mode is neither <c>octet</c> nor <c>netascii</c>, or whose strings are
 /// not NUL-terminated, gets ERROR 4; a file name with no number after its last slash gets ERROR 2.
-/// The uploaded bytes are not kept. A receive with nothing to answer waits until cancelled.
+/// Each new DATA block's bytes are added, as received, to <see cref="TftpServerConnector.UploadedBytes"/>.
+/// A receive with nothing to answer waits until cancelled.
 /// </remarks>
 internal sealed class TftpServerChannel(TftpServerConnector server, IPAddress address) : IDatagramChannel
 {
@@ -75,7 +76,7 @@ internal sealed class TftpServerChannel(TftpServerConnector server, IPAddress ad
                 Request(opcode, datagram[2..]);
                 break;
             case 3:
-                Receive(block, datagram.Length - 4);
+                Receive(block, datagram[4..]);
                 break;
             case 4:
                 Acknowledge(block);
@@ -148,12 +149,13 @@ internal sealed class TftpServerChannel(TftpServerConnector server, IPAddress ad
         }
     }
 
-    private void Receive(int block, int length)
+    private void Receive(int block, ReadOnlySpan<byte> data)
     {
         if (block == expectedBlock)
         {
+            server.RecordUpload(data);
             Enqueue(Packet(4, block, []), false);
-            expectedBlock = length == BlockSize ? expectedBlock + 1 : -1;
+            expectedBlock = data.Length == BlockSize ? expectedBlock + 1 : -1;
         }
         else if (block == expectedBlock - 1)
         {

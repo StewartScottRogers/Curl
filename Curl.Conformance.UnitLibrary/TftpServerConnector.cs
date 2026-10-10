@@ -27,8 +27,13 @@ public sealed class TftpServerConnector(UpstreamTestCase testCase, TimeProvider 
 
     private readonly MemoryStream log = new();
 
+    private readonly MemoryStream upload = new();
+
     /// <summary>The <c>server.input</c> dump: <c>opcode</c>, <c>mode</c>, each option and <c>filename</c>, one <c>name = value</c> line each, per request.</summary>
     public ReadOnlyMemory<byte> ProtocolLog => log.ToArray();
+
+    /// <summary>The file tftpd writes from write requests: each new DATA block's bytes as received, across channels, for <c>&lt;verify&gt;&lt;upload&gt;</c>.</summary>
+    public ReadOnlyMemory<byte> UploadedBytes => upload.ToArray();
 
     /// <summary>The seconds tftpd waits before each DATA packet, from <c>&lt;servercmd&gt;</c>'s <c>writedelay: N</c>.</summary>
     internal int WriteDelaySeconds { get; } = ReadWriteDelay(testCase);
@@ -47,6 +52,9 @@ public sealed class TftpServerConnector(UpstreamTestCase testCase, TimeProvider 
 
     /// <summary>Appends one <c>name = value</c> line to the dump.</summary>
     internal void Log(string name, string value) => log.Write(Encoding.Latin1.GetBytes($"{name} = {value}\n"));
+
+    /// <summary>Appends one DATA block's bytes to <see cref="UploadedBytes"/>.</summary>
+    internal void RecordUpload(ReadOnlySpan<byte> data) => upload.Write(data);
 
     /// <summary>
     /// The file tftpd serves for <paramref name="filename"/>, or <see langword="null"/> for its

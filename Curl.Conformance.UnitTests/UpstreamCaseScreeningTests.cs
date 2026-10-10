@@ -118,7 +118,7 @@ public sealed class UpstreamCaseScreeningTests
 
         string? reason = UpstreamCaseScreening.FindSkipReason(new(ReadOnlyMemory<byte>.Empty, [], [], null), ParsedTestCase.From(testFile), Features);
 
-        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps and imaps servers", reason);
+        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers", reason);
     }
 
     [TestMethod]
@@ -220,7 +220,7 @@ public sealed class UpstreamCaseScreeningTests
 
     [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
-    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps and imaps servers")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]
     [DataRow("<reply>\n<servercmd>\ndelay: 5\n</servercmd>\n</reply>\n", "the sws emulation does not carry out the server command delay")]

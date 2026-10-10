@@ -161,6 +161,22 @@ public sealed class TftpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task WriteRequest_RecordsEachNewBlockOnceAsUploadedBytes()
+    {
+        (TftpServerConnector tftp, IDatagramChannel channel) = await OpenAsync(Hello);
+        byte[] full = [.. Enumerable.Repeat((byte)'a', 512)];
+
+        await RequestAsync(channel, 2, "/5\0octet\0");
+        await SendAsync(channel, [.. Packet(3, 2), (byte)'x']);
+        await SendAsync(channel, [.. Packet(3, 1), .. full]);
+        await SendAsync(channel, [.. Packet(3, 1), .. full]);
+        await SendAsync(channel, [.. Packet(3, 2), (byte)'b', (byte)'\n']);
+        await SendAsync(channel, [.. Packet(3, 3), (byte)'y']);
+
+        CollectionAssert.AreEqual((byte[])[.. full, (byte)'b', (byte)'\n'], tftp.UploadedBytes.ToArray());
+    }
+
+    [TestMethod]
     public async Task Datagrams_ThatAreNoRequestToTheListener_AreIgnored()
     {
         (TftpServerConnector tftp, IDatagramChannel channel) = await OpenAsync(Hello);
