@@ -3,8 +3,8 @@ id: AF-0151
 title: BL-1953's first run stopped 25 s in, after two Bash calls returned exit code 107, with no result; the lane called it an API failure
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-1953:BL-1953-first-run:unfinished-run
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
