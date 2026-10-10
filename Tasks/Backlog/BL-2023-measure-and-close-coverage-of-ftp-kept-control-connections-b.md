@@ -1,5 +1,5 @@
 ---
-id: BL-2022
+id: BL-2023
 title: Measure and close coverage of FTP kept control connections (BL-1981 follow-up)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2022 — Measure and close coverage of FTP kept control connections (BL-1981 follow-up)
+# BL-2023 — Measure and close coverage of FTP kept control connections (BL-1981 follow-up)
 
 ## Goal
 

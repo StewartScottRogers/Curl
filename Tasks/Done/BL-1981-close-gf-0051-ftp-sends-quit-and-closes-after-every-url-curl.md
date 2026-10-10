@@ -56,7 +56,7 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 - Pinned in FtpProtocolHandlerKeptConnectionTests: test146, 215, 1010 and 1225 sequences, refused entry-path CWD (exit 9), login mismatch, failure with no QUIT.
 - The twelve behaviour items are re-measured by the next gap analysis run, outside a lane; their boxes stay for it. No option changed, so --ai-help is unchanged.
 - AUTH-upgraded or CCC-cleared control connections are not kept (still QUIT per URL), recorded in ADR-0468.
-- Coverage not measured (budget): filed BL-2022.
+- Coverage not measured (budget): filed BL-2023.
 
 ## Log
 
