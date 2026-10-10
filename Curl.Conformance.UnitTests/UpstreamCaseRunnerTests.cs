@@ -564,6 +564,76 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
+    [TestMethod]
+    public async Task RunAsync_WithSshServer_GivesTheSshVariablesWritesTheKeyFilesAndRoutesItsPort()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        string[]? arguments = null;
+        string? sshServerReached = null;
+        UpstreamSshServer sshServer = new(
+            () => new RefusingConnector("ssh server"),
+            "curltest",
+            Encoding.ASCII.GetBytes("private"),
+            Encoding.ASCII.GetBytes("public"),
+            "0011",
+            "abc/def");
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                arguments = [.. invocation.Arguments];
+                ConnectResult result = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", UpstreamSshServer.SshPort, false), CancellationToken.None);
+                sshServerReached = result.ErrorMessage;
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            sshServer);
+
+        await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n%SSHPORT %USER [%SFTP_PWD] [%SCP_PWD] %SSHSRVMD5 %SSHSRVSHA256\n</command>\n</client>\n</testcase>\n", logDirectory);
+
+        diagnostics.Assert("arguments", "9003 curltest [] [] 0011 abc/def", string.Join(' ', arguments!));
+        CollectionAssert.AreEqual(new[] { "9003", "curltest", "[]", "[]", "0011", "abc/def" }, arguments);
+        diagnostics.Assert("connector reached on %SSHPORT", "ssh server", sshServerReached);
+        Assert.AreEqual("ssh server", sshServerReached);
+        Assert.AreEqual("private", await File.ReadAllTextAsync(Path.Combine(logDirectory, "server", "curl_client_key")));
+        Assert.AreEqual("public", await File.ReadAllTextAsync(Path.Combine(logDirectory, "server", "curl_client_key.pub")));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_WithSshServer_ReadsTheUploadAfterThePostcheckMovesItIntoPlace()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamSshServer sshServer = new(() => new RefusingConnector("ssh server"), "curltest", Encoding.ASCII.GetBytes("private"), Encoding.ASCII.GetBytes("public"), "0011", "abc/def");
+        UpstreamCaseRunner runner = new(
+            invocation =>
+            {
+                string uploaded = invocation.Arguments[0];
+                Directory.CreateDirectory(Path.GetDirectoryName(uploaded)!);
+                File.WriteAllText(uploaded, "payload\n");
+                return Task.FromResult(0);
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            sshServer);
+        string testFile = "<testcase>\n<client>\n<server>\nsftp\n</server>\n<command option=\"no-output,no-include\">\n%LOGDIR/test%TESTNUMBER.dir/file\n</command>\n</client>\n"
+            + "<verify>\n<upload>\npayload\n</upload>\n<postcheck>\n%PERL %SRCDIR/libtest/test610.pl move %LOGDIR/test%TESTNUMBER.dir/file %LOGDIR/upload.%TESTNUMBER\n</postcheck>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    // Refuses every connection with its own name, so a test can tell it was reached.
+    private sealed class RefusingConnector(string name) : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Refused(name));
+    }
+
     private static UpstreamCaseRunner Runner(Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
         Runner(runCurl, TimeSpan.FromSeconds(10));
 

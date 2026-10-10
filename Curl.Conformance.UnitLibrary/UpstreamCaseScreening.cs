@@ -35,7 +35,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, "sftp", "scp"];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^(?:EPSV|PASV|PORT|EPRT|LPRT)\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
@@ -161,13 +161,13 @@ internal static class UpstreamCaseScreening
             ? $"the FTP stand-in serves no data connection, which the case's {command.Value} opens"
             : null;
 
-    // Only the SMTP and IMAP stand-ins, plain or behind TLS, and the tftpd stand-in record an upload (BL-1909, BL-1910, BL-1914, BL-1952); any other server's case
+    // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1917, BL-1918); any other server's case
     // verifying <upload> keeps a reason.
-    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp"];
+    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "scp", "sftp"];
 
     private static string? UploadOffMailServer(UpstreamTestCase testCase) =>
         testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(UploadingServers).Any()
-            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers"
+            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers"
             : null;
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)

@@ -37,11 +37,21 @@ namespace Curl.Conformance;
 /// <param name="platform">The features and null device of the platform Curl runs on.</param>
 /// <param name="timeProvider">Measures <paramref name="timeLimit"/>.</param>
 /// <param name="timeLimit">How long a run may take before the case fails.</param>
+/// <param name="sshServer">
+/// The stand-in for upstream's test <c>sshd</c> (BL-1916), or <see langword="null"/> to leave
+/// <c>%SSHPORT</c>, <c>%USER</c>, <c>%SFTP_PWD</c>, <c>%SCP_PWD</c>, <c>%SSHSRVMD5</c> and
+/// <c>%SSHSRVSHA256</c> without a value, so the SSH cases skip. Given one, <c>%SSHPORT</c> is
+/// <see cref="UpstreamSshServer.SshPort"/>, <c>%USER</c> its user, <c>%SFTP_PWD</c> and
+/// <c>%SCP_PWD</c> are empty (as <c>%FILE_PWD</c>, since <c>%LOGDIR</c> is already absolute), the
+/// two fingerprints are its host key's, and its client key files are written to
+/// <c>%LOGDIR/server/</c> before the run.
+/// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
     UpstreamCurlPlatform platform,
     TimeProvider timeProvider,
-    TimeSpan timeLimit)
+    TimeSpan timeLimit,
+    UpstreamSshServer? sshServer = null)
 {
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
@@ -148,6 +158,7 @@ public sealed class UpstreamCaseRunner(
         AddDirectoryVariable(variables, "PWD", testsDirectory);
         AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
         AddTlsPorts(variables, certificateDirectory);
+        AddSshVariables(variables);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
@@ -190,6 +201,38 @@ public sealed class UpstreamCaseRunner(
         }
     }
 
+    private void AddSshVariables(Dictionary<string, string> variables)
+    {
+        if (sshServer is not null)
+        {
+            variables["SSHPORT"] = UpstreamSshServer.SshPort.ToString(CultureInfo.InvariantCulture);
+            variables["USER"] = sshServer.User;
+            variables["SFTP_PWD"] = string.Empty;
+            variables["SCP_PWD"] = string.Empty;
+            variables["SSHSRVMD5"] = sshServer.HostKeyMd5;
+            variables["SSHSRVSHA256"] = sshServer.HostKeySha256;
+        }
+    }
+
+    // sshserver.pl writes the client's key pair into the server's log folder before the case runs.
+    // Upstream's sshd runs the real scp and sftp-server, which write an upload where the URL names it; the SCP and SFTP
+    // cases name %LOGDIR/upload.%TESTNUMBER, the file runtests.pl compares with <verify><upload>.
+    private byte[] SshUpload(string logDirectory, int testNumber)
+    {
+        string upload = $"{logDirectory}/upload.{testNumber.ToString(CultureInfo.InvariantCulture)}";
+        return sshServer is not null && File.Exists(upload) ? File.ReadAllBytes(upload) : [];
+    }
+
+    private void WriteSshClientKeyFiles(string logDirectory)
+    {
+        if (sshServer is not null)
+        {
+            Directory.CreateDirectory($"{logDirectory}/server");
+            File.WriteAllBytes($"{logDirectory}/server/curl_client_key", sshServer.ClientPrivateKeyFile.ToArray());
+            File.WriteAllBytes($"{logDirectory}/server/curl_client_key.pub", sshServer.ClientPublicKeyFile.ToArray());
+        }
+    }
+
     private Dictionary<string, string> Variables(int testNumber, string logDirectory) =>
         new(StringComparer.Ordinal)
         {
@@ -225,6 +268,7 @@ public sealed class UpstreamCaseRunner(
         }
 
         string outputFile = $"{logDirectory}/curl{testNumber.ToString(CultureInfo.InvariantCulture)}.out";
+        WriteSshClientKeyFiles(logDirectory);
         WriteClientFiles(testCase);
         List<string> arguments = Arguments(testCase, outputFile);
 
@@ -245,7 +289,8 @@ public sealed class UpstreamCaseRunner(
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
         MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, pop3, certificateDirectory)));
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, tftp, EnvironmentVariables(testCase));
+        IConnector servers = sshServer?.InFrontOf(mqtt) ?? mqtt;
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase));
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -254,13 +299,29 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span, .. tftp.ProtocolLog.Span], ReadOutputFile(outputFile))
+        // Read before the postcheck, as before: only the SSH upload is read after it.
+        byte[] receivedBytes = [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span, .. tftp.ProtocolLog.Span];
+        byte[] outputFileBytes = ReadOutputFile(outputFile);
+        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutput.ToArray(), standardError.ToArray(), receivedBytes, outputFileBytes)
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             // A case reaches one uploading server, so at most one of these holds an upload.
-            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span],
-        };
-        return Judge(testCase, run);
+            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
+        });
+    }
+
+    // runtests.pl runs the postcheck, then compares <verify><upload>, so the run is built after the postcheck: it can
+    // move the upload into place (tests 624 and 625 upload into a folder and test610.pl moves the file).
+    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, Func<UpstreamCaseRun> buildRun)
+    {
+        if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
+        {
+            return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        return UpstreamCaseVerification.FindFirstDifference(testCase, buildRun()) is { } difference
+            ? UpstreamCaseOutcome.Failed(difference)
+            : UpstreamCaseOutcome.Passed;
     }
 
     // runtests.pl sets each NAME=value line of <client><setenv> for the run, an empty value as an
@@ -297,18 +358,6 @@ public sealed class UpstreamCaseRunner(
         CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();
 
     private static byte[] ReadOutputFile(string outputFile) => File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [];
-
-    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, UpstreamCaseRun run)
-    {
-        if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
-        {
-            return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");
-        }
-
-        return UpstreamCaseVerification.FindFirstDifference(testCase, run) is { } difference
-            ? UpstreamCaseOutcome.Failed(difference)
-            : UpstreamCaseOutcome.Passed;
-    }
 
     // Any exception curl lets escape is a failure of the case, not of the harness. Curl starts on
     // a thread of its own: against the in-memory server every await can complete at once, so a

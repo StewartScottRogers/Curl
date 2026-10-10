@@ -30,7 +30,46 @@ upstream's `tests/data` can run in memory (BL-1899). Read ADR-0456 before changi
   `none` compression, no strict key exchange. After `NEWKEYS` both directions are
   protected, and `AcceptServiceRequestAsync` accepts `ssh-userauth` (any other service
   throws). A session's task in `Sessions` completes there (BL-1935).
-- Next: authentication, then the SCP and SFTP subsystems.
+- `SshServerUserAuthentication` then answers `ssh-userauth` requests for the one
+  `SshServerClientAccount` (user `curltest`): `none` and every other method fail naming
+  `publickey,password`; `password` succeeds with `curltest-password`; `publickey` answers
+  `PK_OK` for the account's `ssh-ed25519` key or its RSA twin `SshServerRsaClientKey` (as
+  `ssh-rsa`, `rsa-sha2-256` or `rsa-sha2-512`) and `SUCCESS` for a valid signature over
+  the session identifier and request (BL-1953). Any other user fails.
+- `SshServerSessionChannel` then confirms the client's `session` channel (window 2 MiB,
+  packets of 32768), refuses every request that wants a reply until an `exec` or
+  `subsystem` request, which it accepts and keeps as `ProcessRequest` and `Process`;
+  `ReadDataAsync` and `WriteDataAsync` carry data with window accounting both ways, and
+  `CloseAsync` sends `exit-status`, `EOF` and `CLOSE`. `SshServerConnector.Channels` lists
+  each connection's channel, completing once the process is started.
+- `SshServerConnector.Processes` then runs `scp` on each channel whose `exec` command
+  `SshServerScpCommand` reads as `scp` with `-f` or `-t` and a path, unquoted as a shell
+  would (BL-1917), and SFTP on each channel whose `subsystem` is `sftp` (BL-1918); one
+  channel after another, as curl reuses a connection
+  (`SshServerSessionChannel.OpenAsync` skips the earlier channel's leftover messages). Any
+  other command's or subsystem's channel is left to whoever holds it from `Channels`.
+- `SshServerScpProcess` is OpenSSH's `scp` on the real files the path names (a leading
+  slash before a Windows drive is dropped). Source (`-f`, `-pf`): after the client's zero
+  byte, `T<mtime> 0 <atime> 0`, `C0644 <size> <name>` (always mode 0644: Windows files
+  carry no Unix mode), each acknowledged, then the bytes and a zero byte. Sink (`-t`): a
+  zero byte, then `T`, `D` (makes the directory and enters it) and `E` (leaves it) lines
+  acknowledged, and each `C` line's file written into the path, or into the current
+  directory under its name when the path is a directory. A missing file or folder is
+  scp's error line, `\x01scp: <path>: No such file or directory`, and exit status 1;
+  any other line is a protocol error. `SshServerChannelInput` reads the channel's bytes a
+  byte, line or block at a time.
+- `SshServerSftpProcess` is OpenSSH's `sftp-server`, SFTP version 3, on the same real files
+  (paths mapped as scp's are). `INIT` gets `VERSION 3` with no extensions; `OPEN`, `CLOSE`,
+  `READ`, `WRITE`, `STAT`, `LSTAT`, `FSTAT`, `SETSTAT`, `FSETSTAT`, `OPENDIR`, `READDIR`
+  (`.`, `..`, then the names in ordinal order with `ls -l` long names, all in one reply,
+  then end of file), `REMOVE`, `MKDIR`, `RMDIR`, `REALPATH` (`.` is the current directory,
+  given with forward slashes and a slash before a drive) and `RENAME` are answered in
+  arrival order; anything else is `SSH_FX_OP_UNSUPPORTED`. Every file is reported as mode
+  0644 and every directory as 0755, owner and group 0, and `SETSTAT` changes nothing,
+  since Windows files carry no Unix mode. A missing path is `SSH_FX_NO_SUCH_FILE`, a refused
+  one `SSH_FX_PERMISSION_DENIED`, and anything else (an existing target, a full directory,
+  an unknown handle) `SSH_FX_FAILURE`, as `sftp-server` maps `errno` for version 3. The
+  process ends at the client's `EOF` with exit status 0.
 
 ## The host keys and their fingerprints
 
@@ -46,10 +85,10 @@ the server's key names the fingerprint of the key its client agrees:
   - `--hostpubmd5 2948c3aaadd13b5fc3053eb5f02ff41d` (`SshServerRsaHostKey.Md5Fingerprint`)
   - `--hostpubsha256 oKu2ijiKRpAnWn3uWXJlDBMslPHR6h9ZZOV89/I8n2o` (`SshServerRsaHostKey.Sha256Fingerprint`)
 
-Upstream's cases compute their key's fingerprints from the key its own `sshd` generates;
-the case runner does not reach this server yet, so nothing substitutes these for them. When
-the SCP and SFTP cases are wired in, the runner is to supply the agreed key's two values
-wherever a case asks for the server's MD5 or SHA-256 host key fingerprint.
+Upstream's cases compute their key's fingerprints from the key its own `sshd` generates as
+`%SSHSRVMD5` and `%SSHSRVSHA256`; the case runner gives those variables the agreed key's two
+values (BL-1954): the RSA key's on Windows, the Ed25519 key's elsewhere, chosen by
+`UpstreamConformanceTests`, which `InternalsVisibleTo` lets read these internal keys.
 
 ## The client key
 
@@ -57,4 +96,6 @@ wherever a case asks for the server's MD5 or SHA-256 host key fingerprint.
 authentication on Windows, where curl's WinCNG build reads no Ed25519 or ECDSA private key
 (upstream's `sshserver.pl` generates RSA client keys too): `PrivateKeyPem` is the PKCS #1
 file a case passes as `--key`, `PublicKeyLine` the `ssh-rsa` line for `--pubkey` and the
-account's authorized key. Authentication (BL-1916) is to accept it.
+account's authorized key. Authentication accepts it beside the Ed25519 key, whose
+`openssh-key-v1` and `authorized_keys` files `SshServerClientAccount.CreatePrivateKeyFile`
+and `CreatePublicKeyFile` write (BL-1953).

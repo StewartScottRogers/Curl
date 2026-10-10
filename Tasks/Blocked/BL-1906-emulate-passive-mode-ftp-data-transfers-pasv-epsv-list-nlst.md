@@ -4,7 +4,7 @@ title: Emulate passive-mode FTP data transfers (PASV, EPSV, LIST, NLST, RETR) in
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1905, BL-1942]
+depends-on: [BL-1905]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -37,8 +37,12 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 171 cases newly pass and are on PassingUpstreamCases.txt (FTP downloads and listings incl. EPSV and --disable-epsv: 102, 105, 106, 110, 111, 115, 117, 118, 120-124, 126, 127, 130-143, 1348-1363, 1378-1393 ...). Remaining FTP failures (e.g. 1137, 416 send SIZE before RETR; 146, 1225 CWD / ordering) are Curl differences for the next gap run.
 - Conformance tests 1993 passed, 0 failed; solution build clean, fast tests green. Coverage: every branch is driven by FtpTransferCommandsTests, but Measure-CodeQuality was not run within the cost cap; BL-1942 measures it. FtpTransferCommandsTests also holds the FtpDataConnection, connector and responder cases for brevity; BL-1942 may split them per class.
 
+- 2026-10-10 (interactive): depends-on BL-1942 dropped, it made a cycle (BL-1942 measures code that exists only in this task's shelved work). The shelved code is stash 9a4c35992 ("darkfactory BL-1906 20261009-213949"); apply it by hash (`git stash apply 9a4c35992`), never pop. This task measures its own coverage with Measure-CodeQuality.ps1 and closes any gap, then ticks the box; BL-1942 is deferred as folded in here.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Code done and green but uncommitted (stashed); waits on BL-1942 to measure Library coverage before Done
+- 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.32 of its 3.93 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1906-*.jsonl

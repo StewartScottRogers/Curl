@@ -118,7 +118,7 @@ public sealed class UpstreamCaseScreeningTests
 
         string? reason = UpstreamCaseScreening.FindSkipReason(new(ReadOnlyMemory<byte>.Empty, [], [], null), ParsedTestCase.From(testFile), Features);
 
-        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers", reason);
+        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers", reason);
     }
 
     [TestMethod]
@@ -220,7 +220,7 @@ public sealed class UpstreamCaseScreeningTests
 
     [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
-    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]
     [DataRow("<reply>\n<servercmd>\ndelay: 5\n</servercmd>\n</reply>\n", "the sws emulation does not carry out the server command delay")]
@@ -238,6 +238,39 @@ public sealed class UpstreamCaseScreeningTests
         diagnostics.Act("skip reason", reason);
         diagnostics.Assert("skip reason", expected, reason);
         Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    [DataRow("sftp", "67")]
+    [DataRow("scp", "60")]
+    [DataRow("sftp", " 2 ")]
+    [DataRow("sftp", "0")]
+    public void FindSkipReason_SshCase_IsNull(string server, string errorCode)
+    {
+        string? reason = Screen($"<client>\n<server>\n{server}\n</server>\n<command>\n-u user: {server}://127.0.0.1:9003/f\n</command>\n</client>\n<verify>\n<errorcode>\n{errorCode}\n</errorcode>\n</verify>\n");
+
+        Assert.IsNull(reason);
+    }
+
+    // BL-1918: the SSH stand-in serves SFTP, so an SFTP upload is screened in, never for %SFTP_PWD.
+    [TestMethod]
+    public void FindSkipReason_SftpUploadNamingSftpPwd_IsNull()
+    {
+        string? reason = Screen("<client>\n<server>\nsftp\n</server>\n<command>\n-T f sftp://127.0.0.1:9003%SFTP_PWD/f\n</command>\n</client>\n<verify>\n<upload>\nx\n</upload>\n</verify>\n");
+
+        Assert.IsNull(reason);
+    }
+
+    // BL-1917: the SSH stand-in runs scp, so an SCP transfer, download or upload, is screened in.
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("<verify>\n<errorcode>\n0\n</errorcode>\n</verify>\n")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n")]
+    public void FindSkipReason_ScpTransferCase_IsNull(string verify)
+    {
+        string? reason = Screen($"<client>\n<server>\nscp\n</server>\n<command>\n-u %USER: scp://127.0.0.1:%SSHPORT%SCP_PWD/f\n</command>\n</client>\n{verify}");
+
+        Assert.IsNull(reason);
     }
 
     [TestMethod]

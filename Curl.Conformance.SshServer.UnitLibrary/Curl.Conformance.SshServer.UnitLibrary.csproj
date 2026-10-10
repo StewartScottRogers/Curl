@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Conformance.SshServer.UnitTests" />
+    <InternalsVisibleTo Include="Curl.Conformance.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

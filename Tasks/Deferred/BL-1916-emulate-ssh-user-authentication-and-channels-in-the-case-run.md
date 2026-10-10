@@ -43,3 +43,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-10: Doing -> Backlog. Waits on BL-1951: on Windows Curl (libssh2 WinCNG) offers no curve25519/ed25519, so the SSH stand-in's key exchange fails with exit 2 before authentication
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.42 of its 3.93 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1916-*.jsonl
+- 2026-10-10: Blocked -> Deferred. Superseded by its split, BL-1953 (stand-in classes and tests) and BL-1954 (runner wiring), after the per-task cost cap stopped it; its shelved code is stash 51b9f0bb6

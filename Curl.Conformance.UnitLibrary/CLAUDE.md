@@ -254,9 +254,30 @@ the SSH client's internal wire code from `Curl.Protocol.Ssh.UnitLibrary`, which 
 may not reference. Its `SshServerConnector` is an `IConnector` whose sessions run the SSH
 transport layer - identification exchange, `curve25519-sha256` key exchange with a fixed
 `ssh-ed25519` host key, the client's first implemented cipher and MAC, `NEWKEYS` and the
-`ssh-userauth` service request - and stop there: no authentication, SCP or SFTP yet. Its
-`CLAUDE.md` describes the transport and names the host key's stable `--hostpubmd5` and
-`--hostpubsha256` fingerprints. The runner does not use it yet, so the SSH cases still skip.
+`ssh-userauth` service request - then user authentication for `curltest`, a session
+channel, and `scp` (BL-1917) or the `sftp` subsystem (BL-1918) on it. Its `CLAUDE.md` describes the transport and names the
+host keys' stable `--hostpubmd5` and `--hostpubsha256` fingerprints.
+
+The runner reaches it through `UpstreamSshServer` (BL-1916, BL-1954), a record the caller builds
+from that library and passes as `UpstreamCaseRunner`'s optional last argument; without one the SSH
+variables have no value and the SSH cases skip. Given one, `%SSHPORT` is 9003
+(`UpstreamSshServer.SshPort`; TCP, so it does not clash with the TFTP stand-in's UDP 9003) and
+`InFrontOf` puts a fresh server from `CreateServer` on that port in front of the case's other
+stand-ins; `%USER` is its `User`; `%SFTP_PWD` and `%SCP_PWD` are empty, as `%LOGDIR` is already
+absolute; `%SSHSRVMD5` and `%SSHSRVSHA256` are its host key's fingerprints; and before curl runs
+its client key files are written as `%LOGDIR/server/curl_client_key` and `curl_client_key.pub`,
+as `sshserver.pl` writes them. The conformance tests pass the RSA client key and RSA host key
+fingerprints on Windows, where Curl matches curl's WinCNG build, and the Ed25519 ones elsewhere.
+Screening lets `scp` and `sftp` cases run (BL-1917, BL-1918): the stand-in runs OpenSSH's `scp` source and sink and `sftp-server` on the
+real files under the case's log directory, so a download sends the `<client><file>` the case wrote and
+an upload writes `%LOGDIR/upload.%TESTNUMBER`, which the runner, given an SSH server, reads as the
+run's `<verify><upload>` bytes (screening records `<verify><upload>` for `scp` and `sftp` too). 606,
+607, 628, 629, 630, 631 and 656 pass, and so do the SCP transfers 601, 603, 605, 617, 619, 621, 623,
+641, 665 and 3022 and the SFTP transfers and quote commands 600, 602, 604, 608, 609, 611, 612, 615,
+616, 618, 620, 622, 624, 625, 626, 627, 633 to 640, 642, 664, 1583, 2007 and 3021. 614, 1446 and
+2004 are measured and differ. The runner reads the upload after the case's `<postcheck>`, as
+`runtests.pl` does, because 624 and 625 upload into a folder and the postcheck moves the file to
+`%LOGDIR/upload.%TESTNUMBER` (BL-1955).
 
 What it is to hold in full, per ADR-0013 decision 2:
 
