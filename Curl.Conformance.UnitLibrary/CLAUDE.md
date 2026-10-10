@@ -98,7 +98,7 @@ control channel's responder: the `220` curl banner (or `REPLY welcome`), a `REPL
 else ftpserver.pl's display text, `PWD` as `CWD` moved it, `500 <command> is not dealt with!`
 otherwise, and `500 Unrecognized command` with a close for a line that is not a three- or
 four-letter command; `ReceivedCommandLines` keeps each line with its CRLF. The data-connection
-commands are BL-1906 to BL-1908's, and wiring it into `UpstreamCaseRunner` is BL-1905's. `EmulatedServers` lists the `<server>` names whose cases
+commands are BL-1906 to BL-1908's, and wiring it into `UpstreamCaseRunner` is BL-1905's. `SmtpResponder` (BL-1925) answers SMTP as ftpserver.pl does: EHLO with `<servercmd>`'s `CAPA` and `AUTH` lines (which `LineProtocolServerCommands` also reads), HELO, MAIL, RCPT, DATA through the lone `.` line (kept raw, terminator included, in `UploadedMessage` for `<verify><upload>`), RSET, VRFY and EXPN (from `<reply>` parts), NOOP, HELP and QUIT, and AUTH only through `REPLY` lines; wiring it in is BL-1909's. `EmulatedServers` lists the `<server>` names whose cases
 `UpstreamCaseScreening` lets run; it is empty until a protocol task adds its stand-in's name.
 
 `TlsServerStream` (BL-1921) is the TLS layer for the stand-ins of upstream's stunnel-fronted
