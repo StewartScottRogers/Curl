@@ -162,6 +162,148 @@ public sealed class InProcessCurlTests
         Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, null!));
     }
 
+    [TestMethod]
+    public async Task RunAsync_EnvironmentNoProxyNamesTheHost_SendsTheRequestPastTheProxy()
+    {
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+        Dictionary<string, string> environment = new() { ["NO_PROXY"] = "origin.example" };
+
+        (int exitCode, _, _) = await RunOverDialerAsync(["-s", "-x", "http://proxy.example:3128", "http://origin.example/1249"], server, new LoopbackDnsResolver(), environment);
+
+        string sent = Encoding.ASCII.GetString(server.Written);
+        Diagnostics.Bytes("sent", server.Written);
+        Assert.StartsWith("GET /1249 HTTP/1.1\r\n", sent);
+        Assert.AreEqual(0, exitCode);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EnvironmentXdgConfigHomeHoldsCurlrc_ReadsItsOptions()
+    {
+        string directory = CreateTemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory, "curlrc"), "-d moo\n");
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string sent;
+        try
+        {
+            (int exitCode, _, _) = await RunOverDialerAsync(["-s", "http://origin.example/433"], server, new LoopbackDnsResolver(), new() { ["XDG_CONFIG_HOME"] = directory });
+            sent = Encoding.ASCII.GetString(server.Written);
+            Assert.AreEqual(0, exitCode);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        Diagnostics.Bytes("sent", server.Written);
+        Assert.StartsWith("POST /433 HTTP/1.1\r\n", sent);
+        Assert.EndsWith("\r\n\r\nmoo", sent);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EnvironmentCurlHomeHoldsDotCurlrc_ReadsItsOptions()
+    {
+        string directory = CreateTemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory, ".curlrc"), "-d moo\n");
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string sent;
+        try
+        {
+            (int exitCode, _, _) = await RunOverDialerAsync(["-s", "http://origin.example/436"], server, new LoopbackDnsResolver(), new() { ["CURL_HOME"] = directory });
+            sent = Encoding.ASCII.GetString(server.Written);
+            Assert.AreEqual(0, exitCode);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        Diagnostics.Bytes("sent", server.Written);
+        Assert.StartsWith("POST /436 HTTP/1.1\r\n", sent);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EnvironmentHomeHoldsIpfsGateway_SendsTheRequestToTheGateway()
+    {
+        string directory = CreateTemporaryDirectory();
+        Directory.CreateDirectory(Path.Combine(directory, ".ipfs"));
+        File.WriteAllText(Path.Combine(directory, ".ipfs", "gateway"), "http://gateway.example\n");
+        ScriptedConnector server = new(["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"u8.ToArray()]);
+
+        string sent;
+        try
+        {
+            (int exitCode, _, _) = await RunOverDialerAsync(["-s", "ipfs://bafybeidecnvkrygux6uoukouzps5ofkeevoqland7kopseiod6pzqvjg7u"], server, new LoopbackDnsResolver(), new() { ["HOME"] = directory });
+            sent = Encoding.ASCII.GetString(server.Written);
+            Assert.AreEqual(0, exitCode);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        Diagnostics.Bytes("sent", server.Written);
+        Assert.StartsWith("GET /ipfs/bafybeidecnvkrygux6uoukouzps5ofkeevoqland7kopseiod6pzqvjg7u HTTP/1.1\r\n", sent);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_EnvironmentHomeHoldsMalformedIpfsGateway_ReturnsExit3()
+    {
+        string directory = CreateTemporaryDirectory();
+        Directory.CreateDirectory(Path.Combine(directory, ".ipfs"));
+        File.WriteAllText(Path.Combine(directory, ".ipfs", "gateway"), "http://gateway.example/?query=1\n");
+        ScriptedConnector server = new([]);
+
+        int exitCode;
+        try
+        {
+            (exitCode, _, _) = await RunOverDialerAsync(["-s", "ipfs://bafybeidecnvkrygux6uoukouzps5ofkeevoqland7kopseiod6pzqvjg7u"], server, new LoopbackDnsResolver(), new() { ["HOME"] = directory });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        Diagnostics.Assert("exit code", 3, exitCode);
+        Assert.AreEqual(3, exitCode);
+        Assert.IsEmpty(server.Targets);
+    }
+
+    [TestMethod]
+    public void RunAsync_DialerNullEnvironment_Throws()
+    {
+        MemoryStream stream = new();
+        ScriptedTcpDialer dialer = new(new ScriptedConnector([]));
+        LoopbackDnsResolver resolver = new();
+        RecordingDatagramConnector datagramConnector = new(CurlExitCode.CouldntConnect, "unused");
+        Func<string, string?> environment = _ => null;
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync(null!, stream, stream, stream, dialer, resolver, datagramConnector, environment));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], null!, stream, stream, dialer, resolver, datagramConnector, environment));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, null!, stream, dialer, resolver, datagramConnector, environment));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, null!, dialer, resolver, datagramConnector, environment));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, null!, resolver, datagramConnector, environment));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, null!, datagramConnector, environment));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, null!, environment));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, datagramConnector, null!));
+    }
+
+    private static string CreateTemporaryDirectory()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "curl-bl1977-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private static async Task<(int ExitCode, byte[] StandardOutput, string StandardError)> RunOverDialerAsync(string[] arguments, ScriptedConnector server, IDnsResolver resolver, Dictionary<string, string> environment)
+    {
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+        int exitCode = await InProcessCurl.RunAsync(arguments, standardOutput, standardError, new MemoryStream(), new ScriptedTcpDialer(server), resolver, new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), name => environment.GetValueOrDefault(name));
+        return (exitCode, standardOutput.ToArray(), Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
     private static async Task<(int ExitCode, byte[] StandardOutput, string StandardError)> RunOverDialerAsync(string[] arguments, ScriptedConnector server, IDnsResolver resolver)
     {
         using MemoryStream standardOutput = new();
