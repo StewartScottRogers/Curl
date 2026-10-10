@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test80, behaviour:test83, behaviour:test95, behaviour:test275, behaviour:test744, behaviour:test1078, behaviour:test1184, behaviour:test1288, behaviour:test1297, behaviour:test1428, behaviour:test1904, behaviour:test1319, behaviour:test1320, behaviour:test1321, behaviour:test2107]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1975
+tasks: [BL-1975]
 ---
 # GF-0045 - Through -p/-x the proxy server receives nothing in process: every <verify><proxy> case records no CONNECT
 
@@ -36,3 +36,4 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1975.

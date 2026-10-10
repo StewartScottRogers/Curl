@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test980, behaviour:test982, behaviour:test983, behaviour:test986]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
-task:
-tasks: []
+task: BL-1985
+tasks: [BL-1985]
 ---
 # GF-0055 - A reply pipelined behind STARTTLS/AUTH TLS is not refused with exit 8, and a pre-authenticated FTP server skips AUTH under --ssl-reqd
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1985.

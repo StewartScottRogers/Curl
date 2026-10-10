@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test214]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Core.UnitLibrary, Curl.Core.UnitTests]
-task:
-tasks: []
+task: BL-1996
+tasks: [BL-1996]
 ---
 # GF-0066 - A backslash in a URL path is sent as '/', where curl sends it as written
 
@@ -36,3 +36,4 @@ In Curl.Cli.UnitLibrary's URL globbing (ADR-0032), unescape only the glob charac
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1996.

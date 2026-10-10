@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1249, behaviour:test433, behaviour:test436, behaviour:test724, behaviour:test725, behaviour:test731, behaviour:test740, behaviour:test741]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-1977
+tasks: [BL-1977]
 ---
 # GF-0047 - A case's <setenv> (NO_PROXY, HOME, XDG_CONFIG_HOME, CURL_HOME) never reaches Curl in process, so curlrc, .ipfs/gateway and NO_PROXY lookups differ
 
@@ -36,3 +36,4 @@ Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1977.

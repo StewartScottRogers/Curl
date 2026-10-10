@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1453]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
-task:
-tasks: []
+task: BL-1980
+tasks: [BL-1980]
 ---
 # GF-0050 - An over-long TFTP file name fails with exit 7 when the channel cannot open, where curl refuses it first with exit 71
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpProtocolHandler, run TftpRequestFile's l
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1980.

@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test381, behaviour:test793]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
-task:
-tasks: []
+task: BL-1986
+tasks: [BL-1986]
 ---
 # GF-0056 - --netrc-optional lets the netrc password override the URL's, and a .netrc holding a NUL byte stops the transfer
 
@@ -36,3 +36,4 @@ In Curl.Console's TransferCredentialLookup, under --netrc-optional, keep a passw
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1986.

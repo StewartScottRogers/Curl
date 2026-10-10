@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test3217, behaviour:test3218, behaviour:test2108]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
-task:
-tasks: []
+task: BL-1983
+tasks: [BL-1983]
 ---
 # GF-0053 - An FTP reply holding a NUL byte or control characters (in PWD's path) is accepted; curl ends with exit 8
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Ftp.UnitLibrary's control-reply reader, fail with exit 8 (weird
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1983.

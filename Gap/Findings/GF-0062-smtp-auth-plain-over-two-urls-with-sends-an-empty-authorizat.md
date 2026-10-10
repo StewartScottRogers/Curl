@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test938]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
-task:
-tasks: []
+task: BL-1992
+tasks: [BL-1992]
 ---
 # GF-0062 - SMTP AUTH PLAIN over two URLs with -: sends an empty authorization identity; upstream expects user, user, password
 
@@ -36,3 +36,4 @@ Measure test938's command line against the reference with Record-CurlExchange.ps
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1992.

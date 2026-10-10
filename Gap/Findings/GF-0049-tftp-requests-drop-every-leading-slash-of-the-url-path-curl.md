@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1007, behaviour:test1009, behaviour:test1049, behaviour:test1093, behaviour:test1094, behaviour:test1099, behaviour:test1238, behaviour:test1242, behaviour:test1243, behaviour:test271, behaviour:test283, behaviour:test284, behaviour:test285, behaviour:test286, behaviour:test332]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
-task:
-tasks: []
+task: BL-1979
+tasks: [BL-1979]
 ---
 # GF-0049 - TFTP requests drop every leading slash of the URL path; curl drops only the first, so tftp://host//N asks for /N
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpRequestFile.FromUrlPath, remove exactly 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1979.

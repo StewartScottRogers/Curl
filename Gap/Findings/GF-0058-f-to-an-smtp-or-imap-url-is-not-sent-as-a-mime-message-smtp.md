@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1187, behaviour:test646, behaviour:test648, behaviour:test649, behaviour:test647]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests]
-task:
-tasks: []
+task: BL-1988
+tasks: [BL-1988]
 ---
 # GF-0058 - -F to an smtp:// or imap:// URL is not sent as a MIME message: SMTP sends VRFY and IMAP sends LIST
 
@@ -36,3 +36,4 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1988.

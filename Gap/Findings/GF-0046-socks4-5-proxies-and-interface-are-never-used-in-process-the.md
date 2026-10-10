@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test702, behaviour:test703, behaviour:test704, behaviour:test705, behaviour:test716, behaviour:test728, behaviour:test729, behaviour:test713, behaviour:test714, behaviour:test715, behaviour:test1084, behaviour:test1085]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
-task:
-tasks: []
+task: BL-1976
+tasks: [BL-1976]
 ---
 # GF-0046 - SOCKS4/5 proxies and --interface are never used in process: the request goes straight to the server and their exit codes (97, 7, 45) never arise
 
@@ -36,3 +36,4 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1976.

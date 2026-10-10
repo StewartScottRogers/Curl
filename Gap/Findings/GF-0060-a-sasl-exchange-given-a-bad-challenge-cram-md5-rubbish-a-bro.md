@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test833, behaviour:test879, behaviour:test935, behaviour:test834, behaviour:test880, behaviour:test936]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
-task:
-tasks: []
+task: BL-1990
+tasks: [BL-1990]
 ---
 # GF-0060 - A SASL exchange given a bad challenge (CRAM-MD5 rubbish, a broken NTLM type-2) is not cancelled with * and retried with the next mechanism
 
@@ -36,3 +36,4 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1990.

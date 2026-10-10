@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test3215]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
-task:
-tasks: []
+task: BL-1993
+tasks: [BL-1993]
 ---
 # GF-0063 - --mail-from '<addr> RET=HDRS' gains a trailing '>' after the parameters; curl sends an address that starts with '<' as given
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Smtp.UnitLibrary's SmtpMailTransaction, send a --mail-from (and
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1993.

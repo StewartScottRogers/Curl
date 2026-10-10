@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test941]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1994
+tasks: [BL-1994]
 ---
 # GF-0064 - --crlf does not convert an SMTP upload's LF line ends to CR LF
 
@@ -36,3 +36,4 @@ Carry --crlf into MailRequestOptions (Curl.Console's MailRequestOptionsMapping, 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1994.

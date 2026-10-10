@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test477, behaviour:test1618]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task: BL-1807
-tasks: [BL-1807]
+task: BL-1969
+tasks: [BL-1807, BL-1969]
 ---
 # GF-0014 - --max-filesize stops on a redirect body that is not kept, and does not stop a decompressed body that grows past the limit
 
@@ -39,3 +39,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: 
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1807.
+- 2026-10-10_0756: Filed BL-1969.

@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test891]
 touches: [Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests]
-task:
-tasks: []
+task: BL-1991
+tasks: [BL-1991]
 ---
 # GF-0061 - POP3 with CRAM-MD5 as the only offered mechanism sends no AUTH at all
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offe
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1991.

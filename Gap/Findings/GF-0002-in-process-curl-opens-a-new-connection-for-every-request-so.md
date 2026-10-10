@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test338, behaviour:test1421, behaviour:test1134, behaviour:test48, behaviour:test1418, behaviour:test1419, behaviour:test435, behaviour:test1074, behaviour:test1479, behaviour:test471]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
-task: BL-1795
-tasks: [BL-1795]
+task: BL-1960
+tasks: [BL-1795, BL-1960]
 ---
 # GF-0002 - In process, Curl opens a new connection for every request, so connection-reuse cases see [DISCONNECT], local port -1 and the wrong verdict for the second response
 
@@ -39,3 +39,4 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1795.
+- 2026-10-10_0756: Filed BL-1960.

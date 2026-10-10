@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test101, behaviour:test103, behaviour:test108, behaviour:test251, behaviour:test1414, behaviour:test1206, behaviour:test1207, behaviour:test1211]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
-task:
-tasks: []
+task: BL-1978
+tasks: [BL-1978]
 ---
 # GF-0048 - FTP active mode (-P) hangs in process: the FTP stand-in's PORT/EPRT cannot reach Curl's real TCP listener
 
@@ -36,3 +36,4 @@ Pass the ftpListener through InProcessCurl's new overload (behaviour:in-process-
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1978.

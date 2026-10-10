@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test924, behaviour:test925, behaviour:test927, behaviour:test950]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
-task:
-tasks: []
+task: BL-1995
+tasks: [BL-1995]
 ---
 # GF-0065 - VRFY and EXPN replies are written to the output with LF where curl writes the server's CR LF
 
@@ -36,3 +36,4 @@ Find which side drops the CR. If Curl.Protocol.Smtp.UnitLibrary's SmtpCommandTra
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1995.

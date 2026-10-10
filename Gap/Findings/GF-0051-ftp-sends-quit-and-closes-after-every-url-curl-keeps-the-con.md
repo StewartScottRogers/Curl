@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1010, behaviour:test1096, behaviour:test1149, behaviour:test1217, behaviour:test1225, behaviour:test146, behaviour:test149, behaviour:test215, behaviour:test216, behaviour:test698, behaviour:test2002, behaviour:test2003]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1981
+tasks: [BL-1981]
 ---
 # GF-0051 - FTP sends QUIT and closes after every URL; curl keeps the control connection for the next URL and sends QUIT only at exit
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1981.

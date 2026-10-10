@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1233]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
-task:
-tasks: []
+task: BL-1984
+tasks: [BL-1984]
 ---
 # GF-0054 - When the EPSV data port cannot be connected, FTP does not fall back to PASV
 
@@ -36,3 +36,4 @@ In Curl.Protocol.Ftp.UnitLibrary's FtpSession.OpenPassiveDataConnectionAsync, wh
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1984.

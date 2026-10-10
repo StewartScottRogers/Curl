@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1137, behaviour:test416]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task:
-tasks: []
+task: BL-1982
+tasks: [BL-1982]
 ---
 # GF-0052 - --ignore-content-length does not stop FTP from sending SIZE before RETR
 
@@ -36,3 +36,4 @@ Carry --ignore-content-length to the FTP handler (Curl.Console's transfer-contex
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
+- 2026-10-10_0756: Filed BL-1982.
