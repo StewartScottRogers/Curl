@@ -53,15 +53,19 @@ Group these items under their causes in the next gap-options report.
 - [ ] `options:--dns-ipv6-addr`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-ipv6-addr: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
 - [ ] `options:--dns-servers`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-servers: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
 - [ ] `options:--ech`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --ech: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--proxy-http3:no-form`: Curl answers what curl 8.21.0 answers, `exit 2: curl: (2) no URL specified | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `options:--proxy-http3:no-form`: Curl answers what curl 8.21.0 answers, `exit 2: curl: (2) no URL specified | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
 - 2026-10-10 (interactive): touches set to Curl.Cli.UnitLibrary and Curl.Cli.UnitTests (where BL-1829 fixed GF-0036) so it no longer runs alone and holds other tasks back.
+- 2026-10-10 (lane 5): Measured this tree: `curl --no-proxy-http3` prints `curl: (2) no URL specified` and exits 2, as curl 8.21.0 does. The BL-1829 fix (commit 691001c20, 2026-10-08) holds and is pinned in `CommandLineSchannelBuildRefusalTests`; the gap run that reopened GF-0036 must have measured a ref older than that fix. No code change needed.
+- 2026-10-10 (lane 5): The five unticked items (`--dns-servers`, `--dns-interface`, `--dns-ipv4-addr`, `--dns-ipv6-addr`, `--ech`) are intended differences under ADR-0454 (Decided by Claude under Stewart's delegation: the complete-reimplementation rule keeps them supported rather than copying the Schannel build's missing c-ares and ECH). They close only through an `excluded` entry with that reason in the gap office's baseline, which a lane may neither write nor file a task for. Left to an interactive session.
+- 2026-10-10 (lane 5): Build clean; Curl.Cli.UnitTests 3889 passed, 0 failed, 17 skipped. No option changed, so `--ai-help` needs nothing.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Blocked. Interactive session: --no-proxy-http3 already matches; the five DNS/--ech items are intended differences (ADR-0454) and close only by an excluded entry in the gap office baseline, which lanes may not write
