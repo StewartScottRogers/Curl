@@ -6,6 +6,7 @@ using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
+using Curl.Protocol.Ssh.Sftp;
 using Curl.Protocol.Ssh.Transport;
 
 namespace Curl.Conformance.SshServer;
@@ -127,6 +128,25 @@ public sealed class SshServerConnectorTests
         await connector.Processes.Single();
 
         Assert.AreEqual("\u0001scp: /no/such/file: No such file or directory\n", Encoding.UTF8.GetString(buffer, 0, read));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_SftpChannelThenAnotherSubsystem_ServesSftpThenLeavesTheNextChannel()
+    {
+        SshServerConnector connector = new(new SystemSshRandomSource());
+        SshTransport client = await ConnectAsync(connector, "aes128-ctr", "hmac-sha2-256");
+        await HandshakeAsync(client);
+        await new SshUserAuthentication(client, Encoding.UTF8).AuthenticateAsync(new NetworkCredential(SshServerClientAccount.User, SshServerClientAccount.Password), CancellationToken.None);
+
+        SftpSession sftp = await SftpSession.StartAsync(client, CancellationToken.None);
+        byte[] home = await sftp.RealPathAsync("."u8.ToArray(), CancellationToken.None);
+        await sftp.ShutdownAsync(CancellationToken.None);
+        SshSessionChannel next = new(client);
+        Assert.IsTrue(await next.OpenAsync(CancellationToken.None));
+        Assert.IsTrue(await next.RequestSubsystemAsync("other", CancellationToken.None));
+        await connector.Processes.Single();
+
+        Assert.AreEqual(SshServerSftpProcess.ClientPath(Environment.CurrentDirectory), Encoding.UTF8.GetString(home));
     }
 
     [TestMethod]

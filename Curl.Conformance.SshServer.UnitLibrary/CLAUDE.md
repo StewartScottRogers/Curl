@@ -44,9 +44,10 @@ upstream's `tests/data` can run in memory (BL-1899). Read ADR-0456 before changi
   each connection's channel, completing once the process is started.
 - `SshServerConnector.Processes` then runs `scp` on each channel whose `exec` command
   `SshServerScpCommand` reads as `scp` with `-f` or `-t` and a path, unquoted as a shell
-  would (BL-1917); one channel after another, as curl reuses a connection
+  would (BL-1917), and SFTP on each channel whose `subsystem` is `sftp` (BL-1918); one
+  channel after another, as curl reuses a connection
   (`SshServerSessionChannel.OpenAsync` skips the earlier channel's leftover messages). Any
-  other command's channel is left to whoever holds it from `Channels`.
+  other command's or subsystem's channel is left to whoever holds it from `Channels`.
 - `SshServerScpProcess` is OpenSSH's `scp` on the real files the path names (a leading
   slash before a Windows drive is dropped). Source (`-f`, `-pf`): after the client's zero
   byte, `T<mtime> 0 <atime> 0`, `C0644 <size> <name>` (always mode 0644: Windows files
@@ -57,7 +58,18 @@ upstream's `tests/data` can run in memory (BL-1899). Read ADR-0456 before changi
   scp's error line, `\x01scp: <path>: No such file or directory`, and exit status 1;
   any other line is a protocol error. `SshServerChannelInput` reads the channel's bytes a
   byte, line or block at a time.
-- Next: the SFTP subsystem (BL-1918).
+- `SshServerSftpProcess` is OpenSSH's `sftp-server`, SFTP version 3, on the same real files
+  (paths mapped as scp's are). `INIT` gets `VERSION 3` with no extensions; `OPEN`, `CLOSE`,
+  `READ`, `WRITE`, `STAT`, `LSTAT`, `FSTAT`, `SETSTAT`, `FSETSTAT`, `OPENDIR`, `READDIR`
+  (`.`, `..`, then the names in ordinal order with `ls -l` long names, all in one reply,
+  then end of file), `REMOVE`, `MKDIR`, `RMDIR`, `REALPATH` (`.` is the current directory,
+  given with forward slashes and a slash before a drive) and `RENAME` are answered in
+  arrival order; anything else is `SSH_FX_OP_UNSUPPORTED`. Every file is reported as mode
+  0644 and every directory as 0755, owner and group 0, and `SETSTAT` changes nothing,
+  since Windows files carry no Unix mode. A missing path is `SSH_FX_NO_SUCH_FILE`, a refused
+  one `SSH_FX_PERMISSION_DENIED`, and anything else (an existing target, a full directory,
+  an unknown handle) `SSH_FX_FAILURE`, as `sftp-server` maps `errno` for version 3. The
+  process ends at the client's `EOF` with exit status 0.
 
 ## The host keys and their fingerprints
 
