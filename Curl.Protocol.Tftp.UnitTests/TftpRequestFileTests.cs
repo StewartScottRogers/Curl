@@ -96,6 +96,36 @@ public sealed class TftpRequestFileTests
     }
 
     [TestMethod]
+    [DataRow("tftp://h//271", "/271")]
+    [DataRow("tftp://h///a/b", "//a/b")]
+    [DataRow("tftp://h//", "/")]
+    public async Task ExecuteAsync_DownloadPathWithFurtherLeadingSlashes_DropsOnlyTheSeparatorSlash(string url, string name)
+    {
+        Diagnostics.Arrange("expected file name", name);
+        var channel = Download();
+
+        await RunAsync(channel, Context(url));
+
+        var expected = Bytes($"\0\u0001{name}\0octet\0{Options}");
+        Diagnostics.Diff("read request", expected, channel.Sent[0].Datagram);
+        CollectionAssert.AreEqual(expected, channel.Sent[0].Datagram);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadPathWithDoubleSlash_DropsOnlyTheSeparatorSlash()
+    {
+        var channel = Scripted([0, 4, 0, 0], [0, 4, 0, 1]);
+
+        var result = await RunAsync(channel, Context("tftp://h//test1243.txt", upload: new MemoryStream("abc"u8.ToArray())));
+
+        Diagnostics.Assert("success", true, result.IsSuccess);
+        Assert.IsTrue(result.IsSuccess);
+        var expected = Bytes($"\0\u0002/test1243.txt\0octet\0tsize\03\0blksize\0512\0timeout\06\0");
+        Diagnostics.Diff("write request", expected, channel.Sent[0].Datagram);
+        CollectionAssert.AreEqual(expected, channel.Sent[0].Datagram);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_ModeSuffixAlone_ReturnsMissingFilename()
     {
         var channel = Download();

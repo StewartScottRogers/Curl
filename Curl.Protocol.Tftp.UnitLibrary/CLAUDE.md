@@ -37,7 +37,8 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   and the mode alone, with no `tsize`, `blksize` or `timeout`.
 - File name and mode (`TftpRequestFile`, BL-1238): a trailing `;mode=netascii` or
   `;mode=octet` is cut off the URL path and sets the mode; otherwise `-B`/`--use-ascii`
-  (`UseAscii`) sends `netascii`, else `octet`. The name is the path's percent-decoded raw
+  (`UseAscii`) sends `netascii`, else `octet`. Only the path's first `/`, the RFC 3617
+  separator, is dropped, so `tftp://h//271` asks for `/271` (BL-1979). The name is the path's percent-decoded raw
   bytes (`%E9` is the byte 0xE9; a malformed escape is kept as written). Once the channel
   is open and nothing sent, a decoded NUL is exit 3 `URL using bad/illegal format or
   missing URL`, a name and mode over 512 bytes with their framing exit 71 `TFTP filename

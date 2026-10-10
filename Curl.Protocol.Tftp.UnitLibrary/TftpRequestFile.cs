@@ -43,7 +43,7 @@ internal sealed class TftpRequestFile
         Mode = mode;
     }
 
-    /// <summary>Gets the file name as the URL writes it, percent-encoded, with no leading slash or mode suffix.</summary>
+    /// <summary>Gets the file name as the URL writes it, percent-encoded, without the path's separator slash or mode suffix.</summary>
     internal string EncodedName { get; }
 
     /// <summary>Gets the transfer mode the request asks for: <c>netascii</c> or <c>octet</c>.</summary>
@@ -60,7 +60,9 @@ internal sealed class TftpRequestFile
     /// <returns>The file the request names.</returns>
     internal static TftpRequestFile FromUrlPath(string absolutePath, bool useAscii)
     {
-        string name = absolutePath.TrimStart('/');
+        // RFC 3617: only the one separator slash is not part of the name, so curl's
+        // tftp_send_first skips the path's first character and keeps any further slash.
+        string name = absolutePath[1..];
         if (name.EndsWith(NetasciiSuffix, StringComparison.Ordinal))
         {
             return new TftpRequestFile(name[..^NetasciiSuffix.Length], NetasciiMode);
