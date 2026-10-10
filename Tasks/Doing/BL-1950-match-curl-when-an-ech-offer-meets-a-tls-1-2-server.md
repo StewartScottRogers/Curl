@@ -30,3 +30,4 @@ Found by BL-1949. Upstream's test4001 offers ECH to a TLS 1.3 server that does n
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
