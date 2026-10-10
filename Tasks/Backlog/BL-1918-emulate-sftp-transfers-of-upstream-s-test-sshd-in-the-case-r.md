@@ -4,7 +4,7 @@ title: Emulate SFTP transfers of upstream's test sshd in the case runner
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1916]
+depends-on: [BL-1954]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -31,6 +31,8 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
+
+- 2026-10-10 (interactive): depends-on BL-1916 became BL-1954; BL-1916 was split into BL-1953 and BL-1954 and deferred.
 
 ## Log
 

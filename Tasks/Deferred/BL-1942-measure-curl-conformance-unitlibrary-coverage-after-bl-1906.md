@@ -31,3 +31,4 @@ completed:
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Blocked. Stewart: BL-1942 measures FtpTransferCommands and FtpDataConnection, which exist only in BL-1906's uncommitted stash, and BL-1906 depends-on BL-1942 - a cycle; commit BL-1906's code (or drop its depends-on BL-1942) so this can measure it.
+- 2026-10-10: Blocked -> Deferred. Folded into BL-1906, which now measures its own coverage; the depends-on cycle between them is broken
