@@ -210,6 +210,23 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ForANewConnectionThenAReuse_PassesTheConnectReplyHeadBytesOnOnlyOnce()
+    {
+        _inner.ProxyConnectHeaderBytes = 61;
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Assert("opened, reused proxy connect header bytes", (61L, 0L), (opened.ProxyConnectHeaderBytes, reused.ProxyConnectHeaderBytes));
+        Assert.AreEqual(61L, opened.ProxyConnectHeaderBytes);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(0L, reused.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ReusingAForwardProxyConnection_ReportsItWithProxy()
     {
         await using var pool = CreatePool();

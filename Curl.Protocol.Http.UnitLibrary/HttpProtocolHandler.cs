@@ -2610,7 +2610,7 @@ public sealed class HttpProtocolHandler(
                 UploadSize = upload.BytesWritten,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
-                HeaderSize = earlier?.HeaderSize ?? 0,
+                HeaderSize = earlier?.HeaderSize ?? connect.ProxyConnectHeaderBytes,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,

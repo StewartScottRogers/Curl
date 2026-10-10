@@ -130,6 +130,15 @@ public sealed class ConnectResult
     public int ConnectReplyHeadersStored { get; private init; }
 
     /// <summary>
+    /// Gets how many bytes the heads of the proxy's replies to the CONNECTs that opened a tunnel
+    /// held, status lines and blank lines included and every reply counted, a <c>407</c> answered
+    /// on the way too, which curl 8.21.0 adds to <c>%{size_header}</c> with or without
+    /// <c>--suppress-connect-headers</c> (upstream test1288, BL-2010); <c>0</c> when there was no
+    /// CONNECT, the connection was reused, or the connect failed.
+    /// </summary>
+    public long ProxyConnectHeaderBytes { get; private init; }
+
+    /// <summary>
     /// Creates the result of a successful connect that recorded no timings, endpoint or
     /// CONNECT code.
     /// </summary>
@@ -181,6 +190,10 @@ public sealed class ConnectResult
     /// <param name="connectReplyHeadersStored">
     /// How many header lines the reply to a tunnelling CONNECT held; <c>0</c> when there was none.
     /// </param>
+    /// <param name="proxyConnectHeaderBytes">
+    /// How many bytes the heads of the proxy's replies to a tunnelling CONNECT held; <c>0</c> when
+    /// there was none.
+    /// </param>
     /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
@@ -198,7 +211,8 @@ public sealed class ConnectResult
         string? unixSocketPath = null,
         string? mappedHost = null,
         int mappedPort = 0,
-        int connectReplyHeadersStored = 0)
+        int connectReplyHeadersStored = 0,
+        long proxyConnectHeaderBytes = 0)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -215,6 +229,7 @@ public sealed class ConnectResult
             MappedHost = mappedHost,
             MappedPort = mappedPort,
             ConnectReplyHeadersStored = connectReplyHeadersStored,
+            ProxyConnectHeaderBytes = proxyConnectHeaderBytes,
         };
     }
 

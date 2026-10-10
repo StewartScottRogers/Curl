@@ -1256,13 +1256,14 @@ public sealed partial class TcpConnector(
         var proxyAuthorization = await CreateProxyAuthorizationAsync(destination, proxy, [], authenticatorEvents, cancellationToken).ConfigureAwait(false);
         var answersChallenge = false;
         var reconnects = 0;
+        var replyHeadBytes = new StrongBox<long>();
         while (true)
         {
             // A 407 answered on a connection the proxy closes is sent again on a new one, as
             // curl 8.21.0 connects again ("Connect me again please", BL-602 Notes).
             var (result, redialAuthorization) = await DialAndOpenThroughProxyAsync(
                 addresses,
-                new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents) { HeadOutput = headOutput },
+                new TunnelRequest(target, destination, proxy, started, nameResolved, answersChallenge, authenticatorEvents) { HeadOutput = headOutput, ReplyHeadBytes = replyHeadBytes },
                 proxyAuthorization,
                 cancellationToken).ConfigureAwait(false);
             if (result is not null)
@@ -1671,7 +1672,7 @@ public sealed partial class TcpConnector(
             var (reply, exception) = await RequestTunnelAsync(connection, tunnel, trace, proxyAuthorization, answersChallenge, cancellationToken).ConfigureAwait(false);
             if (exception is null && reply.OpensTunnel)
             {
-                return (WithConnectReplyHeaders(await SecureOpenedTunnelAsync(dialed, trace, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), reply.HeaderCount), null);
+                return (WithConnectReplyHeaders(await SecureOpenedTunnelAsync(dialed, trace, tunnel, reply.StatusCode, proxyAuthorization, cancellationToken).ConfigureAwait(false), reply.HeaderCount, tunnel.ReplyHeadBytes.Value), null);
             }
 
             var (answer, onThisConnection, failure) = exception is null
@@ -1848,6 +1849,7 @@ public sealed partial class TcpConnector(
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
             trace.ReportReceiving(events);
             var reply = await HttpProxyTunnel.ReadReplyAsync(connection, cancellationToken).ConfigureAwait(false);
+            tunnel.ReplyHeadBytes.Value += reply.Head.Length;
             ConnectTunnelVerboseLines.ReportReplyHead(events, reply.Head.Span, reply.StatusCode, proxyAuthorization, DigestStaleChallenge.IsOfferedIn(reply.ProxyAuthenticate));
             ConnectTunnelVerboseLines.ReportReplyFailure(events, reply);
             trace.ReportResponse(events, reply.OpensTunnel);
@@ -1892,10 +1894,12 @@ public sealed partial class TcpConnector(
 
     /// <summary>
     /// Gives an opened tunnel's result carrying how many header lines the proxy's opening reply
-    /// held, which curl 8.21.0 counts toward its 5000 response headers (measured, BL-1609 Notes);
-    /// a failed result, such as a refused TLS handshake inside the tunnel, as it is.
+    /// held, which curl 8.21.0 counts toward its 5000 response headers (measured, BL-1609 Notes),
+    /// and how many bytes every reply head to the tunnel's CONNECTs held, which it adds to
+    /// <c>%{size_header}</c> (BL-2010); a failed result, such as a refused TLS handshake inside
+    /// the tunnel, as it is.
     /// </summary>
-    private static ConnectResult WithConnectReplyHeaders(ConnectResult opened, int headerCount) =>
+    private static ConnectResult WithConnectReplyHeaders(ConnectResult opened, int headerCount, long headBytes) =>
         opened.Connection is { } connection
             ? ConnectResult.Connected(
                 connection,
@@ -1909,7 +1913,8 @@ public sealed partial class TcpConnector(
                 opened.UnixSocketPath,
                 opened.MappedHost,
                 opened.MappedPort,
-                headerCount)
+                headerCount,
+                headBytes)
             : opened;
 
     private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
@@ -2378,5 +2383,12 @@ public sealed partial class TcpConnector(
         /// given, before any trace filter wrapped them, when they take the heads.
         /// </summary>
         public IConnectReplyHeadWritingEvents? HeadOutput { get; init; }
+
+        /// <summary>
+        /// Gets the running count of the CONNECT reply heads' bytes, every reply on every
+        /// connection the tunnel was asked for, shared by the redials, which curl 8.21.0 adds to
+        /// <c>%{size_header}</c> (upstream test1288, BL-2010).
+        /// </summary>
+        public StrongBox<long> ReplyHeadBytes { get; init; } = new();
     }
 }
