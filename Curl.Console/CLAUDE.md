@@ -287,7 +287,9 @@ Under `-n`, `--netrc-file` or `--netrc-optional` the netrc file has its say too,
 through the runner's `IDataFileReader` and environment. The URL's percent-decoded user name picks
 the entry (`Curl.Authentication`'s `NetrcFile`), whose password beats the URL's; an entry with no
 login takes the URL's user name, and one with no password sends an empty one, never the URL's
-(BL-1356); with no entry the URL's user and password are sent. A required file that is missing or malformed fails each URL with
+(BL-1356); with no entry the URL's user and password are sent. Under `--netrc-optional` a URL
+with a password is not looked up at all, and its own credentials are sent (upstream test381,
+BL-1986). A NUL byte in the file ends its line (upstream test793). A required file that is missing or malformed fails each URL with
 `curl: (26) .netrc error: no such file` or `syntax error` before anything is sent, `-v` writing
 the same text as an info line first (BL-1447);
 `--netrc-optional` ignores both. When the file is in use, `TransferCredentialLookup.ForRedirectHops`
