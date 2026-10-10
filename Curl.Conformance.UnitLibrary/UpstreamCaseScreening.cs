@@ -14,7 +14,7 @@ namespace Curl.Conformance;
 /// does not act on (a <c>&lt;tool&gt;</c> libtest, a <c>&lt;setenv&gt;</c>,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
-/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
+/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
@@ -36,6 +36,8 @@ internal static class UpstreamCaseScreening
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
     private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "file", "none", .. LineProtocolServerConnector.EmulatedServers];
+
+    private static readonly Regex FtpDataConnectionCommand = new(@"^(?:EPSV|PASV|PORT|EPRT|LPRT)\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
@@ -61,6 +63,7 @@ internal static class UpstreamCaseScreening
             () => UninterpretedCheck(testCase, "client", "precheck"),
             () => UninterpretedCheck(testCase, "verify", "postcheck"),
             () => UnsupportedServer(testCase),
+            () => FtpDataConnection(testCase),
             () => UnsupportedFeature(testCase, features),
             () => UnsupportedCommand(testCase),
             () => UnsupportedServerCommand(testCase),
@@ -118,6 +121,13 @@ internal static class UpstreamCaseScreening
     private static string? UnsupportedServer(UpstreamTestCase testCase) =>
         UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server)) is { } server
             ? $"the harness does not emulate the {server} server"
+            : null;
+
+    // The FTP stand-in serves the control channel only (BL-1905); a case whose protocol log shows
+    // curl opening a data connection waits for BL-1906 to BL-1908.
+    private static string? FtpDataConnection(UpstreamTestCase testCase) =>
+        FtpDataConnectionCommand.Match(UpstreamTestPartBodies.Text(testCase.Find("verify", "protocol"))) is { Success: true } command
+            ? $"the FTP stand-in serves no data connection, which the case's {command.Value} opens"
             : null;
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)

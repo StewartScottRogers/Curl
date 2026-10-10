@@ -59,6 +59,23 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow(195)]
+    [DataRow(196)]
+    [DataRow(1120)]
+    public void FindSkipReason_FtpCaseWithFtpPortGivenTheRunnersValue_IsNotSkipped(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["TESTNUMBER"] = testNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_NoListenPortGivenTheRunnersValue_IsNotTheReason()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -113,6 +130,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<strip>\n(\n</strip>\n</verify>\n", "the strip pattern ( is not a .NET regular expression")]
     [DataRow("<verify>\n<stripfile2>\n$_ = ''\n</stripfile2>\n</verify>\n", "the harness does not run the Perl $_ = ''")]
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
+    [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPSV\n</protocol>\n</verify>\n", "the FTP stand-in serves no data connection, which the case's EPSV opens")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -124,7 +142,7 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("<client>\n<server>\nhttp\nftp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the ftp server")]
+    [DataRow("<client>\n<server>\nhttp\ntftp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the tftp server")]
     [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", "the case has no <client><command>")]
     [DataRow("<client>\n<command type=\"perl\">\nx\n</command>\n</client>\n", "the harness does not run a perl command")]
     [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its |")]
