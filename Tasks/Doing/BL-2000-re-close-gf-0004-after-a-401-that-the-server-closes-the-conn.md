@@ -60,3 +60,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
