@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2002 — Re-close GF-0006: With --digest (or Digest against a proxy), the first POST/PUT sends its body instead of Content-Length: 0
 
@@ -37,23 +37,23 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test88`: Curl answers what curl 8.21.0 answers, `upstream test88 passes`, so the item measures `match`.
-- [ ] `behaviour:test175`: Curl answers what curl 8.21.0 answers, `upstream test175 passes`, so the item measures `match`.
-- [ ] `behaviour:test177`: Curl answers what curl 8.21.0 answers, `upstream test177 passes`, so the item measures `match`.
-- [ ] `behaviour:test245`: Curl answers what curl 8.21.0 answers, `upstream test245 passes`, so the item measures `match`.
-- [ ] `behaviour:test246`: Curl answers what curl 8.21.0 answers, `upstream test246 passes`, so the item measures `match`.
-- [ ] `behaviour:test1001`: Curl answers what curl 8.21.0 answers, `upstream test1001 passes`, so the item measures `match`.
-- [ ] `behaviour:test1002`: Curl answers what curl 8.21.0 answers, `upstream test1002 passes`, so the item measures `match`.
-- [ ] `behaviour:test1284`: Curl answers what curl 8.21.0 answers, `upstream test1284 passes`, so the item measures `match`.
-- [ ] `behaviour:test1285`: Curl answers what curl 8.21.0 answers, `upstream test1285 passes`, so the item measures `match`.
-- [ ] `behaviour:test2058`: Curl answers what curl 8.21.0 answers, `upstream test2058 passes`, so the item measures `match`.
-- [ ] `behaviour:test2059`: Curl answers what curl 8.21.0 answers, `upstream test2059 passes`, so the item measures `match`.
-- [ ] `behaviour:test2060`: Curl answers what curl 8.21.0 answers, `upstream test2060 passes`, so the item measures `match`.
-- [ ] `behaviour:test2067`: Curl answers what curl 8.21.0 answers, `upstream test2067 passes`, so the item measures `match`.
-- [ ] `behaviour:test2068`: Curl answers what curl 8.21.0 answers, `upstream test2068 passes`, so the item measures `match`.
-- [ ] `behaviour:test2069`: Curl answers what curl 8.21.0 answers, `upstream test2069 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test88`: Curl answers what curl 8.21.0 answers, `upstream test88 passes`, so the item measures `match`.
+- [x] `behaviour:test175`: Curl answers what curl 8.21.0 answers, `upstream test175 passes`, so the item measures `match`.
+- [x] `behaviour:test177`: Curl answers what curl 8.21.0 answers, `upstream test177 passes`, so the item measures `match`.
+- [x] `behaviour:test245`: Curl answers what curl 8.21.0 answers, `upstream test245 passes`, so the item measures `match`.
+- [x] `behaviour:test246`: Curl answers what curl 8.21.0 answers, `upstream test246 passes`, so the item measures `match`.
+- [x] `behaviour:test1001`: Curl answers what curl 8.21.0 answers, `upstream test1001 passes`, so the item measures `match`.
+- [x] `behaviour:test1002`: Curl answers what curl 8.21.0 answers, `upstream test1002 passes`, so the item measures `match`.
+- [x] `behaviour:test1284`: Curl answers what curl 8.21.0 answers, `upstream test1284 passes`, so the item measures `match`.
+- [x] `behaviour:test1285`: Curl answers what curl 8.21.0 answers, `upstream test1285 passes`, so the item measures `match`.
+- [x] `behaviour:test2058`: Curl answers what curl 8.21.0 answers, `upstream test2058 passes`, so the item measures `match`.
+- [x] `behaviour:test2059`: Curl answers what curl 8.21.0 answers, `upstream test2059 passes`, so the item measures `match`.
+- [x] `behaviour:test2060`: Curl answers what curl 8.21.0 answers, `upstream test2060 passes`, so the item measures `match`.
+- [x] `behaviour:test2067`: Curl answers what curl 8.21.0 answers, `upstream test2067 passes`, so the item measures `match`.
+- [x] `behaviour:test2068`: Curl answers what curl 8.21.0 answers, `upstream test2068 passes`, so the item measures `match`.
+- [x] `behaviour:test2069`: Curl answers what curl 8.21.0 answers, `upstream test2069 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -61,3 +61,4 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Digest probe keeps a resumed upload's Content-Range; probe shapes for test88/175/1284/1285 match real curl
