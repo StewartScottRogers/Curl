@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2010 — Count the CONNECT reply head in %{size_header} through -p (upstream test1288, GF-0045)
 
@@ -24,13 +24,17 @@ Through a `-p` CONNECT tunnel, `%{size_header}` counts the proxy's CONNECT reply
 
 ## Acceptance criteria
 
-- [ ] `UpstreamCase_RunThroughCurl_HoldsTheRatchet(1288)` passes and 1288 is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] Unit tests in `Curl.Networking.UnitTests` and `Curl.Protocol.Http.UnitTests` pin the byte count (one CONNECT, and a 407 then 200).
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] `UpstreamCase_RunThroughCurl_HoldsTheRatchet(1288)` passes and 1288 is in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] Unit tests in `Curl.Networking.UnitTests` and `Curl.Protocol.Http.UnitTests` pin the byte count (one CONNECT, and a 407 then 200).
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green.
 
 ## Notes
+
+- 2026-10-10: `ConnectResult.ProxyConnectHeaderBytes` (Abstractions) carries the bytes of every CONNECT reply head; `TcpConnector` counts them in a `StrongBox<long>` on `TunnelRequest`, created once outside the redial loop so a 407 answered on a closed-and-redialled connection counts too, and adds the total in `WithConnectReplyHeaders`. `PoolingConnector` passes it on for a new connection only (a reused one reports 0). `HttpProtocolHandler` seeds `TransferReport.HeaderSize` with it when there is no earlier report (a retry's earlier report already holds it). CONNECT-UDP and h2 proxy tunnels are not counted (not measured; no upstream case asks).
+- Tests: `TcpConnectorTests` (test1288's 61-byte reply; a 407 then 200), `PoolingConnectorTests` (opened 61, reused 0), `ConnectResultTests`, `HttpProtocolHandlerTests.ProxyConnectHeaderSize` (0, 61, 152). Fast tests: 34 projects green; test1288 added to PassingUpstreamCases.txt and passes. New code adds no branch, so Measure-CodeQuality was not run.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. %{size_header} through a -p CONNECT tunnel counts every CONNECT reply head; upstream test1288 passes
