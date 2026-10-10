@@ -30,3 +30,4 @@ BL-1981 (ADR-0468) added FTP control-connection reuse; its lane ran out of budge
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
