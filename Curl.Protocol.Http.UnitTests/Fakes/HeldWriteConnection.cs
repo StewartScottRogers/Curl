@@ -21,6 +21,8 @@ public sealed class HeldWriteConnection(byte[] response) : IConnection
 
     private bool responseRead;
 
+    private CancellationToken writeCancellation;
+
     /// <inheritdoc />
     public bool IsSecure => false;
 
@@ -31,6 +33,14 @@ public sealed class HeldWriteConnection(byte[] response) : IConnection
     /// Gets a value indicating whether a write was cancelled before it finished.
     /// </summary>
     public bool WriteCancelled { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether cancellation of the latest write has been requested.
+    /// It turns true the moment the writer asks, unlike <see cref="WriteCancelled" />, which
+    /// waits for the request to reach the write: <see cref="CancellationTokenSource.CancelAsync" />
+    /// carries it there on another thread, after a test may already have finished the write.
+    /// </summary>
+    public bool WriteCancellationRequested => writeCancellation.IsCancellationRequested;
 
     /// <summary>
     /// Gets every byte whose write finished.
@@ -64,6 +74,7 @@ public sealed class HeldWriteConnection(byte[] response) : IConnection
     /// <inheritdoc />
     public async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
+        writeCancellation = cancellationToken;
         try
         {
             await writesFinished.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
