@@ -44,3 +44,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Waits on BL-1929 (the %RESOLVE precheck, the only perl-free check group the harness can act on); inventory in Notes
+- 2026-10-09: Backlog -> Doing.
