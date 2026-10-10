@@ -31,7 +31,7 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = Screen(sections);
         diagnostics.Act("skip reason", reason ?? "(none)");
         diagnostics.Assert("skip reason", "(none)", reason ?? "(none)");
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
@@ -72,7 +72,29 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
 
         diagnostics.Act("skip reason", reason);
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_SmtpCaseWithSmtpPortGivenTheRunnersValue_IsNotSkipped()
+    {
+        byte[] testFile = System.Text.Encoding.Latin1.GetBytes("<testcase>\n<client>\n<server>\nsmtp\n</server>\n<command>\nsmtp://%HOSTIP:%SMTPPORT/1 --mail-rcpt a@b -T -\n</command>\n</client>\n<verify>\n<upload>\nx\n</upload>\n</verify>\n</testcase>\n");
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["SMTPPORT"] = UpstreamCaseRunner.SmtpPort };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_UploadVerifiedOffSmtp_IsTheReason()
+    {
+        string testFile = RunnableClient + "<verify>\n<upload>\nx\n</upload>\n</verify>\n";
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(new(ReadOnlyMemory<byte>.Empty, [], [], null), ParsedTestCase.From(testFile), Features);
+
+        Assert.AreEqual("the harness records <verify><upload> only for the smtp server", reason);
     }
 
     [TestMethod]
@@ -117,7 +139,7 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
 
         diagnostics.Act("skip reason", reason);
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
@@ -152,7 +174,7 @@ public sealed class UpstreamCaseScreeningTests
 
     [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
-    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness does not act on <verify><upload>")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp server")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]
     [DataRow("<reply>\n<servercmd>\ndelay: 5\n</servercmd>\n</reply>\n", "the sws emulation does not carry out the server command delay")]
@@ -203,7 +225,7 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = Screen(sections);
         diagnostics.Act("skip reason", reason);
         diagnostics.Assert("skip reason", "null", reason ?? "null");
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
@@ -218,7 +240,7 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = UpstreamCaseScreening.FindFileOutsideLogDirectory(ParsedTestCase.From(sections), logDirectory);
         diagnostics.Act("outside-file reason", reason ?? "(none)");
         diagnostics.Assert("outside-file reason", "(none)", reason ?? "(none)");
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]

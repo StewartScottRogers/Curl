@@ -131,8 +131,8 @@ public sealed class LineProtocolServerConnectorTests
     }
 
     [TestMethod]
-    public void EmulatedServers_IsFtp_TheOneStandInTheRunnerWiresIn() =>
-        CollectionAssert.AreEqual(new[] { "ftp" }, LineProtocolServerConnector.EmulatedServers.ToArray());
+    public void EmulatedServers_AreFtpAndSmtp_TheStandInsTheRunnerWiresIn() =>
+        CollectionAssert.AreEqual(new[] { "ftp", "smtp" }, LineProtocolServerConnector.EmulatedServers.ToArray());
 
     [TestMethod]
     public void ServerCommands_ReplyLines_AreFoundByCommandNameIgnoringCase()

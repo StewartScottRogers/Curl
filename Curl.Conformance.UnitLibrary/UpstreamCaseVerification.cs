@@ -52,6 +52,7 @@ internal static class UpstreamCaseVerification
         [
             () => CompareProtocol(testCase, "protocol", run.ReceivedBytes, stripMatchTimeout),
             () => CompareProtocol(testCase, "proxy", run.ProxyReceivedBytes, stripMatchTimeout),
+            () => CompareUpload(testCase, run.UploadedBytes),
             () => CompareReplyData(testCase, run.OutputFileBytes),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
             () => CompareOutput(testCase, "stderr", "stripfile", run.StandardError),
@@ -82,6 +83,10 @@ internal static class UpstreamCaseVerification
         byte[] actual = Strip(received, strips, Substitutions(testCase, "strippart"));
         return UpstreamFirstDifference.Describe($"<verify><{partName}>", expected, actual);
     }
+
+    // runtests.pl compares the stored message with <upload> as it is, after no <strip>.
+    private static string? CompareUpload(UpstreamTestCase testCase, byte[] uploaded) =>
+        testCase.Find("verify", "upload") is { } part ? UpstreamFirstDifference.Describe("<verify><upload>", Expected(part), uploaded) : null;
 
     private static string? CompareReplyData(UpstreamTestCase testCase, byte[] outputFile)
     {

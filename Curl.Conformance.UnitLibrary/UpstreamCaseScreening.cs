@@ -29,7 +29,7 @@ internal static class UpstreamCaseScreening
     private static readonly HashSet<string> VerifyParts =
     [
         "protocol", "proxy", "errorcode", "stdout", "stderr", "file", "file1", "file2", "file3", "file4", "notexists",
-        "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
+        "upload", "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
     ];
 
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
@@ -64,6 +64,7 @@ internal static class UpstreamCaseScreening
             () => UninterpretedCheck(testCase, "verify", "postcheck"),
             () => UnsupportedServer(testCase),
             () => FtpDataConnection(testCase),
+            () => UploadOffSmtp(testCase),
             () => UnsupportedFeature(testCase, features),
             () => UnsupportedCommand(testCase),
             () => UnsupportedServerCommand(testCase),
@@ -128,6 +129,13 @@ internal static class UpstreamCaseScreening
     private static string? FtpDataConnection(UpstreamTestCase testCase) =>
         FtpDataConnectionCommand.Match(UpstreamTestPartBodies.Text(testCase.Find("verify", "protocol"))) is { Success: true } command
             ? $"the FTP stand-in serves no data connection, which the case's {command.Value} opens"
+            : null;
+
+    // Only the SMTP stand-in records an uploaded message (BL-1909); any other server's case
+    // verifying <upload> keeps a reason.
+    private static string? UploadOffSmtp(UpstreamTestCase testCase) =>
+        testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("smtp")
+            ? "the harness records <verify><upload> only for the smtp server"
             : null;
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)
