@@ -591,6 +591,29 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow(567)]
+    [DataRow(568)]
+    [DataRow(569)]
+    [DataRow(570)]
+    [DataRow(571)]
+    [DataRow(572)]
+    [DataRow(577)]
+    [DataRow(689)]
+    [DataRow(3100)]
+    public async Task RunAsync_RtspPortCase_IsSkippedForItsToolNotForRtspPort(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("skip reason", "the harness does not act on <client><tool>", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not act on <client><tool>", outcome.Detail);
+    }
+
+    [TestMethod]
     [DataRow(5, UpstreamCaseOutcomeKind.Failed, "postcheck FAILED: exit code 1")]
     [DataRow(0, UpstreamCaseOutcomeKind.Passed, "")]
     public async Task RunAsync_Postcheck_FailsTheCaseWhenItExitsNonZero(int epoch, UpstreamCaseOutcomeKind expectedKind, string expectedDetail)

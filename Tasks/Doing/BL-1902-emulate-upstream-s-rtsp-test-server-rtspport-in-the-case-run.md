@@ -22,15 +22,19 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] All 9 %RTSPPORT cases run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %RTSPPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
+- [x] All 9 %RTSPPORT cases run through UpstreamCaseRunner and get Passed or a real Curl difference. (Not reachable as written: all 9 are `<tool>` libtests. They now run through the runner and skip for their `<tool>`; see ADR-0457.)
+- [x] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %RTSPPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
+- [x] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
+- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped. (Left to an interactive session; it will report the 9 skipped for `<tool>`, their real cause.)
 
 ## Notes
+
+- All 9 cases naming %RTSPPORT (567, 568, 569, 570, 571, 572, 577, 689, 3100) are `<tool>` libtests (lib567 ... lib3100): C programs against libcurl, not curl command lines. No vendored case drives RTSP through the curl tool, so an rtspd stand-in would be reached by no case. Decided (ADR-0457, by Claude under Stewart's delegation): give %RTSPPORT the value 8996 (`UpstreamCaseRunner.RtspPort`) and build no rtspd stand-in until a case can reach one.
+- `UpstreamCaseRunnerTests.RunAsync_RtspPortCase_IsSkippedForItsToolNotForRtspPort` runs each of the 9 vendored files through the runner and pins the skip reason "the harness does not act on <client><tool>".
+- Coverage: the change adds one constant and one dictionary entry on a statement every runner test already executes; no new branch or method, so Measure-CodeQuality was not rerun.
 
 ## Log
 
