@@ -183,7 +183,7 @@ public sealed class UpstreamCaseRunner(
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
         // curl timer to race them, they are skipped.
-        SwsHttpServerConnector server = new(testCase, CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider());
+        SwsHttpServerConnector server = new(testCase, ServerClock(arguments));
         // Not disposed: CurlCommandRunner.RunAsync takes no cancellation token, so a run past the
         // time limit is stopped only at its next exchange with the abandoned server, and may write
         // to these until then. A memory stream holds nothing but its buffer, which the collector takes.
@@ -200,10 +200,20 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. mqtt.ProtocolLog.Span], File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [])
+        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. mqtt.ProtocolLog.Span], ReadOutputFile(outputFile))
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
         };
+        return Judge(testCase, run);
+    }
+
+    private static TimeProvider ServerClock(List<string> arguments) =>
+        CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();
+
+    private static byte[] ReadOutputFile(string outputFile) => File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [];
+
+    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, UpstreamCaseRun run)
+    {
         if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
         {
             return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");

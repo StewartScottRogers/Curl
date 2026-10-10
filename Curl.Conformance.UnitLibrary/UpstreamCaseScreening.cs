@@ -168,11 +168,14 @@ internal static class UpstreamCaseScreening
     // dot (test2043's https://revoked.badssl.com/) needs the internet, which the in-process harness
     // never reaches (BL-1858); one expecting a failure (test467's http://example.com) fails first.
     private static string? InternetHost(UpstreamTestCase testCase) =>
-        testCase.Find("client", "server") is null
-            && UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is "" or "0"
+        NamesNoServerAndExpectsSuccess(testCase)
             && InternetUrlHost.Match(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))) is { Success: true } url
             ? $"the case reaches {url.Groups["host"].Value} on the internet, which the harness does not"
             : null;
+
+    private static bool NamesNoServerAndExpectsSuccess(UpstreamTestCase testCase) =>
+        testCase.Find("client", "server") is null
+            && UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is "" or "0";
 
     private static string? UnsupportedFileName(UpstreamTestCase testCase, string section) =>
         FileParts.SelectMany(name => testCase.FindAll(section, name))

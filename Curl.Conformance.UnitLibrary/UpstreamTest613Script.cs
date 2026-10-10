@@ -103,11 +103,13 @@ internal static class UpstreamTest613Script
             return new(failure, "");
         }
 
-        if (arguments.Length >= 3)
-        {
-            return new(LastWrittenSeconds(arguments[1]) == PerlInteger(arguments[2]) ? 0 : 1, "");
-        }
+        return arguments.Length >= 3
+            ? new(LastWrittenSeconds(arguments[1]) == PerlInteger(arguments[2]) ? 0 : 1, "")
+            : CanonicalizeNonEmptyLog(arguments);
+    }
 
+    private static UpstreamPerlOneLinerResult CanonicalizeNonEmptyLog(string[] arguments)
+    {
         if (arguments.Length == 2 && new FileInfo(arguments[1]) is { Exists: true, Length: > 0 } log)
         {
             Canonicalize(log.FullName);
@@ -119,23 +121,29 @@ internal static class UpstreamTest613Script
     // Each unlink and the inner rmdir fail silently in Perl; only the last rmdir dies.
     private static int RemoveFolder(string folder)
     {
-        foreach (string entry in Entries.Select(name => Path.Combine(folder, name)).Where(File.Exists))
-        {
-            File.SetAttributes(entry, FileAttributes.Normal);
-            File.Delete(entry);
-        }
-
-        string subfolder = Path.Combine(folder, "asubdir");
-        if (Directory.Exists(subfolder) && !Directory.EnumerateFileSystemEntries(subfolder).Any())
-        {
-            Directory.Delete(subfolder);
-        }
-
+        RemoveEntries(folder);
+        RemoveEmptySubfolder(Path.Combine(folder, "asubdir"));
         return !Directory.Exists(folder) ? NoSuchFile
             : Directory.EnumerateFileSystemEntries(folder).Any() ? NotEmpty
             : Done(() => Directory.Delete(folder));
     }
 
+    private static void RemoveEntries(string folder)
+    {
+        foreach (string entry in Entries.Select(name => Path.Combine(folder, name)).Where(File.Exists))
+        {
+            File.SetAttributes(entry, FileAttributes.Normal);
+            File.Delete(entry);
+        }
+    }
+
+    private static void RemoveEmptySubfolder(string subfolder)
+    {
+        if (Directory.Exists(subfolder) && !Directory.EnumerateFileSystemEntries(subfolder).Any())
+        {
+            Directory.Delete(subfolder);
+        }
+    }
     // Perl's stat of a missing file gives undef, which compares as 0.
     private static long LastWrittenSeconds(string path) =>
         File.Exists(path) ? new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds() : 0;
@@ -174,20 +182,20 @@ internal static class UpstreamTest613Script
     }
 
     private static string? CanonicalLine(Match? match, string line)
-    {
-        string type = match?.Groups[1].Value ?? "";
-        string name = match?.Groups[8].Value ?? "";
-        return type switch
+        => (match?.Groups[1].Value ?? "") switch
         {
-            "d" when name is "." or ".." => null,
-            "d" => $"d?????????    N U         U               N ???  N NN:NN {name}\n",
-            "-" => string.Create(
-                CultureInfo.InvariantCulture,
-                $"-{match!.Groups[2].Value}???????{PerlInteger(match.Groups[5].Value),5} U         U {PerlInteger(match.Groups[6].Value),15} {match.Groups[7].Value} {name}\n"),
+            "d" => DirectoryLine(match!.Groups[8].Value),
+            "-" => FileLine(match!),
             _ => line,
         };
-    }
 
+    private static string? DirectoryLine(string name) =>
+        name is "." or ".." ? null : $"d?????????    N U         U               N ???  N NN:NN {name}\n";
+
+    private static string FileLine(Match match) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"-{match.Groups[2].Value}???????{PerlInteger(match.Groups[5].Value),5} U         U {PerlInteger(match.Groups[6].Value),15} {match.Groups[7].Value} {match.Groups[8].Value}\n");
     private static int Done(Action action)
     {
         action();

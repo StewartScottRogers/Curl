@@ -49,16 +49,7 @@ internal static class UpstreamTest610Script
     {
         while (words.TryDequeue(out string? verb))
         {
-            string path = words.TryDequeue(out string? next) ? next : "";
-            int? exitCode = verb switch
-            {
-                "mkdir" => MakeFolder(path),
-                "rmdir" => RemoveFolder(path),
-                "rm" => File.Exists(path) ? Done(() => File.Delete(path)) : NoSuchFile,
-                "move" => Move(path, words.TryDequeue(out string? target) ? target : ""),
-                "gone" => Path.Exists(path) ? Die : 0,
-                _ => null,
-            };
+            int? exitCode = RunVerb(verb, words);
             if (exitCode is null)
             {
                 return new(1, $"Unsupported command {verb}\n");
@@ -72,6 +63,26 @@ internal static class UpstreamTest610Script
 
         return Passed;
     }
+
+    private static int? RunVerb(string verb, Queue<string> words)
+    {
+        string path = NextWord(words);
+        return verb switch
+        {
+            "mkdir" => MakeFolder(path),
+            "rmdir" => RemoveFolder(path),
+            "rm" => RemoveFile(path),
+            "move" => Move(path, NextWord(words)),
+            "gone" => Gone(path),
+            _ => null,
+        };
+    }
+
+    private static string NextWord(Queue<string> words) => words.TryDequeue(out string? word) ? word : "";
+
+    private static int RemoveFile(string path) => File.Exists(path) ? Done(() => File.Delete(path)) : NoSuchFile;
+
+    private static int Gone(string path) => Path.Exists(path) ? Die : 0;
 
     private static int MakeFolder(string path) =>
         Path.Exists(path) ? AlreadyExists

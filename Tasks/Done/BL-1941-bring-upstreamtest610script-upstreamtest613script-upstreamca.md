@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1941 — Bring UpstreamTest610Script, UpstreamTest613Script, UpstreamCaseRunner and UpstreamCaseScreening under the gates
 
@@ -22,12 +22,15 @@ Split from BL-1936 (BL-1929's measurement, 2026-10-09). Split methods (a lookup 
 
 ## Acceptance criteria
 
-- [ ] The members named in the Goal are absent from the failing list of `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] The members named in the Goal are absent from the failing list of `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+Split RunVerbs, RemoveFolder, Postprocess, CanonicalLine, RunScreenedAsync and InternetHost into helpers; behaviour unchanged. Measured twice: the named members are gone from the failing list (one other member remains, not in this task).
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Named members now under the gates
