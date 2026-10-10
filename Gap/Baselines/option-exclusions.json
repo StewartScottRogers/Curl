@@ -1,0 +1,9 @@
+{
+  "items": [
+    { "key": "options:--dns-interface", "reason": "intended-difference:ADR-0454" },
+    { "key": "options:--dns-ipv4-addr", "reason": "intended-difference:ADR-0454" },
+    { "key": "options:--dns-ipv6-addr", "reason": "intended-difference:ADR-0454" },
+    { "key": "options:--dns-servers", "reason": "intended-difference:ADR-0454" },
+    { "key": "options:--ech", "reason": "intended-difference:ADR-0454" }
+  ]
+}

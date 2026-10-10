@@ -14,7 +14,7 @@ Windows on Windows, the curl on `PATH` on Linux and macOS). The file formats are
 | Path | What it holds | Built by |
 | --- | --- | --- |
 | `Instructions/` | The file formats (`Gap-Format.md`), the analysts' rules (`Analyst-Rules.md`), and one method per area | BL-1720, BL-1737 to BL-1739 |
-| `Baselines/` | The targeted upstream version (`target.json`), the newest one once the watcher has run (`newest.json`), and each release's pinned tarball hash (`curl-<version>.json`) | BL-1721, BL-1736 |
+| `Baselines/` | The targeted upstream version (`target.json`), the options intended to differ, each with its ADR (`option-exclusions.json`), the newest one once the watcher has run (`newest.json`), and each release's pinned tarball hash (`curl-<version>.json`) | BL-1721, BL-1736 |
 | `Upstream/<version>/` | Upstream curl's inventories, one per area, for that version | BL-1723 to BL-1728 |
 | `Findings/` | Gap findings, `GF-####-*.md`, with the folder's `README.md` and `FINDING-TEMPLATE.md` | BL-1720, BL-1731 |
 | `Scorecards/` | One scorecard per run, plus `history.json` | BL-1720, BL-1732 |

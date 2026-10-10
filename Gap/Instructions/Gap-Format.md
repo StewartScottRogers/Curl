@@ -256,6 +256,7 @@ The rest, by area:
 | `options` | `needs-server:<protocol>` | `unmeasured` | The option's effect shows only against a server the probe cannot stand up. |
 | | `platform:<os>` | `excluded` | The option exists only on another platform. |
 | | `debug-build-only` | `excluded` | The option needs a debug build of curl. |
+| | `intended-difference:<ADR-
 | `protocols` | `needs-server:<protocol>` | `unmeasured` | The scheme probe needs a server the probe cannot stand up. |
 | `features` | `debug-build-only` | `excluded` | The feature appears only in a debug build (`Debug`, `TrackMemory`). |
 | `writeout` | `needs-server:<protocol>` | `unmeasured` | The variable has a value only after a transfer to a server the probe cannot stand up. |
