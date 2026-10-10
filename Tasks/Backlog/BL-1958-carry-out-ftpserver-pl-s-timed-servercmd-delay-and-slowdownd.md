@@ -1,5 +1,5 @@
 ---
-id: BL-1957
+id: BL-1958
 title: Carry out ftpserver.pl's timed servercmd DELAY and SLOWDOWNDATA in the FTP emulation
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-1957 — Carry out ftpserver.pl's timed servercmd DELAY and SLOWDOWNDATA in the FTP emulation
+# BL-1958 — Carry out ftpserver.pl's timed servercmd DELAY and SLOWDOWNDATA in the FTP emulation
 
 ## Goal
 
