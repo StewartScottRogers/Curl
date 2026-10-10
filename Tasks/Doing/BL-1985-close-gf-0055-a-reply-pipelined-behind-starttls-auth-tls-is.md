@@ -75,3 +75,4 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Needs Curl.Console.UnitTests (one SMTP STARTTLS test helper splits its reads), held by BL-1987 in Doing; code is done in the stash
+- 2026-10-10: Backlog -> Doing.
