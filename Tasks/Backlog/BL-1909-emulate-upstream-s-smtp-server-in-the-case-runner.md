@@ -4,7 +4,7 @@ title: Emulate upstream's SMTP server in the case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1895]
+depends-on: [BL-1895, BL-1925, BL-1905]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2): split, as BL-1905 was. This run's $2 cost cap cannot hold the SMTP responder, the runner wiring, the %SMTPPORT screening change, 20 sample cases and 100% coverage together. Measured: the line-protocol core (BL-1895) and `FtpControlChannelResponder` exist, but `UpstreamCaseRunner.RunScreenedAsync` is hard-wired to `SwsHttpServerConnector` (its `Abandon`, `ReceivedBytes`, `ProxyReceivedBytes`) and `LineProtocolServerConnector.EmulatedServers` is empty, so no line-protocol stand-in is reachable from a case yet. BL-1905 owns that runner wiring for FTP; SMTP should reuse it rather than build a second dispatch, so BL-1909 waits on BL-1905. The SMTP responder itself is now BL-1925 (same touches). BL-1909 keeps: choosing `SmtpResponder` for `<server>smtp</server>`, a %SMTPPORT value, adding "smtp" to `EmulatedServers`, comparing `<verify><upload>` with the recorded message, the screening test, 20 sample cases and the CLAUDE.md update. Nothing was coded in this run.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Waits on BL-1925 (the SMTP responder, split off to fit one lane run) and BL-1905 (the runner wiring for line-protocol stand-ins)
