@@ -33,6 +33,7 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 
 - 2026-10-08_1640: 7 of 7 items are gaps.
 - 2026-10-08_2029: 5 of 7 items are gaps.
+- 2026-10-10_0657: 4 of 7 items are gaps.
 
 ## Log
 

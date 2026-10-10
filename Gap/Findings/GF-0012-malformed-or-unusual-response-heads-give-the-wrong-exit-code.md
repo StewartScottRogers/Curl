@@ -33,6 +33,7 @@ In Curl.Protocol.Http.UnitLibrary's HttpResponseHeadReader and HttpChunkedDecode
 
 - 2026-10-08_1640: 4 of 4 items are gaps.
 - 2026-10-08_2029: 1 of 4 items are gaps.
+- 2026-10-10_0657: 1 of 4 items are gaps.
 
 ## Log
 

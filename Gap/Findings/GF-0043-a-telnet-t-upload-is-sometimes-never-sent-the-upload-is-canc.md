@@ -4,11 +4,11 @@ title: A telnet -T upload is sometimes never sent: the upload is cancelled when 
 area: behaviour
 key: behaviour:telnet-upload-lost-when-peer-closes
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_2029
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [behaviour:test1327]
 touches: [Curl.Protocol.Telnet.UnitLibrary, Curl.Protocol.Telnet.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Telnet.UnitLibrary's TelnetProtocolHandler, the -T upload runs 
 ## Measurements
 
 - 2026-10-08_2029: 1 of 1 items are gaps.
+- 2026-10-10_0657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
 - 2026-10-08_2131: Filed BL-1853.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.

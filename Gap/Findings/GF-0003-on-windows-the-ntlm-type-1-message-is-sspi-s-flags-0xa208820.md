@@ -10,7 +10,7 @@ introduced-in:
 opened: 2026-10-08_1640
 closed:
 regression: false
-items: [behaviour:test67, behaviour:test68, behaviour:test81, behaviour:test89, behaviour:test91, behaviour:test150, behaviour:test162, behaviour:test169, behaviour:test170, behaviour:test176, behaviour:test239, behaviour:test243, behaviour:test267, behaviour:test776, behaviour:test1215, behaviour:test775]
+items: [behaviour:test67, behaviour:test68, behaviour:test81, behaviour:test89, behaviour:test91, behaviour:test150, behaviour:test162, behaviour:test169, behaviour:test170, behaviour:test176, behaviour:test239, behaviour:test243, behaviour:test267, behaviour:test776, behaviour:test1215, behaviour:test775, behaviour:test822, behaviour:test827, behaviour:test831, behaviour:test868, behaviour:test873, behaviour:test877, behaviour:test906, behaviour:test921, behaviour:test933]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests]
 task: BL-1796
 tasks: [BL-1796]
@@ -33,8 +33,10 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 
 - 2026-10-08_1640: 16 of 16 items are gaps.
 - 2026-10-08_2029: 16 of 16 items are gaps.
+- 2026-10-10_0657: 25 of 25 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1796.
+- 2026-10-10_0657: Added behaviour:test822, behaviour:test827, behaviour:test831, behaviour:test868, behaviour:test873, behaviour:test877, behaviour:test906, behaviour:test921, behaviour:test933 from gap-behaviour.

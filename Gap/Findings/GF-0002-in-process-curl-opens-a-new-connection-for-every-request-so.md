@@ -33,6 +33,7 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 
 - 2026-10-08_1640: 10 of 10 items are gaps.
 - 2026-10-08_2029: 1 of 10 items are gaps.
+- 2026-10-10_0657: 1 of 10 items are gaps.
 
 ## Log
 

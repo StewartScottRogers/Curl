@@ -4,11 +4,11 @@ title: A cookie set for a trailing-dot public suffix is sent, and a -b name=valu
 area: behaviour
 key: behaviour:cookie-domain-matching
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [behaviour:test1629, behaviour:test2015]
 touches: [Curl.Cookies.UnitLibrary, Curl.Cookies.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute
 
 - 2026-10-08_1640: 2 of 2 items are gaps.
 - 2026-10-08_2029: 1 of 2 items are gaps.
+- 2026-10-10_0657: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1803.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.

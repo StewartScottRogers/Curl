@@ -4,11 +4,11 @@ title: On Windows a scheme-less drive-letter path (Z:/dir/file) is parsed as hos
 area: behaviour
 key: behaviour:drive-letter-path-taken-as-url-scheme
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_2029
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [behaviour:test1146]
 touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single
 ## Measurements
 
 - 2026-10-08_2029: 1 of 1 items are gaps.
+- 2026-10-10_0657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
 - 2026-10-08_2131: Filed BL-1851.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.

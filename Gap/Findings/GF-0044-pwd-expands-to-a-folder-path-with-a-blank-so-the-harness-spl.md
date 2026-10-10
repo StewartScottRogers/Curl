@@ -4,11 +4,11 @@ title: %PWD expands to a folder path with a blank, so the harness splits test300
 area: behaviour
 key: behaviour:harness-pwd-with-blank-splits-command
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_2029
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [behaviour:test3009]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
@@ -32,8 +32,10 @@ Curl's behaviour needs no change: it passes test3009 once %PWD holds no blank. M
 ## Measurements
 
 - 2026-10-08_2029: 1 of 1 items are gaps.
+- 2026-10-10_0657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
 - 2026-10-08_2131: Filed BL-1854.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.

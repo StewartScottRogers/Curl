@@ -33,6 +33,7 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 - 2026-10-08_1640: 3 of 3 items are gaps.
 - 2026-10-08_2029: 1 of 3 items are gaps.
+- 2026-10-10_0657: 1 of 3 items are gaps.
 
 ## Log
 

@@ -10,7 +10,7 @@ introduced-in:
 opened: 2026-10-08_1640
 closed:
 regression: false
-items: [behaviour:test1008, behaviour:test1021, behaviour:test1060, behaviour:test1061, behaviour:test206, behaviour:test209, behaviour:test213, behaviour:test217, behaviour:test265, behaviour:test287, behaviour:test718, behaviour:test749, behaviour:test750, behaviour:test1715, behaviour:test94, behaviour:test440, behaviour:test441, behaviour:test493, behaviour:test1455, behaviour:test3201, behaviour:test3220, behaviour:test1471, behaviour:test1472, behaviour:test20, behaviour:test3019, behaviour:test3020, behaviour:test2043, behaviour:test1293]
+items: [behaviour:test1008, behaviour:test1021, behaviour:test1060, behaviour:test1061, behaviour:test206, behaviour:test209, behaviour:test213, behaviour:test217, behaviour:test265, behaviour:test287, behaviour:test718, behaviour:test749, behaviour:test750, behaviour:test1715, behaviour:test94, behaviour:test440, behaviour:test441, behaviour:test493, behaviour:test1455, behaviour:test3201, behaviour:test3220, behaviour:test1471, behaviour:test1472, behaviour:test20, behaviour:test3019, behaviour:test3020, behaviour:test2043, behaviour:test1293, behaviour:test1097, behaviour:test1230, behaviour:test1456, behaviour:test3028, behaviour:test3202, behaviour:test2050, behaviour:test2055, behaviour:test795]
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Conformance.UnitTests]
 task: BL-1794
 tasks: [BL-1794]
@@ -33,8 +33,10 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 
 - 2026-10-08_1640: 28 of 28 items are gaps.
 - 2026-10-08_2029: 28 of 28 items are gaps.
+- 2026-10-10_0657: 35 of 36 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1794.
+- 2026-10-10_0657: Added behaviour:test1097, behaviour:test1230, behaviour:test1456, behaviour:test3028, behaviour:test3202, behaviour:test2050, behaviour:test2055, behaviour:test795 from gap-behaviour.

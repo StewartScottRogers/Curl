@@ -33,6 +33,7 @@ In Curl.Protocol.Abstractions.UnitLibrary's CurlUrl query building (used by --ur
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
 - 2026-10-08_2029: 0 of 1 items are gaps.
+- 2026-10-10_0657: 0 of 1 items are gaps.
 
 ## Log
 

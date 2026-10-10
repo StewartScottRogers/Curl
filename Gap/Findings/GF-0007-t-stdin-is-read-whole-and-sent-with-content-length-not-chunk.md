@@ -33,6 +33,7 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
 
 - 2026-10-08_1640: 6 of 6 items are gaps.
 - 2026-10-08_2029: 4 of 6 items are gaps.
+- 2026-10-10_0657: 5 of 6 items are gaps.
 
 ## Log
 

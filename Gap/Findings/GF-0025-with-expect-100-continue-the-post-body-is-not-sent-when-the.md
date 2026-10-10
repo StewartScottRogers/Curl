@@ -4,11 +4,11 @@ title: With Expect: 100-continue, the POST body is not sent when the server answ
 area: behaviour
 key: behaviour:expect-continue-body-after-early-response
 severity: Critical
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [behaviour:test1070]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBody
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
 - 2026-10-08_2029: 1 of 1 items are gaps.
+- 2026-10-10_0657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1818.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.
