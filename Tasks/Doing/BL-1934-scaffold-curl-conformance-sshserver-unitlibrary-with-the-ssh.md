@@ -33,3 +33,4 @@ Part 1 of BL-1899 (upstream's 42 skipped SCP/SFTP cases). Read ADR-0456 first: t
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
