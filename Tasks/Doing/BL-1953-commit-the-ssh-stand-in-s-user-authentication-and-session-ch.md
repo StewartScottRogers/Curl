@@ -32,3 +32,4 @@ Split from BL-1916, which the factory's per-task cost cap stopped. The code is a
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
