@@ -38,6 +38,8 @@ internal sealed class Pop3Responder : ILineProtocolResponder
 
     private readonly List<string> deletedMessages = [];
 
+    private readonly Dictionary<string, Func<string?, string>> defaultAnswers;
+
     /// <summary>Creates the responder for one connection of a case.</summary>
     /// <param name="serverCommands">The case's <c>&lt;servercmd&gt;</c> <c>REPLY</c>, <c>CAPA</c> and <c>AUTH</c> lines.</param>
     /// <param name="replyParts">The case's <c>&lt;reply&gt;</c> parts by name (<c>data</c>, <c>data2</c> and so on), which <c>RETR</c>, <c>LIST</c> and <c>TOP</c> send.</param>
@@ -47,6 +49,7 @@ internal sealed class Pop3Responder : ILineProtocolResponder
         ArgumentNullException.ThrowIfNull(replyParts);
         this.serverCommands = serverCommands;
         this.replyParts = replyParts;
+        defaultAnswers = CreateDefaultAnswers();
         Greeting = serverCommands.TryFindReply("welcome", out byte[] welcome) ? welcome : Banner;
     }
 
@@ -88,14 +91,8 @@ internal sealed class Pop3Responder : ILineProtocolResponder
     /// <summary>Splits a line as ftpserver.pl's main loop does for POP3.</summary>
     private static bool TrySplitCommand(string commandLine, out string command, out string? argument)
     {
-        int letters = 0;
-        while (letters < commandLine.Length && letters < 5 && char.IsAsciiLetter(commandLine[letters]))
-        {
-            letters++;
-        }
-
-        bool endsAfterLetters = letters == commandLine.Length || char.IsWhiteSpace(commandLine[letters]);
-        if (letters is 3 or 4 && endsAfterLetters)
+        int letters = CountLeadingLetters(commandLine);
+        if (letters is 3 or 4 && EndsAfterLetters(commandLine, letters))
         {
             command = commandLine[..letters];
             argument = letters < commandLine.Length ? commandLine[(letters + 1)..] : null;
@@ -106,6 +103,21 @@ internal sealed class Pop3Responder : ILineProtocolResponder
         argument = null;
         return commandLine == "*" || IsBase64Line(commandLine);
     }
+
+    /// <summary>Counts the ASCII letters a line starts with, stopping at five.</summary>
+    private static int CountLeadingLetters(string commandLine)
+    {
+        int letters = 0;
+        while (letters < commandLine.Length && letters < 5 && char.IsAsciiLetter(commandLine[letters]))
+        {
+            letters++;
+        }
+
+        return letters;
+    }
+
+    private static bool EndsAfterLetters(string commandLine, int letters) =>
+        letters == commandLine.Length || char.IsWhiteSpace(commandLine[letters]);
 
     /// <summary>Matches <c>^[A-Z0-9+\/]*={0,2}$</c>, letters in either case.</summary>
     private static bool IsBase64Line(string line)
@@ -126,23 +138,28 @@ internal sealed class Pop3Responder : ILineProtocolResponder
         return (parts[0], parts.Length > 1 ? parts[1] : string.Empty);
     }
 
-    private string AnswerByDefault(string command, string? argument) => command.ToUpperInvariant() switch
+    private string AnswerByDefault(string command, string? argument) =>
+        defaultAnswers.TryGetValue(command, out Func<string?, string>? answer)
+            ? answer(argument)
+            : $"-ERR {command} is not dealt with!\r\n";
+
+    /// <summary>Maps each command ftpserver.pl answers for POP3 to the method that builds its answer.</summary>
+    private Dictionary<string, Func<string?, string>> CreateDefaultAnswers() => new(StringComparer.OrdinalIgnoreCase)
     {
-        "CAPA" => Capabilities(),
-        "APOP" => AuthenticatedPop(argument),
-        "AUTH" => AuthenticationMechanisms(),
-        "USER" => IsPerlTrue(argument) ? "+OK\r\n" : "-ERR Protocol error\r\n",
-        "PASS" => "+OK Login successful\r\n",
-        "RETR" => Listing("+OK Mail transfer starts\r\n", [Retrieve(argument)]),
-        "LIST" => Listing("+OK Listing starts\r\n", [ReplyData("data")]),
-        "DELE" => Delete(argument),
-        "STAT" => IsPerlTrue(argument) ? "-ERR Protocol error\r\n" : "+OK 3 4294967800\r\n",
-        "NOOP" => IsPerlTrue(argument) ? "-ERR Protocol error\r\n" : "+OK\r\n",
-        "UIDL" => UniqueIdentifiers(),
-        "TOP" => Top(argument),
-        "RSET" => Reset(argument),
-        "QUIT" => Quit(),
-        _ => $"-ERR {command} is not dealt with!\r\n",
+        ["CAPA"] = _ => Capabilities(),
+        ["APOP"] = AuthenticatedPop,
+        ["AUTH"] = _ => AuthenticationMechanisms(),
+        ["USER"] = argument => IsPerlTrue(argument) ? "+OK\r\n" : "-ERR Protocol error\r\n",
+        ["PASS"] = _ => "+OK Login successful\r\n",
+        ["RETR"] = argument => Listing("+OK Mail transfer starts\r\n", [Retrieve(argument)]),
+        ["LIST"] = _ => Listing("+OK Listing starts\r\n", [ReplyData("data")]),
+        ["DELE"] = Delete,
+        ["STAT"] = argument => IsPerlTrue(argument) ? "-ERR Protocol error\r\n" : "+OK 3 4294967800\r\n",
+        ["NOOP"] = argument => IsPerlTrue(argument) ? "-ERR Protocol error\r\n" : "+OK\r\n",
+        ["UIDL"] = _ => UniqueIdentifiers(),
+        ["TOP"] = Top,
+        ["RSET"] = Reset,
+        ["QUIT"] = _ => Quit(),
     };
 
     private bool HasCapability(string capability) => serverCommands.Capabilities.Contains(capability);

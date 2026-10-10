@@ -32,6 +32,8 @@ internal sealed class SmtpResponder : ILineProtocolResponder
 
     private readonly StringBuilder upload = new();
 
+    private readonly Dictionary<string, Func<string?, string>> defaultAnswers;
+
     private bool receivingMessage;
 
     private string serverType = string.Empty;
@@ -47,6 +49,7 @@ internal sealed class SmtpResponder : ILineProtocolResponder
         ArgumentNullException.ThrowIfNull(replyParts);
         this.serverCommands = serverCommands;
         this.replyParts = replyParts;
+        defaultAnswers = CreateDefaultAnswers();
         Greeting = serverCommands.TryFindReply("welcome", out byte[] welcome) ? welcome : Banner;
     }
 
@@ -99,14 +102,8 @@ internal sealed class SmtpResponder : ILineProtocolResponder
     /// <summary>Splits a line as ftpserver.pl's main loop does for SMTP.</summary>
     private static bool TrySplitCommand(string commandLine, out string command, out string? argument)
     {
-        int letters = 0;
-        while (letters < commandLine.Length && letters < 5 && char.IsAsciiLetter(commandLine[letters]))
-        {
-            letters++;
-        }
-
-        bool endsAfterLetters = letters == commandLine.Length || char.IsWhiteSpace(commandLine[letters]);
-        if (letters is 3 or 4 && endsAfterLetters)
+        int letters = CountLeadingLetters(commandLine);
+        if (letters is 3 or 4 && EndsAfterLetters(commandLine, letters))
         {
             command = commandLine[..letters];
             argument = letters < commandLine.Length ? commandLine[(letters + 1)..] : null;
@@ -117,6 +114,21 @@ internal sealed class SmtpResponder : ILineProtocolResponder
         argument = null;
         return commandLine == "*" || IsBase64Line(commandLine);
     }
+
+    /// <summary>Counts the ASCII letters a line starts with, stopping at five.</summary>
+    private static int CountLeadingLetters(string commandLine)
+    {
+        int letters = 0;
+        while (letters < commandLine.Length && letters < 5 && char.IsAsciiLetter(commandLine[letters]))
+        {
+            letters++;
+        }
+
+        return letters;
+    }
+
+    private static bool EndsAfterLetters(string commandLine, int letters) =>
+        letters == commandLine.Length || char.IsWhiteSpace(commandLine[letters]);
 
     /// <summary>Matches <c>^[A-Z0-9+\/]{0,512}={0,2}$</c>, letters in either case.</summary>
     private static bool IsBase64Line(string line)
@@ -134,35 +146,44 @@ internal sealed class SmtpResponder : ILineProtocolResponder
     private static bool IsAddress(string text, bool smtpUtf8)
     {
         int at = text.IndexOf('@', StringComparison.Ordinal);
-        if (at < 0 || !IsLocalPart(text[..at], smtpUtf8))
-        {
-            return false;
-        }
-
-        string[] labels = text[(at + 1)..].Split('.');
-        string topLevel = labels[^1];
-        return labels.Length >= 2 && topLevel.Length is >= 2 and <= 4 && topLevel.All(char.IsAsciiLetter) &&
-            labels[..^1].All(label => label.Length > 0 && label.All(character => IsAddressCharacter(character, "-", smtpUtf8)));
+        return at >= 0 && IsLocalPart(text[..at], smtpUtf8) && IsDomain(text[(at + 1)..], smtpUtf8);
     }
+
+    private static bool IsDomain(string text, bool smtpUtf8)
+    {
+        string[] labels = text.Split('.');
+        return labels.Length >= 2 && IsTopLevelDomain(labels[^1]) &&
+            labels[..^1].All(label => IsDomainLabel(label, smtpUtf8));
+    }
+
+    private static bool IsTopLevelDomain(string label) => label.Length is >= 2 and <= 4 && label.All(char.IsAsciiLetter);
+
+    private static bool IsDomainLabel(string label, bool smtpUtf8) =>
+        label.Length > 0 && label.All(character => IsAddressCharacter(character, "-", smtpUtf8));
 
     private static bool IsAddressCharacter(char character, string punctuation, bool smtpUtf8) =>
         char.IsAsciiLetterOrDigit(character) || punctuation.Contains(character, StringComparison.Ordinal) ||
         (smtpUtf8 && character is >= '\x80' and <= '\xff');
 
-    private string AnswerByDefault(string command, string? argument) => command.ToUpperInvariant() switch
+    private string AnswerByDefault(string command, string? argument) =>
+        defaultAnswers.TryGetValue(command, out Func<string?, string>? answer)
+            ? answer(argument)
+            : $"500 {command} is not dealt with!\r\n";
+
+    /// <summary>Maps each command ftpserver.pl answers for SMTP to the method that builds its answer.</summary>
+    private Dictionary<string, Func<string?, string>> CreateDefaultAnswers() => new(StringComparer.OrdinalIgnoreCase)
     {
-        "EHLO" => Hello(argument, "ESMTP"),
-        "HELO" => Hello(argument, "SMTP"),
-        "MAIL" => Mail(argument),
-        "RCPT" => Recipient(argument),
-        "DATA" => Data(argument),
-        "NOOP" => IsPerlTrue(argument) ? "501 Unrecognized parameter\r\n" : "250 OK\r\n",
-        "RSET" => IsPerlTrue(argument) ? "501 Unrecognized parameter\r\n" : "250 Resetting\r\n",
-        "HELP" => Help(),
-        "VRFY" => Verify(argument),
-        "EXPN" => IsPerlTrue(argument) ? ClientReplyData() : "501 Unrecognized parameter\r\n",
-        "QUIT" => $"221 curl {serverType} server signing off\r\n",
-        _ => $"500 {command} is not dealt with!\r\n",
+        ["EHLO"] = argument => Hello(argument, "ESMTP"),
+        ["HELO"] = argument => Hello(argument, "SMTP"),
+        ["MAIL"] = Mail,
+        ["RCPT"] = Recipient,
+        ["DATA"] = Data,
+        ["NOOP"] = argument => IsPerlTrue(argument) ? "501 Unrecognized parameter\r\n" : "250 OK\r\n",
+        ["RSET"] = argument => IsPerlTrue(argument) ? "501 Unrecognized parameter\r\n" : "250 Resetting\r\n",
+        ["HELP"] = _ => Help(),
+        ["VRFY"] = Verify,
+        ["EXPN"] = argument => IsPerlTrue(argument) ? ClientReplyData() : "501 Unrecognized parameter\r\n",
+        ["QUIT"] = _ => $"221 curl {serverType} server signing off\r\n",
     };
 
     /// <summary>Answers <c>EHLO</c> or <c>HELO</c>; <c>EHLO</c> lists the capabilities and an <c>AUTH</c> line of the mechanisms.</summary>
@@ -197,9 +218,21 @@ internal sealed class SmtpResponder : ILineProtocolResponder
             return "501 Unrecognized parameter\r\n";
         }
 
+        (string from, long size) = ReadMailParameters(argument!);
+        if (from.Length == 0)
+        {
+            return "501 Invalid address\r\n";
+        }
+
+        return size > MaximumMessageSize() ? "552 Message size too large\r\n" : "250 Sender OK\r\n";
+    }
+
+    /// <summary>Reads the last <c>FROM:</c> address and the last numeric <c>SIZE=</c> of <c>MAIL</c>'s parameters; the others are ignored.</summary>
+    private static (string From, long Size) ReadMailParameters(string argument)
+    {
         string from = string.Empty;
         long size = 0;
-        foreach (string element in argument!.Split(' '))
+        foreach (string element in argument.Split(' '))
         {
             if (element.StartsWith("FROM:", StringComparison.Ordinal))
             {
@@ -211,12 +244,7 @@ internal sealed class SmtpResponder : ILineProtocolResponder
             }
         }
 
-        if (from.Length == 0)
-        {
-            return "501 Invalid address\r\n";
-        }
-
-        return size > MaximumMessageSize() ? "552 Message size too large\r\n" : "250 Sender OK\r\n";
+        return (from, size);
     }
 
     /// <summary>The first <c>SIZE &lt;n&gt;</c> capability's limit; unlimited when there is none.</summary>
@@ -234,10 +262,11 @@ internal sealed class SmtpResponder : ILineProtocolResponder
             return "501 Unrecognized parameter\r\n";
         }
 
-        string to = argument[3..];
-        bool valid = to.Length > 2 && to[0] == '<' && to[^1] == '>' && IsAddress(to[1..^1], SupportsSmtpUtf8);
-        return valid ? "250 Recipient OK\r\n" : "501 Invalid address\r\n";
+        return IsBracketedAddress(argument[3..], SupportsSmtpUtf8) ? "250 Recipient OK\r\n" : "501 Invalid address\r\n";
     }
+
+    private static bool IsBracketedAddress(string text, bool smtpUtf8) =>
+        text.Length > 2 && text[0] == '<' && text[^1] == '>' && IsAddress(text[1..^1], smtpUtf8);
 
     /// <summary>Answers <c>DATA</c>; with no argument and a numeric (or no) client name, starts receiving the message.</summary>
     private string Data(string? argument)
@@ -291,7 +320,7 @@ internal sealed class SmtpResponder : ILineProtocolResponder
         }
 
         bool smtpUtf8 = SupportsSmtpUtf8;
-        if (!IsLocalPart(userName, smtpUtf8) && !IsAddress(userName, smtpUtf8))
+        if (!IsUserNameOrAddress(userName, smtpUtf8))
         {
             return "501 Invalid address\r\n";
         }
@@ -304,6 +333,8 @@ internal sealed class SmtpResponder : ILineProtocolResponder
 
         return IsAddress(userName, smtpUtf8: false) ? $"250 <{userName}>\r\n" : $"250 <{userName}@example.com>\r\n";
     }
+
+    private static bool IsUserNameOrAddress(string text, bool smtpUtf8) => IsLocalPart(text, smtpUtf8) || IsAddress(text, smtpUtf8);
 
     /// <summary>
     /// The reply data ftpserver.pl's <c>getreplydata</c> picks for the client name: its number with

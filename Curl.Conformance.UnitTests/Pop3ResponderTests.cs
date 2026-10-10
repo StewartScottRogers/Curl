@@ -68,6 +68,7 @@ public sealed class Pop3ResponderTests
     [DataRow("", "XYZ", "-ERR XYZ is not dealt with!\r\n")]
     [DataRow("", "*", "-ERR * is not dealt with!\r\n")]
     [DataRow("", "dXNlcg==", "-ERR dXNlcg== is not dealt with!\r\n")]
+    [DataRow("", "ab+/cd", "-ERR ab+/cd is not dealt with!\r\n")]
     [DataRow("", "", "-ERR  is not dealt with!\r\n")]
     [DataRow("REPLY AUTH + \nREPLY dXNlcg== +OK Login successful\n", "AUTH PLAIN", "+ \r\n")]
     [DataRow("REPLY AUTH + \nREPLY dXNlcg== +OK Login successful\n", "dXNlcg==", "+OK Login successful\r\n")]
