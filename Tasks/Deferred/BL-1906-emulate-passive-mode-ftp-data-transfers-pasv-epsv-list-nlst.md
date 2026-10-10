@@ -46,3 +46,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Doing -> Backlog. Code done and green but uncommitted (stashed); waits on BL-1942 to measure Library coverage before Done
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 3.32 of its 3.93 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1906-*.jsonl
+- 2026-10-10: Blocked -> Deferred. Superseded by BL-1956, which lands its shelved code (stash 9a4c35992), after the per-task cost cap stopped it twice

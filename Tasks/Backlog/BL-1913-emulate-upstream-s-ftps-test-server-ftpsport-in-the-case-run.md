@@ -4,7 +4,7 @@ title: Emulate upstream's FTPS test server (%FTPSPORT) in the case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1906, BL-1896]
+depends-on: [BL-1956, BL-1896]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -31,6 +31,8 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
+
+- 2026-10-10 (interactive): depends-on BL-1906 became BL-1956; BL-1906 hit the per-task cost cap and its shelved work moved to BL-1956.
 
 ## Log
 
