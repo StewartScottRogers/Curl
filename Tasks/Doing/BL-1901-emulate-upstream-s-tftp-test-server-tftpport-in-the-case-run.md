@@ -50,3 +50,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Parked at the run's cost cap: emulation built, tests need their split literals fixed, then coverage and CLAUDE.md (see Notes)
+- 2026-10-10: Backlog -> Doing.
