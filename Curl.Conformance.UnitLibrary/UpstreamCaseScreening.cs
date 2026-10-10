@@ -14,8 +14,8 @@ namespace Curl.Conformance;
 /// does not act on (a <c>&lt;tool&gt;</c> libtest,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
-/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
-/// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation (or, for an <c>ftp</c> case, the FTP stand-in) does not carry
+/// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>ftps</c> (<see cref="FtpsServerConnector"/> on <c>%FTPSPORT</c>, the FTP stand-in behind implicit TLS), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
+/// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation (or, for an <c>ftp</c> or <c>ftps</c> case, the FTP stand-in) does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
 /// absolute path; when a strip line is not a substitution the harness can run; or when its expected
@@ -35,7 +35,10 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, "sftp", "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. FtpsServerConnector.EmulatedServers, "sftp", "scp"];
+
+    // The servers that read <servercmd> as ftpserver.pl does: the FTP stand-in, plain or behind TLS.
+    private static readonly string[] FtpServers = ["ftp", .. FtpsServerConnector.EmulatedServers];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
@@ -164,13 +167,13 @@ internal static class UpstreamCaseScreening
             ? $"the FTP stand-in does not carry out the case's {command.Value}"
             : null;
 
-    // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd and FTP stand-ins and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1907, BL-1917, BL-1918); any other server's case
+    // Only the SMTP, IMAP and FTP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1907, BL-1913, BL-1917, BL-1918); any other server's case
     // verifying <upload> keeps a reason.
-    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "ftp", "scp", "sftp"];
+    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "ftp", "ftps", "scp", "sftp"];
 
     private static string? UploadOffMailServer(UpstreamTestCase testCase) =>
         testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(UploadingServers).Any()
-            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, scp and sftp servers"
+            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers"
             : null;
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)
@@ -212,9 +215,9 @@ internal static class UpstreamCaseScreening
             ? $"{script.Value} compares with ../curl-config, which Curl does not ship"
             : null;
 
-    // <servercmd> is read by the server the case runs: ftpserver.pl's commands for an ftp case, sws's otherwise.
+    // <servercmd> is read by the server the case runs: ftpserver.pl's commands for an ftp or ftps case, sws's otherwise.
     private static string? UnsupportedServerCommand(UpstreamTestCase testCase) =>
-        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("ftp")
+        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(FtpServers).Any()
             ? UnsupportedFtpServerCommand(testCase)
             : UnsupportedSwsServerCommand(testCase);
 

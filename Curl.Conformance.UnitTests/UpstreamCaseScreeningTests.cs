@@ -150,6 +150,33 @@ public sealed class UpstreamCaseScreeningTests
         Assert.AreEqual(expected, reason);
     }
 
+    // The 8 cases naming %FTPSPORT at curl-8_21_0 run against the FTP stand-in behind implicit TLS
+    // (BL-1913); 404, 407 and 1112 still skip, each for another reason, never for the port.
+    [TestMethod]
+    [DataRow(400, null)]
+    [DataRow(401, null)]
+    [DataRow(403, null)]
+    [DataRow(404, "the expected exit code 77,60 is not a number")]
+    [DataRow(406, null)]
+    [DataRow(407, "the harness does not act on <client><stdout>")]
+    [DataRow(408, null)]
+    [DataRow(1112, "the FTP stand-in does not carry out the server command SLOWDOWNDATA")]
+    public void FindSkipReason_FtpsCase_RunsWithAValueForTheFtpsPort(int testNumber, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal)
+        {
+            ["HOSTIP"] = "127.0.0.1", ["CLIENTIP"] = "127.0.0.1", ["FTPSPORT"] = UpstreamCaseRunner.FtpsPort, ["LOGDIR"] = "/log", ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
+        };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.AreEqual(expected, reason);
+    }
+
     [TestMethod]
     [DataRow("REPLY DELAY 200 ok\nCOUNT DELAY 1\ndelay: 5\n", null)]
     [DataRow("SLOWDOWN\n", null)]
@@ -204,7 +231,7 @@ public sealed class UpstreamCaseScreeningTests
 
         string? reason = UpstreamCaseScreening.FindSkipReason(new(ReadOnlyMemory<byte>.Empty, [], [], null), ParsedTestCase.From(testFile), Features);
 
-        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, scp and sftp servers", reason);
+        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers", reason);
     }
 
     [TestMethod]
@@ -321,7 +348,7 @@ public sealed class UpstreamCaseScreeningTests
 
     [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
-    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, scp and sftp servers")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]
     [DataRow("<reply>\n<servercmd>\ndelay: 5\n</servercmd>\n</reply>\n", "the sws emulation does not carry out the server command delay")]
