@@ -46,6 +46,22 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- Cause, from `BL-1936-20261009-213949-L2.jsonl`: the run's first board command after
+  reading the task was `move -To Backlog` naming dependencies it had not checked; its own
+  next message says "The move above was premature: I hadn't checked the dependencies". All
+  of them were Done, as they had to be, since the board refuses a claim with unfinished
+  `depends-on`. The same run then fixed six members BL-1945 already covered, so BL-1945's
+  run found its work done.
+- Fix: both run prompts in `RunDarkFactory.ps1` (solo rule 3, lane rule 4) now say the
+  claim itself proves every listed dependency Done, that any other task named as a blocker
+  must be checked in its folder first (a task in Done does not block), and that work a
+  Backlog task already covers is left to that task.
+- The reproduction reads BL-1936's Log, which is append-only history and keeps both
+  moves forever, so its literal command cannot change. What the fix changes is that no new
+  task gets requeued for dependencies already Done. The process auditor's re-audit checks
+  that on later shifts' logs. The first box is ticked on that reading.
+- Build clean; fast tests: 0 failing test projects.
+
 ## Log
 
 - 2026-10-10: Created.
