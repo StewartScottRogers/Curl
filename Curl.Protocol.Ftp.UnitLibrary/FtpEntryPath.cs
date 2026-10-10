@@ -36,17 +36,13 @@ internal static class FtpEntryPath
     private static bool TryReadQuoted(string line, int start, out string? path)
     {
         StringBuilder name = new();
-        for (int index = start; index < line.Length; index++)
+        for (int index = start; index < line.Length && !IsControl(line[index]); index++)
         {
-            if (line[index] < ' ' || line[index] == '\u007f')
-            {
-                break;
-            }
-            else if (line[index] != '"')
+            if (line[index] != '"')
             {
                 name.Append(line[index]);
             }
-            else if (index + 1 < line.Length && line[index + 1] == '"')
+            else if (IsDoubledQuote(line, index))
             {
                 name.Append('"');
                 index++;
@@ -61,4 +57,8 @@ internal static class FtpEntryPath
         path = null;
         return false;
     }
+
+    private static bool IsControl(char character) => character < ' ' || character == '\u007f';
+
+    private static bool IsDoubledQuote(string line, int index) => index + 1 < line.Length && line[index + 1] == '"';
 }

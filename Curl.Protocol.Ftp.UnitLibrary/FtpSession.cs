@@ -179,8 +179,7 @@ internal sealed class FtpSession(
     /// The control connection's peer address, which <c>-v</c> names as where a passive data
     /// connection is dialled; the URL's host when it is unknown.
     /// </summary>
-    private readonly string controlPeerAddress =
-        Unmapped((control.Connection.RemoteEndPoint as IPEndPoint)?.Address)?.ToString() ?? context.Url.IdnHost;
+    private readonly string controlPeerAddress = PeerAddressOr(control.Connection.RemoteEndPoint, context.Url.IdnHost);
 
     /// <summary>
     /// Whether the control connection's peer is an IPv6 address (not an IPv4-mapped one),
@@ -230,13 +229,13 @@ internal sealed class FtpSession(
     private long? uploadSize;
 
     /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> when there is none; 0 is none, as in curl.</summary>
-    private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
+    private readonly long? maxFileSize = MaxFileSizeOf(context);
 
     /// <summary>
     /// Whether <c>--ignore-content-length</c> was given: a download then sends no <c>SIZE</c>,
     /// as curl 8.21.0's <c>ftp_state_type_resp</c> skips it for <c>data->set.ignorecl</c> (BL-1982).
     /// </summary>
-    private readonly bool ignoresContentLength = context.Http?.IgnoreContentLength == true;
+    private readonly bool ignoresContentLength = IgnoresContentLength(context);
 
     /// <summary>
     /// The code of the last reply read before <c>QUIT</c>, <c>ABOR</c>'s included; 0 before
@@ -262,7 +261,7 @@ internal sealed class FtpSession(
     private readonly IConnection originalControl = control.Connection;
 
     /// <summary>The last <c>TYPE</c> the server accepted on the control connection, <c>A</c> or <c>I</c>.</summary>
-    private char? transferType = reused?.TransferType;
+    private char? transferType = TransferTypeOf(reused);
 
     /// <summary>What curl's <c>prevpath</c> becomes once the transfer reports the directory it remembers.</summary>
     private string? directoryToRemember;
@@ -1261,6 +1260,19 @@ internal sealed class FtpSession(
 
     private static IPAddress? Unmapped(IPAddress? address) =>
         address is { IsIPv4MappedToIPv6: true } ? address.MapToIPv4() : address;
+
+    // The field initializers' branches live in these four, so the primary constructor
+    // stays under complexity 10 in the coverage report (BL-2024).
+    private static string PeerAddressOr(EndPoint? endPoint, string host) =>
+        Unmapped((endPoint as IPEndPoint)?.Address)?.ToString() ?? host;
+
+    private static long? MaxFileSizeOf(ITransferContext context) =>
+        context.MaxFileSize > 0 ? context.MaxFileSize : null;
+
+    private static bool IgnoresContentLength(ITransferContext context) =>
+        context.Http?.IgnoreContentLength == true;
+
+    private static char? TransferTypeOf(FtpKeptConnection? reused) => reused?.TransferType;
 
     private static bool IsIPv6(EndPoint? endPoint) =>
         Unmapped((endPoint as IPEndPoint)?.Address) is { AddressFamily: AddressFamily.InterNetworkV6 };
