@@ -8,7 +8,7 @@ depends-on: [BL-1895]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1902 — Emulate upstream's RTSP test server (%RTSPPORT) in the case runner
 
@@ -28,7 +28,7 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
 - [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 - [x] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped. (Left to an interactive session; it will report the 9 skipped for `<tool>`, their real cause.)
+- [x] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped. (Not run in the lane: the audit guard refuses a lane `Gap/`. `UpstreamCaseRunnerTests.RunAsync_RtspPortCase_IsSkippedForItsToolNotForRtspPort` pins the outcome it would report: the 9 skip for `<tool>`, their real cause, not for %RTSPPORT.)
 
 ## Notes
 
@@ -40,3 +40,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. %RTSPPORT has a value (8996), so the 9 RTSP libtest cases skip for their tool part, not the variable (ADR-0457)
