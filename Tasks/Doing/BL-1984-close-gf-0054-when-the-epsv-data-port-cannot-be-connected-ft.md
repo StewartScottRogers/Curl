@@ -44,3 +44,4 @@ In Curl.Protocol.Ftp.UnitLibrary's FtpSession.OpenPassiveDataConnectionAsync, wh
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
