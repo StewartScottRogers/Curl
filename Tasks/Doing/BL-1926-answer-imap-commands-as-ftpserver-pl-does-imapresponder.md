@@ -32,3 +32,4 @@ The IMAP half of BL-1910, split off the way BL-1925 (`SmtpResponder`) was split 
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
