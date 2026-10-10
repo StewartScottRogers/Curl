@@ -219,6 +219,21 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPSV\nTYPE I\nSIZE 1\nRETR 1\n</protocol>\n</verify>\n")]
+    [DataRow("<verify>\n<protocol>\nPASV\nLIST\nNLST\nMDTM 1\nREST 3\n</protocol>\n</verify>\n")]
+    public void FindSkipReason_PassiveFtpTransfer_RunsTheCase(string sections)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", sections);
+
+        string? reason = Screen(RunnableClient + sections);
+        diagnostics.Act("skip reason", reason);
+
+        diagnostics.Assert("skip reason", "null", reason);
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
     [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
@@ -229,7 +244,9 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<strip>\n(\n</strip>\n</verify>\n", "the strip pattern ( is not a .NET regular expression")]
     [DataRow("<verify>\n<stripfile2>\n$_ = ''\n</stripfile2>\n</verify>\n", "the harness does not run the Perl $_ = ''")]
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
-    [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPSV\n</protocol>\n</verify>\n", "the FTP stand-in serves no data connection, which the case's EPSV opens")]
+    [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPRT |1|127.0.0.1|5|\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's EPRT")]
+    [DataRow("<verify>\n<protocol>\nEPSV\nSTOR 1\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's STOR")]
+    [DataRow("<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's CWD fully_simulated")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

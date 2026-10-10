@@ -37,7 +37,7 @@ internal static class UpstreamCaseScreening
 
     private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, "sftp", "scp"];
 
-    private static readonly Regex FtpDataConnectionCommand = new(@"^(?:EPSV|PASV|PORT|EPRT|LPRT)\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
+    private static readonly Regex FtpDataConnectionCommand = new(@"^(?:PORT|EPRT|LPRT|STOR|APPE)\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
@@ -154,11 +154,12 @@ internal static class UpstreamCaseScreening
             ? $"the harness does not emulate the {server} server"
             : null;
 
-    // The FTP stand-in serves the control channel only (BL-1905); a case whose protocol log shows
-    // curl opening a data connection waits for BL-1906 to BL-1908.
+    // The FTP stand-in serves passive-mode downloads and listings (BL-1906); a case whose protocol
+    // log shows an active-mode data connection or an upload waits for BL-1907, and one listing
+    // ftpserver.pl's simulated wildcard directory is not emulated.
     private static string? FtpDataConnection(UpstreamTestCase testCase) =>
         FtpDataConnectionCommand.Match(UpstreamTestPartBodies.Text(testCase.Find("verify", "protocol"))) is { Success: true } command
-            ? $"the FTP stand-in serves no data connection, which the case's {command.Value} opens"
+            ? $"the FTP stand-in does not carry out the case's {command.Value}"
             : null;
 
     // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1917, BL-1918); any other server's case
