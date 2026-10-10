@@ -30,6 +30,11 @@ Lanes test only on Windows, so reproduce with `gh run view 38031396189 --log-fai
 
 ## Notes
 
+- Cause: CI's log says `<verify><errorcode>: expected exit code 101, got 52`. test4001 joined the list with BL-1912's HTTPS server and had never run on macOS. The harness's server is `SslStream` (`TlsServerStream`), which on macOS cannot serve TLS 1.3; the handshake settles on TLS 1.2, Curl's hand-built client drops the ECH offer there, and the empty `<reply>` gives exit 52. Linux and Windows serve TLS 1.3 and pass.
+- Fix: `UpstreamConformanceTests` keeps a `NeedsTls13ServerCases` set ({4001}); on macOS those cases still run and report, as Inconclusive, but are not held to `PassingUpstreamCases.txt`. Chosen over removing `ECH` from the macOS platform features (Curl does have ECH there, and a listed skipped case fails anyway) and over changing the ratchet's library contract for a single case.
+- Whether Curl matches curl when an ECH offer meets a TLS 1.2 server is a real question of its own, filed as BL-1950 (outside this task's `touches`).
+- Verified on Windows: build clean, fast tests green (Conformance 2066 passed, 0 failed). CI on macOS is checked by the shift's CI watch once this lands.
+
 ## Log
 
 - 2026-10-09: Created.

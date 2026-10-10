@@ -43,6 +43,12 @@ public sealed class UpstreamConformanceTests
     private static readonly IReadOnlySet<int> PassingCases =
         UpstreamCaseRatchet.ReadPassingList(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, UpstreamCaseRatchet.PassingListFileName)));
 
+    // Listed cases whose verdict needs the HTTPS server to speak TLS 1.3, as upstream's stunnel
+    // does: test4001's ECH offer is rejected only by a TLS 1.3 server. On macOS SslStream cannot
+    // serve TLS 1.3, the handshake settles on TLS 1.2 and curl ends with exit 52, so there these
+    // cases are run and reported but not held to the list (BL-1949).
+    private static readonly IReadOnlySet<int> NeedsTls13ServerCases = new HashSet<int> { 4001 };
+
     /// <summary>One row per vendored <c>test*.rawhttp</c> file, in test-number order.</summary>
     public static IEnumerable<TestDataRow<int>> UpstreamCases =>
         Directory.GetFiles(UpstreamTestDataFolder, $"test*{UpstreamTestFileExtension}")
@@ -57,7 +63,7 @@ public sealed class UpstreamConformanceTests
     public async Task UpstreamCase_RunThroughCurl_HoldsTheRatchet(int testNumber)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        bool isListed = PassingCases.Contains(testNumber);
+        bool isListed = PassingCases.Contains(testNumber) && !(OperatingSystem.IsMacOS() && NeedsTls13ServerCases.Contains(testNumber));
         diagnostics.Arrange("upstream case number", testNumber);
         diagnostics.Arrange("case is on the passing list", isListed);
         byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
