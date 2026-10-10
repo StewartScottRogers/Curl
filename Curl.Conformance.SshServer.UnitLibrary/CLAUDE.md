@@ -37,4 +37,7 @@ fingerprints never change. An upstream case that pins the server's key names the
 - `--hostpubmd5 cf07be9d68ae65546da093c36fbd0d82` (`SshServerHostKey.Md5Fingerprint`)
 - `--hostpubsha256 bbXpuKG6zhzdmnxq256TlqzFBzRl2f6OOg722cYNbU8` (`SshServerHostKey.Sha256Fingerprint`)
 
-The case runner substitutes these for the fingerprints of upstream's own test key.
+Upstream's cases compute their key's fingerprints from the key its own `sshd` generates;
+the case runner does not reach this server yet, so nothing substitutes these for them. When
+the SCP and SFTP cases are wired in, the runner is to supply these two values wherever a case
+asks for the server's MD5 or SHA-256 host key fingerprint.

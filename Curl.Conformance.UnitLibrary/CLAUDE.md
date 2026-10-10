@@ -244,6 +244,16 @@ as uninterpreted until BL-1894 routes them. The result is an
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list.
 
+The stand-in for upstream's test `sshd` is not here but in its own library,
+`Curl.Conformance.SshServer.UnitLibrary` (ADR-0456, BL-1934, BL-1935), because it reuses
+the SSH client's internal wire code from `Curl.Protocol.Ssh.UnitLibrary`, which this library
+may not reference. Its `SshServerConnector` is an `IConnector` whose sessions run the SSH
+transport layer - identification exchange, `curve25519-sha256` key exchange with a fixed
+`ssh-ed25519` host key, the client's first implemented cipher and MAC, `NEWKEYS` and the
+`ssh-userauth` service request - and stop there: no authentication, SCP or SFTP yet. Its
+`CLAUDE.md` describes the transport and names the host key's stable `--hostpubmd5` and
+`--hostpubsha256` fingerprints. The runner does not use it yet, so the SSH cases still skip.
+
 What it is to hold in full, per ADR-0013 decision 2:
 
 - the test-file parser, variable substitution (`%HOSTIP`, `%TESTNUMBER`, `%LOGDIR`, ...)
