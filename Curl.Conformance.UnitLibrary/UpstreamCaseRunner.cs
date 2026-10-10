@@ -25,7 +25,7 @@ namespace Curl.Conformance;
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
-/// <see cref="HttpPort"/>, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="HttpPort"/>, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -44,6 +44,9 @@ public sealed class UpstreamCaseRunner(
 
     /// <summary>The value of <c>%PROXYPORT</c>: connections to this port reach the emulation too, recorded apart for <c>&lt;verify&gt;&lt;proxy&gt;</c>.</summary>
     public const string ProxyPort = "8992";
+
+    /// <summary>The value of <c>%SOCKSPORT</c>: connections to this port reach the socksd emulation, <see cref="SocksServerConnector"/>.</summary>
+    public const string SocksPort = "8994";
 
     /// <summary>The value of <c>%VERSION</c>: the curl release Curl matches.</summary>
     public const string CurlVersion = "8.21.0";
@@ -128,6 +131,7 @@ public sealed class UpstreamCaseRunner(
             ["CLIENTIP"] = HostAddress,
             ["HTTPPORT"] = HttpPort,
             ["PROXYPORT"] = ProxyPort,
+            ["SOCKSPORT"] = SocksPort,
             ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
             ["LOGDIR"] = logDirectory,
             ["FILE_PWD"] = string.Empty,
@@ -157,7 +161,7 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, server, new UnreachableDatagramConnector());
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, new SocksServerConnector(testCase, server), new UnreachableDatagramConnector());
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {

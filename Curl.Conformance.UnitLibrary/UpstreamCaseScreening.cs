@@ -14,7 +14,7 @@ namespace Curl.Conformance;
 /// does not act on (a <c>&lt;tool&gt;</c> libtest, a <c>&lt;setenv&gt;</c>,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
-/// one emulated), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
+/// one emulated), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
@@ -35,7 +35,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-proxy", "file", "none", .. LineProtocolServerConnector.EmulatedServers];
+    private static readonly HashSet<string> Servers = ["http", "http-proxy", "socks4", "socks5", "file", "none", .. LineProtocolServerConnector.EmulatedServers];
 
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
