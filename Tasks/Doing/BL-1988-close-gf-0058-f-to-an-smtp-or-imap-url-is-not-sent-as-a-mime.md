@@ -48,3 +48,4 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
