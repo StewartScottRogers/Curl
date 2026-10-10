@@ -34,3 +34,4 @@ BL-1929's measurement (2026-10-09) found 28 failing members, none in BL-1929's f
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Split into BL-1937, BL-1938, BL-1939, BL-1940, BL-1941; depends on them.
+- 2026-10-10: Backlog -> Doing.
