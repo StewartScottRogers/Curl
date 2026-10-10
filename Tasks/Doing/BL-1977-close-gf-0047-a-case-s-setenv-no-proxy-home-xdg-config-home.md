@@ -51,3 +51,4 @@ Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
