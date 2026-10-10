@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1923 — Generate upstream's tests/certs certificates from the vendored prm files for the upstream case runner
 
@@ -22,13 +22,19 @@ Split from BL-1922. The curl 8.21.0 tarball's tests/certs holds no certificate f
 
 ## Acceptance criteria
 
-- [ ] Each certificate file named by a vendored %CERTDIR case is generated, with the subject, SANs and extensions its .prm names (a unit test per kind pins them).
-- [ ] UpstreamConformanceTests passes the generated folder's parent as the certificate directory.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity at most 10; tests are platform-neutral.
+- [x] Each certificate file named by a vendored %CERTDIR case is generated, with the subject, SANs and extensions its .prm names (a unit test per kind pins them).
+- [x] UpstreamConformanceTests passes the generated folder's parent as the certificate directory.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity at most 10; tests are platform-neutral.
 
 ## Notes
+
+- Plan: `UpstreamCertificateParameters` reads a .prm as OpenSSL does (sections, key = value in order, # comments); `UpstreamTestCertificateGenerator` follows genserv.pl with `CertificateRequest`: P-256 keys (genserv.pl's prime256v1), SHA-256, CA 6000 days, leaves 300 days, each x509v3 key written in file order (basicConstraints, keyUsage, extendedKeyUsage, subjectAltName incl. raw DER:, SKI hash, AKI keyid, AIA caIssuers, CRL distribution points), and a CRL per leaf revoking it (CertificateRevocationListBuilder).
+- Defaults taken: .cacert/.crt hold the PEM block only, without OpenSSL's `-text` dump, since curl reads only the block; the CRL carries the builder's AKI but not crl_ext's AIA; serials are 16 random bytes. Generation uses the injected TimeProvider.
+- UpstreamConformanceTests generates once per run (Lazy) into `<test output>/UpstreamCertificates/certs` and passes `UpstreamCertificates` as %CERTDIR. No case changed verdict: every %CERTDIR case still skips for its https/https-mtls/http3 server (BL-1912 to BL-1914).
+- Measured: Measure-CodeQuality -Library Curl.Conformance.UnitLibrary shows no failing member in the two new files (the library's 29 failing members are pre-existing). Subjects are pinned in DER order, not by X509Certificate2.Subject, whose text order differs by platform.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. The upstream case runner's %CERTDIR now holds certificates generated with the BCL from the vendored .prm files
