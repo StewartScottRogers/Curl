@@ -266,17 +266,42 @@ internal sealed class MqttServerConnection : IConnection
 
         byte[] packetId = body[..2];
         byte[] topic = body[4..(4 + topicLength)];
+        if (PublishAndSuback(packetId, topic))
+        {
+            Disconnect();
+        }
+    }
+
+    // Without a payload mqttd publishes its default and sends no SUBACK; with one it sends the
+    // SUBACK before or after the PUBLISH. False when a short PUBLISH gave up on the connection.
+    private bool PublishAndSuback(byte[] packetId, byte[] topic)
+    {
         if (configuration.Payload is not { } payload)
         {
             _ = Publish(topic, DefaultPayload);
-        }
-        else if (!(configuration.PublishBeforeSuback
-            ? Publish(topic, payload) && Suback(packetId)
-            : Suback(packetId) && Publish(topic, payload)))
-        {
-            return;
+            return true;
         }
 
+        if (!configuration.PublishBeforeSuback)
+        {
+            Suback(packetId);
+        }
+
+        if (!Publish(topic, payload))
+        {
+            return false;
+        }
+
+        if (configuration.PublishBeforeSuback)
+        {
+            Suback(packetId);
+        }
+
+        return true;
+    }
+
+    private void Disconnect()
+    {
         if (configuration.MalformedDisconnect)
         {
             Send("DISCONNECT-malformed", 2, [0xE0, 0x02, 0x00, 0x00]);
@@ -287,11 +312,8 @@ internal sealed class MqttServerConnection : IConnection
         }
     }
 
-    private bool Suback(byte[] packetId)
-    {
+    private void Suback(byte[] packetId) =>
         Send("SUBACK", 3, [0x90, 0x03, packetId[0], packetId[1], 0x00]);
-        return true;
-    }
 
     // mqttd sends a short PUBLISH two bytes short and then gives up on the connection.
     private bool Publish(byte[] topic, byte[] payload)

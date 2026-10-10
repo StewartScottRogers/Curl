@@ -284,6 +284,40 @@ public sealed class CommandLineVariableOptionTests
     }
 
     [TestMethod]
+    public void Parse_GivenAnEnvironmentReader_ImportsTheVariableThroughItAndNotTheProcessEnvironment()
+    {
+        string[] arguments = ["--variable", "%FUNVALUE", "--expand-data", "{{FUNVALUE}}", Url];
+        Diagnostics.ArrangeArguments(arguments);
+        Diagnostics.Arrange("reader", "FUNVALUE=contents; process FUNVALUE " + Quoted(Environment.GetEnvironmentVariable("FUNVALUE")));
+        Assert.IsNull(Environment.GetEnvironmentVariable("FUNVALUE"), "The process environment must not hold FUNVALUE for this test to mean anything.");
+
+        CommandLineParseResult result = CommandLineParser.Parse(
+            arguments,
+            _ => false,
+            new UnexpectedPasswordPrompt(),
+            new RecordingDataFileReader(),
+            new DefaultConfigFileSearch(_ => null, false, null, null),
+            false,
+            name => name == "FUNVALUE" ? "contents" : null);
+
+        Diagnostics.ActParse(result);
+        AssertPostData("contents"u8, result);
+        Assert.IsTrue(result.IsAccepted);
+        CollectionAssert.AreEqual("contents"u8.ToArray(), result.Options!.PostData!.Value.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_GivenANullEnvironmentReader_ThrowsArgumentNullException() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => CommandLineParser.Parse(
+            [Url],
+            _ => false,
+            new UnexpectedPasswordPrompt(),
+            new RecordingDataFileReader(),
+            new DefaultConfigFileSearch(_ => null, false, null, null),
+            false,
+            null!));
+
+    [TestMethod]
     public void Parse_VariableImportingAnUnsetEnvironmentVariableWithADefault_TakesTheDefaultInItsRange()
     {
         string name = EnvironmentVariable.UnsetName();

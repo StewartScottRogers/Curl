@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-1934, BL-1935]
-touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.SshServer.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1899 — Emulate the SSH transport layer of upstream's test sshd in the case runner
 
@@ -22,17 +22,20 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] A unit test connects Curl's own SSH client transport (from Curl.Protocol.Ssh.UnitLibrary, in memory) to the new server and completes key exchange up to the service request.
-- [ ] Host key fingerprints are stable per run so --hostpubmd5 and --hostpubsha256 cases can name them (document how).
-- [ ] The CLAUDE.md of the library holding the server describes the transport.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; `dotnet build -warnaserror` is clean for every touched project and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] A unit test connects Curl's own SSH client transport (from Curl.Protocol.Ssh.UnitLibrary, in memory) to the new server and completes key exchange up to the service request.
+- [x] Host key fingerprints are stable per run so --hostpubmd5 and --hostpubsha256 cases can name them (document how).
+- [x] The CLAUDE.md of the library holding the server describes the transport.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; `dotnet build -warnaserror` is clean for every touched project and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
 - 2026-10-09 (lane 2): Split. `Curl.Protocol.Ssh.UnitTests/Fakes/InMemorySshServerSession.cs` already runs a full server-side SSH session, but as ungated test code; every type in `Curl.Protocol.Ssh.UnitLibrary` is `internal`. Decided in ADR-0456 (by Claude under Stewart's delegation): the server goes in a new `Curl.Conformance.SshServer.UnitLibrary` (+ `.UnitTests`) that reuses the SSH client's packet, negotiation, key exchange and packet protection code through `InternalsVisibleTo`, with RFC 8032's first Ed25519 key as a fixed host key so fingerprints are stable. A new project, the `Curl.slnx` edit and the SSH csproj change are outside this task's `touches`, and the port plus 100% coverage did not fit one run's budget, so the work is BL-1934 (scaffold, identification, plain packets) then BL-1935 (KEX, NEWKEYS, service request, fingerprints). What is left here once both are Done: confirm each criterion above against them, tick them, and add a paragraph to `Curl.Conformance.UnitLibrary/CLAUDE.md` pointing at the new library.
+- 2026-10-09 (lane 1): Closed out. Criterion 1: `SshServerConnectorTests.ConnectAsync_ClientOffersAes128CtrWithHmacSha256_KeysAreExchangedAndTheServiceAcceptedEncrypted` (and the ChaCha20-Poly1305 twin) drive the client's `SshTransport` through key exchange to the accepted `ssh-userauth` request. Criterion 2: `SshServerHostKey` is fixed (RFC 8032 7.1), and its `CLAUDE.md` names both fingerprints. Criterion 3: `Curl.Conformance.SshServer.UnitLibrary/CLAUDE.md` describes the transport; `Curl.Conformance.UnitLibrary/CLAUDE.md` now has a paragraph pointing at it. Criterion 4: this run changed no code in `Curl.Conformance.UnitLibrary`, so its coverage and complexity are as BL-1935 left them; build and fast tests run below. Added `Curl.Conformance.SshServer.UnitLibrary` to `touches` (no other task in Doing names it) to correct its `CLAUDE.md`, which said the case runner substitutes the fixed fingerprints - it does not reach the server yet, so that is now written as intent.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Split: waits on BL-1934 (scaffold Curl.Conformance.SshServer.UnitLibrary) and BL-1935 (key exchange to the service request), per ADR-0456
+- 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. All four criteria met by BL-1934 and BL-1935; Curl.Conformance.UnitLibrary/CLAUDE.md now points at the SSH server library

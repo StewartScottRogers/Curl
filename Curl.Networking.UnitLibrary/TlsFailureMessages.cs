@@ -60,6 +60,10 @@ internal static class TlsFailureMessages
     // .NET sees the end of the stream before OpenSSL does, so no exception carries it.
     private const string OpenSslUnexpectedEof = "error:0A000126:SSL routines::unexpected eof while reading";
 
+    // What the OpenSSL build reports when it refuses the version a ServerHello picked and sends
+    // protocol_version itself (measured with curl 8.21.0 on OpenSSL 4.0.0, BL-1950).
+    private const string OpenSslUnsupportedProtocol = "error:0A000102:SSL routines::unsupported protocol";
+
     /// <summary>
     /// The Schannel build's exit 56 message for a read that finds the connection ended
     /// without <c>close_notify</c> (BL-819, measured; ADR-0221).
@@ -204,7 +208,8 @@ internal static class TlsFailureMessages
     /// <summary>
     /// The OpenSSL build's message for exit 35 when the hand-built client's handshake fails
     /// for a reason other than verification: the server closing is OpenSSL's unexpected-EOF
-    /// error string, and an alert is OpenSSL's error string for it, reason code 1000 plus the
+    /// error string, a <c>protocol_version</c> alert the client sent is OpenSSL's
+    /// <c>unsupported protocol</c>, and any other alert is OpenSSL's error string for it, reason code 1000 plus the
     /// alert, named as OpenSSL 3 names it, or <c>reason(N)</c> as OpenSSL prints a reason it
     /// has no string for.
     /// </summary>
@@ -215,6 +220,11 @@ internal static class TlsFailureMessages
         if (failure.Origin == TlsHandshakeFailureOrigin.TransportClosed)
         {
             return $"TLS connect error: {OpenSslUnexpectedEof}";
+        }
+
+        if (failure is { Origin: TlsHandshakeFailureOrigin.AlertSent, Alert: TlsAlertDescription.ProtocolVersion })
+        {
+            return $"TLS connect error: {OpenSslUnsupportedProtocol}";
         }
 
         var reason = 1000 + (int)failure.Alert;

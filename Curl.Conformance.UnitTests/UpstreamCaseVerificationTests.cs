@@ -64,6 +64,18 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_Upload_ComparesItAgainstTheUploadedMessageWithoutStrip()
+    {
+        string sections = "<verify>\n<strip>\n^body\n</strip>\n<upload crlf=\"yes\">\nbody\n.\n</upload>\n</verify>\n";
+
+        string? matching = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { UploadedBytes = Bytes("body\r\n.\r\n") });
+        string? differing = Verify(sections, Run(received: "body\r\n.\r\n"));
+
+        Assert.IsNull(matching);
+        Assert.AreEqual("<verify><upload> differs at byte 0 (line 1): expected \"body\\r\\n\", got the end", differing);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_ReplyData_IsComparedWithTheOutputFile()
     {
         string sections = "<reply>\n<data crlf=\"headers\">\nHTTP/1.1 200 OK\n\nbody\n</data>\n</reply>\n";

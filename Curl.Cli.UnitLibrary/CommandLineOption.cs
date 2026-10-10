@@ -252,13 +252,17 @@ public sealed class CommandLineOption
     private static CommandLineOptionApplier WarnAboutLeadingUnicodeThen(CommandLineOptionApplier apply) =>
         (options, value, spelledOption, pathExists, dataFileReader) =>
         {
-            if ((options.ReadsArgumentsAsUtf8 || options.ReadingConfigFile || options.ApplyingValueLedByVariableBytes) && value.Length > 0 && value[0] is >= ' ' and <= '‿')
+            if (ReadsValueAsUtf8(options) && value.Length > 0 && value[0] is >= ' ' and <= '‿')
             {
                 options.AddWarningLinesUnlessSilent(CommandLineWarning.ArgumentStartsWithUnicode(value));
             }
 
             return apply(options, value, spelledOption, pathExists, dataFileReader);
         };
+
+    /// <summary>Whether the value being applied is read as UTF-8, the cases <see cref="WarnAboutLeadingUnicodeThen"/> lists.</summary>
+    private static bool ReadsValueAsUtf8(CommandLineOptions options) =>
+        options.ReadsArgumentsAsUtf8 || options.ReadingConfigFile || options.ApplyingValueLedByVariableBytes;
 
     /// <summary>An applier that ignores its value and adds curl's no-function warning for <paramref name="longName"/>.</summary>
     private static CommandLineOptionApplier WarnDeprecatedWithNoFunction(string longName) =>

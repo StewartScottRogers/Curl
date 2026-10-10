@@ -33,7 +33,7 @@ internal sealed class LineProtocolServerConnector : IConnector
     /// Gets the <c>&lt;server&gt;</c> names whose cases <see cref="UpstreamCaseScreening"/> lets run
     /// on a line-protocol stand-in; each protocol task adds its name here once its stand-in answers.
     /// </summary>
-    public static IReadOnlyList<string> EmulatedServers { get; } = [];
+    public static IReadOnlyList<string> EmulatedServers { get; } = ["ftp", "smtp", "imap", "pop3"];
 
     /// <summary>
     /// Gets every byte the server has read, across every connection in the order the client wrote

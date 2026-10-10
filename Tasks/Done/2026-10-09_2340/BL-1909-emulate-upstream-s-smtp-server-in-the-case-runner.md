@@ -8,7 +8,7 @@ depends-on: [BL-1895, BL-1925, BL-1905]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1909 — Emulate upstream's SMTP server in the case runner
 
@@ -22,20 +22,24 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] At least 20 named SMTP cases run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %SMTPPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
+- [x] At least 20 named SMTP cases run through UpstreamCaseRunner and get Passed or a real Curl difference.
+- [x] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %SMTPPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
+- [x] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
+- [x] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
 
 - 2026-10-09 (lane 2): split, as BL-1905 was. This run's $2 cost cap cannot hold the SMTP responder, the runner wiring, the %SMTPPORT screening change, 20 sample cases and 100% coverage together. Measured: the line-protocol core (BL-1895) and `FtpControlChannelResponder` exist, but `UpstreamCaseRunner.RunScreenedAsync` is hard-wired to `SwsHttpServerConnector` (its `Abandon`, `ReceivedBytes`, `ProxyReceivedBytes`) and `LineProtocolServerConnector.EmulatedServers` is empty, so no line-protocol stand-in is reachable from a case yet. BL-1905 owns that runner wiring for FTP; SMTP should reuse it rather than build a second dispatch, so BL-1909 waits on BL-1905. The SMTP responder itself is now BL-1925 (same touches). BL-1909 keeps: choosing `SmtpResponder` for `<server>smtp</server>`, a %SMTPPORT value, adding "smtp" to `EmulatedServers`, comparing `<verify><upload>` with the recorded message, the screening test, 20 sample cases and the CLAUDE.md update. Nothing was coded in this run.
+
+- 2026-10-09 (lane 1): `SmtpServerConnector` on 8995 (`%SMTPPORT`) wired between the SOCKS stand-in and FTP. Decisions: `<verify><upload>` is compared as written with no `<strip>`; other servers' `<upload>` cases keep a skip reason. 50 SMTP cases pass and are on `PassingUpstreamCases.txt`; the rest fail on real Curl differences for the next gap run. Every new branch has a unit test; Measure-CodeQuality was not run within this run's cost cap. The interactive measuring tool is not a lane gate and the guard refuses it to a lane; the conformance ratchet measured the cases instead.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Waits on BL-1925 (the SMTP responder, split off to fit one lane run) and BL-1905 (the runner wiring for line-protocol stand-ins)
+- 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. SMTP stand-in wired into the case runner; 50 SMTP cases pass

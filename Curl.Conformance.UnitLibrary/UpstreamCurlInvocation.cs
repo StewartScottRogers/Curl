@@ -12,13 +12,18 @@ namespace Curl.Conformance;
 /// <param name="standardInput">What curl reads as standard input.</param>
 /// <param name="connector">Every TCP connection; an in-memory test server.</param>
 /// <param name="datagramConnector">Every UDP channel.</param>
+/// <param name="environmentVariables">
+/// The whole environment the run reads, as the case's <c>&lt;client&gt;&lt;setenv&gt;</c> sets it;
+/// <see langword="null"/> for none.
+/// </param>
 public sealed class UpstreamCurlInvocation(
     IReadOnlyList<string> arguments,
     Stream standardOutput,
     Stream standardError,
     Stream standardInput,
     IConnector connector,
-    IDatagramConnector datagramConnector)
+    IDatagramConnector datagramConnector,
+    IReadOnlyDictionary<string, string>? environmentVariables = null)
 {
     /// <summary>The command-line arguments, without the program name.</summary>
     public IReadOnlyList<string> Arguments { get; } = arguments;
@@ -37,4 +42,10 @@ public sealed class UpstreamCurlInvocation(
 
     /// <summary>Every UDP channel.</summary>
     public IDatagramConnector DatagramConnector { get; } = datagramConnector;
+
+    /// <summary>
+    /// The whole environment the run reads, as the case's <c>&lt;client&gt;&lt;setenv&gt;</c> sets it;
+    /// a variable not in it is unset for the run.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> EnvironmentVariables { get; } = environmentVariables ?? new Dictionary<string, string>(StringComparer.Ordinal);
 }

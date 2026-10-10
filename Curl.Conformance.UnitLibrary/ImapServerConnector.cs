@@ -1,0 +1,59 @@
+using System.Text;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Conformance;
+
+/// <summary>
+/// An <see cref="IConnector"/> on which <see cref="ImapPort"/>, upstream's <c>%IMAPPORT</c>, reaches
+/// the IMAP side of upstream's <c>tests/ftpserver.pl</c> (at <c>curl-8_21_0</c>) for one case, and
+/// which hands every other connection to the server it wraps. Each connection to
+/// <see cref="ImapPort"/> gets its own <see cref="ImapResponder"/> answering from the case's
+/// <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts, each with the line endings its
+/// <c>crlf</c> attribute forces, as <c>prepro</c> forces them before ftpserver.pl reads the part.
+/// No socket is opened.
+/// </summary>
+/// <param name="testCase">The expanded case whose <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts the server answers from.</param>
+/// <param name="backend">The server every connection not to <see cref="ImapPort"/> reaches.</param>
+public sealed class ImapServerConnector(UpstreamTestCase testCase, IConnector backend) : IConnector
+{
+    /// <summary>The port of the IMAP server, <c>%IMAPPORT</c>.</summary>
+    public const int ImapPort = 8997;
+
+    private readonly List<ImapResponder> responders = [];
+
+    private LineProtocolServerConnector? server;
+
+    /// <summary>
+    /// Gets every command line the server has answered, across every connection, each with its CRLF:
+    /// what ftpserver.pl logs for <c>&lt;verify&gt;&lt;protocol&gt;</c>, without an <c>APPEND</c> literal's lines.
+    /// </summary>
+    public ReadOnlyMemory<byte> ProtocolLog =>
+        Encoding.Latin1.GetBytes(string.Concat(responders.SelectMany(responder => responder.ReceivedCommandLines)));
+
+    /// <summary>
+    /// Gets the last <c>APPEND</c> literal any connection received, as ftpserver.pl stores it for
+    /// <c>&lt;verify&gt;&lt;upload&gt;</c>, or nothing when none was sent.
+    /// </summary>
+    public ReadOnlyMemory<byte> UploadedMessage =>
+        responders.Select(responder => responder.UploadedMessage).LastOrDefault(message => message.Length > 0);
+
+    /// <summary>Opens an IMAP connection when <paramref name="target"/>'s port is <see cref="ImapPort"/>, otherwise a connection to the wrapped server.</summary>
+    /// <param name="target">The host and port to connect to.</param>
+    /// <param name="cancellationToken">Passed to the server the connection reaches.</param>
+    /// <returns>The connected result.</returns>
+    public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+        target.Port == ImapPort
+            ? Server().ConnectAsync(target, cancellationToken)
+            : backend.ConnectAsync(target, cancellationToken);
+
+    private LineProtocolServerConnector Server() => server ??= new(CreateResponder);
+
+    private ImapResponder CreateResponder()
+    {
+        ImapResponder responder = new(
+            LineProtocolServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span),
+            testCase.Sections.Where(part => part.Section == "reply").ToDictionary(part => part.Name, UpstreamTestPartBodies.Served, StringComparer.Ordinal));
+        responders.Add(responder);
+        return responder;
+    }
+}

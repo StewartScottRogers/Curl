@@ -1,6 +1,3 @@
-using System.Collections.Frozen;
-using System.Diagnostics.CodeAnalysis;
-
 namespace Curl.Cli;
 
 /// <summary>
@@ -302,16 +299,6 @@ public static class CurlOptionAliasTable
         new("write-out", 'w', CurlOptionNoPrefix.NotAccepted),
         new("xattr", ' ', CurlOptionNoPrefix.Accepted),
     ];
-
-    private static readonly FrozenDictionary<string, CurlOptionAlias> AliasesByName =
-        Aliases.ToFrozenDictionary(alias => alias.Name, StringComparer.Ordinal);
-
-    /// <summary>Finds the row named <paramref name="name"/>, case-sensitively.</summary>
-    /// <param name="name">The long name without its leading <c>--</c>.</param>
-    /// <param name="alias">The row found; <see langword="null"/> when there is none.</param>
-    /// <returns><see langword="true"/> when curl 8.21.0 knows the name.</returns>
-    public static bool TryFindName(string name, [NotNullWhen(true)] out CurlOptionAlias? alias) =>
-        AliasesByName.TryGetValue(name, out alias);
 }
 
 /// <summary>Whether a long option takes a <c>--no-</c> prefix, and whether the manual names it that way.</summary>

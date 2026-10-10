@@ -690,9 +690,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CancellationToken cancellationToken)
     {
         // Every TLS 1.3 suite is runnable (BL-811), and a --tls13-ciphers list naming none
-        // is exit 59 before this, so a range reaching TLS 1.3 always offers it.
+        // is exit 59 before this, so a range reaching TLS 1.3 always offers it. An ECH offer
+        // raises the minimum to TLS 1.3, as curl's OpenSSL build does (ADR-0359, BL-1950).
         var runsTls13 = OffersTls13;
-        var runsTls12 = OffersBelowTls13 && settings.OffersSuiteFor(IsTls12Suite);
+        var runsTls12 = OffersBelowTls13 && settings.EchConfigs is null && settings.OffersSuiteFor(IsTls12Suite);
         return runsTls13 && runsTls12 ? await HandshakeTls13OrTls12Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
             : runsTls13 ? await HandshakeTls13Async(transport, settings, verifier, earlyData, cancellationToken).ConfigureAwait(false)
             : await HandshakeTls12Async(transport, settings, verifier, cancellationToken).ConfigureAwait(false);

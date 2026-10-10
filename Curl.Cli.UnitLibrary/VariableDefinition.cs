@@ -14,7 +14,8 @@ namespace Curl.Cli;
 /// <remarks>
 /// Measured with the local curl 8.21.0 on 2026-09-27 (through <c>--expand-data</c> against a loopback
 /// server, from PowerShell, since Git Bash rewrites some arguments) and checked against <c>src/var.c</c>
-/// at tag <c>curl-8_21_0</c>. The environment is this process's; see ADR-0064.
+/// at tag <c>curl-8_21_0</c>. The environment is the one <see cref="CommandLineOptions.ReadEnvironmentVariable"/>
+/// reads: this process's, unless the parse was given the run's own reader (BL-1943); see ADR-0064.
 /// </remarks>
 internal static class VariableDefinition
 {
@@ -42,7 +43,7 @@ internal static class VariableDefinition
             return null;
         }
 
-        string? imported = imports ? Environment.GetEnvironmentVariable(name) : null;
+        string? imported = imports ? options.ReadEnvironmentVariable(name) : null;
         return ImportIsMissing(imports, imported, rest)
             ? CommandLineRefusal.VariableExpansionFailure(spelledOption, $"Variable '{name}' import fail, not set", options.ErrorsHidden)
             : ApplyAfterName(options, name, rest, imported, (value, spelledOption, pathExists, dataFileReader));

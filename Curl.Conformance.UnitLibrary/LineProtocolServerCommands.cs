@@ -79,9 +79,37 @@ internal sealed class LineProtocolServerCommands
         bool isReply = line.Split(' ', 3) is ["REPLY", _, _];
         string[] fields = line.Split(' ', 3);
         command = isReply ? fields[1] : string.Empty;
-        reply = isReply ? Encoding.Latin1.GetBytes(fields[2] + "\r\n") : [];
+        reply = isReply ? Encoding.Latin1.GetBytes(PerlDoubleQuoted(fields[2]) + "\r\n") : [];
         return isReply;
     }
+
+    /// <summary>
+    /// Reads reply text as ftpserver.pl's <c>eval "qq{...}"</c> does: <c>\r</c>, <c>\n</c> and
+    /// <c>\t</c> are control characters and a backslash before any other character stands for that
+    /// character, so <c>\r\n</c> splits a reply into lines and <c>\@</c> is <c>@</c>; a lone
+    /// backslash at the end stays.
+    /// </summary>
+    private static string PerlDoubleQuoted(string text)
+    {
+        StringBuilder value = new();
+        for (int index = 0; index < text.Length; index++)
+        {
+            char character = text[index];
+            if (character == '\\' && index + 1 < text.Length)
+            {
+                index++;
+                character = PerlEscaped(text[index]);
+            }
+
+            value.Append(character);
+        }
+
+        return value.ToString();
+    }
+
+    /// <summary>The character a backslash before <paramref name="escaped"/> stands for in a Perl double-quoted string.</summary>
+    private static char PerlEscaped(char escaped) =>
+        escaped switch { 'r' => '\r', 'n' => '\n', 't' => '\t', _ => escaped };
 
     /// <summary>Finds the first of <c>POSTFETCH</c>, <c>CAPA</c> and <c>AUTH</c> a line holds, as the first matching branch of ftpserver.pl's chain does.</summary>
     private static (string Keyword, string Argument)? FindKeywordLine(string line)

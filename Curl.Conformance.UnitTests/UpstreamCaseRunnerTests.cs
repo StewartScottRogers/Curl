@@ -79,8 +79,8 @@ public sealed class UpstreamCaseRunnerTests
         await RunAsync(runner, $"<testcase>\n<client>\n<command{commandAttributes}>\na\n</command>\n</client>\n{verify}</testcase>\n");
 
         diagnostics.Arrange("expected arguments", string.Join(' ', expected));
-        diagnostics.Assert("arguments", string.Join(' ', expected), string.Join(' ', arguments!.Select(argument => argument.EndsWith("/curl.out", StringComparison.Ordinal) ? "*" : argument).ToArray()));
-        CollectionAssert.AreEqual(expected, arguments!.Select(argument => argument.EndsWith("/curl.out", StringComparison.Ordinal) ? "*" : argument).ToArray());
+        diagnostics.Assert("arguments", string.Join(' ', expected), string.Join(' ', arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument).ToArray()));
+        CollectionAssert.AreEqual(expected, arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument).ToArray());
     }
 
     [TestMethod]
@@ -157,12 +157,12 @@ public sealed class UpstreamCaseRunnerTests
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nftp://%HOSTIP:%FTPPORT/\n</command>\n</client>\n</testcase>\n");
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%CLIENT6IP/\n</command>\n</client>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        diagnostics.Assert("detail", "the harness has no value for %FTPPORT", outcome.Detail);
-        Assert.AreEqual("the harness has no value for %FTPPORT", outcome.Detail);
+        diagnostics.Assert("detail", "the harness has no value for %CLIENT6IP", outcome.Detail);
+        Assert.AreEqual("the harness has no value for %CLIENT6IP", outcome.Detail);
     }
 
     [TestMethod]
@@ -286,7 +286,7 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
-    public async Task RunAsync_CurlReachingForUdp_GetsAnUnreachableConnector()
+    public async Task RunAsync_CurlReachingForUdp_GetsTheTftpEmulation()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         IDatagramConnector? datagramConnector = null;
@@ -298,8 +298,27 @@ public sealed class UpstreamCaseRunnerTests
 
         await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
 
-        diagnostics.Assert("datagram connector type", nameof(UnreachableDatagramConnector), datagramConnector?.GetType().Name ?? "(none)");
-        Assert.IsInstanceOfType<UnreachableDatagramConnector>(datagramConnector);
+        diagnostics.Assert("datagram connector type", nameof(TftpServerConnector), datagramConnector?.GetType().Name ?? "(none)");
+        Assert.IsInstanceOfType<TftpServerConnector>(datagramConnector);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Test271_ReachesTheTftpEmulationOnTftpPort()
+    {
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await using IDatagramChannel channel = (await invocation.DatagramConnector.OpenAsync("127.0.0.1", int.Parse(UpstreamCaseRunner.TftpPort, System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None)).Channel!;
+            await channel.SendAsync(Encoding.Latin1.GetBytes("\0\u0001/5\0octet\0tsize\00\0blksize\0512\0timeout\06\0"), channel.ServerEndPoint, CancellationToken.None);
+            DatagramReceived received = await channel.ReceiveAsync(new byte[600], CancellationToken.None);
+            await channel.SendAsync(new byte[] { 0, 4, 0, 1 }, received.RemoteEndPoint, CancellationToken.None);
+            return 0;
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test271.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        // The protocol dump matches; only the --output file the fake never writes differs.
+        StringAssert.StartsWith(outcome.Detail, "the --output file");
     }
 
     [TestMethod]
@@ -383,6 +402,24 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_CaseUsingProxyport_RunsItWithTheProxyPort()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[]? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = [.. invocation.Arguments];
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttp\n</server>\n<command option=\"no-output,no-include\">\n-x %HOSTIP:%PROXYPORT http://example.com/\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("arguments", "-x 127.0.0.1:8992 http://example.com/", string.Join(' ', arguments ?? []));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "-x", "127.0.0.1:" + UpstreamCaseRunner.ProxyPort, "http://example.com/" }, arguments);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoCertificateDirectory_SkipsACaseUsingCertdir()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -405,6 +442,58 @@ public sealed class UpstreamCaseRunnerTests
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PwdBeforeLogDir_NamesTheFileInTheLogDirectoryWithNoTestsDirectory()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n%PWD/%LOGDIR/x\n</command>\n</client>\n</testcase>\n", logDirectory);
+
+        string expected = logDirectory.Replace('\\', '/') + "/x";
+        diagnostics.Assert("argument", expected, arguments?.SingleOrDefault());
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expected, arguments!.Single());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OutputFile_IsCurlTestNumberDotOutInTheLogDirectory()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+
+        await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n", logDirectory);
+
+        string expected = logDirectory.Replace('\\', '/') + "/curl5.out";
+        diagnostics.Assert("output file", expected, arguments?[1]);
+        Assert.AreEqual(expected, arguments![1]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SrcdirOutsideTheEmulatedScripts_SkipsForTheVariable()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\n-K %SRCDIR/data/x\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("outcome detail", "the harness has no value for %SRCDIR", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("the harness has no value for %SRCDIR", outcome.Detail);
     }
 
     [TestMethod]
@@ -433,6 +522,29 @@ public sealed class UpstreamCaseRunnerTests
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Setenv_SetsTheVariablesForThatRunOnlyAndTheNextRunHasNone()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        List<IReadOnlyDictionary<string, string>> environments = [];
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            environments.Add(invocation.EnvironmentVariables);
+            return Task.FromResult(0);
+        });
+        string withSetenv = "<testcase>\n<client>\n<setenv>\nno_proxy=%HOSTIP\nEMPTY=\nUNSET\n=nameless\nA=b=c\n</setenv>\n"
+            + "<command>\na\n</command>\n</client>\n</testcase>\n";
+
+        await RunAsync(runner, withSetenv);
+        await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
+
+        string first = string.Join(';', environments[0].OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}"));
+        diagnostics.Assert("first run's environment", "A=b=c;EMPTY=;no_proxy=127.0.0.1", first);
+        Assert.AreEqual("A=b=c;EMPTY=;no_proxy=127.0.0.1", first);
+        diagnostics.Assert("second run's environment size", 0, environments[1].Count);
+        Assert.IsEmpty(environments[1]);
     }
 
     [TestMethod]
@@ -654,5 +766,103 @@ public sealed class UpstreamCaseRunnerTests
 
         Assert.AreEqual(expectedKind, outcome.Kind, outcome.Detail);
         Assert.AreEqual(expectedDetail, outcome.Detail ?? "");
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task RunAsync_HttpsCaseWithACertificateDirectory_ServesTlsOnTheHttpsPort()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        string[]? arguments = null;
+        int read = -1;
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            arguments = [.. invocation.Arguments];
+            ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsServerConnector.HttpsPort, false), CancellationToken.None);
+            await using IConnection connection = connected.Connection!;
+            await connection.WriteAsync("GET / HTTP/1.1\r\n\r\n"u8.ToArray(), CancellationToken.None);
+            read = await connection.ReadAsync(new byte[16], CancellationToken.None);
+            return 0;
+        });
+        string testFile = "<testcase>\n<client>\n<server>\nhttps\n</server>\n<command option=\"no-output,no-include\">\nhttps://localhost:%HTTPSPORT/\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+        diagnostics.Act("arguments", string.Join(' ', arguments ?? []));
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "https://localhost:" + UpstreamCaseRunner.HttpsPort + "/" }, arguments);
+        Assert.AreEqual(0, read, "a plain-text request to the TLS server ends the connection");
+    }
+
+    [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task RunAsync_SmtpsCaseWithACertificateDirectory_ServesTlsOnTheSmtpsPort()
+    {
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        string[]? arguments = null;
+        int read = -1;
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            arguments = [.. invocation.Arguments];
+            ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", MailTlsServerConnector.SmtpsPort, false), CancellationToken.None);
+            await using IConnection connection = connected.Connection!;
+            await connection.WriteAsync("EHLO x\r\n"u8.ToArray(), CancellationToken.None);
+            read = await connection.ReadAsync(new byte[16], CancellationToken.None);
+            return 0;
+        });
+        string testFile = "<testcase>\n<client>\n<server>\nsmtps\n</server>\n<command option=\"no-output,no-include\">\nsmtps://localhost:%SMTPSPORT/ %IMAPSPORT %POP3SPORT\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "smtps://localhost:" + UpstreamCaseRunner.SmtpsPort + "/", UpstreamCaseRunner.ImapsPort, UpstreamCaseRunner.Pop3sPort }, arguments);
+        Assert.AreEqual(0, read, "a plain-text command to the TLS server ends the connection");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SmtpsCaseWithoutACertificateDirectory_SkipsForTheSmtpsPort()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nsmtps\n</server>\n<command>\nsmtps://localhost:%SMTPSPORT/\n</command>\n</client>\n</testcase>\n");
+
+        Assert.AreEqual("the harness has no value for %SMTPSPORT", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsCaseWithoutACertificateDirectory_SkipsForTheHttpsPort()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttps\n</server>\n<command>\nhttps://localhost:%HTTPSPORT/\n</command>\n</client>\n</testcase>\n");
+
+        Assert.AreEqual("the harness has no value for %HTTPSPORT", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsCaseNotNamingTheHttpsPortWithoutACertificateDirectory_Runs()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nhttps\n</server>\n<command option=\"no-output,no-include\">\nhttp://localhost/\n</command>\n</client>\n</testcase>\n");
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 }

@@ -73,10 +73,30 @@ public sealed class SshServerTransportTests
     {
         (SshServerDuplexConnection client, SshServerDuplexConnection server) = SshServerDuplexConnection.CreatePair();
         SshServerTransport transport = new(server, new SystemSshRandomSource());
-        SshAlgorithmPreferences preferences = new(["diffie-hellman-group14-sha256"], ["ssh-ed25519"], ["aes128-ctr"], ["hmac-sha2-256"], ["none"]);
+        SshAlgorithmPreferences preferences = new(["diffie-hellman-group1-sha1"], ["ssh-ed25519"], ["aes128-ctr"], ["hmac-sha2-256"], ["none"]);
         byte[] kexInit = SshKexInit.ForClient(preferences, SshAlgorithmCatalogue.Implemented, new SystemSshRandomSource()).ToPayload();
 
         await new SshPacketWriter(client, new SystemSshRandomSource()).WriteAsync(kexInit, CancellationToken.None);
+
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await transport.ExchangeKeysAsync(CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ExchangeKeysAsync_Group14ClientSendsEOfOne_ThrowsInvalidDataException()
+    {
+        (SshServerDuplexConnection client, SshServerDuplexConnection server) = SshServerDuplexConnection.CreatePair();
+        SshServerTransport transport = new(server, new SystemSshRandomSource());
+        SshAlgorithmPreferences preferences = new(["diffie-hellman-group14-sha256"], ["ssh-rsa"], ["aes128-ctr"], ["hmac-sha2-256"], ["none"]);
+        byte[] kexInit = SshKexInit.ForClient(preferences, SshAlgorithmCatalogue.Implemented, new SystemSshRandomSource()).ToPayload();
+        SshWireWriter init = new();
+        init.WriteByte(SshMessageNumber.KeyExchangeDiffieHellmanInit);
+        init.WriteMpint([1]);
+        SshPacketWriter writer = new(client, new SystemSshRandomSource());
+
+        await client.WriteAsync(Encoding.ASCII.GetBytes("SSH-2.0-test\r\n"), CancellationToken.None);
+        await transport.ExchangeIdentificationAsync(CancellationToken.None);
+        await writer.WriteAsync(kexInit, CancellationToken.None);
+        await writer.WriteAsync(init.ToArray(), CancellationToken.None);
 
         await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await transport.ExchangeKeysAsync(CancellationToken.None));
     }

@@ -1361,7 +1361,8 @@ internal sealed class CurlCommandRunner(
             ConsolePasswordPrompt.ForProcessConsole,
             fileReader,
             defaultConfigFileSearch ?? NoDefaultConfigFile,
-            parsesAsWindowsBuild ?? OperatingSystem.IsWindows());
+            parsesAsWindowsBuild ?? OperatingSystem.IsWindows(),
+            EnvironmentVariables);
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL

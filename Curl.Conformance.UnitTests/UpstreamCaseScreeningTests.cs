@@ -31,7 +31,7 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = Screen(sections);
         diagnostics.Act("skip reason", reason ?? "(none)");
         diagnostics.Assert("skip reason", "(none)", reason ?? "(none)");
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
@@ -59,6 +59,124 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow(195)]
+    [DataRow(196)]
+    [DataRow(1120)]
+    public void FindSkipReason_FtpCaseWithFtpPortGivenTheRunnersValue_IsNotSkipped(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["TESTNUMBER"] = testNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_SmtpCaseWithSmtpPortGivenTheRunnersValue_IsNotSkipped()
+    {
+        byte[] testFile = System.Text.Encoding.Latin1.GetBytes("<testcase>\n<client>\n<server>\nsmtp\n</server>\n<command>\nsmtp://%HOSTIP:%SMTPPORT/1 --mail-rcpt a@b -T -\n</command>\n</client>\n<verify>\n<upload>\nx\n</upload>\n</verify>\n</testcase>\n");
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["SMTPPORT"] = UpstreamCaseRunner.SmtpPort };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_Pop3CaseWithPop3PortGivenTheRunnersValue_IsNotSkipped()
+    {
+        byte[] testFile = System.Text.Encoding.Latin1.GetBytes("<testcase>\n<client>\n<server>\npop3\n</server>\n<command>\npop3://%HOSTIP:%POP3PORT/1 -u user:secret\n</command>\n</client>\n</testcase>\n");
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["POP3PORT"] = UpstreamCaseRunner.Pop3Port };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_ImapCaseWithImapPortGivenTheRunnersValue_IsNotSkipped()
+    {
+        byte[] testFile = System.Text.Encoding.Latin1.GetBytes("<testcase>\n<client>\n<server>\nimap\n</server>\n<command>\nimap://%HOSTIP:%IMAPPORT/1 -T -\n</command>\n</client>\n<verify>\n<upload>\nx\n</upload>\n</verify>\n</testcase>\n");
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["IMAPPORT"] = UpstreamCaseRunner.ImapPort };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_UploadVerifiedOffSmtpAndImap_IsTheReason()
+    {
+        string testFile = RunnableClient + "<verify>\n<upload>\nx\n</upload>\n</verify>\n";
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(new(ReadOnlyMemory<byte>.Empty, [], [], null), ParsedTestCase.From(testFile), Features);
+
+        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers", reason);
+    }
+
+    [TestMethod]
+    [DataRow(80)]
+    [DataRow(83)]
+    [DataRow(95)]
+    [DataRow(150)]
+    [DataRow(184)]
+    [DataRow(194)]
+    [DataRow(275)]
+    [DataRow(744)]
+    [DataRow(1078)]
+    [DataRow(1184)]
+    [DataRow(1288)]
+    [DataRow(1297)]
+    [DataRow(1428)]
+    [DataRow(1904)]
+    [DataRow(2050)]
+    [DataRow(2107)]
+    [DataRow(3028)]
+    public void FindSkipReason_ProxyCaseGivenTheRunnersProxyPort_IsNotSkippedForProxyPort(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["HTTPPORT"] = UpstreamCaseRunner.HttpPort, ["PROXYPORT"] = UpstreamCaseRunner.ProxyPort, ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason ?? "(none)");
+        Assert.DoesNotContain("%PROXYPORT", reason ?? string.Empty);
+    }
+
+    [TestMethod]
+    [DataRow(987)]
+    [DataRow(988)]
+    [DataRow(989)]
+    public void FindSkipReason_ImplicitTlsMailCaseGivenTheRunnersTlsPorts_IsNotSkipped(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal)
+        {
+            ["HOSTIP"] = "127.0.0.1",
+            ["SMTPSPORT"] = UpstreamCaseRunner.SmtpsPort,
+            ["IMAPSPORT"] = UpstreamCaseRunner.ImapsPort,
+            ["POP3SPORT"] = UpstreamCaseRunner.Pop3sPort,
+            ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
+        };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason ?? "(none)");
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_NoListenPortGivenTheRunnersValue_IsNotTheReason()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -69,11 +187,11 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
 
         diagnostics.Act("skip reason", reason);
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
-    public void FindSkipReason_CertdirGivenAValue_IsNotTheReasonButTheTlsServerIs()
+    public void FindSkipReason_CertdirGivenAValue_IsNotTheReasonAndNeitherIsTheHttpsServer()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         byte[] file = "<testcase>\n<client>\n<server>\nhttps test-localhost.pem\n</server>\n<command>\n--cacert %CERTDIR/certs/test-ca.crt https://localhost/\n</command>\n</client>\n</testcase>\n"u8.ToArray();
@@ -85,9 +203,7 @@ public sealed class UpstreamCaseScreeningTests
         diagnostics.Act("skip reason", reason);
 
         diagnostics.Assert("skip reason does not name %CERTDIR", false, reason?.Contains("%CERTDIR", StringComparison.Ordinal) ?? false);
-        Assert.IsNotNull(reason);
-        Assert.DoesNotContain("%CERTDIR", reason);
-        Assert.Contains("https", reason);
+        Assert.IsNull(reason, "the https server is emulated (BL-1912)");
     }
 
     [TestMethod]
@@ -104,7 +220,7 @@ public sealed class UpstreamCaseScreeningTests
 
     [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
-    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness does not act on <verify><upload>")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]
     [DataRow("<reply>\n<servercmd>\ndelay: 5\n</servercmd>\n</reply>\n", "the sws emulation does not carry out the server command delay")]
@@ -113,6 +229,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<strip>\n(\n</strip>\n</verify>\n", "the strip pattern ( is not a .NET regular expression")]
     [DataRow("<verify>\n<stripfile2>\n$_ = ''\n</stripfile2>\n</verify>\n", "the harness does not run the Perl $_ = ''")]
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
+    [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPSV\n</protocol>\n</verify>\n", "the FTP stand-in serves no data connection, which the case's EPSV opens")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -124,7 +241,15 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("<client>\n<server>\nhttp\nftp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the ftp server")]
+    public void FindSkipReason_TftpServer_IsNull()
+    {
+        string? reason = Screen("<client>\n<server>\ntftp\n</server>\n<command>\ntftp://127.0.0.1:9003//1\n</command>\n</client>\n");
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<server>\nhttp\nrtsp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the rtsp server")]
     [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", "the case has no <client><command>")]
     [DataRow("<client>\n<command type=\"perl\">\nx\n</command>\n</client>\n", "the harness does not run a perl command")]
     [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its |")]
@@ -147,6 +272,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<server>\nhttp\nsocks4\n</server>\n<command>\n--socks4 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nsocks5\n</server>\n<command>\n--socks5 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nmqtt\n</server>\n<command>\nmqtt://127.0.0.1:8998/1190\n</command>\n</client>\n")]
+    [DataRow("<client>\n<setenv>\nhttp_proxy=http://127.0.0.1:8990/\n</setenv>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n</client>\n")]
     public void FindSkipReason_NoInternetHostOrAServerNamed_ReturnsNull(string sections)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -154,7 +280,7 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = Screen(sections);
         diagnostics.Act("skip reason", reason);
         diagnostics.Assert("skip reason", "null", reason ?? "null");
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
@@ -169,7 +295,7 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = UpstreamCaseScreening.FindFileOutsideLogDirectory(ParsedTestCase.From(sections), logDirectory);
         diagnostics.Act("outside-file reason", reason ?? "(none)");
         diagnostics.Assert("outside-file reason", "(none)", reason ?? "(none)");
-        Assert.IsNull(reason);
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
@@ -239,6 +365,18 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("client", "precheck", "resolve --ipv6 ip6-localhost")]
+    [DataRow("client", "precheck", "sh -c true")]
+    [DataRow("verify", "postcheck", "resolve --ipv4 localhost")]
+    [DataRow("verify", "postcheck", "sh -c true")]
+    public void FindSkipReason_PrecheckOrPostcheckPart_IsNeverAnUnactedPart(string section, string name, string line)
+    {
+        string? reason = Screen(RunnableClient + $"<{section}>\n<{name}>\n{line}\n</{name}>\n</{section}>\n");
+
+        Assert.DoesNotContain($"the harness does not act on <{section}><{name}>", reason ?? "");
+    }
+
+    [TestMethod]
     [DataRow("client", "precheck", "perl -e \"if('[::1]' ne '[::1]') {print 'x';} else {exec 'resolve --ipv6 ip6-localhost'; print 'Cannot run precheck resolve';}\"")]
     [DataRow("verify", "postcheck", "sh -c true")]
     public void FindSkipReason_CheckLineNotInterpreted_NamesTheLine(string section, string name, string line)
@@ -246,5 +384,43 @@ public sealed class UpstreamCaseScreeningTests
         string? reason = Screen(RunnableClient + $"<{section}>\n<{name}>\n{line}\n</{name}>\n</{section}>\n");
 
         Assert.AreEqual($"the harness does not interpret the <{section}><{name}> line {line}", reason);
+    }
+
+    [TestMethod]
+    [DataRow("https", "test-localhost.pem")]
+    [DataRow("https test-localhost-san-first.pem", "test-localhost-san-first.pem")]
+    public void HttpsCertificateFile_HttpsServerLine_NamesTheCertificate(string serverLine, string expected)
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From($"<client>\n<server>\nhttp\n{serverLine}\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        Assert.AreEqual(expected, UpstreamCaseScreening.HttpsCertificateFile(testCase));
+        Assert.IsNull(UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features));
+    }
+
+    [TestMethod]
+    public void HttpsCertificateFile_NoHttpsServer_IsNull()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttp\nhttps a b\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        Assert.IsNull(UpstreamCaseScreening.HttpsCertificateFile(testCase));
+        Assert.AreEqual("the harness does not emulate the https a b server", UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features));
+    }
+
+    [TestMethod]
+    public void FindSkipReason_HttpsThroughTheHttpProxy_IsTheReason()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttps\nhttp-proxy\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features);
+
+        Assert.AreEqual("the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)", reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_HttpProxyWithoutHttps_IsNotSkippedForTheTunnel()
+    {
+        UpstreamTestCase testCase = ParsedTestCase.From("<client>\n<server>\nhttp-proxy\n</server>\n<command>\nhttp://h/1\n</command>\n</client>\n");
+
+        Assert.IsNull(UpstreamCaseScreening.FindSkipReason(CleanExpansion, testCase, Features));
     }
 }

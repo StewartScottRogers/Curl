@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Cryptography;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
 using Curl.Protocol.Ssh.KeyExchange;
@@ -27,8 +28,17 @@ internal sealed class SshServerTransport
 
     private const string NoCompression = "none";
 
-    /// <summary>The key-exchange methods the server offers: RFC 8731's name and libssh's older one.</summary>
-    private static readonly string[] KeyExchangeMethods = ["curve25519-sha256", "curve25519-sha256@libssh.org"];
+    /// <summary>The finite-field key exchange the server offers, for clients that offer no Curve25519.</summary>
+    private const string FiniteFieldKeyExchange = "diffie-hellman-group14-sha256";
+
+    /// <summary>
+    /// The key-exchange methods the server offers: RFC 8731's name and libssh's older one, then
+    /// RFC 8268's <c>diffie-hellman-group14-sha256</c>, the first curl's WinCNG build shares.
+    /// </summary>
+    private static readonly string[] KeyExchangeMethods = ["curve25519-sha256", "curve25519-sha256@libssh.org", FiniteFieldKeyExchange];
+
+    /// <summary>The host-key algorithms the server offers: Ed25519 first, then the RSA key's three signature forms.</summary>
+    private static readonly string[] HostKeyAlgorithms = [SshServerHostKey.Algorithm, .. SshServerRsaHostKey.Algorithms];
 
     private readonly IConnection connection;
 
@@ -101,18 +111,20 @@ internal sealed class SshServerTransport
 
     /// <summary>
     /// Runs the first key exchange as the server (RFC 4253 sections 7 and 8, RFC 8731):
-    /// sends a <c>KEXINIT</c> offering <c>curve25519-sha256</c>, the
-    /// <see cref="SshServerHostKey" /> and every cipher and MAC
+    /// sends a <c>KEXINIT</c> offering <c>curve25519-sha256</c> and
+    /// <c>diffie-hellman-group14-sha256</c>, the <see cref="SshServerHostKey" /> and the
+    /// <see cref="SshServerRsaHostKey" />, and every cipher and MAC
     /// <see cref="SshPacketProtections" /> implements, so the client's first implemented
-    /// choice wins; answers the client's X25519 share with its own and a signature over the
-    /// exchange hash; then exchanges <c>NEWKEYS</c>, protecting each direction from its own
+    /// choice wins; answers the client's X25519 share or e with its own and a signature over
+    /// the exchange hash by the agreed host key; then exchanges <c>NEWKEYS</c>, protecting each direction from its own
     /// <c>NEWKEYS</c> on.
     /// </summary>
     /// <param name="cancellationToken">Cancels the exchange.</param>
     /// <returns>The algorithms agreed.</returns>
     /// <exception cref="InvalidDataException">
     /// The client offers nothing the server implements, or sends another message where the
-    /// exchange expects its <c>KEXINIT</c>, its share or its <c>NEWKEYS</c>.
+    /// exchange expects its <c>KEXINIT</c>, its share or its <c>NEWKEYS</c>, or sends a group 14
+    /// e outside 1 &lt; e &lt; p - 1.
     /// </exception>
     internal async ValueTask<SshNegotiatedAlgorithms> ExchangeKeysAsync(CancellationToken cancellationToken)
     {
@@ -124,14 +136,18 @@ internal sealed class SshServerTransport
         SshNegotiatedHandshake handshake = new(ClientIdentification!, ServerIdentification, clientKexInit, serverKexInit, algorithms);
         SshWireReader clientInit = new(await ReadMessageAsync(SshMessageNumber.KeyExchangeDiffieHellmanInit, cancellationToken).ConfigureAwait(false));
         clientInit.ReadByte();
-        byte[] clientShare = clientInit.ReadString().ToArray();
-        using X25519SshKeyShare serverShare = new(new SystemSshEphemeralKeySource());
-        byte[] encodedSharedSecret = SshExchangeHashInput.EncodeMpint(serverShare.ComputeSharedSecret(clientShare));
-        SshExchangeHashInput hashInput = new(handshake, SshServerHostKey.Blob);
-        hashInput.Fields.WriteString(clientShare);
-        hashInput.Fields.WriteString(serverShare.ClientShare);
+        byte[] hostKey = algorithms.ServerHostKey == SshServerHostKey.Algorithm ? SshServerHostKey.Blob : SshServerRsaHostKey.Blob;
+        SshExchangeHashInput hashInput = new(handshake, hostKey);
+        SshWireWriter reply = new();
+        reply.WriteByte(SshMessageNumber.KeyExchangeDiffieHellmanReply);
+        reply.WriteString(hostKey);
+        byte[] sharedSecret = algorithms.KeyExchange == FiniteFieldKeyExchange
+            ? AgreeFiniteField(clientInit, hashInput.Fields, reply)
+            : AgreeX25519(clientInit, hashInput.Fields, reply);
+        byte[] encodedSharedSecret = SshExchangeHashInput.EncodeMpint(sharedSecret);
         byte[] exchangeHash = hashInput.ComputeHash(encodedSharedSecret, HashAlgorithmName.SHA256);
-        await WritePacketAsync(CreateReply(serverShare.ClientShare, exchangeHash), cancellationToken).ConfigureAwait(false);
+        reply.WriteString(SignExchangeHash(algorithms.ServerHostKey, exchangeHash));
+        await WritePacketAsync(reply.ToArray(), cancellationToken).ConfigureAwait(false);
         SshKeyDerivation keys = new(HashAlgorithmName.SHA256, encodedSharedSecret, exchangeHash, exchangeHash);
         await WritePacketAsync(new[] { SshMessageNumber.NewKeys }, cancellationToken).ConfigureAwait(false);
         packetWriter.ChangeProtection(SshPacketProtections.ForServerToClient(algorithms, keys));
@@ -170,7 +186,7 @@ internal sealed class SshServerTransport
         return new SshKexInit(
             RandomNumberGenerator.GetBytes(SshKexInit.CookieLength),
             KeyExchangeMethods,
-            [SshServerHostKey.Algorithm],
+            HostKeyAlgorithms,
             protections,
             protections,
             protections,
@@ -182,15 +198,47 @@ internal sealed class SshServerTransport
             FirstKexPacketFollows: false);
     }
 
-    private static byte[] CreateReply(byte[] serverShare, byte[] exchangeHash)
+    /// <summary>
+    /// Answers the client's X25519 share (RFC 8731): both shares go into the exchange hash as
+    /// strings, and the server's into the reply.
+    /// </summary>
+    private static byte[] AgreeX25519(SshWireReader clientInit, SshWireWriter hashFields, SshWireWriter reply)
     {
-        SshWireWriter reply = new();
-        reply.WriteByte(SshMessageNumber.KeyExchangeDiffieHellmanReply);
-        reply.WriteString(SshServerHostKey.Blob);
-        reply.WriteString(serverShare);
-        reply.WriteString(SshServerHostKey.Sign(exchangeHash));
-        return reply.ToArray();
+        byte[] clientShare = clientInit.ReadString().ToArray();
+        using X25519SshKeyShare serverShare = new(new SystemSshEphemeralKeySource());
+        byte[] sharedSecret = serverShare.ComputeSharedSecret(clientShare);
+        hashFields.WriteString(clientShare);
+        hashFields.WriteString(serverShare.ClientShare);
+        reply.WriteString(serverShare.ClientShare);
+        return sharedSecret;
     }
+
+    /// <summary>
+    /// Answers the client's e in MODP group 14 (RFC 4253 section 8, RFC 8268): e and f go into
+    /// the exchange hash as mpints, and f into the reply.
+    /// </summary>
+    private static byte[] AgreeFiniteField(SshWireReader clientInit, SshWireWriter hashFields, SshWireWriter reply)
+    {
+        byte[] clientPublicValue = clientInit.ReadMpint().ToArray();
+        using FiniteFieldDiffieHellman serverKey = new SystemSshEphemeralKeySource().CreateFiniteFieldKey(FiniteFieldDiffieHellmanGroup.Group14);
+        byte[] serverPublicValue = new byte[serverKey.Group.PrimeLength];
+        serverKey.ComputePublicValue(serverPublicValue);
+        byte[] sharedSecret = new byte[serverKey.Group.PrimeLength];
+        if (!serverKey.TryComputeSharedSecret(clientPublicValue, sharedSecret))
+        {
+            throw new InvalidDataException("The SSH client's Diffie-Hellman public value e is not in 1 < e < p - 1.");
+        }
+
+        hashFields.WriteMpint(clientPublicValue);
+        hashFields.WriteMpint(serverPublicValue);
+        reply.WriteMpint(serverPublicValue);
+        return sharedSecret;
+    }
+
+    private static byte[] SignExchangeHash(string hostKeyAlgorithm, byte[] exchangeHash) =>
+        hostKeyAlgorithm == SshServerHostKey.Algorithm
+            ? SshServerHostKey.Sign(exchangeHash)
+            : SshServerRsaHostKey.Sign(hostKeyAlgorithm, exchangeHash);
 
     private async ValueTask<byte[]> ReadMessageAsync(byte expectedMessageNumber, CancellationToken cancellationToken)
     {

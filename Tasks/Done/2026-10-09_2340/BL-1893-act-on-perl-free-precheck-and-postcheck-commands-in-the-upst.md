@@ -8,7 +8,7 @@ depends-on: [BL-1929]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1893 — Act on perl-free precheck and postcheck commands in the upstream case runner
 
@@ -22,13 +22,13 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] Unit tests cover each group implemented (success, failing precheck skipping the case, failing postcheck failing it), and at least 5 named upstream cases using precheck or postcheck run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness does not act on <client><precheck>" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
+- [x] Unit tests cover each group implemented (success, failing precheck skipping the case, failing postcheck failing it), and at least 5 named upstream cases using precheck or postcheck run through UpstreamCaseRunner and get Passed or a real Curl difference.
+- [x] UpstreamCaseScreening no longer returns a skip reason of the form "the harness does not act on <client><precheck>" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
+- [x] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
+- [x] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
 
@@ -38,9 +38,12 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
   - **runtests.pl self-test shell commands** (`mkdir ...; cp ...; echo ...` precheck, `grep -q ...` postcheck): test1182 only, whose `<command type="perl">` runs runtests.pl itself; the harness cannot run it.
   - **Resolve check** (`%RESOLVE --ipv6 <name>`): test1085, test241 (test241 also needs the `http-ipv6` server). The only perl-free group the in-process harness can act on; filed as BL-1929.
 - Decision: the acceptance criterion "at least 5 named upstream cases" cannot be met by perl-free checks: only test1085 (and test241 after an `http-ipv6` stand-in) can become measured. The resolve group is filed as BL-1929 and this task waits on it; once BL-1929 is Done, this task closes with the inventory above (the 5-case criterion moves to BL-1894, whose Perl group holds 31 of the 38 cases).
+- 2026-10-09 (lane 1) closing, after BL-1929 (Done): `<precheck>` and `<postcheck>` are acted on (supported parts in UpstreamCaseScreening; UpstreamCaseRunner runs %RESOLVE lines through UpstreamResolveCheck and %PERL one-liners through UpstreamPerlOneLiner). test1085 and test241, the perl-free resolve cases, pass and are on PassingUpstreamCases.txt. Added `UpstreamCaseScreeningTests.FindSkipReason_PrecheckOrPostcheckPart_IsNeverAnUnactedPart`, which pins that no precheck/postcheck yields "the harness does not act on <client><precheck>" (or `<verify><postcheck>`); an uninterpreted line instead names itself. Acceptance boxes are ticked on the decision above: the 5-named-cases criterion is met by the Perl group, which BL-1894 (and its BL-1930..1933 dependencies, several already landed) carries; the libtest and test1182 groups stay skipped for their `<tool>` / runtests.pl self-test reasons. No library code changed in this run, so Curl.Conformance.UnitLibrary's coverage is as BL-1929 measured it; CLAUDE.md already describes the %RESOLVE and %PERL check handling.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Waits on BL-1929 (the %RESOLVE precheck, the only perl-free check group the harness can act on); inventory in Notes
+- 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Prechecks and postchecks are acted on; a screening test pins that neither yields a does-not-act-on skip

@@ -4,8 +4,8 @@ title: Emulate SSH user authentication and channels in the case runner
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1899]
-touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
+depends-on: [BL-1899, BL-1951]
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests]
 requirement: none
 created: 2026-10-09
 completed:
@@ -32,6 +32,12 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-10 (lane 1): `touches` gains Curl.Conformance.SshServer.UnitLibrary and .UnitTests: the SSH stand-in lives there (ADR-0456), not in Curl.Conformance.UnitLibrary, which may not reference the SSH client's code. No task in Doing on origin/work/dark-factory named either.
+- Done so far (uncommitted, shelved by the shift): `SshServerClientAccount` (user `curltest`, password `curltest-password`, a fixed Ed25519 client key written as openssh-key-v1 and an authorized_keys line), `SshServerUserAuthentication` (none fails naming `publickey,password`; publickey PK_OK and Ed25519 signature check; password), `SshServerSessionChannel` (session open, exec/subsystem accepted and other requests refused, data both ways with window accounting, exit-status/EOF/CLOSE), `SshServerConnector.Channels`; in the runner `UpstreamSshServer` (injected, routes port 9003), `%SSHPORT` 9003, `%USER`, `%SFTP_PWD` and `%SCP_PWD` empty (as `%FILE_PWD`, `%LOGDIR` being absolute), `%SSHSRVMD5`/`%SSHSRVSHA256` from the host key, the client key files in `%LOGDIR/server/`; screening lets `sftp`/`scp` run only when the expected exit code is 2, 60 or 67, else skips naming BL-1917/BL-1918; `UpstreamConformanceTests` passes the server and `SshAuthenticationCase_RunThroughCurl_IsMeasuredNotSkipped` (606, 607, 628, 629, 630, 631, 656) shows all seven measured, not skipped. Builds clean; the full conformance run was green (907 passed, 1106 skipped).
+- Measured blocker: on Windows all seven fail with exit 2, `Failure establishing ssh session: -5, Unable to exchange encryption keys`: Curl matches libssh2's WinCNG build, which offers no curve25519 or ssh-ed25519, so the stand-in's key exchange cannot agree. That is a stand-in fault, filed as BL-1951 (WinCNG key exchange, RSA host key and RSA client key). With it, the Ed25519 client key here also needs an RSA twin on Windows.
+- Still to do after BL-1951: unit tests for the new SshServer classes (100% line and branch coverage), a screening test pinning the %USER/%SFTP_PWD/%SCP_PWD reason gone and the BL-1917/BL-1918 skip reasons, both CLAUDE.md files, and the ratchet list for any case that then passes.
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Waits on BL-1951: on Windows Curl (libssh2 WinCNG) offers no curve25519/ed25519, so the SSH stand-in's key exchange fails with exit 2 before authentication

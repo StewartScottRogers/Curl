@@ -56,6 +56,9 @@ public static class CommandLineParser
 
     private const string ExpansionPrefix = "expand-";
 
+    /// <summary>Reads this process's environment, for the overloads given no reader of their own.</summary>
+    private static readonly Func<string, string?> ProcessEnvironmentVariable = Environment.GetEnvironmentVariable;
+
     /// <summary>Parses <paramref name="arguments"/>, the command line without the program name.</summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
     /// <returns>
@@ -154,21 +157,42 @@ public static class CommandLineParser
     /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
     /// <returns>As the overload without <paramref name="isWindows"/> returns.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch, isWindows, ProcessEnvironmentVariable);
+
+    /// <summary>
+    /// Parses <paramref name="arguments"/> as the overload without <paramref name="readEnvironmentVariable"/>
+    /// does, but imports a <c>--variable %name</c> through <paramref name="readEnvironmentVariable"/> rather
+    /// than from this process's environment, so a run given its own environment sees it there too (BL-1943).
+    /// </summary>
+    /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
+    /// <param name="pathExists">Reports whether a file or directory exists at a path.</param>
+    /// <param name="passwordPrompt">Asks for the password of a <c>-u</c> user given without one; called at most once.</param>
+    /// <param name="dataFileReader">Reads the default config file, and every file an option names.</param>
+    /// <param name="defaultConfigFileSearch">Lists where to look for the default config file; <see cref="DefaultConfigFileSearch.ForProcess"/> for this process.</param>
+    /// <param name="isWindows">Whether to read the arguments as curl's Windows Schannel build does.</param>
+    /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null"/> when it is not set.</param>
+    /// <returns>As the overload without <paramref name="readEnvironmentVariable"/> returns.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows);
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable);
     }
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows)
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows) =>
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable);
+
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
         ArgumentNullException.ThrowIfNull(passwordPrompt);
         ArgumentNullException.ThrowIfNull(dataFileReader);
+        ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
 
-        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows };
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ReadEnvironmentVariable = readEnvironmentVariable };
         if (isWindows)
         {
             options.ConfigFileWireTextEncoding = ConfigFileWireText.WindowsAnsiCodePage(() => System.Text.CodePagesEncodingProvider.Instance.GetEncoding(0));
@@ -366,21 +390,20 @@ public static class CommandLineParser
     /// <summary>
     /// Reads a long name that is not in the table as <c>--no-&lt;name&gt;</c>: it turns off a
     /// negatable flag (any attached value ignored) unless the row refuses that, is refused as not reversible for any other row,
-    /// and, when there is no <c>no-</c> or no row after it, is refused by <see cref="RefuseUnlistedName"/>
-    /// or <see cref="RefuseUnlistedNegation"/>. Checked before a value is
+    /// and, when there is no <c>no-</c> or no row after it, is refused by <see cref="RefuseUnlistedName"/>. Checked before a value is
     /// taken, so <c>--no-output</c> as the last argument is refused as not reversible.
     /// </summary>
     private static CommandLineRefusal? ParseNegatedLong(CommandLineOptions options, string argument, string longName, ArgumentReader reader)
     {
         if (!longName.StartsWith(NegationPrefix, StringComparison.Ordinal))
         {
-            return RefuseUnlistedName(argument, longName);
+            return RefuseUnlistedName(argument);
         }
 
         string negatedName = longName[NegationPrefix.Length..];
         if (!CommandLineOptionTable.TryFindLong(negatedName, out CommandLineOption? option))
         {
-            return RefuseUnlistedNegation(argument, negatedName);
+            return RefuseUnlistedName(argument);
         }
 
         if (option.Negate is null)
@@ -392,24 +415,14 @@ public static class CommandLineParser
     }
 
     /// <summary>
-    /// Refuses a long name <see cref="CommandLineOptionTable"/> has no row for, as ADR-0137 decides: a name
-    /// curl 8.21.0 knows (<see cref="CurlOptionAliasTable"/>) is not implemented yet and gets
-    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/>; any other name is <see cref="CommandLineRefusal.UnknownOption"/>.
+    /// Refuses a long name <see cref="CommandLineOptionTable"/> has no row for as an unknown option. Every
+    /// name curl 8.21.0 knows (<see cref="CurlOptionAliasTable"/>) has a row (BL-1135, BL-1421), so such a
+    /// name is never one curl knows and ADR-0137's "installed libcurl does not support this" refusal comes
+    /// from the row, never from here; <c>CommandLineUnimplementedOptionTests</c> fails should a row for
+    /// one ever be removed.
     /// </summary>
-    private static CommandLineRefusal RefuseUnlistedName(string argument, string name) =>
-        CurlOptionAliasTable.TryFindName(name, out _)
-            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument)
-            : CommandLineRefusal.UnknownOption(argument);
-
-    /// <summary>
-    /// Refuses <c>--no-&lt;name&gt;</c> where <see cref="CommandLineOptionTable"/> has no row for
-    /// <paramref name="negatedName"/>, as ADR-0137 decides: not implemented yet when curl 8.21.0 knows the
-    /// name, and unknown otherwise. Every curl name that takes no <c>--no-</c> prefix has a row since BL-1135,
-    /// so its "cannot be reversed" refusal comes from the row; <c>CommandLineUnimplementedOptionTests</c>
-    /// fails should a row for such a name ever be removed.
-    /// </summary>
-    private static CommandLineRefusal RefuseUnlistedNegation(string argument, string negatedName) =>
-        RefuseUnlistedName(argument, negatedName);
+    private static CommandLineRefusal RefuseUnlistedName(string argument) =>
+        CommandLineRefusal.UnknownOption(argument);
 
     /// <summary>
     /// Refuses a short letter <see cref="CommandLineOptionTable"/> has no row for, spelled as the whole
@@ -438,7 +451,7 @@ public static class CommandLineParser
     {
         if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
         {
-            return RefuseUnlistedName(argument, longName);
+            return RefuseUnlistedName(argument);
         }
 
         string? template = attachedValue ?? reader.PeekNext();
