@@ -52,14 +52,14 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 
 ## Notes
 
-- Plan (ADR-0467): the FTP control target carries PoolScheme, so the run connection cache keeps it; a transfer curl leaves intact holds an FtpKeptConnection session on it and MarkReusable instead of QUIT; ShutDownAsync sends QUIT at exit. Reuse skips login and PWD, a TYPE already in force, and CWD when prevpath matches or the path is absolute nocwd; otherwise CWD to the entry path first unless absolute (curl ftp_state_cwd).
+- Plan (ADR-0468): the FTP control target carries PoolScheme, so the run connection cache keeps it; a transfer curl leaves intact holds an FtpKeptConnection session on it and MarkReusable instead of QUIT; ShutDownAsync sends QUIT at exit. Reuse skips login and PWD, a TYPE already in force, and CWD when prevpath matches or the path is absolute nocwd; otherwise CWD to the entry path first unless absolute (curl ftp_state_cwd).
 - Pinned in FtpProtocolHandlerKeptConnectionTests: test146, 215, 1010 and 1225 sequences, refused entry-path CWD (exit 9), login mismatch, failure with no QUIT.
 - The twelve behaviour items are re-measured by the next gap analysis run, outside a lane; their boxes stay for it. No option changed, so --ai-help is unchanged.
-- AUTH-upgraded or CCC-cleared control connections are not kept (still QUIT per URL), recorded in ADR-0467.
+- AUTH-upgraded or CCC-cleared control connections are not kept (still QUIT per URL), recorded in ADR-0468.
 - Coverage not measured (budget): filed BL-2022.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
-- 2026-10-10: Doing -> Done. FTP keeps the control connection for the next URL and sends QUIT only at exit (ADR-0467)
+- 2026-10-10: Doing -> Done. FTP keeps the control connection for the next URL and sends QUIT only at exit (ADR-0468)

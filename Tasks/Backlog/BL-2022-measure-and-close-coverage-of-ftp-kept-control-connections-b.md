@@ -18,7 +18,7 @@ Run `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` after BL-19
 
 ## Context
 
-BL-1981 (ADR-0467) added FTP control-connection reuse; its lane ran out of budget before measuring coverage. Tests: Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerKeptConnectionTests.cs.
+BL-1981 (ADR-0468) added FTP control-connection reuse; its lane ran out of budget before measuring coverage. Tests: Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerKeptConnectionTests.cs.
 
 ## Acceptance criteria
 
