@@ -726,11 +726,14 @@ public sealed partial class TcpConnector(
     /// An alternative counts as mapped, so exit 7 names it after <c>via</c>, as curl's does.
     /// The line is reported once per target object: <c>--http3</c> races QUIC and TCP with one
     /// target, and curl 8.18.0's ngtcp2 build reports it once for both attempts (measured, BL-733
-    /// Notes, BL-949).
+    /// Notes, BL-949). A <see cref="ConnectTarget.IsForwardProxy" /> target names the proxy, which
+    /// <c>--connect-to</c> never maps, as curl 8.21.0 maps only the origin (upstream test 2050).
     /// </summary>
     private ConnectDestination DestinationOf(ConnectTarget target)
     {
-        var mapped = _connectToMappings.Map(target.Host, target.Port);
+        var mapped = target.IsForwardProxy
+            ? new ConnectDestination(target.Host, target.Port, IsMapped: false, ParseError: null)
+            : _connectToMappings.Map(target.Host, target.Port);
         if (mapped.IsMapped || mapped.ParseError is not null || target.AltSvcRoute is not { } route)
         {
             return mapped;
