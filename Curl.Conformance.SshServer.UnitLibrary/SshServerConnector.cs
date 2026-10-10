@@ -8,7 +8,8 @@ namespace Curl.Conformance.SshServer;
 /// The upstream case runner's stand-in for OpenSSH's <c>sshd</c> (ADR-0456): every connection
 /// is an in-memory pipe whose server end runs identification, <c>curve25519-sha256</c> key
 /// exchange, the <c>ssh-userauth</c> service request, user authentication and a session
-/// channel with the client (BL-1953). SCP and SFTP payloads are still to come.
+/// channel with the client (BL-1953), on which an <c>scp</c> command runs (BL-1917). SFTP is
+/// still to come.
 /// </summary>
 /// <param name="randomSource">Where packet padding comes from.</param>
 public sealed class SshServerConnector(ISshRandomSource randomSource) : IConnector
@@ -37,15 +38,40 @@ public sealed class SshServerConnector(ISshRandomSource randomSource) : IConnect
         SshServerTransport transport = new(server, randomSource);
         Task<SshServerTransport> session = RunSessionAsync(transport);
         sessions.Enqueue(session);
-        channels.Enqueue(OpenChannelAsync(session));
+        Task<SshServerSessionChannel> channel = OpenChannelAsync(session);
+        channels.Enqueue(channel);
+        processes.Enqueue(RunProcessesAsync(transport, channel));
         return ValueTask.FromResult(ConnectResult.Connected(client));
     }
+
+    /// <summary>
+    /// Gets each connection's processes so far, in connection order: a task that runs every
+    /// <c>scp</c> command the connection's channels start, one channel after another as curl
+    /// reuses a connection, and ends when the client opens no further channel. A channel whose
+    /// <c>exec</c> runs anything else is left to whoever holds it from <see cref="Channels"/>.
+    /// </summary>
+    internal IReadOnlyList<Task> Processes => [.. processes];
+
+    private readonly ConcurrentQueue<Task> processes = new();
 
     private static async Task<SshServerSessionChannel> OpenChannelAsync(Task<SshServerTransport> session)
     {
         SshServerTransport transport = await session.ConfigureAwait(false);
         string user = await SshServerUserAuthentication.AuthenticateAsync(transport, CancellationToken.None).ConfigureAwait(false);
         return await SshServerSessionChannel.OpenAsync(transport, user, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    // The first channel's scp, then each next channel's, until the client disconnects (the next
+    // open then fails) or starts something other than scp.
+    private static async Task RunProcessesAsync(SshServerTransport transport, Task<SshServerSessionChannel> first)
+    {
+        SshServerSessionChannel channel = await first.ConfigureAwait(false);
+        // A subsystem's name, such as sftp, is never an scp command line.
+        while (SshServerScpCommand.Parse(channel.Process) is { } command)
+        {
+            await SshServerScpProcess.RunAsync(channel, command, CancellationToken.None).ConfigureAwait(false);
+            channel = await SshServerSessionChannel.OpenAsync(transport, channel.User, CancellationToken.None).ConfigureAwait(false);
+        }
     }
 
     private static async Task<SshServerTransport> RunSessionAsync(SshServerTransport transport)

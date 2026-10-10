@@ -86,7 +86,7 @@ public sealed class SshServerConnectorTests
 
         await new SshUserAuthentication(client, Encoding.UTF8).AuthenticateAsync(new NetworkCredential(SshServerClientAccount.User, SshServerClientAccount.Password), CancellationToken.None);
         Assert.IsTrue(await clientChannel.OpenAsync(CancellationToken.None));
-        bool started = await clientChannel.RequestExecAsync("scp -f /file"u8.ToArray(), CancellationToken.None);
+        bool started = await clientChannel.RequestExecAsync("cat /file"u8.ToArray(), CancellationToken.None);
         SshServerSessionChannel channel = await connector.Channels.Single();
         await channel.WriteDataAsync("hello"u8.ToArray(), CancellationToken.None);
         byte[] buffer = new byte[16];
@@ -99,10 +99,34 @@ public sealed class SshServerConnectorTests
         Assert.IsTrue(started);
         Assert.AreEqual(SshServerClientAccount.User, channel.User);
         Assert.AreEqual("exec", channel.ProcessRequest);
-        Assert.AreEqual("scp -f /file", channel.Process);
+        Assert.AreEqual("cat /file", channel.Process);
+        await connector.Processes.Single();
         CollectionAssert.AreEqual("hello"u8.ToArray(), buffer[..read]);
         CollectionAssert.AreEqual("ack"u8.ToArray(), received);
         Assert.IsEmpty(await channel.ReadDataAsync(CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ScpChannelThenAnotherChannel_RunsScpThenLeavesTheNextChannel()
+    {
+        SshServerConnector connector = new(new SystemSshRandomSource());
+        SshTransport client = await ConnectAsync(connector, "aes128-ctr", "hmac-sha2-256");
+        await HandshakeAsync(client);
+        await new SshUserAuthentication(client, Encoding.UTF8).AuthenticateAsync(new NetworkCredential(SshServerClientAccount.User, SshServerClientAccount.Password), CancellationToken.None);
+        SshSessionChannel scp = new(client);
+
+        Assert.IsTrue(await scp.OpenAsync(CancellationToken.None));
+        Assert.IsTrue(await scp.RequestExecAsync("scp -f '/no/such/file'"u8.ToArray(), CancellationToken.None));
+        await scp.SendAsync(new byte[] { 0 }, CancellationToken.None);
+        byte[] buffer = new byte[64];
+        int read = await scp.ReadAsync(buffer, CancellationToken.None);
+        await scp.CloseAsync(CancellationToken.None);
+        SshSessionChannel next = new(client);
+        Assert.IsTrue(await next.OpenAsync(CancellationToken.None));
+        Assert.IsTrue(await next.RequestExecAsync("cat /file"u8.ToArray(), CancellationToken.None));
+        await connector.Processes.Single();
+
+        Assert.AreEqual("\u0001scp: /no/such/file: No such file or directory\n", Encoding.UTF8.GetString(buffer, 0, read));
     }
 
     [TestMethod]

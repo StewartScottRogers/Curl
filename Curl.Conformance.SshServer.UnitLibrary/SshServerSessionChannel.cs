@@ -8,8 +8,8 @@ namespace Curl.Conformance.SshServer;
 /// The server's side of one <c>session</c> channel (RFC 4254): it confirms the client's
 /// <c>CHANNEL_OPEN</c>, starts the process the client's <c>exec</c> or <c>subsystem</c> request
 /// names (refusing any other request that wants a reply), then carries data both ways with
-/// window accounting, and ends with <c>exit-status</c>, <c>EOF</c> and <c>CLOSE</c>. What runs on
-/// it, SCP or SFTP, is BL-1917's and BL-1918's.
+/// window accounting, and ends with <c>exit-status</c>, <c>EOF</c> and <c>CLOSE</c>. An
+/// <c>scp</c> command runs on it as <see cref="SshServerScpProcess"/> (BL-1917); SFTP is BL-1918's.
 /// </summary>
 internal sealed class SshServerSessionChannel
 {
@@ -60,7 +60,7 @@ internal sealed class SshServerSessionChannel
     /// <exception cref="InvalidDataException">The client sends another message, or opens a channel of another type.</exception>
     internal static async ValueTask<SshServerSessionChannel> OpenAsync(SshServerTransport transport, string user, CancellationToken cancellationToken)
     {
-        SshWireReader open = new(await ReadMessageAsync(transport, SshConnectionMessageNumber.ChannelOpen, cancellationToken).ConfigureAwait(false));
+        SshWireReader open = new(await ReadChannelOpenAsync(transport, cancellationToken).ConfigureAwait(false));
         open.ReadByte();
         string type = open.ReadName();
         if (type != "session")
@@ -160,6 +160,25 @@ internal sealed class SshServerSessionChannel
         return payload[0] == expectedMessageNumber
             ? payload
             : throw new InvalidDataException($"The SSH client sent message {payload[0]} where the server expects {expectedMessageNumber}.");
+    }
+
+    // A reused connection's earlier channel may still have the client's data, window
+    // adjustments, EOF and CLOSE on their way, which go before the next CHANNEL_OPEN.
+    private static async ValueTask<byte[]> ReadChannelOpenAsync(SshServerTransport transport, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            byte[] payload = await transport.ReadPacketAsync(cancellationToken).ConfigureAwait(false);
+            switch (payload[0])
+            {
+                case SshConnectionMessageNumber.ChannelOpen:
+                    return payload;
+                case SshConnectionMessageNumber.ChannelData or SshConnectionMessageNumber.ChannelWindowAdjust or SshConnectionMessageNumber.ChannelEof or SshConnectionMessageNumber.ChannelClose:
+                    break;
+                default:
+                    throw new InvalidDataException($"The SSH client sent message {payload[0]} where the server expects {SshConnectionMessageNumber.ChannelOpen}.");
+            }
+        }
     }
 
     // RFC 4254 section 6.5: the first exec or subsystem request starts the process; anything

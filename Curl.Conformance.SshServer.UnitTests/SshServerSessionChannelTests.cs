@@ -55,6 +55,33 @@ public sealed class SshServerSessionChannelTests
     }
 
     [TestMethod]
+    public async Task OpenAsync_ClientSendsDataInsteadOfARequest_ThrowsInvalidDataException()
+    {
+        Session session = Session.Create();
+
+        await session.Client.WriteAsync(Open("session", 100, 100), CancellationToken.None);
+        await session.Client.WriteAsync(Data("x"), CancellationToken.None);
+
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(async () => await SshServerSessionChannel.OpenAsync(session.Transport, "someone", CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_EarlierChannelsMessagesBeforeTheOpen_SkipsThemAndOpens()
+    {
+        Session session = Session.Create();
+        SshWireWriter adjust = Header(SshConnectionMessageNumber.ChannelWindowAdjust, 0);
+        adjust.WriteUInt32(5);
+
+        await session.Client.WriteAsync(Data("x"), CancellationToken.None);
+        await session.Client.WriteAsync(adjust.ToArray(), CancellationToken.None);
+        await session.Client.WriteAsync(ChannelMessage(SshConnectionMessageNumber.ChannelEof), CancellationToken.None);
+        await session.Client.WriteAsync(ChannelMessage(SshConnectionMessageNumber.ChannelClose), CancellationToken.None);
+        SshServerSessionChannel channel = await session.OpenExecAsync(window: 100, maximumPacketSize: 100);
+
+        Assert.AreEqual("exec", channel.ProcessRequest);
+    }
+
+    [TestMethod]
     public async Task WriteDataAsync_ClientWindowSmallerThanTheData_SendsWithinTheWindowAndWaitsForAdjust()
     {
         Session session = Session.Create();

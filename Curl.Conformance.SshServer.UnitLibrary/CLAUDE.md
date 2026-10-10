@@ -42,7 +42,22 @@ upstream's `tests/data` can run in memory (BL-1899). Read ADR-0456 before changi
   `ReadDataAsync` and `WriteDataAsync` carry data with window accounting both ways, and
   `CloseAsync` sends `exit-status`, `EOF` and `CLOSE`. `SshServerConnector.Channels` lists
   each connection's channel, completing once the process is started.
-- Next: the SCP and SFTP processes on the channel (BL-1917, BL-1918).
+- `SshServerConnector.Processes` then runs `scp` on each channel whose `exec` command
+  `SshServerScpCommand` reads as `scp` with `-f` or `-t` and a path, unquoted as a shell
+  would (BL-1917); one channel after another, as curl reuses a connection
+  (`SshServerSessionChannel.OpenAsync` skips the earlier channel's leftover messages). Any
+  other command's channel is left to whoever holds it from `Channels`.
+- `SshServerScpProcess` is OpenSSH's `scp` on the real files the path names (a leading
+  slash before a Windows drive is dropped). Source (`-f`, `-pf`): after the client's zero
+  byte, `T<mtime> 0 <atime> 0`, `C0644 <size> <name>` (always mode 0644: Windows files
+  carry no Unix mode), each acknowledged, then the bytes and a zero byte. Sink (`-t`): a
+  zero byte, then `T`, `D` (makes the directory and enters it) and `E` (leaves it) lines
+  acknowledged, and each `C` line's file written into the path, or into the current
+  directory under its name when the path is a directory. A missing file or folder is
+  scp's error line, `\x01scp: <path>: No such file or directory`, and exit status 1;
+  any other line is a protocol error. `SshServerChannelInput` reads the channel's bytes a
+  byte, line or block at a time.
+- Next: the SFTP subsystem (BL-1918).
 
 ## The host keys and their fingerprints
 
