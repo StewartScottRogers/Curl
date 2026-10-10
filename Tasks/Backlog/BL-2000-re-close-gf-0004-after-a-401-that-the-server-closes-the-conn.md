@@ -1,5 +1,5 @@
 ---
-id: BL-1962
+id: BL-2000
 title: Re-close GF-0004: After a 401 that the server closes the connection on, the authenticated retry is written to the dead connection and never resent on a fresh one
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-1962 — Re-close GF-0004: After a 401 that the server closes the connection on, the authenticated retry is written to the dead connection and never resent on a fresh one
+# BL-2000 — Re-close GF-0004: After a 401 that the server closes the connection on, the authenticated retry is written to the dead connection and never resent on a fresh one
 
 ## Goal
 

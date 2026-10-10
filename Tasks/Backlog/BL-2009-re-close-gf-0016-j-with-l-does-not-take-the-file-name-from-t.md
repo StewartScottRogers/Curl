@@ -1,5 +1,5 @@
 ---
-id: BL-1971
+id: BL-2009
 title: Re-close GF-0016: -J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-1971 — Re-close GF-0016: -J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs
+# BL-2009 — Re-close GF-0016: -J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs
 
 ## Goal
 

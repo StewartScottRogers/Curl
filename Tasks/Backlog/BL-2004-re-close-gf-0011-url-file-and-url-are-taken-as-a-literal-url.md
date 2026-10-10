@@ -1,5 +1,5 @@
 ---
-id: BL-1966
+id: BL-2004
 title: Re-close GF-0011: --url @file and --url @- are taken as a literal URL instead of a list of URLs to read
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-1966 — Re-close GF-0011: --url @file and --url @- are taken as a literal URL instead of a list of URLs to read
+# BL-2004 — Re-close GF-0011: --url @file and --url @- are taken as a literal URL instead of a list of URLs to read
 
 ## Goal
 

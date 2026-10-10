@@ -1,5 +1,5 @@
 ---
-id: BL-1968
+id: BL-2006
 title: Re-close GF-0013: --skip-existing skips the transfer silently; curl writes 'Note: skips transfer, <file> exists locally'
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-1968 — Re-close GF-0013: --skip-existing skips the transfer silently; curl writes 'Note: skips transfer, <file> exists locally'
+# BL-2006 — Re-close GF-0013: --skip-existing skips the transfer silently; curl writes 'Note: skips transfer, <file> exists locally'
 
 ## Goal
 

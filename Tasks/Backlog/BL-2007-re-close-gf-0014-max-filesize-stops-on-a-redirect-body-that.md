@@ -1,5 +1,5 @@
 ---
-id: BL-1969
+id: BL-2007
 title: Re-close GF-0014: --max-filesize stops on a redirect body that is not kept, and does not stop a decompressed body that grows past the limit
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-1969 — Re-close GF-0014: --max-filesize stops on a redirect body that is not kept, and does not stop a decompressed body that grows past the limit
+# BL-2007 — Re-close GF-0014: --max-filesize stops on a redirect body that is not kept, and does not stop a decompressed body that grows past the limit
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-1964
+id: BL-2002
 title: Re-close GF-0006: With --digest (or Digest against a proxy), the first POST/PUT sends its body instead of Content-Length: 0
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-1964 — Re-close GF-0006: With --digest (or Digest against a proxy), the first POST/PUT sends its body instead of Content-Length: 0
+# BL-2002 — Re-close GF-0006: With --digest (or Digest against a proxy), the first POST/PUT sends its body instead of Content-Length: 0
 
 ## Goal
 
