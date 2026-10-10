@@ -290,7 +290,7 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(HttpsServer(testCase, server, certificateDirectory)));
+        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(HttpsServer(testCase, server, certificateDirectory)), serverClock);
         SmtpServerConnector smtp = new(testCase, ftp);
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);

@@ -121,7 +121,7 @@ public sealed class UpstreamCaseScreeningTests
 
     // The FTP cases whose <servercmd> BL-1908 carries out (COUNT, NODATACONN and its 425, 421 and
     // 150 variants, RETRWEIRDO, RETRNOSIZE, RETRSIZE, PASVBADIP, SLOWDOWN, REPLY) run, with
-    // %FTPTIME2 given the runner's value; DELAY and SLOWDOWNDATA, which time the answers, skip, naming the command.
+    // %FTPTIME2 given the runner's value; DELAY and SLOWDOWNDATA, which time the answers, run too (BL-1958).
     [TestMethod]
     [DataRow(147, null)]
     [DataRow(280, null)]
@@ -135,8 +135,8 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow(270, null)]
     [DataRow(416, null)]
     [DataRow(250, null)]
-    [DataRow(190, "the FTP stand-in does not carry out the server command DELAY")]
-    [DataRow(1086, "the FTP stand-in does not carry out the server command SLOWDOWNDATA")]
+    [DataRow(190, null)]
+    [DataRow(1086, null)]
     public void FindSkipReason_FtpServerCommandCase_RunsUnlessItsAnswersAreTimed(int testNumber, string? expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -160,14 +160,18 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow(406, null)]
     [DataRow(407, "the harness does not act on <client><stdout>")]
     [DataRow(408, null)]
-    [DataRow(1112, "the FTP stand-in does not carry out the server command SLOWDOWNDATA")]
+    [DataRow(1112, null)]
     public void FindSkipReason_FtpsCase_RunsWithAValueForTheFtpsPort(int testNumber, string? expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
         Dictionary<string, string> variables = new(StringComparer.Ordinal)
         {
-            ["HOSTIP"] = "127.0.0.1", ["CLIENTIP"] = "127.0.0.1", ["FTPSPORT"] = UpstreamCaseRunner.FtpsPort, ["LOGDIR"] = "/log", ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
+            ["HOSTIP"] = "127.0.0.1",
+            ["CLIENTIP"] = "127.0.0.1",
+            ["FTPSPORT"] = UpstreamCaseRunner.FtpsPort,
+            ["LOGDIR"] = "/log",
+            ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
         };
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
 
@@ -180,7 +184,8 @@ public sealed class UpstreamCaseScreeningTests
     [TestMethod]
     [DataRow("REPLY DELAY 200 ok\nCOUNT DELAY 1\ndelay: 5\n", null)]
     [DataRow("SLOWDOWN\n", null)]
-    [DataRow("DELAY CWD 60\n", "the FTP stand-in does not carry out the server command DELAY")]
+    [DataRow("DELAY CWD 60\n", null)]
+    [DataRow("SLOWDOWNDATA\n", null)]
     public void FindSkipReason_FtpCaseServerCommand_IsReadAsFtpserverReadsIt(string serverCommands, string? expected)
     {
         string? reason = Screen($"<reply>\n<servercmd>\n{serverCommands}</servercmd>\n</reply>\n<client>\n<server>\nftp\n</server>\n<command>\nftp://127.0.0.1:8993/1\n</command>\n</client>\n");

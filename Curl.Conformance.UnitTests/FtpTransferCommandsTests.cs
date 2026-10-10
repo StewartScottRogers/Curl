@@ -294,6 +294,39 @@ public sealed class FtpTransferCommandsTests
         Assert.AreEqual("uploaded bytes\n", Encoding.Latin1.GetString(server.UploadedBytes.Span));
     }
 
+    [TestMethod]
+    public async Task TryAnswer_RetrUnderSlowdowndata_SendsOneByteEach5Milliseconds()
+    {
+        ManualTimeProvider clock = new();
+        List<FtpDataConnection> opened = [];
+        FtpTransferCommands commands = new(ParsedTestCase.From("<reply>\n<data>\nhi\n</data>\n<servercmd>\nSLOWDOWNDATA\n</servercmd>\n</reply>\n"), opened.Add, _ => null, _ => { }, clock);
+        Answer(commands, "PASV", string.Empty);
+
+        string answer = Answer(commands, "RETR", "1");
+        byte[] buffer = new byte[64];
+        int first = await opened[0].ReadAsync(buffer, TestContext.CancellationToken);
+        Task<int> second = opened[0].ReadAsync(buffer, TestContext.CancellationToken).AsTask();
+        bool secondBeforeTheWait = second.IsCompleted;
+        clock.Advance(FtpDataConnection.SlowDataByteDelay);
+
+        Assert.AreEqual("150 Binary data connection for 1 () (3 bytes).\r\n226 File transfer complete\r\n", answer);
+        Assert.AreEqual(1, first);
+        Assert.IsFalse(secondBeforeTheWait);
+        Assert.AreEqual(1, await second);
+    }
+
+    [TestMethod]
+    public async Task TryAnswer_RetrUnderSlowdowndata_SendsEveryByteThenCloses()
+    {
+        List<FtpDataConnection> opened = [];
+        FtpTransferCommands commands = new(ParsedTestCase.From("<reply>\n<data>\nhello\n</data>\n<servercmd>\nSLOWDOWNDATA\n</servercmd>\n</reply>\n"), opened.Add, _ => null, _ => { }, new WaitSkippingTimeProvider());
+        Answer(commands, "PASV", string.Empty);
+
+        Answer(commands, "RETR", "1");
+
+        Assert.AreEqual("hello\n", await ReadToEndAsync(opened[0]));
+    }
+
     private static FtpTransferCommands Create(string reply, List<FtpDataConnection> opened) =>
         new(ParsedTestCase.From($"<reply>\n{reply}</reply>\n"), opened.Add, _ => null, _ => { });
 

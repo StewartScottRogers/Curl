@@ -90,6 +90,41 @@ public sealed class LineProtocolServerConnectorTests
     }
 
     [TestMethod]
+    public async Task Write_DelayedReply_IsReadableOnceTheClockPassesTheDelay()
+    {
+        ManualTimeProvider clock = new();
+        await using IConnection connection = await ConnectAsync(new LineProtocolServerConnector(() => new EchoResponder(), clock));
+        await ReadTextAsync(connection, 64);
+
+        await WriteTextAsync(connection, "SLOW 2 late\r\n");
+        Task<string> read = ReadTextAsync(connection, 64);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        bool readBeforeTheDelay = read.IsCompleted;
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.IsFalse(readBeforeTheDelay);
+        Assert.AreEqual("late\r\n", await read);
+    }
+
+    [TestMethod]
+    public async Task Write_ReplyAfterADelayedOne_WaitsForIt()
+    {
+        ManualTimeProvider clock = new();
+        await using IConnection connection = await ConnectAsync(new LineProtocolServerConnector(() => new EchoResponder(), clock));
+        await ReadTextAsync(connection, 64);
+
+        await WriteTextAsync(connection, "SLOW 1 first\r\nECHO second\r\n");
+        clock.Advance(TimeSpan.FromSeconds(1));
+        string replies = await ReadTextAsync(connection, 64);
+        while (replies.Length < "first\r\nsecond\r\n".Length)
+        {
+            replies += await ReadTextAsync(connection, 64);
+        }
+
+        Assert.AreEqual("first\r\nsecond\r\n", replies);
+    }
+
+    [TestMethod]
     public async Task Read_NothingWaiting_IsCancelled()
     {
         await using IConnection connection = await ConnectAsync(new LineProtocolServerConnector(() => new EchoResponder()));
@@ -193,7 +228,8 @@ public sealed class LineProtocolServerConnectorTests
         return Encoding.Latin1.GetString(buffer, 0, count);
     }
 
-    // A test-only protocol: "ECHO <text>" answers the text, "QUIT" answers and closes, anything else answers nothing.
+    // A test-only protocol: "ECHO <text>" answers the text, "SLOW <seconds> <text>" answers it after
+    // that many seconds, "QUIT" answers and closes, anything else answers nothing.
     private sealed class EchoResponder : ILineProtocolResponder
     {
         public ReadOnlyMemory<byte> Greeting { get; } = "+OK echo ready\r\n"u8.ToArray();
@@ -201,6 +237,8 @@ public sealed class LineProtocolServerConnectorTests
         public LineProtocolReply Answer(string commandLine) => commandLine switch
         {
             "QUIT" => new LineProtocolReply("+OK bye\r\n"u8.ToArray(), true),
+            _ when commandLine.Split(' ', 3) is ["SLOW", var seconds, var text] =>
+                new LineProtocolReply(Encoding.Latin1.GetBytes(text + "\r\n"), false) { Delay = TimeSpan.FromSeconds(int.Parse(seconds, System.Globalization.CultureInfo.InvariantCulture)) },
             _ when commandLine.StartsWith("ECHO ", StringComparison.Ordinal) => new LineProtocolReply(Encoding.Latin1.GetBytes(commandLine[5..] + "\r\n"), false),
             _ => new LineProtocolReply(ReadOnlyMemory<byte>.Empty, false),
         };

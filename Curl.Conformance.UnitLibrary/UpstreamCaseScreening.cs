@@ -41,9 +41,6 @@ internal static class UpstreamCaseScreening
     private static readonly string[] FtpServers = ["ftp", .. FtpsServerConnector.EmulatedServers];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
-
-    private static readonly Regex FtpTimedServerCommand = new(@"DELAY(?= [A-Z]+ \d*)|SLOWDOWNDATA", RegexOptions.CultureInvariant);
-
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
     private static readonly string[] FileParts = ["file", "file1", "file2", "file3", "file4"];
@@ -215,25 +212,16 @@ internal static class UpstreamCaseScreening
             ? $"{script.Value} compares with ../curl-config, which Curl does not ship"
             : null;
 
-    // <servercmd> is read by the server the case runs: ftpserver.pl's commands for an ftp or ftps case, sws's otherwise.
+    // <servercmd> is read by the server the case runs: ftpserver.pl's commands for an ftp or ftps
+    // case, which the FTP stand-in carries out (DELAY and SLOWDOWNDATA too, BL-1958), sws's otherwise.
     private static string? UnsupportedServerCommand(UpstreamTestCase testCase) =>
         UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(FtpServers).Any()
-            ? UnsupportedFtpServerCommand(testCase)
+            ? null
             : UnsupportedSwsServerCommand(testCase);
 
     private static string? UnsupportedSwsServerCommand(UpstreamTestCase testCase) =>
         SwsServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span).UnsupportedCommands is [var first, ..]
             ? $"the sws emulation does not carry out the server command {first}"
-            : null;
-
-    // DELAY <COMMAND> <seconds> and SLOWDOWNDATA time ftpserver.pl's answers, which the FTP stand-in
-    // does not (BL-1908's follow-up); a REPLY or COUNT line, read first by ftpserver.pl, is neither.
-    private static string? UnsupportedFtpServerCommand(UpstreamTestCase testCase) =>
-        UpstreamTestPartBodies.Lines(testCase.Find("reply", "servercmd"))
-            .Where(line => !line.Contains("REPLY", StringComparison.Ordinal) && !line.Contains("COUNT ", StringComparison.Ordinal))
-            .Select(line => FtpTimedServerCommand.Match(line))
-            .FirstOrDefault(match => match.Success) is { } command
-            ? $"the FTP stand-in does not carry out the server command {command.Value}"
             : null;
 
     // A case that names no server, expects success and sends its command to a host name with a

@@ -14,7 +14,8 @@ namespace Curl.Conformance;
 /// or the case's data are carried out by the <see cref="FtpTransferCommands"/> it is given, after
 /// their display text as ftpserver.pl does; without them, and for the active-mode and upload
 /// commands (<c>PORT</c>, <c>EPRT</c>, <c>STOR</c>, <c>APPE</c>, BL-1907), they get a <c>REPLY</c>
-/// line, their display text, or the not-dealt-with answer.
+/// line, their display text, or the not-dealt-with answer. A <c>DELAY &lt;COMMAND&gt; &lt;seconds&gt;</c>
+/// line delays the reply to that command, as written, by its seconds (BL-1958).
 /// </summary>
 internal sealed class FtpControlChannelResponder : ILineProtocolResponder
 {
@@ -90,12 +91,14 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
             return Reply("500 Unrecognized command\r\n", closesConnection: true);
         }
 
+        // ftpserver.pl sleeps for a DELAY line before it looks up the reply.
+        TimeSpan delay = serverCommands.ReplyDelay(command);
         if (serverCommands.TryFindReply(command, out byte[] customReply))
         {
-            return new LineProtocolReply(customReply, false);
+            return new LineProtocolReply(customReply, false) { Delay = delay };
         }
 
-        return Reply(AnswerByDefault(command, argument), closesConnection: false);
+        return Reply(AnswerByDefault(command, argument), closesConnection: false) with { Delay = delay };
     }
 
     private static LineProtocolReply Reply(string text, bool closesConnection) =>

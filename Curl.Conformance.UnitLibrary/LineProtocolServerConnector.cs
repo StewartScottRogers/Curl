@@ -19,14 +19,18 @@ internal sealed class LineProtocolServerConnector : IConnector
 
     private readonly Func<ILineProtocolResponder> createResponder;
 
+    private readonly TimeProvider clock;
+
     private int connectionsOpened;
 
     /// <summary>Creates a server that gives each connection a responder of its own.</summary>
     /// <param name="createResponder">Creates the responder for one new connection.</param>
-    public LineProtocolServerConnector(Func<ILineProtocolResponder> createResponder)
+    /// <param name="clock">The clock a reply's <see cref="LineProtocolReply.Delay"/> is waited on; <see langword="null"/> for the system clock.</param>
+    public LineProtocolServerConnector(Func<ILineProtocolResponder> createResponder, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(createResponder);
         this.createResponder = createResponder;
+        this.clock = clock ?? TimeProvider.System;
     }
 
     /// <summary>
@@ -46,7 +50,7 @@ internal sealed class LineProtocolServerConnector : IConnector
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(ConnectResult.Connected(new LineProtocolServerConnection(createResponder(), recording)
+        ValueTask.FromResult(ConnectResult.Connected(new LineProtocolServerConnection(createResponder(), recording, clock)
         {
             LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + Interlocked.Increment(ref connectionsOpened) - 1),
             RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, target.Port),

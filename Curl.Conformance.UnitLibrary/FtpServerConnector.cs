@@ -9,7 +9,8 @@ namespace Curl.Conformance;
 /// <see cref="FtpPort"/> gets its own <see cref="FtpControlChannelResponder"/> answering from the
 /// case's <c>&lt;servercmd&gt;</c> <c>REPLY</c> lines. The passive-mode data connections of <c>PASV</c> and <c>EPSV</c> are reached on <see cref="PassivePort"/>; <c>PORT</c> and <c>EPRT</c> connect to
 /// curl's port on <see cref="ActiveModeListener"/>, and the last <c>STOR</c> or <c>APPE</c> upload is
-/// <see cref="UploadedBytes"/> (BL-1907). No socket is opened.
+/// <see cref="UploadedBytes"/> (BL-1907). <c>DELAY</c> and <c>SLOWDOWNDATA</c> wait on the clock it is
+/// given (BL-1958). No socket is opened.
 /// </summary>
 public sealed class FtpServerConnector : IConnector
 {
@@ -32,12 +33,15 @@ public sealed class FtpServerConnector : IConnector
     /// <summary>Creates the FTP server for one case.</summary>
     /// <param name="testCase">The expanded case whose <c>&lt;servercmd&gt;</c> and <c>&lt;reply&gt;</c> parts the server answers from.</param>
     /// <param name="backend">The server every connection not to <see cref="FtpPort"/> or an open passive data connection reaches.</param>
-    public FtpServerConnector(UpstreamTestCase testCase, IConnector backend)
+    /// <param name="clock">The clock <c>DELAY</c> and <c>SLOWDOWNDATA</c> wait on (the runner's server clock); <see langword="null"/> for the system clock.</param>
+    public FtpServerConnector(UpstreamTestCase testCase, IConnector backend, TimeProvider? clock = null)
     {
         this.backend = backend;
-        controlChannel = new(() => new FtpControlChannelResponder(
-            LineProtocolServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span),
-            new FtpTransferCommands(testCase, connection => passiveConnection = connection, activeModeListener.Connect, connection => upload = connection)));
+        controlChannel = new(
+            () => new FtpControlChannelResponder(
+                LineProtocolServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span),
+                new FtpTransferCommands(testCase, connection => passiveConnection = connection, activeModeListener.Connect, connection => upload = connection, clock)),
+            clock);
     }
 
     /// <summary>

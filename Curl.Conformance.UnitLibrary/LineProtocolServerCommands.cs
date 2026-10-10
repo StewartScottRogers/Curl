@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Curl.Conformance;
 
@@ -10,19 +11,24 @@ namespace Curl.Conformance;
 /// command wins), and <c>COUNT &lt;COMMAND&gt; &lt;n&gt;</c> takes that reply away after n uses; <c>CAPA</c> lists the capabilities the server announces, split on spaces outside
 /// double quotes with the quotes removed; <c>AUTH</c> lists its authentication mechanisms, split on
 /// spaces; <c>POSTFETCH &lt;text&gt;</c> gives the text IMAP sends before the <c>)</c> that ends a
-/// <c>FETCH</c> response. A later <c>CAPA</c>, <c>AUTH</c> or <c>POSTFETCH</c> line replaces an earlier one. Other lines are left for
+/// <c>FETCH</c> response; <c>DELAY &lt;COMMAND&gt; &lt;seconds&gt;</c> gives how long the reply to that command waits. A later <c>CAPA</c>, <c>AUTH</c> or <c>POSTFETCH</c> line replaces an earlier one. Other lines are left for
 /// the protocol stand-ins to read.
 /// </summary>
 internal sealed class LineProtocolServerCommands
 {
+    private static readonly Regex DelayLine = new(@"DELAY ([A-Z]+) (\d*)", RegexOptions.CultureInvariant);
+
     private readonly Dictionary<string, byte[]> replies;
 
     private readonly Dictionary<string, int> remainingUses;
 
-    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, Dictionary<string, int> remainingUses, string[] capabilities, string[] authenticationMechanisms, string postFetch)
+    private readonly Dictionary<string, TimeSpan> delays;
+
+    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, Dictionary<string, int> remainingUses, Dictionary<string, TimeSpan> delays, string[] capabilities, string[] authenticationMechanisms, string postFetch)
     {
         this.replies = replies;
         this.remainingUses = remainingUses;
+        this.delays = delays;
         Capabilities = capabilities;
         AuthenticationMechanisms = authenticationMechanisms;
         PostFetch = postFetch;
@@ -47,6 +53,7 @@ internal sealed class LineProtocolServerCommands
         return new LineProtocolServerCommands(
             ReadReplies(lines),
             ReadUseCounts(lines),
+            ReadDelays(lines),
             ReadCapabilities(keywordLines),
             LastArgument(keywordLines, "AUTH ")?.Split(' ') ?? [],
             LastArgument(keywordLines, "POSTFETCH ") ?? string.Empty);
@@ -83,6 +90,27 @@ internal sealed class LineProtocolServerCommands
         line.Split(' ', 3) is ["COUNT", var command, var uses] && IsUpperCaseName(command)
             ? (command, SwsServerCommands.LeadingInteger(uses.TrimStart()) ?? 0)
             : null;
+
+    // DELAY <COMMAND> <seconds>: ftpserver.pl sleeps that long before it answers the command, on
+    // a line its REPLY and COUNT branches did not take first; no number (or 0) never sleeps.
+    private static Dictionary<string, TimeSpan> ReadDelays(List<string> lines)
+    {
+        Dictionary<string, TimeSpan> lineDelays = new(StringComparer.Ordinal);
+        foreach (Match delay in lines
+            .Where(line => !line.Contains("REPLY", StringComparison.Ordinal) && !line.Contains("COUNT ", StringComparison.Ordinal))
+            .Select(line => DelayLine.Match(line))
+            .Where(match => match.Success))
+        {
+            lineDelays[delay.Groups[1].Value] = TimeSpan.FromSeconds(SwsServerCommands.LeadingInteger(delay.Groups[2].Value) ?? 0);
+        }
+
+        return lineDelays;
+    }
+
+    /// <summary>Finds how long ftpserver.pl waits before it answers a command: a <c>DELAY &lt;COMMAND&gt; &lt;seconds&gt;</c> line's seconds, the command matched as written.</summary>
+    /// <param name="command">The command name as the client wrote it.</param>
+    /// <returns>The delay; zero when no line delays the command.</returns>
+    public TimeSpan ReplyDelay(string command) => delays.GetValueOrDefault(command);
 
     private static bool IsUpperCaseName(string command) => command.Length > 0 && command.All(char.IsAsciiLetterUpper);
 

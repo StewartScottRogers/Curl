@@ -26,6 +26,11 @@ internal sealed class FtpDataConnection : IConnection
 
     private bool closed;
 
+    private volatile bool disposed;
+
+    /// <summary>Gets how long ftpserver.pl's <c>SLOWDOWNDATA</c> waits after each data byte: 5 ms.</summary>
+    public static TimeSpan SlowDataByteDelay { get; } = TimeSpan.FromMilliseconds(5);
+
     public bool IsSecure => false;
 
     public EndPoint? RemoteEndPoint { get; init; }
@@ -54,6 +59,30 @@ internal sealed class FtpDataConnection : IConnection
         }
 
         Signal();
+    }
+
+    /// <summary>
+    /// Sends <paramref name="bytes"/> one at a time, waiting <see cref="SlowDataByteDelay"/> on
+    /// <paramref name="clock"/> after each, as ftpserver.pl's <c>SLOWDOWNDATA</c> does, then
+    /// <see cref="Close"/>s; stops once the client has disposed the connection.
+    /// </summary>
+    /// <param name="bytes">The bytes the server writes.</param>
+    /// <param name="clock">The clock the waits are on.</param>
+    /// <returns>A task that completes once the connection is closed or the client has gone.</returns>
+    public async Task SendSlowlyAsync(byte[] bytes, TimeProvider clock)
+    {
+        foreach (byte value in bytes)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            Send([value]);
+            await Task.Delay(SlowDataByteDelay, clock).ConfigureAwait(false);
+        }
+
+        Close();
     }
 
     /// <summary>Closes the server's end: once what was sent is read, reads return 0.</summary>
@@ -99,7 +128,11 @@ internal sealed class FtpDataConnection : IConnection
 
     public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        disposed = true;
+        return ValueTask.CompletedTask;
+    }
 
     private void Signal()
     {

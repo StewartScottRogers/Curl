@@ -44,6 +44,11 @@ internal sealed class FtpTransferCommands
 
     private readonly Dictionary<string, Func<string, string>> handlers;
 
+    private readonly TimeProvider clock;
+
+    // SLOWDOWNDATA: ftpserver.pl waits 5 ms after each byte it sends on a data connection.
+    private readonly bool slowData;
+
     private FtpDataConnection? dataConnection;
 
     private long restartOffset;
@@ -55,14 +60,17 @@ internal sealed class FtpTransferCommands
     /// <param name="openPassive">Called with each data connection <c>PASV</c> or <c>EPSV</c> opens, for the client to connect to.</param>
     /// <param name="connectActive">Connects to the port <c>PORT</c> or <c>EPRT</c> names, returning the server's end, or <see langword="null"/> when nothing listens there.</param>
     /// <param name="receiveUpload">Called with the data connection each <c>STOR</c> or <c>APPE</c> uploads into.</param>
-    public FtpTransferCommands(UpstreamTestCase testCase, Action<FtpDataConnection> openPassive, Func<int, FtpDataConnection?> connectActive, Action<FtpDataConnection> receiveUpload)
+    /// <param name="clock">The clock <c>SLOWDOWNDATA</c>'s waits are on; <see langword="null"/> for the system clock.</param>
+    public FtpTransferCommands(UpstreamTestCase testCase, Action<FtpDataConnection> openPassive, Func<int, FtpDataConnection?> connectActive, Action<FtpDataConnection> receiveUpload, TimeProvider? clock = null)
     {
         this.testCase = testCase;
         this.openPassive = openPassive;
         this.connectActive = connectActive;
         this.receiveUpload = receiveUpload;
+        this.clock = clock ?? TimeProvider.System;
         serverCommandLines = UpstreamTestPartBodies.Lines(testCase.Find("reply", "servercmd"));
         weirdRetrieve = HasServerCommand("RETRWEIRDO");
+        slowData = HasServerCommand("SLOWDOWNDATA");
         handlers = new(StringComparer.Ordinal)
         {
             ["PASV"] = _ => OpenPassive(extended: false),
@@ -186,8 +194,17 @@ internal sealed class FtpTransferCommands
             return NoDataConnectionAnswer();
         }
 
-        dataConnection.Send(data);
-        dataConnection.Close();
+        if (slowData)
+        {
+            // Not awaited: ftpserver.pl answers on the control channel while the bytes trickle out.
+            _ = dataConnection.SendSlowlyAsync(data, clock);
+        }
+        else
+        {
+            dataConnection.Send(data);
+            dataConnection.Close();
+        }
+
         dataConnection = null;
         return completion;
     }
