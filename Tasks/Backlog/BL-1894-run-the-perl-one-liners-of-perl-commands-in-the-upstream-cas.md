@@ -4,7 +4,7 @@ title: Run the Perl one-liners of %PERL commands in the upstream case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1930, BL-1931, BL-1932]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2): Split rather than started. The 31 vendored cases that use %PERL need three separate emulations - the perl -e one-liners (stat mtime checks, print-if prechecks, grep counts, file generators), tests/libtest/test610.pl (mkdir, rmdir, move, gone, rm) and tests/libtest/test613.pl (prepare, postprocess) - each with its own coverage-held tests; together they do not fit one lane run. Filed as BL-1930, BL-1931 and BL-1932. What is left here once they are Done: run at least 10 named %PERL cases through UpstreamCaseRunner and the interactive Measure-UpstreamCases.cs check. test1013.pl and test1022.pl compare against ../curl-config and are expected to stay skipped with that reason.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Split into BL-1930, BL-1931 and BL-1932 (one-liners, test610.pl, test613.pl); resumes once they are Done
