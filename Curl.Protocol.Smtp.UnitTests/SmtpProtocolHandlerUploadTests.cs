@@ -118,6 +118,9 @@ public sealed class SmtpProtocolHandlerUploadTests
     [DataRow("<a@b", "c@d>", "MAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\n", DisplayName = "Half bracketed")]
     [DataRow("<<a@b>>", "c@d", "MAIL FROM:<<a@b>>\r\nRCPT TO:<c@d>\r\n", DisplayName = "Doubly bracketed")]
     [DataRow("alice", "bob", "MAIL FROM:<alice>\r\nRCPT TO:<bob>\r\n", DisplayName = "No @")]
+    [DataRow("<s@example.com> RET=HDRS", "<r@example.com> NOTIFY=SUCCESS", "MAIL FROM:<s@example.com> RET=HDRS\r\nRCPT TO:<r@example.com> NOTIFY=SUCCESS\r\n", DisplayName = "Bracketed with DSN parameters: sent as given (upstream test3215)")]
+    [DataRow("<nohost> A=1", "<r@b> x>y", "MAIL FROM:<nohost> A=1\r\nRCPT TO:<r@b> x>y\r\n", DisplayName = "Bracketed with a suffix: no @, and a > in the suffix")]
+    [DataRow("a@b", "r@example.com> X", "MAIL FROM:<a@b>\r\nRCPT TO:<r@example.com> X>\r\n", DisplayName = "Not starting with <: no suffix, bracketed whole")]
     public async Task ExecuteAsync_Addresses_AreBracketedAsCurlDoes(string? from, string recipient, string envelope)
     {
         SmtpRun run = await RunAsync(Accepting, Body("one\r\n"), new MailRequestOptions { From = from, Recipients = [recipient] });

@@ -11,10 +11,12 @@ namespace Curl.Protocol.Smtp;
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item>An address is sent inside angle brackets after one leading <c>&lt;</c> and one
-/// trailing <c>&gt;</c> are taken off it and its host is made an A-label
-/// (<see cref="SmtpMailbox" />), so <c>&lt;a@b</c> and <c>a@b</c> both go out as
-/// <c>&lt;a@b&gt;</c>; no <c>--mail-from</c> sends <c>MAIL FROM:&lt;&gt;</c>.</item>
+/// <item>An address is sent inside angle brackets after its own brackets are taken off and
+/// its host is made an A-label (<see cref="SmtpMailbox" />), so <c>&lt;a@b</c> and
+/// <c>a@b</c> both go out as <c>&lt;a@b&gt;</c>; whatever follows the last <c>&gt;</c> of an
+/// address starting <c>&lt;</c> follows the closing bracket, so
+/// <c>&lt;a@b&gt; RET=HDRS</c> goes out as given (BL-1993); no <c>--mail-from</c> sends
+/// <c>MAIL FROM:&lt;&gt;</c>.</item>
 /// <item><c>MAIL FROM</c> adds, in this order, <c>AUTH=&lt;addr&gt;</c> for
 /// <c>--mail-auth</c> once <c>AUTH</c> succeeded, <c>SIZE=n</c> when <c>EHLO</c> advertised
 /// <c>SIZE</c> and the upload can seek and has bytes left, and <c>SMTPUTF8</c> when

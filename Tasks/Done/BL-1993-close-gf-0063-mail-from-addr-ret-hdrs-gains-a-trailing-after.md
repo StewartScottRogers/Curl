@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1993 — Close GF-0063: --mail-from '<addr> RET=HDRS' gains a trailing '>' after the parameters; curl sends an address that starts with '<' as given
 
@@ -35,13 +35,19 @@ In Curl.Protocol.Smtp.UnitLibrary's SmtpMailTransaction, send a --mail-from (and
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test3215`: Curl answers what curl 8.21.0 answers, `upstream test3215 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test3215`: Curl answers what curl 8.21.0 answers, `upstream test3215 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option was added or changed: --mail-from, --mail-rcpt and --mail-auth only send what curl sends.
 
 ## Notes
+
+- Measured curl 8.21.0 (Schannel build, `Record-CurlExchange.ps1 -Smtp`): an address that starts with `<` is cut at its LAST `>`, and what follows is sent after the closing bracket: `--mail-from "<s@example.com> RET=HDRS"` -> `MAIL FROM:<s@example.com> RET=HDRS SIZE=4`, `--mail-rcpt "<r@example.com> NOTIFY=SUCCESS"` -> `RCPT TO:<r@example.com> NOTIFY=SUCCESS`, `--mail-auth "<a@example.com> X=Y"` -> `AUTH=<a@example.com> X=Y`, `"<r@b> x>y"` -> `RCPT TO:<r@b> x>y`. The default `VRFY` drops the suffix (`<v@example.com> X` -> `VRFY v@example.com`; `<r@b> x>y` -> `VRFY r@b> x`, which is what shows the cut is at the last `>`). An address not starting with `<` loses only one trailing `>` and has no suffix (`r@example.com> X` -> `RCPT TO:<r@example.com> X>`), unchanged. `-X VRFY` already sent the recipient as given.
+- Fix: `SmtpMailbox` splits off the suffix; `Bracketed` appends it, `Bare` drops it. Unit tests pin every measured case, including upstream test3215's exact `MAIL FROM` line. The gap tool itself is out of a lane's reach (audit guard), so `behaviour:test3215` is confirmed by the next gap run.
+- No ADR: this matches measured curl, no design choice was made.
+- The full fast run had one failure in Curl.Networking.UnitTests that passed alone; filed as BL-2028.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. MAIL FROM, RCPT TO and AUTH= keep the suffix after a bracketed address, as curl 8.21.0 sends it
