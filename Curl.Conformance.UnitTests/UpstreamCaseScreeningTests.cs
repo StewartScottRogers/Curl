@@ -59,6 +59,20 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    public void FindSkipReason_NoListenPortGivenTheRunnersValue_IsNotTheReason()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] test19 = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test19.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["NOLISTENPORT"] = UpstreamCaseRunner.NoListenPort };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(test19, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_CertdirGivenAValue_IsNotTheReasonButTheTlsServerIs()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.Globalization;
 using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
@@ -94,8 +93,8 @@ internal sealed class SocksServerConnection(SocksServerConfiguration configurati
         string host = namesHost
             ? Encoding.Latin1.GetString(request, userEnd + 1, end - userEnd - 1)
             : new IPAddress(request.AsSpan(4, 4)).ToString();
-        await ConnectBackendAsync(host, BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(2)), cancellationToken).ConfigureAwait(false);
-        pendingReply = [.. pendingReply, 0, 90, .. request.AsSpan(2, 6)];
+        bool connected = await ConnectBackendAsync(host, BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(2)), cancellationToken).ConfigureAwait(false);
+        pendingReply = [.. pendingReply, 0, (byte)(connected ? 90 : 91), .. request.AsSpan(2, 6)];
         return end + 1;
     }
 
@@ -164,16 +163,20 @@ internal sealed class SocksServerConnection(SocksServerConfiguration configurati
         string host = request[3] == 3
             ? Encoding.Latin1.GetString(request, 5, request[4])
             : new IPAddress(request.AsSpan(4, addressLength)).ToString();
-        await ConnectBackendAsync(host, BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(end - 2)), cancellationToken).ConfigureAwait(false);
-        pendingReply = [.. pendingReply, 5, 0, .. request.AsSpan(2, end - 2)];
+        bool connected = await ConnectBackendAsync(host, BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(end - 2)), cancellationToken).ConfigureAwait(false);
+        pendingReply = [.. pendingReply, 5, (byte)(connected ? 0 : 5), .. request.AsSpan(2, end - 2)];
         return end;
     }
 
-    private async ValueTask ConnectBackendAsync(string host, int port, CancellationToken cancellationToken)
+    // A backend that refuses the connection (%NOLISTENPORT) closes this one after the failure
+    // reply, as socksd answers a failed connect and hangs up.
+    private async ValueTask<bool> ConnectBackendAsync(string host, int port, CancellationToken cancellationToken)
     {
         int backendPort = configuration.BackendPort == 0 ? port : configuration.BackendPort;
         ConnectResult result = await backend.ConnectAsync(new ConnectTarget(host, backendPort, false), cancellationToken).ConfigureAwait(false);
-        relay = result.Connection ?? throw new IOException(string.Create(CultureInfo.InvariantCulture, $"The SOCKS backend refused {host}:{backendPort}."));
+        relay = result.Connection;
+        closed = relay is null;
+        return !closed;
     }
 
     private int Close()

@@ -435,6 +435,23 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
+    [TestMethod]
+    public async Task RunAsync_NoListenPort_IsAPortWhoseConnectionIsRefused()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            string port = invocation.Arguments[^1].Split(':')[1];
+            ConnectResult result = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", int.Parse(port, System.Globalization.CultureInfo.InvariantCulture), false), CancellationToken.None);
+            return (int)result.ExitCode;
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command>\n%HOSTIP:%NOLISTENPORT\n</command>\n</client>\n<verify>\n<errorcode>\n7\n</errorcode>\n</verify>\n</testcase>\n");
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
     private static UpstreamCaseRunner Runner(Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
         Runner(runCurl, TimeSpan.FromSeconds(10));
 

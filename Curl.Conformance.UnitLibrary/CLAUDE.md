@@ -82,6 +82,8 @@ sws never answers 100 (test1070). Under `skip: N`, bytes past the request's end 
 unrecorded, as sws's stored request ends there. Otherwise a
 read with no reply waiting returns 0, because in memory nothing else can arrive.
 
+`NoListenPortConnector` (BL-1904) stands for the port nothing listens on, the runner's `%NOLISTENPORT` (47, as `runtests.pl` gives it): a connection to it ends as a refused TCP connect does (`ConnectResult.Refused`, exit 7, `Failed to connect to <host>:47 after 0 ms: Could not connect to server`), and every other connection reaches the `sws` emulation it wraps. The runner puts it between `SocksServerConnector` and the `sws` emulation, so a SOCKS CONNECT to `%NOLISTENPORT` fails too: socksd's SOCKS4 reply 91, or SOCKS5 reply 5, then a close.
+
 `SocksServerConnector` (BL-1898) emulates upstream's `socksd` (`tests/server/socksd.c`) on port 8994, the runner's `%SOCKSPORT`, and passes every other connection to the `sws` emulation it wraps: a `SocksServerConnection` answers a SOCKS4 or SOCKS4a request, or a SOCKS5 greeting, the username/password exchange under `method 2` and a CONNECT to an IPv4 address, IPv6 address or host name, then relays both ways to the wrapped server at the requested port, or at `backendport`. `SocksServerConfiguration` reads socksd's `method`, `user`, `password` and `backendport` from `<servercmd>`; wrong credentials get status 1 and a close. Screening lets `socks4` and `socks5` cases run; `<verify><socks>` (the target socksd logs) is not compared yet, so cases verifying it still skip, naming it.
 
 `LineProtocolServerConnector` is the shared core of the line-protocol stand-ins for upstream's

@@ -157,12 +157,27 @@ public sealed class SocksServerConnectorTests
     }
 
     [TestMethod]
-    public async Task Connect_BackendRefuses_Throws()
+    public async Task Socks5_BackendRefuses_RepliesConnectionRefusedAndCloses()
     {
         SocksServerConnector socks = new(ParsedTestCase.From(string.Empty), new RefusingConnector());
         IConnection connection = await ConnectAsync(socks);
 
-        await Assert.ThrowsExactlyAsync<IOException>(async () => await connection.WriteAsync((byte[])[.. Socks5NoAuthGreeting, .. Socks5Ipv4Connect], CancellationToken.None));
+        await connection.WriteAsync((byte[])[.. Socks5NoAuthGreeting, .. Socks5Ipv4Connect], CancellationToken.None);
+
+        CollectionAssert.AreEqual(new byte[] { 5, 0, 5, 5, 0, 1, 127, 0, 0, 1, 0x23, 0x1E }, await ReadAsync(connection));
+        Assert.IsEmpty(await ReadAsync(connection));
+    }
+
+    [TestMethod]
+    public async Task Socks4_BackendRefuses_RepliesRejectedAndCloses()
+    {
+        SocksServerConnector socks = new(ParsedTestCase.From(string.Empty), new RefusingConnector());
+        IConnection connection = await ConnectAsync(socks);
+
+        await connection.WriteAsync(new byte[] { 4, 1, 0, 47, 127, 0, 0, 1, 0 }, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new byte[] { 0, 91, 0, 47, 127, 0, 0, 1 }, await ReadAsync(connection));
+        Assert.IsEmpty(await ReadAsync(connection));
     }
 
     private static (SocksServerConnector Socks, SwsHttpServerConnector Server) Server(string serverCommands)

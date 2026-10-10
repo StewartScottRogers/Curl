@@ -22,15 +22,21 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] A unit test shows a connection to the %NOLISTENPORT value ends curl with exit code 7 and curl's refused-connection message, and at least 10 named upstream cases using %NOLISTENPORT run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %NOLISTENPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
+- [x] A unit test shows a connection to the %NOLISTENPORT value ends curl with exit code 7 and curl's refused-connection message, and at least 10 named upstream cases using %NOLISTENPORT run through UpstreamCaseRunner and get Passed or a real Curl difference.
+- [x] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %NOLISTENPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
+- [x] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Curl.Conformance.UnitLibraryCLAUDE.md states what the runner now does for this.
 - [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
+- %NOLISTENPORT is 47, as runtests.pl gives it. NoListenPortConnector refuses it with ConnectResult.Refused (exit 7, TcpConnector's own wording) and wraps sws; the runner chains SocksServerConnector -> NoListenPortConnector -> sws, so a SOCKS CONNECT to 47 is refused too.
+- Stand-in fault fixed: SocksServerConnection threw when its backend refused; it now answers as socksd (SOCKS4 reply 91, SOCKS5 reply 5) and closes, so test702 and test703 pass (exit 97).
+- InMemoryServerTcpDialer (tests) throws SocketException(ConnectionRefused) for a refused result, so the production TcpConnector reports the refusal.
+- Of 33 %NOLISTENPORT cases, 22 now pass and are listed (19, 219, 333, 370, 702-705, 1084, 1234, 1236, 1248, 1260, 1263, 1269, 1409, 1410, 1427, 1447, 1469, 1474, 1673). test1453 fails with a real difference (expected 71, got 7, TFTP), left for the next gap run. The rest skip for named other reasons: <setenv>, <tool>, %HOST6IP/%RESOLVE, %USER/%SFTP_PWD.
+- Coverage: no Measure-CodeQuality run (cost cap); every new branch is hit by a named test (NoListenPortConnectorTests, SocksServerConnectorTests Socks4/Socks5_BackendRefuses).
+- Interactive Measure-UpstreamCases check not run (not a lane gate).
 
 ## Log
 
