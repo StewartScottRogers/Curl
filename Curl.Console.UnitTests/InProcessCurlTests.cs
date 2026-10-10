@@ -289,6 +289,43 @@ public sealed class InProcessCurlTests
         Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, datagramConnector, null!));
     }
 
+    [TestMethod]
+    public async Task RunAsync_FtpListenerGiven_BindsTheActiveModePortThroughIt()
+    {
+        ScriptedConnector server = new(["220 ready\r\n331 password\r\n230 in\r\n257 \"/\"\r\n221 bye\r\n"u8.ToArray()]);
+        RefusingListener listener = new();
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+
+        int exitCode = await InProcessCurl.RunAsync(["-sS", "-P", "127.0.0.1", "ftp://127.0.0.1/1978"], standardOutput, standardError, new MemoryStream(), new ScriptedTcpDialer(server), new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "unused"), _ => null, listener);
+
+        Diagnostics.Bytes("sent", server.Written);
+        Diagnostics.Assert("exit code", 30, exitCode);
+        Assert.AreEqual(30, exitCode);
+        Assert.Contains("refused by the given listener", Encoding.UTF8.GetString(standardError.ToArray()));
+    }
+
+    [TestMethod]
+    public void RunAsync_FtpListenerNullArgument_Throws()
+    {
+        MemoryStream stream = new();
+        ScriptedTcpDialer dialer = new(new ScriptedConnector([]));
+        LoopbackDnsResolver resolver = new();
+        RecordingDatagramConnector datagramConnector = new(CurlExitCode.CouldntConnect, "unused");
+        Func<string, string?> environment = _ => null;
+        RefusingListener listener = new();
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync(null!, stream, stream, stream, dialer, resolver, datagramConnector, environment, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], null!, stream, stream, dialer, resolver, datagramConnector, environment, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, null!, stream, dialer, resolver, datagramConnector, environment, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, null!, dialer, resolver, datagramConnector, environment, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, null!, resolver, datagramConnector, environment, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, null!, datagramConnector, environment, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, null!, environment, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, datagramConnector, null!, listener));
+        Assert.ThrowsExactly<ArgumentNullException>(() => InProcessCurl.RunAsync([], stream, stream, stream, dialer, resolver, datagramConnector, environment, null!));
+    }
+
     private static string CreateTemporaryDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), "curl-bl1977-" + Guid.NewGuid().ToString("N"));
@@ -317,6 +354,18 @@ public sealed class InProcessCurlTests
     {
         public ValueTask<IReadOnlyList<System.Net.IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
             ValueTask.FromResult<IReadOnlyList<System.Net.IPAddress>>([]);
+    }
+
+    /// <summary>A listener that refuses every bind with exit 30, counting the binds asked of it.</summary>
+    private sealed class RefusingListener : IConnectionListener
+    {
+        public int ListenCount { get; private set; }
+
+        public ValueTask<ListenResult> ListenAsync(ListenTarget target, CancellationToken cancellationToken)
+        {
+            ListenCount++;
+            return ValueTask.FromResult(ListenResult.Failed(CurlExitCode.FtpPortFailed, "refused by the given listener"));
+        }
     }
 
     /// <summary>A connector that refuses every connect with exit 7; a <c>file://</c> transfer never calls it.</summary>
