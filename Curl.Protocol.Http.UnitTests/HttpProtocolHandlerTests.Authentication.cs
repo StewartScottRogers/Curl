@@ -541,6 +541,115 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.DoesNotContain("Content-Length: 0", requests[1]);
     }
 
+    /// <summary>
+    /// With <c>--ntlm</c> the POST that carries the Type 1 message sends <c>Content-Length: 0</c>
+    /// and no body; the body goes only with the Type 3 message, as upstream test176 and test267
+    /// expect of curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmPostWithItsType1Message_SendsContentLengthZeroAndNoBody()
+    {
+        TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"));
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --ntlm");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new HandshakeAuthenticator(NtlmType1, [NtlmType3])).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[0]);
+        Assert.EndsWith("Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", requests[0]);
+        Assert.Contains("Authorization: " + NtlmType3 + "\r\n", requests[1]);
+        Assert.EndsWith("Content-Length: 5\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nhello", requests[1]);
+    }
+
+    /// <summary>
+    /// The Type 1 request of a <c>-F</c> form leaves out the form's <c>Content-Type</c> with its
+    /// parts, as upstream test170 expects of curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmFormPostWithItsType1Message_SendsNoContentType()
+    {
+        TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("part"u8.ToArray(), "multipart/form-data; boundary=xyz"));
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -F form, --ntlm");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new HandshakeAuthenticator(NtlmType1, [NtlmType3])).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.EndsWith("Content-Length: 0\r\n\r\n", requests[0]);
+        Assert.DoesNotContain("Content-Type", requests[0]);
+        Assert.EndsWith("Content-Length: 4\r\nContent-Type: multipart/form-data; boundary=xyz\r\n\r\npart", requests[1]);
+    }
+
+    /// <summary>
+    /// A Type 1 probe answered with a 2xx is followed by the same POST with its body and without
+    /// the Type 1 value, as upstream test176 expects of curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_NtlmProbeAnsweredWithoutAChallenge_SendsTheBodyWithoutTheType1Value()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"));
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --ntlm, a server asking for no auth");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new HandshakeAuthenticator(NtlmType1, [])).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[0]);
+        Assert.DoesNotContain("Authorization:", requests[1]);
+        Assert.EndsWith("\r\n\r\nhello", requests[1]);
+    }
+
+    /// <summary>
+    /// A retry that answers a challenge with a Type 1 message, as <c>--anyauth</c> does after a
+    /// first request with the body, holds the body back too, as upstream test243 expects of
+    /// curl 8.21.0 (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_RetryAnsweringWithAType1Message_SendsContentLengthZeroAndNoBody()
+    {
+        TurnTakingConnection connection = new(65536, NtlmChallengeHead + "nope", OkHead + "ok", OkHead + "ok");
+        TransferContext context = NtlmPostContext(new BytesBody("hello"u8.ToArray(), "application/x-www-form-urlencoded"), HttpAuthSchemes.Ntlm | HttpAuthSchemes.Basic);
+        Diagnostics.Arrange("url, body, schemes", $"{AuthUrl}, -d hello, --anyauth");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, NtlmType1)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(3, requests, connection.Written);
+        Assert.EndsWith("\r\n\r\nhello", requests[0]);
+        Assert.Contains("Authorization: " + NtlmType1 + "\r\n", requests[1]);
+        Assert.EndsWith("Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", requests[1]);
+        Assert.EndsWith("\r\n\r\nhello", requests[2]);
+    }
+
+    private const string NtlmType1 = "NTLM TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=";
+
+    private const string NtlmType3 = "NTLM TlRMTVNTUAADAAAAGAAYAEAAAAA=";
+
+    private static TransferContext NtlmPostContext(BytesBody body, HttpAuthSchemes schemes = HttpAuthSchemes.Ntlm) =>
+        new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { Body = body, AuthSchemes = schemes },
+        };
+
     private static TransferContext DigestPostContext(Stream output, IReadOnlyList<string>? headers = null) =>
         new()
         {

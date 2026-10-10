@@ -360,7 +360,7 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// Appends the body's framing headers: <c>Content-Length</c> as
     /// <see cref="ContentLengthOf" /> gives it, <c>Transfer-Encoding: chunked</c> when its
-    /// length is unknown, its <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's
+    /// length is unknown, its <c>Content-Type</c> as <see cref="BodyContentTypeOf" /> gives it, and curl's
     /// own <c>Expect: 100-continue</c>. A <c>-F</c> form's <c>Content-Type</c> is
     /// <paramref name="formContentType" /> when an <c>-H</c> value names one.
     /// </summary>
@@ -374,9 +374,19 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, framing.IsAuthProbe ? [] : customHeaders, ContentLengthName, ContentLengthOf(framing));
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
         AppendAlways(head, ContentTypeName, formContentType);
-        AppendUnlessOverridden(head, customHeaders, ContentTypeName, framing.IsUpload ? null : body.ContentType);
+        AppendUnlessOverridden(head, customHeaders, ContentTypeName, BodyContentTypeOf(framing, body));
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
     }
+
+    /// <summary>
+    /// Gives the bodys <c>Content-Type</c>: none for a <c>-T</c> upload, none for the probe of a
+    /// <c>-F</c> form (<see cref="HttpRequestFraming.IsAuthProbe" />), which curl 8.21.0 sends
+    /// without the forms parts or their type (upstream test170, BL-2029), and else its own.
+    /// </summary>
+    private static string? BodyContentTypeOf(HttpRequestFraming framing, HttpRequestBody body) =>
+        framing.IsUpload || (framing.IsAuthProbe && body.ContentType.StartsWith(FormBoundaryPrefix, StringComparison.Ordinal))
+            ? null
+            : body.ContentType;
 
     /// <summary>
     /// Gives a <c>-F</c> form's <c>Content-Type</c> when an <c>-H</c> value names one, as curl

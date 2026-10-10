@@ -110,7 +110,7 @@ internal sealed class HttpRequestFraming
     internal string? ContentRange { get; }
 
     /// <summary>
-    /// Gets a value indicating whether this is the Digest probe <see cref="AsAuthProbe" /> makes:
+    /// Gets a value indicating whether this is the Digest or NTLM probe <see cref="AsAuthProbe" /> makes:
     /// its <c>Content-Length: 0</c> replaces any <c>-H</c> <c>Content-Length</c> line, as curl
     /// 8.21.0 sends it (upstream test1284, BL-1835).
     /// </summary>
@@ -151,7 +151,7 @@ internal sealed class HttpRequestFraming
     /// Makes the same request with an empty body and <c>Content-Length: 0</c>: the probe curl
     /// 8.21.0 sends first when Digest is the one scheme allowed and no challenge has been
     /// answered yet, holding the body back for the authenticated request (upstream test88,
-    /// test175, test1001; ADR-0441). Its <c>Content-Type</c> stays; a <c>-T</c> upload still
+    /// test175, test1001; ADR-0441), or when the request starts an NTLM handshake (BL-2029). Its <c>Content-Type</c> stays, though the head leaves a <c>-F</c> form's out (<see cref="HttpRequestHeadFormatter" />); a <c>-T</c> upload still
     /// sends none. Its <c>Content-Range</c> stays too, as curl 8.21.0 sends a resumed <c>-T</c>
     /// upload's probe with it (measured, BL-2002 Notes; upstream test1001). Its
     /// <c>Content-Length: 0</c> replaces any <c>-H</c> one (<see cref="IsAuthProbe" />).

@@ -520,6 +520,35 @@ public sealed partial class HttpProtocolHandlerTests
     /// composition builds, answering the proxy with <paramref name="proxySchemes" /> and drawing
     /// each Digest cnonce from <paramref name="clientNonces" /> in turn.
     /// </summary>
+    /// <summary>
+    /// With <c>--proxy-ntlm</c> the POST that carries the Type 1 message in
+    /// <c>Proxy-Authorization</c> sends <c>Content-Length: 0</c> and no body, as upstream test239
+    /// expects of curl 8.21.0; a 2xx to it draws the body without the Type 1 value (BL-2029).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyNtlmPostWithItsType1Message_SendsContentLengthZeroAndNoBody()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok", OkHead + "ok");
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(ProxyAuthUrl),
+            Output = new MemoryStream(),
+            Http = new HttpRequestOptions { ForwardProxy = ChallengingProxy, Body = new BytesBody("postit"u8.ToArray(), "application/x-www-form-urlencoded") },
+        };
+        Diagnostics.Arrange("url, body, proxy schemes", $"{ProxyAuthUrl}, -d postit, --proxy-ntlm");
+
+        TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Ntlm).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("request written", "a Type 1 probe", OneLine(connection.Written));
+        string[] requests = connection.Written.Split("POST ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Proxy-Authorization: NTLM TlRMTVNTUAABAAAA", requests[0]);
+        Assert.EndsWith("Content-Length: 0\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n", requests[0]);
+        Assert.DoesNotContain("Proxy-Authorization:", requests[1]);
+        Assert.EndsWith("\r\n\r\npostit", requests[1]);
+    }
+
     private static HttpProtocolHandler ProxyChallengeHandler(QueueConnector connector, HttpAuthSchemes proxySchemes, params string[] clientNonces)
     {
         Queue<string> nonces = new(clientNonces);
