@@ -139,8 +139,12 @@ compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`), and
 `stat` modification-time check, the `print ... if('A' ne 'B')` and `$^O` prechecks, test8's
 `%HOSTIP !~ /.../` precheck, the `grep` line count over a file, the `printf` loop redirected
 to a file, and test1683's numbered-file write and verify loops; `$^O` is passed in. test1083's
-`exec '%RESOLVE ...'` form is not interpreted. Nothing calls it yet: running prechecks and
-postchecks through it is BL-1933. The result is an
+`exec '%RESOLVE ...'` form is not interpreted. `UpstreamTest610Script` (BL-1931) emulates
+upstream's `tests/libtest/test610.pl` for a `%PERL` line whose program is `test610.pl`: its
+`mkdir`, `rmdir`, `rm`, `move` and `gone` verbs, chained on one line and stopping at the first
+failure with Perl's `die "$!"` exit code (2 missing, 17 exists, 39 not empty, 255 for `gone` on
+an existing path), and the usage or `Unsupported command` text with exit 1. Nothing calls either
+yet: running prechecks and postchecks through them is BL-1933. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list.

@@ -173,6 +173,16 @@ public sealed class UpstreamCaseScreeningTests
         Assert.AreEqual(expectedReason, reason);
     }
 
+    [TestMethod]
+    [DataRow("<client>\n<precheck>\n%PERL %SRCDIR/libtest/test610.pl mkdir /log/test610.dir\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\n%PERL %SRCDIR/libtest/test610.pl move /log/a /log/b rmdir /log/c rm /log/d\n</postcheck>\n</verify>\n")]
+    public void FindSkipReason_Test610ScriptLines_AreNotPerlTheHarnessDoesNotRun(string sections)
+    {
+        string? reason = Screen(RunnableClient + sections);
+
+        Assert.DoesNotContain("the harness does not run the Perl", reason ?? "");
+    }
+
     private static string? Screen(string sections) =>
         UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features);
 
