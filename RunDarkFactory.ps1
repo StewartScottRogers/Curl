@@ -3268,6 +3268,12 @@ Rules for this unattended run, in addition to CLAUDE.md:
    no task covers yet, split it or file that work and requeue it then, not after a
    long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
    after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
+   The board let this run claim the task only because every ID already in its
+   `depends-on` is Done, so those never send it back. Before naming any other task as the
+   blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
+   not block. And leave work a Backlog task already covers to that task rather than doing
+   it here (AF-0148: BL-1936 was moved to Backlog for dependencies that were already Done,
+   moved back 16 seconds later, and then did BL-1945's work, so BL-1945's run found nothing to do).
 4. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file) and push the current
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
@@ -3367,6 +3373,12 @@ Rules for this unattended run, in addition to CLAUDE.md:
    no task covers yet, split it or file that work and requeue it then, not after a
    long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
    after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
+   The shift claimed the task only because every ID already in its `depends-on` is Done,
+   so those never send it back. Before naming any other task as the blocker, check its
+   folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
+   leave work a Backlog task already covers to that task rather than doing it here
+   (AF-0148: BL-1936 was moved to Backlog for dependencies that were already Done, moved
+   back 16 seconds later, and then did BL-1945's work, so BL-1945's run found nothing to do).
 5. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.
