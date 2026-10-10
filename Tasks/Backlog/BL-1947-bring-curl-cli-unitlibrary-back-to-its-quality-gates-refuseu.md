@@ -1,5 +1,5 @@
 ---
-id: BL-1945
+id: BL-1947
 title: Bring Curl.Cli.UnitLibrary back to its quality gates: RefuseUnlistedName branch, two complexity-12 methods
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-09
 completed:
 ---
-# BL-1945 — Bring Curl.Cli.UnitLibrary back to its quality gates: RefuseUnlistedName branch, two complexity-12 methods
+# BL-1947 — Bring Curl.Cli.UnitLibrary back to its quality gates: RefuseUnlistedName branch, two complexity-12 methods
 
 ## Goal
 
