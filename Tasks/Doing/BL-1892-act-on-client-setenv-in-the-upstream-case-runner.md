@@ -39,3 +39,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Waits on BL-1928: the conformance composition in Curl.Console reads no environment, so setenv cannot reach curl yet
+- 2026-10-09: Backlog -> Doing.
