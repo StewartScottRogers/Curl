@@ -4,7 +4,7 @@ title: Re-close GF-0004: After a 401 that the server closes the connection on, t
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2015, BL-2016]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-10
@@ -57,7 +57,15 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 
 ## Notes
 
+- 2026-10-10 (lane 5): BL-1797's fix (03b4e0404) is on `master` (in every master merge since 2026-10-08, including the one before the 2026-10-10_0657 gap run). The gap run's own failure could not be reproduced here: a lane may not read `Gap/` or the upstream cases under `%LOCALAPPDATA%\Curl\gap` (guard-audit-paths.ps1 refused both).
+- Measured this tree's Debug `Curl.Console` against curl 8.21.0 (Schannel) on loopback (`Record-CurlExchange.ps1`, plus a throwaway half-close server in %TEMP%): `GET /64 -u testuser:testpass --digest`, answered with a Digest 401 (`Content-Length: 26`), then 200 on the next connection.
+  - FIN close after the 401: both reuse, read `Recv failure`, write `Connection died, retrying a fresh connect (retry count: 1)` and send the authenticated GET on connection #1. Exit 0, two GETs recorded, same as upstream's expected `<protocol>`.
+  - RST close (zero linger): the same, exit 0, both GETs.
+  - Server half-closes (FIN, keeps reading): curl writes `Connection 0 seems to be dead` and `shutting down connection #0` and never writes to #0. Curl writes the 219-byte retry to #0, reads EOF, then retries fresh, exit 0. A real divergence in `-v` lines and bytes sent, filed as BL-2015.
+- None of these reproduces the measured "the second request never reaches the server". So the harness server's `swsclose` handling (or a stale Curl binary in the gap run) has to be checked by an interactive session: BL-2016 (lane: no). Parked in Backlog on BL-2015 and BL-2016; no code changed here.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Waits on BL-2015 (curl's dead-connection check before a same-connection retry) and BL-2016 (interactive: reproduce GF-0004 in the guarded gap harness); BL-1797's fix already holds for FIN and RST closes on loopback
