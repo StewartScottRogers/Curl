@@ -33,7 +33,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "file", "none"];
+    private static readonly HashSet<string> Servers = ["http", "file", "none", .. LineProtocolServerConnector.EmulatedServers];
 
     private static readonly string[] FileParts = ["file", "file1", "file2", "file3", "file4"];
 

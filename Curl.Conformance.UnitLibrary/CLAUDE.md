@@ -77,6 +77,20 @@ sws never answers 100 (test1070). Under `skip: N`, bytes past the request's end 
 unrecorded, as sws's stored request ends there. Otherwise a
 read with no reply waiting returns 0, because in memory nothing else can arrive.
 
+`LineProtocolServerConnector` is the shared core of the line-protocol stand-ins for upstream's
+`tests/ftpserver.pl` (BL-1895), the base that the FTP, SMTP, IMAP and POP3 stand-ins of
+BL-1905, BL-1909, BL-1910 and BL-1911 build on. Each connection (`LineProtocolServerConnection`)
+gets its own `ILineProtocolResponder` from the factory the connector is given: its `Greeting`
+waits to be read from the start, every CRLF-terminated command line the client writes is
+answered with a `LineProtocolReply` however the writes split it (a lone line feed stays part of
+the line), and a read with nothing waiting waits for the client's next write, as ftpserver.pl
+blocks reading a command. A reply that closes the connection makes later reads return 0 and
+drops the rest of the client's bytes unrecorded; `ReceivedBytes` records every byte read, across
+connections, for `<verify><protocol>` (the shared `SwsServerRecording`).
+`LineProtocolServerCommands` reads `<servercmd>`'s `REPLY <command> <text>` lines for the
+responders to look up by command name. `EmulatedServers` lists the `<server>` names whose cases
+`UpstreamCaseScreening` lets run; it is empty until a protocol task adds its stand-in's name.
+
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands
 the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),
 asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other

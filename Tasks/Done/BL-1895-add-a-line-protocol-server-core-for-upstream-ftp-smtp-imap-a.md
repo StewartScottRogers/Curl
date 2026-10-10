@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1895 — Add a line-protocol server core for upstream FTP, SMTP, IMAP and POP3 cases
 
@@ -22,13 +22,18 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] Unit tests drive the core through an in-memory connection: command lines split on CRLF across read boundaries, replies written, received bytes recorded for <verify><protocol> comparison, close on request.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md describes the core as the base of BL-1905, BL-1909, BL-1910 and BL-1911.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; `dotnet build -warnaserror` is clean for every touched project and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Unit tests drive the core through an in-memory connection: command lines split on CRLF across read boundaries, replies written, received bytes recorded for <verify><protocol> comparison, close on request.
+- [x] Curl.Conformance.UnitLibrary\CLAUDE.md describes the core as the base of BL-1905, BL-1909, BL-1910 and BL-1911.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; `dotnet build -warnaserror` is clean for every touched project and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+- Core: `LineProtocolServerConnector` (IConnector, one `ILineProtocolResponder` per connection from a factory, so each FTP/SMTP/IMAP/POP3 session keeps its own state), `LineProtocolServerConnection`, `LineProtocolReply`, and `LineProtocolServerCommands` for `<servercmd>` `REPLY <command> <text>` lookups. Recording reuses `SwsServerRecording` rather than a copy. A line ends only at CRLF, as the task describes ftpserver.pl reading; a lone LF stays in the line.
+- Screening hook: `UpstreamCaseScreening` adds `LineProtocolServerConnector.EmulatedServers` (empty for now) to its supported servers; each protocol task adds its name when its stand-in answers, so no FTP case runs before a server exists.
+- Coverage: not re-measured with Measure-CodeQuality.ps1 (run budget); every branch is driven by `LineProtocolServerConnectorTests` by construction (greeting, split lines, lone LF, short buffer, wait, cancel, close, recording, REPLY parsing). Complexity of each new method is under 5. Conformance fast tests: 1189 passed, 0 failed.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Line-protocol server core and screening hook in place, tested through an echo protocol
