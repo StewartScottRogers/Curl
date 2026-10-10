@@ -117,6 +117,13 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     }
 
     /// <summary>
+    /// Whether the bytes already read past the last reply start a 4xx or 5xx reply, as curl
+    /// 8.21.0's <c>ReceivedServerConnect</c> checks its cached response while it waits for an
+    /// active-mode data connection (BL-1978).
+    /// </summary>
+    public bool HasBufferedNegativeReply => bufferStart < bufferEnd && buffer[bufferStart] > (byte)'3';
+
+    /// <summary>
     /// Reads the next complete reply.
     /// </summary>
     /// <returns>

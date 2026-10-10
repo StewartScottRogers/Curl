@@ -156,6 +156,19 @@ internal static class FtpTransferMessages
     internal const string AcceptTimeout = "Accept timeout occurred while waiting server connect";
 
     /// <summary>
+    /// The <c>-v</c> line curl 8.21.0's <c>ReceivedServerConnect</c> writes when a 4xx or 5xx
+    /// reply is already read while it waits for the server's data connection (BL-1978).
+    /// </summary>
+    internal const string NegativeReplyWhileAwaitingServerConnect = "There is negative response in cache while serv connect";
+
+    /// <summary>
+    /// The exit 10 message, curl's <c>curl_easy_strerror</c> text for <c>CURLE_FTP_ACCEPT_FAILED</c>,
+    /// for a 4xx or 5xx reply that ends the wait for the server's data connection; curl sets no
+    /// message of its own there (BL-1978).
+    /// </summary>
+    internal const string ServerFailedToConnectToDataPort = "FTP: The server failed to connect to data port";
+
+    /// <summary>
     /// The exit 64 message for an <c>AUTH</c> refused under <c>--ssl-reqd</c> or
     /// <c>--ftp-ssl-control</c>, or a <c>PROT P</c> refused under <c>--ssl-reqd</c> (BL-437).
     /// </summary>

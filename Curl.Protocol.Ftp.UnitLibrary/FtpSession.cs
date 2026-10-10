@@ -1249,12 +1249,22 @@ internal sealed class FtpSession(
     /// <summary>
     /// Waits up to 60 seconds for the server to connect to the active-mode port: exit 12
     /// after <c>QUIT</c> when it does not, and a failed accept's exit code after <c>QUIT</c>.
+    /// A 4xx or 5xx reply already read behind the transfer command's <c>150</c> (a server's
+    /// <c>425</c> or <c>421</c> for a data connection it could not open) is read and ends the
+    /// wait with exit 10 after <c>QUIT</c>, as curl 8.21.0 does (upstream tests 1206 and 1207, BL-1978).
     /// </summary>
     private async ValueTask<TransferResult?> AcceptDataConnectionAsync(IPendingConnection pending)
     {
         context.Events.ReportInfo(FtpTransferMessages.DataConnectionNotAvailable);
         trace.AcceptPending();
         context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
+        if (control.HasBufferedNegativeReply)
+        {
+            context.Events.ReportInfo(FtpTransferMessages.NegativeReplyWhileAwaitingServerConnect);
+            await ReadReplyIgnoringItsFailureAsync().ConfigureAwait(false);
+            return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
+        }
+
         using var timeout = new CancellationTokenSource(AcceptTimeout, context.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, timeout.Token);
         ConnectResult accepted;
@@ -1276,6 +1286,22 @@ internal sealed class FtpSession(
         ReportAccepted(dataConnection.RemoteEndPoint, (IPEndPoint)pending.LocalEndPoint);
         log.ActiveDataAccepted();
         return null;
+    }
+
+    /// <summary>
+    /// Reads the next reply and drops whatever reading it fails with, a <c>421</c>'s exit 28
+    /// included (its <c>-v</c> line still written), as curl 8.21.0's <c>ReceivedServerConnect</c>
+    /// ignores what <c>Curl_GetFTPResponse</c> returns (BL-1978).
+    /// </summary>
+    private async ValueTask ReadReplyIgnoringItsFailureAsync()
+    {
+        try
+        {
+            await ReadReplyAsync().ConfigureAwait(false);
+        }
+        catch (FtpControlConversationFailedException)
+        {
+        }
     }
 
     /// <summary>
