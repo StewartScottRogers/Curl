@@ -1,5 +1,5 @@
 ---
-id: BL-2021
+id: BL-2022
 title: Format a Digest Authorization header as curl's Schannel build does, without a space after each comma
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2021 — Format a Digest Authorization header as curl's Schannel build does, without a space after each comma
+# BL-2022 — Format a Digest Authorization header as curl's Schannel build does, without a space after each comma
 
 ## Goal
 
