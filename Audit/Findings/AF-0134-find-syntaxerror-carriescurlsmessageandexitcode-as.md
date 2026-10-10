@@ -42,6 +42,8 @@ Select-String -Path Curl.Authentication.UnitTests/NetrcFileTests.cs -SimpleMatch
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the Select-String for '// Assert.AreEqual(' in NetrcFileTests.cs: no match. Find_SyntaxError_CarriesCurlsMessageAndExitCode now calls AssertSyntaxError(diagnostics, result) and Assert.AreEqual("curl: (26) .netrc error: syntax error", actual).
+
 ## Log
 
 - 2026-10-09: filed proposed.

@@ -42,6 +42,8 @@ Run from the repository root:
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | not re-audited | Ran the reproduction: the count of 'on every platform now that' is still 1, and the WindowsFeaturesLine pattern still has no match, the same output as before. But the matching line (CurlVersionText.cs:43) is now '<c>NTLM</c> on every platform now that <c>--ntlm</c> is', which is true (both lines list NTLM). Lines 37-46 now say the Windows line drops ECH, GSS-API, HTTP2, HTTP3 and TLS-SRP, and list each of those 'off Windows'. That matches FeaturesLine (line 52) and WindowsFeaturesLine (line 66). The defect looks fixed, but the reproduction no longer discriminates.
+
 ## Log
 
 - 2026-10-09: filed proposed.

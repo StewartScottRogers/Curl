@@ -3,8 +3,8 @@ id: AF-0128
 title: CI red on work/dark-factory for 321 minutes from run 37733074018 on 711fbdf0
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: the reproduction no longer reproduces.
 key: process:logs:37733074018:ci-red
 reproduction: none
 task: BL-1878
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_1435.md
 ---
 # AF-0128 - CI red on work/dark-factory for 321 minutes from run 37733074018 on 711fbdf0
 
@@ -45,8 +45,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | still reported
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the reproduction (-Since 2026-10-08): ciRedSpells lists 2026-10-08T05:41:00Z to 11:01:51Z, 320.85 minutes, runId 37733074018. It is the same incident, still inside a window that starts at a date. The only other spell, 37907205689, lasted 11.52 minutes.
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: yes | Ran the reproduction (-Since 2026-10-08). ciRedSpells: 37733074018 320.85 min (the original incident, 711fbdf0), 94826414012 90 min (rests on impossible CI runs, reported as a separate finding), 37907205689 11.52 min, and 37931431648 30.42 min (2026-10-09T12:45:17Z to 13:15:42Z on ea846a2e). By mechanism over this window, CI on work/dark-factory again stayed red for over 30 minutes in one spell: run 37931431648, caused by lane-1 task BL-1876's edit to the guard file task-board.ps1 in shift 20261009-050349. The spell is much shorter than the original 321 minutes, but it still crosses the rule.
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Re-audited by its mechanism (CI red rule) over this window: Measure-FactoryProcess.ps1 -Since 2026-10-09 with ..\logs\ci-runs.json gives ciRedMinutes 41.94 (limit 60) and two spells: 11.52 minutes (run 37907205689) and 30.42 minutes (run 37931431648). The 30.42-minute spell is AF-0139's earlier incident (12:45Z to 13:15Z, before this log copy's first shift at 09:37 -0700 = 16:37Z). Since then no CI run on work/dark-factory failed: runs from 16:34Z on are cancelled or success (37962252915 and 37963508491 success). The window holds a shift that finished tasks (DarkFactory-20261009-093905: 7 Done). No long red spell like AF-0128's 321 minutes reappears; nothing stayed red without a fix.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: the reproduction no longer reproduces.

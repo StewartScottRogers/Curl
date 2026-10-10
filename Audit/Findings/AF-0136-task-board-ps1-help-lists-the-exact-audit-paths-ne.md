@@ -42,6 +42,8 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'whose
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | not re-audited | Ran the reproduction: it still prints task-board.ps1:18 ('... or whose touches name an audit') and :220 ('(BL-1876)'), as it would have in the defective tree, so its output does not tell. Reading the help, lines 18-23 now add 'or a folder that holds any of them (.claude, .claude/skills, .github and the like) (Test-AuditPath)', which matches Test-AuditPath's $holders check (lines 220-223). The defect looks fixed, but the reproduction cannot tell. A distinguishing one would be: Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'or a folder that holds any of them'.
+
 ## Log
 
 - 2026-10-09: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0132
 title: h2c upgrade's 'afterHead.Length > 0' can become '>= 0' with no test failing: a spurious 'Copied HTTP/2 data ... len=0' -v line
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpH2cUpgradeConnection.cs:SwitchAsync-gt:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpH2cUpgradeConnection.cs:179:>
 task: BL-1884
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: mechanical
+closed-by: 2026-10-09_1435.md
 ---
 # AF-0132 - h2c upgrade's 'afterHead.Length > 0' can become '>= 0' with no test failing: a spurious 'Copied HTTP/2 data ... len=0' -v line
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the -Site command with -ExcludeBaselineFailures: HttpH2cUpgradeConnection.cs:179 'if (afterHead.Length > 0)' -> '>= 0', outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

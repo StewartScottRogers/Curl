@@ -3,8 +3,8 @@ id: AF-0126
 title: task-board.ps1 help says interactive-only tasks do not count toward capacity, but every task in Doing is counted
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).
 key: truthfulness:.claude/skills/task-board/task-board.ps1:capacity:false-help
 reproduction: none
 task: BL-1876
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-09_0647.md, 2026-10-09_1435.md
 ---
 # AF-0126 - task-board.ps1 help says interactive-only tasks do not count toward capacity, but every task in Doing is counted
 
@@ -44,8 +44,10 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -SimpleMatch 'Inter
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the reproduction, and both lines matched. task-board.ps1:32 still says 'Interactive-only tasks do not count.', and task-board.ps1:468 still sets '$doing = @($tasks | Where-Object { $_.State -eq 'Doing' })'. The Capacity line adds $doing.Count, so every task in Doing is counted, interactive-only ones included. Only the ready tasks are filtered, through Get-LaneReadyTasks.
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: 'Interactive-only tasks do not count' no longer matches; only line 474 '$doing = @($tasks | Where-Object { $_.State -eq 'Doing' })' matches. The capacity help (lines 28-33) now says 'Every task in Doing counts, interactive-only ones included; of the ready tasks, only lane-eligible ones do', which matches the code.
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: 'Interactive-only tasks do not count' no longer matches; only the code line task-board.ps1:475 ($doing = @($tasks | Where-Object { $_.State -eq 'Doing' })) matches. The help (lines 27-29) now says 'Every task in Doing counts, interactive-only ones included; of the ready tasks, only lane-eligible ones do', which matches the code (Get-LaneReadyTasks for the ready set).
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).
