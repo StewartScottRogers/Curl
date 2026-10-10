@@ -4,11 +4,11 @@ title: Curl lists TLS-SRP in Features; the Windows reference build does not
 area: features
 key: features:tls-srp-not-in-reference
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [features:TLS-SRP]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -33,8 +33,10 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 
 - 2026-10-08_1640: 1 of 1 items are gaps.
 - 2026-10-08_2029: 1 of 1 items are gaps.
+- 2026-10-10_0657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-features.
 - 2026-10-08_1731: Filed BL-1826.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.

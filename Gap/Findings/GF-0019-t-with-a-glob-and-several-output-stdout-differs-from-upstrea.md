@@ -4,11 +4,11 @@ title: -T with a glob and several --output: stdout differs from upstream's %EMPT
 area: behaviour
 key: behaviour:upload-glob-stdout
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [behaviour:test2013, behaviour:test2014]
 touches: [Curl.Console, Curl.Console.UnitTests]
@@ -33,8 +33,10 @@ First confirm against the reference curl what test2013/2014 write to stdout with
 
 - 2026-10-08_1640: 2 of 2 items are gaps.
 - 2026-10-08_2029: 2 of 2 items are gaps.
+- 2026-10-10_0657: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1812.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.

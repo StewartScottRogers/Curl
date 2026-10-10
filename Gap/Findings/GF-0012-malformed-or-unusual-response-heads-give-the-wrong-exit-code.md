@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1144, behaviour:test1473, behaviour:test1480, behaviour:test2106]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task: BL-1805
-tasks: [BL-1805]
+task: BL-1967
+tasks: [BL-1805, BL-1967]
 ---
 # GF-0012 - Malformed or unusual response heads give the wrong exit code (HTTP/0.9 under -I, header starting with whitespace, 100 without a final response, NUL in a trailer)
 
@@ -33,8 +33,10 @@ In Curl.Protocol.Http.UnitLibrary's HttpResponseHeadReader and HttpChunkedDecode
 
 - 2026-10-08_1640: 4 of 4 items are gaps.
 - 2026-10-08_2029: 1 of 4 items are gaps.
+- 2026-10-10_0657: 1 of 4 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1805.
+- 2026-10-10_0756: Filed BL-1967.

@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test366, behaviour:test1633, behaviour:test1634]
 touches: [Curl.Console, Curl.Console.UnitTests]
-task: BL-1808
-tasks: [BL-1808]
+task: BL-1970
+tasks: [BL-1808, BL-1970]
 ---
 # GF-0015 - --retry does not follow a 429's Retry-After as curl does (resend, --fail, --retry-max-time warning)
 
@@ -33,8 +33,10 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 
 - 2026-10-08_1640: 3 of 3 items are gaps.
 - 2026-10-08_2029: 3 of 3 items are gaps.
+- 2026-10-10_0657: 3 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1808.
+- 2026-10-10_0756: Filed BL-1970.
