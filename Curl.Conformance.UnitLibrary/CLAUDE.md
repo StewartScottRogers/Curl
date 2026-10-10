@@ -96,6 +96,16 @@ four-letter command; `ReceivedCommandLines` keeps each line with its CRLF. The d
 commands are BL-1906 to BL-1908's, and wiring it into `UpstreamCaseRunner` is BL-1905's. `EmulatedServers` lists the `<server>` names whose cases
 `UpstreamCaseScreening` lets run; it is empty until a protocol task adds its stand-in's name.
 
+`TlsServerStream` (BL-1921) is the TLS layer for the stand-ins of upstream's stunnel-fronted
+servers (BL-1912 to BL-1914): `AuthenticateAsync` runs `SslStream`'s server handshake on a
+server's in-memory stream with a `TlsServerOptions` certificate, ALPN protocol list (empty for
+none, as stunnel by default) and client-certificate request, accepting any client certificate
+as stunnel at `verify = 0` does, and disposes the stream if the handshake fails.
+`InMemoryDuplexStream.CreatePair` makes the two connected ends it runs over: each end reads,
+asynchronously only, what the other writes, and reads 0 once the other end is disposed and
+drained. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
+reject an ephemeral server key.
+
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands
 the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),
 asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other
