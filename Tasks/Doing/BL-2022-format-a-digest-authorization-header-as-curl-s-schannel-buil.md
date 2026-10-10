@@ -37,3 +37,4 @@ The response hash matches; only the separators differ. `HttpProtocolHandlerTests
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
