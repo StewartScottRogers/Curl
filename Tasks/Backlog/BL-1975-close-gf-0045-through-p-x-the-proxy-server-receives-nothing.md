@@ -4,8 +4,8 @@ title: Close GF-0045: Through -p/-x the proxy server receives nothing in process
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests]
+depends-on: [BL-2010, BL-2011]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
 completed:
@@ -55,7 +55,13 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 
 ## Notes
 
+- 2026-10-10 (lane 1), measured with `Curl.Conformance.UnitTests`' `UpstreamCase_RunThroughCurl_HoldsTheRatchet`, which runs in process over the production `TcpConnector` (BL-1831): test80, 83, 95, 275, 744, 1078, 1184, 1297, 1428 and 1904 already pass there and are listed. Their gap entries come from the gap office's `Gap/Tools/Measure-UpstreamCases.cs` measuring through `InProcessCurl.RunAsync`'s `IConnector` overload, which skips `TcpConnector`; switching that tool to the `ITcpDialer`/`IDnsResolver` overload is interactive-only work (Gap/ is closed to lanes and the board refuses a lane filing it), so an interactive session should do it before the next gap run, or BL-1997 should.
+- test2107 fixed here: `HttpProxyTunnel.ReadReplyAsync` fails a reply header line holding a NUL byte with exit 8 `Nul byte in header` (curl 8.21.0's `lib/http.c` `verify_header` text), the head being the lines before it, as curl refuses the line before `-v` shows it. The upstream case expects only exit 8; the message and the head cut are taken from curl's source, not measured (no reference proxy that sends a NUL byte is at hand). 2107 added to `PassingUpstreamCases.txt`; `Curl.Conformance.UnitTests` added to touches for that (no task in Doing named it).
+- test1288 left: `%{size_header}` lacks the CONNECT reply head's 61 bytes (231 expected, 170 got); needs `Curl.Protocol.Abstractions` and `Curl.Protocol.Http` (the latter held by BL-1959). Filed as BL-2010.
+- test1319-1321 left: pop3/smtp/imap never put the proxy on their connect target, so nothing is sent; needs the mail protocol libraries (held by BL-1989). Filed as BL-2011.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. test2107 fixed; waits on BL-2010 (test1288, size_header needs Curl.Protocol.Http held by BL-1959) and BL-2011 (test1319-1321, mail libraries held by BL-1989)
