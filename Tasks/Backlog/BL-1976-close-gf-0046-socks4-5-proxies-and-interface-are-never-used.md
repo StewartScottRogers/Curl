@@ -4,7 +4,7 @@ title: Close GF-0046: SOCKS4/5 proxies and --interface are never used in process
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1997, BL-2033]
+depends-on: [BL-1997, BL-2035]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console]
 requirement: none
 created: 2026-10-10
@@ -74,7 +74,7 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
   Curl.Networking.UnitTests 3153 passed. test713 still writes the banner after it, so another
   hop is involved. Curl.Console added to touches: `CurlComposition.FtpDataConnectorOf` and its
   CLAUDE.md name the renamed method; no task in Doing touches it. Harness work and the test713
-  diagnosis filed as BL-2033; this task waits on it.
+  diagnosis filed as BL-2035; this task waits on it.
 
 ## Log
 
@@ -82,4 +82,4 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-1997 (InProcessCurl runs TcpConnector); re-measure GF-0046 after it, then fix what still stops test713-715
 - 2026-10-10: Backlog -> Doing.
-- 2026-10-10: Doing -> Backlog. Waits on BL-2033 (harness relays CONNECT to FTP ports; diagnose test713's data connection); --connect-to fix for FTP data connections left uncommitted
+- 2026-10-10: Doing -> Backlog. Waits on BL-2035 (harness relays CONNECT to FTP ports; diagnose test713's data connection); --connect-to fix for FTP data connections left uncommitted

@@ -1,5 +1,5 @@
 ---
-id: BL-2033
+id: BL-2035
 title: Run upstream test713-715 (FTP through SOCKS5, an HTTP tunnel or both, with --connect-to) through the conformance harness
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2033 — Run upstream test713-715 (FTP through SOCKS5, an HTTP tunnel or both, with --connect-to) through the conformance harness
+# BL-2035 — Run upstream test713-715 (FTP through SOCKS5, an HTTP tunnel or both, with --connect-to) through the conformance harness
 
 ## Goal
 
