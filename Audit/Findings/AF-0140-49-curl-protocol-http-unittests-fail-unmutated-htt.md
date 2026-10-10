@@ -3,8 +3,8 @@ id: AF-0140
 title: 49 Curl.Protocol.Http.UnitTests fail unmutated: HttpResponseBodyReader counts every length-delimited/read-to-close body byte twice in BytesWritten
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:CopyFramedAsync:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "FullyQuali
 ## Log
 
 - 2026-10-09: filed proposed.
+- 2026-10-09: proposed -> accepted.
