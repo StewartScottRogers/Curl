@@ -48,3 +48,4 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
