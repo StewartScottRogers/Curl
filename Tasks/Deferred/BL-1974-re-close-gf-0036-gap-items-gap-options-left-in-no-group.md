@@ -69,3 +69,4 @@ Group these items under their causes in the next gap-options report.
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Blocked. Interactive session: --no-proxy-http3 already matches; the five DNS/--ech items are intended differences (ADR-0454) and close only by an excluded entry in the gap office baseline, which lanes may not write
+- 2026-10-10: Blocked -> Deferred. Gap PR #105 marks the five ADR-0454 options excluded (Gap/Baselines/option-exclusions.json); GF-0036 closes on the next gap run, which re-measures them; look again then
