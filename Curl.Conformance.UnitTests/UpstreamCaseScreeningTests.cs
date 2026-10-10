@@ -118,7 +118,7 @@ public sealed class UpstreamCaseScreeningTests
 
         string? reason = UpstreamCaseScreening.FindSkipReason(new(ReadOnlyMemory<byte>.Empty, [], [], null), ParsedTestCase.From(testFile), Features);
 
-        Assert.AreEqual("the harness records <verify><upload> only for the smtp and imap servers", reason);
+        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps and imaps servers", reason);
     }
 
     [TestMethod]
@@ -150,6 +150,30 @@ public sealed class UpstreamCaseScreeningTests
 
         diagnostics.Act("skip reason", reason ?? "(none)");
         Assert.DoesNotContain("%PROXYPORT", reason ?? string.Empty);
+    }
+
+    [TestMethod]
+    [DataRow(987)]
+    [DataRow(988)]
+    [DataRow(989)]
+    public void FindSkipReason_ImplicitTlsMailCaseGivenTheRunnersTlsPorts_IsNotSkipped(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal)
+        {
+            ["HOSTIP"] = "127.0.0.1",
+            ["SMTPSPORT"] = UpstreamCaseRunner.SmtpsPort,
+            ["IMAPSPORT"] = UpstreamCaseRunner.ImapsPort,
+            ["POP3SPORT"] = UpstreamCaseRunner.Pop3sPort,
+            ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
+        };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason ?? "(none)");
+        Assert.IsNull(reason, reason);
     }
 
     [TestMethod]
@@ -196,7 +220,7 @@ public sealed class UpstreamCaseScreeningTests
 
     [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
-    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp and imap servers")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps and imaps servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]
     [DataRow("<reply>\n<servercmd>\ndelay: 5\n</servercmd>\n</reply>\n", "the sws emulation does not carry out the server command delay")]

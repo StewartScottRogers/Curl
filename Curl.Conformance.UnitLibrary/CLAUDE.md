@@ -138,6 +138,21 @@ Windows 25 HTTPS cases pass (300, 303, 304, 306, 309, 311, 312, 325, 364, 410, 4
 1561, 1562, 2009-2011, 2033, 2048, 2070, 2079, 2087, 3023, 3024, ...) and 2035, 2038, 2042,
 323 and 1244 fail on a difference the next gap run files; the `!Schannel` cases run on Linux and macOS.
 
+`MailTlsServerConnector` (BL-1914, ADR-0459) stands in for stunnel in front of the mail
+stand-ins: ports 9000, 9001 and 9002, the runner's `%SMTPSPORT`, `%IMAPSPORT` and `%POP3SPORT`
+(with a value only when the caller names a certificate directory, as `%HTTPSPORT`), reach the
+SMTP, IMAP and POP3 stand-ins on their plain ports through a `TlsRelayConnection`, which runs
+`TlsServerStream` with `%CERTDIR/certs/test-localhost.pem`, no ALPN and no client certificate
+request, and relays both ways at once (the server's greeting comes first), so the decrypted
+commands land in the plain stand-in's `ProtocolLog` and `UploadedMessage`; once the plain server
+closes it sends close_notify, and once the client closes the relay from the server stops. The
+runner puts it between the SOCKS stand-in and `Pop3ServerConnector` only for a case naming
+`smtps`, `imaps` or `pop3s`; screening lets those servers run, and records `<verify><upload>`
+for `smtps` and `imaps` too. No STARTTLS upgrade is emulated, since ftpserver.pl offers none:
+the `--ssl` / `--ssl-reqd` cases on a plain mail server (980, 981, 982, 984, 985) measure curl
+against a server that does not offer it. 981, 984, 985, 987, 988 and 989 pass; 980 and 982 fail
+on a Curl difference the next gap run files.
+
 `UpstreamTestCertificateGenerator` (BL-1923) writes the files cases read through
 `%CERTDIR/certs/`, as upstream's `tests/certs/genserv.pl` does with OpenSSL at build time,
 from the vendored `.prm` files (read by `UpstreamCertificateParameters`) and the BCL only: a

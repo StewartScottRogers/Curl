@@ -785,6 +785,49 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task RunAsync_SmtpsCaseWithACertificateDirectory_ServesTlsOnTheSmtpsPort()
+    {
+        string certificateDirectory = CreateLogDirectory();
+        Directory.CreateDirectory(Path.Combine(certificateDirectory, "certs"));
+        using (System.Security.Cryptography.ECDsa key = System.Security.Cryptography.ECDsa.Create())
+        {
+            System.Security.Cryptography.X509Certificates.CertificateRequest request = new("CN=localhost", key, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using System.Security.Cryptography.X509Certificates.X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            await File.WriteAllTextAsync(Path.Combine(certificateDirectory, "certs", "test-localhost.pem"), certificate.ExportCertificatePem() + "\n" + key.ExportPkcs8PrivateKeyPem() + "\n");
+        }
+
+        string[]? arguments = null;
+        int read = -1;
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            arguments = [.. invocation.Arguments];
+            ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", MailTlsServerConnector.SmtpsPort, false), CancellationToken.None);
+            await using IConnection connection = connected.Connection!;
+            await connection.WriteAsync("EHLO x\r\n"u8.ToArray(), CancellationToken.None);
+            read = await connection.ReadAsync(new byte[16], CancellationToken.None);
+            return 0;
+        });
+        string testFile = "<testcase>\n<client>\n<server>\nsmtps\n</server>\n<command option=\"no-output,no-include\">\nsmtps://localhost:%SMTPSPORT/ %IMAPSPORT %POP3SPORT\n</command>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, certificateDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "smtps://localhost:" + UpstreamCaseRunner.SmtpsPort + "/", UpstreamCaseRunner.ImapsPort, UpstreamCaseRunner.Pop3sPort }, arguments);
+        Assert.AreEqual(0, read, "a plain-text command to the TLS server ends the connection");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SmtpsCaseWithoutACertificateDirectory_SkipsForTheSmtpsPort()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nsmtps\n</server>\n<command>\nsmtps://localhost:%SMTPSPORT/\n</command>\n</client>\n</testcase>\n");
+
+        Assert.AreEqual("the harness has no value for %SMTPSPORT", outcome.Detail);
+    }
+
+    [TestMethod]
     public async Task RunAsync_HttpsCaseWithoutACertificateDirectory_SkipsForTheHttpsPort()
     {
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
