@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1980 — Close GF-0050: An over-long TFTP file name fails with exit 7 when the channel cannot open, where curl refuses it first with exit 71
 
@@ -62,3 +62,4 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpProtocolHandler, run TftpRequestFile's l
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Upstream test1453 passes: an over-long TFTP name now fails with exit 71 ahead of a failed connect
