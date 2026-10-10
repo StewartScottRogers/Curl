@@ -1,5 +1,5 @@
 ---
-id: BL-2015
+id: BL-2018
 title: Detect a kept HTTP connection the server closed before sending a retry on it, as curl's Connection N seems to be dead
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2015 — Detect a kept HTTP connection the server closed before sending a retry on it, as curl's Connection N seems to be dead
+# BL-2018 — Detect a kept HTTP connection the server closed before sending a retry on it, as curl's Connection N seems to be dead
 
 ## Goal
 
@@ -27,7 +27,7 @@ curl checks a kept connection before reusing it (`Curl_conn_is_alive`: the socke
 
 Where to start: add a liveness question to `IConnection` (default "alive"), answer it in `StreamConnection` over a socket (`Socket.Poll(0, SelectRead)` with `Available == 0`) and forward it through `PooledConnection`, `SslStreamConnection` and the hand-built TLS connection; ask it in `ExchangeWithRetriesAsync` before `ReportRetryOnSameConnection` and in `PoolingConnector.TakeIdleAsync`. Keep the socket call inside the `[ExcludeFromCodeCoverage]` transport seam (ADR-0083). Record the decision in an ADR.
 
-This may be what GF-0004's gap harness meets (BL-2000, BL-2016); with a plain FIN or RST close Curl already matches curl.
+This may be what GF-0004's gap harness meets (BL-2000, BL-2019); with a plain FIN or RST close Curl already matches curl.
 
 ## Acceptance criteria
 
