@@ -65,3 +65,4 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. test2107 fixed; waits on BL-2010 (test1288, size_header needs Curl.Protocol.Http held by BL-1959) and BL-2011 (test1319-1321, mail libraries held by BL-1989)
+- 2026-10-10: Backlog -> Doing.
