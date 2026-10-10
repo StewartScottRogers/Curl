@@ -155,7 +155,7 @@
     from `gh run view <id> --log-failed`: every "Failed <TestName>" line, or every compiler
     "error" line when the build broke. Over the last six such runs, newest first, a failure
     is a regression when it fails in the newest run and broke the build, failed on two
-    platforms, failed in the run before too, or found no run to confirm it within 30
+    platforms, failed in the run before too, or found no run to confirm it within 5
     minutes; it is flaky when it failed once with a passing run on each side, or failed
     again after passing. For each one it files a High task with task-board.ps1 new -
     "Fix CI failure <test> on Linux and macOS", "Fix flaky CI test <test> that failed once
@@ -171,7 +171,7 @@
     run to confirm it - once per run, and again when that changes. The watch also runs while
     a coordinator waits for a fresh session before its shift starts, and once more at the
     end of a shift, after the merge has waited for CI on the last commit; that last look
-    files a one-platform failure at once instead of waiting 30 minutes (BL-1031).
+    files a one-platform failure at once instead of waiting 5 minutes (BL-1031).
 
     The audit guard (BL-998) fails the `audit-guard` job with "Audit guard: <path> changed
     on work/dark-factory ..." when the factory changed an audit path or a guard. The watch
@@ -2559,7 +2559,7 @@ $script:CiWatchBranch = ''
 # How many finished runs the flaky and regression verdicts look back over, and how long a
 # failure seen on one platform in only the newest run waits for the next run to confirm it.
 $CiWindowRuns = 6
-$CiConfirmMinutes = 30
+$CiConfirmMinutes = 5
 
 function Get-CiPlatform {
     # "Build and test (ubuntu-latest)" -> Linux; the platform's name, or the job's when unknown.
@@ -2998,7 +2998,7 @@ if ($TestCiWatch) {
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux', 'macOS'))), (& $run 8 20 @()))))
     & $check 'one platform, newest only: waits' '' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux'))), (& $run 8 20 @()))))
-    & $check 'one platform, unconfirmed for 30 min: regression' 'regression A run 9 from sha9 on Linux' `
+    & $check 'one platform, unconfirmed for 5 min: regression' 'regression A run 9 from sha9 on Linux' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 31 @(& $f A @('Linux'))), (& $run 8 40 @()))))
     & $check 'two runs in a row: regression from the first' 'regression A run 9 from sha8 on Linux+macOS' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux'))), (& $run 8 9 @(& $f A @('macOS'))), (& $run 7 20 @()))))
@@ -3085,7 +3085,7 @@ if ($TestCiWatch) {
     $script:ciListJson = '[{"conclusion":"failure","databaseId":36674691490,"headSha":"d0621052bba101113a0187570196267f13bc6b74","status":"completed","updatedAt":"2026-09-30T05:47:43Z"},{"conclusion":"success","databaseId":36668685198,"headSha":"7c9833f44d160cdb92e3bf3c9fda81b9cc9a0e5d","status":"completed","updatedAt":"2026-09-30T04:28:52Z"}]'
     $replay = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
     $replayAt = $replay[0].FinishedAt
-    & $check 'replay 36674691490: new, waits to confirm' '' (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(5) -Runs $replay))
+    & $check 'replay 36674691490: new, waits to confirm' '' (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(4) -Runs $replay))
     & $check 'replay 36674691490: a task per failing test once confirmed' `
         'regression BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed run 36674691490 from d0621052bba101113a0187570196267f13bc6b74 on Linux; regression BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext run 36674691490 from d0621052bba101113a0187570196267f13bc6b74 on Linux' `
         (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay))
@@ -3104,8 +3104,8 @@ if ($TestCiWatch) {
     & $check 'gh cannot list: no runs, traced once' 'True True; cannot list the CI runs on work with gh' "$($null -eq $first) $($null -eq $second); $($traced -join '|')"
     # What a coordinator log line says for each run it examined, and that it says it once.
     $verdicts = @(Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay)
-    $waiting = Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts @() -Settled @{} -ConfirmMinutes 30
-    & $check 'outcome: waiting' "failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed on Linux only, waiting for the next run or $($replayAt.AddMinutes(30).ToString('HH:mm')) to confirm it; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext on Linux only, waiting for the next run or $($replayAt.AddMinutes(30).ToString('HH:mm')) to confirm it" $waiting
+    $waiting = Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts @() -Settled @{} -ConfirmMinutes 5
+    & $check 'outcome: waiting' "failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it" $waiting
     $settled = @{ 'BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed|36674691490' = 'filed BL-1040'; 'BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext|36674691490' = 'covered by a task' }
     & $check 'outcome: filed and covered' 'failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed regression, filed BL-1040; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext regression, covered by a task' `
         (Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts $verdicts -Settled $settled)
