@@ -3648,6 +3648,14 @@ function Invoke-TaskRun {
         }
     }
     $p.WaitForExit()
+    # A run that ended with no result event (killed, crashed, stream cut) gets one written
+    # for it, so every run log ends with a result and the audit's unfinishedRuns stays empty
+    # for runs the factory itself saw end (AF-0151). RunResult stays null: the retry logic
+    # still sees "no result". total_cost_usd 0 keeps the cost readers' sums right.
+    if ($null -eq $script:RunResult) {
+        $why = if ($timedOut) { "killed: timed out after $Minutes min" } else { "ended with no result event, exit $($p.ExitCode)" }
+        Add-Content -Path $raw -Value ([pscustomobject][ordered]@{ type = 'result'; subtype = 'factory_no_result'; is_error = $true; exit_code = $p.ExitCode; timed_out = $timedOut; result = $why; total_cost_usd = 0 } | ConvertTo-Json -Compress) -Encoding UTF8
+    }
     return @{ ExitCode = $p.ExitCode; TimedOut = $timedOut }
 }
 
@@ -4213,7 +4221,7 @@ function Wait-ForTokensByProbe {
     # returns how long it waited.
     param([string]$Id)
     $began = Get-Date
-    Write-Trace $Id 'tokens' 'run failed on the API; waiting until Claude answers again' 'Yellow'
+    Write-Trace $Id 'tokens' 'run ended with no result (not necessarily the API); waiting until Claude answers a probe' 'Yellow'
     Write-Heartbeat 'tokens' 'waiting until Claude answers again'
     while (-not (Test-TokensAvailable)) {
         if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane waiting for the API" } catch { } }
