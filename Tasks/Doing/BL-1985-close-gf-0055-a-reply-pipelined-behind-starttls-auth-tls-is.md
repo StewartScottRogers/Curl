@@ -47,3 +47,4 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
