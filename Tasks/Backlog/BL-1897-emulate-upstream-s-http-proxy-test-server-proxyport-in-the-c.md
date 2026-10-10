@@ -4,7 +4,7 @@ title: Emulate upstream's HTTP proxy test server (%PROXYPORT) in the case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1924]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2): `%PROXYPORT` now has a value, `UpstreamCaseRunner.ProxyPort` = 8992 (any port other than 8990 would do; every connection reaches the same `sws` stand-in whatever its port), with a runner test `RunAsync_CaseUsingProxyport_RunsItWithTheProxyPort`. That change is left uncommitted for the shift to stash. Measured with the conformance run: all 45 vendored `%PROXYPORT` cases are still skipped, for other reasons - 14 for `<verify><proxy>`, 2 for the `http-proxy` server, the rest for `<client><tool>`, `<client><setenv>` or another server's port. No "no value for %PROXYPORT" reason is left. Reaching 15 measured cases therefore needs `<verify><proxy>` and `http-proxy`, filed as BL-1924 with the case list; this task waits on it and then only has to confirm the criteria and update CLAUDE.md.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Waits on BL-1924: every %PROXYPORT case is still skipped for <verify><proxy> or http-proxy, which BL-1924 adds
