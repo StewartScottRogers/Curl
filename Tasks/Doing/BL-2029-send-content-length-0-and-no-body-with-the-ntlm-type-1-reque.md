@@ -38,3 +38,4 @@ NTLM or Negotiate negotiation is under way and the real body only with the final
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
