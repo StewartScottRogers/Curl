@@ -461,6 +461,38 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// The probe of a <c>-T</c> upload resumed with <c>-C</c> keeps its <c>Content-Range</c>, as
+    /// curl 8.21.0 sends it (measured, BL-2002 Notes; upstream test1001).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_DigestProbeOfAResumedUpload_KeepsItsContentRange()
+    {
+        TurnTakingConnection connection = new(65536, ChallengeHead + "nope", OkHead + "ok");
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Upload = new MemoryStream("test\n"u8.ToArray()),
+            ResumeFrom = 2,
+            Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest },
+        };
+        Diagnostics.Arrange("url, upload, schemes", $"{AuthUrl}, -T 5-byte file -C 2, --digest");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new ScriptedAuthenticator(null, DigestValue)).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        string[] requests = connection.Written.Split("PUT ", StringSplitOptions.RemoveEmptyEntries);
+        Assert.HasCount(2, requests, connection.Written);
+        Assert.Contains("Content-Range: bytes 2-4/5\r\n", requests[0]);
+        Assert.EndsWith("Content-Length: 0\r\n\r\n", requests[0]);
+        Assert.Contains("Content-Range: bytes 2-4/5\r\n", requests[1]);
+        Assert.EndsWith("Content-Length: 3\r\n\r\nst\n", requests[1]);
+    }
+
+    /// <summary>
     /// A probe answered with a 2xx instead of a challenge is followed by the same POST with its
     /// body and no credentials, as upstream test175 expects of curl 8.21.0 (ADR-0441).
     /// </summary>
