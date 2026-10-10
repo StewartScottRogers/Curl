@@ -58,10 +58,10 @@ the server's key names the fingerprint of the key its client agrees:
   - `--hostpubmd5 2948c3aaadd13b5fc3053eb5f02ff41d` (`SshServerRsaHostKey.Md5Fingerprint`)
   - `--hostpubsha256 oKu2ijiKRpAnWn3uWXJlDBMslPHR6h9ZZOV89/I8n2o` (`SshServerRsaHostKey.Sha256Fingerprint`)
 
-Upstream's cases compute their key's fingerprints from the key its own `sshd` generates;
-the case runner does not reach this server yet, so nothing substitutes these for them. When
-the SCP and SFTP cases are wired in, the runner is to supply the agreed key's two values
-wherever a case asks for the server's MD5 or SHA-256 host key fingerprint.
+Upstream's cases compute their key's fingerprints from the key its own `sshd` generates as
+`%SSHSRVMD5` and `%SSHSRVSHA256`; the case runner gives those variables the agreed key's two
+values (BL-1954): the RSA key's on Windows, the Ed25519 key's elsewhere, chosen by
+`UpstreamConformanceTests`, which `InternalsVisibleTo` lets read these internal keys.
 
 ## The client key
 

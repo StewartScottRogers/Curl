@@ -241,6 +241,27 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("sftp", "67")]
+    [DataRow("scp", "60")]
+    [DataRow("sftp", " 2 ")]
+    public void FindSkipReason_SshCaseEndingBeforeItsPayload_IsNull(string server, string errorCode)
+    {
+        string? reason = Screen($"<client>\n<server>\n{server}\n</server>\n<command>\n-u user: {server}://127.0.0.1:9003/f\n</command>\n</client>\n<verify>\n<errorcode>\n{errorCode}\n</errorcode>\n</verify>\n");
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
+    [DataRow("scp", "", "the SSH stand-in serves no SCP payload yet (BL-1917)")]
+    [DataRow("sftp", "<verify>\n<errorcode>\n0\n</errorcode>\n</verify>\n", "the SSH stand-in serves no SFTP payload yet (BL-1918)")]
+    public void FindSkipReason_SshCaseNeedingItsPayload_NamesTheTaskThatServesIt(string server, string verify, string expected)
+    {
+        string? reason = Screen($"<client>\n<server>\n{server}\n</server>\n<command>\n{server}://127.0.0.1:9003/f\n</command>\n</client>\n{verify}");
+
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_TftpServer_IsNull()
     {
         string? reason = Screen("<client>\n<server>\ntftp\n</server>\n<command>\ntftp://127.0.0.1:9003//1\n</command>\n</client>\n");

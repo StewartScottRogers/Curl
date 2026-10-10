@@ -37,11 +37,21 @@ namespace Curl.Conformance;
 /// <param name="platform">The features and null device of the platform Curl runs on.</param>
 /// <param name="timeProvider">Measures <paramref name="timeLimit"/>.</param>
 /// <param name="timeLimit">How long a run may take before the case fails.</param>
+/// <param name="sshServer">
+/// The stand-in for upstream's test <c>sshd</c> (BL-1916), or <see langword="null"/> to leave
+/// <c>%SSHPORT</c>, <c>%USER</c>, <c>%SFTP_PWD</c>, <c>%SCP_PWD</c>, <c>%SSHSRVMD5</c> and
+/// <c>%SSHSRVSHA256</c> without a value, so the SSH cases skip. Given one, <c>%SSHPORT</c> is
+/// <see cref="UpstreamSshServer.SshPort"/>, <c>%USER</c> its user, <c>%SFTP_PWD</c> and
+/// <c>%SCP_PWD</c> are empty (as <c>%FILE_PWD</c>, since <c>%LOGDIR</c> is already absolute), the
+/// two fingerprints are its host key's, and its client key files are written to
+/// <c>%LOGDIR/server/</c> before the run.
+/// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
     UpstreamCurlPlatform platform,
     TimeProvider timeProvider,
-    TimeSpan timeLimit)
+    TimeSpan timeLimit,
+    UpstreamSshServer? sshServer = null)
 {
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
@@ -148,6 +158,7 @@ public sealed class UpstreamCaseRunner(
         AddDirectoryVariable(variables, "PWD", testsDirectory);
         AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
         AddTlsPorts(variables, certificateDirectory);
+        AddSshVariables(variables);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
@@ -190,6 +201,30 @@ public sealed class UpstreamCaseRunner(
         }
     }
 
+    private void AddSshVariables(Dictionary<string, string> variables)
+    {
+        if (sshServer is not null)
+        {
+            variables["SSHPORT"] = UpstreamSshServer.SshPort.ToString(CultureInfo.InvariantCulture);
+            variables["USER"] = sshServer.User;
+            variables["SFTP_PWD"] = string.Empty;
+            variables["SCP_PWD"] = string.Empty;
+            variables["SSHSRVMD5"] = sshServer.HostKeyMd5;
+            variables["SSHSRVSHA256"] = sshServer.HostKeySha256;
+        }
+    }
+
+    // sshserver.pl writes the client's key pair into the server's log folder before the case runs.
+    private void WriteSshClientKeyFiles(string logDirectory)
+    {
+        if (sshServer is not null)
+        {
+            Directory.CreateDirectory($"{logDirectory}/server");
+            File.WriteAllBytes($"{logDirectory}/server/curl_client_key", sshServer.ClientPrivateKeyFile.ToArray());
+            File.WriteAllBytes($"{logDirectory}/server/curl_client_key.pub", sshServer.ClientPublicKeyFile.ToArray());
+        }
+    }
+
     private Dictionary<string, string> Variables(int testNumber, string logDirectory) =>
         new(StringComparer.Ordinal)
         {
@@ -225,6 +260,7 @@ public sealed class UpstreamCaseRunner(
         }
 
         string outputFile = $"{logDirectory}/curl{testNumber.ToString(CultureInfo.InvariantCulture)}.out";
+        WriteSshClientKeyFiles(logDirectory);
         WriteClientFiles(testCase);
         List<string> arguments = Arguments(testCase, outputFile);
 
@@ -245,7 +281,8 @@ public sealed class UpstreamCaseRunner(
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
         MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, pop3, certificateDirectory)));
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, tftp, EnvironmentVariables(testCase));
+        IConnector servers = sshServer?.InFrontOf(mqtt) ?? mqtt;
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase));
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {

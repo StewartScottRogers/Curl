@@ -35,7 +35,10 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers];
+    // Each SSH server name, with the task that is to serve its payload.
+    private static readonly Dictionary<string, string> SshServers = new(StringComparer.Ordinal) { ["scp"] = "BL-1917", ["sftp"] = "BL-1918" };
+
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. SshServers.Keys];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^(?:EPSV|PASV|PORT|EPRT|LPRT)\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
@@ -65,6 +68,7 @@ internal static class UpstreamCaseScreening
             () => UnsupportedServer(testCase),
             () => HttpsThroughProxy(testCase),
             () => FtpDataConnection(testCase),
+            () => SshPayload(testCase),
             () => UploadOffMailServer(testCase),
             () => UnsupportedFeature(testCase, features),
             () => UnsupportedCommand(testCase),
@@ -147,6 +151,15 @@ internal static class UpstreamCaseScreening
     private static string? HttpsThroughProxy(UpstreamTestCase testCase) =>
         HttpsCertificateFile(testCase) is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http-proxy")
             ? "the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)"
+            : null;
+
+    // The SSH stand-in authenticates and opens a session channel (BL-1916) but serves no SCP
+    // (BL-1917) or SFTP (BL-1918) payload yet, so only a case that ends before one runs: a
+    // command-line error (2), a host key mismatch (60) or a refused login (67).
+    private static string? SshPayload(UpstreamTestCase testCase) =>
+        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(SshServers.ContainsKey) is { } server
+            && UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is not ("2" or "60" or "67")
+            ? $"the SSH stand-in serves no {server.ToUpperInvariant()} payload yet ({SshServers[server]})"
             : null;
 
     private static string? UnsupportedServer(UpstreamTestCase testCase) =>
