@@ -3,8 +3,8 @@ id: AF-0142
 title: IsAnyNotYetValid's 'return true' can become 'return false' with no test failing: not-yet-valid certificates report 'expired (10)'
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/OpenSslVerifyResult.cs:IsAnyNotYetValid-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslVerifyResult.cs:131:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
