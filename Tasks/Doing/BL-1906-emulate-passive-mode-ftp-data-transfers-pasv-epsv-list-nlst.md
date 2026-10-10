@@ -44,3 +44,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Code done and green but uncommitted (stashed); waits on BL-1942 to measure Library coverage before Done
+- 2026-10-10: Backlog -> Doing.
