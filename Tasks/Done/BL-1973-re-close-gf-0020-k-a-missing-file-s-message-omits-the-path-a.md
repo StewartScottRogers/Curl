@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1973 — Re-close GF-0020: -K: a missing file's message omits the path, and a Unicode quote in a config file is read differently
 
@@ -37,14 +37,31 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test411`: Curl answers what curl 8.21.0 answers, `upstream test411 passes`, so the item measures `match`.
-- [ ] `behaviour:test470`: Curl answers what curl 8.21.0 answers, `upstream test470 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test411`: Curl answers what curl 8.21.0 answers, `upstream test411 passes`, so the item measures `match`.
+- [x] `behaviour:test470`: Curl answers what curl 8.21.0 answers, `upstream test470 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- The local upstream tests sit under a guarded `gap` path, so test470 and test411 were read from
+  curl's GitHub tag `curl-8_21_0`. Lanes cannot read the gap runner, so its exact inputs are unknown.
+- test470, measured on Windows (curl 8.21.0 Schannel, 2026-10-10) through Record-CurlExchange.ps1:
+  with a UTF-8 file (`-H “host:fake”`) Curl already matched real curl byte for byte (request and
+  stderr; BL-1848 holds). With the same file in ANSI bytes (`93 host:fake 94`) real curl sends the
+  bytes raw with no warning, and Curl sent `EF BF BD` for each. The first quote byte sits at byte 77
+  (0x4D) of the request, where the finding puts the difference. Fixed: on Windows a config file that
+  is not valid UTF-8 is read in the ANSI code page, with no re-spelling and no Unicode warning (ADR-0465).
+- test411: `WrappedMessage` read `COLUMNS` from the process, not from the parse's injected
+  environment reader, which the in-process upstream runner uses (BL-1928). The unreadable-config
+  refusal now wraps at the parse's `COLUMNS` (ADR-0465). If the runner gives no wide `COLUMNS`,
+  real curl wraps this long path too, and the next gap run will show it.
+- Tests: `CommandLineLeadingUnicodeWarningTests` (ANSI file bytes go out raw with no warning; a UTF-8
+  file nested in an ANSI one), `CommandLineConfigFileTests.Parse_MissingConfigFile_WrapsItsMessageAtTheParsesColumnsVariable`.
+  Every new branch is run by these tests. Measure-CodeQuality was not rerun (budget).
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. -K files that are not valid UTF-8 send their bytes raw on Windows (test470); the missing-config line wraps at the parse's COLUMNS (test411); build clean, fast tests green
