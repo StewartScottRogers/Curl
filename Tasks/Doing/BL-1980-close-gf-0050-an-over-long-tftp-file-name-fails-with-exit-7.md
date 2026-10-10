@@ -44,3 +44,4 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpProtocolHandler, run TftpRequestFile's l
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
