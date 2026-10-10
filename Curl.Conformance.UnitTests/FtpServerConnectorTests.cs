@@ -39,6 +39,18 @@ public sealed class FtpServerConnectorTests
         Assert.IsTrue(result.IsConnectionRefused);
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_PassivePortWithNoDataConnectionOffered_IsRefused()
+    {
+        FtpServerConnector connector = new(
+            ParsedTestCase.From(string.Empty),
+            new SwsHttpServerConnector(ParsedTestCase.From(string.Empty), TimeProvider.System));
+
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", FtpServerConnector.PassivePort, false), TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsConnectionRefused);
+    }
+
     private async Task<string> ReadTextAsync(IConnection connection)
     {
         byte[] buffer = new byte[256];

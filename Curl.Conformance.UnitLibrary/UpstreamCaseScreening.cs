@@ -15,7 +15,7 @@ namespace Curl.Conformance;
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
 /// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
 /// one emulated), <c>http-ipv6</c> (the same emulation on <c>%HOST6IP</c>:<c>%HTTP6PORT</c>), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>socks4</c> or <c>socks5</c> (<see cref="SocksServerConnector"/> on <c>%SOCKSPORT</c>), <c>mqtt</c> (<see cref="MqttServerConnector"/> on <c>%MQTTPORT</c>), <c>tftp</c> (<see cref="TftpServerConnector"/> on <c>%TFTPPORT</c>),<c>ftp</c> (<see cref="FtpServerConnector"/> on <c>%FTPPORT</c>, control channel only, so a case whose <c>&lt;verify&gt;&lt;protocol&gt;</c> shows a data connection opening is skipped), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
-/// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation does not carry
+/// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation (or, for an <c>ftp</c> case, the FTP stand-in) does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
 /// absolute path; when a strip line is not a substitution the harness can run; or when its expected
@@ -38,6 +38,8 @@ internal static class UpstreamCaseScreening
     private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, "sftp", "scp"];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^LPRT\b|^CWD fully_simulated", RegexOptions.CultureInvariant | RegexOptions.Multiline);
+
+    private static readonly Regex FtpTimedServerCommand = new(@"DELAY(?= [A-Z]+ \d*)|SLOWDOWNDATA", RegexOptions.CultureInvariant);
 
     private static readonly Regex CurlConfigScript = new(@"\btest(?:1013|1022)\.pl\b", RegexOptions.CultureInvariant);
 
@@ -210,9 +212,25 @@ internal static class UpstreamCaseScreening
             ? $"{script.Value} compares with ../curl-config, which Curl does not ship"
             : null;
 
+    // <servercmd> is read by the server the case runs: ftpserver.pl's commands for an ftp case, sws's otherwise.
     private static string? UnsupportedServerCommand(UpstreamTestCase testCase) =>
+        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("ftp")
+            ? UnsupportedFtpServerCommand(testCase)
+            : UnsupportedSwsServerCommand(testCase);
+
+    private static string? UnsupportedSwsServerCommand(UpstreamTestCase testCase) =>
         SwsServerCommands.Read((testCase.Find("reply", "servercmd")?.Content ?? ReadOnlyMemory<byte>.Empty).Span).UnsupportedCommands is [var first, ..]
             ? $"the sws emulation does not carry out the server command {first}"
+            : null;
+
+    // DELAY <COMMAND> <seconds> and SLOWDOWNDATA time ftpserver.pl's answers, which the FTP stand-in
+    // does not (BL-1908's follow-up); a REPLY or COUNT line, read first by ftpserver.pl, is neither.
+    private static string? UnsupportedFtpServerCommand(UpstreamTestCase testCase) =>
+        UpstreamTestPartBodies.Lines(testCase.Find("reply", "servercmd"))
+            .Where(line => !line.Contains("REPLY", StringComparison.Ordinal) && !line.Contains("COUNT ", StringComparison.Ordinal))
+            .Select(line => FtpTimedServerCommand.Match(line))
+            .FirstOrDefault(match => match.Success) is { } command
+            ? $"the FTP stand-in does not carry out the server command {command.Value}"
             : null;
 
     // A case that names no server, expects success and sends its command to a host name with a

@@ -10,7 +10,7 @@ namespace Curl.Conformance;
 /// on <see cref="FtpServerConnector.PassivePort"/>, and <c>PORT</c> and <c>EPRT</c> connect one to
 /// the port curl listens on; <c>RETR</c>, <c>LIST</c> and <c>NLST</c> send into it and close it,
 /// and <c>STOR</c> and <c>APPE</c> hand it over as the upload, whose bytes are what ftpserver.pl
-/// writes to its upload file; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>
+/// writes to its upload file; under <c>/// writes to its upload file; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>lt;servercmd/// writes to its upload file; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>gt;</c> <c>NODATACONN</c> (or its 425, 421 and 150 variants) no data connection is made and the transfer commands answer as ftpserver.pl does without one; <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>
 /// answer from the case's <c>&lt;reply&gt;</c> parts. Each answer is what ftpserver.pl's handler
 /// sends after the command's display text. A file name loads the case's data when, as
 /// ftpserver.pl reads it, it names a test number: ftpserver.pl then loads that test's file, which
@@ -100,10 +100,37 @@ internal sealed class FtpTransferCommands
     private bool HasServerCommand(string name) =>
         serverCommandLines.Any(line => line.Contains(name, StringComparison.Ordinal));
 
+    // NODATACONN, or any of NODATACONN425, NODATACONN421 and NODATACONN150, which imply it: the
+    // passive port is bound but not listening, so curl's connect is refused, and PORT or EPRT
+    // connects to nothing.
+    private bool RefusesDataConnections => HasServerCommand("NODATACONN");
+
+    // What LIST, NLST, RETR, STOR and APPE answer when no data connection is up, as ftpserver.pl's
+    // handlers do, checking NODATACONN425 first, then 421, then 150; otherwise the client times out.
+    private string NoDataConnectionAnswer()
+    {
+        const string Opening = "150 Opening data connection\r\n";
+        if (HasServerCommand("NODATACONN425"))
+        {
+            return Opening + "425 Can't open data connection\r\n";
+        }
+
+        if (HasServerCommand("NODATACONN421"))
+        {
+            return Opening + "421 Connection timed out\r\n";
+        }
+
+        return HasServerCommand("NODATACONN150") ? Opening : string.Empty;
+    }
+
     private string OpenPassive(bool extended)
     {
-        dataConnection = new FtpDataConnection();
-        openPassive(dataConnection);
+        dataConnection = RefusesDataConnections ? null : new FtpDataConnection();
+        if (dataConnection is not null)
+        {
+            openPassive(dataConnection);
+        }
+
         const int port = FtpServerConnector.PassivePort;
         string address = HasServerCommand("PASVBADIP") ? "1,2,3,4" : "127,0,0,1";
         return extended
@@ -132,7 +159,7 @@ internal sealed class FtpTransferCommands
     // Port 0 or one past 65535 starts no data connection, and the client waits for one.
     private string ConnectActive(long port, string answer)
     {
-        dataConnection = port is > 0 and <= 65535 ? connectActive((int)port) : null;
+        dataConnection = port is > 0 and <= 65535 && !RefusesDataConnections ? connectActive((int)port) : null;
         return answer;
     }
 
@@ -142,7 +169,7 @@ internal sealed class FtpTransferCommands
     {
         if (dataConnection is null)
         {
-            return string.Empty;
+            return NoDataConnectionAnswer();
         }
 
         receiveUpload(dataConnection);
@@ -151,12 +178,12 @@ internal sealed class FtpTransferCommands
         return GimmeGimme + (storeResponse is null ? FileTransferComplete : storeResponse[5..] + "\r\n");
     }
 
-    // Without a data connection ftpserver.pl sends nothing after the display text.
+    // Without a data connection ftpserver.pl sends nothing after the display text, unless a NODATACONN variant says otherwise.
     private string Transfer(byte[] data, string completion)
     {
         if (dataConnection is null)
         {
-            return string.Empty;
+            return NoDataConnectionAnswer();
         }
 
         dataConnection.Send(data);
@@ -175,7 +202,7 @@ internal sealed class FtpTransferCommands
     {
         if (dataConnection is null)
         {
-            return string.Empty;
+            return NoDataConnectionAnswer();
         }
 
         int firstDigit = argument.AsSpan().IndexOfAnyInRange('0', '9');

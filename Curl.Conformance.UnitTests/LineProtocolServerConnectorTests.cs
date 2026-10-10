@@ -159,6 +159,21 @@ public sealed class LineProtocolServerConnectorTests
     }
 
     [TestMethod]
+    public void ServerCommands_CountLine_TakesTheReplyAwayAfterThatManyUses()
+    {
+        LineProtocolServerCommands commands = LineProtocolServerCommands.Read(
+            "REPLY CWD 550 no\nCOUNT CWD 2\nREPLY USER 530 no\nCOUNT USER 0\nREPLY PASS 530 no\nCOUNT PASS x\nCOUNT Pass 1\nCOUNT\nCOUNT  5\nREPLY COUNT PWD 1\n"u8);
+
+        Assert.IsTrue(commands.TryFindReply("CWD", out _));
+        Assert.IsTrue(commands.TryFindReply("cwd", out _));
+        Assert.IsFalse(commands.TryFindReply("CWD", out _));
+        Assert.IsTrue(commands.TryFindReply("USER", out _));
+        Assert.IsTrue(commands.TryFindReply("USER", out _));
+        Assert.IsTrue(commands.TryFindReply("PASS", out _));
+        Assert.IsTrue(commands.TryFindReply("PASS", out _));
+    }
+
+    [TestMethod]
     public void ServerCommands_Empty_FindsNothing() =>
         Assert.IsFalse(LineProtocolServerCommands.Read([]).TryFindReply("USER", out _));
 

@@ -55,7 +55,7 @@ public sealed class FtpServerConnector : IConnector
     /// <summary>
     /// Opens a control-channel connection when <paramref name="target"/>'s port is <see cref="FtpPort"/>,
     /// the data connection the last <c>PASV</c> or <c>EPSV</c> opened (once) when it is
-    /// <see cref="PassivePort"/>, otherwise a connection to the wrapped server.
+    /// <see cref="PassivePort"/> (refused when none is offered), otherwise a connection to the wrapped server.
     /// </summary>
     /// <param name="target">The host and port to connect to.</param>
     /// <param name="cancellationToken">Passed to the server the connection reaches.</param>
@@ -67,9 +67,16 @@ public sealed class FtpServerConnector : IConnector
             return controlChannel.ConnectAsync(target, cancellationToken);
         }
 
-        FtpDataConnection? passive = target.Port == PassivePort ? Interlocked.Exchange(ref passiveConnection, null) : null;
-        return passive is null
-            ? backend.ConnectAsync(target, cancellationToken)
-            : ValueTask.FromResult(ConnectResult.Connected(passive));
+        if (target.Port != PassivePort)
+        {
+            return backend.ConnectAsync(target, cancellationToken);
+        }
+
+        // With no data connection offered (none yet, already taken, or NODATACONN's bound but not
+        // listening port) the connect is refused, as by a port nothing listens on.
+        FtpDataConnection? passive = Interlocked.Exchange(ref passiveConnection, null);
+        return ValueTask.FromResult(passive is null
+            ? ConnectResult.Refused($"Failed to connect to {target.Host}:{target.Port} after 0 ms: Could not connect to server")
+            : ConnectResult.Connected(passive));
     }
 }

@@ -118,6 +118,49 @@ public sealed class UpstreamCaseScreeningTests
         Assert.DoesNotContain("FTP stand-in", reason);
         Assert.DoesNotContain("<upload>", reason);
     }
+
+    // The FTP cases whose <servercmd> BL-1908 carries out (COUNT, NODATACONN and its 425, 421 and
+    // 150 variants, RETRWEIRDO, RETRNOSIZE, RETRSIZE, PASVBADIP, SLOWDOWN, REPLY) run, with
+    // %FTPTIME2 given the runner's value; DELAY and SLOWDOWNDATA, which time the answers, skip, naming the command.
+    [TestMethod]
+    [DataRow(147, null)]
+    [DataRow(280, null)]
+    [DataRow(1206, null)]
+    [DataRow(1207, null)]
+    [DataRow(1208, null)]
+    [DataRow(1209, null)]
+    [DataRow(1211, null)]
+    [DataRow(126, null)]
+    [DataRow(137, null)]
+    [DataRow(270, null)]
+    [DataRow(416, null)]
+    [DataRow(250, null)]
+    [DataRow(190, "the FTP stand-in does not carry out the server command DELAY")]
+    [DataRow(1086, "the FTP stand-in does not carry out the server command SLOWDOWNDATA")]
+    public void FindSkipReason_FtpServerCommandCase_RunsUnlessItsAnswersAreTimed(int testNumber, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["FTPTIME2"] = "8", ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    [DataRow("REPLY DELAY 200 ok\nCOUNT DELAY 1\ndelay: 5\n", null)]
+    [DataRow("SLOWDOWN\n", null)]
+    [DataRow("DELAY CWD 60\n", "the FTP stand-in does not carry out the server command DELAY")]
+    public void FindSkipReason_FtpCaseServerCommand_IsReadAsFtpserverReadsIt(string serverCommands, string? expected)
+    {
+        string? reason = Screen($"<reply>\n<servercmd>\n{serverCommands}</servercmd>\n</reply>\n<client>\n<server>\nftp\n</server>\n<command>\nftp://127.0.0.1:8993/1\n</command>\n</client>\n");
+
+        Assert.AreEqual(expected, reason);
+    }
+
     [TestMethod]
     public void FindSkipReason_SmtpCaseWithSmtpPortGivenTheRunnersValue_IsNotSkipped()
     {

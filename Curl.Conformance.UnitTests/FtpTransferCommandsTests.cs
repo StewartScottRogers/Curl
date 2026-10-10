@@ -157,7 +157,7 @@ public sealed class FtpTransferCommandsTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_PassivePort_ReachesTheDataConnectionOnceThenTheWrappedServer()
+    public async Task ConnectAsync_PassivePort_ReachesTheDataConnectionOnceThenIsRefused()
     {
         FtpServerConnector connector = new(
             ParsedTestCase.From("<reply>\n<data>\nhi\n</data>\n</reply>\n"),
@@ -171,7 +171,39 @@ public sealed class FtpTransferCommandsTests
 
         Assert.AreEqual("hi\n", await ReadToEndAsync(data.Connection!));
         Assert.IsTrue(again.IsConnectionRefused);
-        Assert.IsInstanceOfType<SwsHttpServerConnection>(passiveAgain.Connection);
+        Assert.IsTrue(passiveAgain.IsConnectionRefused);
+    }
+
+    [TestMethod]
+    [DataRow("NODATACONN", "")]
+    [DataRow("NODATACONN425", "150 Opening data connection\r\n425 Can't open data connection\r\n")]
+    [DataRow("NODATACONN421", "150 Opening data connection\r\n421 Connection timed out\r\n")]
+    [DataRow("NODATACONN150", "150 Opening data connection\r\n")]
+    public void TryAnswer_TransferUnderNoDataConn_OpensNoPassiveConnectionAndAnswersAsFtpserverDoes(string serverCommand, string expected)
+    {
+        List<FtpDataConnection> opened = [];
+        FtpTransferCommands commands = Create($"<servercmd>\n{serverCommand}\n</servercmd>\n<data>\nhi\n</data>\n", opened);
+
+        string passive = Answer(commands, "EPSV", string.Empty);
+
+        Assert.AreEqual("229 Entering Passive Mode (|||9005|)\r\n", passive);
+        Assert.IsEmpty(opened);
+        foreach (string command in new[] { "RETR", "LIST", "NLST", "STOR", "APPE" })
+        {
+            Assert.AreEqual(expected, Answer(commands, command, "1"), command);
+        }
+    }
+
+    [TestMethod]
+    public void TryAnswer_PortUnderNoDataConn_ConnectsToNothing()
+    {
+        List<int> connected = [];
+        FtpTransferCommands commands = new(ParsedTestCase.From("<reply>\n<servercmd>\nNODATACONN425\n</servercmd>\n</reply>\n"), _ => { }, port => { connected.Add(port); return null; }, _ => { });
+
+        string answer = Answer(commands, "PORT", "127,0,0,1,35,47");
+
+        Assert.AreEqual(string.Empty, answer);
+        Assert.IsEmpty(connected);
     }
 
     [TestMethod]

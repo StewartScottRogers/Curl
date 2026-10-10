@@ -39,6 +39,9 @@ public sealed class UpstreamPerlSubstitutionTests
     [DataRow("s/^b$/X/m", "b\n", "X\n")]
     [DataRow("s/a.b/X/s", "a\nb", "X")]
     [DataRow("s/a b/X/x", "ab", "X")]
+    [DataRow("s/^EPRT \\|1\\|(\\S*)/EPRT \\|1\\|/", "EPRT |1|127.0.0.1|9006|\n", "EPRT |1|\n")]
+    [DataRow("s/a/\\$1\\n/", "a", "$1\\n")]
+    [DataRow("s/a/b\\\\/", "a", "b\\")]
     public void Parse_RunsTheSubstitutionAsPerlDoes(string code, string line, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
