@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1946 — Bring Curl.Console back to its quality gates: CreateDialingSecurityContextFactory branch, RemoteHeaderNameStream.ReadLineAsync complexity 12
 
@@ -22,8 +22,8 @@ BL-1943's measurement (2026-10-09) found two members failing that BL-1943 did no
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` lists 0 failing members for Curl.Console.
-- [ ] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Console` lists 0 failing members for Curl.Console.
+- [x] `dotnet build -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
@@ -31,3 +31,4 @@ BL-1943's measurement (2026-10-09) found two members failing that BL-1943 did no
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Extracted ContentDispositionNameOf; pinned both CreateDialingSecurityContextFactory branches; 0 failing members for Curl.Console
