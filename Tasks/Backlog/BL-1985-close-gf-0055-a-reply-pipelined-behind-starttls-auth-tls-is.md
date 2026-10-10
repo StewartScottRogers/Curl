@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
+touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
 completed:
@@ -44,7 +44,34 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 
 ## Notes
 
+- 2026-10-10 (lane 5): Implemented, uncommitted (the shift stashes it). curl 8.21.0 checks
+  `pp.overflow` first in `smtp_state_starttls_resp`, `pop3_state_starttls_resp` and
+  `ftp_state_auth_resp` and returns CURLE_WEIRD_SERVER_REPLY ("Weird server reply", exit 8)
+  whatever the code; and in FTP_WAIT220 a 230 greeting only means logged-in when
+  `use_ssl <= CURLUSESSL_TRY` or the control is already TLS. So:
+  - `SmtpControlChannel`/`Pop3ControlChannel`/`FtpControlChannel.HasBufferedBytes`
+    (`bufferStart < bufferEnd`); `SmtpSession.StartTlsAsync`, `Pop3Session.StartTlsAsync`
+    and `FtpSession.SecureControlAsync` fail exit 8 when it is true after the reply.
+  - `FtpSession.GreetAndLogInAsync`: 230 under `--ssl-reqd`/`--ftp-ssl-control` on a
+    plaintext control goes through `SecureControlAsync` like 220 (test986: AUTH SSL,
+    AUTH TLS, exit 64).
+  - Tests: new pipelined cases in `SmtpProtocolHandlerSessionTests`,
+    `Pop3ProtocolHandlerSessionTests`, `FtpProtocolHandlerTlsTests` (also 230 under
+    `--ssl-reqd` and `--ssl`). Existing tests that scripted a reply to a later command in
+    the same read as the STARTTLS/STLS/AUTH reply now split reads (FTP:
+    `ScriptedConnection.FromReplies` with a `NextRead` mark, used by `FtpRun`).
+    Smtp, Pop3 and Ftp unit tests green; build -warnaserror clean.
+- What is left: `Curl.Console.UnitTests` `CurlCommandRunnerSmtpTransferEventTests`
+  `RunAsync_VerboseMailUploadWithStartTlsOnWindows_...` fails (exit 8): its `RunAsync`
+  helper (line ~269) scripts `"220 Ready to start TLS\r\n" + SecureEhloReply + Transaction`
+  as one read. Fix: give `ScriptedConnector` two reads split after the 220 line (e.g.
+  split `replies` on a marker). That project is held by BL-1987 (in Doing), so
+  `Curl.Console.UnitTests` was added to `touches` and the task went back to Backlog.
+- Could not rerun Measure-UpstreamCases.cs here: the audit guard refuses lanes any `Gap/`
+  path, the upstream test data's included. Behaviour matches curl's source as above.
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Needs Curl.Console.UnitTests (one SMTP STARTTLS test helper splits its reads), held by BL-1987 in Doing; code is done in the stash
