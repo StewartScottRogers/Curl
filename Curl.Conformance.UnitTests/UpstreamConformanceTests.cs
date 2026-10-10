@@ -179,7 +179,9 @@ public sealed class UpstreamConformanceTests
         outcome.Kind == UpstreamCaseOutcomeKind.Failed
         && (outcome.Detail == CaseHangLimitMessage || outcome.Detail.StartsWith("curl did not finish within ", StringComparison.Ordinal));
 
-    private static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
+    // Curl as the command composes it, every TCP dial reaching the case's in-memory servers through
+    // InMemoryServerTcpDialer, so TcpConnector's proxy tunnel and PROXY-line code stays in the path (ADR-0460).
+    internal static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
         CurlComposition.CreateRunner(
             invocation.StandardOutput,
             invocation.StandardError,

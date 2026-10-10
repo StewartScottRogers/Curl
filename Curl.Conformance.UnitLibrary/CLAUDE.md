@@ -78,6 +78,16 @@ upstream's HTTP server logs the tunnelled request. Screening lets `http-proxy` c
 No case is skipped for `%PROXYPORT` any more (BL-1897): 17 proxy cases are measured (80, 83, 95,
 150, 184, 194, 275, 744, 1078, 1184, 1288, 1297, 1428, 1904, 2050, 2107, 3028), and the other
 `%PROXYPORT` cases skip for another reason (a `<tool>`, `<setenv>`, a feature or another server's port).
+Every connection a case makes goes through `TcpConnector`'s own code (ADR-0460, BL-1915): the
+conformance tests compose curl with `CurlComposition.CreateRunner`, as the command does, and replace
+only the dial, `ITcpDialer`, with `InMemoryServerTcpDialer` (in `Curl.Conformance.UnitTests`), which
+asks the runner's connector chain for the dialled address and port. So the `CONNECT` request and its
+reply's parsing (`HttpProxyTunnel`, `-p` / `--proxytunnel` and HTTPS through an HTTP proxy), the SOCKS
+handshakes, the HAProxy PROXY line (`--haproxy-protocol`, `--haproxy-clientip`, written inside an
+opened tunnel) and TLS are Curl's real code; the `sws` stand-in only answers them.
+`InMemoryServerTcpDialerTests` pins this, and 22 CONNECT-tunnel cases (206, 209, 213, 217, 265, 287,
+718, 749, 750, 1008, 1021, 1060, 1061, 1297, 1715, 3028 among them) and 6 PROXY-line cases (1455,
+1456, 3028, 3201, 3202, 3220) pass through it.
 A read before the client's first write waits for that write, as sws blocks reading the
 request (a telnet `-T` session reads while its upload is on its way; BL-1853), and a read while
 an `Expect: 100-continue` request still owes its body waits for the client's next write, since
