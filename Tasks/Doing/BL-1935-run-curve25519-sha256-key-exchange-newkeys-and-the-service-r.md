@@ -32,3 +32,4 @@ Part 2 of BL-1899; builds on BL-1934's scaffold. Read ADR-0456. Reuse `Curl.Prot
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
