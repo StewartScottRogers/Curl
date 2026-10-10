@@ -35,3 +35,4 @@ Forms used: `%PERL %SRCDIR/libtest/test610.pl mkdir|rmdir|gone <path>`, `move <f
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
