@@ -41,3 +41,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-1951: on Windows Curl (libssh2 WinCNG) offers no curve25519/ed25519, so the SSH stand-in's key exchange fails with exit 2 before authentication
+- 2026-10-10: Backlog -> Doing.
