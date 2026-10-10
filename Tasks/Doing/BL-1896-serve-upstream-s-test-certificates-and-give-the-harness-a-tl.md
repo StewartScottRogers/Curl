@@ -39,3 +39,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Split for the run's cost cap; waits on BL-1921 (TLS server stream wrapper) and BL-1922 (tests/certs and %CERTDIR)
+- 2026-10-09: Backlog -> Doing.
