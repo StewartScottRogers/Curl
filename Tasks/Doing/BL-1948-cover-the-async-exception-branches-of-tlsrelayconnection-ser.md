@@ -30,3 +30,4 @@ Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary (2026-10-09, BL-19
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-10: Backlog -> Doing.
