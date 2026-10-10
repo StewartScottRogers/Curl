@@ -49,3 +49,4 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
