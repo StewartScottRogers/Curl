@@ -44,3 +44,4 @@ In Curl.Cli.UnitLibrary's URL globbing (ADR-0032), unescape only the glob charac
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
