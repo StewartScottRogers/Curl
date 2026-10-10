@@ -194,13 +194,18 @@ internal sealed class NetrcTokenScanner(string text)
 
         if (text[position] == '\0')
         {
-            // curl 8.21.0 reads each line as a C string, so a NUL byte ends it (upstream test793).
-            int lineFeed = text.IndexOf('\n', position);
-            position = lineFeed < 0 ? text.Length : lineFeed;
+            SkipToEndOfLine();
             return Peek();
         }
 
         return text[position];
+    }
+
+    // curl 8.21.0 reads each line as a C string, so a NUL byte ends it (upstream test793).
+    private void SkipToEndOfLine()
+    {
+        int lineFeed = text.IndexOf('\n', position);
+        position = lineFeed < 0 ? text.Length : lineFeed;
     }
 
     private bool CheckLineAtUncheckedStart()

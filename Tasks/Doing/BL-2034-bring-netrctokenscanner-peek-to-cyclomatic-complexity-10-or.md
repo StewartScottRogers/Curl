@@ -22,11 +22,13 @@ BL-2022's measurement on 2026-10-10 found `NetrcTokenScanner.Peek()` at complexi
 
 ## Acceptance criteria
 
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports 0 failing members and 100% line and branch coverage.
-- [ ] Every existing `NetrcFile` test passes unchanged; `dotnet build -warnaserror` is clean and the fast tests are green.
-- [ ] No option changes, so `--ai-help` needs nothing.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary` reports 0 failing members and 100% line and branch coverage.
+- [x] Every existing `NetrcFile` test passes unchanged; `dotnet build -warnaserror` is clean and the fast tests are green.
+- [x] No option changes, so `--ai-help` needs nothing.
 
 ## Notes
+
+Extracted the NUL line skip from `Peek` into `SkipToEndOfLine`. Measured: 0 failing members, 100% line and branch.
 
 ## Log
 
