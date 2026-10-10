@@ -241,7 +241,15 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
-    [DataRow("<client>\n<server>\nhttp\ntftp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the tftp server")]
+    public void FindSkipReason_TftpServer_IsNull()
+    {
+        string? reason = Screen("<client>\n<server>\ntftp\n</server>\n<command>\ntftp://127.0.0.1:9003//1\n</command>\n</client>\n");
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<server>\nhttp\nrtsp\n</server>\n<command>\na\n</command>\n</client>\n", "the harness does not emulate the rtsp server")]
     [DataRow("<client>\n<name>\nno command\n</name>\n</client>\n", "the case has no <client><command>")]
     [DataRow("<client>\n<command type=\"perl\">\nx\n</command>\n</client>\n", "the harness does not run a perl command")]
     [DataRow("<client>\n<command>\nhttp://h/ | cat\n</command>\n</client>\n", "the command needs a shell for its |")]

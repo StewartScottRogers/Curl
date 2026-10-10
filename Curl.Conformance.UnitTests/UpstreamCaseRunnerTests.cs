@@ -286,7 +286,7 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
-    public async Task RunAsync_CurlReachingForUdp_GetsAnUnreachableConnector()
+    public async Task RunAsync_CurlReachingForUdp_GetsTheTftpEmulation()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         IDatagramConnector? datagramConnector = null;
@@ -298,8 +298,27 @@ public sealed class UpstreamCaseRunnerTests
 
         await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
 
-        diagnostics.Assert("datagram connector type", nameof(UnreachableDatagramConnector), datagramConnector?.GetType().Name ?? "(none)");
-        Assert.IsInstanceOfType<UnreachableDatagramConnector>(datagramConnector);
+        diagnostics.Assert("datagram connector type", nameof(TftpServerConnector), datagramConnector?.GetType().Name ?? "(none)");
+        Assert.IsInstanceOfType<TftpServerConnector>(datagramConnector);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Test271_ReachesTheTftpEmulationOnTftpPort()
+    {
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await using IDatagramChannel channel = (await invocation.DatagramConnector.OpenAsync("127.0.0.1", int.Parse(UpstreamCaseRunner.TftpPort, System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None)).Channel!;
+            await channel.SendAsync(Encoding.Latin1.GetBytes("\0\u0001/5\0octet\0tsize\00\0blksize\0512\0timeout\06\0"), channel.ServerEndPoint, CancellationToken.None);
+            DatagramReceived received = await channel.ReceiveAsync(new byte[600], CancellationToken.None);
+            await channel.SendAsync(new byte[] { 0, 4, 0, 1 }, received.RemoteEndPoint, CancellationToken.None);
+            return 0;
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test271.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        // The protocol dump matches; only the --output file the fake never writes differs.
+        StringAssert.StartsWith(outcome.Detail, "the --output file");
     }
 
     [TestMethod]

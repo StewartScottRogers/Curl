@@ -46,7 +46,7 @@ skipped cases are not runnable).
 | 2026-10-07 | 559 | 162 | 1292 | 721 | 77.5% |
 
 The whole conformance run of 2013 cases takes about 8 seconds on the development machine and opens no socket: every
-connection goes to the in-memory `sws` emulation, and UDP to `UnreachableDatagramConnector`.
+connection goes to the in-memory `sws` emulation, and UDP to the in-memory `tftpd` emulation, `TftpServerConnector`.
 
 No sockets and no network, like every other `.UnitTests` project. Unlike the rule in
 `.claude/rules/testing.md`, the runner's tests and the conformance method touch the file

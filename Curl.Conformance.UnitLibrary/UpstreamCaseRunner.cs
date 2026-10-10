@@ -29,7 +29,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c> and <c>%POP3SPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/> and <see cref="Pop3sPort"/> when a certificate directory is named, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c> and <c>%POP3SPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/> and <see cref="Pop3sPort"/> when a certificate directory is named, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -79,6 +79,9 @@ public sealed class UpstreamCaseRunner(
     /// libtest, which screening skips for that reason, so no RTSP server stands behind it (ADR-0457).
     /// </summary>
     public const string RtspPort = "8996";
+
+    /// <summary>The value of <c>%TFTPPORT</c>: datagrams to this port reach the tftpd emulation, <see cref="TftpServerConnector"/>, whose request dump follows the mqttd emulation's for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
+    public const string TftpPort = "9003";
 
     /// <summary>The value of <c>%HTTPSPORT</c> when the caller names a certificate directory: connections to this port reach the sws emulation through TLS, <see cref="HttpsServerConnector"/>, presenting the certificate the case's <c>https</c> server line names from <c>%CERTDIR/certs/</c>.</summary>
     public const string HttpsPort = "8989";
@@ -201,6 +204,7 @@ public sealed class UpstreamCaseRunner(
             ["POP3PORT"] = Pop3Port,
             ["MQTTPORT"] = MqttPort,
             ["RTSPPORT"] = RtspPort,
+            ["TFTPPORT"] = TftpPort,
             ["NOLISTENPORT"] = NoListenPort,
             ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
             ["LOGDIR"] = logDirectory,
@@ -227,7 +231,9 @@ public sealed class UpstreamCaseRunner(
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
         // curl timer to race them, they are skipped.
-        SwsHttpServerConnector server = new(testCase, ServerClock(arguments));
+        TimeProvider serverClock = ServerClock(arguments);
+        SwsHttpServerConnector server = new(testCase, serverClock);
+        TftpServerConnector tftp = new(testCase, serverClock);
         // Not disposed: CurlCommandRunner.RunAsync takes no cancellation token, so a run past the
         // time limit is stopped only at its next exchange with the abandoned server, and may write
         // to these until then. A memory stream holds nothing but its buffer, which the collector takes.
@@ -239,7 +245,7 @@ public sealed class UpstreamCaseRunner(
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
         MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, pop3, certificateDirectory)));
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, new UnreachableDatagramConnector(), EnvironmentVariables(testCase));
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, tftp, EnvironmentVariables(testCase));
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -248,7 +254,7 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span], ReadOutputFile(outputFile))
+        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span, .. tftp.ProtocolLog.Span], ReadOutputFile(outputFile))
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             // A case reaches one mail server, so at most one of these holds a message.

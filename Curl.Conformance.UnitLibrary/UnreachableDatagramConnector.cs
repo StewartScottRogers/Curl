@@ -3,10 +3,9 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Conformance;
 
 /// <summary>
-/// The <see cref="IDatagramConnector"/> the harness hands curl until a TFTP emulation exists:
-/// every open fails with <see cref="CurlExitCode.CouldntConnect"/>, and no socket is opened.
-/// Cases that need the <c>tftp</c> server are skipped before they run, so only a case that
-/// reaches for UDP unexpectedly sees it.
+/// The <see cref="IDatagramConnector"/> for a UDP port nothing listens on: every open fails with
+/// <see cref="CurlExitCode.CouldntConnect"/>, and no socket is opened. <see cref="TftpServerConnector"/>
+/// hands every open to a port other than its own to it.
 /// </summary>
 public sealed class UnreachableDatagramConnector : IDatagramConnector
 {
