@@ -30,3 +30,4 @@ BL-1929's measurement (2026-10-09) found 28 failing members, none in BL-1929's f
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
