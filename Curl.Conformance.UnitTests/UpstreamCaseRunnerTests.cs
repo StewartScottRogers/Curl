@@ -157,12 +157,12 @@ public sealed class UpstreamCaseRunnerTests
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nimap://%HOSTIP:%IMAPPORT/\n</command>\n</client>\n</testcase>\n");
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%CLIENT6IP/\n</command>\n</client>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        diagnostics.Assert("detail", "the harness has no value for %IMAPPORT", outcome.Detail);
-        Assert.AreEqual("the harness has no value for %IMAPPORT", outcome.Detail);
+        diagnostics.Assert("detail", "the harness has no value for %CLIENT6IP", outcome.Detail);
+        Assert.AreEqual("the harness has no value for %CLIENT6IP", outcome.Detail);
     }
 
     [TestMethod]
