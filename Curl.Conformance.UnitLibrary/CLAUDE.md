@@ -158,7 +158,12 @@ Screening skips a case whose postcheck runs test1013.pl or test1022.pl, naming t
 postcheck whose every line is a `%PERL -e` one-liner `UpstreamPerlOneLiner` interprets (`%PERL` is
 `perl`, `$^O` is the platform's `OperatingSystemName`; BL-1933): a precheck that prints skips the
 case with its first line, one that exits non-zero with `precheck command error`, and a postcheck
-that exits non-zero fails it; any other check line skips the case, naming it. Nothing calls the two script
+that exits non-zero fails it. A check line `%RESOLVE [--ipv4|--ipv6] NAME` (`%RESOLVE` is
+`resolve`; BL-1929) runs `UpstreamResolveCheck`, which stands for upstream's `server/resolve`
+without any lookup, so the answer is platform-neutral: an IP literal resolves in its own family
+only, the names `localhost` (both) and `ip6-localhost` (IPv6) resolve, and anything else prints
+`Resolving IPv6 'NAME' didn't work` (or `IPv4`) and exits 1, so the precheck skips the case
+with that line; `%HOST6IP` is `[::1]`, which lets test1085 run. Any other check line skips the case, naming it. Nothing calls the two script
 emulations yet: their `%SRCDIR` has no value. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given

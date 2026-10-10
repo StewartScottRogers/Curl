@@ -231,6 +231,7 @@ public sealed class UpstreamCaseScreeningTests
     [TestMethod]
     [DataRow("<client>\n<precheck>\nperl -e 'if(\"127.0.0.1\" !~ /[.]0[.]0[.]1$/) {print \"Test only works for HOSTIPs ending with .0.0.1\"; exit(1)}'\n</precheck>\n</client>\n")]
     [DataRow("<verify>\n<postcheck>\nperl -e 'exit((stat(\"/log/1443\"))[9] != 960898200)'\n</postcheck>\n</verify>\n")]
+    [DataRow("<client>\n<precheck>\nresolve --ipv6 ::1\n</precheck>\n</client>\n")]
     public void FindSkipReason_CheckOfInterpretedOneLiners_DoesNotSkip(string sections)
     {
         Assert.IsNull(Screen(RunnableClient + sections));

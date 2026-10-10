@@ -108,9 +108,10 @@ internal static class UpstreamCaseScreening
             : null;
 
     // A precheck or postcheck runs only when every line is a %PERL -e one-liner that
-    // UpstreamPerlOneLiner interprets (BL-1933).
+    // UpstreamPerlOneLiner interprets (BL-1933) or a %RESOLVE line UpstreamResolveCheck emulates (BL-1929).
     private static string? UninterpretedCheck(UpstreamTestCase testCase, string section, string name) =>
-        UpstreamTestPartBodies.Lines(testCase.Find(section, name)).FirstOrDefault(line => !UpstreamPerlOneLiner.Interprets(line)) is { } line
+        UpstreamTestPartBodies.Lines(testCase.Find(section, name))
+            .FirstOrDefault(line => !UpstreamPerlOneLiner.Interprets(line) && !UpstreamResolveCheck.Interprets(line)) is { } line
             ? $"the harness does not interpret the <{section}><{name}> line {line}"
             : null;
 

@@ -544,6 +544,7 @@ public sealed class UpstreamCaseRunnerTests
     [TestMethod]
     [DataRow("%PERL -e \"print 'Test requires X' if('a' ne 'b');\"", "Test requires X")]
     [DataRow("%PERL -e 'exit((stat(\"%LOGDIR/missing\"))[9] != 5)'", "precheck command error")]
+    [DataRow("%RESOLVE --ipv6 %HOSTIP", "Resolving IPv6 '127.0.0.1' didn't work")]
     public async Task RunAsync_PrecheckThatPrintsOrFails_SkipsTheCaseWithoutRunningCurl(string precheck, string expectedReason)
     {
         bool curlRan = false;
@@ -559,6 +560,34 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
         Assert.AreEqual(expectedReason, outcome.Detail);
         Assert.IsFalse(curlRan);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ResolvePrecheckThatSucceeds_RunsTheCase()
+    {
+        bool curlRan = false;
+        UpstreamCaseRunner runner = Runner(_ =>
+        {
+            curlRan = true;
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n%RESOLVE --ipv6 ::1\n</precheck>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.IsTrue(curlRan);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Test1085_IsNotSkipped()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(45));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1085.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
     }
 
     [TestMethod]

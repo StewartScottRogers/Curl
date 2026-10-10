@@ -25,7 +25,8 @@ namespace Curl.Conformance;
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
-/// <see cref="HttpPort"/>, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%RESOLVE</c> is the name
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -55,6 +56,9 @@ public sealed class UpstreamCaseRunner(
     public const string CurlVersion = "8.21.0";
 
     private const string HostAddress = "127.0.0.1";
+
+    // runtests.pl's $HOST6IP: the IPv6 loopback, bracketed for a URL.
+    private const string Host6Address = "[::1]";
 
     private static readonly string[] ClientFileParts = ["file", "file1", "file2", "file3", "file4"];
 
@@ -142,6 +146,8 @@ public sealed class UpstreamCaseRunner(
             ["VERSION"] = CurlVersion,
             ["DEV_NULL"] = platform.NullDevice,
             ["PERL"] = UpstreamPerlOneLiner.Program,
+            ["RESOLVE"] = UpstreamResolveCheck.Program,
+            ["HOST6IP"] = Host6Address,
         };
 
     private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory)
@@ -224,7 +230,7 @@ public sealed class UpstreamCaseRunner(
 
     private UpstreamPerlOneLinerResult? FirstFailedCheck(UpstreamTestCase testCase, string section, string name, Func<UpstreamPerlOneLinerResult, bool> failed) =>
         UpstreamTestPartBodies.Lines(testCase.Find(section, name))
-            .Select(line => UpstreamPerlOneLiner.RunLine(line, platform.OperatingSystemName)!)
+            .Select(line => UpstreamPerlOneLiner.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!)
             .FirstOrDefault(failed);
 
     private static List<string> Arguments(UpstreamTestCase testCase, string outputFile)
