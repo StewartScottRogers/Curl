@@ -12,7 +12,7 @@ namespace Curl.Conformance;
 /// <remarks>
 /// <para>
 /// The command gets the arguments <c>runtests.pl</c> puts before it: <c>--output
-/// %LOGDIR/curl.out</c> unless the command's <c>option</c> says <c>no-output</c> or the case
+/// %LOGDIR/curl%TESTNUMBER.out</c> unless the command's <c>option</c> says <c>no-output</c> or the case
 /// verifies <c>&lt;stdout&gt;</c> without <c>force-output</c>, then <c>--include</c> unless it says
 /// <c>no-include</c>. Upstream's <c>--trace-ascii</c>, <c>--trace-config</c> and <c>--trace-time</c>
 /// are left out: Curl has no trace output and no case compares the trace (ADR-0029).
@@ -20,7 +20,9 @@ namespace Curl.Conformance;
 /// <para>
 /// <c>%LOGDIR</c> is the absolute log directory with forward slashes, so cases can run in
 /// parallel, <c>%PWD</c> is the tests directory the caller names, with forward slashes, and <c>%FILE_PWD</c> is empty, so <c>file://localhost%FILE_PWD/%LOGDIR/…</c> still
-/// names the file. As upstream does, standard output and standard error are saved to
+/// names the file. <see cref="UpstreamTestDirectoryComposition"/> first rewrites <c>%PWD/%LOGDIR</c>
+/// to <c>%LOGDIR</c>, and <c>%SRCDIR</c> before the two emulated <c>libtest</c> scripts to <c>.</c>;
+/// any other <c>%SRCDIR</c> has no value. As upstream does, standard output and standard error are saved to
 /// <c>%LOGDIR/stdout%TESTNUMBER</c> and <c>%LOGDIR/stderr%TESTNUMBER</c> before the comparison,
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
@@ -130,7 +132,7 @@ public sealed class UpstreamCaseRunner(
         AddDirectoryVariable(variables, "PWD", testsDirectory);
         AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
 
-        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile.Span, variables, platform.Features, ReadIncludedFile);
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
         if (!parsed.IsParsed)
         {
@@ -192,7 +194,7 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.Skipped(skipReason);
         }
 
-        string outputFile = logDirectory + "/curl.out";
+        string outputFile = $"{logDirectory}/curl{testNumber.ToString(CultureInfo.InvariantCulture)}.out";
         WriteClientFiles(testCase);
         List<string> arguments = Arguments(testCase, outputFile);
 

@@ -140,7 +140,12 @@ the file for an `UpstreamCurlPlatform` (the features Curl reports and its null d
 asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other
 than `http`, `file` or `none`, a missing feature, a variable with no value, an unsupported
 `<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
-outside the case's log directory; `%PWD` has a value only when the caller names a tests
+outside the case's log directory; before expansion `UpstreamTestDirectoryComposition` rewrites
+`%PWD/%LOGDIR` to `%LOGDIR` (the absolute log directory, so the composition names the file there on
+every platform) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
+`runtests.pl`'s default `$srcdir` names them; any other `%SRCDIR` has no value and skips the case
+(ADR-0458, BL-1944); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it;
+`%PWD` elsewhere has a value only when the caller names a tests
 directory, and `%CERTDIR` only when it names a certificate directory: the folder holding
 upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the
 conformance tests pass the parent of the `certs` folder `UpstreamTestCertificateGenerator` writes, BL-1923); a log, tests or certificate directory
@@ -194,7 +199,8 @@ without any lookup, so the answer is platform-neutral: an IP literal resolves in
 only, the names `localhost` (both) and `ip6-localhost` (IPv6) resolve, and anything else prints
 `Resolving IPv6 'NAME' didn't work` (or `IPv4`) and exits 1, so the precheck skips the case
 with that line; `%HOST6IP` is `[::1]`, which lets test1085 run. Any other check line skips the case, naming it. Nothing calls the two script
-emulations yet: their `%SRCDIR` has no value. The result is an
+emulations yet: their check lines reach the runner as `perl ./libtest/test613.pl ...` and skip
+as uninterpreted until BL-1894 routes them. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list.

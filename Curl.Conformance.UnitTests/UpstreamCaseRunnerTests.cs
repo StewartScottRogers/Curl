@@ -79,8 +79,8 @@ public sealed class UpstreamCaseRunnerTests
         await RunAsync(runner, $"<testcase>\n<client>\n<command{commandAttributes}>\na\n</command>\n</client>\n{verify}</testcase>\n");
 
         diagnostics.Arrange("expected arguments", string.Join(' ', expected));
-        diagnostics.Assert("arguments", string.Join(' ', expected), string.Join(' ', arguments!.Select(argument => argument.EndsWith("/curl.out", StringComparison.Ordinal) ? "*" : argument).ToArray()));
-        CollectionAssert.AreEqual(expected, arguments!.Select(argument => argument.EndsWith("/curl.out", StringComparison.Ordinal) ? "*" : argument).ToArray());
+        diagnostics.Assert("arguments", string.Join(' ', expected), string.Join(' ', arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument).ToArray()));
+        CollectionAssert.AreEqual(expected, arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument).ToArray());
     }
 
     [TestMethod]
@@ -423,6 +423,58 @@ public sealed class UpstreamCaseRunnerTests
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PwdBeforeLogDir_NamesTheFileInTheLogDirectoryWithNoTestsDirectory()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n%PWD/%LOGDIR/x\n</command>\n</client>\n</testcase>\n", logDirectory);
+
+        string expected = logDirectory.Replace('\\', '/') + "/x";
+        diagnostics.Assert("argument", expected, arguments?.SingleOrDefault());
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expected, arguments!.Single());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OutputFile_IsCurlTestNumberDotOutInTheLogDirectory()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string logDirectory = CreateLogDirectory();
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+
+        await RunWithLogDirectoryAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n", logDirectory);
+
+        string expected = logDirectory.Replace('\\', '/') + "/curl5.out";
+        diagnostics.Assert("output file", expected, arguments?[1]);
+        Assert.AreEqual(expected, arguments![1]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_SrcdirOutsideTheEmulatedScripts_SkipsForTheVariable()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\n-K %SRCDIR/data/x\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("outcome detail", "the harness has no value for %SRCDIR", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("the harness has no value for %SRCDIR", outcome.Detail);
     }
 
     [TestMethod]
