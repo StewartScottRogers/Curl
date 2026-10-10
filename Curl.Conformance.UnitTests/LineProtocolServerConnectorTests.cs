@@ -131,8 +131,8 @@ public sealed class LineProtocolServerConnectorTests
     }
 
     [TestMethod]
-    public void EmulatedServers_AreFtpSmtpAndImap_TheStandInsTheRunnerWiresIn() =>
-        CollectionAssert.AreEqual(new[] { "ftp", "smtp", "imap" }, LineProtocolServerConnector.EmulatedServers.ToArray());
+    public void EmulatedServers_AreFtpSmtpImapAndPop3_TheStandInsTheRunnerWiresIn() =>
+        CollectionAssert.AreEqual(new[] { "ftp", "smtp", "imap", "pop3" }, LineProtocolServerConnector.EmulatedServers.ToArray());
 
     [TestMethod]
     public void ServerCommands_ReplyLines_AreFoundByCommandNameIgnoringCase()
@@ -144,6 +144,18 @@ public sealed class LineProtocolServerConnectorTests
         Assert.AreEqual("502 later wins\r\n", Encoding.Latin1.GetString(reply));
         Assert.IsFalse(commands.TryFindReply("EPSV", out _));
         Assert.IsFalse(commands.TryFindReply("LIST", out _));
+    }
+
+    [TestMethod]
+    public void ServerCommands_ReplyTextWithBackslashEscapes_IsReadAsAPerlDoubleQuotedString()
+    {
+        LineProtocolServerCommands commands = LineProtocolServerCommands.Read(
+            "REPLY LIST +OK none\\r\\n.\\tx\\@y\\\\z\nREPLY welcome ends with \\\n"u8);
+
+        Assert.IsTrue(commands.TryFindReply("LIST", out byte[] list));
+        Assert.AreEqual("+OK none\r\n.\tx@y\\z\r\n", Encoding.Latin1.GetString(list));
+        Assert.IsTrue(commands.TryFindReply("welcome", out byte[] welcome));
+        Assert.AreEqual("ends with \\\r\n", Encoding.Latin1.GetString(welcome));
     }
 
     [TestMethod]

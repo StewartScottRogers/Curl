@@ -26,7 +26,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -61,6 +61,9 @@ public sealed class UpstreamCaseRunner(
 
     /// <summary>The value of <c>%IMAPPORT</c>: connections to this port reach the IMAP server, <see cref="ImapServerConnector"/>, whose command lines follow the SMTP server's for <c>&lt;verify&gt;&lt;protocol&gt;</c> and whose last <c>APPEND</c> literal is compared with <c>&lt;verify&gt;&lt;upload&gt;</c>.</summary>
     public const string ImapPort = "8997";
+
+    /// <summary>The value of <c>%POP3PORT</c>: connections to this port reach the POP3 server, <see cref="Pop3ServerConnector"/>, whose command lines follow the IMAP server's for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
+    public const string Pop3Port = "8999";
 
     /// <summary>The value of <c>%SOCKSPORT</c>: connections to this port reach the socksd emulation, <see cref="SocksServerConnector"/>.</summary>
     public const string SocksPort = "8994";
@@ -167,6 +170,7 @@ public sealed class UpstreamCaseRunner(
             ["FTPPORT"] = FtpPort,
             ["SMTPPORT"] = SmtpPort,
             ["IMAPPORT"] = ImapPort,
+            ["POP3PORT"] = Pop3Port,
             ["MQTTPORT"] = MqttPort,
             ["RTSPPORT"] = RtspPort,
             ["NOLISTENPORT"] = NoListenPort,
@@ -205,7 +209,8 @@ public sealed class UpstreamCaseRunner(
         FtpServerConnector ftp = new(testCase, new NoListenPortConnector(server));
         SmtpServerConnector smtp = new(testCase, ftp);
         ImapServerConnector imap = new(testCase, smtp);
-        MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, imap));
+        Pop3ServerConnector pop3 = new(testCase, imap);
+        MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, pop3));
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, new UnreachableDatagramConnector());
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
@@ -215,7 +220,7 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. mqtt.ProtocolLog.Span], ReadOutputFile(outputFile))
+        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span], ReadOutputFile(outputFile))
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             // A case reaches one mail server, so at most one of these holds a message.

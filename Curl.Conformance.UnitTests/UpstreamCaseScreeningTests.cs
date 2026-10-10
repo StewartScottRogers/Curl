@@ -88,6 +88,18 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    public void FindSkipReason_Pop3CaseWithPop3PortGivenTheRunnersValue_IsNotSkipped()
+    {
+        byte[] testFile = System.Text.Encoding.Latin1.GetBytes("<testcase>\n<client>\n<server>\npop3\n</server>\n<command>\npop3://%HOSTIP:%POP3PORT/1 -u user:secret\n</command>\n</client>\n</testcase>\n");
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["POP3PORT"] = UpstreamCaseRunner.Pop3Port };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        Assert.IsNull(reason, reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_ImapCaseWithImapPortGivenTheRunnersValue_IsNotSkipped()
     {
         byte[] testFile = System.Text.Encoding.Latin1.GetBytes("<testcase>\n<client>\n<server>\nimap\n</server>\n<command>\nimap://%HOSTIP:%IMAPPORT/1 -T -\n</command>\n</client>\n<verify>\n<upload>\nx\n</upload>\n</verify>\n</testcase>\n");
