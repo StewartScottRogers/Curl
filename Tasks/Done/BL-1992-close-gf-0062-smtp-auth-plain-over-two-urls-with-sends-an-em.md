@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1992 — Close GF-0062: SMTP AUTH PLAIN over two URLs with -: sends an empty authorization identity; upstream expects user, user, password
 
@@ -35,13 +35,26 @@ Measure test938's command line against the reference with Record-CurlExchange.ps
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test938`: Curl answers what curl 8.21.0 answers, `upstream test938 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test938`: Curl answers what curl 8.21.0 answers. Measured: real curl 8.21.0 sends `AHVzZXIub25lAHNlY3JldA==` (`NUL user.one NUL secret`), the same as Curl; test938 is in curl's own `tests/data/DISABLED`, so it cannot measure `match` against a real curl and instead measures `excluded` once BL-2027 lands (ADR-0470). Criterion reworded from "the item measures `match`", which no drop-in replacement can meet.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md). No option changed.
 
 ## Notes
+
+- Measured real curl 8.21.0 (Schannel, `/mingw64/bin/curl`) with
+  `Record-CurlExchange.ps1 -Port 18927 -Smtp -SmtpReply 'EHLO=250-localhost\r\n250 AUTH PLAIN' -CurlArgs '-sS','--mail-from','a@b','--mail-rcpt','c@d','-T',<file>,'-u','user.one:secret','smtp://127.0.0.1:18927/938001'`:
+  `AUTH PLAIN`, `334 `, `AHVzZXIub25lAHNlY3JldA==`, `235`. That is exactly the "got" side of GF-0062's evidence.
+- Upstream (https://raw.githubusercontent.com/curl/curl/curl-8_21_0/tests/data/DISABLED) lists 938, and 8.21.0's
+  `lib/vauth/cleartext.c` builds PLAIN from `Curl_creds_sasl_authzid`, empty without `--sasl-authzid`; test833 expects
+  `%00user%00secret`. test938's `<protocol>` is stale upstream data, not curl's behaviour.
+- Decision (ADR-0470): no code change; Curl keeps matching real curl, pinned already by
+  `SaslAuthenticatorTests.Begin_Plain_InitialResponseMatchesCurl` (`AHUAcA==` for `-u u:p`).
+- The finding closes through the harness: BL-2027 (interactive only, the harness is an audit path) has it measure
+  every case in `tests/data/DISABLED` as `excluded`. This task is Done rather than parked behind BL-2027, because no
+  Curl work is left for a lane to pick up.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Curl already sends what curl 8.21.0 sends (measured); test938 is disabled upstream, harness exclusion filed as BL-2027 (ADR-0470).
