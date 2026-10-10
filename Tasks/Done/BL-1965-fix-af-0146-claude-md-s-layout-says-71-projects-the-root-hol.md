@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1965 — Fix AF-0146: CLAUDE.md's layout says 71 projects; the root holds 73 Curl.* projects
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. CLAUDE.md layout now says 73 projects, matching the root
