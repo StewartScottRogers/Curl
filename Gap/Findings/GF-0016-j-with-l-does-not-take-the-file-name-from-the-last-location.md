@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1642, behaviour:test1643, behaviour:test3036]
 touches: [Curl.Console, Curl.Console.UnitTests]
-task: BL-1971
-tasks: [BL-1809, BL-1971]
+task: BL-2009
+tasks: [BL-1809, BL-2009]
 ---
 # GF-0016 - -J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs
 
@@ -39,4 +39,4 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1809.
-- 2026-10-10_0756: Filed BL-1971.
+- 2026-10-10_0756: Filed BL-2009.
