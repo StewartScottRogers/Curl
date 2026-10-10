@@ -106,7 +106,7 @@ namespace Curl.Protocol.Ftp;
 /// ASCII mode and appending (BL-633): <c>-B</c> or a <c>;type=a</c> URL suffix
 /// (<see cref="FtpTypeCode" />) sends <c>TYPE A</c> instead of <c>TYPE I</c>, for a
 /// download, an upload and <c>-I</c> alike; an ASCII download sends no <c>SIZE</c> or
-/// <c>REST</c>. <c>;type=d</c> lists with <c>NLST</c> as <c>-l</c> does. A download's bytes
+/// <c>REST</c>, and a download under <c>--ignore-content-length</c> no <c>SIZE</c> (BL-1982). <c>;type=d</c> lists with <c>NLST</c> as <c>-l</c> does. A download's bytes
 /// pass unchanged either way. <c>-a</c> uploads with <c>APPE</c> instead of <c>STOR</c>, and
 /// <c>--crlf</c>, or ASCII mode off Windows (<see cref="FtpUploadLineEndings" />), converts
 /// each line feed of an upload not already after a carriage return into a carriage-return
@@ -231,6 +231,12 @@ internal sealed class FtpSession(
 
     /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> when there is none; 0 is none, as in curl.</summary>
     private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
+
+    /// <summary>
+    /// Whether <c>--ignore-content-length</c> was given: a download then sends no <c>SIZE</c>,
+    /// as curl 8.21.0's <c>ftp_state_type_resp</c> skips it for <c>data->set.ignorecl</c> (BL-1982).
+    /// </summary>
+    private readonly bool ignoresContentLength = context.Http?.IgnoreContentLength == true;
 
     /// <summary>
     /// The code of the last reply read before <c>QUIT</c>, <c>ABOR</c>'s included; 0 before
@@ -681,7 +687,7 @@ internal sealed class FtpSession(
         return await OpenDownloadDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
             ?? await SetTypeAsync(ascii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
-            ?? await ReadSizeAsync(path.FileName, ascii).ConfigureAwait(false)
+            ?? await ReadSizeAsync(path.FileName, SendsNoSize(ascii)).ConfigureAwait(false)
             ?? TraceRetrieveNext(listing)
             ?? await RefuseOversizedFileAsync().ConfigureAwait(false)
             ?? await PositionAsync().ConfigureAwait(false)
@@ -1587,9 +1593,19 @@ internal sealed class FtpSession(
         return null;
     }
 
-    private async ValueTask<TransferResult?> ReadSizeAsync(string fileName, bool listing)
+    /// <summary>
+    /// Whether a download sends no <c>SIZE</c>: an ASCII one or a listing, or any under
+    /// <c>--ignore-content-length</c>.
+    /// </summary>
+    private bool SendsNoSize(bool ascii) => ascii || ignoresContentLength;
+
+    /// <summary>
+    /// Sends <c>SIZE</c> and keeps its count, exit 78 on a <c>550</c>; nothing when
+    /// <paramref name="skipped" /> (a listing, an ASCII download or <c>--ignore-content-length</c>).
+    /// </summary>
+    private async ValueTask<TransferResult?> ReadSizeAsync(string fileName, bool skipped)
     {
-        if (listing)
+        if (skipped)
         {
             return null;
         }
