@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
+touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
 completed:
@@ -35,11 +35,28 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpProtocolHandler, run TftpRequestFile's l
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1453`: Curl answers what curl 8.21.0 answers, `upstream test1453 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1453`: Curl answers what curl 8.21.0 answers, `upstream test1453 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Fix: `TftpProtocolHandler` still opens the channel first, then, when the open fails with
+  exit 7 (`CouldntConnect`), runs `TftpRequestFile.RefuseUnsendableName` - the decoded-NUL
+  (exit 3) and `TFTP filename too long` (exit 71, with its `-v` line) checks - and returns
+  that refusal ahead of the connector's failure. Choice and why: curl resolves the host,
+  then opens a UDP socket that cannot fail to connect, then `tftp_send_first` checks the
+  name. So a resolve failure (exit 6) must still win, and a successful open must keep its
+  connect and timeout `-v` lines before the refusal; checking the name before every open,
+  as the finding suggested, would break both. `TFTP buffer too small for options` stays
+  after the open, as it needs the retry schedule the options carry; no upstream case hits
+  it with a failed open.
+- Measured: upstream test1453 now passes in `UpstreamConformanceTests` (it was
+  `Inconclusive: passes; add 1453`), so 1453 is added to
+  `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`. That project was added to
+  `touches`: the ratchet's rule is to list a case in the same commit that makes it pass, and
+  no task in Doing on `origin/work/dark-factory` names it.
+- No option changed, so `--ai-help` needs nothing.
 
 ## Log
 

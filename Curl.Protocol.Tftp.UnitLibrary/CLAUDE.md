@@ -43,7 +43,10 @@ which a byte stream cannot express. The tests in the matching `.UnitTests` proje
   is open and nothing sent, a decoded NUL is exit 3 `URL using bad/illegal format or
   missing URL`, a name and mode over 512 bytes with their framing exit 71 `TFTP filename
   too long`, and options that push the request past 512 bytes exit 71 `TFTP buffer too
-  small for options`; each exit 71 message is also reported as a `-v` line.
+  small for options`; each exit 71 message is also reported as a `-v` line. A channel
+  that fails to open with exit 7 loses to the decoded NUL and the too-long name, as curl's
+  UDP socket opens without contacting the server (GF-0050, BL-1980); a host that does not
+  resolve still fails first.
 - Retransmission and timeouts (`TftpDownload`, `TftpUpload`, `TftpRetrySchedule`,
   `TftpTimeLimits`), as curl 8.21.0's `tftp_set_timeouts` derives them: from the time
   left (`ConnectTimeout`, 300 s by default, or `MaxTime` if sooner; after the first
