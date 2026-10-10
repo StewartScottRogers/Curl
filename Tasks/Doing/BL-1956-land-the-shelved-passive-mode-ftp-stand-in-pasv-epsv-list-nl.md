@@ -33,3 +33,4 @@ BL-1906 is deferred because it hit the factory's per-task cost cap twice. Its co
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
