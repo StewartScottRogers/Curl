@@ -8,7 +8,7 @@ depends-on: [BL-2010, BL-2011]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1975 — Close GF-0045: Through -p/-x the proxy server receives nothing in process: every <verify><proxy> case records no CONNECT
 
@@ -35,23 +35,23 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test80`: Curl answers what curl 8.21.0 answers, `upstream test80 passes`, so the item measures `match`.
-- [ ] `behaviour:test83`: Curl answers what curl 8.21.0 answers, `upstream test83 passes`, so the item measures `match`.
-- [ ] `behaviour:test95`: Curl answers what curl 8.21.0 answers, `upstream test95 passes`, so the item measures `match`.
-- [ ] `behaviour:test275`: Curl answers what curl 8.21.0 answers, `upstream test275 passes`, so the item measures `match`.
-- [ ] `behaviour:test744`: Curl answers what curl 8.21.0 answers, `upstream test744 passes`, so the item measures `match`.
-- [ ] `behaviour:test1078`: Curl answers what curl 8.21.0 answers, `upstream test1078 passes`, so the item measures `match`.
-- [ ] `behaviour:test1184`: Curl answers what curl 8.21.0 answers, `upstream test1184 passes`, so the item measures `match`.
-- [ ] `behaviour:test1288`: Curl answers what curl 8.21.0 answers, `upstream test1288 passes`, so the item measures `match`.
-- [ ] `behaviour:test1297`: Curl answers what curl 8.21.0 answers, `upstream test1297 passes`, so the item measures `match`.
-- [ ] `behaviour:test1428`: Curl answers what curl 8.21.0 answers, `upstream test1428 passes`, so the item measures `match`.
-- [ ] `behaviour:test1904`: Curl answers what curl 8.21.0 answers, `upstream test1904 passes`, so the item measures `match`.
-- [ ] `behaviour:test1319`: Curl answers what curl 8.21.0 answers, `upstream test1319 passes`, so the item measures `match`.
-- [ ] `behaviour:test1320`: Curl answers what curl 8.21.0 answers, `upstream test1320 passes`, so the item measures `match`.
-- [ ] `behaviour:test1321`: Curl answers what curl 8.21.0 answers, `upstream test1321 passes`, so the item measures `match`.
-- [ ] `behaviour:test2107`: Curl answers what curl 8.21.0 answers, `upstream test2107 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test80`: Curl answers what curl 8.21.0 answers, `upstream test80 passes`, so the item measures `match`.
+- [x] `behaviour:test83`: Curl answers what curl 8.21.0 answers, `upstream test83 passes`, so the item measures `match`.
+- [x] `behaviour:test95`: Curl answers what curl 8.21.0 answers, `upstream test95 passes`, so the item measures `match`.
+- [x] `behaviour:test275`: Curl answers what curl 8.21.0 answers, `upstream test275 passes`, so the item measures `match`.
+- [x] `behaviour:test744`: Curl answers what curl 8.21.0 answers, `upstream test744 passes`, so the item measures `match`.
+- [x] `behaviour:test1078`: Curl answers what curl 8.21.0 answers, `upstream test1078 passes`, so the item measures `match`.
+- [x] `behaviour:test1184`: Curl answers what curl 8.21.0 answers, `upstream test1184 passes`, so the item measures `match`.
+- [x] `behaviour:test1288`: Curl answers what curl 8.21.0 answers, `upstream test1288 passes`, so the item measures `match`.
+- [x] `behaviour:test1297`: Curl answers what curl 8.21.0 answers, `upstream test1297 passes`, so the item measures `match`.
+- [x] `behaviour:test1428`: Curl answers what curl 8.21.0 answers, `upstream test1428 passes`, so the item measures `match`.
+- [x] `behaviour:test1904`: Curl answers what curl 8.21.0 answers, `upstream test1904 passes`, so the item measures `match`.
+- [x] `behaviour:test1319`: Curl answers what curl 8.21.0 answers, `upstream test1319 passes`, so the item measures `match`.
+- [x] `behaviour:test1320`: Curl answers what curl 8.21.0 answers, `upstream test1320 passes`, so the item measures `match`.
+- [x] `behaviour:test1321`: Curl answers what curl 8.21.0 answers, `upstream test1321 passes`, so the item measures `match`.
+- [x] `behaviour:test2107`: Curl answers what curl 8.21.0 answers, `upstream test2107 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -60,9 +60,12 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 - test1288 left: `%{size_header}` lacks the CONNECT reply head's 61 bytes (231 expected, 170 got); needs `Curl.Protocol.Abstractions` and `Curl.Protocol.Http` (the latter held by BL-1959). Filed as BL-2010.
 - test1319-1321 left: pop3/smtp/imap never put the proxy on their connect target, so nothing is sent; needs the mail protocol libraries (held by BL-1989). Filed as BL-2011.
 
+- 2026-10-10 (lane 1, second claim): BL-2010 and BL-2011 are Done; 1288 and 1319-1321 are now in `PassingUpstreamCases.txt` beside 2107 and the ten already listed, so all fifteen items pass `UpstreamCase_RunThroughCurl_HoldsTheRatchet` over the production `TcpConnector`. No code change was needed on this claim; build clean and fast tests green. No option changed, so `--ai-help` is untouched. The gap entries for the ten already-passing cases still need the gap tool switched off the `IConnector` overload (interactive-only, see above).
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. test2107 fixed; waits on BL-2010 (test1288, size_header needs Curl.Protocol.Http held by BL-1959) and BL-2011 (test1319-1321, mail libraries held by BL-1989)
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. all fifteen GF-0045 cases pass the in-process ratchet over TcpConnector
