@@ -39,3 +39,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Waits on BL-1924: every %PROXYPORT case is still skipped for <verify><proxy> or http-proxy, which BL-1924 adds
+- 2026-10-09: Backlog -> Doing.
