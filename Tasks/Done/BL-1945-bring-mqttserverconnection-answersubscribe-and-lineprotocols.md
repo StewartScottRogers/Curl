@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-10
 ---
 # BL-1945 — Bring MqttServerConnection.AnswerSubscribe and LineProtocolServerCommands.PerlDoubleQuoted under the complexity and branch gates
 
@@ -22,12 +22,15 @@ Measured by BL-1944 on 2026-10-09 (Curl.Conformance.UnitLibrary: 100% lines, 99.
 
 ## Acceptance criteria
 
-- [ ] Both methods (or what they are split into) have complexity of at most 10 and 100% line and branch coverage.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no case on PassingUpstreamCases.txt stops passing.
+- [x] Both methods (or what they are split into) have complexity of at most 10 and 100% line and branch coverage.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; no case on PassingUpstreamCases.txt stops passing.
 
 ## Notes
+
+Already done by BL-1936 (cbd5ee03d), which split both methods and covered the branch. Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary on 2026-10-10 reports 0 failing members; no code change needed.
 
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Already done by BL-1936; Measure-CodeQuality reports 0 failing members
