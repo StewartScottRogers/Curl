@@ -33,3 +33,4 @@ Split from BL-1916 (cost cap). The runner half of the code is in stash 51b9f0bb6
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
