@@ -3263,6 +3263,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    file with the board script - add those IDs to its `depends-on` and move it to
    Backlog, not Blocked, with a -Reason naming them. The board starts it again once
    they are Done.
+   Look for that in your first few turns, before any code: read the task, the files it
+   touches and the tests or data it names, and if it is too big for one run or needs work
+   no task covers yet, split it or file that work and requeue it then, not after a
+   long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
+   after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
 4. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file) and push the current
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
@@ -3357,6 +3362,11 @@ Rules for this unattended run, in addition to CLAUDE.md:
    file with the board script - add those IDs to its `depends-on` and move it to
    Backlog, not Blocked, with a -Reason naming them. The board starts it again once
    they are Done. Blocked is only for what needs Stewart.
+   Look for that in your first few turns, before any code: read the task, the files it
+   touches and the tests or data it names, and if it is too big for one run or needs work
+   no task covers yet, split it or file that work and requeue it then, not after a
+   long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
+   after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
 5. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.

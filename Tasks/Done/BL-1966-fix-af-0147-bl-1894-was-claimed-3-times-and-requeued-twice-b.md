@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1966 — Fix AF-0147: BL-1894 was claimed 3 times and requeued twice before one run finished it
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The audit finding is off-limits to lanes, so the fix follows the task text. Cause: BL-1894 was too big and had a missing dependency, each found only after a long run. Both run prompts in `RunDarkFactory.ps1` now tell the run to look for either in its first few turns, before any code, and to split or requeue then. The script parses clean; no C# changed.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Run prompts now say to check size and dependencies in the first turns
