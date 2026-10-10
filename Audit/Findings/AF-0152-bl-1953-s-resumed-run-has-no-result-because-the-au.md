@@ -3,8 +3,8 @@ id: AF-0152
 title: BL-1953's resumed run has no result because the audit copied the logs 1 s after it started
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-1953:BL-1953-resumed-run:unfinished-run
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
