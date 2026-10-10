@@ -8,7 +8,7 @@ depends-on: [BL-1895]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1925 — Answer SMTP commands as ftpserver.pl does (SMTP line-protocol responder)
 
@@ -42,3 +42,4 @@ Split from BL-1909 (lane 2, 2026-10-09) so each piece fits one lane run's $2 cos
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: SmtpResponder and its tests added; build clean, fast tests green.
+- 2026-10-09: Doing -> Done. SmtpResponder done; build clean, fast tests green
