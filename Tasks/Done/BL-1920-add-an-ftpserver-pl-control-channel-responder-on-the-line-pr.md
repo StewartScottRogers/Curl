@@ -8,7 +8,7 @@ depends-on: [BL-1895]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1920 — Add an ftpserver.pl control-channel responder on the line-protocol core
 
@@ -36,3 +36,4 @@ First slice of BL-1905, split off because the whole of BL-1905 does not fit one 
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. FtpControlChannelResponder answers ftpserver.pl's control channel; 100% coverage, build clean, fast tests green
