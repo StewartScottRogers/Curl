@@ -29,7 +29,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c> and <c>%POP3SPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/> and <see cref="Pop3sPort"/> when a certificate directory is named, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c> and <c>%FTPSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/> and <see cref="FtpsPort"/> when a certificate directory is named, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -104,6 +104,9 @@ public sealed class UpstreamCaseRunner(
 
     /// <summary>The value of <c>%POP3SPORT</c> when the caller names a certificate directory: connections to this port reach the POP3 server through TLS, <see cref="MailTlsServerConnector"/>.</summary>
     public const string Pop3sPort = "9002";
+
+    /// <summary>The value of <c>%FTPSPORT</c> when the caller names a certificate directory: connections to this port reach the FTP control channel through implicit TLS, <see cref="FtpsServerConnector"/>, presenting <c>%CERTDIR/certs/test-localhost.pem</c>.</summary>
+    public const string FtpsPort = "9007";
 
     /// <summary>The value of <c>%NOLISTENPORT</c>: connections to this port are refused, <see cref="NoListenPortConnector"/>.</summary>
     public const string NoListenPort = "47";
@@ -198,6 +201,7 @@ public sealed class UpstreamCaseRunner(
             variables["SMTPSPORT"] = SmtpsPort;
             variables["IMAPSPORT"] = ImapsPort;
             variables["POP3SPORT"] = Pop3sPort;
+            variables["FTPSPORT"] = FtpsPort;
         }
     }
 
@@ -249,6 +253,8 @@ public sealed class UpstreamCaseRunner(
             ["RTSPPORT"] = RtspPort,
             ["TFTPPORT"] = TftpPort,
             ["NOLISTENPORT"] = NoListenPort,
+            // servers.pm's $ftpchecktime * 8, where the check time is never below 1 second.
+            ["FTPTIME2"] = "8",
             ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
             ["LOGDIR"] = logDirectory,
             ["FILE_PWD"] = string.Empty,
@@ -284,13 +290,13 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(HttpsServer(testCase, server, certificateDirectory)));
+        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(HttpsServer(testCase, server, certificateDirectory)), serverClock);
         SmtpServerConnector smtp = new(testCase, ftp);
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
-        MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, pop3, certificateDirectory)));
+        MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory)));
         IConnector servers = sshServer?.InFrontOf(mqtt) ?? mqtt;
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase));
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -306,7 +312,7 @@ public sealed class UpstreamCaseRunner(
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             // A case reaches one uploading server, so at most one of these holds an upload.
-            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
+            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
         });
     }
 
@@ -353,6 +359,12 @@ public sealed class UpstreamCaseRunner(
         certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(MailTlsServerConnector.EmulatedServers).Any()
             ? new MailTlsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), mail)
             : mail;
+
+    // A case naming the ftps server reaches it on %FTPSPORT, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
+    private static IConnector FtpsServer(UpstreamTestCase testCase, IConnector ftp, string? certificateDirectory) =>
+        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(FtpsServerConnector.EmulatedServers).Any()
+            ? new FtpsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), ftp)
+            : ftp;
 
     private static TimeProvider ServerClock(List<string> arguments) =>
         CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();

@@ -131,14 +131,14 @@ public sealed class MailTlsServerConnectorTests
         CollectionAssert.AreEqual(new[] { "smtps", "imaps", "pop3s" }, MailTlsServerConnector.EmulatedServers.ToArray());
     }
 
-    private static async Task<SslStream> HandshakeAsync(IConnection connection)
+    internal static async Task<SslStream> HandshakeAsync(IConnection connection)
     {
         SslStream client = new(new ConnectionStream(connection), leaveInnerStreamOpen: false, static (_, _, _, _) => true);
         await client.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = "localhost" });
         return client;
     }
 
-    private static async Task<string> ReadAsync(SslStream client, int length)
+    internal static async Task<string> ReadAsync(SslStream client, int length)
     {
         byte[] reply = new byte[length];
         int count = 0;
@@ -153,7 +153,7 @@ public sealed class MailTlsServerConnectorTests
 
     // A P-256 certificate reloaded through PKCS#12, since Windows Schannel and macOS reject a
     // server certificate whose key is ephemeral.
-    private static X509Certificate2 CreateCertificate()
+    internal static X509Certificate2 CreateCertificate()
     {
         using ECDsa key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         CertificateRequest request = new("CN=localhost", key, HashAlgorithmName.SHA256);

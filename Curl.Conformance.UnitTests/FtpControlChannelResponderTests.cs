@@ -122,6 +122,35 @@ public sealed class FtpControlChannelResponderTests
             responder.ReceivedCommandLines.ToArray());
     }
 
+    [TestMethod]
+    [DataRow("DELAY CWD 60\n", "CWD /", 60)]
+    [DataRow("DELAY USER 5\nREPLY USER 331 ok\n", "USER a", 5)]
+    [DataRow("DELAY CWD \n", "CWD /", 0)]
+    [DataRow("DELAY CWD 60\n", "cwd /", 0)]
+    [DataRow("DELAY CWD 60\n", "PWD", 0)]
+    [DataRow("REPLY PASS DELAY CWD 9\n", "CWD /", 0)]
+    [DataRow("COUNT DELAY CWD 9\n", "CWD /", 0)]
+    [DataRow("DELAY CWD 1\nDELAY CWD 2\n", "CWD /", 2)]
+    public void Answer_DelayLine_DelaysTheReplyToTheCommandAsWritten(string serverCommands, string commandLine, int expectedSeconds)
+    {
+        FtpControlChannelResponder responder = Create(serverCommands);
+
+        LineProtocolReply reply = responder.Answer(commandLine);
+
+        Assert.AreEqual(TimeSpan.FromSeconds(expectedSeconds), reply.Delay);
+    }
+
+    [TestMethod]
+    public void Answer_UnrecognizedLineUnderDelay_IsAnsweredAtOnce()
+    {
+        FtpControlChannelResponder responder = Create("DELAY BAD 9\n");
+
+        LineProtocolReply reply = responder.Answer("BAD!");
+
+        Assert.AreEqual(TimeSpan.Zero, reply.Delay);
+        Assert.IsTrue(reply.ClosesConnection);
+    }
+
     private static FtpControlChannelResponder Create(string serverCommands) =>
         new(LineProtocolServerCommands.Read(Encoding.Latin1.GetBytes(serverCommands)));
 }

@@ -7,9 +7,11 @@ namespace Curl.Conformance;
 
 /// <summary>
 /// One client connection to a <see cref="LineProtocolServerConnector"/>. The greeting waits to be
-/// read from the start; every complete command line the client writes is answered at once, and
-/// the reply waits to be read. A read with nothing waiting waits for the client's next write, as
-/// <c>ftpserver.pl</c> blocks reading a command, and returns 0 once the server has closed.
+/// read from the start; every complete command line the client writes is answered at once, or
+/// after the reply's <see cref="LineProtocolReply.Delay"/> on the server's clock (a reply after a
+/// delayed one waits for it, keeping their order), and the reply waits to be read. A read with
+/// nothing waiting waits for the client's next write or a delayed reply, as <c>ftpserver.pl</c>
+/// blocks reading a command, and returns 0 once the server has closed.
 /// </summary>
 /// <remarks>
 /// Bytes are recorded as they are written while the server still reads them; once a reply has
@@ -21,20 +23,27 @@ internal sealed class LineProtocolServerConnection : IConnection
 
     private readonly SwsServerRecording recording;
 
+    private readonly TimeProvider clock;
+
     private readonly Lock gate = new();
 
     private readonly List<byte> unreadReplyBytes = [];
 
     private readonly List<byte> unansweredLineBytes = [];
 
-    private TaskCompletionSource nextWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private Task delayedReplies = Task.CompletedTask;
 
     private bool closed;
 
-    public LineProtocolServerConnection(ILineProtocolResponder responder, SwsServerRecording recording)
+    private bool closing;
+
+    public LineProtocolServerConnection(ILineProtocolResponder responder, SwsServerRecording recording, TimeProvider clock)
     {
         this.responder = responder;
         this.recording = recording;
+        this.clock = clock;
         unreadReplyBytes.AddRange(responder.Greeting.Span);
     }
 
@@ -46,7 +55,7 @@ internal sealed class LineProtocolServerConnection : IConnection
 
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        Task written;
+        Task signalled;
         lock (gate)
         {
             if (unreadReplyBytes.Count > 0 || closed)
@@ -57,24 +66,21 @@ internal sealed class LineProtocolServerConnection : IConnection
                 return count;
             }
 
-            written = nextWrite.Task;
+            signalled = changed.Task;
         }
 
-        await written.WaitAsync(cancellationToken);
+        await signalled.WaitAsync(cancellationToken);
         return await ReadAsync(buffer, cancellationToken);
     }
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        TaskCompletionSource written;
         lock (gate)
         {
             ReadCommandLines(buffer.Span);
-            written = nextWrite;
-            nextWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
-        written.TrySetResult();
+        Signal();
         return ValueTask.CompletedTask;
     }
 
@@ -82,10 +88,22 @@ internal sealed class LineProtocolServerConnection : IConnection
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
+    private void Signal()
+    {
+        TaskCompletionSource signal;
+        lock (gate)
+        {
+            signal = changed;
+            changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        signal.TrySetResult();
+    }
+
     // Records and answers the written bytes line by line, up to the end of the write or a close.
     private void ReadCommandLines(ReadOnlySpan<byte> written)
     {
-        while (!closed && !written.IsEmpty)
+        while (!closing && !written.IsEmpty)
         {
             int lineFeed = written.IndexOf((byte)'\n');
             int taken = lineFeed < 0 ? written.Length : lineFeed + 1;
@@ -108,6 +126,31 @@ internal sealed class LineProtocolServerConnection : IConnection
         string commandLine = Encoding.Latin1.GetString([.. unansweredLineBytes], 0, count - 2);
         unansweredLineBytes.Clear();
         LineProtocolReply reply = responder.Answer(commandLine);
+        closing = reply.ClosesConnection;
+        if (reply.Delay > TimeSpan.Zero || !delayedReplies.IsCompleted)
+        {
+            delayedReplies = SendAfterAsync(delayedReplies, reply);
+            return;
+        }
+
+        Send(reply);
+    }
+
+    // ftpserver.pl sleeps before it answers, so the reply waits for the one before it and then its own delay.
+    private async Task SendAfterAsync(Task previousReplies, LineProtocolReply reply)
+    {
+        await previousReplies.ConfigureAwait(false);
+        await Task.Delay(reply.Delay, clock).ConfigureAwait(false);
+        lock (gate)
+        {
+            Send(reply);
+        }
+
+        Signal();
+    }
+
+    private void Send(LineProtocolReply reply)
+    {
         unreadReplyBytes.AddRange(reply.Bytes.Span);
         closed = reply.ClosesConnection;
     }

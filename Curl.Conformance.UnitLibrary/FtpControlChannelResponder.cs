@@ -11,9 +11,11 @@ namespace Curl.Conformance;
 /// <c>500 &lt;command&gt; is not dealt with!</c> for any other command. A line that is not three or
 /// four letters, optionally followed by white space and an argument, is answered
 /// <c>500 Unrecognized command</c> and the connection closes. Commands that need a data connection
-/// or the case's data (<c>PASV</c>, <c>EPSV</c>, <c>PORT</c>, <c>EPRT</c>, <c>LIST</c>, <c>NLST</c>,
-/// <c>RETR</c>, <c>STOR</c>, <c>APPE</c>, <c>SIZE</c>, <c>MDTM</c>) are not carried out yet
-/// (BL-1906 to BL-1908): they get a <c>REPLY</c> line, their display text, or the not-dealt-with answer.
+/// or the case's data are carried out by the <see cref="FtpTransferCommands"/> it is given, after
+/// their display text as ftpserver.pl does; without them, and for the active-mode and upload
+/// commands (<c>PORT</c>, <c>EPRT</c>, <c>STOR</c>, <c>APPE</c>, BL-1907), they get a <c>REPLY</c>
+/// line, their display text, or the not-dealt-with answer. A <c>DELAY &lt;COMMAND&gt; &lt;seconds&gt;</c>
+/// line delays the reply to that command, as written, by its seconds (BL-1958).
 /// </summary>
 internal sealed class FtpControlChannelResponder : ILineProtocolResponder
 {
@@ -47,6 +49,8 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
 
     private readonly LineProtocolServerCommands serverCommands;
 
+    private readonly FtpTransferCommands? transferCommands;
+
     private readonly List<string> receivedCommandLines = [];
 
     private string targetDirectory = "/";
@@ -58,6 +62,15 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
         ArgumentNullException.ThrowIfNull(serverCommands);
         this.serverCommands = serverCommands;
         Greeting = serverCommands.TryFindReply("welcome", out byte[] welcome) ? welcome : Banner;
+    }
+
+    /// <summary>Creates the responder for one connection of a case, carrying out its passive-mode transfers.</summary>
+    /// <param name="serverCommands">The case's <c>&lt;servercmd&gt;</c> <c>REPLY</c> lines.</param>
+    /// <param name="transferCommands">The connection's <c>PASV</c>, <c>EPSV</c>, <c>RETR</c>, <c>LIST</c>, <c>NLST</c>, <c>SIZE</c>, <c>MDTM</c> and <c>REST</c>.</param>
+    public FtpControlChannelResponder(LineProtocolServerCommands serverCommands, FtpTransferCommands transferCommands)
+        : this(serverCommands)
+    {
+        this.transferCommands = transferCommands;
     }
 
     /// <inheritdoc/>
@@ -78,12 +91,14 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
             return Reply("500 Unrecognized command\r\n", closesConnection: true);
         }
 
+        // ftpserver.pl sleeps for a DELAY line before it looks up the reply.
+        TimeSpan delay = serverCommands.ReplyDelay(command);
         if (serverCommands.TryFindReply(command, out byte[] customReply))
         {
-            return new LineProtocolReply(customReply, false);
+            return new LineProtocolReply(customReply, false) { Delay = delay };
         }
 
-        return Reply(AnswerByDefault(command, argument), closesConnection: false);
+        return Reply(AnswerByDefault(command, argument), closesConnection: false) with { Delay = delay };
     }
 
     private static LineProtocolReply Reply(string text, bool closesConnection) =>
@@ -112,9 +127,14 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
                 SwitchDirectory(argument);
                 return displayText ?? string.Empty;
             default:
-                return displayText ?? $"500 {command} is not dealt with!\r\n";
+                return AnswerTransferOrNotDealtWith(command, argument, displayText);
         }
     }
+
+    private string AnswerTransferOrNotDealtWith(string command, string argument, string? displayText) =>
+        transferCommands is not null && transferCommands.TryAnswer(command.ToUpperInvariant(), argument, out string answer)
+            ? (displayText ?? string.Empty) + answer
+            : displayText ?? $"500 {command} is not dealt with!\r\n";
 
     private string CurrentDirectory() => targetDirectory == "/" ? "/" : targetDirectory.TrimEnd('/');
 

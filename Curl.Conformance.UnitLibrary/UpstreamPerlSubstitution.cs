@@ -45,7 +45,7 @@ internal sealed class UpstreamPerlSubstitution
         char delimiter = code[1];
         List<string> pieces = SplitOnDelimiter(code[2..], delimiter);
         return pieces.Count == 3 && HasOnlySupportedFlags(pieces[2])
-            ? Create(pieces[0], UnescapeDelimiter(pieces[1], delimiter), pieces[2])
+            ? Create(pieces[0], UnescapePerlReplacement(pieces[1]), pieces[2])
             : null;
     }
 
@@ -61,8 +61,22 @@ internal sealed class UpstreamPerlSubstitution
     private static bool HasOnlySupportedFlags(string flags) =>
         flags.All(flag => SupportedFlags.Contains(flag, StringComparison.Ordinal));
 
-    private static string UnescapeDelimiter(string replacement, char delimiter) =>
-        replacement.Replace(string.Concat("\\", delimiter.ToString()), delimiter.ToString(), StringComparison.Ordinal);
+    // The replacement is a Perl double-quoted string: a backslash before any character that is not a
+    // letter or digit stands for that character (test1206's "EPRT \|1\|" is "EPRT |1|"), and a
+    // literal $ is written $$ for .NET's Regex.Replace.
+    private static string UnescapePerlReplacement(string replacement)
+    {
+        StringBuilder value = new();
+        for (int index = 0; index < replacement.Length; index++)
+        {
+            // A piece never ends in a lone backslash: SplitOnDelimiter keeps each escape whole.
+            bool escapes = replacement[index] == '\\' && !char.IsAsciiLetterOrDigit(replacement[index + 1]);
+            index += escapes ? 1 : 0;
+            value.Append(escapes && replacement[index] == '$' ? "$$" : replacement[index].ToString());
+        }
+
+        return value.ToString();
+    }
 
     private static bool IsDelimiter(char character) =>
         char.IsPunctuation(character) || char.IsSymbol(character);

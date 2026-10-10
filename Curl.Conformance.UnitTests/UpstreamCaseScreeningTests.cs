@@ -75,6 +75,124 @@ public sealed class UpstreamCaseScreeningTests
         Assert.IsNull(reason, reason);
     }
 
+    // The FTP active-mode and upload cases BL-1907 opened: none skips for %FTPPORT, the FTP stand-in
+    // or <verify><upload>; the runner measures them (most pass, 149, 216, 1211 and 1217 differ).
+    [TestMethod]
+    [DataRow(101)]
+    [DataRow(103)]
+    [DataRow(107)]
+    [DataRow(108)]
+    [DataRow(109)]
+    [DataRow(112)]
+    [DataRow(116)]
+    [DataRow(128)]
+    [DataRow(144)]
+    [DataRow(145)]
+    [DataRow(149)]
+    [DataRow(216)]
+    [DataRow(235)]
+    [DataRow(236)]
+    [DataRow(248)]
+    [DataRow(251)]
+    [DataRow(348)]
+    [DataRow(362)]
+    [DataRow(475)]
+    [DataRow(476)]
+    [DataRow(1038)]
+    [DataRow(1039)]
+    [DataRow(1055)]
+    [DataRow(1211)]
+    [DataRow(1217)]
+    [DataRow(1414)]
+    public void FindSkipReason_FtpActiveModeOrUploadCase_IsNotSkippedForTheFtpStandIn(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features) ?? string.Empty;
+
+        diagnostics.Act("skip reason", reason);
+        Assert.DoesNotContain("%FTPPORT", reason);
+        Assert.DoesNotContain("FTP stand-in", reason);
+        Assert.DoesNotContain("<upload>", reason);
+    }
+
+    // The FTP cases whose <servercmd> BL-1908 carries out (COUNT, NODATACONN and its 425, 421 and
+    // 150 variants, RETRWEIRDO, RETRNOSIZE, RETRSIZE, PASVBADIP, SLOWDOWN, REPLY) run, with
+    // %FTPTIME2 given the runner's value; DELAY and SLOWDOWNDATA, which time the answers, run too (BL-1958).
+    [TestMethod]
+    [DataRow(147, null)]
+    [DataRow(280, null)]
+    [DataRow(1206, null)]
+    [DataRow(1207, null)]
+    [DataRow(1208, null)]
+    [DataRow(1209, null)]
+    [DataRow(1211, null)]
+    [DataRow(126, null)]
+    [DataRow(137, null)]
+    [DataRow(270, null)]
+    [DataRow(416, null)]
+    [DataRow(250, null)]
+    [DataRow(190, null)]
+    [DataRow(1086, null)]
+    public void FindSkipReason_FtpServerCommandCase_RunsUnlessItsAnswersAreTimed(int testNumber, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["FTPPORT"] = UpstreamCaseRunner.FtpPort, ["FTPTIME2"] = "8", ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture) };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.AreEqual(expected, reason);
+    }
+
+    // The 8 cases naming %FTPSPORT at curl-8_21_0 run against the FTP stand-in behind implicit TLS
+    // (BL-1913); 404, 407 and 1112 still skip, each for another reason, never for the port.
+    [TestMethod]
+    [DataRow(400, null)]
+    [DataRow(401, null)]
+    [DataRow(403, null)]
+    [DataRow(404, "the expected exit code 77,60 is not a number")]
+    [DataRow(406, null)]
+    [DataRow(407, "the harness does not act on <client><stdout>")]
+    [DataRow(408, null)]
+    [DataRow(1112, null)]
+    public void FindSkipReason_FtpsCase_RunsWithAValueForTheFtpsPort(int testNumber, string? expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] testFile = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal)
+        {
+            ["HOSTIP"] = "127.0.0.1",
+            ["CLIENTIP"] = "127.0.0.1",
+            ["FTPSPORT"] = UpstreamCaseRunner.FtpsPort,
+            ["LOGDIR"] = "/log",
+            ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
+        };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.AreEqual(expected, reason);
+    }
+
+    [TestMethod]
+    [DataRow("REPLY DELAY 200 ok\nCOUNT DELAY 1\ndelay: 5\n", null)]
+    [DataRow("SLOWDOWN\n", null)]
+    [DataRow("DELAY CWD 60\n", null)]
+    [DataRow("SLOWDOWNDATA\n", null)]
+    public void FindSkipReason_FtpCaseServerCommand_IsReadAsFtpserverReadsIt(string serverCommands, string? expected)
+    {
+        string? reason = Screen($"<reply>\n<servercmd>\n{serverCommands}</servercmd>\n</reply>\n<client>\n<server>\nftp\n</server>\n<command>\nftp://127.0.0.1:8993/1\n</command>\n</client>\n");
+
+        Assert.AreEqual(expected, reason);
+    }
+
     [TestMethod]
     public void FindSkipReason_SmtpCaseWithSmtpPortGivenTheRunnersValue_IsNotSkipped()
     {
@@ -118,7 +236,7 @@ public sealed class UpstreamCaseScreeningTests
 
         string? reason = UpstreamCaseScreening.FindSkipReason(new(ReadOnlyMemory<byte>.Empty, [], [], null), ParsedTestCase.From(testFile), Features);
 
-        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers", reason);
+        Assert.AreEqual("the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers", reason);
     }
 
     [TestMethod]
@@ -219,8 +337,23 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPSV\nTYPE I\nSIZE 1\nRETR 1\n</protocol>\n</verify>\n")]
+    [DataRow("<verify>\n<protocol>\nPASV\nLIST\nNLST\nMDTM 1\nREST 3\n</protocol>\n</verify>\n")]
+    public void FindSkipReason_PassiveFtpTransfer_RunsTheCase(string sections)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("test sections", sections);
+
+        string? reason = Screen(RunnableClient + sections);
+        diagnostics.Act("skip reason", reason);
+
+        diagnostics.Assert("skip reason", "null", reason);
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
     [DataRow("<client>\n<tool>\nlib1\n</tool>\n</client>\n", "the harness does not act on <client><tool>")]
-    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers")]
+    [DataRow("<verify>\n<upload>\nx\n</upload>\n</verify>\n", "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, ftp, ftps, scp and sftp servers")]
     [DataRow("<client>\n<features>\nhttp\nDebug\n</features>\n</client>\n", "Curl lacks the feature Debug")]
     [DataRow("<client>\n<features>\n!SSL\n</features>\n</client>\n", "the case needs Curl without the feature SSL")]
     [DataRow("<reply>\n<servercmd>\ndelay: 5\n</servercmd>\n</reply>\n", "the sws emulation does not carry out the server command delay")]
@@ -229,7 +362,8 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<verify>\n<strip>\n(\n</strip>\n</verify>\n", "the strip pattern ( is not a .NET regular expression")]
     [DataRow("<verify>\n<stripfile2>\n$_ = ''\n</stripfile2>\n</verify>\n", "the harness does not run the Perl $_ = ''")]
     [DataRow("<verify>\n<errorcode>\nlots\n</errorcode>\n</verify>\n", "the expected exit code lots is not a number")]
-    [DataRow("<verify>\n<protocol>\nUSER anonymous\nEPSV\n</protocol>\n</verify>\n", "the FTP stand-in serves no data connection, which the case's EPSV opens")]
+    [DataRow("<verify>\n<protocol>\nUSER anonymous\nLPRT 4,4,127,0,0,1,2,35,46\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's LPRT")]
+    [DataRow("<verify>\n<protocol>\nCWD fully_simulated\n</protocol>\n</verify>\n", "the FTP stand-in does not carry out the case's CWD fully_simulated")]
     public void FindSkipReason_NamesWhatTheHarnessCannotDo(string sections, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

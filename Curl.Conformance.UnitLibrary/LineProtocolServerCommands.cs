@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Curl.Conformance;
 
@@ -7,19 +8,27 @@ namespace Curl.Conformance;
 /// upstream's <c>tests/ftpserver.pl</c> (at <c>curl-8_21_0</c>) reads them:
 /// <c>REPLY &lt;command&gt; &lt;text&gt;</c> replaces the server's answer to that command with the
 /// text and a CRLF (command names are matched without regard to case; a later line for the same
-/// command wins); <c>CAPA</c> lists the capabilities the server announces, split on spaces outside
+/// command wins), and <c>COUNT &lt;COMMAND&gt; &lt;n&gt;</c> takes that reply away after n uses; <c>CAPA</c> lists the capabilities the server announces, split on spaces outside
 /// double quotes with the quotes removed; <c>AUTH</c> lists its authentication mechanisms, split on
 /// spaces; <c>POSTFETCH &lt;text&gt;</c> gives the text IMAP sends before the <c>)</c> that ends a
-/// <c>FETCH</c> response. A later <c>CAPA</c>, <c>AUTH</c> or <c>POSTFETCH</c> line replaces an earlier one. Other lines are left for
+/// <c>FETCH</c> response; <c>DELAY &lt;COMMAND&gt; &lt;seconds&gt;</c> gives how long the reply to that command waits. A later <c>CAPA</c>, <c>AUTH</c> or <c>POSTFETCH</c> line replaces an earlier one. Other lines are left for
 /// the protocol stand-ins to read.
 /// </summary>
 internal sealed class LineProtocolServerCommands
 {
+    private static readonly Regex DelayLine = new(@"DELAY ([A-Z]+) (\d*)", RegexOptions.CultureInvariant);
+
     private readonly Dictionary<string, byte[]> replies;
 
-    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, string[] capabilities, string[] authenticationMechanisms, string postFetch)
+    private readonly Dictionary<string, int> remainingUses;
+
+    private readonly Dictionary<string, TimeSpan> delays;
+
+    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, Dictionary<string, int> remainingUses, Dictionary<string, TimeSpan> delays, string[] capabilities, string[] authenticationMechanisms, string postFetch)
     {
         this.replies = replies;
+        this.remainingUses = remainingUses;
+        this.delays = delays;
         Capabilities = capabilities;
         AuthenticationMechanisms = authenticationMechanisms;
         PostFetch = postFetch;
@@ -43,6 +52,8 @@ internal sealed class LineProtocolServerCommands
         List<(string Keyword, string Argument)> keywordLines = ReadKeywordLines(lines);
         return new LineProtocolServerCommands(
             ReadReplies(lines),
+            ReadUseCounts(lines),
+            ReadDelays(lines),
             ReadCapabilities(keywordLines),
             LastArgument(keywordLines, "AUTH ")?.Split(' ') ?? [],
             LastArgument(keywordLines, "POSTFETCH ") ?? string.Empty);
@@ -62,16 +73,77 @@ internal sealed class LineProtocolServerCommands
         return replies;
     }
 
+    // COUNT <COMMAND> <n>: ftpserver.pl blanks the command's REPLY after n uses (Perl's number of
+    // the rest of the line; 0 or no number never blanks it).
+    private static Dictionary<string, int> ReadUseCounts(List<string> lines)
+    {
+        Dictionary<string, int> counts = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string command, int uses) in lines.Where(line => !TryReadReply(line, out _, out _)).Select(ReadUseCount).OfType<(string, int)>())
+        {
+            counts[command] = uses;
+        }
+
+        return counts;
+    }
+
+    private static (string Command, int Uses)? ReadUseCount(string line) =>
+        line.Split(' ', 3) is ["COUNT", var command, var uses] && IsUpperCaseName(command)
+            ? (command, SwsServerCommands.LeadingInteger(uses.TrimStart()) ?? 0)
+            : null;
+
+    // DELAY <COMMAND> <seconds>: ftpserver.pl sleeps that long before it answers the command, on
+    // a line its REPLY and COUNT branches did not take first; no number (or 0) never sleeps.
+    private static Dictionary<string, TimeSpan> ReadDelays(List<string> lines)
+    {
+        Dictionary<string, TimeSpan> lineDelays = new(StringComparer.Ordinal);
+        foreach (Match delay in lines
+            .Where(line => !line.Contains("REPLY", StringComparison.Ordinal) && !line.Contains("COUNT ", StringComparison.Ordinal))
+            .Select(line => DelayLine.Match(line))
+            .Where(match => match.Success))
+        {
+            lineDelays[delay.Groups[1].Value] = TimeSpan.FromSeconds(SwsServerCommands.LeadingInteger(delay.Groups[2].Value) ?? 0);
+        }
+
+        return lineDelays;
+    }
+
+    /// <summary>Finds how long ftpserver.pl waits before it answers a command: a <c>DELAY &lt;COMMAND&gt; &lt;seconds&gt;</c> line's seconds, the command matched as written.</summary>
+    /// <param name="command">The command name as the client wrote it.</param>
+    /// <returns>The delay; zero when no line delays the command.</returns>
+    public TimeSpan ReplyDelay(string command) => delays.GetValueOrDefault(command);
+
+    private static bool IsUpperCaseName(string command) => command.Length > 0 && command.All(char.IsAsciiLetterUpper);
+
     private static List<(string Keyword, string Argument)> ReadKeywordLines(List<string> lines) =>
         [.. lines.Where(line => !TryReadReply(line, out _, out _)).Select(FindKeywordLine).OfType<(string, string)>()];
 
     private static string[] ReadCapabilities(List<(string Keyword, string Argument)> keywordLines) =>
         LastArgument(keywordLines, "CAPA ") is { } capabilityList ? SplitOutsideQuotes(capabilityList) : [];
-    /// <summary>Finds the reply <c>&lt;servercmd&gt;</c> gives for a command.</summary>
+    /// <summary>
+    /// Finds the reply <c>&lt;servercmd&gt;</c> gives for a command, counting it as one use: once a
+    /// <c>COUNT &lt;command&gt; &lt;n&gt;</c> line's n uses are spent, the reply is gone, as ftpserver.pl blanks it.
+    /// </summary>
     /// <param name="command">The command name, such as <c>PASV</c>.</param>
     /// <param name="reply">The reply bytes, with their CRLF, when one is given.</param>
     /// <returns>Whether <c>&lt;servercmd&gt;</c> gives a reply for the command.</returns>
-    public bool TryFindReply(string command, out byte[] reply) => replies.TryGetValue(command, out reply!);
+    public bool TryFindReply(string command, out byte[] reply)
+    {
+        if (!replies.TryGetValue(command, out reply!))
+        {
+            return false;
+        }
+
+        if (remainingUses.TryGetValue(command, out int uses) && uses != 0)
+        {
+            remainingUses[command] = --uses;
+            if (uses == 0)
+            {
+                replies.Remove(command);
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>Reads <c>REPLY &lt;command&gt; &lt;text&gt;</c>: the command and the text with its CRLF.</summary>
     private static bool TryReadReply(string line, out string command, out byte[] reply)

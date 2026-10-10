@@ -226,7 +226,8 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UseAsciiUpload_SendsTypeAAndTheBytesUnchanged()
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UseAsciiUploadOnWindows_SendsTypeAAndTheBytesUnchanged()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
 
@@ -241,7 +242,24 @@ public sealed class FtpProtocolHandlerTransferTypeTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_UploadToATypeASuffix_SendsTypeAAndStoresWithoutTheSuffix()
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UseAsciiUploadOffWindows_SendsTypeAAndEachLoneLineFeedAsCrLf()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        // curl -T up.txt -B, built with CURL_PREFER_LF_LINEENDS as upstream's test475 expects.
+        FtpRun run = await UploadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.UseAscii = true);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual("a\r\nb\r\nc\r\n", Encoding.Latin1.GetString(run.Data.Sent));
+        diagnostics.Assert("result", TransferResult.Success(9), run.Result);
+        Assert.AreEqual(TransferResult.Success(9), run.Result);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UploadToATypeASuffixOnWindows_SendsTypeAAndStoresWithoutTheSuffix()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
 
@@ -251,6 +269,20 @@ public sealed class FtpProtocolHandlerTransferTypeTests
         diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(Upload, Encoding.Latin1.GetString(run.Data.Sent));
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_UploadToATypeASuffixOffWindows_StoresWithoutTheSuffixAndEachLoneLineFeedAsCrLf()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        // curl -T up.txt ftp://127.0.0.1:47633/dir/f.txt;type=a, as upstream's test475 runs it.
+        FtpRun run = await UploadAsync(diagnostics, Url + ";type=a", Typed + Transferred + Bye);
+
+        diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nSTOR f.txt\r\nQUIT\r\n", run.Sent);
+        Assert.AreEqual("a\r\nb\r\nc\r\n", Encoding.Latin1.GetString(run.Data.Sent));
     }
 
     [TestMethod]
@@ -330,7 +362,7 @@ public sealed class FtpProtocolHandlerTransferTypeTests
         FtpRun run = await UploadAsync(diagnostics, Url, Typed + Transferred + Bye, context => context.ConvertLineEndings = true, content);
 
         diagnostics.Diff("uploaded bytes", new string('x', 16383) + "\r\ny\r\n", Encoding.Latin1.GetString(run.Data.Sent));
-        Assert.AreEqual(new string('x', 16383) + "\r\ny\r\n",Encoding.Latin1.GetString(run.Data.Sent));
+        Assert.AreEqual(new string('x', 16383) + "\r\ny\r\n", Encoding.Latin1.GetString(run.Data.Sent));
     }
 
     private static async Task<FtpRun> DownloadAsync(

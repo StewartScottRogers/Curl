@@ -371,7 +371,8 @@ public sealed class UpstreamConformanceTests
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
             usesHandBuiltNtlm: true,
-            readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name)).RunAsync(invocation.Arguments);
+            readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name),
+            ftpListener: invocation.ConnectionListener).RunAsync(invocation.Arguments);
 
     private static string GenerateCertificates()
     {
