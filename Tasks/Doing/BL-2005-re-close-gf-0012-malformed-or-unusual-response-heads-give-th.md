@@ -49,3 +49,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpResponseHeadReader and HttpChunkedDecode
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
