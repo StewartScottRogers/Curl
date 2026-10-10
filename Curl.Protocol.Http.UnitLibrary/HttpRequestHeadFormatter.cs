@@ -360,7 +360,7 @@ internal static class HttpRequestHeadFormatter
     /// <summary>
     /// Appends the body's framing headers: <c>Content-Length</c> as
     /// <see cref="ContentLengthOf" /> gives it, <c>Transfer-Encoding: chunked</c> when its
-    /// length is unknown, its <c>Content-Type</c> unless it is a <c>-T</c> upload, and curl's
+    /// length is unknown, its <c>Content-Type</c> as <see cref="BodyContentTypeOf" /> gives it, and curl's
     /// own <c>Expect: 100-continue</c>. A <c>-F</c> form's <c>Content-Type</c> is
     /// <paramref name="formContentType" /> when an <c>-H</c> value names one.
     /// </summary>
@@ -374,24 +374,36 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, framing.IsAuthProbe ? [] : customHeaders, ContentLengthName, ContentLengthOf(framing));
         AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
         AppendAlways(head, ContentTypeName, formContentType);
-        AppendUnlessOverridden(head, customHeaders, ContentTypeName, framing.IsUpload ? null : body.ContentType);
+        AppendUnlessOverridden(head, customHeaders, ContentTypeName, BodyContentTypeOf(framing, body));
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);
     }
+
+    /// <summary>
+    /// Gives the bodys <c>Content-Type</c>: none for a <c>-T</c> upload, none for the probe of a
+    /// <c>-F</c> form (<see cref="HttpRequestFraming.IsAuthProbe" />), which curl 8.21.0 sends
+    /// without the forms parts or their type (upstream test170, BL-2029), and else its own.
+    /// </summary>
+    private static string? BodyContentTypeOf(HttpRequestFraming framing, HttpRequestBody body) =>
+        framing.IsUpload || (framing.IsAuthProbe && body.ContentType.StartsWith(FormBoundaryPrefix, StringComparison.Ordinal))
+            ? null
+            : body.ContentType;
 
     /// <summary>
     /// Gives a <c>-F</c> form's <c>Content-Type</c> when an <c>-H</c> value names one, as curl
     /// 8.21.0 sends it (upstream tests 277 and 669, BL-1811): the first such value, then
     /// <c>; boundary=</c> and the form's boundary, in the generated header's place after
-    /// <c>Content-Length</c>, every <c>-H</c> <c>Content-Type</c> line left out. Gives
-    /// <see langword="null" /> when the body is not a <c>multipart/form-data</c> form or no
-    /// <c>-H</c> value names a non-empty <c>Content-Type</c>.
+    /// <c>Content-Length</c>, every <c>-H</c> <c>Content-Type</c> line left out. An empty
+    /// <c>-H "Content-Type:"</c> or <c>-H "Content-Type;"</c> is such a value too, sent as
+    /// <c>Content-Type: ; boundary=...</c> (measured, BL-1972). Gives <see langword="null" />
+    /// when the body is not a <c>multipart/form-data</c> form or no <c>-H</c> value names
+    /// <c>Content-Type</c>.
     /// </summary>
     private static string? FormContentTypeOf(HttpCustomHeader[] customHeaders, HttpRequestFraming framing)
     {
         string? userType = customHeaders
             .Where(header => header.Names(ContentTypeName))
-            .Select(header => header.Value)
-            .FirstOrDefault(value => !string.IsNullOrEmpty(value));
+            .Select(header => header.Entry[(ContentTypeName.Length + 1)..].TrimStart(' '))
+            .FirstOrDefault();
         return framing is { Body.ContentType: { } bodyType }
             && userType is not null
             && bodyType.StartsWith(FormBoundaryPrefix, StringComparison.Ordinal)

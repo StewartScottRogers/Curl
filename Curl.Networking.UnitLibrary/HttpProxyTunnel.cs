@@ -156,7 +156,8 @@ internal static class HttpProxyTunnel
     /// The reply as <see cref="ReadReplyAsync(IConnection, CancellationToken)" /> returns it; a
     /// reply whose status does not ignore <c>Content-Length</c> (<see cref="IgnoresBodyFields" />)
     /// and whose <c>Content-Length</c> is not a number is exit 8
-    /// <see cref="UnsupportedContentLength" />, its head ending with that field's line.
+    /// <see cref="UnsupportedContentLength" />, its head ending with that field's line; a header
+    /// line holding a NUL byte is exit 8 <see cref="NulByteInHeader" />, its head the lines before it.
     /// </returns>
     public static async ValueTask<HttpProxyTunnelReply> ReadReplyAsync(IConnection connection, bool forConnectUdp, CancellationToken cancellationToken)
     {
@@ -206,6 +207,11 @@ internal static class HttpProxyTunnel
                 string.Create(CultureInfo.InvariantCulture, $"Too large response headers: {header.Count} > {MaximumHeaderBytes}"));
         }
 
+        if (header.IndexOf(0, lineStart) >= 0)
+        {
+            return NulByteReply(header, lineStart);
+        }
+
         if (IsEmptyLine(header, lineStart))
         {
             return ParseReply(header, forConnectUdp);
@@ -225,6 +231,21 @@ internal static class HttpProxyTunnel
     /// does not start with <c>HTTP/</c> (measured, upstream test750, BL-1857).
     /// </summary>
     internal const string InvalidResponseHeader = "Invalid response header";
+
+    /// <summary>
+    /// The message curl 8.21.0 fails a reply with, exit 8, once a header line holding a NUL byte
+    /// has ended (<c>lib/http.c</c>'s <c>verify_header</c>, upstream test2107, BL-1975).
+    /// </summary>
+    internal const string NulByteInHeader = "Nul byte in header";
+
+    // The exit 8 reply for a line holding a NUL byte, its head the lines before it, as curl
+    // refuses the line before writing it to -v.
+    private static HttpProxyTunnelReply NulByteReply(List<byte> header, int lineStart) =>
+        HttpProxyTunnelReply.Failed(NulByteInHeader) with
+        {
+            FailureExitCode = CurlExitCode.WeirdServerReply,
+            Head = header[..lineStart].ToArray(),
+        };
 
     private static bool StartsWithHttpVersion(List<byte> header) =>
         System.Runtime.InteropServices.CollectionsMarshal.AsSpan(header).StartsWith("HTTP/"u8);

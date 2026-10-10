@@ -40,6 +40,9 @@ public sealed class FakeConnector : IConnector
     /// <summary>Gets or sets how many CONNECT reply header lines every connection reports.</summary>
     public int ConnectReplyHeadersStored { get; set; }
 
+    /// <summary>Gets or sets how many CONNECT reply head bytes every connection reports.</summary>
+    public long ProxyConnectHeaderBytes { get; set; }
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -66,6 +69,7 @@ public sealed class FakeConnector : IConnector
             unixSocketPath: UnixSocketPath,
             mappedHost: MappedHost,
             mappedPort: MappedPort,
-            connectReplyHeadersStored: ConnectReplyHeadersStored));
+            connectReplyHeadersStored: ConnectReplyHeadersStored,
+            proxyConnectHeaderBytes: ProxyConnectHeaderBytes));
     }
 }

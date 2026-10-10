@@ -19,10 +19,18 @@ namespace Curl.Protocol.Imap;
 /// The <c>-D</c> stream alone (<see cref="ITransferContext.DumpHeaderOutput" />), where every
 /// line read is written as it is reported to <c>-v</c>, or <see langword="null" /> without <c>-D</c>.
 /// </param>
+/// <param name="tagLetter">
+/// The letter every tag starts with: <c>A</c> plus the connection's number modulo 26, as curl
+/// 8.21.0's <c>imap.c</c> tags a second connection's commands <c>B001</c>, ... (BL-1987).
+/// </param>
+/// <param name="commandsSent">
+/// The commands already sent on the connection, which the tags count on from: <c>0</c> on a
+/// new connection, more on one a previous URL left intact (BL-1987).
+/// </param>
 /// <remarks>
 /// <para>
 /// Commands and responses are Latin-1. As curl 8.21.0 does (<c>lib/imap.c</c>, measured in
-/// BL-553): each command is tagged <c>A</c> and a three-digit number that starts at
+/// BL-553): each command is tagged with the tag letter and a three-digit number that starts at
 /// <c>001</c> and wraps from <c>255</c> to <c>000</c>, curl counting in an unsigned char; the
 /// greeting is read as the response tagged <c>*</c>; a line ends at LF, with a CR before it
 /// kept; a line starting with the tag and a space completes the response; a line starting
@@ -59,7 +67,9 @@ internal sealed class ImapControlChannel(
     ITransferEvents events,
     CancellationToken cancellationToken,
     IDiagnosticLog? diagnosticLog = null,
-    Stream? dumpHeaderOutput = null)
+    Stream? dumpHeaderOutput = null,
+    char tagLetter = 'A',
+    byte commandsSent = 0)
 {
     /// <summary>The most bytes curl 8.21.0's pingpong reader takes in one read (measured, BL-559).</summary>
     private const int ReadBufferSize = 900;
@@ -85,7 +95,7 @@ internal sealed class ImapControlChannel(
 
     private int bufferEnd;
 
-    private byte commandId;
+    private byte commandId = commandsSent;
 
     /// <summary>Where lines are reported: <c>events</c> until <see cref="StopReporting" />, nowhere after.</summary>
     private ITransferEvents reporting = events;
@@ -106,6 +116,9 @@ internal sealed class ImapControlChannel(
     /// was built with until <see cref="SwitchTo(IConnection)" />.
     /// </summary>
     public IConnection Connection => connection;
+
+    /// <summary>Gets the number of commands sent so far, counting those sent before the channel was built.</summary>
+    public byte CommandsSent => commandId;
 
     /// <summary>
     /// Gets the tag the next response is completed by: <c>*</c> for the greeting, then the
@@ -152,7 +165,7 @@ internal sealed class ImapControlChannel(
     public ValueTask SendCommandAsync(string command, string? logged = null)
     {
         commandId = unchecked((byte)(commandId + 1));
-        Tag = string.Create(CultureInfo.InvariantCulture, $"A{commandId:D3}");
+        Tag = string.Create(CultureInfo.InvariantCulture, $"{tagLetter}{commandId:D3}");
         return SendLineAsync(Tag + " " + command, Tag + " " + (logged ?? command));
     }
 

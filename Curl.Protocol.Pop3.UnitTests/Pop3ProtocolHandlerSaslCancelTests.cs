@@ -297,6 +297,29 @@ public sealed class Pop3ProtocolHandlerSaslCancelTests
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
     }
 
+    /// <summary>
+    /// Upstream test 891: CAPA offers only CRAM-MD5 and its continuation is a bare <c>+</c>
+    /// ending in LF alone. curl 8.21.0 sends <c>AUTH CRAM-MD5</c>, reads the bare-LF line as
+    /// an empty challenge, answers it, and fails with exit 67 when the answer is refused
+    /// (recorded with <c>Record-CurlExchange.ps1 -Script</c> on 2026-10-10, BL-1991 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CramMd5ContinuationEndingInBareLf_AnswersEmptyChallengeThenLoginDenied()
+    {
+        RankedSaslAuthenticator sasl = CramMd5();
+
+        (TransferResult result, _, string sent, _) = await RunAsync(
+            "+OK curl POP3 server ready to serve\r\n" + CramMd5Capa + "+\n-ERR Unrecognized command\r\n", sasl);
+
+        string expected = "CAPA\r\nAUTH CRAM-MD5\r\n" + Convert.ToBase64String(CramMd5Answer) + "\r\n";
+        Diagnostics.AssertValues("sent", expected, sent);
+        Assert.AreEqual(expected, sent);
+        Assert.HasCount(1, sasl.Challenges);
+        Assert.IsEmpty(sasl.Challenges[0].Challenge);
+        Diagnostics.AssertValues("result", TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Login denied"), result);
+    }
+
     private static RankedSaslAuthenticator CramMd5() => new(("CRAM-MD5", null, [CramMd5Answer]));
 
     private async Task<(TransferResult Result, RecordingTransferEvents Events, string Sent, RecordingDiagnosticLog Log)> RunAsync(

@@ -11,7 +11,7 @@ namespace Curl.Cli;
 /// <remarks>
 /// The rules, ported from the source and each measured with the local curl 8.21.0 on 2026-09-26:
 /// <list type="bullet">
-/// <item>The bytes are read as UTF-8 and every CR LF as LF, as a Windows text-mode read does; lines end at LF.</item>
+/// <item>The bytes are read in the given encoding and every CR LF as LF, as a Windows text-mode read does; lines end at LF.</item>
 /// <item>A line that is empty, all spaces and tabs, or whose first non-blank character is <c>#</c> is skipped
 /// and not counted, so line numbers count only option lines.</item>
 /// <item>The option runs from the first character of the line, not the first non-blank one (so
@@ -40,10 +40,11 @@ internal static class ConfigFileSyntax
     /// <summary>Splits <paramref name="contents"/> into its option lines.</summary>
     /// <param name="file">The file name as curl shows it in warnings.</param>
     /// <param name="contents">The file's bytes.</param>
+    /// <param name="encoding">The encoding the bytes are read in: UTF-8, or on Windows the ANSI code page for a file that is not valid UTF-8 (<see cref="ConfigFileApplier"/>).</param>
     /// <returns>The option lines in file order.</returns>
-    internal static IReadOnlyList<ConfigFileLine> ReadLines(string file, byte[] contents)
+    internal static IReadOnlyList<ConfigFileLine> ReadLines(string file, byte[] contents, Encoding encoding)
     {
-        string text = Encoding.UTF8.GetString(contents).Replace("\r\n", "\n", StringComparison.Ordinal);
+        string text = encoding.GetString(contents).Replace("\r\n", "\n", StringComparison.Ordinal);
         List<ConfigFileLine> lines = [];
         foreach (string line in text.Split('\n'))
         {

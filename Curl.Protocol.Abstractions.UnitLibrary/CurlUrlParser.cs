@@ -89,11 +89,13 @@ internal static class CurlUrlParser
 
     /// <summary>
     /// Returns what follows the scheme and the one to three slashes after it, or
-    /// <see langword="null" /> when there are more than three.
+    /// <see langword="null" /> when there are more than three. A backslash stays as typed:
+    /// curl 8.21.0 on Windows was measured to send <c>http://h/a\b</c> as <c>GET /a\b</c>
+    /// and to reject a backslash in the host (BL-1996).
     /// </summary>
     private static string? SkipSchemeAndSlashes(string text, string scheme)
     {
-        string rest = ConvertBackslashesAfterDoubleSlash(text[(scheme.Length + 1)..]);
+        string rest = text[(scheme.Length + 1)..];
         int slashes = rest.AsSpan().IndexOfAnyExcept('/');
         if (slashes < 0)
         {
@@ -186,8 +188,8 @@ internal static class CurlUrlParser
 
     /// <summary>
     /// Turns each <c>\</c> before the first <c>?</c> or <c>#</c> into <c>/</c> when the
-    /// text after the scheme's colon starts with <c>//</c>, as curl 8.21.0 on Windows was
-    /// measured to do for every scheme; after a single slash they stay as typed.
+    /// text after <c>file:</c> starts with <c>//</c>, as curl 8.21.0 on Windows was
+    /// measured to do for a <c>file</c> URL; after a single slash they stay as typed.
     /// </summary>
     private static string ConvertBackslashesAfterDoubleSlash(string text)
     {

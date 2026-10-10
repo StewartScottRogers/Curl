@@ -210,6 +210,30 @@ public sealed partial class NtlmHttpAuthenticatorTests
         Assert.AreEqual("user + domain + hostname too big for NTLM", failure.Message);
     }
 
+    /// <summary>
+    /// A run that matches the SSPI build but answers NTLM with curl's own context (the upstream
+    /// case harness on Windows) is the non-SSPI build, so an over-long user name fails as
+    /// upstream test775 expects: exit 100, not SSPI's exit 94 (BL-1999).
+    /// </summary>
+    [TestMethod]
+    public async Task CreateAuthorizationAsync_Type3PastCurlsBufferWithCurlsOwnNtlmWhereSspiBuildIsMatched_FailsWithExit100()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("credential", "600 a characters : p");
+        diagnostics.Arrange("matches SSPI build", true);
+        diagnostics.Arrange("server challenge", Type2Challenge);
+        NtlmHttpAuthenticator authenticator = new(new HandBuiltNtlmContexts(), matchesSspiBuild: true);
+
+        HttpAuthenticationFailedException failure = await Assert.ThrowsExactlyAsync<HttpAuthenticationFailedException>(
+            () => authenticator.CreateAuthorizationAsync(Request(new string('a', 600) + ":p"), "NTLM " + HandBuiltNtlmSecurityContextTests.CurlType1, sentBeforeAnyChallenge: true, [Type2Challenge], CancellationToken.None).AsTask());
+
+        diagnostics.Act("exception", failure.Message);
+        diagnostics.Assert("exit code", CurlExitCode.TooLarge, failure.ExitCode);
+        diagnostics.Diff("message", "user + domain + hostname too big for NTLM", failure.Message);
+        Assert.AreEqual(CurlExitCode.TooLarge, failure.ExitCode);
+        Assert.AreEqual("user + domain + hostname too big for NTLM", failure.Message);
+    }
+
     [TestMethod]
     public async Task CreateAuthorizationAsync_LargestType3ThatFitsWithCurlsOwnNtlm_AnswersIt()
     {

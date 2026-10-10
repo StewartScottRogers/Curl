@@ -182,8 +182,10 @@ public sealed class MqttProtocolHandlerTransferEventsTests
     [TestMethod]
     public async Task ExecuteAsync_PublishPayloadBufferedWithItsHeader_ReportsNoAgain()
     {
-        // Measured (BL-1434): the PUBLISH in one segment; curl wrote no "EEEE AAAAGAIN".
-        Run run = await RunHeldAsync("mqtt://h/t", null, [3], Hex(Connack), Hex(Suback + Publish), Hex("E0 00"));
+        // Measured (BL-1434): the PUBLISH in one segment; curl wrote no "EEEE AAAAGAIN". No
+        // read is held: the handler reports nothing while it waits for the DISCONNECT, so a
+        // held one would never be released (BL-2015).
+        Run run = await RunAsync("mqtt://h/t", Hex(Connack), Hex(Suback + Publish), Hex("E0 00"));
 
         Diagnostics.Assert("\"EEEE AAAAGAIN\" lines", 0, run.Transcript.Count(line => line == "* EEEE AAAAGAIN"));
         Diagnostics.Assert("\"Got DISCONNECT\" lines", 1, run.Transcript.Count(line => line == "* Got DISCONNECT"));
@@ -456,7 +458,11 @@ public sealed class MqttProtocolHandlerTransferEventsTests
     {
         ScriptedConnection connection = new(reads);
         connection.HeldReads.UnionWith(heldReads);
-        TranscriptTransferEvents events = new();
+
+        // A held read completes at the next event the handler reports after starting it - the
+        // "EEEE AAAAGAIN" line or the data block it reads before asking again - so the handler
+        // always finds it pending when it asks (BL-2015).
+        TranscriptTransferEvents events = new() { Recorded = connection.ReleaseHeldRead };
         TransferContext context = new()
         {
             Url = CurlUrl.Parse(url),

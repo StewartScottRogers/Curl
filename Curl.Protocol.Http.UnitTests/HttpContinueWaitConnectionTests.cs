@@ -322,9 +322,15 @@ public sealed class HttpContinueWaitConnectionTests
         Task<bool> send = connection.SendUnlessStoppedAsync("a"u8.ToArray(), CancellationToken.None).AsTask();
         Assert.IsFalse(send.IsCompleted);
         inner.DeliverResponse();
+        bool cancellationRequested = inner.WriteCancellationRequested;
         inner.FinishWrites();
         bool sent = await send;
         Diagnostics.Act("send", sent);
+
+        // Checked before the write finishes: a cancellation requested with CancelAsync reaches
+        // the write on another thread, so WriteCancelled alone can miss it (AF-0115, BL-1959).
+        Diagnostics.Assert("write cancellation requested", false, cancellationRequested);
+        Assert.IsFalse(cancellationRequested);
 
         Diagnostics.Assert("write cancelled", false, inner.WriteCancelled);
         Assert.IsFalse(inner.WriteCancelled);

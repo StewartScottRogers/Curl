@@ -600,18 +600,35 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
-    public void ChooseMechanism_ExternalWithoutCredential_PicksNothing()
+    public void ChooseMechanism_ExternalWithoutCredential_PicksExternal()
     {
+        // curl 8.21.0's tests 838, 884 and 943: ;AUTH=EXTERNAL with no user name starts EXTERNAL (BL-1989).
         var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("offered", "EXTERNAL");
+        diagnostics.Arrange("offered", "EXTERNAL PLAIN");
         diagnostics.Arrange("credentials", "(none)");
         diagnostics.Arrange("required mechanism", "EXTERNAL");
 
-        string? chosen = Authenticator.ChooseMechanism(Request(null, requiredMechanism: "EXTERNAL"), ["EXTERNAL"]);
+        string? chosen = Authenticator.ChooseMechanism(Request(null, requiredMechanism: "EXTERNAL"), ["EXTERNAL", "PLAIN"]);
 
         diagnostics.Act("chosen", chosen);
-        diagnostics.Assert("chosen", null, chosen);
-        Assert.IsNull(chosen);
+        diagnostics.Assert("chosen", "EXTERNAL", chosen);
+        Assert.AreEqual("EXTERNAL", chosen);
+    }
+
+    [TestMethod]
+    public async Task Begin_ExternalWithoutCredential_SendsAnEmptyMessage()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("mechanism", "EXTERNAL");
+        diagnostics.Arrange("credentials", "(none)");
+
+        ISaslExchange exchange = Authenticator.Begin("EXTERNAL", Request(null, requiredMechanism: "EXTERNAL"));
+        byte[]? initial = await exchange.GetInitialResponseAsync(CancellationToken.None);
+
+        diagnostics.Act("initial response length", initial?.Length);
+        diagnostics.Assert("initial response length", 0, initial?.Length);
+        Assert.IsNotNull(initial);
+        Assert.IsEmpty(initial);
     }
 
     [TestMethod]

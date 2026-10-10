@@ -381,12 +381,19 @@ public sealed partial class HttpRequestHeadFormatterTests
             options);
     }
 
+    /// <summary>
+    /// Measured on 2026-10-10 with curl 8.21.0 (Schannel) as <c>curl -F name=daniel -H "Content-Type:"</c>
+    /// and <c>-H "Content-Type;"</c> (BL-1972): an empty value is still the form's type, sent
+    /// before the boundary, and a later non-empty one is left out.
+    /// </summary>
     [TestMethod]
-    public void Format_FormBodyWithEmptyCustomContentType_SendsNoContentType()
+    [DataRow("Content-Type:")]
+    [DataRow("Content-Type;")]
+    public void Format_FormBodyWithEmptyCustomContentType_SendsAnEmptyTypeWithTheBoundary(string header)
     {
-        HttpRequestOptions options = new() { Headers = ["Content-Type:"], Body = new StreamBody(new MemoryStream(), 158, "multipart/form-data; boundary=b") };
+        HttpRequestOptions options = new() { Headers = [header, "Content-Type: second"], Body = new StreamBody(new MemoryStream(), 158, "multipart/form-data; boundary=b") };
 
-        AssertHead($"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 158\r\n\r\n", CurlUrl.Parse(Url), options);
+        AssertHead($"POST / HTTP/1.1\r\n{DefaultHeaders}Content-Length: 158\r\nContent-Type: ; boundary=b\r\n\r\n", CurlUrl.Parse(Url), options);
     }
 
     [TestMethod]

@@ -12,8 +12,9 @@ namespace Curl.Protocol.Smtp;
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item><c>VRFY</c> sends the address after one leading <c>&lt;</c> and one trailing
-/// <c>&gt;</c> are taken off it, its host part converted to an IDNA A-label, and
+/// <item><c>VRFY</c> sends the address bare (<see cref="SmtpMailbox.Bare" />: its brackets,
+/// and anything after the last <c>&gt;</c> of one starting <c>&lt;</c>, taken off), its host
+/// part converted to an IDNA A-label, and
 /// <c> SMTPUTF8</c> appended when the <c>EHLO</c> reply advertised <c>SMTPUTF8</c> and the
 /// address is not all ASCII, all in the argv bytes of <see cref="SmtpCommandLineText" />. The
 /// <c>-X</c> command and the recipient after it are sent as their argv bytes, unconverted,

@@ -433,6 +433,90 @@ public sealed class DigestAuthenticatorTests
         diagnostics.Assert("null sent exception type", nameof(ArgumentNullException), nullSent.GetType().Name);
     }
 
+    /// <summary>
+    /// Measured (BL-2022 Notes) with <c>Record-CurlExchange.ps1</c> and
+    /// <c>curl --digest -u u:p http://127.0.0.1:{port}/64</c> against curl 8.21.0's Schannel
+    /// build: SSPI writes no blank after a comma, algorithm before the response, qop quoted
+    /// after it and opaque last.
+    /// </summary>
+    [TestMethod]
+    [DataRow(
+        "unused",
+        "Digest realm=\"r\", nonce=\"abc\"",
+        "Digest username=\"u\",realm=\"r\",nonce=\"abc\",uri=\"/64\",response=\"fc3de222db74c3ec88aabb5510c76f80\"",
+        DisplayName = "No qop")]
+    [DataRow(
+        "unused",
+        "Digest realm=\"r\", nonce=\"abc\", opaque=\"op\", algorithm=MD5",
+        "Digest username=\"u\",realm=\"r\",nonce=\"abc\",uri=\"/64\",algorithm=MD5,response=\"fc3de222db74c3ec88aabb5510c76f80\",opaque=\"op\"",
+        DisplayName = "No qop, opaque and algorithm")]
+    [DataRow(
+        "1789520a8086d8c6b386c5286eace9d3",
+        "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"",
+        "Digest username=\"u\",realm=\"r\",nonce=\"abc\",uri=\"/64\",cnonce=\"1789520a8086d8c6b386c5286eace9d3\",nc=00000001,response=\"7929e56cf7fe409f959989397c308dd3\",qop=\"auth\"",
+        DisplayName = "qop=auth")]
+    [DataRow(
+        "896707c735f53ea0b5a4c92546a776b6",
+        "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", opaque=\"op\", algorithm=MD5",
+        "Digest username=\"u\",realm=\"r\",nonce=\"abc\",uri=\"/64\",cnonce=\"896707c735f53ea0b5a4c92546a776b6\",nc=00000001,algorithm=MD5,response=\"6619c920c1ac2d2ec458c3ba51e39426\",qop=\"auth\",opaque=\"op\"",
+        DisplayName = "qop=auth, opaque and algorithm")]
+    public void CreateAuthorization_SspiBuild_MatchesCurlsSchannelBuild(string clientNonce, string challenge, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => clientNonce, matchesSspiBuild: true);
+        diagnostics.Arrange("client nonce", clientNonce);
+        diagnostics.Arrange("challenge", challenge);
+
+        string? value = authenticator.CreateAuthorization(Request(new NetworkCredential("u", "p"), "/64", HttpAuthSchemes.Digest), [challenge]);
+
+        diagnostics.Act("Authorization", value);
+        diagnostics.Diff("Authorization", expected, value!);
+        diagnostics.Assert("Authorization", expected, value);
+        Assert.AreEqual(expected, value);
+    }
+
+    /// <summary>
+    /// The OpenSSL build's form for the same exchange as
+    /// <see cref="CreateAuthorization_SspiBuild_MatchesCurlsSchannelBuild" />: curl's own
+    /// <c>vauth/digest.c</c> puts <c>", "</c> between parameters, qop unquoted before the response.
+    /// </summary>
+    [TestMethod]
+    public void CreateAuthorization_OwnDigestCode_MatchesCurlsOpenSslBuild()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        const string challenge = "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", opaque=\"op\", algorithm=MD5";
+        diagnostics.Arrange("challenge", challenge);
+
+        string? value = Answer("u", "p", "/64", "896707c735f53ea0b5a4c92546a776b6", challenge);
+
+        const string expected = "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/64\", cnonce=\"896707c735f53ea0b5a4c92546a776b6\", nc=00000001, qop=auth, "
+            + "response=\"6619c920c1ac2d2ec458c3ba51e39426\", opaque=\"op\", algorithm=MD5";
+        diagnostics.Act("Authorization", value);
+        diagnostics.Diff("Authorization", expected, value!);
+        diagnostics.Assert("Authorization", expected, value);
+        Assert.AreEqual(expected, value);
+    }
+
+    [TestMethod]
+    public void RepeatAuthorization_SspiBuildUserHash_CountsOnInTheSspiForm()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c", matchesSspiBuild: true);
+        HttpAuthRequest request = Request(new NetworkCredential("u", "p"), "/", HttpAuthSchemes.Digest);
+        const string challenge = "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", userhash=true";
+        diagnostics.Arrange("challenge", challenge);
+        string first = authenticator.CreateAuthorization(request, [challenge])!;
+
+        string second = authenticator.RepeatAuthorization(request, first);
+
+        diagnostics.Act("first", first);
+        diagnostics.Act("second", second);
+        diagnostics.Assert("second counted on", true, second.Contains(",nc=00000002,", StringComparison.Ordinal));
+        diagnostics.Assert("second ends", true, second.EndsWith(",qop=\"auth\",userhash=true", StringComparison.Ordinal));
+        StringAssert.Contains(second, ",nc=00000002,", StringComparison.Ordinal);
+        StringAssert.EndsWith(second, ",qop=\"auth\",userhash=true", StringComparison.Ordinal);
+    }
+
     private static string? Answer(string user, string password, string target, string clientNonce, params string[] challenges)
     {
         DigestAuthenticator authenticator = new(Encoding.UTF8, () => clientNonce);

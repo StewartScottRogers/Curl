@@ -57,6 +57,9 @@ internal sealed class TcpIoTraceConnection(IConnection inner, ITransferEvents ev
     public bool IsSharedWithAnotherTransfer => inner.IsSharedWithAnotherTransfer;
 
     /// <inheritdoc />
+    public bool HasPeerClosed => inner.HasPeerClosed;
+
+    /// <inheritdoc />
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         var length = Lines.ReceiveLength ?? buffer.Length;

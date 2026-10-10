@@ -26,9 +26,14 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
 
     private int readCount;
 
+    private TaskCompletionSource<int>? heldRead;
+
+    private int heldReadLength;
+
     /// <summary>
     /// Gets the zero-based numbers of the scripted reads that do not complete at once,
-    /// the way a socket read waits when the peer's next bytes have not arrived yet.
+    /// the way a socket read waits when the peer's next bytes have not arrived yet; each
+    /// stays pending until <see cref="ReleaseHeldRead" /> is called.
     /// </summary>
     public ISet<int> HeldReads { get; } = new HashSet<int>();
 
@@ -85,17 +90,27 @@ public sealed class ScriptedConnection(params byte[]?[] reads) : IConnection
         }
 
         chunk.CopyTo(buffer);
-        return HeldReads.Contains(readCount++) ? ReadAfterYieldingAsync(chunk.Length) : ValueTask.FromResult(chunk.Length);
+        if (!HeldReads.Contains(readCount++))
+        {
+            return ValueTask.FromResult(chunk.Length);
+        }
+
+        heldRead = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        heldReadLength = chunk.Length;
+        return new ValueTask<int>(heldRead.Task);
     }
 
     /// <summary>
-    /// Returns a read that is still pending when <see cref="ReadAsync" /> returns, as a
-    /// socket read is when nothing has arrived yet, and completes on the next turn.
+    /// Completes the held read still pending, if any. A held read completes only when this
+    /// is called, never on its own, so a handler that asks whether it has completed straight
+    /// after starting it always finds it pending, however busy the machine (BL-2015: one
+    /// completed by <see cref="Task.Yield" /> could finish on another thread before the ask).
     /// </summary>
-    private static async ValueTask<int> ReadAfterYieldingAsync(int length)
+    public void ReleaseHeldRead()
     {
-        await Task.Yield();
-        return length;
+        TaskCompletionSource<int>? read = heldRead;
+        heldRead = null;
+        read?.TrySetResult(heldReadLength);
     }
 
     /// <inheritdoc />

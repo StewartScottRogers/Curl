@@ -103,6 +103,36 @@ public sealed class CurlCommandRunnerFormTests
         Assert.Contains($"Content-Disposition: form-data; {sentName}\r\n", Encoding.Latin1.GetString(server.Written));
     }
 
+    /// <summary>
+    /// Measured on 2026-10-10 with curl 8.21.0 (Schannel) as <c>curl -F name=daniel -H '&lt;header&gt;'</c>
+    /// (upstream tests 277 and 669, BL-1972): the parts are <c>form-data</c> only while the
+    /// <c>-H</c> type is <c>multipart/form-data</c>; any other type, an empty one included, makes
+    /// them <c>attachment</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Content-Type: text/info", "text/info", "attachment", DisplayName = "upstream test277")]
+    [DataRow("Content-type: multipart/form-data; charset=utf-8", "multipart/form-data; charset=utf-8", "form-data", DisplayName = "upstream test669")]
+    [DataRow("content-type: Multipart/Form-Data", "Multipart/Form-Data", "form-data", DisplayName = "any case")]
+    [DataRow("Content-Type:", "", "attachment", DisplayName = "empty")]
+    [DataRow("Content-Type;", "", "attachment", DisplayName = "empty, sent")]
+    public async Task RunAsync_FormWithCustomContentType_SendsTheMeasuredTypeAndDisposition(string header, string sentType, string disposition)
+    {
+        int exitCode = await RunAsync("-sS", "-H", "A: b", "-H", "X-Content-Type: no", "-H", "Content-Typo: no", "-H", header, "-H", "Content-Type: second", "-F", "name=daniel", Url);
+
+        string expectedBody =
+            "--" + Boundary + "\r\n"
+            + $"Content-Disposition: {disposition}; name=\"name\"\r\n"
+            + "\r\n"
+            + "daniel\r\n"
+            + "--" + Boundary + "--\r\n";
+        string expectedEnd = $"Content-Length: {expectedBody.Length}\r\nContent-Type: {sentType}; boundary={Boundary}\r\n\r\n{expectedBody}";
+        string written = Encoding.Latin1.GetString(server.Written);
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("request ends", expectedEnd, written[^Math.Min(written.Length, expectedEnd.Length)..]);
+        Assert.AreEqual(0, exitCode);
+        Assert.EndsWith(expectedEnd, written);
+    }
+
     [TestMethod]
     public async Task RunAsync_FormWithOutputFile_SendsTheMultipartRequestAndWritesTheFile()
     {

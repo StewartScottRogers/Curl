@@ -155,7 +155,7 @@
     from `gh run view <id> --log-failed`: every "Failed <TestName>" line, or every compiler
     "error" line when the build broke. Over the last six such runs, newest first, a failure
     is a regression when it fails in the newest run and broke the build, failed on two
-    platforms, failed in the run before too, or found no run to confirm it within 30
+    platforms, failed in the run before too, or found no run to confirm it within 5
     minutes; it is flaky when it failed once with a passing run on each side, or failed
     again after passing. For each one it files a High task with task-board.ps1 new -
     "Fix CI failure <test> on Linux and macOS", "Fix flaky CI test <test> that failed once
@@ -171,7 +171,7 @@
     run to confirm it - once per run, and again when that changes. The watch also runs while
     a coordinator waits for a fresh session before its shift starts, and once more at the
     end of a shift, after the merge has waited for CI on the last commit; that last look
-    files a one-platform failure at once instead of waiting 30 minutes (BL-1031).
+    files a one-platform failure at once instead of waiting 5 minutes (BL-1031).
 
     The audit guard (BL-998) fails the `audit-guard` job with "Audit guard: <path> changed
     on work/dark-factory ..." when the factory changed an audit path or a guard. The watch
@@ -345,6 +345,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskIds
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskBudget
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestClaimDuplicates
 #>
 [CmdletBinding()]
 param(
@@ -422,6 +423,10 @@ param(
     # no other, and that a stash that no longer applies leaves the worktree clean and the
     # run its hash (AF-0091), and exit.
     [switch]$TestTaskStash,
+    # Prove, on a throwaway repository, that a claim on a board where two live tasks share an
+    # ID renumbers the later one, pushes that and claims, and that a claim the board refuses
+    # for another reason is traced with the board's own words (BL-2014), and exit.
+    [switch]$TestClaimDuplicates,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -1930,6 +1935,21 @@ function Get-TaskSpentUsd {
     return $spent
 }
 
+function Close-UnfinishedRunLogs {
+    # Gives a result event to every earlier run log of a task that ends without one: a shift
+    # restart or a killed lane stops the run before Invoke-TaskRun can write its result, so
+    # the audit's unfinishedRuns listed it for good (AF-0152). Called as the task's next run
+    # starts, when no earlier run of the task can still be writing. -Except is the new log.
+    param([string]$Dir, [string]$Id, [string]$Except = '')
+    if (-not (Test-Path $Dir)) { return }
+    $pattern = '^' + [regex]::Escape($Id) + '-\d{8}-\d{6}.*\.jsonl$'
+    foreach ($log in @(Get-ChildItem $Dir -Filter "$Id-*.jsonl" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern -and $_.FullName -ne $Except })) {
+        $tail = @(Get-Content $log.FullName -Tail 3 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"type"\s*:\s*"result"' })
+        if ($tail.Count) { continue }
+        Add-Content -Path $log.FullName -Value ([pscustomobject][ordered]@{ type = 'result'; subtype = 'factory_no_result'; is_error = $true; exit_code = $null; timed_out = $false; result = 'ended with no result event: the shift or lane stopped before the run did'; total_cost_usd = 0 } | ConvertTo-Json -Compress) -Encoding UTF8
+    }
+}
+
 function Test-TaskCapSpent {
     # Whether a task's runs of the last day already cost all but $1 of its cap (AF-0096).
     # Get-RunBudgetUsd never gives a run less than $1, so without this a task requeued
@@ -2554,7 +2574,7 @@ $script:CiWatchBranch = ''
 # How many finished runs the flaky and regression verdicts look back over, and how long a
 # failure seen on one platform in only the newest run waits for the next run to confirm it.
 $CiWindowRuns = 6
-$CiConfirmMinutes = 30
+$CiConfirmMinutes = 5
 
 function Get-CiPlatform {
     # "Build and test (ubuntu-latest)" -> Linux; the platform's name, or the job's when unknown.
@@ -2993,7 +3013,7 @@ if ($TestCiWatch) {
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux', 'macOS'))), (& $run 8 20 @()))))
     & $check 'one platform, newest only: waits' '' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux'))), (& $run 8 20 @()))))
-    & $check 'one platform, unconfirmed for 30 min: regression' 'regression A run 9 from sha9 on Linux' `
+    & $check 'one platform, unconfirmed for 5 min: regression' 'regression A run 9 from sha9 on Linux' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 31 @(& $f A @('Linux'))), (& $run 8 40 @()))))
     & $check 'two runs in a row: regression from the first' 'regression A run 9 from sha8 on Linux+macOS' `
         (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux'))), (& $run 8 9 @(& $f A @('macOS'))), (& $run 7 20 @()))))
@@ -3080,7 +3100,7 @@ if ($TestCiWatch) {
     $script:ciListJson = '[{"conclusion":"failure","databaseId":36674691490,"headSha":"d0621052bba101113a0187570196267f13bc6b74","status":"completed","updatedAt":"2026-09-30T05:47:43Z"},{"conclusion":"success","databaseId":36668685198,"headSha":"7c9833f44d160cdb92e3bf3c9fda81b9cc9a0e5d","status":"completed","updatedAt":"2026-09-30T04:28:52Z"}]'
     $replay = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
     $replayAt = $replay[0].FinishedAt
-    & $check 'replay 36674691490: new, waits to confirm' '' (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(5) -Runs $replay))
+    & $check 'replay 36674691490: new, waits to confirm' '' (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(4) -Runs $replay))
     & $check 'replay 36674691490: a task per failing test once confirmed' `
         'regression BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed run 36674691490 from d0621052bba101113a0187570196267f13bc6b74 on Linux; regression BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext run 36674691490 from d0621052bba101113a0187570196267f13bc6b74 on Linux' `
         (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay))
@@ -3099,8 +3119,8 @@ if ($TestCiWatch) {
     & $check 'gh cannot list: no runs, traced once' 'True True; cannot list the CI runs on work with gh' "$($null -eq $first) $($null -eq $second); $($traced -join '|')"
     # What a coordinator log line says for each run it examined, and that it says it once.
     $verdicts = @(Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay)
-    $waiting = Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts @() -Settled @{} -ConfirmMinutes 30
-    & $check 'outcome: waiting' "failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed on Linux only, waiting for the next run or $($replayAt.AddMinutes(30).ToString('HH:mm')) to confirm it; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext on Linux only, waiting for the next run or $($replayAt.AddMinutes(30).ToString('HH:mm')) to confirm it" $waiting
+    $waiting = Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts @() -Settled @{} -ConfirmMinutes 5
+    & $check 'outcome: waiting' "failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it" $waiting
     $settled = @{ 'BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed|36674691490' = 'filed BL-1040'; 'BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext|36674691490' = 'covered by a task' }
     & $check 'outcome: filed and covered' 'failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed regression, filed BL-1040; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext regression, covered by a task' `
         (Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts $verdicts -Settled $settled)
@@ -3263,6 +3283,17 @@ Rules for this unattended run, in addition to CLAUDE.md:
    file with the board script - add those IDs to its `depends-on` and move it to
    Backlog, not Blocked, with a -Reason naming them. The board starts it again once
    they are Done.
+   Look for that in your first few turns, before any code: read the task, the files it
+   touches and the tests or data it names, and if it is too big for one run or needs work
+   no task covers yet, split it or file that work and requeue it then, not after a
+   long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
+   after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
+   The board let this run claim the task only because every ID already in its
+   `depends-on` is Done, so those never send it back. Before naming any other task as the
+   blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
+   not block. And leave work a Backlog task already covers to that task rather than doing
+   it here (AF-0148: BL-1936 was moved to Backlog for dependencies that were already Done,
+   moved back 16 seconds later, and then did BL-1945's work, so BL-1945's run found nothing to do).
 4. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file) and push the current
    branch yourself with git, per the standing authorization in CLAUDE.md. Never push to
@@ -3357,6 +3388,17 @@ Rules for this unattended run, in addition to CLAUDE.md:
    file with the board script - add those IDs to its `depends-on` and move it to
    Backlog, not Blocked, with a -Reason naming them. The board starts it again once
    they are Done. Blocked is only for what needs Stewart.
+   Look for that in your first few turns, before any code: read the task, the files it
+   touches and the tests or data it names, and if it is too big for one run or needs work
+   no task covers yet, split it or file that work and requeue it then, not after a
+   long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
+   after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
+   The shift claimed the task only because every ID already in its `depends-on` is Done,
+   so those never send it back. Before naming any other task as the blocker, check its
+   folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And
+   leave work a Backlog task already covers to that task rather than doing it here
+   (AF-0148: BL-1936 was moved to Backlog for dependencies that were already Done, moved
+   back 16 seconds later, and then did BL-1945's work, so BL-1945's run found nothing to do).
 5. When the task reaches Done with dotnet build clean and the fast tests green, commit
    by logical unit (Conventional Commits, including the task file). Do NOT push, pull,
    rebase, merge or switch branches: the shift integrates your commits.
@@ -3588,6 +3630,7 @@ function Invoke-TaskRun {
     # The cost cap (AF-0004, AF-0033): the run stops once it has cost 2.7 times the median
     # recent run, at most -TaskBudgetUsd, less what the task's runs of the last day cost
     # (AF-0095). Read before this run's log exists, so it never counts itself.
+    Close-UnfinishedRunLogs $LogDir $Id $raw
     $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir) (Get-TaskSpentUsd $LogDir $Id)
     $budget = if ($script:RunBudgetUsd -gt 0) { ' --max-budget-usd ' + $script:RunBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
     # The task's model (BL-1705); the resolver's, overtime and resumed runs keep it. The
@@ -3621,6 +3664,14 @@ function Invoke-TaskRun {
         }
     }
     $p.WaitForExit()
+    # A run that ended with no result event (killed, crashed, stream cut) gets one written
+    # for it, so every run log ends with a result and the audit's unfinishedRuns stays empty
+    # for runs the factory itself saw end (AF-0151). RunResult stays null: the retry logic
+    # still sees "no result". total_cost_usd 0 keeps the cost readers' sums right.
+    if ($null -eq $script:RunResult) {
+        $why = if ($timedOut) { "killed: timed out after $Minutes min" } else { "ended with no result event, exit $($p.ExitCode)" }
+        Add-Content -Path $raw -Value ([pscustomobject][ordered]@{ type = 'result'; subtype = 'factory_no_result'; is_error = $true; exit_code = $p.ExitCode; timed_out = $timedOut; result = $why; total_cost_usd = 0 } | ConvertTo-Json -Compress) -Encoding UTF8
+    }
     return @{ ExitCode = $p.ExitCode; TimedOut = $timedOut }
 }
 
@@ -3693,6 +3744,37 @@ function Test-Rebasing {
 
 function Get-DoingCount { return @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue).Count }
 
+function Get-DuplicateIdSince {
+    # The commit to hand `dedupe -Since` so that the first of the live tasks sharing <Id> to
+    # appear keeps it: the parent of the commit that added the newest of them. $null when
+    # no commit of this checkout added any of them.
+    param([string]$Id)
+    $added = @()
+    foreach ($file in Get-ChildItem (Join-Path $Root 'Tasks') -Directory | Where-Object { $_.Name -ne 'Done' } | ForEach-Object { Get-ChildItem $_.FullName -Filter "$Id-*.md" }) {
+        $first = @(& git -C $Root log --diff-filter=A --format=%H -- "Tasks/*/$($file.Name)" 2>$null | Where-Object { $_ }) | Select-Object -Last 1
+        if ($first) { $added += $first }
+    }
+    if (-not $added.Count) { return $null }
+    $newest = @(& git -C $Root rev-list --topo-order HEAD 2>$null | Where-Object { $added -contains $_ })[0]
+    $parent = (& git -C $Root rev-parse --verify -q "$newest^" 2>$null)
+    if ($LASTEXITCODE -ne 0) { return $null }
+    return "$parent".Trim()
+}
+
+function Invoke-RenumberDuplicates {
+    # Two live tasks share <Id>: renumber the later ones, commit and push the renumbering.
+    # True when it was pushed, so the claim can go on; false when it could not be.
+    param([string]$Id)
+    $since = Get-DuplicateIdSince $Id
+    if (-not $since) { Write-Trace $Id 'renum' "$Id names several tasks but no commit says which came first" 'Yellow'; return $false }
+    $renumbered = @((Invoke-Board @('dedupe', '-Since', $since)) | Where-Object { $_ -match '->' })
+    if (-not $renumbered.Count) { return $false }
+    Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+    Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber duplicate task IDs`n`n$($renumbered -join "`n")", '-m', $SkipCiNote) | Out-Null
+    foreach ($line in $renumbered) { Write-Trace $Id 'renum' "renumbered duplicate task IDs $($line -replace '\s{2,}.*$', '')" 'DarkYellow' }
+    return (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))
+}
+
 function Invoke-Claim {
     # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
     # overlaps work in progress (or nothing is ready but other lanes may unlock more), or
@@ -3717,16 +3799,25 @@ function Invoke-Claim {
                 if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
                 return @{ None = $true }
             }
-            Invoke-Board @('move', '-Id', $id, '-To', 'Doing') | Out-Null
-            if ((Get-TaskState $id) -ne 'Doing') { continue }
+            $moved = (Invoke-Board @('move', '-Id', $id, '-To', 'Doing')) -join ' '
+            if ((Get-TaskState $id) -ne 'Doing') {
+                # The board refuses an ID that names two live tasks, and no claim can win
+                # until they are renumbered (BL-2014); any other refusal is reported as it is.
+                if ($moved -match 'names \d+ tasks' -and (Invoke-RenumberDuplicates $id)) { continue }
+                $refusal = Get-Short $moved 100
+                Write-Trace $id 'refused' "the board would not move it to Doing: $refusal" 'DarkYellow'
+                continue
+            }
             Invoke-Git @('add', '-A', 'Tasks') | Out-Null
             Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane", '-m', $SkipCiNote) | Out-Null
             if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return @{ Id = $id } }
             # Only a claim that was pushed is traced as 'claim', so the log counts claims
             # truly; a refused push is 'race', and an unheard one is no race at all.
             if (Test-RemoteReachable) { Write-Trace $id 'race' 'another lane pushed first; picking again' 'DarkYellow' }
+            $lostRace = $true
         }
-        return @{ Wait = $true; Why = 'claim kept losing races' }
+        $why = if ($lostRace) { 'claim kept losing races' } else { 'claim kept being refused by the board or origin' }
+        return @{ Wait = $true; Why = $why }
     } finally { $lock.Dispose() }
 }
 
@@ -3995,6 +4086,55 @@ if ($TestPark) {
     exit $(if ($failed) { 1 } else { 0 })
 }
 
+if ($TestClaimDuplicates) {
+    # Two lanes filed BL-001 at the same time: the board refuses to move either, so a claim
+    # must renumber the later one and carry on, rather than retry and call it a lost race.
+    $temp = Join-Path ([IO.Path]::GetTempPath()) "df-claim-dup-$PID"
+    $origin = Join-Path $temp 'origin.git'
+    $repo = Join-Path $temp 'lane-9'
+    New-Item -ItemType Directory -Force -Path $temp | Out-Null
+    git init -q --bare -b work $origin 2>&1 | Out-Null
+    git clone -q $origin $repo 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    git -C $repo checkout -q -b work 2>&1 | Out-Null
+    foreach ($state in 'Doing', 'Backlog', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $repo "Tasks\$state") | Out-Null; Set-Content -Path (Join-Path $repo "Tasks\$state\.gitkeep") -Value '' }
+    $file = {
+        param($Slug)
+        Set-Content -Path (Join-Path $repo "Tasks\Backlog\BL-001-$Slug.md") -Encoding UTF8 -Value @(
+            '---', 'id: BL-001', "title: $Slug", 'priority: Normal', 'assignee: Claude', 'pipeline: direct',
+            'depends-on: []', "touches: [$Slug]", 'requirement: none', 'created: 2026-10-01', 'completed:', '---',
+            "# BL-001 - $Slug", '', '## Goal', '', '## Context', '', '## Acceptance criteria', '', '- [ ] Claimed.', '', '## Notes', '', '## Log', '', '- 2026-10-01: Created.')
+        git -C $repo add -A 2>&1 | Out-Null
+        git -C $repo commit -q -m "file $Slug" 2>&1 | Out-Null
+    }
+    & $file 'first'
+    & $file 'second'
+    git -C $repo push -q origin work 2>&1 | Out-Null
+    $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
+    $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
+    $env:CLAUDE_PROJECT_DIR = $repo
+    $failed = 0
+    try {
+        $claim = Invoke-Claim -Skip @()
+        git -C $repo fetch -q origin work 2>&1 | Out-Null
+        $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) | Where-Object { $_ -match 'BL-\d+-' }
+        $ids = @($shared | ForEach-Object { if ($_ -match '(BL-\d+)-') { $Matches[1] } })
+        $cases = @(
+            ,@('a duplicate ID is renumbered and the claim goes on', 'claimed', $(if ($claim.Id) { 'claimed' } else { "waited: $($claim.Why)" }))
+            ,@('no ID is left naming two tasks on the shared branch', '2 tasks, 2 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
+            ,@('the first task to be filed keeps its ID', 'True', "$(@($shared | Where-Object { $_ -match 'BL-001-first' }).Count -eq 1)")
+            ,@('the claimed task is in Doing on the shared branch', 'True', "$(@($shared | Where-Object { $_ -match 'Tasks/Doing/' }).Count -eq 1)")
+        )
+        foreach ($case in $cases) {
+            if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+            else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+        }
+    } finally {
+        Remove-Item -Recurse -Force -Path $temp -ErrorAction SilentlyContinue
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
 function Write-LaneSummary {
     param([string[]]$Lines)
     $dir = Join-Path $LogDir "lanes-$Stamp"
@@ -4097,7 +4237,7 @@ function Wait-ForTokensByProbe {
     # returns how long it waited.
     param([string]$Id)
     $began = Get-Date
-    Write-Trace $Id 'tokens' 'run failed on the API; waiting until Claude answers again' 'Yellow'
+    Write-Trace $Id 'tokens' 'run ended with no result (not necessarily the API); waiting until Claude answers a probe' 'Yellow'
     Write-Heartbeat 'tokens' 'waiting until Claude answers again'
     while (-not (Test-TokensAvailable)) {
         if ($Lane) { try { $Host.UI.RawUI.WindowTitle = "Dark factory - lane $Lane waiting for the API" } catch { } }

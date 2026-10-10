@@ -117,6 +117,37 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     }
 
     /// <summary>
+    /// Whether the bytes already read past the last reply start a 4xx or 5xx reply, as curl
+    /// 8.21.0's <c>ReceivedServerConnect</c> checks its cached response while it waits for an
+    /// active-mode data connection (BL-1978).
+    /// </summary>
+    public bool HasBufferedNegativeReply => bufferStart < bufferEnd && buffer[bufferStart] > (byte)'3';
+
+    /// <summary>
+    /// Gets the bytes read from the connection past the last reply, which the next transfer on a
+    /// kept connection reads first (BL-1981).
+    /// </summary>
+    public byte[] UnreadBytes => buffer[bufferStart..bufferEnd];
+
+    /// <summary>
+    /// Whether bytes past the last reply have already been read: a reply the server pipelined
+    /// behind it, which curl 8.21.0 refuses after <c>AUTH</c> (BL-1985).
+    /// </summary>
+    public bool HasBufferedBytes => bufferStart < bufferEnd;
+
+    /// <summary>
+    /// Reads <paramref name="unread" /> before anything more from the connection: the bytes a
+    /// previous transfer on the kept connection read past its last reply. Called before any read.
+    /// </summary>
+    /// <param name="unread">The bytes, at most a buffer's worth.</param>
+    public void ReadFirst(byte[] unread)
+    {
+        unread.CopyTo(buffer, 0);
+        bufferStart = 0;
+        bufferEnd = unread.Length;
+    }
+
+    /// <summary>
     /// Reads the next complete reply.
     /// </summary>
     /// <returns>

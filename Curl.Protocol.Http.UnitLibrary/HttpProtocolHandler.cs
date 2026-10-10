@@ -291,7 +291,7 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder proxyAuthorizationLines = new();
         string? proxyAuthorization = await CreateFirstProxyAuthorizationAsync(proxyAuthRequest, proxyAuthorizationLines, context.CancellationToken).ConfigureAwait(false);
         (string? authorization, HttpTransferException? authorizationFailure) = await CreateFirstAuthorizationAsync(authRequest with { Events = authorizationLines }, context.CancellationToken).ConfigureAwait(false);
-        bool probes = SendsDigestProbe(framing, authRequest, authorization) || (proxyAuthRequest is not null && SendsDigestProbe(framing, proxyAuthRequest, proxyAuthorization));
+        bool probes = SendsFirstProbe(framing, authRequest, authorization, proxyAuthRequest, proxyAuthorization);
         HttpRequestPlan plan = new(context, options, probes ? framing.AsAuthProbe() : framing, authRequest, authorization)
         {
             ProbedFraming = probes ? framing : null,
@@ -313,6 +313,16 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Decides whether the transfer's first request goes as a probe with an empty body: a Digest
+    /// one to the origin or the proxy (<see cref="SendsDigestProbe" />), or one that starts an
+    /// NTLM handshake (<see cref="SendsNtlmProbe" />).
+    /// </summary>
+    private static bool SendsFirstProbe(HttpRequestFraming framing, HttpAuthRequest authRequest, string? authorization, HttpAuthRequest? proxyAuthRequest, string? proxyAuthorization) =>
+        SendsDigestProbe(framing, authRequest, authorization)
+            || (proxyAuthRequest is not null && SendsDigestProbe(framing, proxyAuthRequest, proxyAuthorization))
+            || SendsNtlmProbe(framing, authorization, proxyAuthorization);
+
+    /// <summary>
     /// Decides whether the first request goes as a probe with an empty body
     /// (<see cref="HttpRequestFraming.AsAuthProbe" />): one with a body, sent where Digest is the
     /// one scheme allowed, with credentials and no value made yet, as curl 8.21.0 holds a POST's
@@ -324,6 +334,30 @@ public sealed class HttpProtocolHandler(
             && request.AllowedSchemes == HttpAuthSchemes.Digest
             && request.Credential is not null
             && authorization is null;
+
+    /// <summary>
+    /// Decides whether a request goes as a probe with an empty body
+    /// (<see cref="HttpRequestFraming.AsAuthProbe" />) because it starts an NTLM handshake: one
+    /// with a body whose <c>Authorization</c> or <c>Proxy-Authorization</c> value is an NTLM
+    /// Type 1 message, as curl 8.21.0 holds a POST's or PUT's body back until the Type 3 message
+    /// goes (upstream test170, test176, test239, test243, test267; BL-2029).
+    /// </summary>
+    private static bool SendsNtlmProbe(HttpRequestFraming framing, string? authorization, string? proxyAuthorization) =>
+        framing.Body is not null && (IsNtlmType1(authorization) || IsNtlmType1(proxyAuthorization));
+
+    /// <summary>
+    /// Decides whether an <c>Authorization</c> or <c>Proxy-Authorization</c> value is an NTLM
+    /// Type 1 message: <c>NTLM</c> and the base64 of <c>NTLMSSP\0</c> followed by the message
+    /// type 1, whose first twelve bytes encode to exactly <see cref="NtlmType1Prefix" />.
+    /// </summary>
+    private static bool IsNtlmType1(string? value) =>
+        value?.StartsWith(NtlmType1Prefix, StringComparison.Ordinal) is true;
+
+    /// <summary>
+    /// The start of every NTLM Type 1 value: <c>NTLM </c> and the base64 of the message's
+    /// signature <c>NTLMSSP\0</c> and its type, 1, as a little-endian 32-bit number.
+    /// </summary>
+    private const string NtlmType1Prefix = "NTLM TlRMTVNTUAABAAAA";
 
     /// <summary>
     /// Gives the schemes the origin request may answer with: the scheme an earlier hop's server
@@ -894,7 +928,8 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,
-    /// then each retry the response asks for while the connection stays open. After an h2c
+    /// then each retry the response asks for while the connection stays open and its peer has not
+    /// closed it (<see cref="IConnection.HasPeerClosed" />). After an h2c
     /// upgrade the retries go out on new streams of the session the connection switched to, as
     /// curl sends them (measured, BL-866 Notes), and that session is given back with the outcome.
     /// </summary>
@@ -909,7 +944,7 @@ public sealed class HttpProtocolHandler(
         HttpAttemptOutcome outcome = await ExchangeAsync(first, connect, connection, earlier, newConnection: !connect.IsReused, streams).ConfigureAwait(false);
         Http2Session? upgradedSession = outcome.UpgradedSession;
         streams ??= upgradedSession;
-        while (outcome.Retry is { } retry && outcome.KeepsAlive)
+        while (RetryOnSameConnection(outcome, connection) is { } retry)
         {
             ReportRetryOnSameConnection(retry, connect);
             HttpRequestPlan next = streams is null ? retry : retry.ForHttp2OrHttp3();
@@ -918,6 +953,16 @@ public sealed class HttpProtocolHandler(
 
         return (outcome, upgradedSession);
     }
+
+    /// <summary>
+    /// Gives the retry <paramref name="outcome" /> asks for when it can go out on the same
+    /// connection: the connection persists and its peer has not closed it. curl 8.21.0 asks a
+    /// kept connection whether it is alive before it sends on it again; one the server has
+    /// closed is left intact and the retry issued anew, so the pool reports it dead and opens a
+    /// fresh one (BL-2018, ADR-0467). Gives <see langword="null" /> otherwise.
+    /// </summary>
+    private static HttpRequestPlan? RetryOnSameConnection(HttpAttemptOutcome outcome, IConnection connection) =>
+        outcome.KeepsAlive && !connection.HasPeerClosed ? outcome.Retry : null;
 
     /// <summary>
     /// Reports what curl 8.21.0 writes between a response it answers with another request and
@@ -1148,6 +1193,7 @@ public sealed class HttpProtocolHandler(
             HttpFailMode fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, exchange.RedirectUrl);
+            ReportAuthRetryRewind(plan, actedOn, retry);
             ReportIgnoredBody(plan, actedOn, discardsBody && !upload.CutShort);
             ReportUploadStopped(context.Events, upload, retry, discardsBody);
             delivery = DeliveryOf(plan, actedOn, discardsBody);
@@ -1560,6 +1606,24 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Reports <c>Need to rewind upload for next request</c> when a 401 or 407 is answered with
+    /// <paramref name="retry" /> and the request sent a body that is not empty, as curl 8.21.0
+    /// writes it after the head's last header, before <c>Ignoring the response-body</c>, for a
+    /// <c>-T</c> file, a <c>-F</c> form or <c>-d</c> data, and not for an empty one (measured,
+    /// BL-2001 Notes).
+    /// </summary>
+    private static void ReportAuthRetryRewind(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry)
+    {
+        if (retry is not null
+            && head.StatusLine.StatusCode is 401 or 407
+            && plan.Framing.Body is not null
+            && plan.Framing.KnownLength != 0)
+        {
+            plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
+        }
+    }
+
+    /// <summary>
     /// Reports that a body is read only to be discarded, as curl 8.21.0 does before the
     /// head's empty line (measured, BL-449 Notes): <c>Ignoring the response-body</c> when the
     /// body is discarded - a redirect <c>-L</c> follows, or a response answered with a retry -
@@ -1902,7 +1966,7 @@ public sealed class HttpProtocolHandler(
         bool discardsBody,
         CancellationToken cancellationToken)
     {
-        if (delivery != HttpBodyDelivery.Deliver && !discardsBody)
+        if ((delivery != HttpBodyDelivery.Deliver && !discardsBody) || AbandonsBody(plan, head, requestStream, delivery, discardsBody))
         {
             return ValueTask.CompletedTask;
         }
@@ -1910,6 +1974,23 @@ public sealed class HttpProtocolHandler(
         return discardsBody && requestStream is Http2StreamConnection http2Stream
             ? http2Stream.AbandonResponseAsync(cancellationToken)
             : CopyBodyAsync(plan, head, body, requestStream, discardsBody, cancellationToken);
+    }
+
+    /// <summary>
+    /// Decides whether an HTTP/1.x body discarded for a retry or a followed redirect is not read
+    /// at all because the connection closes after it, as curl 8.21.0 stops reading once the head
+    /// is in when it has a new request to make and the connection is to close anyway - so a 401
+    /// with <c>Connection: close</c> and no length is answered at once, not when the server
+    /// closes (measured, BL-2001 Notes). A 416's ignored body (<paramref name="delivery" /> not
+    /// <see cref="HttpBodyDelivery.Deliver" />) is still read.
+    /// </summary>
+    private static bool AbandonsBody(HttpRequestPlan plan, HttpResponseHead head, IHttpStreamConnection? requestStream, HttpBodyDelivery delivery, bool discardsBody)
+    {
+        HttpRequestOptions options = plan.Options;
+        return discardsBody
+            && delivery == HttpBodyDelivery.Deliver
+            && requestStream is null
+            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding);
     }
 
     /// <summary>
@@ -2304,12 +2385,27 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Makes the <c>Proxy-Authorization</c> value a retry that answers a 401 keeps, as
-    /// <see cref="RepeatAuthorization" /> makes the <c>Authorization</c> value a 407's retry keeps.
+    /// <see cref="RepeatAuthorization" /> makes the <c>Authorization</c> value a 407's retry keeps;
+    /// none after an NTLM Type 3 message, whose handshake authenticated the connection, as
+    /// curl 8.21.0 sends only the origin's answer after it (upstream test169, BL-2030).
     /// </summary>
     private string? RepeatProxyAuthorization(HttpRequestPlan plan) =>
-        plan.ProxyAuthRequest is { } request && plan.ProxyAuthorization is { } sent
-            ? Authenticator.RepeatAuthorization(request, sent)
-            : plan.ProxyAuthorization;
+        plan.ProxyAuthorization is { } sent && IsNtlmType3(sent)
+            ? null
+            : plan.ProxyAuthRequest is { } request && plan.ProxyAuthorization is { } kept
+                ? Authenticator.RepeatAuthorization(request, kept)
+                : plan.ProxyAuthorization;
+
+    /// <summary>
+    /// Decides whether a <c>Proxy-Authorization</c> value is an NTLM Type 3 message: <c>NTLM</c>
+    /// and the base64 of <c>NTLMSSP\0</c> followed by the message type 3, as
+    /// <see cref="IsNtlmType1" /> reads Type 1.
+    /// </summary>
+    private static bool IsNtlmType3(string value) =>
+        value.StartsWith(NtlmType3Prefix, StringComparison.Ordinal);
+
+    /// <summary>The start of every NTLM Type 3 value, as <see cref="NtlmType1Prefix" /> is of Type 1.</summary>
+    private const string NtlmType3Prefix = "NTLM TlRMTVNTUAADAAAA";
 
     /// <summary>Reports each of <paramref name="lines" /> to <paramref name="events" />, in order.</summary>
     private static void ReportInfoLines(ITransferEvents events, IReadOnlyList<string> lines)
@@ -2610,7 +2706,7 @@ public sealed class HttpProtocolHandler(
                 UploadSize = upload.BytesWritten,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
-                HeaderSize = earlier?.HeaderSize ?? 0,
+                HeaderSize = earlier?.HeaderSize ?? connect.ProxyConnectHeaderBytes,
                 ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
@@ -2798,7 +2894,7 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptProxyAuthorization">The <c>Proxy-Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithAuthorization(string authorization, IReadOnlyList<string> infoLines, string? keptProxyAuthorization) =>
-            With(ProbedFraming ?? Framing, authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines, endsProbe: true);
+            WithAnswer(authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
 
         /// <summary>
         /// Gets the framing the probe (<see cref="HttpRequestFraming.AsAuthProbe" />) held back, sent
@@ -2809,11 +2905,14 @@ public sealed class HttpProtocolHandler(
 
         /// <summary>
         /// Makes the same request with the body the probe held back and no credentials, which
-        /// curl 8.21.0 sends when the probe drew a 2xx instead of a challenge (upstream test175).
+        /// curl 8.21.0 sends when the probe drew a 2xx instead of a challenge (upstream test175):
+        /// an NTLM Type 1 value the probe carried is not sent again (upstream test176, BL-2029).
         /// </summary>
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan WithProbedBody() =>
-            With(ProbedFraming!, Authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, endsProbe: true);
+            With(ProbedFraming!, WithoutNtlmType1(Authorization), SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, WithoutNtlmType1(ProxyAuthorization), ProxyAuthorizationAnswersChallenge, endsProbe: true);
+
+        private static string? WithoutNtlmType1(string? value) => IsNtlmType1(value) ? null : value;
 
         /// <summary>
         /// Makes the retry that answers a challenge the authenticator refused to answer: it
@@ -2835,7 +2934,7 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptAuthorization">The <c>Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithProxyAuthorization(string proxyAuthorization, string? keptAuthorization) =>
-            With(ProbedFraming ?? Framing, keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true, endsProbe: true);
+            WithAnswer(keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
@@ -2895,6 +2994,36 @@ public sealed class HttpProtocolHandler(
                 ServerCertificate = Context.Url.Scheme == "https" && connect.PeerCertificates is [var certificate, ..] ? certificate : default,
             };
 
+        /// <summary>
+        /// Makes the retry that answers a challenge with <paramref name="authorization" /> and
+        /// <paramref name="proxyAuthorization" />: with the body any probe held back, or, when
+        /// either value is an NTLM Type 1 message, as a probe again holding the body back for
+        /// the Type 3 message (<see cref="SendsNtlmProbe" />; upstream test243, BL-2029).
+        /// </summary>
+        private HttpRequestPlan WithAnswer(
+            string? authorization,
+            bool sentOnFreshConnection,
+            int redirectsFollowed,
+            bool authorizationAnswersChallenge,
+            string? proxyAuthorization,
+            bool proxyAuthorizationAnswersChallenge,
+            IReadOnlyList<string>? authorizationInfoLines = null)
+        {
+            HttpRequestFraming full = ProbedFraming ?? Framing;
+            bool probes = SendsNtlmProbe(full, authorization, proxyAuthorization);
+            return With(
+                probes ? full.AsAuthProbe() : full,
+                authorization,
+                sentOnFreshConnection,
+                redirectsFollowed,
+                authorizationAnswersChallenge,
+                proxyAuthorization,
+                proxyAuthorizationAnswersChallenge,
+                authorizationInfoLines,
+                endsProbe: true,
+                nextProbedFraming: probes ? full : null);
+        }
+
         private HttpRequestPlan With(HttpRequestFraming framing, string? authorization) =>
             With(framing, authorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge);
 
@@ -2911,10 +3040,11 @@ public sealed class HttpProtocolHandler(
             bool proxyAuthorizationAnswersChallenge,
             IReadOnlyList<string>? authorizationInfoLines = null,
             HttpTransferException? authorizationFailure = null,
-            bool endsProbe = false) =>
+            bool endsProbe = false,
+            HttpRequestFraming? nextProbedFraming = null) =>
             new(Context, Options, framing, AuthRequest, authorization)
             {
-                ProbedFraming = endsProbe ? null : ProbedFraming,
+                ProbedFraming = endsProbe ? nextProbedFraming : ProbedFraming,
                 Started = Started,
                 Deadline = Deadline,
                 Progress = Progress,

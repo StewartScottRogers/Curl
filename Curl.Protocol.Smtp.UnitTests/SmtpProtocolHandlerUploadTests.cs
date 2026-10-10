@@ -118,6 +118,9 @@ public sealed class SmtpProtocolHandlerUploadTests
     [DataRow("<a@b", "c@d>", "MAIL FROM:<a@b>\r\nRCPT TO:<c@d>\r\n", DisplayName = "Half bracketed")]
     [DataRow("<<a@b>>", "c@d", "MAIL FROM:<<a@b>>\r\nRCPT TO:<c@d>\r\n", DisplayName = "Doubly bracketed")]
     [DataRow("alice", "bob", "MAIL FROM:<alice>\r\nRCPT TO:<bob>\r\n", DisplayName = "No @")]
+    [DataRow("<s@example.com> RET=HDRS", "<r@example.com> NOTIFY=SUCCESS", "MAIL FROM:<s@example.com> RET=HDRS\r\nRCPT TO:<r@example.com> NOTIFY=SUCCESS\r\n", DisplayName = "Bracketed with DSN parameters: sent as given (upstream test3215)")]
+    [DataRow("<nohost> A=1", "<r@b> x>y", "MAIL FROM:<nohost> A=1\r\nRCPT TO:<r@b> x>y\r\n", DisplayName = "Bracketed with a suffix: no @, and a > in the suffix")]
+    [DataRow("a@b", "r@example.com> X", "MAIL FROM:<a@b>\r\nRCPT TO:<r@example.com> X>\r\n", DisplayName = "Not starting with <: no suffix, bracketed whole")]
     public async Task ExecuteAsync_Addresses_AreBracketedAsCurlDoes(string? from, string recipient, string envelope)
     {
         SmtpRun run = await RunAsync(Accepting, Body("one\r\n"), new MailRequestOptions { From = from, Recipients = [recipient] });
@@ -235,6 +238,28 @@ public sealed class SmtpProtocolHandlerUploadTests
         Assert.AreEqual("EHLO dom\r\nHELP\r\n" + Quit, run.Sent);
         Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadWithCrlf_SendsEachBareLineFeedAsCrlf()
+    {
+        // upstream test941: -T with --crlf sends "From: different\r\n" for "From: different\n".
+        const string body = "From: different\n.dot\r\nend\n";
+        const string sentMessage = "From: different\r\n..dot\r\nend\r\n.\r\n";
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            Upload = Body(body),
+            Mail = new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
+            ConvertLineEndings = true,
+        };
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Accepting)));
+
+        Diagnostics.Diff("sent", Envelope + sentMessage + Quit, run.Sent);
+        Assert.AreEqual(Envelope + sentMessage + Quit, run.Sent);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, sentMessage.Length);
     }
 
     [TestMethod]

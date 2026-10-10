@@ -15,6 +15,8 @@ namespace Curl.Console;
 /// </remarks>
 internal static class MultipartFormPartMapping
 {
+    private const string ContentTypeName = "Content-Type";
+
     /// <summary>Maps <paramref name="parts" />, and the parts nested inside them, in order.</summary>
     /// <param name="parts">The parsed parts, from <see cref="CommandLineOptions.FormParts" />.</param>
     /// <returns>The builder's parts, one for each of <paramref name="parts" />.</returns>
@@ -29,6 +31,22 @@ internal static class MultipartFormPartMapping
     /// <returns>The escaping <see cref="CommandLineOptions.FormEscape" /> asks for.</returns>
     internal static MultipartNameEscaping NameEscapingOf(CommandLineOptions options) =>
         options.FormEscape ? MultipartNameEscaping.Backslash : MultipartNameEscaping.Percent;
+
+    /// <summary>
+    /// The request <c>Content-Type</c> the builder chooses the parts' disposition by, read as
+    /// libcurl 8.21.0's <c>Curl_checkheaders</c> reads it: the first <c>-H</c> value naming
+    /// <c>Content-Type</c> before a <c>:</c> or <c>;</c>, after that separator and its leading
+    /// spaces, so <c>-H "Content-Type:"</c> gives an empty one (BL-1972).
+    /// </summary>
+    /// <param name="options">The option group whose form is being built.</param>
+    /// <returns>The value, or <see langword="null" /> when no <c>-H</c> value names <c>Content-Type</c>.</returns>
+    internal static string? RequestContentTypeOf(CommandLineOptions options) =>
+        options.Headers
+            .Where(header => header.Length > ContentTypeName.Length
+                && header[ContentTypeName.Length] is ':' or ';'
+                && header.StartsWith(ContentTypeName, StringComparison.OrdinalIgnoreCase))
+            .Select(header => header[(ContentTypeName.Length + 1)..].TrimStart(' '))
+            .FirstOrDefault();
 
     private static MultipartFormPart FromSpecification(FormPartSpecification part) =>
         new(

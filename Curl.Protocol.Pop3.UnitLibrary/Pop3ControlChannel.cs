@@ -65,6 +65,12 @@ internal sealed class Pop3ControlChannel(
     public IConnection Connection => connection;
 
     /// <summary>
+    /// Gets whether bytes past the last response have already been read: a response the
+    /// server pipelined behind it, which curl 8.21.0 refuses after <c>STLS</c> (BL-1985).
+    /// </summary>
+    public bool HasBufferedBytes => bufferStart < bufferEnd;
+
+    /// <summary>
     /// Carries on over <paramref name="secured" />, the connection after <c>STLS</c>
     /// upgraded it to TLS.
     /// </summary>

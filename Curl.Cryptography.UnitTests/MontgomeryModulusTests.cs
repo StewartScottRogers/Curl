@@ -201,6 +201,25 @@ public sealed class MontgomeryModulusTests
     }
 
     [TestMethod]
+    [DataRow("0101", "00FF")]
+    [DataRow("010001", "00FFFF")]
+    [DataRow("0107", "0105")]
+    [DataRow("07FFFFFFFFFFFFFFFFFFFFFFFFFF", "07FFFFFFFFFFFFFFFFFFFFFFFFFD")]
+    public void MinusTwo_BigEndianPrime_SubtractsTwoWithTheBorrowRunningToTheTopByte(string prime, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] input = Convert.FromHexString(prime);
+        diagnostics.Bytes("prime", input);
+
+        byte[] result = MontgomeryModulus.MinusTwo(input);
+        diagnostics.Act("prime - 2", Convert.ToHexString(result));
+
+        diagnostics.Diff("prime - 2", Convert.FromHexString(expected), result);
+        Assert.AreEqual(expected, Convert.ToHexString(result));
+        Assert.AreEqual(ToInteger(input) - 2, ToInteger(result));
+    }
+
+    [TestMethod]
     [DataRow(89, 3)]
     [DataRow(521, 17)]
     [DataRow(607, 19)]

@@ -96,6 +96,32 @@ public sealed class OpenSslVerifyResultTests
     }
 
     [TestMethod]
+    [DataRow(5, 10, OpenSslVerifyResult.CertificateNotYetValid)]
+    [DataRow(-10, -5, OpenSslVerifyResult.CertificateHasExpired)]
+    public void Of_TrustedChainOutsideItsValidity_ReturnsNotYetValidOrExpired(int notBeforeDays, int notAfterDays, long expected)
+    {
+        Diagnostics.Arrange("not before (days from now)", notBeforeDays);
+        Diagnostics.Arrange("not after (days from now)", notAfterDays);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var request = new CertificateRequest("CN=BL1961 Trusted", key, HashAlgorithmName.SHA256);
+        var now = DateTimeOffset.UtcNow;
+        using var certificate = request.CreateSelfSigned(now.AddDays(notBeforeDays), now.AddDays(notAfterDays));
+        using var chain = new X509Chain();
+        chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+        chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Add(certificate);
+        using (Diagnostics.Phase("chain build"))
+        {
+            chain.Build(certificate);
+        }
+
+        var code = OpenSslVerifyResult.Of(SslPolicyErrors.RemoteCertificateChainErrors, chain, now);
+
+        WriteCode(expected, code);
+        Assert.AreEqual(expected, code);
+    }
+
+    [TestMethod]
     [DataRow(X509ChainStatusFlags.NotTimeValid | X509ChainStatusFlags.UntrustedRoot, 1, false, OpenSslVerifyResult.DepthZeroSelfSignedCertificate)]
     [DataRow(X509ChainStatusFlags.NotTimeValid | X509ChainStatusFlags.PartialChain, 1, false, OpenSslVerifyResult.UnableToGetIssuerCertificateLocally)]
     [DataRow(X509ChainStatusFlags.NotTimeValid, 1, false, OpenSslVerifyResult.CertificateHasExpired)]

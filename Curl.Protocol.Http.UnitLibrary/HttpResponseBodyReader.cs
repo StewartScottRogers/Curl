@@ -10,7 +10,8 @@ namespace Curl.Protocol.Http;
 /// </summary>
 /// <remarks>
 /// The bytes read along with the head are written first, as one write; after them each
-/// read is written as it arrives, in reads of at most <see cref="ReadSize" /> bytes, so a
+/// read of at most <see cref="ReceiveSize" /> bytes is written as it arrives, in writes of at most
+/// <see cref="WriteSize" /> bytes, so a
 /// failed write reports the same <c>passed</c> size curl does. A Content-Length body stops
 /// at its length and ignores anything the peer sends past it. A chunked body wins over a
 /// Content-Length, which is still checked; its data is written as it is decoded, each run of
@@ -21,10 +22,17 @@ namespace Curl.Protocol.Http;
 internal sealed class HttpResponseBodyReader(IConnection connection)
 {
     /// <summary>
-    /// The most bytes one read asks for: curl 8.21.0's receive buffer, which is the
+    /// The most bytes one write passes to the output: curl 8.21.0's largest client write, the
     /// <c>passed 16384</c> it reports when the output fails on a large body (measured).
     /// </summary>
-    internal const int ReadSize = 16384;
+    internal const int WriteSize = 16384;
+
+    /// <summary>
+    /// The most bytes one read of a Content-Length or read-to-close body asks for: the
+    /// 100 KiB receive buffer the curl tool sets (<c>CURLOPT_BUFFERSIZE</c>), so a large
+    /// download takes a sixth of the reads <see cref="WriteSize" /> would (AF-0144, BL-1963).
+    /// </summary>
+    internal const int ReceiveSize = 102400;
 
     private HttpChunkedDecoder? decoder;
 
@@ -325,10 +333,10 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         ReportReceived(prefix);
         remaining -= await WriteAsync(output, prefix, cancellationToken).ConfigureAwait(false);
 
-        byte[] buffer = new byte[ReadSize];
+        byte[] buffer = new byte[ReceiveSize];
         while (remaining > 0)
         {
-            int read = await ReadAsync(buffer.AsMemory(0, (int)Math.Min(ReadSize, remaining)), cancellationToken)
+            int read = await ReadAsync(buffer.AsMemory(0, (int)Math.Min(ReceiveSize, remaining)), cancellationToken)
                 .ConfigureAwait(false);
             if (read == 0)
             {
@@ -336,9 +344,25 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
                 return;
             }
 
-            ReportReceived(buffer.AsMemory(0, read));
-            remaining -= await WriteAsync(output, buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            remaining -= await WriteInPiecesAsync(output, buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Reports and writes one read's bytes in pieces of at most <see cref="WriteSize" />.
+    /// </summary>
+    /// <returns>How many bytes were written.</returns>
+    private async ValueTask<int> WriteInPiecesAsync(Stream output, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
+    {
+        int written = 0;
+        while (written < bytes.Length)
+        {
+            ReadOnlyMemory<byte> piece = bytes.Slice(written, Math.Min(WriteSize, bytes.Length - written));
+            ReportReceived(piece);
+            written += await WriteAsync(output, piece, cancellationToken).ConfigureAwait(false);
+        }
+
+        return written;
     }
 
     /// <summary>
@@ -349,7 +373,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     {
         decoder = new HttpChunkedDecoder { TrailerLimit = HttpResponseHeadReader.MaximumHeaderCount - HeadersStoredBefore };
         ReportReceived(bytes);
-        byte[] buffer = new byte[ReadSize];
+        byte[] buffer = new byte[WriteSize];
         while (true)
         {
             while (!bytes.IsEmpty && !decoder.IsComplete)

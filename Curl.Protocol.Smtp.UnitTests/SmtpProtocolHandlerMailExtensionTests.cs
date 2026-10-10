@@ -56,6 +56,7 @@ public sealed class SmtpProtocolHandlerMailExtensionTests
     [TestMethod]
     [DataRow("x@y", "MAIL FROM:<a@b> AUTH=<x@y> SIZE=21", DisplayName = "--mail-auth x@y")]
     [DataRow("<x@y>", "MAIL FROM:<a@b> AUTH=<x@y> SIZE=21", DisplayName = "--mail-auth <x@y>: brackets taken off")]
+    [DataRow("<x@y> X=Y", "MAIL FROM:<a@b> AUTH=<x@y> X=Y SIZE=21", DisplayName = "--mail-auth '<x@y> X=Y': the suffix kept (BL-1993)")]
     [DataRow("xy", "MAIL FROM:<a@b> AUTH=<xy> SIZE=21", DisplayName = "--mail-auth xy: no @")]
     [DataRow("x@yü.de", "MAIL FROM:<a@b> AUTH=<x@xn--y-eha.de> SIZE=21 SMTPUTF8", DisplayName = "non-ASCII host: A-label and SMTPUTF8")]
     [DataRow("xü@y", "MAIL FROM:<a@b> AUTH=<xü@y> SIZE=21 SMTPUTF8", DisplayName = "non-ASCII local part: SMTPUTF8")]

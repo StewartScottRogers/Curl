@@ -116,8 +116,8 @@ public sealed class FtpProtocolHandlerTests
         diagnostics.Act("connect targets", run.Connector.Targets.Count);
         diagnostics.Assert("connect target count", 2, run.Connector.Targets.Count);
         Assert.HasCount(2, run.Connector.Targets);
-        diagnostics.Assert("control target", new ConnectTarget("127.0.0.1", 18321, false) { TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18321, false) { TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
+        diagnostics.Assert("control target", new ConnectTarget("127.0.0.1", 18321, false) { PoolScheme = "ftp", TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18321, false) { PoolScheme = "ftp", TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
         diagnostics.Assert("data target", new ConnectTarget("127.0.0.1", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         diagnostics.Assert("control disposed", true, run.Control.IsDisposed);
@@ -136,8 +136,8 @@ public sealed class FtpProtocolHandlerTests
         FtpRun run = await FtpRun.ExecuteAsync("ftp://h/file.txt", replies, "x");
 
         diagnostics.ActRun(run);
-        diagnostics.Assert("control target", new ConnectTarget("h", 21, false) { TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
-        Assert.AreEqual(new ConnectTarget("h", 21, false) { TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
+        diagnostics.Assert("control target", new ConnectTarget("h", 21, false) { PoolScheme = "ftp", TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
+        Assert.AreEqual(new ConnectTarget("h", 21, false) { PoolScheme = "ftp", TcpIoTrace = new TcpIoTraceLines("TCP", 900, false) }, run.Connector.Targets[0]);
         diagnostics.Assert("data target", new ConnectTarget("h", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
         Assert.AreEqual(new ConnectTarget("h", 61744, false) { TcpIoTrace = new TcpIoTraceLines("TCP-1", null, true) }, run.Connector.Targets[1]);
     }

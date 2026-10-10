@@ -3517,12 +3517,8 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
         }
 
-        MultipartFormBuildResult form = await formBodyBuilder
-            .BuildAsync(
-                MultipartFormPartMapping.FromCommandLine(options.FormParts),
-                MultipartFormPartMapping.NameEscapingOf(options),
-                CancellationToken.None)
-            .ConfigureAwait(false);
+        bool mimeMessage = MailRequestOptionsMapping.SendsFormAsMimeMessage(transferUrl.Scheme);
+        MultipartFormBuildResult form = await BuildFormAsync(options, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
             return form.Failure;
@@ -3530,11 +3526,36 @@ internal sealed class CurlCommandRunner(
 
         await using (form.Body.Content.ConfigureAwait(false))
         {
-            return await TransferWithBodyAsync(
-                    follower, dispatch, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
-                .ConfigureAwait(false);
+            return mimeMessage
+                ? await TransferWithBodyAsync(
+                        follower, dispatch, options, transferUrl, transfer, range, headerOutput, null, form.Body.Content)
+                    .ConfigureAwait(false)
+                : await TransferWithBodyAsync(
+                        follower, dispatch, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
+                    .ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Builds the <c>-F</c> parts: as the MIME mail message curl 8.21.0 uploads to an
+    /// <c>smtp</c> or <c>imap</c> URL, headed by the <c>-H</c> headers, when
+    /// <paramref name="mimeMessage" /> is set, otherwise as the HTTP form body (BL-1988).
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="mimeMessage">Whether the parts are a mail message rather than a form.</param>
+    /// <returns>The body, or the failure that stops the transfer before it connects.</returns>
+    private ValueTask<MultipartFormBuildResult> BuildFormAsync(CommandLineOptions options, bool mimeMessage) =>
+        mimeMessage
+            ? formBodyBuilder.BuildMailMessageAsync(
+                MultipartFormPartMapping.FromCommandLine(options.FormParts),
+                MultipartFormPartMapping.NameEscapingOf(options),
+                options.Headers,
+                CancellationToken.None)
+            : formBodyBuilder.BuildAsync(
+                MultipartFormPartMapping.FromCommandLine(options.FormParts),
+                MultipartFormPartMapping.NameEscapingOf(options),
+                MultipartFormPartMapping.RequestContentTypeOf(options),
+                CancellationToken.None);
 
     /// <summary>
     /// Parses the transfer's URL; under <c>--disallow-username-in-url</c> a URL with user information,

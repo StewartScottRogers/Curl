@@ -65,6 +65,9 @@ public sealed class NetrcFileTests
     [DataRow("machine 127.0.0.1 password p login a login", "a", "p", DisplayName = "A login keyword without a value keeps the earlier login")]
     [DataRow("machine 127.0.0.1 login a password", "a", null, DisplayName = "A password keyword without a value at the end")]
     [DataRow("machine\t127.0.0.1\r\n\tlogin u\r\n\tpassword p\r\n", "u", "p", DisplayName = "Tabs and CRLF")]
+    [DataRow("machine 127.0.0.1 login username \"password\"\0 hello\n", "username", null, DisplayName = "A NUL byte after a quoted keyword ends its line (upstream test793)")]
+    [DataRow("machine 127.0.0.1 login a\0 password z\npassword p\n", "a", "p", DisplayName = "Text after a NUL byte on its line is skipped")]
+    [DataRow("machine 127.0.0.1 login a password p\0x", "a", "p", DisplayName = "A NUL byte on the last line ends the text")]
     [DataRow("machine 127.0.0.1 login a password pé\n", "a", "pé", DisplayName = "A non-ASCII password")]
     [DataRow("machine 127.0.0.1 login a password pa\nmachine other login \"abc\n", "a", "pa", DisplayName = "A syntax error after the match is never read")]
     public void Find_WithoutUserName_ReturnsTheEntryCurlPicks(string text, string? expectedLogin, string? expectedPassword)

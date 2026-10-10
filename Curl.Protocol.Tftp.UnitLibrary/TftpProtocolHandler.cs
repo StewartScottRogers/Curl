@@ -36,8 +36,11 @@ namespace Curl.Protocol.Tftp;
 /// <para>
 /// An ERROR packet ends the transfer with the exit code and message curl reports for its
 /// code. A URL with no file name is exit 71 (<see cref="CurlExitCode.TftpIllegal" />) with
-/// <c>Missing filename</c>, before any channel is opened, and a channel that will not open
-/// is returned with the connector's code and message unchanged.
+/// <c>Missing filename</c>, before any channel is opened. A channel that will not open
+/// is returned with the connector's code and message unchanged, except that a connect
+/// failure (exit 7) loses to a file name curl refuses whatever the options, a decoded NUL
+/// (exit 3) or one too long for the request (exit 71), since curl's UDP socket opens
+/// without contacting the server and checks the name before it sends.
 /// </para>
 /// <para>
 /// Each transfer's end, and a download's request, packets, options, retransmissions and
@@ -152,12 +155,13 @@ public sealed class TftpProtocolHandler(
             .OpenAsync(context.Url.IdnHost, port, context.CancellationToken)
             .ConfigureAwait(false);
 
+        var events = new TftpTransferEvents(context.Events);
         if (opened.Channel is not { } channel)
         {
-            return TransferResult.Failure(opened.ExitCode, opened.ErrorMessage!);
+            return RefusalBeforeConnecting(file, opened, events)
+                ?? TransferResult.Failure(opened.ExitCode, opened.ErrorMessage!);
         }
 
-        var events = new TftpTransferEvents(context.Events);
         events.Connected(context.Url.IdnHost, channel.ServerEndPoint);
         TransferResult result;
         await using (channel.ConfigureAwait(false))
@@ -170,6 +174,13 @@ public sealed class TftpProtocolHandler(
         events.ShuttingDown(opened.ConnectionNumber);
         return result;
     }
+
+    // curl's UDP socket opens without contacting the server, so the file name checks of its
+    // tftp_send_first come before any failure to connect (GF-0050); a host that does not
+    // resolve still fails first, as curl resolves before it opens the socket.
+    private static TransferResult? RefusalBeforeConnecting(
+        TftpRequestFile file, DatagramOpenResult opened, TftpTransferEvents events) =>
+        opened.ExitCode == CurlExitCode.CouldntConnect ? file.RefuseUnsendableName(events) : null;
 
     // Sends the MASQUE request to the proxy, when there is a connector to reach it, and
     // fails as curl 8.21.0 does once the proxy has replied.

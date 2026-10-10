@@ -5,16 +5,19 @@ namespace Curl.Protocol.Smtp;
 
 /// <summary>
 /// Sends one message on an open SMTP session: <c>MAIL FROM</c>, one <c>RCPT TO</c> per
-/// <c>--mail-rcpt</c>, <c>DATA</c>, the dot-stuffed upload (<see cref="SmtpDotStuffer" />) and
+/// <c>--mail-rcpt</c>, <c>DATA</c>, the dot-stuffed upload (<see cref="SmtpDotStuffer" />, each bare line
+/// feed made CRLF first under <c>--crlf</c>) and
 /// <c>QUIT</c>, each step and each failure's exit code measured on curl 8.21.0 with
 /// <c>Record-CurlExchange.ps1 -Smtp</c> (BL-542).
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
-/// <item>An address is sent inside angle brackets after one leading <c>&lt;</c> and one
-/// trailing <c>&gt;</c> are taken off it and its host is made an A-label
-/// (<see cref="SmtpMailbox" />), so <c>&lt;a@b</c> and <c>a@b</c> both go out as
-/// <c>&lt;a@b&gt;</c>; no <c>--mail-from</c> sends <c>MAIL FROM:&lt;&gt;</c>.</item>
+/// <item>An address is sent inside angle brackets after its own brackets are taken off and
+/// its host is made an A-label (<see cref="SmtpMailbox" />), so <c>&lt;a@b</c> and
+/// <c>a@b</c> both go out as <c>&lt;a@b&gt;</c>; whatever follows the last <c>&gt;</c> of an
+/// address starting <c>&lt;</c> follows the closing bracket, so
+/// <c>&lt;a@b&gt; RET=HDRS</c> goes out as given (BL-1993); no <c>--mail-from</c> sends
+/// <c>MAIL FROM:&lt;&gt;</c>.</item>
 /// <item><c>MAIL FROM</c> adds, in this order, <c>AUTH=&lt;addr&gt;</c> for
 /// <c>--mail-auth</c> once <c>AUTH</c> succeeded, <c>SIZE=n</c> when <c>EHLO</c> advertised
 /// <c>SIZE</c> and the upload can seek and has bytes left, and <c>SMTPUTF8</c> when
@@ -82,6 +85,12 @@ internal sealed class SmtpMailTransaction(
         catch (SmtpSendFailedException failure)
         {
             result = TransferResult.Failure(CurlExitCode.SendError, failure.Message);
+        }
+        catch (RequestBodyReadFailedException failure)
+        {
+            // A -F message whose 7bit part holds a byte above 127 fails the read that reaches
+            // it, after DATA, as curl 8.21.0 fails it: exit 26 and no QUIT (BL-1988).
+            result = TransferResult.Failure(CurlExitCode.ReadError, failure.Message);
         }
 
         return result with
@@ -184,7 +193,7 @@ internal sealed class SmtpMailTransaction(
         // from a read that returns nothing (BL-1198).
         SmtpStateTrace trace = channel.Trace;
         bool sendsEachRead = trace.Enabled || expected is null;
-        var stuffer = new SmtpDotStuffer();
+        var stuffer = new SmtpDotStuffer(context.ConvertLineEndings);
         byte[] buffer = new byte[ReadBufferSize];
         byte[] pending = [];
         int read;

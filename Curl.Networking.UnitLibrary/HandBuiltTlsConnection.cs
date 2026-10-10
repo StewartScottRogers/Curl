@@ -48,6 +48,8 @@ internal sealed class HandBuiltTlsConnection(
 
     public EndPoint? LocalEndPoint => plaintext.LocalEndPoint;
 
+    public bool HasPeerClosed => plaintext.HasPeerClosed;
+
     /// <exception cref="MissingCloseNotifyException">The connection ended without <c>close_notify</c>.</exception>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

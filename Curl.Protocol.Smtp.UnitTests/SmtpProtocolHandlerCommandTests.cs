@@ -82,6 +82,18 @@ public sealed class SmtpProtocolHandlerCommandTests
     }
 
     [TestMethod]
+    [DataRow("<v@example.com> X", "VRFY v@example.com", DisplayName = "the suffix after > dropped")]
+    [DataRow("<r@b> x>y", "VRFY r@b> x", DisplayName = "cut at the last >")]
+    public async Task ExecuteAsync_BracketedRecipientWithSuffix_IsVerifiedWithoutTheSuffix(string recipient, string expected)
+    {
+        // Measured on curl 8.21.0 (BL-1993).
+        CommandRun run = await RunAsync(EhloReply + Verified + Bye, new MailRequestOptions { Recipients = [recipient] });
+
+        Diagnostics.Diff("sent", Ehlo + expected + "\r\n" + Quit, run.Sent);
+        Assert.AreEqual(Ehlo + expected + "\r\n" + Quit, run.Sent);
+    }
+
+    [TestMethod]
     [DataRow("jörg@example.com", "VRFY jörg@example.com SMTPUTF8", DisplayName = "non-ASCII local part")]
     [DataRow("a@bücher.example", "VRFY a@xn--bcher-kva.example SMTPUTF8", DisplayName = "non-ASCII host")]
     [DataRow("a@bü..x", "VRFY a@bü..x SMTPUTF8", DisplayName = "host no IDNA A-label exists for")]

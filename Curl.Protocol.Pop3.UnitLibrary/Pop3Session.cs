@@ -197,12 +197,19 @@ internal sealed class Pop3Session(
 
     /// <summary>
     /// Sends <c>STLS</c> and upgrades on its <c>+OK</c>; any other answer carries on in
-    /// plaintext under <c>--ssl</c> and is exit 64 under <c>--ssl-reqd</c>.
+    /// plaintext under <c>--ssl</c> and is exit 64 under <c>--ssl-reqd</c>. A response with
+    /// more bytes pipelined behind it is exit 8 whatever it says, and nothing more is sent, as
+    /// curl 8.21.0 forbids pipelining there (upstream test982, BL-1985).
     /// </summary>
     private async ValueTask<TransferResult?> StartTlsAsync()
     {
         await channel.SendAsync("STLS").ConfigureAwait(false);
         Pop3Response stls = await channel.ReadResponseAsync().ConfigureAwait(false);
+        if (channel.HasBufferedBytes)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, Pop3SessionMessages.WeirdServerReply);
+        }
+
         if (stls.IsOk)
         {
             return await UpgradeAsync().ConfigureAwait(false);

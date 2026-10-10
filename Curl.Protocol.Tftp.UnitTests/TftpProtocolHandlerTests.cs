@@ -338,6 +338,48 @@ public sealed class TftpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(CurlExitCode.CouldntConnect, "Failed to connect", "tftp://h/file.txt")]
+    [DataRow(CurlExitCode.CouldntResolveHost, "Could not resolve host: h", "tftp://h/a%00b")]
+    public async Task ExecuteAsync_OpenFailsAndTheNameIsSendableOrTheHostUnresolved_ReturnsConnectorsFailure(
+        CurlExitCode exitCode, string message, string url)
+    {
+        Diagnostics.Arrange("connector result", $"Failed({exitCode}, {message})");
+        var connector = new RecordingDatagramConnector(DatagramOpenResult.Failed(exitCode, message));
+
+        var result = await RunAsync(connector, Context(url));
+
+        Diagnostics.Assert("exit code", exitCode, result.ExitCode);
+        Assert.AreEqual(exitCode, result.ExitCode);
+        Diagnostics.Assert("error message", message, result.ErrorMessage);
+        Assert.AreEqual(message, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("a%00b", CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL", 0)]
+    [DataRow(null, CurlExitCode.TftpIllegal, "TFTP filename too long", 1)]
+    public async Task ExecuteAsync_ConnectFailsAndTheNameIsUnsendable_ReturnsTheNamesRefusal(
+        string? name, CurlExitCode expectedExitCode, string expectedMessage, int expectedEvents)
+    {
+        // GF-0050, upstream test1453: curl's UDP socket opens without contacting the
+        // server, so tftp_send_first refuses a 504-character name with exit 71.
+        string url = $"tftp://h/{name ?? new string('a', 504)}";
+        var connector = new RecordingDatagramConnector(
+            DatagramOpenResult.Failed(CurlExitCode.CouldntConnect, "Failed to connect"));
+        var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("url length", url.Length);
+        var context = new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream(), Events = events };
+
+        var result = await RunAsync(connector, context);
+
+        Diagnostics.Assert("exit code", expectedExitCode, result.ExitCode);
+        Assert.AreEqual(expectedExitCode, result.ExitCode);
+        Diagnostics.Assert("error message", expectedMessage, result.ErrorMessage);
+        Assert.AreEqual(expectedMessage, result.ErrorMessage);
+        Diagnostics.Act("transfer events", string.Join(" | ", events.Steps));
+        Assert.HasCount(expectedEvents, events.Steps);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FirstReplyOfTheWrongBlock_IsIgnored()
     {
         var channel = Channel(

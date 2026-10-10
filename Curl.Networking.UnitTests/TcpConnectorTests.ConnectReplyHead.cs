@@ -75,6 +75,36 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ThroughATunnelOpenedByOneReply_CarriesItsHeadsBytesInTheResult()
+    {
+        // Upstream test1288's proxy reply: 61 bytes that curl 8.21.0 adds to %{size_header}.
+        const string reply = "HTTP/1.1 200 Mighty fine indeed\r\nServer: test tunnel 2000\r\n\r\n";
+        var proxyConnection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply + "HTTP/1.1 200 OK\r\n"));
+        var connector = CreateProxyConnector(proxyConnection, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, PlainTarget);
+
+        Diagnostics.Assert("proxy connect header bytes", 61L, result.ProxyConnectHeaderBytes);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(61L, result.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ThroughATunnelOpenedAfterA407_CarriesBothRepliesHeadBytesInTheResult()
+    {
+        const string challenge = "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"\r\nContent-Length: 6\r\n\r\n";
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(challenge + "denied" + EstablishedReply));
+        var (connector, _) = CreateAuthenticatingConnector(HttpAuthSchemes.Digest, connection);
+
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
+
+        long expected = challenge.Length + EstablishedReply.Length;
+        Diagnostics.Assert("proxy connect header bytes", expected, result.ProxyConnectHeaderBytes);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(expected, result.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheHandshakeInsideTheTunnelFails_ReturnsTheFailureWithNoHeaderCount()
     {
         const string reply = "HTTP/1.1 200 Connection established\r\nX-A: 1\r\n\r\n";

@@ -43,7 +43,7 @@ internal sealed class TftpRequestFile
         Mode = mode;
     }
 
-    /// <summary>Gets the file name as the URL writes it, percent-encoded, with no leading slash or mode suffix.</summary>
+    /// <summary>Gets the file name as the URL writes it, percent-encoded, without the path's separator slash or mode suffix.</summary>
     internal string EncodedName { get; }
 
     /// <summary>Gets the transfer mode the request asks for: <c>netascii</c> or <c>octet</c>.</summary>
@@ -60,7 +60,9 @@ internal sealed class TftpRequestFile
     /// <returns>The file the request names.</returns>
     internal static TftpRequestFile FromUrlPath(string absolutePath, bool useAscii)
     {
-        string name = absolutePath.TrimStart('/');
+        // RFC 3617: only the one separator slash is not part of the name, so curl's
+        // tftp_send_first skips the path's first character and keeps any further slash.
+        string name = absolutePath[1..];
         if (name.EndsWith(NetasciiSuffix, StringComparison.Ordinal))
         {
             return new TftpRequestFile(name[..^NetasciiSuffix.Length], NetasciiMode);
@@ -86,14 +88,9 @@ internal sealed class TftpRequestFile
         Func<byte[], string, byte[]> buildRequest, TftpTransferEvents events, out byte[] request)
     {
         request = [];
-        if (DecodeName() is not { } name)
+        if (RefuseUnsendableName(events, out byte[] name) is { } refused)
         {
-            return TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrlMessage);
-        }
-
-        if (name.Length + Mode.Length + 4 > MaximumRequestLength)
-        {
-            return Refuse(FileNameTooLongMessage, events);
+            return refused;
         }
 
         byte[] built = buildRequest(name, Mode);
@@ -104,6 +101,28 @@ internal sealed class TftpRequestFile
 
         request = built;
         return null;
+    }
+
+    /// <summary>
+    /// Gives the failure curl 8.21.0 ends with for a file name it cannot send whatever the
+    /// options: exit 3 for a decoded NUL, exit 71 <c>TFTP filename too long</c> (reporting
+    /// curl's <c>-v</c> line) for a name and mode too long for the request.
+    /// </summary>
+    /// <param name="events">Where the <c>-v</c> line of an exit 71 is reported.</param>
+    /// <returns>The failure when the name is refused, otherwise <see langword="null" />.</returns>
+    internal TransferResult? RefuseUnsendableName(TftpTransferEvents events) => RefuseUnsendableName(events, out _);
+
+    // Decodes the name, or refuses it as curl's tftp_send_first does before it adds the options.
+    private TransferResult? RefuseUnsendableName(TftpTransferEvents events, out byte[] name)
+    {
+        byte[]? decoded = DecodeName();
+        name = decoded ?? [];
+        if (decoded is null)
+        {
+            return TransferResult.Failure(CurlExitCode.UrlMalformat, MalformedUrlMessage);
+        }
+
+        return name.Length + Mode.Length + 4 > MaximumRequestLength ? Refuse(FileNameTooLongMessage, events) : null;
     }
 
     // Reports curl's -v line for the refusal and fails with exit 71.

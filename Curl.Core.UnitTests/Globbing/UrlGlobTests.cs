@@ -39,6 +39,7 @@ public sealed class UrlGlobTests
     [DataRow("file:///n/{,}", "file:///n/|file:///n/")]
     [DataRow("file:///n/{a\\,b,c\\}d\\x}", "file:///n/a,b|file:///n/c}dx")]
     [DataRow("file:///n/\\{a\\}\\[\\]\\x[]", "file:///n/{a}[]\\x[]")]
+    [DataRow("http://h/\\{\\}\\/214", "http://h/{}\\/214")]
     [DataRow("http://[::1]:1/[1-2]", "http://[::1]:1/1|http://[::1]:1/2")]
     [DataRow("http://[fe80::1%25eth0]:1/", "http://[fe80::1%25eth0]:1/")]
     [DataRow("http://[fe80::1%eth0]:1/{a}", "http://[fe80::1%eth0]:1/a")]

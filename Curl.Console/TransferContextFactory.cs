@@ -195,7 +195,11 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             Proxy = proxy,
             Http = HttpOptionsWithAltSvc(
                 url,
-                HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with { HstsStore = HstsStore },
+                HttpRequestOptionsMapping.FromCommandLine(options, formBody, proxy, commandLineTextEncoding, ifNoneMatchHeaders) with
+                {
+                    HstsStore = HstsStore,
+                    ProxyTunnel = options.ProxyTunnel || ConnectToTunnelsThroughProxy(options, url, proxy),
+                },
                 altSvc),
             Mail = MailRequestOptionsMapping.FromCommandLine(options, url.Scheme),
             Ssh = ssh,
@@ -315,6 +319,28 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// <param name="events">The sink given to <see cref="Create" />.</param>
     /// <returns>The sink the context carries.</returns>
     private static ITransferEvents EventsOrNone(ITransferEvents? events) => events ?? NoTransferEvents.Instance;
+
+    /// <summary>
+    /// Tells whether a <c>--connect-to</c> mapping sends <paramref name="url" /> to another host or
+    /// port through an HTTP or HTTPS proxy, which makes curl 8.21.0 tunnel through the proxy as
+    /// <c>-p</c> would (<c>lib/url.c</c>'s <c>parse_connect_to_slist</c>; upstream tests 2050 and
+    /// 2055). A mapping that names the URL's own host and port, or does not parse, does not.
+    /// </summary>
+    /// <param name="options">The parsed command line.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <param name="proxy">The transfer's proxy, or <see langword="null" /> for none.</param>
+    /// <returns><see langword="true" /> when the transfer tunnels because of <c>--connect-to</c>.</returns>
+    internal static bool ConnectToTunnelsThroughProxy(CommandLineOptions options, CurlUrl url, ProxyEndpoint? proxy)
+    {
+        if (proxy is not { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } || options.ConnectToEntries.Count == 0)
+        {
+            return false;
+        }
+
+        Networking.ConnectDestination destination = new Networking.ConnectToMappings(options.ConnectToEntries).Map(url.Host, url.Port);
+        return destination is { IsMapped: true, ParseError: null }
+            && (destination.Port != url.Port || !string.Equals(destination.Host, url.Host, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Gets <paramref name="events" /> writing each CONNECT reply head a tunnelling proxy sends to

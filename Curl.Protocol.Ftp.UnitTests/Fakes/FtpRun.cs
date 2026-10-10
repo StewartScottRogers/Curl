@@ -32,7 +32,7 @@ public sealed record FtpRun(
         byte[] dataBytes = Encoding.Latin1.GetBytes(data);
         return ExecuteAsync(
             url,
-            new ScriptedConnection(Encoding.Latin1.GetBytes(replies)),
+            ScriptedConnection.FromReplies(replies),
             dataBytes.Length == 0 ? new ScriptedConnection() : new ScriptedConnection(dataBytes),
             adjust);
     }

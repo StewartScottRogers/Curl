@@ -50,7 +50,7 @@ public sealed class FtpProtocolHandlerTlsTests
         // curl -v writes the data handshake's schannel: lines, so it reports to the transfer's events (BL-1084).
         var events = new RecordingTransferEvents();
         var securedData = Scripted("hello");
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftps://127.0.0.1/a.txt",
             Greeting + LoggedIn + Protected + Pwd + Retrieved,
             m => m.Events = events,
@@ -59,7 +59,7 @@ public sealed class FtpProtocolHandlerTlsTests
         var expectedSent = LogInSent + "PBSZ 0\r\nPROT P\r\n" + RetrieveSent;
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 990, true), run.Connector.Targets[0]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 990, true) { PoolScheme = "ftps" }, run.Connector.Targets[0]);
         Assert.AreEqual(new ConnectTarget("127.0.0.1", 64396, false), run.Connector.Targets[1]);
         Assert.AreSame(run.Data, run.Tls.Handshakes.Single().Plaintext);
         Assert.AreSame(events, run.Tls.HandshakeEvents.Single());
@@ -75,13 +75,13 @@ public sealed class FtpProtocolHandlerTlsTests
     public async Task ExecuteAsync_FtpsUrlWithPort_ConnectsToThatPort()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftps://127.0.0.1:18437/a.txt",
             Greeting + LoggedIn + Protected + Pwd + Retrieved,
             _ => { },
             ConnectResult.Connected(Scripted("hello")));
 
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18437, true), run.Connector.Targets[0]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18437, true) { PoolScheme = "ftps" }, run.Connector.Targets[0]);
         var expectedResult = TransferResult.Success(5);
         diagnostics.Assert("result", expectedResult, run.Result);
         Assert.AreEqual(expectedResult, run.Result);
@@ -92,7 +92,7 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k ftps://127.0.0.1:18437/a.txt, PROT answered 500 no: exit 0.
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftps://127.0.0.1:18437/a.txt",
             Greeting + LoggedIn + "200 PBSZ=0\r\n" + Refused + Pwd + Retrieved,
             _ => { },
@@ -114,7 +114,7 @@ public sealed class FtpProtocolHandlerTlsTests
         // curl -k --ssl-reqd ftp://127.0.0.1:18437/a.txt
         var securedControl = Scripted(LoggedIn + Protected + Pwd + Retrieved);
         var securedData = Scripted("hello");
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
             context => context.SslLevel = TransportSecurityLevel.Required,
@@ -125,7 +125,7 @@ public sealed class FtpProtocolHandlerTlsTests
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
         Assert.AreEqual(LogInSent + "PBSZ 0\r\nPROT P\r\n" + RetrieveSent, Encoding.Latin1.GetString(securedControl.Sent));
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18437, false), run.Connector.Targets[0]);
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18437, false) { PoolScheme = "ftp" }, run.Connector.Targets[0]);
         Assert.AreSame(run.Control, run.Tls.Handshakes[0].Plaintext);
         Assert.AreSame(run.Data, run.Tls.Handshakes[1].Plaintext);
         Assert.IsTrue(securedControl.IsDisposed);
@@ -142,9 +142,9 @@ public sealed class FtpProtocolHandlerTlsTests
         // curl -k --ssl ftp://127.0.0.1:18437/a.txt, AUTH SSL answered 500 no and AUTH TLS 334:
         // curl takes 334 as acceptance and starts the handshake.
         var securedControl = Scripted(LoggedIn + Protected + Pwd + Retrieved);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + "334 ok\r\n",
+            Greeting + Refused + ScriptedConnection.NextRead + "334 ok\r\n",
             context => context.SslLevel = TransportSecurityLevel.Try,
             ConnectResult.Connected(securedControl),
             ConnectResult.Connected(Scripted("hello")));
@@ -162,9 +162,9 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ssl-reqd ftp://127.0.0.1:18437/a.txt, AUTH answered 500 no
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + Refused,
+            Greeting + Refused + ScriptedConnection.NextRead + Refused + ScriptedConnection.NextRead,
             context => context.SslLevel = TransportSecurityLevel.Required);
 
         var expectedSent = "AUTH SSL\r\nAUTH TLS\r\n";
@@ -182,9 +182,9 @@ public sealed class FtpProtocolHandlerTlsTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ssl --ftp-ssl-control ftp://127.0.0.1:18437/a.txt, AUTH answered 500 no:
         // --ftp-ssl-control outranks --ssl.
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + Refused,
+            Greeting + Refused + ScriptedConnection.NextRead + Refused + ScriptedConnection.NextRead,
             context =>
             {
                 context.SslLevel = TransportSecurityLevel.Try;
@@ -204,9 +204,9 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ssl ftp://127.0.0.1:18437/a.txt, AUTH answered 500 no: exit 0, no PBSZ.
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + Refused + LoggedIn + Pwd + Retrieved,
+            Greeting + Refused + ScriptedConnection.NextRead + Refused + ScriptedConnection.NextRead + LoggedIn + Pwd + Retrieved,
             context => context.SslLevel = TransportSecurityLevel.Try,
             data: "hello");
 
@@ -220,12 +220,70 @@ public sealed class FtpProtocolHandlerTlsTests
     }
 
     [TestMethod]
+    [DataRow("500 no", TransportSecurityLevel.Try, DisplayName = "--ssl, AUTH SSL=500 with more replies pipelined")]
+    [DataRow("234 AUTH accepted", TransportSecurityLevel.Required, DisplayName = "--ssl-reqd, AUTH SSL=234 with more replies pipelined")]
+    public async Task ExecuteAsync_AuthReplyWithMoreRepliesPipelined_FailsWithExit8SendingNothingMore(string authReply, TransportSecurityLevel sslLevel)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream test983: a reply pipelined behind AUTH's is exit 8, with no handshake and no QUIT.
+        TlsRun run = await RunAsync(diagnostics,
+            "ftp://127.0.0.1:18437/a.txt",
+            Greeting + authReply + "\r\n" + LoggedIn + Pwd,
+            context => context.SslLevel = sslLevel);
+
+        var expectedSent = "AUTH SSL\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.IsEmpty(run.Tls.Handshakes);
+        var expectedResult = TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply");
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LoggedInGreetingUnderSslReqdAndAuthRefused_SendsAuthAndEndsWithExit64()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream test986: a 230 greeting under --ssl-reqd is taken as a 220, so AUTH is still sent.
+        TlsRun run = await RunAsync(diagnostics,
+            "ftp://127.0.0.1:18437/a.txt",
+            "230 welcome without password\r\n" + Refused + ScriptedConnection.NextRead + Refused,
+            context => context.SslLevel = TransportSecurityLevel.Required);
+
+        var expectedSent = "AUTH SSL\r\nAUTH TLS\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        var expectedResult = TransferResult.Failure(CurlExitCode.UseSslFailed, "Requested SSL level failed");
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LoggedInGreetingUnderSsl_SkipsAuthAndLogIn()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // --ssl only tries TLS, so a 230 greeting is taken as logged in, as curl 8.21.0 does.
+        TlsRun run = await RunAsync(diagnostics,
+            "ftp://127.0.0.1:18437/a.txt",
+            "230 welcome without password\r\n" + Pwd + Retrieved,
+            context => context.SslLevel = TransportSecurityLevel.Try,
+            data: "hello");
+
+        diagnostics.DiffSent(RetrieveSent, run.Sent);
+        Assert.AreEqual(RetrieveSent, run.Sent);
+        Assert.IsEmpty(run.Tls.Handshakes);
+        var expectedResult = TransferResult.Success(5);
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_FtpSslControl_SendsProtCAndLeavesTheDataInPlaintext()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ftp-ssl-control ftp://127.0.0.1:18437/a.txt
         var securedControl = Scripted(LoggedIn + "200 PBSZ=0\r\n200 Protection level set to C\r\n" + Pwd + Retrieved);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
             context => context.FtpSslControlOnly = true,
@@ -245,7 +303,7 @@ public sealed class FtpProtocolHandlerTlsTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ftp-ssl-control ftp://127.0.0.1:18437/a.txt, PROT answered 500 no: exit 0.
         var securedControl = Scripted(LoggedIn + "200 PBSZ=0\r\n" + Refused + Pwd + Retrieved);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
             context => context.FtpSslControlOnly = true,
@@ -263,7 +321,7 @@ public sealed class FtpProtocolHandlerTlsTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ssl-reqd --ftp-ssl-control ftp://127.0.0.1:18437/a.txt: --ssl-reqd outranks it.
         var securedControl = Scripted(LoggedIn + Protected + Pwd + Retrieved);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
             context =>
@@ -286,7 +344,7 @@ public sealed class FtpProtocolHandlerTlsTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ssl-reqd ftp://127.0.0.1:18437/a.txt, PROT answered 500 no
         var securedControl = Scripted(LoggedIn + "200 PBSZ=0\r\n" + Refused);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
             context => context.SslLevel = TransportSecurityLevel.Required,
@@ -304,7 +362,7 @@ public sealed class FtpProtocolHandlerTlsTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k --ssl-reqd ftp://127.0.0.1:18437/a.txt, PBSZ answered 500 no: exit 0.
         var securedControl = Scripted(LoggedIn + Refused + "200 Protection level set to P\r\n" + Pwd + Retrieved);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
             context => context.SslLevel = TransportSecurityLevel.Required,
@@ -321,7 +379,7 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl --ssl-reqd ftp://127.0.0.1:18437/a.txt without -k: the certificate is refused.
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             Greeting + AuthAccepted,
             context => context.SslLevel = TransportSecurityLevel.Required,
@@ -340,7 +398,7 @@ public sealed class FtpProtocolHandlerTlsTests
     public async Task ExecuteAsync_DataHandshakeFails_EndsWithItsExitCodeWithoutQuit()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftps://127.0.0.1:18437/a.txt",
             Greeting + LoggedIn + Protected + Pwd + Retrieved,
             _ => { },
@@ -432,7 +490,7 @@ public sealed class FtpProtocolHandlerTlsTests
     public async Task ExecuteAsync_UploadAndDataHandshakeFails_EndsWithItsExitCode()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftps://127.0.0.1:18437/u.txt",
             Greeting + LoggedIn + Protected + Pwd + Epsv + "200 Type set\r\n150 Opening BINARY mode data connection\r\n",
             context => context.Upload = new MemoryStream([1]),
@@ -448,7 +506,7 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         var securedData = new ScriptedConnection();
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftps://127.0.0.1:18437/u.txt",
             Greeting + LoggedIn + Protected + Pwd + Epsv + "200 Type set\r\n150 Opening BINARY mode data connection\r\n226 Transfer complete\r\n221 Bye\r\n",
             context => context.Upload = new MemoryStream(Encoding.Latin1.GetBytes("hello")),
@@ -466,7 +524,7 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // A 230 greeting logs in at once; curl 8.21.0 sends AUTH only after a 220.
-        TlsRun run = await RunAsync(diagnostics, 
+        TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
             "230 Logged in\r\n" + Pwd + Retrieved,
             context => context.SslLevel = TransportSecurityLevel.Try,
@@ -572,7 +630,7 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         diagnostics.ArrangeFtp(url, replies, data.Length == 0 ? null : data);
 
-        var control = Scripted(replies);
+        var control = ScriptedConnection.FromReplies(replies);
         var dataConnection = data.Length == 0 ? new ScriptedConnection() : Scripted(data);
         var connector = new QueuedConnector(ConnectResult.Connected(control), ConnectResult.Connected(dataConnection));
         var tls = new QueuedTlsProvider(handshakes);

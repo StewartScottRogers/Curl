@@ -74,6 +74,16 @@ public sealed class CommandLineOptions
     internal bool ReadingConfigFile { get => globals.ReadingConfigFile; set => globals.ReadingConfigFile = value; }
 
     /// <summary>
+    /// <see langword="true"/> while the config file being read is read in <see cref="ConfigFileWireTextEncoding"/>
+    /// rather than UTF-8, because on Windows its bytes are not valid UTF-8: its values already hold the
+    /// file's bytes as the request side encodes them, and are not read as UTF-8 (BL-1973).
+    /// </summary>
+    internal bool ReadingConfigFileAsWireText { get => globals.ReadingConfigFileAsWireText; set => globals.ReadingConfigFileAsWireText = value; }
+
+    /// <summary><see langword="true"/> while a line of a config file read as UTF-8 is applied.</summary>
+    internal bool ReadingUtf8ConfigFile => ReadingConfigFile && !ReadingConfigFileAsWireText;
+
+    /// <summary>
     /// <see langword="true"/> while <see cref="CommandLineParser"/> applies an <c>--expand-</c> value whose
     /// first byte came from a variable's content rather than from the argument as typed: those bytes are
     /// read as UTF-8 on every platform, so curl 8.21.0's leading-Unicode check sees them as UTF-8 even on
@@ -89,13 +99,13 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// <paramref name="value"/> as the request side must hold it to send it as curl 8.21.0 does: while a
-    /// config file is read and <see cref="ConfigFileWireTextEncoding"/> is set, re-spelled so it goes out as
+    /// config file read as UTF-8 is read and <see cref="ConfigFileWireTextEncoding"/> is set, re-spelled so it goes out as
     /// the file's own bytes (<see cref="ConfigFileWireText.Respell"/>); otherwise unchanged.
     /// </summary>
     /// <param name="value">A header, user-agent or referer value.</param>
     /// <returns>The value to store.</returns>
     internal string AsWireText(string value) =>
-        ReadingConfigFile && ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(value, wireEncoding) : value;
+        ReadingUtf8ConfigFile && ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(value, wireEncoding) : value;
 
     /// <summary>
     /// Applies <c>-:</c> / <c>--next</c> read into this group, as curl 8.21.0 does: when this group has a

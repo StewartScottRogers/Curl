@@ -83,6 +83,11 @@
     prints when a write fails after the server has spoken, as for a telnet negotiation
     reply (BL-1312). Default off: close with a FIN.
 
+.PARAMETER HalfCloseAfterResponse
+    After sending each response, shut down the send side (a FIN) and go on reading, so
+    with HoldOpenMilliseconds anything curl still sends on the connection is recorded. Use
+    it to measure how curl finds a kept connection the server has closed (BL-2018).
+
 .PARAMETER HoldOpenMilliseconds
     After sending each response, keep the connection open instead of closing it, until
     curl closes its end or this many milliseconds pass without a byte from curl, and
@@ -621,6 +626,7 @@ param(
     [ValidateRange(0, 600000)] [int] $ResponseDelayMilliseconds = 0,
     [switch] $Reset,
     [switch] $ResetAfterResponse,
+    [switch] $HalfCloseAfterResponse,
     [ValidateRange(0, 600000)] [int] $HoldOpenMilliseconds = 0,
     [ValidateRange(0, 1000)] [int] $AnswerHeldRequests = 0,
     [ValidateRange(-1, [int]::MaxValue)] [int] $RespondAfterBodyBytes = -1,
@@ -761,7 +767,7 @@ function ConvertTo-CommandLineArgument {
 # The server runs in its own runspace so curl can run in this one. It returns one
 # byte array per connection served.
 $serveConnections = {
-    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld, [bool] $ResetAfterAnswer)
+    param($Listener, $ResponseBytes, [int] $ConnectionCount, [int] $DelayMilliseconds, [bool] $ResetConnections, [int] $EarlyResponseBodyBytes, $TlsCertificate, [int] $HoldOpen, [bool] $CloseNotify, [int] $AnswerHeld, [bool] $ResetAfterAnswer, [bool] $HalfClose)
 
     Set-StrictMode -Version Latest
     $ErrorActionPreference = 'Stop'
@@ -846,6 +852,7 @@ $serveConnections = {
                     $received.Write($buffer, 0, $count)
                 }
             }
+            if ($HalfClose) { $client.Client.Shutdown([System.Net.Sockets.SocketShutdown]::Send) }  # FIN, then keep reading (BL-2018).
             if ($HoldOpen -gt 0) {
                 # Held open: wait for curl to hang up, recording what it still sends and
                 # answering up to $AnswerHeld more requests with the responses after this one.
@@ -3106,7 +3113,7 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse)
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse).AddArgument([bool] $HalfCloseAfterResponse)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 

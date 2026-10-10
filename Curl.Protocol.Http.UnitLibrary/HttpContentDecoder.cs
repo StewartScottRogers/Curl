@@ -50,8 +50,9 @@ internal sealed class HttpContentDecoder : IDisposable
     /// <summary>
     /// Gets or sets the most decoded bytes the output may be given, <c>--max-filesize</c>'s
     /// limit, or <see langword="null" /> for none. A body that decodes past it - a
-    /// decompression bomb - has as many decoded bytes written as the limit allows, then fails
-    /// with exit 63, as curl 8.21.0 does (upstream test1618, BL-1807).
+    /// decompression bomb - fails with exit 63 before the decoded piece that would cross the
+    /// limit is written, so none of that piece reaches the output, as curl 8.21.0 does
+    /// (upstream test1618, BL-2007).
     /// </summary>
     internal long? MaximumDeliveredSize { get; set; }
 
@@ -169,15 +170,13 @@ internal sealed class HttpContentDecoder : IDisposable
     private async ValueTask DeliverWithinLimitAsync(ReadOnlyMemory<byte> decoded, Stream output, CancellationToken cancellationToken)
     {
         long roomLeft = MaximumDeliveredSize is { } limit ? limit - BytesDelivered : long.MaxValue;
-        ReadOnlyMemory<byte> allowed = decoded.Length > roomLeft ? decoded[..(int)roomLeft] : decoded;
-        await output.WriteAsync(allowed, cancellationToken).ConfigureAwait(false);
-        BytesDelivered += allowed.Length;
-        if (allowed.Length < decoded.Length)
+        if (decoded.Length > roomLeft)
         {
-            throw new HttpTransferException(
-                CurlExitCode.FilesizeExceeded,
-                HttpTransferMessages.FileSizeLimitExceeded(MaximumDeliveredSize.GetValueOrDefault(), BytesDelivered));
+            throw new HttpTransferException(CurlExitCode.FilesizeExceeded, HttpTransferMessages.DecodedFileSizeLimitExceeded);
         }
+
+        await output.WriteAsync(decoded, cancellationToken).ConfigureAwait(false);
+        BytesDelivered += decoded.Length;
     }
 
     private static HttpContentCoding? CodingOf(string coding)

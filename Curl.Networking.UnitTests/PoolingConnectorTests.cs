@@ -210,6 +210,23 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ForANewConnectionThenAReuse_PassesTheConnectReplyHeadBytesOnOnlyOnce()
+    {
+        _inner.ProxyConnectHeaderBytes = 61;
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Assert("opened, reused proxy connect header bytes", (61L, 0L), (opened.ProxyConnectHeaderBytes, reused.ProxyConnectHeaderBytes));
+        Assert.AreEqual(61L, opened.ProxyConnectHeaderBytes);
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(0L, reused.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ReusingAForwardProxyConnection_ReportsItWithProxy()
     {
         await using var pool = CreatePool();
@@ -515,6 +532,61 @@ public sealed class PoolingConnectorTests
         Assert.IsFalse(fresh.IsReused);
         Assert.AreEqual(1L, fresh.ConnectionNumber);
         Assert.HasCount(2, _inner.Targets);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WhenAnIdleConnectionReportsItsPeerClosed_ReportsItDeadAndOpensANewOne()
+    {
+        // curl 8.21.0 asks Curl_conn_is_alive before reusing a kept connection: a server that
+        // answered and then half-closed is found dead without a byte read (BL-2018 Notes).
+        await using var pool = CreatePool();
+        var events = new RecordingTransferEvents();
+        await ReturnToPoolAsync(pool, Target());
+        _inner.Opened[0].HasPeerClosed = true;
+
+        var fresh = await pool.ConnectAsync(Target() with { Events = events }, CancellationToken.None);
+
+        Diagnostics.Arrange("pooled", "peer closed while idle");
+        Diagnostics.Act("info", string.Join(" | ", events.Info));
+        Diagnostics.Assert("fresh reused", false, fresh.IsReused);
+
+        CollectionAssert.AreEqual(new[] { "Connection 0 seems to be dead", "shutting down connection #0" }, events.Info);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsEmpty(_inner.Opened[0].Written);
+        Assert.IsFalse(fresh.IsReused);
+        Assert.AreEqual(1L, fresh.ConnectionNumber);
+    }
+
+    [TestMethod]
+    public async Task HasPeerClosed_OfALeaseWhoseConnectionReportsItsPeerClosed_IsTrue()
+    {
+        await using var pool = CreatePool();
+        var lease = await pool.ConnectAsync(Target(), CancellationToken.None);
+        var before = lease.Connection!.HasPeerClosed;
+        _inner.Opened[0].HasPeerClosed = true;
+
+        Diagnostics.Arrange("lease", "underlying connection open, then closed by its peer");
+        Diagnostics.Act("has peer closed", lease.Connection.HasPeerClosed);
+        Diagnostics.Assert("has peer closed", true, lease.Connection.HasPeerClosed);
+
+        Assert.IsFalse(before);
+        Assert.IsTrue(lease.Connection.HasPeerClosed);
+        await lease.Connection.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task HasPeerClosed_OfALeaseAfterAReadFoundTheServersClose_IsTrue()
+    {
+        await using var pool = CreatePool();
+        var lease = await pool.ConnectAsync(Target(), CancellationToken.None);
+        await lease.Connection!.ReadAsync(new byte[1], CancellationToken.None);
+
+        Diagnostics.Arrange("lease", "a read returned zero");
+        Diagnostics.Act("has peer closed", lease.Connection.HasPeerClosed);
+        Diagnostics.Assert("has peer closed", true, lease.Connection.HasPeerClosed);
+
+        Assert.IsTrue(lease.Connection.HasPeerClosed);
+        await lease.Connection.DisposeAsync();
     }
 
     [TestMethod]

@@ -6,7 +6,8 @@ namespace Curl.Authentication;
 /// Splits netrc text into tokens as curl 8.21.0 does, and enforces its limits: a line of
 /// 16383 bytes or more, or a token of 4096 bytes or more, is a syntax error, and so is a
 /// quoted token that never closes. Lines are checked only when the scanner reaches them, so
-/// text after the point where a lookup stops is never judged.
+/// text after the point where a lookup stops is never judged. A NUL byte ends its line: the
+/// scanner skips from it to the line feed, as curl reads each line as a C string.
 /// </summary>
 /// <param name="text">The netrc text.</param>
 internal sealed class NetrcTokenScanner(string text)
@@ -133,13 +134,16 @@ internal sealed class NetrcTokenScanner(string text)
 
     private string ReadUnquotedToken()
     {
+        // Peek may skip past a NUL byte, so the token ends where the last character read ends.
         int start = position;
+        int end = position;
         while (Peek() is not EndOfText && !IsWhitespace(Peek()))
         {
             position++;
+            end = position;
         }
 
-        return text[start..position];
+        return text[start..end];
     }
 
     private string? ReadQuotedToken()
@@ -188,7 +192,20 @@ internal sealed class NetrcTokenScanner(string text)
             return EndOfText;
         }
 
+        if (text[position] == '\0')
+        {
+            SkipToEndOfLine();
+            return Peek();
+        }
+
         return text[position];
+    }
+
+    // curl 8.21.0 reads each line as a C string, so a NUL byte ends it (upstream test793).
+    private void SkipToEndOfLine()
+    {
+        int lineFeed = text.IndexOf('\n', position);
+        position = lineFeed < 0 ? text.Length : lineFeed;
     }
 
     private bool CheckLineAtUncheckedStart()

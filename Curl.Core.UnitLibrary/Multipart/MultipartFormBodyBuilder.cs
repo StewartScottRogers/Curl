@@ -120,16 +120,97 @@ public sealed class MultipartFormBodyBuilder(
     /// <param name="cancellationToken">Cancels the file opens.</param>
     /// <returns>The body or the failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives them.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="parts" /> is <see langword="null" />.</exception>
+    public ValueTask<MultipartFormBuildResult> BuildAsync(
+        IReadOnlyList<MultipartFormPart> parts,
+        MultipartNameEscaping nameEscaping,
+        CancellationToken cancellationToken) =>
+        BuildAsync(parts, nameEscaping, null, cancellationToken);
+
+    /// <summary>
+    /// Builds the body for <paramref name="parts" /> as the overload without
+    /// <paramref name="requestContentType" /> does, except that the parts' disposition follows
+    /// the request's <c>Content-Type</c> as libcurl 8.21.0's <c>Curl_mime_prepare_headers</c>
+    /// chooses it: <c>form-data</c> when <paramref name="requestContentType" /> is
+    /// <see langword="null" /> or <c>multipart/form-data</c>, otherwise each named part falls back
+    /// to <c>attachment</c> (upstream test 277, BL-1972).
+    /// </summary>
+    /// <param name="parts">The form's parts, in the order given on the command line.</param>
+    /// <param name="nameEscaping">How names and file names are escaped in <c>Content-Disposition</c>.</param>
+    /// <param name="requestContentType">
+    /// The value of the first <c>-H</c> header naming <c>Content-Type</c>, empty for
+    /// <c>-H "Content-Type:"</c>; <see langword="null" /> when no <c>-H</c> header names it.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the file opens.</param>
+    /// <returns>The body or the failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives them.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="parts" /> is <see langword="null" />.</exception>
     public async ValueTask<MultipartFormBuildResult> BuildAsync(
         IReadOnlyList<MultipartFormPart> parts,
         MultipartNameEscaping nameEscaping,
+        string? requestContentType,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parts);
 
+        string? disposition = requestContentType is null || MultipartPartHeaders.IsContentType(requestContentType, "multipart/form-data")
+            ? FormDataDisposition
+            : null;
+        return await BuildBodyAsync(parts, "multipart/form-data", null, disposition, nameEscaping, false, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds the MIME mail message curl 8.21.0 sends for <c>-F</c> parts to an <c>smtp://</c> or
+    /// <c>imap://</c> URL, as libcurl's <c>MIMESTRATEGY_MAIL</c> lays it out (measured, BL-1988):
+    /// <c>Content-Type: multipart/mixed; boundary=&lt;boundary&gt;</c>, <c>Mime-Version: 1.0</c>
+    /// and <paramref name="messageHeaders" /> head the message, a part falls back to
+    /// <c>attachment</c> only for a name or a file name, a default <c>text/plain</c> goes
+    /// unlabelled, a labelled part without an encoder is <c>Content-Transfer-Encoding: 8bit</c>,
+    /// and a <c>7bit</c> file is never read ahead, so a byte above 127 fails the read that
+    /// reaches it while the message is sent, as curl meets it after <c>DATA</c>.
+    /// </summary>
+    /// <param name="parts">The message's parts, in the order given on the command line.</param>
+    /// <param name="nameEscaping">How names and file names are escaped in <c>Content-Disposition</c>.</param>
+    /// <param name="messageHeaders">The <c>-H</c> headers, each sent as given, after <c>Mime-Version</c>.</param>
+    /// <param name="cancellationToken">Cancels the file opens.</param>
+    /// <returns>
+    /// The message, its headers included, with the outermost multipart's content type; or the
+    /// failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives it.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="parts" /> or <paramref name="messageHeaders" /> is <see langword="null" />.</exception>
+    public ValueTask<MultipartFormBuildResult> BuildMailMessageAsync(
+        IReadOnlyList<MultipartFormPart> parts,
+        MultipartNameEscaping nameEscaping,
+        IReadOnlyList<string> messageHeaders,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parts);
+        ArgumentNullException.ThrowIfNull(messageHeaders);
+        return BuildBodyAsync(parts, "multipart/mixed", messageHeaders, null, nameEscaping, true, cancellationToken);
+    }
+
+    /// <summary>
+    /// Builds the multipart body of <paramref name="parts" /> as <paramref name="contentType" />,
+    /// preceded, for a mail message, by its message headers.
+    /// </summary>
+    private async ValueTask<MultipartFormBuildResult> BuildBodyAsync(
+        IReadOnlyList<MultipartFormPart> parts,
+        string contentType,
+        IReadOnlyList<string>? messageHeaders,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        CancellationToken cancellationToken)
+    {
         using MultipartBodySegments segments = new(textEncoding);
         string boundary = createBoundary();
-        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, FormDataDisposition, nameEscaping, cancellationToken)
+        string labelledContentType = $"{contentType}; boundary={boundary}";
+        if (messageHeaders is not null)
+        {
+            segments.AddText($"Content-Type: {labelledContentType}\r\nMime-Version: 1.0\r\n"
+                + string.Concat(messageHeaders.Select(header => header + "\r\n")) + "\r\n");
+        }
+
+        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, disposition, nameEscaping, forMail, cancellationToken)
             .ConfigureAwait(false);
         if (failure is not null)
         {
@@ -142,7 +223,7 @@ public sealed class MultipartFormBodyBuilder(
         }
 
         Stream content = segments.ToStream();
-        StreamBody body = new(content, segments.Length, $"multipart/form-data; boundary={boundary}");
+        StreamBody body = new(content, segments.Length, labelledContentType);
         return new MultipartFormBuildResult(body, null);
     }
 
@@ -152,13 +233,14 @@ public sealed class MultipartFormBodyBuilder(
         string boundary,
         string? disposition,
         MultipartNameEscaping nameEscaping,
+        bool forMail,
         CancellationToken cancellationToken)
     {
         string lineBefore = string.Empty;
         foreach (MultipartFormPart part in parts)
         {
             segments.AddText($"{lineBefore}--{boundary}\r\n");
-            TransferResult? failure = await AddPartAsync(segments, part, disposition, nameEscaping, cancellationToken).ConfigureAwait(false);
+            TransferResult? failure = await AddPartAsync(segments, part, disposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
             if (failure is not null)
             {
                 return failure;
@@ -176,14 +258,15 @@ public sealed class MultipartFormBodyBuilder(
         MultipartFormPart part,
         string? disposition,
         MultipartNameEscaping nameEscaping,
+        bool forMail,
         CancellationToken cancellationToken)
     {
         if (part.Kind == MultipartFormPartKind.Multipart)
         {
             string boundary = createBoundary();
-            segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, null, nameEscaping, out string? contentType));
+            segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, null, nameEscaping, forMail, out string? contentType));
             string? partsDisposition = MultipartPartHeaders.IsContentType(contentType, "multipart/form-data") ? FormDataDisposition : null;
-            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, cancellationToken).ConfigureAwait(false);
+            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
         }
 
         if (!TryFindEncoder(part.Encoder, out MultipartPartEncoder? encoder))
@@ -193,11 +276,11 @@ public sealed class MultipartFormBodyBuilder(
 
         if (part.Kind == MultipartFormPartKind.Text)
         {
-            AddTextPart(segments, part, disposition, nameEscaping, encoder);
+            AddTextPart(segments, part, disposition, nameEscaping, forMail, encoder);
             return null;
         }
 
-        return await AddFilePartAsync(segments, part, disposition, nameEscaping, encoder, cancellationToken).ConfigureAwait(false);
+        return await AddFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Finds the encoder <paramref name="name" /> names; no name finds no encoder, which is not a failure.</summary>
@@ -213,17 +296,19 @@ public sealed class MultipartFormBodyBuilder(
         MultipartFormPart part,
         string? disposition,
         MultipartNameEscaping nameEscaping,
+        bool forMail,
         MultipartPartEncoder? encoder,
         CancellationToken cancellationToken) =>
         part.ReadsStandardInput && standardInput is not null
-            ? AddStandardInputPartAsync(segments, part, disposition, nameEscaping, encoder, standardInput, cancellationToken)
-            : AddOpenedFilePartAsync(segments, part, disposition, nameEscaping, encoder, cancellationToken);
+            ? AddStandardInputPartAsync(segments, part, disposition, nameEscaping, forMail, encoder, standardInput, cancellationToken)
+            : AddOpenedFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken);
 
     private async ValueTask<TransferResult?> AddOpenedFilePartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
         MultipartNameEscaping nameEscaping,
+        bool forMail,
         MultipartPartEncoder? encoder,
         CancellationToken cancellationToken)
     {
@@ -235,9 +320,9 @@ public sealed class MultipartFormBodyBuilder(
         }
 
         Stream content = opened.Content!;
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, out _));
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
         long? length = content.CanSeek ? seekableFileLength(part.Content, opened.Length) : unseekableFileLength(part.Content);
-        return await AddFileDataAsync(segments, content, length, encoder, cancellationToken)
+        return await AddFileDataAsync(segments, content, length, encoder, forMail, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -251,6 +336,7 @@ public sealed class MultipartFormBodyBuilder(
         Stream content,
         long? length,
         MultipartPartEncoder? encoder,
+        bool forMail,
         CancellationToken cancellationToken)
     {
         if (encoder is null || encoder.PassesDataThrough)
@@ -259,7 +345,7 @@ public sealed class MultipartFormBodyBuilder(
             return ValueTask.FromResult<TransferResult?>(null);
         }
 
-        if (encoder.CanRefuseData && content.CanSeek)
+        if (encoder.CanRefuseData && content.CanSeek && !forMail)
         {
             return AddCheckedFileAsync(segments, content, length, encoder, cancellationToken);
         }
@@ -306,6 +392,7 @@ public sealed class MultipartFormBodyBuilder(
         MultipartFormPart part,
         string? disposition,
         MultipartNameEscaping nameEscaping,
+        bool forMail,
         MultipartPartEncoder? encoder,
         Stream input,
         CancellationToken cancellationToken)
@@ -320,14 +407,14 @@ public sealed class MultipartFormBodyBuilder(
             return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
         }
 
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, out _));
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
         AddData(segments, copy.ToArray(), encoder);
         return null;
     }
 
-    private void AddTextPart(MultipartBodySegments segments, MultipartFormPart part, string? disposition, MultipartNameEscaping nameEscaping, MultipartPartEncoder? encoder)
+    private void AddTextPart(MultipartBodySegments segments, MultipartFormPart part, string? disposition, MultipartNameEscaping nameEscaping, bool forMail, MultipartPartEncoder? encoder)
     {
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, out _));
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
         if (encoder is null)
         {
             segments.AddText(part.Content);

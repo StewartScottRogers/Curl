@@ -380,7 +380,8 @@ public interface ITransferContext
     /// not given.
     /// </summary>
     /// <remarks>
-    /// It applies to uploads only; a download ignores it. <c>file://</c> reads it, and
+    /// It applies to uploads only; a download ignores it. <c>file://</c>, <c>ftp://</c> and
+    /// <c>smtp://</c> (before dot-stuffing, BL-1994) read it, and
     /// measured on curl 8.21.0 the conversion inserts a carriage return before a line feed
     /// only when the byte before that line feed is not already one, so <c>a\r\nb</c> is
     /// sent unchanged, a lone carriage return is left alone, and that state carries across
@@ -468,7 +469,8 @@ public interface ITransferContext
     /// <remarks>
     /// An HTTP handler treats <see langword="null" /> exactly as
     /// <c>new HttpRequestOptions()</c>, every member at its default; every other handler
-    /// ignores it (ADR-0014).
+    /// ignores it (ADR-0014), but for the FTP handler, which reads
+    /// <see cref="HttpRequestOptions.IgnoreContentLength" /> to skip <c>SIZE</c> (BL-1982).
     /// </remarks>
     HttpRequestOptions? Http { get; }
 

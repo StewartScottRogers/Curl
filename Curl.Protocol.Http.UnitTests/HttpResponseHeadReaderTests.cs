@@ -391,6 +391,7 @@ public sealed class HttpResponseHeadReaderTests
         Diagnostics.Act("thrown", $"{thrown.GetType().Name}, exit code {thrown.ExitCode}, message '{thrown.Message}'");
         Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, thrown.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, thrown.ExitCode);
+        Assert.AreEqual("Weird server reply", thrown.Message);
     }
 
     [TestMethod]

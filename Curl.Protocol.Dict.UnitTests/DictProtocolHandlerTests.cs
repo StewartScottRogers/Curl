@@ -350,11 +350,11 @@ public sealed class DictProtocolHandlerTests
     }
 
     [TestMethod]
-    [DataRow("/d:a\\b", "DEFINE ! a/b")]
+    [DataRow("/d:a\\b", "DEFINE ! a\\\\b")]
     [DataRow("/d:x/../y", "y")]
     [DataRow("/a/%2e%2e/d:x", "DEFINE ! x")]
     [DataRow("/d:x/./y", "DEFINE ! x/y")]
-    public async Task ExecuteAsync_BackslashOrDotSegments_AreNormalisedAsCurlDoes(string path, string command)
+    public async Task ExecuteAsync_BackslashOrDotSegments_AreSentAsCurlSendsThem(string path, string command)
     {
         string expected = Client + command + "\r\n" + Quit;
         Assert.AreEqual(expected, await SentForAsync(path, expected));

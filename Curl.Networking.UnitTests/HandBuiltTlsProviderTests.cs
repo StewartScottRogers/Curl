@@ -191,6 +191,7 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsTrue(connection.IsSecure);
         Assert.AreSame(ServerEndPoint, connection.RemoteEndPoint);
         Assert.AreSame(localEndPoint, connection.LocalEndPoint);
+        Assert.IsFalse(connection.HasPeerClosed);
         Diagnostics.Assert("peer certificate length", s_serverCertificate.RawData.Length, result.PeerCertificates.Single().Length);
         CollectionAssert.AreEqual(s_serverCertificate.RawData, result.PeerCertificates.Single().ToArray());
         Assert.IsNotNull(result.Timings);

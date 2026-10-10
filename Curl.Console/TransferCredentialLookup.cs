@@ -32,7 +32,8 @@ namespace Curl.Console;
 /// entry's login, else the URL's user name, else an empty one, is sent with the entry's
 /// password, else the URL's, else an empty one: the entry's password beats the URL's. With no
 /// entry, or no usable file under <c>--netrc-optional</c>, the URL's user name and password are
-/// sent when it has a user name.
+/// sent when it has a user name. Under <c>--netrc-optional</c> a URL with a password is not looked
+/// up at all: its own credentials are sent as with no netrc option (upstream test381, BL-1986).
 /// </para>
 /// <para>
 /// When the netrc file is in use, the lookup is made again for every redirect hop's URL
@@ -108,7 +109,7 @@ internal sealed class TransferCredentialLookup(
             return failure is null;
         }
 
-        if (options.NetrcUse == NetrcUse.Ignored)
+        if (options.NetrcUse == NetrcUse.Ignored || UrlPasswordWinsOverOptionalNetrc(options, url))
         {
             credentials = CredentialsWrittenInUrl(url);
             return true;
@@ -181,6 +182,18 @@ internal sealed class TransferCredentialLookup(
     /// <returns>The line, without its <c>* </c> prefix.</returns>
     internal static string HostNotFoundLine(string host, string? netrcFile) =>
         $"Could not find host {host} in the {netrcFile ?? ".netrc"} file; using defaults";
+
+    /// <summary>
+    /// Whether the URL's own credentials are sent without looking in the netrc file: under
+    /// <c>--netrc-optional</c> a URL with a password keeps it, and curl 8.21.0's
+    /// <c>override_login</c> reads no netrc file at all (upstream test381, BL-1986). Under <c>-n</c>
+    /// or <c>--netrc-file</c> curl drops the URL's password first, so the file is read.
+    /// </summary>
+    /// <param name="options">The option group of the transfer.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns><see langword="true" /> under <c>--netrc-optional</c> with a URL password.</returns>
+    private static bool UrlPasswordWinsOverOptionalNetrc(CommandLineOptions options, CurlUrl url) =>
+        options.NetrcUse == NetrcUse.Optional && DecodedUserInformation(url.Password) is not null;
 
     /// <summary>Whether <c>-u</c> gives a user name, which wins over the URL's and the netrc file's credentials.</summary>
     /// <param name="options">The option group of the transfer.</param>

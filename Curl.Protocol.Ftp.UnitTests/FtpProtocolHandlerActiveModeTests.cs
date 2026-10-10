@@ -109,7 +109,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -P - --disable-eprt ftp://127.0.0.1:18437/
-        ActiveRun run = await RunAsync(diagnostics, 
+        ActiveRun run = await RunAsync(diagnostics,
             "/",
             "-",
             LoggedIn + PortOk + TypeSet + Opened + Complete + Bye,
@@ -211,7 +211,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         // and --disable-eprt cannot skip EPRT for it. curl 8.21.0 sends nothing more and waits
         // until the server hangs up; this ends at once instead (ADR-0102's BL-437 addendum).
         var pending = Pending(62572, "::1");
-        ActiveRun run = await RunAsync(diagnostics, 
+        ActiveRun run = await RunAsync(diagnostics,
             "/a.txt",
             "[::1]",
             LoggedIn + Refused + Bye,
@@ -233,7 +233,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // A dual-mode socket reports ::ffff:127.0.0.1; curl announces 127.0.0.1.
-        ActiveRun run = await RunAsync(diagnostics, 
+        ActiveRun run = await RunAsync(diagnostics,
             "/a.txt",
             "-",
             LoggedIn + EprtOk + Retrieved,
@@ -499,7 +499,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         // 60 seconds later, whatever --connect-timeout says, exit 12 after QUIT.
         var clock = new ImmediateTimerTimeProvider();
         var pending = new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 52272), null);
-        ActiveRun run = await RunAsync(diagnostics, 
+        ActiveRun run = await RunAsync(diagnostics,
             "/a.txt",
             "-",
             LoggedIn + EprtOk + TypeSet + Sized + "150 Opening\r\n" + Bye,
@@ -514,6 +514,33 @@ public sealed class FtpProtocolHandlerActiveModeTests
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.FtpAcceptTimeout, "Accept timeout occurred while waiting server connect"),
             run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("425 Can't open data connection")]
+    [DataRow("421 Connection timed out")]
+    [DataRow("550 No data connection")]
+    public async Task ExecuteAsync_NegativeReplyBehindThe150_QuitsWithExit10WithoutWaiting(string refusal)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream tests 1206 and 1207 (NODATACONN425 and NODATACONN421): the server answers RETR
+        // with 150 and at once a refusal, and never connects; curl 8.21.0 sends QUIT and ends with exit 10.
+        var clock = new ImmediateTimerTimeProvider();
+        var pending = new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 52273), null);
+        ActiveRun run = await RunAsync(diagnostics,
+            "/a.txt",
+            "-",
+            LoggedIn + EprtOk + TypeSet + Sized + "150 Opening\r\n" + refusal + "\r\n" + Bye,
+            context => context.TimeProvider = clock,
+            pending);
+
+        var expectedSent = LogInSent + "EPRT |1|127.0.0.1|52273|\r\n" + RetrieveSent;
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.IsFalse(clock.Waits.Contains(TimeSpan.FromSeconds(60)));
+        var expectedResult = TransferResult.Failure(CurlExitCode.FtpAcceptFailed, "FTP: The server failed to connect to data port");
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
     }
 
     [TestMethod]
@@ -561,7 +588,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         // curl -P - -T global.json ftp://127.0.0.1:18437/u.txt
         var data = new ScriptedConnection();
         var pending = new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 56726), ConnectResult.Connected(data));
-        ActiveRun run = await RunAsync(diagnostics, 
+        ActiveRun run = await RunAsync(diagnostics,
             "/u.txt",
             "-",
             LoggedIn + EprtOk + TypeSet + Opened + Complete + Bye,
@@ -583,7 +610,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         var diagnostics = TestDiagnostics.For(TestContext);
         var clock = new ImmediateTimerTimeProvider();
         var pending = new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 56726), null);
-        ActiveRun run = await RunAsync(diagnostics, 
+        ActiveRun run = await RunAsync(diagnostics,
             "/u.txt",
             "-",
             LoggedIn + EprtOk + TypeSet + Opened + Bye,

@@ -18,6 +18,24 @@ internal static class MailRequestOptionsMapping
     };
 
     /// <summary>
+    /// The schemes whose <c>-F</c> parts are sent as a MIME mail message, the upload, rather
+    /// than as a form, matched without case (BL-1988).
+    /// </summary>
+    private static readonly HashSet<string> MimeMessageSchemes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "smtp", "smtps", "imap", "imaps",
+    };
+
+    /// <summary>
+    /// Tells whether <c>-F</c> parts to a URL of <paramref name="scheme" /> are a MIME mail
+    /// message to upload, as curl 8.21.0 sends them to <c>smtp</c>, <c>smtps</c>, <c>imap</c>
+    /// and <c>imaps</c> (BL-1988).
+    /// </summary>
+    /// <param name="scheme">The transfer URL's scheme.</param>
+    /// <returns><see langword="true" /> for those four schemes, without case.</returns>
+    internal static bool SendsFormAsMimeMessage(string scheme) => MimeMessageSchemes.Contains(scheme);
+
+    /// <summary>
     /// Each <c>--upload-flags</c> flag and the name it is sent under, in the fixed order curl
     /// 8.21.0 sends them whatever order they were given in (BL-535 Notes).
     /// </summary>

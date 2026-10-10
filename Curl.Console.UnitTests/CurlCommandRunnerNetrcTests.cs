@@ -363,6 +363,20 @@ public sealed class CurlCommandRunnerNetrcTests
     }
 
     [TestMethod]
+    public async Task RunAsync_OptionalNetrcWithUrlPassword_SendsTheUrlCredentialsAndReadsNoFile()
+    {
+        // Upstream test381: --netrc-optional with ftp://mary:drfrank@ sends PASS drfrank, not the
+        // matching entry's password; curl 8.21.0 does not look in the file (BL-1986).
+        dataFiles.Files["home/.netrc"] = Encoding.UTF8.GetBytes(TwoEntries);
+
+        await RunAsync(["-s", "-S", "--netrc-optional", "http://b:x@127.0.0.1:18505/"]);
+
+        Diagnostics.Assert("paths read", string.Empty, Joined(dataFiles.PathsRead));
+        AssertSent("b", "x");
+        Assert.IsEmpty(dataFiles.PathsRead);
+    }
+
+    [TestMethod]
     [DataRow("--netrc-file", ".")]
     [DataRow("--netrc-optional", "--netrc-file", ".")]
     public async Task RunAsync_NetrcFile_IsReadInsteadOfTheHomeDirectory(params string[] options)

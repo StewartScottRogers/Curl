@@ -199,11 +199,18 @@ internal sealed class SmtpSession(
 
     /// <summary>
     /// Sends <c>STARTTLS</c> and upgrades on its 220; any other answer carries on in
-    /// plaintext under <c>--ssl</c> and is exit 64 under <c>--ssl-reqd</c>.
+    /// plaintext under <c>--ssl</c> and is exit 64 under <c>--ssl-reqd</c>. A reply with more
+    /// bytes pipelined behind it is exit 8 whatever its code, and nothing more is sent, as
+    /// curl 8.21.0 forbids pipelining there (upstream test980, BL-1985).
     /// </summary>
     private async ValueTask<TransferResult?> StartTlsAsync()
     {
         SmtpReply startTls = await ExchangeAsync(StartTlsKeyword, StartTlsKeyword).ConfigureAwait(false);
+        if (channel.HasBufferedBytes)
+        {
+            return TransferResult.Failure(CurlExitCode.WeirdServerReply, SmtpSessionMessages.WeirdServerReply);
+        }
+
         if (startTls.Code == StartTlsAccepted)
         {
             return await UpgradeAsync().ConfigureAwait(false);

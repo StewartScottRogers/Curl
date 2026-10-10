@@ -207,7 +207,11 @@ public sealed class SmtpProtocolHandlerSessionTests
     public async Task ExecuteAsync_StartTlsRefusedUnderSsl_CarriesOnInPlaintext()
     {
         // --ssl, STARTTLS=454 not now: no second EHLO, the upload in plaintext, exit 0.
-        SmtpRun run = await RunAsync(Url, Greeting + EhloReply + "454 not now\r\n" + HelpReplyAndBye, Try);
+        // The server answers HELP only once it is sent, so nothing is pipelined behind 454.
+        var connection = new ScriptedConnection(
+            Encoding.Latin1.GetBytes(Greeting + EhloReply + "454 not now\r\n"),
+            Encoding.Latin1.GetBytes(HelpReplyAndBye));
+        SmtpRun run = await RunAsync(Url, connection, Try);
 
         Diagnostics.Diff("sent", Ehlo + "STARTTLS\r\n" + HelpAndQuit, run.Sent);
         Diagnostics.AssertValues("handshake count", 0, run.Tls.Handshakes.Count);
@@ -215,6 +219,21 @@ public sealed class SmtpProtocolHandlerSessionTests
         Assert.AreEqual(Ehlo + "STARTTLS\r\n" + HelpAndQuit, run.Sent);
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("454 not now", TransportSecurityLevel.Try, DisplayName = "--ssl, STARTTLS=454 with HELP's reply pipelined")]
+    [DataRow("220 go ahead", TransportSecurityLevel.Required, DisplayName = "--ssl-reqd, STARTTLS=220 with HELP's reply pipelined")]
+    public async Task ExecuteAsync_StartTlsReplyWithMoreRepliesPipelined_FailsWithExit8SendingNothingMore(string startTlsReply, TransportSecurityLevel sslLevel)
+    {
+        // Upstream test980: a reply pipelined behind STARTTLS's is exit 8, with no handshake and no QUIT.
+        SmtpRun run = await RunAsync(Url, Greeting + EhloReply + startTlsReply + "\r\n" + HelpReplyAndBye, sslLevel);
+
+        Diagnostics.Diff("sent", Ehlo + "STARTTLS\r\n", run.Sent);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
+        Assert.AreEqual(Ehlo + "STARTTLS\r\n", run.Sent);
+        Assert.IsEmpty(run.Tls.Handshakes);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
     }
 
     [TestMethod]

@@ -14,8 +14,11 @@ public sealed class TranscriptTransferEvents : ITransferEvents
     /// <summary>Gets every recorded event, in the order reported.</summary>
     public List<string> Transcript { get; } = [];
 
+    /// <summary>Gets or sets what runs after each event is recorded, or <see langword="null" /> for nothing.</summary>
+    public Action? Recorded { get; set; }
+
     /// <inheritdoc />
-    public void ReportInfo(string text) => Transcript.Add("* " + text);
+    public void ReportInfo(string text) => Record("* " + text);
 
     /// <inheritdoc />
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
@@ -38,14 +41,20 @@ public sealed class TranscriptTransferEvents : ITransferEvents
     }
 
     /// <inheritdoc />
-    public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Transcript.Add("> " + Encoding.Latin1.GetString(bytes));
+    public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => Record("> " + Encoding.Latin1.GetString(bytes));
 
     /// <inheritdoc />
-    public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => Transcript.Add("< " + Encoding.Latin1.GetString(bytes));
+    public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => Record("< " + Encoding.Latin1.GetString(bytes));
 
     /// <inheritdoc />
-    public void ReportDataSent(ReadOnlySpan<byte> bytes) => Transcript.Add("=> " + Encoding.Latin1.GetString(bytes));
+    public void ReportDataSent(ReadOnlySpan<byte> bytes) => Record("=> " + Encoding.Latin1.GetString(bytes));
 
     /// <inheritdoc />
-    public void ReportDataReceived(ReadOnlySpan<byte> bytes) => Transcript.Add("<= " + Encoding.Latin1.GetString(bytes));
+    public void ReportDataReceived(ReadOnlySpan<byte> bytes) => Record("<= " + Encoding.Latin1.GetString(bytes));
+
+    private void Record(string line)
+    {
+        Transcript.Add(line);
+        Recorded?.Invoke();
+    }
 }

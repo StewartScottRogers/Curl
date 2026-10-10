@@ -69,7 +69,9 @@ internal sealed class ImapSession(
     ISaslAuthenticator? saslAuthenticator,
     ITransferContext context,
     bool implicitTls,
-    ConnectionOpenedEvent? opened) : IAsyncDisposable
+    ConnectionOpenedEvent? opened,
+    ImapKeptConnection kept,
+    bool resumesKept = false) : IAsyncDisposable
 {
     private const string CapabilityCommand = "CAPABILITY";
 
@@ -89,6 +91,15 @@ internal sealed class ImapSession(
     private bool preauthenticated;
 
     private IConnection? securedConnection;
+
+    /// <summary>The connection the session started on, which only it can be kept as (BL-1987).</summary>
+    private readonly IConnection originalConnection = channel.Connection;
+
+    /// <summary>The mailbox selected on the connection, as curl's <c>imapc->mailbox</c> remembers it.</summary>
+    private string? selectedMailbox = resumesKept ? kept.SelectedMailbox : null;
+
+    /// <summary>The UIDVALIDITY the selecting <c>SELECT</c> reported, as curl's <c>mb_uidvalidity</c>.</summary>
+    private uint? selectedUidValidity = resumesKept ? kept.SelectedUidValidity : null;
 
     /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> for none (0 is none).</summary>
     private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
@@ -114,7 +125,7 @@ internal sealed class ImapSession(
 
         try
         {
-            if ((await OpenAsync().ConfigureAwait(false) ?? await LoginAsync(loginOptions).ConfigureAwait(false)) is { } failure)
+            if (await OpenOrResumeAsync(loginOptions).ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
@@ -282,6 +293,21 @@ internal sealed class ImapSession(
         return digitsEnd < line.Length && line[digitsEnd] == ' ' ? digitsEnd + 1 : -1;
     }
 
+    /// <summary>
+    /// Opens and logs in on a new connection; on one a previous URL left intact, carries on
+    /// logged in, sending no <c>LOGOUT</c> at exit unless this transfer leaves it intact too.
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenOrResumeAsync(ImapLoginOptions loginOptions)
+    {
+        if (resumesKept)
+        {
+            kept.LogsOutOnShutDown = false;
+            return null;
+        }
+
+        return await OpenAsync().ConfigureAwait(false) ?? await LoginAsync(loginOptions).ConfigureAwait(false);
+    }
+
     private async ValueTask<TransferResult?> OpenAsync()
     {
         ImapResponse greeting = await channel.ReadResponseAsync(NoUntagged).ConfigureAwait(false)
@@ -447,7 +473,7 @@ internal sealed class ImapSession(
             }
         }
 
-        await LogoutAsync().ConfigureAwait(false);
+        await LogoutOrKeepAsync(result.ExitCode == CurlExitCode.Ok).ConfigureAwait(false);
         return result;
     }
 
@@ -461,7 +487,9 @@ internal sealed class ImapSession(
         string? query = SearchQueryOf(path);
         if (path.Mailbox is { } mailbox && AsksForASelectedMailbox(path, customCommand, query))
         {
-            return SelectAsync(mailbox, path, customCommand, query);
+            return IsSelected(mailbox, path)
+                ? AfterSelectAsync(path, customCommand, query)
+                : SelectAsync(mailbox, path, customCommand, query);
         }
 
         return customCommand is null
@@ -525,6 +553,8 @@ internal sealed class ImapSession(
     /// </summary>
     private async ValueTask<TransferResult> SelectAsync(string mailbox, ImapUrlPath path, string? customCommand, string? query)
     {
+        selectedMailbox = null;
+        selectedUidValidity = null;
         ImapResponse selected = await ExchangeAsync("SELECT " + ImapQuoting.AtomOrQuoted(mailbox), AnyUntagged).ConfigureAwait(false);
         if (selected.Status != ImapResponseStatus.Ok)
         {
@@ -536,8 +566,22 @@ internal sealed class ImapSession(
             return await LogoutAndFailAsync(CurlExitCode.RemoteFileNotFound, ImapSessionMessages.UidValidityChanged).ConfigureAwait(false);
         }
 
+        selectedMailbox = mailbox;
+        selectedUidValidity = UidValidityOf(selected.Untagged);
         return await AfterSelectAsync(path, customCommand, query).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Whether <paramref name="mailbox" /> is already selected on the connection, as curl's
+    /// <c>imap_perform</c> judges it: the same name in any case, and the URL's UIDVALIDITY, when
+    /// it gives a number and the selection reported one, the same (upstream test 804).
+    /// </summary>
+    private bool IsSelected(string mailbox, ImapUrlPath path) =>
+        string.Equals(mailbox, selectedMailbox, StringComparison.OrdinalIgnoreCase)
+        && (selectedUidValidity is not { } actual
+            || path.UidValidity is not { } requested
+            || LeadingNumberOf(requested) is not { } expected
+            || actual == expected);
 
     /// <summary>
     /// Sends <paramref name="command" /> (a <c>LIST</c>, a <c>SEARCH</c> or the <c>-X</c>
@@ -665,7 +709,7 @@ internal sealed class ImapSession(
             return await LogoutAndFailAsync(CurlExitCode.WeirdServerReply, ImapSessionMessages.WeirdServerReply, size).ConfigureAwait(false);
         }
 
-        await LogoutAsync().ConfigureAwait(false);
+        await LogoutOrKeepAsync(keeps: true).ConfigureAwait(false);
         return TransferResult.Success(size);
     }
 
@@ -728,7 +772,7 @@ internal sealed class ImapSession(
 
     private async ValueTask<TransferResult> LogoutAndSucceedAsync(long bytesTransferred)
     {
-        await LogoutAsync().ConfigureAwait(false);
+        await LogoutOrKeepAsync(keeps: true).ConfigureAwait(false);
         return TransferResult.Success(bytesTransferred);
     }
 
@@ -783,6 +827,26 @@ internal sealed class ImapSession(
     {
         await LogoutAsync().ConfigureAwait(false);
         return TransferResult.Failure(exitCode, message, bytesTransferred);
+    }
+
+    /// <summary>
+    /// Hands the connection back to the run's connection cache for the next URL when
+    /// <paramref name="keeps" /> is set, with the commands sent and the mailbox selected, instead
+    /// of sending <c>LOGOUT</c>, as curl 8.21.0 keeps a connection its <c>imap_done</c> leaves
+    /// valid (BL-1987); otherwise, or when the connection cannot be kept, sends <c>LOGOUT</c>.
+    /// Only a pooled connection the session still talks on, not one <c>STARTTLS</c> replaced,
+    /// can be kept.
+    /// </summary>
+    private async ValueTask LogoutOrKeepAsync(bool keeps)
+    {
+        if (keeps && securedConnection is null && originalConnection.TryHoldSession(kept))
+        {
+            kept.Remember(channel.CommandsSent, selectedMailbox, selectedUidValidity);
+            originalConnection.MarkReusable();
+            return;
+        }
+
+        await LogoutAsync().ConfigureAwait(false);
     }
 
     private async ValueTask LogoutAsync()

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Curl.Cli;
 using Curl.Conformance.SshServer;
 using Curl.Console;
 using Curl.Networking;
@@ -360,6 +361,7 @@ public sealed class UpstreamConformanceTests
 
     // Curl as the command composes it, every TCP dial reaching the case's in-memory servers through
     // InMemoryServerTcpDialer, so TcpConnector's proxy tunnel and PROXY-line code stays in the path (ADR-0460).
+    // The default config file is looked for only where the case's <setenv> points CURL_HOME, XDG_CONFIG_HOME or HOME (BL-1977).
     internal static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation) =>
         CurlComposition.CreateRunner(
             invocation.StandardOutput,
@@ -372,7 +374,8 @@ public sealed class UpstreamConformanceTests
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
             usesHandBuiltNtlm: true,
             readEnvironmentVariable: name => invocation.EnvironmentVariables.GetValueOrDefault(name),
-            ftpListener: invocation.ConnectionListener).RunAsync(invocation.Arguments);
+            ftpListener: invocation.ConnectionListener,
+            defaultConfigFileSearch: new DefaultConfigFileSearch(name => invocation.EnvironmentVariables.GetValueOrDefault(name), OperatingSystem.IsWindows(), executableDirectory: null, accountHomeDirectory: null)).RunAsync(invocation.Arguments);
 
     private static string GenerateCertificates()
     {

@@ -134,6 +134,22 @@ public sealed class ConnectResultTests
     }
 
     [TestMethod]
+    [DataRow(0L, DisplayName = "default")]
+    [DataRow(61L, DisplayName = "61 bytes")]
+    public void Connected_WithProxyConnectHeaderBytes_CarriesThemAndDefaultsToZero(long bytes)
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("proxy connect header bytes", bytes);
+
+        var result = bytes == 0
+            ? ConnectResult.Connected(new UnusedConnection())
+            : ConnectResult.Connected(new UnusedConnection(), null, proxyConnectHeaderBytes: bytes);
+
+        diagnostics.Assert("proxy connect header bytes", bytes, result.ProxyConnectHeaderBytes);
+        Assert.AreEqual(bytes, result.ProxyConnectHeaderBytes);
+    }
+
+    [TestMethod]
     public void Connected_WithTimingsOnly_CarriesThemAndDefaultsTheRest()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

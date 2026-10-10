@@ -49,6 +49,12 @@ internal static class HttpTransferMessages
     internal const string InvalidStatusLine = "Invalid status line";
 
     /// <summary>
+    /// The exit 8 message for an HTTP/0.9 answer to a HEAD (<c>-I</c>) request, upstream
+    /// test1144 (measured against curl 8.18.0 for BL-2005).
+    /// </summary>
+    internal const string WeirdServerReply = "Weird server reply";
+
+    /// <summary>
     /// The exit 8 message for a head line holding a NUL byte (curl 8.21.0, <c>lib/http.c</c>).
     /// </summary>
     internal const string NulByteInHeader = "Nul byte in header";
@@ -373,6 +379,13 @@ internal static class HttpTransferMessages
     /// </returns>
     internal static string FileSizeLimitExceeded(long maxFileSize, long received) =>
         string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {received} bytes");
+
+    /// <summary>
+    /// The exit 63 message for a <c>--compressed</c> body whose next decoded piece would take
+    /// the output past the <c>--max-filesize</c> limit, which curl 8.21.0 prints without
+    /// writing that piece (measured, BL-2007).
+    /// </summary>
+    internal const string DecodedFileSizeLimitExceeded = "Would have exceeded max file size";
 
     /// <summary>
     /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or

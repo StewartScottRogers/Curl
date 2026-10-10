@@ -105,6 +105,24 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToAForwardProxyWithAWildcardConnectToMapping_DialsTheProxyUnmapped()
+    {
+        // curl --connect-to ::www.example.com:8990 -x 127.0.0.1:8991 http://www.example.com:8990/ sends
+        // the GET to the proxy itself: --connect-to maps the origin, never the proxy (upstream test 2050)
+        var resolver = new FakeDnsResolver(Loopback);
+        var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
+        var connector = new TcpConnector(
+            resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(),
+            connectToMappings: new ConnectToMappings(["::www.example.com:8990"]));
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 8991, UseTls: false) { IsForwardProxy = true });
+
+        Diagnostics.Assert("dialed end points", "127.0.0.1:8991", string.Join(",", dialer.DialedEndPoints));
+        CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 8991) }, dialer.DialedEndPoints);
+        Assert.IsNull(result.MappedHost);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithoutAMatchingConnectToMapping_ReportsNoMappedDestination()
     {
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };

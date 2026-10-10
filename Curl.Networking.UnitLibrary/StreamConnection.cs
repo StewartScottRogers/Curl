@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
@@ -44,6 +45,17 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// after a request comes later, so it reports the RST as the reset it was.
     /// </remarks>
     internal bool ReportsAbortedReadAsReset { get; init; } = OperatingSystem.IsWindows();
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Asks the socket under a <see cref="NetworkStream" />: readable with nothing to read means
+    /// the peer's FIN, or a reset, has arrived. Any other stream has no socket to ask.
+    /// </remarks>
+    public bool HasPeerClosed => HasPeerClosedSocketUnder(_stream);
+
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private static bool HasPeerClosedSocketUnder(Stream stream) =>
+        stream is NetworkStream network && network.Socket.Poll(0, SelectMode.SelectRead) && network.Socket.Available == 0;
 
     /// <inheritdoc />
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)

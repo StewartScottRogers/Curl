@@ -21,6 +21,10 @@ namespace Curl.Protocol.Ftp;
 /// states before <c>DO</c> (BL-512); the caller owns it.
 /// </param>
 /// <param name="trace">Writes the <c>--trace-config ftp</c> lines as the session steps (BL-1162).</param>
+/// <param name="reused">
+/// The state a previous transfer left on the control connection the run's connection cache served
+/// again, or <see langword="null" /> for a new connection, which greets and logs in (BL-1981).
+/// </param>
 /// <remarks>
 /// <para>
 /// TLS (ADR-0102's BL-437 addendum): under <c>--ssl</c>, <c>--ftp-ssl-control</c> or
@@ -102,7 +106,7 @@ namespace Curl.Protocol.Ftp;
 /// ASCII mode and appending (BL-633): <c>-B</c> or a <c>;type=a</c> URL suffix
 /// (<see cref="FtpTypeCode" />) sends <c>TYPE A</c> instead of <c>TYPE I</c>, for a
 /// download, an upload and <c>-I</c> alike; an ASCII download sends no <c>SIZE</c> or
-/// <c>REST</c>. <c>;type=d</c> lists with <c>NLST</c> as <c>-l</c> does. A download's bytes
+/// <c>REST</c>, and a download under <c>--ignore-content-length</c> no <c>SIZE</c> (BL-1982). <c>;type=d</c> lists with <c>NLST</c> as <c>-l</c> does. A download's bytes
 /// pass unchanged either way. <c>-a</c> uploads with <c>APPE</c> instead of <c>STOR</c>, and
 /// <c>--crlf</c>, or ASCII mode off Windows (<see cref="FtpUploadLineEndings" />), converts
 /// each line feed of an upload not already after a carriage return into a carriage-return
@@ -132,7 +136,8 @@ internal sealed class FtpSession(
     ITransferContext context,
     bool implicitTls,
     FtpConnectPhaseLimit connectPhase,
-    FtpStateTrace trace)
+    FtpStateTrace trace,
+    FtpKeptConnection? reused = null)
     : IAsyncDisposable
 {
     private const string AnonymousUser = "anonymous";
@@ -174,8 +179,7 @@ internal sealed class FtpSession(
     /// The control connection's peer address, which <c>-v</c> names as where a passive data
     /// connection is dialled; the URL's host when it is unknown.
     /// </summary>
-    private readonly string controlPeerAddress =
-        Unmapped((control.Connection.RemoteEndPoint as IPEndPoint)?.Address)?.ToString() ?? context.Url.IdnHost;
+    private readonly string controlPeerAddress = PeerAddressOr(control.Connection.RemoteEndPoint, context.Url.IdnHost);
 
     /// <summary>
     /// Whether the control connection's peer is an IPv6 address (not an IPv4-mapped one),
@@ -225,7 +229,13 @@ internal sealed class FtpSession(
     private long? uploadSize;
 
     /// <summary>The <c>--max-filesize</c> limit, or <see langword="null" /> when there is none; 0 is none, as in curl.</summary>
-    private readonly long? maxFileSize = context.MaxFileSize > 0 ? context.MaxFileSize : null;
+    private readonly long? maxFileSize = MaxFileSizeOf(context);
+
+    /// <summary>
+    /// Whether <c>--ignore-content-length</c> was given: a download then sends no <c>SIZE</c>,
+    /// as curl 8.21.0's <c>ftp_state_type_resp</c> skips it for <c>data->set.ignorecl</c> (BL-1982).
+    /// </summary>
+    private readonly bool ignoresContentLength = IgnoresContentLength(context);
 
     /// <summary>
     /// The code of the last reply read before <c>QUIT</c>, <c>ABOR</c>'s included; 0 before
@@ -247,6 +257,18 @@ internal sealed class FtpSession(
     /// </summary>
     private DateTimeOffset? modifiedUtc;
 
+    /// <summary>The control connection the session was given, which only it can be kept as (BL-1981).</summary>
+    private readonly IConnection originalControl = control.Connection;
+
+    /// <summary>The last <c>TYPE</c> the server accepted on the control connection, <c>A</c> or <c>I</c>.</summary>
+    private char? transferType = TransferTypeOf(reused);
+
+    /// <summary>What curl's <c>prevpath</c> becomes once the transfer reports the directory it remembers.</summary>
+    private string? directoryToRemember;
+
+    /// <summary>The directory the transfer reported it remembers, or <see langword="null" /> when it reported none.</summary>
+    private string? rememberedPath;
+
     /// <summary>
     /// Holds the whole conversation. The data connection it opens stays open until the
     /// session is disposed.
@@ -263,7 +285,7 @@ internal sealed class FtpSession(
         TransferResult result;
         try
         {
-            result = await ConnectAsync().ConfigureAwait(false)
+            result = (reused is null ? await ConnectAsync().ConfigureAwait(false) : ResumeKeptConnection())
                 ?? await TransferPathAsync().ConfigureAwait(false);
         }
         catch (FtpControlConversationFailedException lost)
@@ -326,6 +348,61 @@ internal sealed class FtpSession(
         }
     }
 
+    /// <summary>
+    /// Carries on over a control connection a previous transfer left intact: no greeting,
+    /// login, <c>PBSZ</c>, <c>PROT</c> or <c>PWD</c>, as curl 8.21.0 skips its connect phase on
+    /// a reused connection, with the entry path and data protection it found (BL-1981).
+    /// </summary>
+    private TransferResult? ResumeKeptConnection()
+    {
+        reused!.QuitsOnShutDown = false;
+        entryPath = reused.EntryPath;
+        protectData = reused.ProtectsData;
+        control.ReadFirst(reused.UnreadBytes);
+        control.CancellationToken = context.CancellationToken;
+        return null;
+    }
+
+    /// <summary>
+    /// Changes to the directory <paramref name="path" /> names. On a new connection, each
+    /// <c>CWD</c> of the path. On a reused one, as curl 8.21.0's <c>ftp_state_cwd</c> does:
+    /// nothing when the connection is already there or the path is an absolute <c>nocwd</c> one,
+    /// otherwise <c>CWD</c> back to the entry path first, unless the path is absolute, then the
+    /// path's own; a refused <c>CWD</c> to the entry path is exit 9 too.
+    /// </summary>
+    private async ValueTask<TransferResult?> ChangeToPathDirectoryAsync(FtpUrlPath path)
+    {
+        if (reused is null)
+        {
+            return await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false);
+        }
+
+        if (path.IsAbsoluteWithoutCwd || path.IsReachedFrom(reused.PreviousPath))
+        {
+            return null;
+        }
+
+        return await ReturnToEntryPathAsync(path).ConfigureAwait(false)
+            ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>CWD</c> to the reused connection's entry path unless <paramref name="path" /> is
+    /// absolute; a refusal ends the session with exit 9.
+    /// </summary>
+    private async ValueTask<TransferResult?> ReturnToEntryPathAsync(FtpUrlPath path)
+    {
+        bool absolute = path.Directories.Count > 0 && path.Directories[0].StartsWith('/');
+        if (absolute || reused!.EntryPath is not { } entry)
+        {
+            return null;
+        }
+
+        return (await ExchangeAsync("CWD " + entry).ConfigureAwait(false)).IsCompletion
+            ? null
+            : await QuitAndFailLeavingConnectionIntactAsync(CurlExitCode.RemoteAccessDenied, FtpTransferMessages.ChangeDirectoryDenied).ConfigureAwait(false);
+    }
+
     private ValueTask<TransferResult?> ReadEntryPathAsync() => ReadEntryPathAsync(askSystemForRelativePath: true);
 
     /// <summary>
@@ -368,17 +445,20 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Reads the greeting and logs in: a <c>230</c> greeting means already logged in, a
-    /// <c>220</c> starts the login, and anything else is exit 8.
+    /// Reads the greeting and logs in: a <c>230</c> greeting means already logged in, unless
+    /// <c>--ftp-ssl-control</c> or <c>--ssl-reqd</c> still wants <c>AUTH</c> on a plaintext
+    /// connection, when it is taken as a <c>220</c> as curl 8.21.0 does (upstream test986,
+    /// BL-1985); a <c>220</c> starts the login, and anything else is exit 8.
     /// </summary>
     private async ValueTask<TransferResult?> GreetAndLogInAsync()
     {
         trace.AwaitingGreeting();
         FtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
+        bool authStillRequired = !controlSecured && tlsRequirement is not (FtpTlsRequirement.None or FtpTlsRequirement.Try);
         return greeting.Code switch
         {
-            230 => LoggedIn(),
-            220 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
+            230 when !authStillRequired => LoggedIn(),
+            220 or 230 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
             _ => TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
         };
     }
@@ -401,7 +481,14 @@ internal sealed class FtpSession(
 
         foreach (string mechanism in AuthMechanisms)
         {
-            if (await ExchangeAsync("AUTH " + mechanism).ConfigureAwait(false) is { Code: 234 or 334 })
+            FtpReply auth = await ExchangeAsync("AUTH " + mechanism).ConfigureAwait(false);
+            if (control.HasBufferedBytes)
+            {
+                // A reply pipelined behind AUTH's is exit 8 whatever AUTH's code, as curl 8.21.0 does (test983, BL-1985).
+                return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
+            }
+
+            if (auth is { Code: 234 or 334 })
             {
                 return await UpgradeControlAsync().ConfigureAwait(false);
             }
@@ -588,6 +675,7 @@ internal sealed class FtpSession(
 
         log.PathWalk(context.FtpFileMethod, path.Directories.Count);
         rememberedDirectory = string.Concat(path.Directories.Select(directory => directory + "/"));
+        directoryToRemember = path.DirectoryToRemember;
         return context.Upload is { } upload
             ? await UploadAsync(path, upload).ConfigureAwait(false)
             : await RetrieveFromPathAsync(path).ConfigureAwait(false);
@@ -598,7 +686,7 @@ internal sealed class FtpSession(
         ReportWhetherInEntryDirectory(path);
         trace.DoPhaseStarts(IsListing(path) ? "LIST" : "RETR");
         return await SendQuotesAsync(quotes.AfterLogin, FtpQuoteStage.AfterLogin).ConfigureAwait(false)
-            ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
+            ?? await ChangeToPathDirectoryAsync(path).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? (context.NoBody
                 ? await ReportHeadAsync(path.FileName).ConfigureAwait(false)
@@ -620,7 +708,7 @@ internal sealed class FtpSession(
         return await OpenDownloadDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
             ?? await SetTypeAsync(ascii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
-            ?? await ReadSizeAsync(path.FileName, ascii).ConfigureAwait(false)
+            ?? await ReadSizeAsync(path.FileName, SendsNoSize(ascii)).ConfigureAwait(false)
             ?? TraceRetrieveNext(listing)
             ?? await RefuseOversizedFileAsync().ConfigureAwait(false)
             ?? await PositionAsync().ConfigureAwait(false)
@@ -666,7 +754,7 @@ internal sealed class FtpSession(
             return null;
         }
 
-        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        ReportRememberedDirectory();
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
@@ -717,7 +805,7 @@ internal sealed class FtpSession(
         ReportWhetherInEntryDirectory(path);
         trace.DoPhaseStarts("STOR");
         return await SendQuotesAsync(quotes.AfterLogin, FtpQuoteStage.AfterLogin).ConfigureAwait(false)
-            ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false)
+            ?? await ChangeToPathDirectoryAsync(path).ConfigureAwait(false)
             ?? await CheckModificationTimeAsync(path.FileName).ConfigureAwait(false)
             ?? await OpenDataConnectionAsync("STOR " + path.FileName).ConfigureAwait(false)
             ?? await SetTypeAsync(typeCode.UseAscii).ConfigureAwait(false)
@@ -899,7 +987,17 @@ internal sealed class FtpSession(
     /// <paramref name="path" /> needs no <c>CWD</c> to reach from the entry directory (BL-945).
     /// </summary>
     private void ReportWhetherInEntryDirectory(FtpUrlPath path) =>
-        ReportInfo(path.IsInEntryDirectory ? FtpTransferMessages.SamePathAsPreviousTransfer : null);
+        ReportInfo((reused is null ? path.IsInEntryDirectory : path.IsReachedFrom(reused.PreviousPath)) ? FtpTransferMessages.SamePathAsPreviousTransfer : null);
+
+    /// <summary>
+    /// Reports curl 8.21.0's <c>-v</c> line naming the directory it remembers, and remembers
+    /// the path's directory part as the <c>prevpath</c> a kept connection carries (BL-1981).
+    /// </summary>
+    private void ReportRememberedDirectory()
+    {
+        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        rememberedPath = directoryToRemember;
+    }
 
     private void ReportInfo(string? line)
     {
@@ -1173,6 +1271,19 @@ internal sealed class FtpSession(
     private static IPAddress? Unmapped(IPAddress? address) =>
         address is { IsIPv4MappedToIPv6: true } ? address.MapToIPv4() : address;
 
+    // The field initializers' branches live in these four, so the primary constructor
+    // stays under complexity 10 in the coverage report (BL-2024).
+    private static string PeerAddressOr(EndPoint? endPoint, string host) =>
+        Unmapped((endPoint as IPEndPoint)?.Address)?.ToString() ?? host;
+
+    private static long? MaxFileSizeOf(ITransferContext context) =>
+        context.MaxFileSize > 0 ? context.MaxFileSize : null;
+
+    private static bool IgnoresContentLength(ITransferContext context) =>
+        context.Http?.IgnoreContentLength == true;
+
+    private static char? TransferTypeOf(FtpKeptConnection? reused) => reused?.TransferType;
+
     private static bool IsIPv6(EndPoint? endPoint) =>
         Unmapped((endPoint as IPEndPoint)?.Address) is { AddressFamily: AddressFamily.InterNetworkV6 };
 
@@ -1249,12 +1360,22 @@ internal sealed class FtpSession(
     /// <summary>
     /// Waits up to 60 seconds for the server to connect to the active-mode port: exit 12
     /// after <c>QUIT</c> when it does not, and a failed accept's exit code after <c>QUIT</c>.
+    /// A 4xx or 5xx reply already read behind the transfer command's <c>150</c> (a server's
+    /// <c>425</c> or <c>421</c> for a data connection it could not open) is read and ends the
+    /// wait with exit 10 after <c>QUIT</c>, as curl 8.21.0 does (upstream tests 1206 and 1207, BL-1978).
     /// </summary>
     private async ValueTask<TransferResult?> AcceptDataConnectionAsync(IPendingConnection pending)
     {
         context.Events.ReportInfo(FtpTransferMessages.DataConnectionNotAvailable);
         trace.AcceptPending();
         context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
+        if (control.HasBufferedNegativeReply)
+        {
+            context.Events.ReportInfo(FtpTransferMessages.NegativeReplyWhileAwaitingServerConnect);
+            await ReadReplyIgnoringItsFailureAsync().ConfigureAwait(false);
+            return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
+        }
+
         using var timeout = new CancellationTokenSource(AcceptTimeout, context.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, timeout.Token);
         ConnectResult accepted;
@@ -1276,6 +1397,22 @@ internal sealed class FtpSession(
         ReportAccepted(dataConnection.RemoteEndPoint, (IPEndPoint)pending.LocalEndPoint);
         log.ActiveDataAccepted();
         return null;
+    }
+
+    /// <summary>
+    /// Reads the next reply and drops whatever reading it fails with, a <c>421</c>'s exit 28
+    /// included (its <c>-v</c> line still written), as curl 8.21.0's <c>ReceivedServerConnect</c>
+    /// ignores what <c>Curl_GetFTPResponse</c> returns (BL-1978).
+    /// </summary>
+    private async ValueTask ReadReplyIgnoringItsFailureAsync()
+    {
+        try
+        {
+            await ReadReplyAsync().ConfigureAwait(false);
+        }
+        catch (FtpControlConversationFailedException)
+        {
+        }
     }
 
     /// <summary>
@@ -1473,15 +1610,36 @@ internal sealed class FtpSession(
     /// <summary>Sends <c>TYPE A</c> for a listing or an ASCII transfer, <c>TYPE I</c> otherwise.</summary>
     private async ValueTask<TransferResult?> SetTypeAsync(bool ascii)
     {
-        FtpReply type = await ExchangeAsync(ascii ? "TYPE A" : "TYPE I").ConfigureAwait(false);
-        return type.IsCompletion
-            ? null
-            : await QuitAndFailAsync(CurlExitCode.FtpCouldntSetType, FtpTransferMessages.CouldNotSetType).ConfigureAwait(false);
+        char wanted = ascii ? 'A' : 'I';
+        if (transferType == wanted)
+        {
+            // Already set on this connection: curl 8.21.0's ftp_nb_type sends no TYPE (BL-1981).
+            return null;
+        }
+
+        FtpReply type = await ExchangeAsync("TYPE " + wanted).ConfigureAwait(false);
+        if (!type.IsCompletion)
+        {
+            return await QuitAndFailAsync(CurlExitCode.FtpCouldntSetType, FtpTransferMessages.CouldNotSetType).ConfigureAwait(false);
+        }
+
+        transferType = wanted;
+        return null;
     }
 
-    private async ValueTask<TransferResult?> ReadSizeAsync(string fileName, bool listing)
+    /// <summary>
+    /// Whether a download sends no <c>SIZE</c>: an ASCII one or a listing, or any under
+    /// <c>--ignore-content-length</c>.
+    /// </summary>
+    private bool SendsNoSize(bool ascii) => ascii || ignoresContentLength;
+
+    /// <summary>
+    /// Sends <c>SIZE</c> and keeps its count, exit 78 on a <c>550</c>; nothing when
+    /// <paramref name="skipped" /> (a listing, an ASCII download or <c>--ignore-content-length</c>).
+    /// </summary>
+    private async ValueTask<TransferResult?> ReadSizeAsync(string fileName, bool skipped)
     {
-        if (listing)
+        if (skipped)
         {
             return null;
         }
@@ -1736,12 +1894,12 @@ internal sealed class FtpSession(
             return TransferResult.Failure(CurlExitCode.PartialFile, FtpTransferMessages.EndOfResponseWithBytesMissing(expected - bytesTransferred), bytesTransferred);
         }
 
-        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        ReportRememberedDirectory();
         await AbortRangeAsync().ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.PartialDownloadClosing);
         (FtpQuoteCommand Command, int Code)? refused = await RunPostQuotesAsync().ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
-        return await QuitAfterPostQuotesAsync(refused).ConfigureAwait(false);
+        return await QuitAfterPostQuotesAsync(refused, keepsConnection: false).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1753,7 +1911,7 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> ReadTransferCompleteAsync()
     {
-        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        ReportRememberedDirectory();
         trace.ClosingDataConnection();
         FtpReply complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead).ConfigureAwait(false);
         trace.TransferReplyRead(complete);
@@ -1806,7 +1964,7 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> QuitAndFailAsync(CurlExitCode exitCode, string message)
     {
-        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        ReportRememberedDirectory();
         return await QuitAndFailLeavingConnectionIntactAsync(exitCode, message).ConfigureAwait(false);
     }
 
@@ -1821,7 +1979,7 @@ internal sealed class FtpSession(
     {
         ReportUnalignedUpload();
         context.Events.ReportInfo(FtpTransferMessages.ConnectionLeftIntact(controlName.Number, controlName.Host, controlName.Port));
-        await QuitAsync().ConfigureAwait(false);
+        await EndControlConnectionAsync(keepsConnection: true).ConfigureAwait(false);
         return TransferResult.Failure(exitCode, message, bytesTransferred);
     }
 
@@ -1863,9 +2021,9 @@ internal sealed class FtpSession(
     /// Sends <c>QUIT</c> and ends the transfer: exit 21 naming <paramref name="refused" />
     /// when a post-transfer quote was refused, otherwise a success.
     /// </summary>
-    private async ValueTask<TransferResult> QuitAfterPostQuotesAsync((FtpQuoteCommand Command, int Code)? refused)
+    private async ValueTask<TransferResult> QuitAfterPostQuotesAsync((FtpQuoteCommand Command, int Code)? refused, bool keepsConnection = true)
     {
-        await QuitAsync().ConfigureAwait(false);
+        await EndControlConnectionAsync(keepsConnection && refused is null).ConfigureAwait(false);
         return refused is { } quote
             ? TransferResult.Failure(CurlExitCode.QuoteError, FtpTransferMessages.QuoteNotAccepted(quote.Command.Command), bytesTransferred)
             : TransferResult.Success(bytesTransferred);
@@ -1887,7 +2045,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult> EndAndSucceedAsync()
     {
         await AbortRangeAsync().ConfigureAwait(false);
-        return await QuitAndSucceedAsync().ConfigureAwait(false);
+        return await QuitAfterPostQuotesAsync(await RunPostQuotesAsync().ConfigureAwait(false), keepsConnection: window.MaxDownload is null).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1903,7 +2061,7 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
         }
 
-        context.Events.ReportInfo(FtpTransferMessages.RememberingDirectory(rememberedDirectory));
+        ReportRememberedDirectory();
         await AbortRangeAsync().ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.PartialDownloadClosing);
         context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
@@ -1951,6 +2109,34 @@ internal sealed class FtpSession(
     /// Sends <c>QUIT</c>, whose reply curl 8.21.0 never reports as <c>%{response_code}</c>;
     /// neither it nor its reply is reported to <c>-v</c> or <c>--trace</c> (BL-930).
     /// </summary>
+    private async ValueTask EndControlConnectionAsync(bool keepsConnection)
+    {
+        if (!keepsConnection || !TryKeepControlConnection())
+        {
+            await QuitAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Hands the control connection back to the run's connection cache for the next URL, with
+    /// what it knows of the connection, instead of sending <c>QUIT</c>, as curl 8.21.0 keeps a
+    /// control connection its <c>ftp_done</c> leaves valid (BL-1981). Only a pooled connection
+    /// the session still talks on, not one <c>AUTH</c> or <c>CCC</c> replaced, can be kept.
+    /// </summary>
+    /// <returns><see langword="true" /> when the connection was kept.</returns>
+    private bool TryKeepControlConnection()
+    {
+        FtpKeptConnection kept = reused ?? new FtpKeptConnection(originalControl, FtpKeptConnection.LoginKeyOf(context), context.TimeProvider);
+        if (!ReferenceEquals(control.Connection, originalControl) || !originalControl.TryHoldSession(kept))
+        {
+            return false;
+        }
+
+        kept.Remember(entryPath, protectData, transferType, rememberedPath, control.UnreadBytes);
+        originalControl.MarkReusable();
+        return true;
+    }
+
     private async ValueTask QuitAsync()
     {
         control.StopReporting();

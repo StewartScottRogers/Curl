@@ -649,6 +649,58 @@ public sealed class TransferContextFactoryTests
         Assert.AreEqual("220 hi\r\nContent-Length: 3\r\n226 done\r\n", System.Text.Encoding.ASCII.GetString(dumpHeader.ToArray()));
     }
 
+    // curl 8.21.0 tunnels through an HTTP proxy when --connect-to sends the URL to another host or
+    // port (lib/url.c parse_connect_to_slist; upstream tests 2050 and 2055).
+    [TestMethod]
+    [DataRow("::connect.example:8990", ProxyKind.Http, true)]
+    [DataRow("::CONNECT.example:80", ProxyKind.Http10, true)]
+    [DataRow("::www.example:8990", ProxyKind.Https, true)]
+    [DataRow("::WWW.example:80", ProxyKind.Http, false)]
+    [DataRow("other:80:connect.example:8990", ProxyKind.Http, false)]
+    [DataRow("::connect.example:x", ProxyKind.Http, false)]
+    [DataRow("::connect.example:8990", ProxyKind.Socks5, false)]
+    public void ConnectToTunnelsThroughProxy_ForAMappingAndProxy_TunnelsOnlyWhenTheHostOrPortChangesThroughAnHttpProxy(string mapping, ProxyKind kind, bool expected)
+    {
+        CommandLineOptions options = Parse("--connect-to", mapping, "http://www.example/");
+
+        bool tunnels = TransferContextFactory.ConnectToTunnelsThroughProxy(options, CurlUrl.Parse("http://www.example/"), new ProxyEndpoint(kind, "127.0.0.1", 8991, null));
+
+        Diagnostics.Assert("tunnels", expected, tunnels);
+        Assert.AreEqual(expected, tunnels);
+    }
+
+    [TestMethod]
+    public void ConnectToTunnelsThroughProxy_WithoutAProxyOrAMapping_DoesNotTunnel()
+    {
+        CurlUrl url = CurlUrl.Parse("http://www.example/");
+
+        bool withoutProxy = TransferContextFactory.ConnectToTunnelsThroughProxy(Parse("--connect-to", "::other:1", "http://www.example/"), url, null);
+        bool withoutMapping = TransferContextFactory.ConnectToTunnelsThroughProxy(Parse("http://www.example/"), url, new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 8991, null));
+
+        Diagnostics.Assert("tunnels without proxy, without mapping", (false, false), (withoutProxy, withoutMapping));
+        Assert.IsFalse(withoutProxy);
+        Assert.IsFalse(withoutMapping);
+    }
+
+    [TestMethod]
+    public void Create_WithAConnectToMappingThroughAnHttpProxy_SetsProxyTunnel()
+    {
+        using var standardInput = new MemoryStream();
+        using var output = new MemoryStream();
+
+        TransferContext context = new TransferContextFactory(standardInput).Create(
+            Parse("--connect-to", "::connect.example:8990", "http://www.example/"),
+            CurlUrl.Parse("http://www.example/"),
+            output,
+            null,
+            null,
+            null,
+            proxy: new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 8991, null));
+
+        Diagnostics.Assert("proxy tunnel", true, context.Http!.ProxyTunnel);
+        Assert.IsTrue(context.Http!.ProxyTunnel);
+    }
+
     private CommandLineOptions Parse(params string[] arguments)
     {
         Diagnostics.Arrange("command line", string.Join(' ', arguments));

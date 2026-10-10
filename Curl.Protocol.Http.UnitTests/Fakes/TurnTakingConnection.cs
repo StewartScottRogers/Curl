@@ -28,6 +28,12 @@ public sealed class TurnTakingConnection(int chunkSize, params string[] response
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint => null;
 
+    /// <summary>
+    /// Gets or sets the value <see cref="IConnection.HasPeerClosed" /> reports: whether the
+    /// server has closed the connection by the time it is asked.
+    /// </summary>
+    public bool HasPeerClosed { get; set; }
+
     /// <summary>Gets every byte written so far, as Latin-1 text.</summary>
     public string Written => Encoding.Latin1.GetString(written.ToArray());
 

@@ -472,6 +472,32 @@ public sealed class CommandLineConfigFileTests
     }
 
     [TestMethod]
+    [DataRow("200", 1)]
+    [DataRow(null, 3)]
+    public void Parse_MissingConfigFile_WrapsItsMessageAtTheParsesColumnsVariable(string? columns, int expectedMessageLines)
+    {
+        // curl 8.21.0 wraps 'cannot read config from' at its own COLUMNS (79 without one); a parse
+        // given an environment reader takes COLUMNS from it, not from this process (BL-1973, test411).
+        const string Missing = "C:/Temp/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbb/log/missing";
+        string[] arguments = ["-K", Missing, Url];
+        TestDiagnostics.For(TestContext).ArrangeArguments(arguments);
+
+        CommandLineParseResult result = CommandLineParser.Parse(
+            arguments,
+            _ => true,
+            new UnexpectedPasswordPrompt(),
+            new RecordingDataFileReader(),
+            new DefaultConfigFileSearch(_ => null, false, null, null),
+            false,
+            name => name == "COLUMNS" ? columns : null);
+
+        string expectedFirstLine = expectedMessageLines == 1 ? $"curl: cannot read config from '{Missing}'" : "curl: cannot read config from ";
+        TestDiagnostics.For(TestContext).Assert("Refusal.StandardErrorLines[0]", expectedFirstLine, result.Refusal?.StandardErrorLines[0]);
+        Assert.HasCount(expectedMessageLines + 2, result.Refusal!.StandardErrorLines);
+        Assert.AreEqual(expectedFirstLine, result.Refusal.StandardErrorLines[0]);
+    }
+
+    [TestMethod]
     [DataRow("-K", "")]
     [DataRow("--config=", null)]
     public void Parse_EmptyConfigFileName_IsRefusedAsUnreadable(string option, string? value)

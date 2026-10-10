@@ -45,6 +45,12 @@ public sealed class ScriptedConnection(byte[] bytesToRead) : IConnection
     /// </summary>
     public int UnreadCount => bytesToRead.Length - _readPosition;
 
+    /// <summary>
+    /// Gets or sets the value <see cref="IConnection.HasPeerClosed" /> reports: whether a
+    /// liveness probe would find the peer gone.
+    /// </summary>
+    public bool HasPeerClosed { get; set; }
+
     /// <inheritdoc />
     public bool IsSecure => false;
 
