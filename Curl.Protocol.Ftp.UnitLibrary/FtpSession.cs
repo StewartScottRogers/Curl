@@ -445,17 +445,20 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Reads the greeting and logs in: a <c>230</c> greeting means already logged in, a
-    /// <c>220</c> starts the login, and anything else is exit 8.
+    /// Reads the greeting and logs in: a <c>230</c> greeting means already logged in, unless
+    /// <c>--ftp-ssl-control</c> or <c>--ssl-reqd</c> still wants <c>AUTH</c> on a plaintext
+    /// connection, when it is taken as a <c>220</c> as curl 8.21.0 does (upstream test986,
+    /// BL-1985); a <c>220</c> starts the login, and anything else is exit 8.
     /// </summary>
     private async ValueTask<TransferResult?> GreetAndLogInAsync()
     {
         trace.AwaitingGreeting();
         FtpReply greeting = await ReadReplyAsync().ConfigureAwait(false);
+        bool authStillRequired = !controlSecured && tlsRequirement is not (FtpTlsRequirement.None or FtpTlsRequirement.Try);
         return greeting.Code switch
         {
-            230 => LoggedIn(),
-            220 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
+            230 when !authStillRequired => LoggedIn(),
+            220 or 230 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
             _ => TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
         };
     }
@@ -478,7 +481,14 @@ internal sealed class FtpSession(
 
         foreach (string mechanism in AuthMechanisms)
         {
-            if (await ExchangeAsync("AUTH " + mechanism).ConfigureAwait(false) is { Code: 234 or 334 })
+            FtpReply auth = await ExchangeAsync("AUTH " + mechanism).ConfigureAwait(false);
+            if (control.HasBufferedBytes)
+            {
+                // A reply pipelined behind AUTH's is exit 8 whatever AUTH's code, as curl 8.21.0 does (test983, BL-1985).
+                return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
+            }
+
+            if (auth is { Code: 234 or 334 })
             {
                 return await UpgradeControlAsync().ConfigureAwait(false);
             }

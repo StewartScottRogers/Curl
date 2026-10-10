@@ -130,6 +130,12 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     public byte[] UnreadBytes => buffer[bufferStart..bufferEnd];
 
     /// <summary>
+    /// Whether bytes past the last reply have already been read: a reply the server pipelined
+    /// behind it, which curl 8.21.0 refuses after <c>AUTH</c> (BL-1985).
+    /// </summary>
+    public bool HasBufferedBytes => bufferStart < bufferEnd;
+
+    /// <summary>
     /// Reads <paramref name="unread" /> before anything more from the connection: the bytes a
     /// previous transfer on the kept connection read past its last reply. Called before any read.
     /// </summary>

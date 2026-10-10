@@ -82,6 +82,12 @@ internal sealed class SmtpControlChannel(
     public int LastReplyCode { get; private set; }
 
     /// <summary>
+    /// Gets whether bytes past the last reply have already been read: a reply the server
+    /// pipelined behind it, which curl 8.21.0 refuses after <c>STARTTLS</c> (BL-1985).
+    /// </summary>
+    public bool HasBufferedBytes => bufferStart < bufferEnd;
+
+    /// <summary>
     /// Carries on over <paramref name="secured" />, the connection after <c>STARTTLS</c>
     /// upgraded it to TLS.
     /// </summary>

@@ -148,7 +148,7 @@ public sealed class FtpProtocolHandlerHeaderEventTests
         var events = new RecordingTransferEvents();
         FtpRun run = await FtpRun.ExecuteAsync(
             Url,
-            Greeting + "500 AUTH not understood\r\n500 AUTH not understood\r\n",
+            Greeting + "500 AUTH not understood\r\n" + ScriptedConnection.NextRead + "500 AUTH not understood\r\n",
             adjust: c => MutableContext.Build(c, m =>
             {
                 m.SslLevel = TransportSecurityLevel.Required;

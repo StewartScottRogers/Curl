@@ -295,7 +295,7 @@ public sealed class FtpProtocolHandlerDiagnosticLogTests
         await RunAsync(
             diagnostics,
             Url,
-            Greeting + Refused + Refused + "331 Password required\r\n230 Logged in\r\n257 \"/\"\r\n" + Epsv + Retrieved,
+            Greeting + Refused + ScriptedConnection.NextRead + Refused + ScriptedConnection.NextRead + "331 Password required\r\n230 Logged in\r\n257 \"/\"\r\n" + Epsv + Retrieved,
             log,
             context => new TransferContext { Url = context.Url, Output = context.Output, DiagnosticLog = context.DiagnosticLog, SslLevel = TransportSecurityLevel.Try },
             "hello");
@@ -403,7 +403,7 @@ public sealed class FtpProtocolHandlerDiagnosticLogTests
     {
         diagnostics.ArrangeFtp(url, replies, data);
         var dataConnection = data.Length == 0 ? new ScriptedConnection() : Scripted(data);
-        var connector = new QueuedConnector(ConnectResult.Connected(Scripted(replies)), ConnectResult.Connected(dataConnection));
+        var connector = new QueuedConnector(ConnectResult.Connected(ScriptedConnection.FromReplies(replies)), ConnectResult.Connected(dataConnection));
         TransferContext context = Context(url, log);
         context = adjust?.Invoke(context) ?? context;
         FtpProtocolHandler handler = tls is null

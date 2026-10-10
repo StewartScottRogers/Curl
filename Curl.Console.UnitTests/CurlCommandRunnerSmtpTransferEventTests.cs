@@ -188,7 +188,7 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
     private async Task AssertStartTlsUploadLinesAsync(string tlsBackendLines)
     {
         int exitCode = await RunAsync(
-            ["-sv", "-k", "--ssl-reqd"], 18027, 53681, Greeting + EhloReply + "220 Ready to start TLS\r\n" + SecureEhloReply + Transaction);
+            ["-sv", "-k", "--ssl-reqd"], 18027, 53681, Greeting + EhloReply + "220 Ready to start TLS\r\n" + NextRead + SecureEhloReply + Transaction);
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
@@ -262,14 +262,17 @@ public sealed class CurlCommandRunnerSmtpTransferEventTests
         + "< 250 OK message accepted" + HeaderEnd
         + $"* Connection #0 to host 127.0.0.1:{port} left intact" + InfoEnd;
 
+    /// <summary>Splits a connector script into reads: the server answers the next command only once it is sent.</summary>
+    private const string NextRead = "<next read>";
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private async Task<int> RunAsync(IReadOnlyList<string> arguments, int port, int localPort, string replies)
     {
-        var connector = new ReportingConnector(new ScriptedConnector([Encoding.ASCII.GetBytes(replies)]), localPort);
+        var connector = new ReportingConnector(new ScriptedConnector(replies.Split(NextRead).Select(Encoding.ASCII.GetBytes)), localPort);
         Diagnostics.Arrange("arguments", string.Join(' ', arguments));
         Diagnostics.Arrange("target", "smtp://127.0.0.1:port/client with --mail-from a@b --mail-rcpt c@d -T mail.txt");
-        Diagnostics.Arrange("connector script", Lf(replies));
+        Diagnostics.Arrange("connector script", Lf(replies.Replace(NextRead, string.Empty, StringComparison.Ordinal)));
         int exitCode;
         using (Diagnostics.Phase("run"))
         {

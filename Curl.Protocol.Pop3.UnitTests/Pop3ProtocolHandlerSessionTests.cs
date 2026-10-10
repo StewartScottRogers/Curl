@@ -268,7 +268,12 @@ public sealed class Pop3ProtocolHandlerSessionTests
     public async Task ExecuteAsync_StlsRefusedUnderSsl_CarriesOnInPlaintext()
     {
         // --ssl, STLS=-ERR not now: CAPA, STLS, then LIST and QUIT, exit 0.
-        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + "-ERR not now\r\n" + ListReply + Bye, Try);
+        // The server answers each command only once it is sent, so nothing is pipelined behind -ERR.
+        var connection = new ScriptedConnection(
+            Encoding.Latin1.GetBytes(Greeting + CapaReply + "-ERR not now\r\n"),
+            Encoding.Latin1.GetBytes(ListReply),
+            Encoding.Latin1.GetBytes(Bye));
+        Pop3Run run = await Pop3Run.ExecuteAsync(Diagnostics, Url, connection, Try);
 
         Diagnostics.Diff("sent", Capa + Stls + List + Quit, run.Sent);
         Assert.AreEqual(Capa + Stls + List + Quit, run.Sent);
@@ -276,6 +281,21 @@ public sealed class Pop3ProtocolHandlerSessionTests
         Assert.IsEmpty(run.Tls.Handshakes);
         Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("-ERR not now", TransportSecurityLevel.Try, DisplayName = "--ssl, STLS=-ERR with LIST's reply pipelined")]
+    [DataRow("+OK begin TLS", TransportSecurityLevel.Required, DisplayName = "--ssl-reqd, STLS=+OK with LIST's reply pipelined")]
+    public async Task ExecuteAsync_StlsReplyWithMoreRepliesPipelined_FailsWithExit8SendingNothingMore(string stlsReply, TransportSecurityLevel sslLevel)
+    {
+        // Upstream test982: a reply pipelined behind STLS's is exit 8, with no handshake and no QUIT.
+        Pop3Run run = await RunAsync(Url, Greeting + CapaReply + stlsReply + "\r\n" + ListReply + Bye, sslLevel);
+
+        Diagnostics.Diff("sent", Capa + Stls, run.Sent);
+        Assert.AreEqual(Capa + Stls, run.Sent);
+        Assert.IsEmpty(run.Tls.Handshakes);
+        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply"), run.Result);
     }
 
     [TestMethod]

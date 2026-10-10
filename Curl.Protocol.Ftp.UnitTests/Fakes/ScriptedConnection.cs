@@ -13,7 +13,22 @@ namespace Curl.Protocol.Ftp.Fakes;
 /// <param name="reads">What the server sends, one non-empty read at a time.</param>
 public sealed class ScriptedConnection(params byte[][] reads) : IConnection
 {
+    /// <summary>
+    /// Marks where one read of a <see cref="FromReplies(string)" /> script ends and the next
+    /// begins, as a server that answers each command only once it is sent splits its replies.
+    /// </summary>
+    public const string NextRead = "<next read>";
+
     private readonly List<byte> sent = [];
+
+    /// <summary>
+    /// Builds a connection that reads <paramref name="replies" /> as Latin-1, one read per
+    /// piece between <see cref="NextRead" /> marks.
+    /// </summary>
+    /// <param name="replies">The reply lines, with <see cref="NextRead" /> between reads.</param>
+    /// <returns>The scripted connection.</returns>
+    public static ScriptedConnection FromReplies(string replies) =>
+        new([.. replies.Split(NextRead).Where(read => read.Length > 0).Select(System.Text.Encoding.Latin1.GetBytes)]);
 
     private int nextRead;
 

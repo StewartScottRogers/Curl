@@ -144,7 +144,7 @@ public sealed class FtpProtocolHandlerTlsTests
         var securedControl = Scripted(LoggedIn + Protected + Pwd + Retrieved);
         TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + "334 ok\r\n",
+            Greeting + Refused + ScriptedConnection.NextRead + "334 ok\r\n",
             context => context.SslLevel = TransportSecurityLevel.Try,
             ConnectResult.Connected(securedControl),
             ConnectResult.Connected(Scripted("hello")));
@@ -164,7 +164,7 @@ public sealed class FtpProtocolHandlerTlsTests
         // curl -k --ssl-reqd ftp://127.0.0.1:18437/a.txt, AUTH answered 500 no
         TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + Refused,
+            Greeting + Refused + ScriptedConnection.NextRead + Refused + ScriptedConnection.NextRead,
             context => context.SslLevel = TransportSecurityLevel.Required);
 
         var expectedSent = "AUTH SSL\r\nAUTH TLS\r\n";
@@ -184,7 +184,7 @@ public sealed class FtpProtocolHandlerTlsTests
         // --ftp-ssl-control outranks --ssl.
         TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + Refused,
+            Greeting + Refused + ScriptedConnection.NextRead + Refused + ScriptedConnection.NextRead,
             context =>
             {
                 context.SslLevel = TransportSecurityLevel.Try;
@@ -206,13 +206,71 @@ public sealed class FtpProtocolHandlerTlsTests
         // curl -k --ssl ftp://127.0.0.1:18437/a.txt, AUTH answered 500 no: exit 0, no PBSZ.
         TlsRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:18437/a.txt",
-            Greeting + Refused + Refused + LoggedIn + Pwd + Retrieved,
+            Greeting + Refused + ScriptedConnection.NextRead + Refused + ScriptedConnection.NextRead + LoggedIn + Pwd + Retrieved,
             context => context.SslLevel = TransportSecurityLevel.Try,
             data: "hello");
 
         var expectedSent = "AUTH SSL\r\nAUTH TLS\r\n" + LogInSent + RetrieveSent;
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
+        Assert.IsEmpty(run.Tls.Handshakes);
+        var expectedResult = TransferResult.Success(5);
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
+    [DataRow("500 no", TransportSecurityLevel.Try, DisplayName = "--ssl, AUTH SSL=500 with more replies pipelined")]
+    [DataRow("234 AUTH accepted", TransportSecurityLevel.Required, DisplayName = "--ssl-reqd, AUTH SSL=234 with more replies pipelined")]
+    public async Task ExecuteAsync_AuthReplyWithMoreRepliesPipelined_FailsWithExit8SendingNothingMore(string authReply, TransportSecurityLevel sslLevel)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream test983: a reply pipelined behind AUTH's is exit 8, with no handshake and no QUIT.
+        TlsRun run = await RunAsync(diagnostics,
+            "ftp://127.0.0.1:18437/a.txt",
+            Greeting + authReply + "\r\n" + LoggedIn + Pwd,
+            context => context.SslLevel = sslLevel);
+
+        var expectedSent = "AUTH SSL\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        Assert.IsEmpty(run.Tls.Handshakes);
+        var expectedResult = TransferResult.Failure(CurlExitCode.WeirdServerReply, "Weird server reply");
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LoggedInGreetingUnderSslReqdAndAuthRefused_SendsAuthAndEndsWithExit64()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // Upstream test986: a 230 greeting under --ssl-reqd is taken as a 220, so AUTH is still sent.
+        TlsRun run = await RunAsync(diagnostics,
+            "ftp://127.0.0.1:18437/a.txt",
+            "230 welcome without password\r\n" + Refused + ScriptedConnection.NextRead + Refused,
+            context => context.SslLevel = TransportSecurityLevel.Required);
+
+        var expectedSent = "AUTH SSL\r\nAUTH TLS\r\n";
+        diagnostics.DiffSent(expectedSent, run.Sent);
+        Assert.AreEqual(expectedSent, run.Sent);
+        var expectedResult = TransferResult.Failure(CurlExitCode.UseSslFailed, "Requested SSL level failed");
+        diagnostics.Assert("result", expectedResult, run.Result);
+        Assert.AreEqual(expectedResult, run.Result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LoggedInGreetingUnderSsl_SkipsAuthAndLogIn()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // --ssl only tries TLS, so a 230 greeting is taken as logged in, as curl 8.21.0 does.
+        TlsRun run = await RunAsync(diagnostics,
+            "ftp://127.0.0.1:18437/a.txt",
+            "230 welcome without password\r\n" + Pwd + Retrieved,
+            context => context.SslLevel = TransportSecurityLevel.Try,
+            data: "hello");
+
+        diagnostics.DiffSent(RetrieveSent, run.Sent);
+        Assert.AreEqual(RetrieveSent, run.Sent);
         Assert.IsEmpty(run.Tls.Handshakes);
         var expectedResult = TransferResult.Success(5);
         diagnostics.Assert("result", expectedResult, run.Result);
@@ -572,7 +630,7 @@ public sealed class FtpProtocolHandlerTlsTests
     {
         diagnostics.ArrangeFtp(url, replies, data.Length == 0 ? null : data);
 
-        var control = Scripted(replies);
+        var control = ScriptedConnection.FromReplies(replies);
         var dataConnection = data.Length == 0 ? new ScriptedConnection() : Scripted(data);
         var connector = new QueuedConnector(ConnectResult.Connected(control), ConnectResult.Connected(dataConnection));
         var tls = new QueuedTlsProvider(handshakes);
