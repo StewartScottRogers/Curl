@@ -4,7 +4,7 @@ title: Close GF-0060: A SASL exchange given a bad challenge (CRAM-MD5 rubbish, a
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-2026]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-10
@@ -46,7 +46,16 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 
 ## Notes
 
+- 2026-10-10 (lane 5): Curl already cancels and downgrades. Replayed against this tree's Curl (`curl.exe` from 192ec6f80) with `Record-CurlExchange.ps1 -Script`, the server sending what each case's `<servercmd>` lists:
+  - test833 shape (IMAP, `+ Rubbish` to CRAM-MD5): `A002 AUTHENTICATE CRAM-MD5`, `*`, `A003 AUTHENTICATE PLAIN`, `AHVzZXIAc2VjcmV0`, `A004 SELECT 833` - as upstream expects.
+  - test834 shape (IMAP NTLM, `+`, then `+ Rubbish`): Type 1, `*`, `A003 AUTHENTICATE PLAIN`, PLAIN message, `SELECT`. The Type 1 is SSPI's on Windows (as curl's Schannel build sends; these cases are `!SSPI`); off Windows the hand-built NTLM sends the expected `TlRMTVNTUAABAAAABoIIAAAAAAAAAAAAAAAAAAAAAAA=` (`HandBuiltSecurityContextFactoryTests`, `CurlCompositionSmtpNtlmTests`).
+  - test879 shape (POP3 CRAM-MD5) and test936 shape (SMTP NTLM, `334 Rubbish`): `*`, then `AUTH PLAIN` and the PLAIN message, then `RETR` / `MAIL FROM`.
+  - The same paths are pinned by `ImapProtocolHandlerSaslCancelTests`, `Pop3ProtocolHandlerSaslCancelTests` and `SmtpProtocolHandlerSaslCancelTests` (BL-1220 and its POP3/SMTP twins).
+- So "got the end" right after `AUTHENTICATE`/`AUTH` comes from the gap harness, which lanes may not read (ADR-0433 guard). All six cases give a quoted command with an argument (`REPLY "AUTHENTICATE CRAM-MD5" + Rubbish`); a harness that does not match those would never send the `+`/`334`. Filed BL-2026 (interactive only) to find the cause in the harness, and parked this task behind it. No code changed.
+
+
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Waits on BL-2026: Curl already cancels with * and downgrades to PLAIN on a loopback replay of all six cases; the 'got the end' comes from the gap harness, which only an interactive session may read
