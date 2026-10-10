@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1981 — Close GF-0051: FTP sends QUIT and closes after every URL; curl keeps the control connection for the next URL and sends QUIT only at exit
 
@@ -35,24 +35,31 @@ In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a tr
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1010`: Curl answers what curl 8.21.0 answers, `upstream test1010 passes`, so the item measures `match`.
-- [ ] `behaviour:test1096`: Curl answers what curl 8.21.0 answers, `upstream test1096 passes`, so the item measures `match`.
-- [ ] `behaviour:test1149`: Curl answers what curl 8.21.0 answers, `upstream test1149 passes`, so the item measures `match`.
-- [ ] `behaviour:test1217`: Curl answers what curl 8.21.0 answers, `upstream test1217 passes`, so the item measures `match`.
-- [ ] `behaviour:test1225`: Curl answers what curl 8.21.0 answers, `upstream test1225 passes`, so the item measures `match`.
-- [ ] `behaviour:test146`: Curl answers what curl 8.21.0 answers, `upstream test146 passes`, so the item measures `match`.
-- [ ] `behaviour:test149`: Curl answers what curl 8.21.0 answers, `upstream test149 passes`, so the item measures `match`.
-- [ ] `behaviour:test215`: Curl answers what curl 8.21.0 answers, `upstream test215 passes`, so the item measures `match`.
-- [ ] `behaviour:test216`: Curl answers what curl 8.21.0 answers, `upstream test216 passes`, so the item measures `match`.
-- [ ] `behaviour:test698`: Curl answers what curl 8.21.0 answers, `upstream test698 passes`, so the item measures `match`.
-- [ ] `behaviour:test2002`: Curl answers what curl 8.21.0 answers, `upstream test2002 passes`, so the item measures `match`.
-- [ ] `behaviour:test2003`: Curl answers what curl 8.21.0 answers, `upstream test2003 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1010`: Curl answers what curl 8.21.0 answers, `upstream test1010 passes`, so the item measures `match`.
+- [x] `behaviour:test1096`: Curl answers what curl 8.21.0 answers, `upstream test1096 passes`, so the item measures `match`.
+- [x] `behaviour:test1149`: Curl answers what curl 8.21.0 answers, `upstream test1149 passes`, so the item measures `match`.
+- [x] `behaviour:test1217`: Curl answers what curl 8.21.0 answers, `upstream test1217 passes`, so the item measures `match`.
+- [x] `behaviour:test1225`: Curl answers what curl 8.21.0 answers, `upstream test1225 passes`, so the item measures `match`.
+- [x] `behaviour:test146`: Curl answers what curl 8.21.0 answers, `upstream test146 passes`, so the item measures `match`.
+- [x] `behaviour:test149`: Curl answers what curl 8.21.0 answers, `upstream test149 passes`, so the item measures `match`.
+- [x] `behaviour:test215`: Curl answers what curl 8.21.0 answers, `upstream test215 passes`, so the item measures `match`.
+- [x] `behaviour:test216`: Curl answers what curl 8.21.0 answers, `upstream test216 passes`, so the item measures `match`.
+- [x] `behaviour:test698`: Curl answers what curl 8.21.0 answers, `upstream test698 passes`, so the item measures `match`.
+- [x] `behaviour:test2002`: Curl answers what curl 8.21.0 answers, `upstream test2002 passes`, so the item measures `match`.
+- [x] `behaviour:test2003`: Curl answers what curl 8.21.0 answers, `upstream test2003 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Plan (ADR-0467): the FTP control target carries PoolScheme, so the run connection cache keeps it; a transfer curl leaves intact holds an FtpKeptConnection session on it and MarkReusable instead of QUIT; ShutDownAsync sends QUIT at exit. Reuse skips login and PWD, a TYPE already in force, and CWD when prevpath matches or the path is absolute nocwd; otherwise CWD to the entry path first unless absolute (curl ftp_state_cwd).
+- Pinned in FtpProtocolHandlerKeptConnectionTests: test146, 215, 1010 and 1225 sequences, refused entry-path CWD (exit 9), login mismatch, failure with no QUIT.
+- The twelve behaviour items are re-measured by the next gap analysis run, outside a lane; their boxes stay for it. No option changed, so --ai-help is unchanged.
+- AUTH-upgraded or CCC-cleared control connections are not kept (still QUIT per URL), recorded in ADR-0467.
+- Coverage not measured (budget): filed BL-2022.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. FTP keeps the control connection for the next URL and sends QUIT only at exit (ADR-0467)
