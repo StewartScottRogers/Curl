@@ -4,7 +4,7 @@ title: Act on client setenv in the upstream case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1928]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2): Measured the seam. `UpstreamCurlInvocation` carries no environment, and the composition `UpstreamConformanceTests.RunCurlAsync` calls (the dialing `CurlComposition.CreateRunner` in Curl.Console) reads no environment at all: it passes no `readEnvironmentVariable` to `CurlCommandRunner` and builds `new ProxySelector(_ => null)`. Un-screening `<setenv>` here alone would measure the cases with their variables ignored, so BL-1928 adds that seam first. Plan once it lands: an `EnvironmentVariables` dictionary on `UpstreamCurlInvocation` (optional constructor parameter, default empty); `UpstreamCaseRunner.RunScreenedAsync` fills it from `UpstreamTestPartBodies.Lines(testCase.Find("client", "setenv"))`, split at the first `=` (an empty value kept; expansion has already replaced %HOSTIP and the rest); `"setenv"` joins `UpstreamCaseScreening.ClientParts`; `RunCurlAsync` passes `name => invocation.EnvironmentVariables.GetValueOrDefault(name)`. Per-run injection leaves nothing to restore: a test shows the next run, without the variable, does not see it. Candidate cases: 1101 (no_proxy, http_proxy), 1034 and 1035 (LC_ALL), 1106, 1136, 1143, 1162, 1249-1257. The gap office's measuring tool also builds invocations; it is off limits to lanes, keeps compiling through the optional parameter, and an interactive session wires it.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Waits on BL-1928: the conformance composition in Curl.Console reads no environment, so setenv cannot reach curl yet
