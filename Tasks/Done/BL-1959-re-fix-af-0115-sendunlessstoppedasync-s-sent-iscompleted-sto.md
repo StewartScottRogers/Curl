@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1959 — Re-fix AF-0115: SendUnlessStoppedAsync's '!sent.IsCompleted && StopsSending' can become '||' with no test failing
 
@@ -45,12 +45,29 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-1865's test `SendUnlessStoppedAsync_Below300ArrivesDuringTheWrite_LetsItFinish`
+  raced the mutant. The mutant calls `sending.CancelAsync()`, which sets
+  `IsCancellationRequested` at once but carries the cancellation to the write on a thread-pool
+  thread; the test's `FinishWrites()` often finished the write first, so `WriteCancelled`
+  stayed false and the row passed. With the mutant applied by hand, 1 of the 3 rows failed in
+  this lane; in the audit's run, none did.
+- Fix (tests only, no production change): `Fakes/HeldWriteConnection` keeps the latest
+  write's token and exposes `WriteCancellationRequested`. The test reads it right after
+  `DeliverResponse()` and before `FinishWrites()`, and asserts it false. With the mutant
+  applied by hand, all 3 rows now fail; with the original line, all pass.
+- `touches` widened to `Curl.Protocol.Http.UnitTests` (the fake and test live there); no task
+  in Doing on origin/work/dark-factory names it (BL-1961: Networking, BL-1979: Tftp).
+- The audit guard refuses lanes `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was
+  applied with the Edit tool and the class's tests run with `dotnet test --filter`; the
+  re-audit's own run of the reproduction decides the finding.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. SendUnlessStoppedAsync's && -> || mutant now fails every row of the mid-write below-300 test (cancellation request checked before the write finishes)
