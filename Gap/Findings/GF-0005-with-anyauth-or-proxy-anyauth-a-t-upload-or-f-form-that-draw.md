@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test154, behaviour:test155, behaviour:test258, behaviour:test259, behaviour:test1030, behaviour:test1071, behaviour:test1075]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task: BL-1798
-tasks: [BL-1798]
+task: BL-1963
+tasks: [BL-1798, BL-1963]
 ---
 # GF-0005 - With --anyauth or --proxy-anyauth, a -T upload or -F form that draws a 401/407 is never resent with credentials
 
@@ -33,8 +33,10 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 
 - 2026-10-08_1640: 7 of 7 items are gaps.
 - 2026-10-08_2029: 5 of 7 items are gaps.
+- 2026-10-10_0657: 4 of 7 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1798.
+- 2026-10-10_0756: Filed BL-1963.

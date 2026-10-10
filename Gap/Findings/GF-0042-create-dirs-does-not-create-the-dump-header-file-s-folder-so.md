@@ -4,11 +4,11 @@ title: --create-dirs does not create the --dump-header file's folder, so the tra
 area: behaviour
 key: behaviour:dump-header-ignores-create-dirs
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_2029
-closed:
+closed: 2026-10-10_0657
 regression: false
 items: [behaviour:test3031]
 touches: [Curl.Console, Curl.Console.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Console's CurlCommandRunner.TransferWithHeaderFileAsync, when options.Cr
 ## Measurements
 
 - 2026-10-08_2029: 1 of 1 items are gaps.
+- 2026-10-10_0657: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-08_2029: Opened by gap-behaviour.
 - 2026-10-08_2131: Filed BL-1852.
+- 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.
