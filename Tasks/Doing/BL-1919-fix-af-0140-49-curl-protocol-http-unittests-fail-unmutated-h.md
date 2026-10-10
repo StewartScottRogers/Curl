@@ -41,10 +41,13 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-09 (lane 1): No code change was needed. The finding's reproduction already gives the expected result on this tree. `CopyAsync_Body_IsWrittenToTheOutput`, `CopyAsync_OutputFailsOnALargeBody_ThrowsExit23WithCurlsReadSize`, `ExecuteAsync_BodyAtMaxFileSize_Succeeds` and `ExecuteAsync_Exchange_SendsTheRequestAndWritesHeadersThenBody` all pass (10 of 10 rows), and the whole of Curl.Protocol.Http.UnitTests passes (1980 passed, 18 skipped, 0 failed). `CopyFramedAsync` writes the prefix, then each read of at most ReadSize, straight to the output through `WriteAsync` once, so `BytesWritten` counts each byte once.
+- The `MemoryStream held` code the finding quotes appears nowhere in this branch's history (`git log -S "MemoryStream held"` finds nothing). The audited tree most likely carried a defect planted by audit-seeder, and the auditor reported it as a real finding. The audit office should check AF-0140 against that run's planted-defect manifest. A re-audit can close it.
 
 ## Log
 
