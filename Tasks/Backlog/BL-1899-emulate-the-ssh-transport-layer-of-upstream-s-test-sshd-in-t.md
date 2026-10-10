@@ -4,7 +4,7 @@ title: Emulate the SSH transport layer of upstream's test sshd in the case runne
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1934, BL-1935]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -29,7 +29,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2): Split. `Curl.Protocol.Ssh.UnitTests/Fakes/InMemorySshServerSession.cs` already runs a full server-side SSH session, but as ungated test code; every type in `Curl.Protocol.Ssh.UnitLibrary` is `internal`. Decided in ADR-0456 (by Claude under Stewart's delegation): the server goes in a new `Curl.Conformance.SshServer.UnitLibrary` (+ `.UnitTests`) that reuses the SSH client's packet, negotiation, key exchange and packet protection code through `InternalsVisibleTo`, with RFC 8032's first Ed25519 key as a fixed host key so fingerprints are stable. A new project, the `Curl.slnx` edit and the SSH csproj change are outside this task's `touches`, and the port plus 100% coverage did not fit one run's budget, so the work is BL-1934 (scaffold, identification, plain packets) then BL-1935 (KEX, NEWKEYS, service request, fingerprints). What is left here once both are Done: confirm each criterion above against them, tick them, and add a paragraph to `Curl.Conformance.UnitLibrary/CLAUDE.md` pointing at the new library.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Split: waits on BL-1934 (scaffold Curl.Conformance.SshServer.UnitLibrary) and BL-1935 (key exchange to the service request), per ADR-0456
