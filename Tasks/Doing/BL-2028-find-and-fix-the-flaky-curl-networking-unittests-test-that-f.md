@@ -31,3 +31,4 @@ Curl.Networking.UnitTests passes in every full `dotnet test --filter "TestCatego
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
