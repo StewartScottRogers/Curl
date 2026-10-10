@@ -37,3 +37,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-10: Backlog -> Doing.
