@@ -299,13 +299,29 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span, .. tftp.ProtocolLog.Span], ReadOutputFile(outputFile))
+        // Read before the postcheck, as before: only the SSH upload is read after it.
+        byte[] receivedBytes = [.. server.ReceivedBytes.Span, .. ftp.ReceivedBytes.Span, .. smtp.ProtocolLog.Span, .. imap.ProtocolLog.Span, .. pop3.ProtocolLog.Span, .. mqtt.ProtocolLog.Span, .. tftp.ProtocolLog.Span];
+        byte[] outputFileBytes = ReadOutputFile(outputFile);
+        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutput.ToArray(), standardError.ToArray(), receivedBytes, outputFileBytes)
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             // A case reaches one uploading server, so at most one of these holds an upload.
             UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
-        };
-        return Judge(testCase, run);
+        });
+    }
+
+    // runtests.pl runs the postcheck, then compares <verify><upload>, so the run is built after the postcheck: it can
+    // move the upload into place (tests 624 and 625 upload into a folder and test610.pl moves the file).
+    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, Func<UpstreamCaseRun> buildRun)
+    {
+        if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
+        {
+            return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        return UpstreamCaseVerification.FindFirstDifference(testCase, buildRun()) is { } difference
+            ? UpstreamCaseOutcome.Failed(difference)
+            : UpstreamCaseOutcome.Passed;
     }
 
     // runtests.pl sets each NAME=value line of <client><setenv> for the run, an empty value as an
@@ -342,18 +358,6 @@ public sealed class UpstreamCaseRunner(
         CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();
 
     private static byte[] ReadOutputFile(string outputFile) => File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [];
-
-    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, UpstreamCaseRun run)
-    {
-        if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
-        {
-            return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");
-        }
-
-        return UpstreamCaseVerification.FindFirstDifference(testCase, run) is { } difference
-            ? UpstreamCaseOutcome.Failed(difference)
-            : UpstreamCaseOutcome.Passed;
-    }
 
     // Any exception curl lets escape is a failure of the case, not of the harness. Curl starts on
     // a thread of its own: against the in-memory server every await can complete at once, so a

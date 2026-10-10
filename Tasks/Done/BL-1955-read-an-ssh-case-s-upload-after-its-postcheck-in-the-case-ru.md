@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1955 — Read an SSH case's upload after its postcheck in the case runner
 
@@ -22,9 +22,9 @@ Found by BL-1918. `UpstreamCaseRunner.SshUpload` reads `%LOGDIR/upload.%TESTNUMB
 
 ## Acceptance criteria
 
-- [ ] 624 and 625 pass through `UpstreamCaseRunner` and are listed in `Curl.Conformance.UnitTests\PassingUpstreamCases.txt`.
-- [ ] A test in `Curl.Conformance.UnitTests` pins that the upload is read after the postcheck.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage; `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] 624 and 625 pass through `UpstreamCaseRunner` and are listed in `Curl.Conformance.UnitTests\PassingUpstreamCases.txt`.
+- [x] A test in `Curl.Conformance.UnitTests` pins that the upload is read after the postcheck.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage; `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
@@ -32,3 +32,4 @@ Found by BL-1918. `UpstreamCaseRunner.SshUpload` reads `%LOGDIR/upload.%TESTNUMB
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Runner reads the SSH upload after the postcheck; 624 and 625 pass and are listed.

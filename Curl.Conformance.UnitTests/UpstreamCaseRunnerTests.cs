@@ -601,6 +601,32 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual("public", await File.ReadAllTextAsync(Path.Combine(logDirectory, "server", "curl_client_key.pub")));
     }
 
+    [TestMethod]
+    public async Task RunAsync_WithSshServer_ReadsTheUploadAfterThePostcheckMovesItIntoPlace()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamSshServer sshServer = new(() => new RefusingConnector("ssh server"), "curltest", Encoding.ASCII.GetBytes("private"), Encoding.ASCII.GetBytes("public"), "0011", "abc/def");
+        UpstreamCaseRunner runner = new(
+            invocation =>
+            {
+                string uploaded = invocation.Arguments[0];
+                Directory.CreateDirectory(Path.GetDirectoryName(uploaded)!);
+                File.WriteAllText(uploaded, "payload\n");
+                return Task.FromResult(0);
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            sshServer);
+        string testFile = "<testcase>\n<client>\n<server>\nsftp\n</server>\n<command option=\"no-output,no-include\">\n%LOGDIR/test%TESTNUMBER.dir/file\n</command>\n</client>\n"
+            + "<verify>\n<upload>\npayload\n</upload>\n<postcheck>\n%PERL %SRCDIR/libtest/test610.pl move %LOGDIR/test%TESTNUMBER.dir/file %LOGDIR/upload.%TESTNUMBER\n</postcheck>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
     // Refuses every connection with its own name, so a test can tell it was reached.
     private sealed class RefusingConnector(string name) : IConnector
     {
