@@ -31,3 +31,4 @@ Split from BL-1922. The curl 8.21.0 tarball's tests/certs holds no certificate f
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
