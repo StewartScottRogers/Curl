@@ -209,6 +209,32 @@ public sealed class UpstreamConformanceTests
         Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
     }
 
+    // SCP downloads and uploads the SSH stand-in's scp serves (BL-1917).
+    [TestMethod]
+    [DataRow(601)]
+    [DataRow(603)]
+    [DataRow(605)]
+    [DataRow(617)]
+    [DataRow(619)]
+    [DataRow(621)]
+    [DataRow(623)]
+    [DataRow(641)]
+    [DataRow(665)]
+    [DataRow(3022)]
+    public async Task ScpTransferCase_RunThroughCurl_IsMeasuredNotSkipped(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("upstream case number", testNumber);
+        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
+
+        UpstreamCaseOutcome outcome = await RunCaseOnceAsync(testNumber, testFile);
+
+        diagnostics.Act("outcome kind", outcome.Kind);
+        diagnostics.Act("outcome detail", outcome.Detail);
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.IsFalse(outcome.Detail?.Contains(CaseHangLimitMessage, StringComparison.Ordinal) ?? false, outcome.Detail);
+    }
+
     // Every vendored case naming an SSH variable gets a value for it, so none skips for one (BL-1954).
     [TestMethod]
     public async Task SshVariableCases_RunThroughCurl_NoneSkipsForAnSshVariable()

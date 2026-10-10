@@ -36,9 +36,9 @@ internal static class UpstreamCaseScreening
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
     // Each SSH server name, with the task that is to serve its payload.
-    private static readonly Dictionary<string, string> SshServers = new(StringComparer.Ordinal) { ["scp"] = "BL-1917", ["sftp"] = "BL-1918" };
+    private static readonly Dictionary<string, string> SshServers = new(StringComparer.Ordinal) { ["sftp"] = "BL-1918" };
 
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. SshServers.Keys];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. SshServers.Keys, "scp"];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^(?:EPSV|PASV|PORT|EPRT|LPRT)\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
@@ -153,8 +153,7 @@ internal static class UpstreamCaseScreening
             ? "the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)"
             : null;
 
-    // The SSH stand-in authenticates and opens a session channel (BL-1916) but serves no SCP
-    // (BL-1917) or SFTP (BL-1918) payload yet, so only a case that ends before one runs: a
+    // The SSH stand-in runs scp (BL-1917) but serves no SFTP (BL-1918) payload yet, so only an SFTP a case that ends before one runs: a
     // command-line error (2), a host key mismatch (60) or a refused login (67).
     private static string? SshPayload(UpstreamTestCase testCase) =>
         UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(SshServers.ContainsKey) is { } server
@@ -174,13 +173,13 @@ internal static class UpstreamCaseScreening
             ? $"the FTP stand-in serves no data connection, which the case's {command.Value} opens"
             : null;
 
-    // Only the SMTP and IMAP stand-ins, plain or behind TLS, and the tftpd stand-in record an upload (BL-1909, BL-1910, BL-1914, BL-1952); any other server's case
+    // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1917); any other server's case
     // verifying <upload> keeps a reason.
-    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp"];
+    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "scp"];
 
     private static string? UploadOffMailServer(UpstreamTestCase testCase) =>
         testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(UploadingServers).Any()
-            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps and tftp servers"
+            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp and scp servers"
             : null;
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)

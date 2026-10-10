@@ -254,8 +254,8 @@ the SSH client's internal wire code from `Curl.Protocol.Ssh.UnitLibrary`, which 
 may not reference. Its `SshServerConnector` is an `IConnector` whose sessions run the SSH
 transport layer - identification exchange, `curve25519-sha256` key exchange with a fixed
 `ssh-ed25519` host key, the client's first implemented cipher and MAC, `NEWKEYS` and the
-`ssh-userauth` service request - then user authentication for `curltest` and a session
-channel; no SCP or SFTP payload yet. Its `CLAUDE.md` describes the transport and names the
+`ssh-userauth` service request - then user authentication for `curltest`, a session
+channel, and `scp` on it (BL-1917); no SFTP payload yet. Its `CLAUDE.md` describes the transport and names the
 host keys' stable `--hostpubmd5` and `--hostpubsha256` fingerprints.
 
 The runner reaches it through `UpstreamSshServer` (BL-1916, BL-1954), a record the caller builds
@@ -268,10 +268,14 @@ absolute; `%SSHSRVMD5` and `%SSHSRVSHA256` are its host key's fingerprints; and 
 its client key files are written as `%LOGDIR/server/curl_client_key` and `curl_client_key.pub`,
 as `sshserver.pl` writes them. The conformance tests pass the RSA client key and RSA host key
 fingerprints on Windows, where Curl matches curl's WinCNG build, and the Ed25519 ones elsewhere.
-Screening lets `scp` and `sftp` cases run only when `<verify><errorcode>` is 2, 60 or 67 (they end
-before any payload: a command-line error, a host key mismatch, a refused login) and otherwise skips
-them with `the SSH stand-in serves no SCP payload yet (BL-1917)` or `... SFTP ... (BL-1918)`.
-606, 607, 628, 629, 630, 631 and 656 pass.
+Screening lets `scp` cases run (BL-1917): the stand-in runs OpenSSH's `scp` source and sink on the
+real files under the case's log directory, so a download sends the `<client><file>` the case wrote and
+an upload writes `%LOGDIR/upload.%TESTNUMBER`, which the runner, given an SSH server, reads as the
+run's `<verify><upload>` bytes (screening records `<verify><upload>` for `scp` too). `sftp` cases run
+only when `<verify><errorcode>` is 2, 60 or 67 (they end before any payload: a command-line error, a
+host key mismatch, a refused login) and otherwise skip with
+`the SSH stand-in serves no SFTP payload yet (BL-1918)`. 606, 607, 628, 629, 630, 631 and 656 pass,
+and so do the SCP transfers 601, 603, 605, 617, 619, 621, 623, 641, 665 and 3022.
 
 What it is to hold in full, per ADR-0013 decision 2:
 

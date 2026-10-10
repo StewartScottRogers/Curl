@@ -215,6 +215,14 @@ public sealed class UpstreamCaseRunner(
     }
 
     // sshserver.pl writes the client's key pair into the server's log folder before the case runs.
+    // Upstream's sshd runs the real scp, which writes an upload where the URL names it; the SCP
+    // cases name %LOGDIR/upload.%TESTNUMBER, the file runtests.pl compares with <verify><upload>.
+    private byte[] ScpUpload(string logDirectory, int testNumber)
+    {
+        string upload = $"{logDirectory}/upload.{testNumber.ToString(CultureInfo.InvariantCulture)}";
+        return sshServer is not null && File.Exists(upload) ? File.ReadAllBytes(upload) : [];
+    }
+
     private void WriteSshClientKeyFiles(string logDirectory)
     {
         if (sshServer is not null)
@@ -295,7 +303,7 @@ public sealed class UpstreamCaseRunner(
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             // A case reaches one uploading server, so at most one of these holds an upload.
-            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span],
+            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ScpUpload(logDirectory, testNumber)],
         };
         return Judge(testCase, run);
     }
