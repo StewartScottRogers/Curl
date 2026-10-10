@@ -1,5 +1,5 @@
 ---
-id: BL-2028
+id: BL-2031
 title: Run the gap office's upstream cases with hand-built NTLM, as the conformance harness does (GF-0003)
 priority: High
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2028 — Run the gap office's upstream cases with hand-built NTLM, as the conformance harness does (GF-0003)
+# BL-2031 — Run the gap office's upstream cases with hand-built NTLM, as the conformance harness does (GF-0003)
 
 ## Goal
 

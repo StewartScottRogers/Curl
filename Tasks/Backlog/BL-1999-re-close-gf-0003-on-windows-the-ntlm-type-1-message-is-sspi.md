@@ -4,7 +4,7 @@ title: Re-close GF-0003: On Windows the NTLM type-1 message is SSPI's (flags 0xa
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2028, BL-2029, BL-2030]
+depends-on: [BL-2031, BL-2029, BL-2030]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests, Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
@@ -67,7 +67,7 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 
 ## Notes
 
-- Why the gap still measures: BL-1796 added `SSPI` to the Windows `curl -V` Features line, but the gap tool's `UpstreamCurlPlatform.Windows` lists no `SSPI`, so the `!SSPI` cases still run, and the tool composes Curl without ADR-0455's `usesHandBuiltNtlm: true`, so NTLM goes to SSPI. The in-repo conformance harness sets it and already passes 67, 68, 81, 89, 91, 150, 162, 822, 827, 831, 868, 873, 877, 906, 921, 933 and 1215. The tool lives in the gap office's folder, which lanes may not touch: filed BL-2028 (interactive only).
+- Why the gap still measures: BL-1796 added `SSPI` to the Windows `curl -V` Features line, but the gap tool's `UpstreamCurlPlatform.Windows` lists no `SSPI`, so the `!SSPI` cases still run, and the tool composes Curl without ADR-0455's `usesHandBuiltNtlm: true`, so NTLM goes to SSPI. The in-repo conformance harness sets it and already passes 67, 68, 81, 89, 91, 150, 162, 822, 827, 831, 868, 873, 877, 906, 921, 933 and 1215. The tool lives in the gap office's folder, which lanes may not touch: filed BL-2031 (interactive only).
 - Fixed here (Curl.Authentication): `NtlmHttpAuthenticator` failed a hand-built context's over-long type 3 with SSPI's exit 94 whenever `matchesSspiBuild` was set (Windows). A run that answers NTLM with `HandBuiltNtlmSecurityContext` is the non-SSPI build, so it now fails as curl's own NTLM does, exit 100. test775 and test776 now pass in the harness and are listed in `PassingUpstreamCases.txt`; the executable is unchanged (its Windows NTLM contexts are SSPI's). Added `Curl.Conformance.UnitTests` to touches for the passing list; no task in Doing names it.
 - Still differing in the harness, filed: BL-2029 (type-1 request of a POST/PUT must send `Content-Length: 0`: test170, 176, 239, 243, 267; touches `Curl.Protocol.Http`, which BL-2007 holds now) and BL-2030 (test169, origin Digest after proxy NTLM).
 - No option changed, so `--ai-help` needs nothing.
@@ -76,4 +76,4 @@ Make Curl's advertised features match its behaviour. On Windows, add SSPI to the
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
-- 2026-10-10: Doing -> Backlog. Waits on BL-2028 (gap tool must compose hand-built NTLM; interactive only), BL-2029 (NTLM POST Content-Length: 0) and BL-2030 (test169); test775/776 fixed here
+- 2026-10-10: Doing -> Backlog. Waits on BL-2031 (gap tool must compose hand-built NTLM; interactive only), BL-2029 (NTLM POST Content-Length: 0) and BL-2030 (test169); test775/776 fixed here
