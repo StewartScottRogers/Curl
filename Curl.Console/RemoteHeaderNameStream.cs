@@ -128,7 +128,7 @@ internal sealed class RemoteHeaderNameStream(
             return;
         }
 
-        if (output.NamedByContentDisposition || statusClass is not (2 or 3) || ContentDispositionFileName.Find(line) is not { } fileName)
+        if (ContentDispositionNameOf(line) is not { } fileName)
         {
             return;
         }
@@ -138,6 +138,16 @@ internal sealed class RemoteHeaderNameStream(
             throw new IOException($"Could not create the output file {output.Path}.");
         }
     }
+
+    /// <summary>
+    /// Finds the file name a <c>Content-Disposition</c> line gives, when the file may still be named by one.
+    /// </summary>
+    /// <param name="line">One header line, its line feed included.</param>
+    /// <returns>The name, or <see langword="null" /> when the line names none or a name was already taken or the response is not 2xx or 3xx.</returns>
+    private string? ContentDispositionNameOf(byte[] line) =>
+        output.NamedByContentDisposition || statusClass is not (2 or 3)
+            ? null
+            : ContentDispositionFileName.Find(line);
 
     /// <summary>
     /// Under <c>-L</c>, renames the not yet opened output file after a 3xx response's
