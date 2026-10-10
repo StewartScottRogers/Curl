@@ -381,6 +381,13 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"Exceeded the maximum allowed file size ({maxFileSize}) with {received} bytes");
 
     /// <summary>
+    /// The exit 63 message for a <c>--compressed</c> body whose next decoded piece would take
+    /// the output past the <c>--max-filesize</c> limit, which curl 8.21.0 prints without
+    /// writing that piece (measured, BL-2007).
+    /// </summary>
+    internal const string DecodedFileSizeLimitExceeded = "Would have exceeded max file size";
+
+    /// <summary>
     /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or
     /// <c>--fail-with-body</c>.
     /// </summary>

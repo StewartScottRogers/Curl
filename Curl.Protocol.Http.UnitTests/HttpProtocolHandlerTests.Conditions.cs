@@ -750,7 +750,7 @@ public sealed partial class HttpProtocolHandlerTests
     /// with exit 63.
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_CompressedBodyDecodesPastMaxFileSize_WritesTheLimitThenFailsWithExit63()
+    public async Task ExecuteAsync_CompressedBodyDecodesPastMaxFileSize_WritesNothingAndFailsWithExit63()
     {
         MemoryStream compressed = new();
         using (GZipStream gzip = new(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
@@ -775,10 +775,44 @@ public sealed partial class HttpProtocolHandlerTests
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
-        Diagnostics.Diff("error message", "Exceeded the maximum allowed file size (1000) with 1000 bytes", result.ErrorMessage ?? string.Empty);
-        Assert.AreEqual("Exceeded the maximum allowed file size (1000) with 1000 bytes", result.ErrorMessage);
-        Diagnostics.Assert("output length", 1000L, output.Length);
-        Assert.AreEqual(1000L, output.Length);
+        Diagnostics.Diff("error message", "Would have exceeded max file size", result.ErrorMessage ?? string.Empty);
+        Assert.AreEqual("Would have exceeded max file size", result.ErrorMessage);
+        Diagnostics.Assert("output length", 0L, output.Length);
+        Assert.AreEqual(0L, output.Length);
+    }
+
+    /// <summary>
+    /// BL-2007: the decoded pieces that fit under <c>--max-filesize</c> are written whole, and
+    /// the piece that would cross it is not written at all before exit 63.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_CompressedBodyDecodesPastMaxFileSizeAfterAPieceFits_WritesOnlyWholePiecesThatFit()
+    {
+        MemoryStream compressed = new();
+        using (GZipStream gzip = new(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
+        {
+            gzip.Write(new byte[100_000]);
+        }
+
+        string body = Encoding.Latin1.GetString(compressed.ToArray());
+        string response = $"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: {body.Length}\r\n\r\n{body}";
+        MemoryStream output = new();
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18803),
+            Output = output,
+            MaxFileSize = 20000,
+            Http = new HttpRequestOptions { Compressed = true },
+        };
+        Diagnostics.Arrange("max file size, encoded length, decoded length", $"20000, {body.Length}, 100000");
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(response, 65536))).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
+        Diagnostics.Assert("output length", 16384L, output.Length);
+        Assert.AreEqual(16384L, output.Length);
     }
 
     [TestMethod]
