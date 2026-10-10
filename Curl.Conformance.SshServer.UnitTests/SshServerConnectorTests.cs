@@ -1,7 +1,9 @@
+using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
 using Curl.Protocol.Ssh.Authentication;
+using Curl.Protocol.Ssh.Connection;
 using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.Transport;
@@ -72,6 +74,35 @@ public sealed class SshServerConnectorTests
 
         Assert.AreEqual(hostKeyAlgorithm, result.Algorithms.ServerHostKey);
         CollectionAssert.AreEqual(client.SessionIdentifier, session.SessionIdentifier);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ClientLogsInByPasswordAndRunsExec_ChannelCarriesDataBothWaysAndCloses()
+    {
+        SshServerConnector connector = new(new SystemSshRandomSource());
+        SshTransport client = await ConnectAsync(connector, "aes128-ctr", "hmac-sha2-256");
+        await HandshakeAsync(client);
+        SshSessionChannel clientChannel = new(client);
+
+        await new SshUserAuthentication(client, Encoding.UTF8).AuthenticateAsync(new NetworkCredential(SshServerClientAccount.User, SshServerClientAccount.Password), CancellationToken.None);
+        Assert.IsTrue(await clientChannel.OpenAsync(CancellationToken.None));
+        bool started = await clientChannel.RequestExecAsync("scp -f /file"u8.ToArray(), CancellationToken.None);
+        SshServerSessionChannel channel = await connector.Channels.Single();
+        await channel.WriteDataAsync("hello"u8.ToArray(), CancellationToken.None);
+        byte[] buffer = new byte[16];
+        int read = await clientChannel.ReadAsync(buffer, CancellationToken.None);
+        await clientChannel.SendAsync("ack"u8.ToArray(), CancellationToken.None);
+        byte[] received = await channel.ReadDataAsync(CancellationToken.None);
+        await channel.CloseAsync(0, CancellationToken.None);
+        await clientChannel.CloseAsync(CancellationToken.None);
+
+        Assert.IsTrue(started);
+        Assert.AreEqual(SshServerClientAccount.User, channel.User);
+        Assert.AreEqual("exec", channel.ProcessRequest);
+        Assert.AreEqual("scp -f /file", channel.Process);
+        CollectionAssert.AreEqual("hello"u8.ToArray(), buffer[..read]);
+        CollectionAssert.AreEqual("ack"u8.ToArray(), received);
+        Assert.IsEmpty(await channel.ReadDataAsync(CancellationToken.None));
     }
 
     [TestMethod]

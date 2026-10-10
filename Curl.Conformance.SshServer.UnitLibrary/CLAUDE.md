@@ -30,7 +30,19 @@ upstream's `tests/data` can run in memory (BL-1899). Read ADR-0456 before changi
   `none` compression, no strict key exchange. After `NEWKEYS` both directions are
   protected, and `AcceptServiceRequestAsync` accepts `ssh-userauth` (any other service
   throws). A session's task in `Sessions` completes there (BL-1935).
-- Next: authentication, then the SCP and SFTP subsystems.
+- `SshServerUserAuthentication` then answers `ssh-userauth` requests for the one
+  `SshServerClientAccount` (user `curltest`): `none` and every other method fail naming
+  `publickey,password`; `password` succeeds with `curltest-password`; `publickey` answers
+  `PK_OK` for the account's `ssh-ed25519` key or its RSA twin `SshServerRsaClientKey` (as
+  `ssh-rsa`, `rsa-sha2-256` or `rsa-sha2-512`) and `SUCCESS` for a valid signature over
+  the session identifier and request (BL-1953). Any other user fails.
+- `SshServerSessionChannel` then confirms the client's `session` channel (window 2 MiB,
+  packets of 32768), refuses every request that wants a reply until an `exec` or
+  `subsystem` request, which it accepts and keeps as `ProcessRequest` and `Process`;
+  `ReadDataAsync` and `WriteDataAsync` carry data with window accounting both ways, and
+  `CloseAsync` sends `exit-status`, `EOF` and `CLOSE`. `SshServerConnector.Channels` lists
+  each connection's channel, completing once the process is started.
+- Next: the SCP and SFTP processes on the channel (BL-1917, BL-1918).
 
 ## The host keys and their fingerprints
 
@@ -57,4 +69,6 @@ wherever a case asks for the server's MD5 or SHA-256 host key fingerprint.
 authentication on Windows, where curl's WinCNG build reads no Ed25519 or ECDSA private key
 (upstream's `sshserver.pl` generates RSA client keys too): `PrivateKeyPem` is the PKCS #1
 file a case passes as `--key`, `PublicKeyLine` the `ssh-rsa` line for `--pubkey` and the
-account's authorized key. Authentication (BL-1916) is to accept it.
+account's authorized key. Authentication accepts it beside the Ed25519 key, whose
+`openssh-key-v1` and `authorized_keys` files `SshServerClientAccount.CreatePrivateKeyFile`
+and `CreatePublicKeyFile` write (BL-1953).

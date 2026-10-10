@@ -33,10 +33,55 @@ internal static class SshServerRsaClientKey
     /// </summary>
     internal static string PublicKeyLine { get; } = KeyType + " " + Convert.ToBase64String(PublicKeyBlob);
 
+    /// <summary>
+    /// Gets whether a <c>publickey</c> request's algorithm signs with this key: <c>ssh-rsa</c>
+    /// (SHA-1), <c>rsa-sha2-256</c> or <c>rsa-sha2-512</c> (RFC 8332).
+    /// </summary>
+    /// <param name="algorithm">The algorithm the request names.</param>
+    /// <returns>Whether the algorithm is one of the three.</returns>
+    internal static bool IsSignatureAlgorithm(string algorithm) => algorithm is KeyType or "rsa-sha2-256" or "rsa-sha2-512";
+
+    /// <summary>Checks a PKCS #1 v1.5 signature made with this key under one of its algorithms.</summary>
+    /// <param name="algorithm">The algorithm, one <see cref="IsSignatureAlgorithm" /> accepts.</param>
+    /// <param name="signedData">The data the client signed.</param>
+    /// <param name="signature">The signature's bytes.</param>
+    /// <returns>Whether the signature is this key's over the data.</returns>
+    internal static bool Verifies(string algorithm, ReadOnlySpan<byte> signedData, ReadOnlySpan<byte> signature)
+    {
+        using RSA rsa = CreateKey();
+        return rsa.VerifyData(signedData, signature, HashFor(algorithm), RSASignaturePadding.Pkcs1);
+    }
+
+    /// <summary>Signs data with this key, as the client would.</summary>
+    /// <param name="algorithm">The algorithm, one <see cref="IsSignatureAlgorithm" /> accepts.</param>
+    /// <param name="data">The data to sign.</param>
+    /// <returns>The signature blob: the algorithm's name, then the signature, both as strings.</returns>
+    internal static byte[] Sign(string algorithm, ReadOnlySpan<byte> data)
+    {
+        using RSA rsa = CreateKey();
+        SshWireWriter writer = new();
+        writer.WriteString(Encoding.ASCII.GetBytes(algorithm));
+        writer.WriteString(rsa.SignData(data.ToArray(), HashFor(algorithm), RSASignaturePadding.Pkcs1));
+        return writer.ToArray();
+    }
+
+    private static HashAlgorithmName HashFor(string algorithm) => algorithm switch
+    {
+        "rsa-sha2-256" => HashAlgorithmName.SHA256,
+        "rsa-sha2-512" => HashAlgorithmName.SHA512,
+        _ => HashAlgorithmName.SHA1,
+    };
+
+    private static RSA CreateKey()
+    {
+        RSA rsa = RSA.Create();
+        rsa.ImportRSAPrivateKey(Convert.FromBase64String(PrivateKeyPkcs1), out _);
+        return rsa;
+    }
+
     private static byte[] CreateBlob()
     {
-        using RSA rsa = RSA.Create();
-        rsa.ImportRSAPrivateKey(Convert.FromBase64String(PrivateKeyPkcs1), out _);
+        using RSA rsa = CreateKey();
         RSAParameters parameters = rsa.ExportParameters(includePrivateParameters: false);
         SshWireWriter writer = new();
         writer.WriteString(Encoding.ASCII.GetBytes(KeyType));
