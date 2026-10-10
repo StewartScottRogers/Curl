@@ -7,7 +7,8 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Answers Digest challenges (RFC 7616) with the <c>Authorization</c> value curl 8.21.0
-/// builds in its own Digest code, the one the OpenSSL build uses (ADR-0025): MD5, SHA-256
+/// builds in its own Digest code, the one the OpenSSL build uses (ADR-0025), or laid out as its
+/// Schannel build's SSPI lays it out (<c>matchesSspiBuild</c>): MD5, SHA-256
 /// and SHA-512-256, their <c>-sess</c> variants, <c>qop=auth</c> and <c>auth-int</c>, and
 /// <c>userhash</c>.
 /// </summary>
@@ -32,7 +33,13 @@ namespace Curl.Authentication;
 /// each first answer uses are written to the diagnostic log at <c>verbose</c> (BL-923).
 /// </remarks>
 /// <param name="diagnosticLog">Where the algorithm and qop chosen are logged; <see langword="null" /> logs nothing.</param>
-public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string> createClientNonce, IDiagnosticLog? diagnosticLog = null) : IHttpAuthenticator
+/// <param name="matchesSspiBuild">
+/// <see langword="true" /> writes the value as curl 8.21.0's Schannel build does through SSPI
+/// (BL-2022): no blank after each comma, <c>algorithm</c> before <c>response</c>, <c>qop</c>
+/// quoted after it and <c>opaque</c> last. <see langword="false" />, the default, writes curl's
+/// own form, the OpenSSL build's: <c>, </c> between parameters in RFC 7616's order.
+/// </param>
+public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string> createClientNonce, IDiagnosticLog? diagnosticLog = null, bool matchesSspiBuild = false) : IHttpAuthenticator
 {
     private readonly AuthDiagnosticLog log = new(diagnosticLog);
 
@@ -118,7 +125,31 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
         return FormatValue(challenge, request.RequestTarget, challenge.UserHash ? algorithm.HashToHex(user + ":" + realm) : user, realm, clientNonce, nonceCount, response);
     }
 
-    private static string FormatValue(DigestChallenge challenge, string uri, string username, string realm, string clientNonce, string nonceCount, string response)
+    private string FormatValue(DigestChallenge challenge, string uri, string username, string realm, string clientNonce, string nonceCount, string response) =>
+        matchesSspiBuild
+            ? FormatSspiValue(challenge, uri, username, realm, clientNonce, nonceCount, response)
+            : FormatOwnValue(challenge, uri, username, realm, clientNonce, nonceCount, response);
+
+    // The order SSPI writes, measured from curl 8.21.0's Schannel build (BL-2022): no blank
+    // after a comma, algorithm before the response, qop quoted after it, and opaque last.
+    private static string FormatSspiValue(DigestChallenge challenge, string uri, string username, string realm, string clientNonce, string nonceCount, string response)
+    {
+        StringBuilder value = new();
+        value.Append("username=\"").Append(DigestQuoting.Quote(username));
+        value.Append("\",realm=\"").Append(DigestQuoting.Quote(realm));
+        value.Append("\",nonce=\"").Append(DigestQuoting.Quote(challenge.Nonce));
+        value.Append("\",uri=\"").Append(DigestQuoting.Quote(uri)).Append("\",");
+        value.Append(challenge.Qop is null ? string.Empty : $"cnonce=\"{clientNonce}\",nc={nonceCount},");
+        value.Append(challenge.AlgorithmName is null ? string.Empty : "algorithm=" + challenge.AlgorithmName + ",");
+        value.Append("response=\"").Append(response).Append('"');
+        value.Append(challenge.Qop is null ? string.Empty : $",qop=\"{challenge.Qop}\"");
+        value.Append(challenge.Opaque is null ? string.Empty : ",opaque=\"" + DigestQuoting.Quote(challenge.Opaque) + "\"");
+        value.Append(challenge.UserHash ? ",userhash=true" : string.Empty);
+        return value.ToString();
+    }
+
+    // The order curl's own Digest code writes (vauth/digest.c), the OpenSSL build's.
+    private static string FormatOwnValue(DigestChallenge challenge, string uri, string username, string realm, string clientNonce, string nonceCount, string response)
     {
         StringBuilder value = new();
         value.Append("username=\"").Append(DigestQuoting.Quote(username));
