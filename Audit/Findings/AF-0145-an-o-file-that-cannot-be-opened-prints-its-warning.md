@@ -3,8 +3,8 @@ id: AF-0145
 title: An -o file that cannot be opened prints its Warning line inside the progress-meter row instead of after the meter's closing newline
 auditor: conformance
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/CurlCommandRunner.cs:output-open-warning-after-meter:stderr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ $o="$env:TEMP\ac-odir"; $a=@('--output','missing.txt/f.txt','http://127.0.0.1:50
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
