@@ -109,7 +109,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -l --ftp-method nocwd ftp://127.0.0.1:47380/a/b/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             "ftp://127.0.0.1:47380/a/b/f.txt",
             LoggedIn + Passive + Opened + Complete + Bye,
             context =>
@@ -164,7 +164,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q NOOP -Q "+SITE A" -Q "-DELE f.txt" -Q "*BOGUS" ftp://127.0.0.1:47380/d/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + Ok + NotImplemented + DirectoryChanged + Passive + Ok + Sized + Opened + Complete + "250 Deleted\r\n" + Bye,
             Quotes("NOOP", "+SITE A", "-DELE f.txt", "*BOGUS"));
@@ -208,7 +208,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q "-BOGUS x" ftp://127.0.0.1:47380/d/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + DirectoryChanged + Passive + Sized + Opened + Complete + NotImplemented + Bye,
             Quotes("-BOGUS x"));
@@ -225,7 +225,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q "-*BOGUS x" ftp://127.0.0.1:47380/d/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + DirectoryChanged + Passive + Sized + Opened + Complete + NotImplemented + Bye,
             Quotes("-*BOGUS x"));
@@ -241,7 +241,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q "RNFR a" ftp://127.0.0.1:47380/d/f.txt, RNFR answered 350 Ready
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + "350 Ready\r\n" + DirectoryChanged + Passive + Sized + Opened + Complete + Bye,
             Quotes("RNFR a"));
@@ -270,7 +270,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q "*" ftp://127.0.0.1:47380/d/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + NotImplemented + DirectoryChanged + Passive + Sized + Opened + Complete + Bye,
             Quotes("*"));
@@ -286,7 +286,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q "+*BOGUS" -Q "*-X" ftp://127.0.0.1:47380/d/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + NotImplemented + DirectoryChanged + Passive + NotImplemented + Sized + Opened + Complete + Bye,
             Quotes("+*BOGUS", "*-X"));
@@ -355,7 +355,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q NOOP -Q +NOOP -Q -NOOP -T up.txt ftp://127.0.0.1:47380/d/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + Ok + DirectoryChanged + Passive + Ok + Opened + Complete + Ok + Bye,
             context =>
@@ -376,7 +376,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -C - -Q +NOOP -T up.txt ftp://127.0.0.1:47380/d/f.txt, SIZE answered 213 2
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + DirectoryChanged + Passive + Ok + "213 2\r\n" + Opened + Complete + Bye,
             context =>
@@ -415,7 +415,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -Q NOOP -Q +NOOP -Q -NOOP ftp://127.0.0.1:47380/d/
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             DirectoryUrl,
             LoggedIn + Ok + DirectoryChanged + Passive + Ok + Opened + Complete + Ok + Bye,
             Quotes("NOOP", "+NOOP", "-NOOP"));
@@ -445,7 +445,7 @@ public sealed class FtpProtocolHandlerQuoteTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -C 1 -Q +NOOP ftp://127.0.0.1:47380/d/f.txt
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + DirectoryChanged + Passive + Ok + Sized + "350 Restarting at 1\r\n" + Opened + Complete + Bye,
             context =>
@@ -498,7 +498,7 @@ public sealed class FtpProtocolHandlerQuoteTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -r 0-0 -Q -NOOP ftp://127.0.0.1:47380/d/f.txt: the recorder sent 226 before
         // curl's ABOR, so curl read 226 for ABOR and ABOR's 502 for NOOP, and failed.
-        FtpRun run = await RunAsync(diagnostics, 
+        FtpRun run = await RunAsync(diagnostics,
             Url,
             LoggedIn + DirectoryChanged + Passive + Sized + Opened + Complete + NotImplemented + Ok + Bye,
             context =>

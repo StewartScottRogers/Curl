@@ -124,6 +124,24 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
     public bool HasBufferedNegativeReply => bufferStart < bufferEnd && buffer[bufferStart] > (byte)'3';
 
     /// <summary>
+    /// Gets the bytes read from the connection past the last reply, which the next transfer on a
+    /// kept connection reads first (BL-1981).
+    /// </summary>
+    public byte[] UnreadBytes => buffer[bufferStart..bufferEnd];
+
+    /// <summary>
+    /// Reads <paramref name="unread" /> before anything more from the connection: the bytes a
+    /// previous transfer on the kept connection read past its last reply. Called before any read.
+    /// </summary>
+    /// <param name="unread">The bytes, at most a buffer's worth.</param>
+    public void ReadFirst(byte[] unread)
+    {
+        unread.CopyTo(buffer, 0);
+        bufferStart = 0;
+        bufferEnd = unread.Length;
+    }
+
+    /// <summary>
     /// Reads the next complete reply.
     /// </summary>
     /// <returns>

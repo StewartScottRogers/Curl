@@ -63,13 +63,47 @@ internal sealed record FtpUrlPath(IReadOnlyList<string> Directories, string File
             return null;
         }
 
-        return method switch
+        string rawPath = string.Join('/', decoded[1..]);
+        FtpUrlPath split = method switch
         {
-            FtpFileMethod.NoCwd => SplitForNoCwd(string.Join('/', decoded[1..])),
-            FtpFileMethod.SingleCwd => SplitForSingleCwd(string.Join('/', decoded[1..])),
-            _ => SplitForMultiCwd(string.Join('/', decoded[1..])),
+            FtpFileMethod.NoCwd => SplitForNoCwd(rawPath),
+            FtpFileMethod.SingleCwd => SplitForSingleCwd(rawPath),
+            _ => SplitForMultiCwd(rawPath),
         };
+        return split with { RawPath = rawPath, Method = method };
     }
+
+    /// <summary>Gets the percent-decoded path after the URL path's first <c>/</c>, curl's <c>rawPath</c>.</summary>
+    public string RawPath { get; private init; } = string.Empty;
+
+    /// <summary>Gets the <c>--ftp-method</c> the path was split for.</summary>
+    public FtpFileMethod Method { get; private init; }
+
+    /// <summary>
+    /// Gets what curl 8.21.0's <c>ftp_done</c> remembers as <c>prevpath</c> after a transfer on
+    /// this path: <see langword="null" /> for an absolute <c>nocwd</c> path, the empty string
+    /// (the entry directory) for a relative <c>nocwd</c> one, and otherwise
+    /// <see cref="RawPath" /> without the file name (BL-1981).
+    /// </summary>
+    public string? DirectoryToRemember => IsAbsoluteWithoutCwd ? null : DirectoryPart;
+
+    /// <summary>
+    /// Gets whether the path is an absolute <c>nocwd</c> one, for which curl 8.21.0 sends no
+    /// <c>CWD</c> at all, not even back to the entry directory on a reused connection.
+    /// </summary>
+    public bool IsAbsoluteWithoutCwd => Method == FtpFileMethod.NoCwd && RawPath.StartsWith('/');
+
+    private string DirectoryPart =>
+        Method == FtpFileMethod.NoCwd ? string.Empty : RawPath[..^FileName.Length];
+
+    /// <summary>
+    /// Tells whether a reused connection that remembers <paramref name="previousPath" /> is
+    /// already where this path's transfer takes place, as curl 8.21.0's <c>ftp_parse_url</c>
+    /// compares <c>prevpath</c>: for <c>nocwd</c>, when it remembers the entry directory.
+    /// </summary>
+    /// <param name="previousPath">The kept connection's remembered directory, or <see langword="null" />.</param>
+    /// <returns><see langword="true" /> when no <c>CWD</c> is needed.</returns>
+    public bool IsReachedFrom(string? previousPath) => previousPath is not null && previousPath == DirectoryPart;
 
     private static FtpUrlPath SplitForMultiCwd(string path)
     {

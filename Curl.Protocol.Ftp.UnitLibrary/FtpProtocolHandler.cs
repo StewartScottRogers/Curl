@@ -258,8 +258,9 @@ public sealed class FtpProtocolHandler : IProtocolHandler
             Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
             TcpIoTrace = FtpTcpIoTraces.ForControl(implicitTls, FtpTlsRequirements.Of(context)),
+            PoolScheme = url.Scheme,
         };
-        ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        ConnectResult connected = await ConnectControlAsync(target, FtpKeptConnection.LoginKeyOf(context), context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
             var failed = new TransferResult(connected.ExitCode, 0, connected.ErrorMessage)
@@ -275,15 +276,33 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         await using (connection.ConfigureAwait(false))
         {
             var name = new FtpControlConnectionName(connected.ConnectionNumber, target.Host, target.Port);
-            return await TransferAsync(connection, name, connectEvents.Opened, controlConnectEvents, context, implicitTls, started, trace).ConfigureAwait(false);
+            return await TransferAsync(connection, name, connectEvents.Opened, controlConnectEvents, context, implicitTls, started, trace, connected.IsReused ? connection.Session as FtpKeptConnection : null).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, InfoLineStoppingTransferEvents controlConnectEvents, ITransferContext context, bool implicitTls, long started, FtpStateTrace trace)
+    /// <summary>
+    /// Connects the control connection, which the run's connection cache may serve from a
+    /// connection a previous URL left intact (BL-1981); one kept for another login is closed,
+    /// with its <c>QUIT</c>, and the connect tried again, as curl 8.21.0 reuses an FTP
+    /// connection only for the same login.
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectControlAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
+    {
+        ConnectResult connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        while (connected is { IsReused: true, Connection: { Session: FtpKeptConnection kept } connection } && !kept.Serves(loginKey))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+
+        return connected;
+    }
+
+    private async ValueTask<TransferResult> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, InfoLineStoppingTransferEvents controlConnectEvents, ITransferContext context, bool implicitTls, long started, FtpStateTrace trace, FtpKeptConnection? reused)
     {
         var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace);
+        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

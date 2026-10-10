@@ -20,7 +20,7 @@ public sealed class FtpProtocolHandlerInterfaceNameTests
 {
     public TestContext TestContext { get; set; } = null!;
 
-    private const string Url ="ftp://127.0.0.1:47471/a.txt";
+    private const string Url = "ftp://127.0.0.1:47471/a.txt";
 
     private const string LoggedIn = "220 Recorder ready\r\n331 Password required\r\n230 Logged in\r\n257 \"/\" is current directory\r\n";
 
