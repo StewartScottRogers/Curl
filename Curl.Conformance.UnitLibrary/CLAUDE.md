@@ -121,6 +121,17 @@ asynchronously only, what the other writes, and reads 0 once the other end is di
 drained. Tests reload a generated certificate through PKCS#12, since Windows Schannel and macOS
 reject an ephemeral server key.
 
+`UpstreamTestCertificateGenerator` (BL-1923) writes the files cases read through
+`%CERTDIR/certs/`, as upstream's `tests/certs/genserv.pl` does with OpenSSL at build time,
+from the vendored `.prm` files (read by `UpstreamCertificateParameters`) and the BCL only: a
+P-256 test CA from `test-ca.prm` (`.key`, `.cacert`, `.crt`, `.der`, 6000 days), then for every
+other `test-*.prm` a P-256 key and a 300-day certificate the CA signs (`.key`, `.pub.pem`,
+`.pub.der`, `.crt`, `.der`, a `.crl` revoking it, and the `.pem` of prm text, key and
+certificate), with the subject and `x509v3` extensions the `.prm` names, including
+`test-localhost0h.prm`'s raw `DER:` subject alternative name. `.cacert` and `.crt` hold the PEM
+block without OpenSSL's text dump. An extension, key usage or name form it does not write
+throws `FormatException`.
+
 `UpstreamCaseRunner.RunAsync` runs one case end to end (ADR-0013, decision 4): it expands
 the file for an `UpstreamCurlPlatform` (the features Curl reports and its null device),
 asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a server other
@@ -129,7 +140,7 @@ than `http`, `file` or `none`, a missing feature, a variable with no value, an u
 outside the case's log directory; `%PWD` has a value only when the caller names a tests
 directory, and `%CERTDIR` only when it names a certificate directory: the folder holding
 upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the
-conformance tests pass the vendored `UpstreamTestData`); a log, tests or certificate directory
+conformance tests pass the parent of the `certs` folder `UpstreamTestCertificateGenerator` writes, BL-1923); a log, tests or certificate directory
 holding a blank is refused, since commands name them unquoted, GF-0044), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against

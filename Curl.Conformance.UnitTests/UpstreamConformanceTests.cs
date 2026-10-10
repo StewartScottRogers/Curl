@@ -36,6 +36,10 @@ public sealed class UpstreamConformanceTests
     // space that an unquoted %LOGDIR in a command would split, as upstream's relative log/ never does.
     private static readonly string LogFolder = Path.Combine(AppContext.BaseDirectory, "log");
 
+    // The files cases read through %CERTDIR/certs/, generated once per run from the vendored
+    // .prm files as upstream's genserv.pl does at build time (BL-1923); %CERTDIR is their parent.
+    private static readonly Lazy<string> CertificateFolder = new(GenerateCertificates);
+
     private static readonly IReadOnlySet<int> PassingCases =
         UpstreamCaseRatchet.ReadPassingList(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, UpstreamCaseRatchet.PassingListFileName)));
 
@@ -96,7 +100,7 @@ public sealed class UpstreamConformanceTests
         try
         {
             UpstreamCaseRunner runner = new(RunCurlAsync, Platform, TimeProvider.System, TimeLimit);
-            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
+            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
         {
@@ -130,6 +134,14 @@ public sealed class UpstreamConformanceTests
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
             usesHandBuiltNtlm: true).RunAsync(invocation.Arguments);
+
+    private static string GenerateCertificates()
+    {
+        string certificateDirectory = Path.Combine(AppContext.BaseDirectory, "UpstreamCertificates");
+        new UpstreamTestCertificateGenerator(TimeProvider.System)
+            .Generate(Path.Combine(UpstreamTestDataFolder, "certs"), Path.Combine(certificateDirectory, "certs"));
+        return certificateDirectory;
+    }
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
     private static void DeleteLogDirectory(DirectoryInfo logDirectory)
