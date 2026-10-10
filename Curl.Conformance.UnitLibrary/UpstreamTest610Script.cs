@@ -24,7 +24,8 @@ internal static class UpstreamTest610Script
 
     private const int Die = 255;
 
-    private const string ScriptName = "test610.pl";
+    /// <summary>The file name of the upstream script this class emulates.</summary>
+    public const string ScriptName = "test610.pl";
 
     private static readonly UpstreamPerlOneLinerResult Passed = new(0, "");
 

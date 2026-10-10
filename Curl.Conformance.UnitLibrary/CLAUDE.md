@@ -239,9 +239,11 @@ that exits non-zero fails it. A check line `%RESOLVE [--ipv4|--ipv6] NAME` (`%RE
 without any lookup, so the answer is platform-neutral: an IP literal resolves in its own family
 only, the names `localhost` (both) and `ip6-localhost` (IPv6) resolve, and anything else prints
 `Resolving IPv6 'NAME' didn't work` (or `IPv4`) and exits 1, so the precheck skips the case
-with that line; `%HOST6IP` is `[::1]`, which lets test1085 run. Any other check line skips the case, naming it. Nothing calls the two script
-emulations yet: their check lines reach the runner as `perl ./libtest/test613.pl ...` and skip
-as uninterpreted until BL-1894 routes them. The result is an
+with that line; `%HOST6IP` is `[::1]`, which lets test1085 run. A `%PERL` check line goes through `UpstreamPerlCheckLine` (BL-1894), which
+runs a `-e` one-liner with `UpstreamPerlOneLiner` and a line whose program is `test610.pl` or
+`test613.pl`, in whatever folder (`perl ./libtest/test613.pl ...`), with `UpstreamTest610Script`
+or `UpstreamTest613Script`; test1013.pl and test1022.pl, which compare with `../curl-config`, are
+not emulated. Any other check line skips the case, naming it. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list.
