@@ -335,6 +335,18 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("client", "precheck", "resolve --ipv6 ip6-localhost")]
+    [DataRow("client", "precheck", "sh -c true")]
+    [DataRow("verify", "postcheck", "resolve --ipv4 localhost")]
+    [DataRow("verify", "postcheck", "sh -c true")]
+    public void FindSkipReason_PrecheckOrPostcheckPart_IsNeverAnUnactedPart(string section, string name, string line)
+    {
+        string? reason = Screen(RunnableClient + $"<{section}>\n<{name}>\n{line}\n</{name}>\n</{section}>\n");
+
+        Assert.DoesNotContain($"the harness does not act on <{section}><{name}>", reason ?? "");
+    }
+
+    [TestMethod]
     [DataRow("client", "precheck", "perl -e \"if('[::1]' ne '[::1]') {print 'x';} else {exec 'resolve --ipv6 ip6-localhost'; print 'Cannot run precheck resolve';}\"")]
     [DataRow("verify", "postcheck", "sh -c true")]
     public void FindSkipReason_CheckLineNotInterpreted_NamesTheLine(string section, string name, string line)
