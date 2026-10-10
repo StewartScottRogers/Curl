@@ -34,3 +34,4 @@ Add to the stand-in, BCL only, reusing the client's own key-exchange code from C
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
