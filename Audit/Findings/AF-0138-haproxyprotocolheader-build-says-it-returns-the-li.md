@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitLibrary/HaproxyProtocolHeader.cs -Simple
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: 'ASCII bytes' no longer matches in Curl.Networking.UnitLibrary/HaproxyProtocolHeader.cs. Line 42 still uses Encoding.UTF8.GetBytes, and the doc (line 30) now says 'The line's UTF-8 bytes (plain ASCII unless a --haproxy-clientip value is not), ending in CRLF'. That agrees with the code.
+
 ## Log
 
 - 2026-10-09: filed proposed.

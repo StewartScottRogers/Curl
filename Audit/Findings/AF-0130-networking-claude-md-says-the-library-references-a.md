@@ -3,8 +3,8 @@ id: AF-0130
 title: Networking CLAUDE.md says the library references Abstractions, Tls, Quic and Kerberos and nothing else, but it also references Curl.Http2.UnitLibrary
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).
 key: truthfulness:Curl.Networking.UnitLibrary/CLAUDE.md:ProjectReferences:false-statement
 reproduction: none
 task: BL-1880
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 64e750b3931ea71536d942080142f37bfc4c9ccf
 scorecard: 2026-10-09_0225.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-09_0647.md, 2026-10-09_1435.md
 ---
 # AF-0130 - Networking CLAUDE.md says the library references Abstractions, Tls, Quic and Kerberos and nothing else, but it also references Curl.Http2.UnitLibrary
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.cspr
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: the csproj still references Curl.Http2.UnitLibrary (line 9), and (Select-String Curl.Networking.UnitLibrary/CLAUDE.md -SimpleMatch 'Http2').Count is now 2. Lines 7-10 list the Http2 reference (for Http2ProxyTunnelConnection) before 'and nothing else'.
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: the csproj still references Curl.Http2.UnitLibrary (line 9), and (Select-String Curl.Networking.UnitLibrary/CLAUDE.md -SimpleMatch 'Http2').Count is 2. CLAUDE.md line 9 now names `Curl.Http2.UnitLibrary`, whose Http2Connection carries the CONNECT stream of an h2 HTTPS proxy tunnel, before 'and nothing else'.
 
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).

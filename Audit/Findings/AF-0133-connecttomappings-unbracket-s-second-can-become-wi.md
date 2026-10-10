@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction (-Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -ExcludeBaselineFailures -TimeoutSeconds 600). The sample included ConnectToMappings.cs:153 [Unbracket] 'host.StartsWith('[') && host.EndsWith(']')' -> '||' (the second &&), outcome killed.
+
 ## Log
 
 - 2026-10-09: filed proposed.
