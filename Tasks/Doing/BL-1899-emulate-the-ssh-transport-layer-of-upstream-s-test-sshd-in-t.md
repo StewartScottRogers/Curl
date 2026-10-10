@@ -36,3 +36,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Split: waits on BL-1934 (scaffold Curl.Conformance.SshServer.UnitLibrary) and BL-1935 (key exchange to the service request), per ADR-0456
+- 2026-10-09: Backlog -> Doing.
