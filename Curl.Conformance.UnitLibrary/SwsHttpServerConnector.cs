@@ -110,6 +110,14 @@ public sealed class SwsHttpServerConnector : IConnector
     public ReadOnlyMemory<byte> ProxyReceivedBytes => proxyRecording.Bytes;
 
     /// <summary>
+    /// Given the port a <c>CONNECT</c> through <see cref="ProxyPort"/> names, the connector whose
+    /// server the tunnel is relayed to once the <c>&lt;connect&gt;</c> reply has been sent, as
+    /// upstream's http-proxy connects to that port (a POP3, SMTP or IMAP stand-in, BL-2011);
+    /// <see langword="null"/>, or no function, serves the tunnelled requests from this emulation.
+    /// </summary>
+    public Func<int, IConnector?>? TunnelServerForPort { get; set; }
+
+    /// <summary>
     /// Gives up on the server once the harness no longer waits for the run using it: from then
     /// on connecting, and reading or writing on any connection it opened, throws
     /// <see cref="IOException"/>, so a run that outlived its time limit stops at its next exchange.
@@ -129,6 +137,7 @@ public sealed class SwsHttpServerConnector : IConnector
             LocalEndPoint = new IPEndPoint(LoopbackFor(target.Host), FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
             RemoteEndPoint = new IPEndPoint(LoopbackFor(target.Host), target.Port),
             TunnelRecording = target.Port == ProxyPort ? recording : null,
+            TunnelServerForPort = TunnelServerForPort,
         }));
     }
 

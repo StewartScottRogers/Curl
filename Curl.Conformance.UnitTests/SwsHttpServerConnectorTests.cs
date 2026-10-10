@@ -63,6 +63,74 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToTheProxyPortWithATunnelServer_RelaysTheTunnelToThatServer()
+    {
+        const string Connect = "CONNECT pop.1319:8999 HTTP/1.1\r\n\r\n";
+        SwsHttpServerConnector tunnelled = new(Case(Reply("data", "tunnelled\n")));
+        int? relayedPort = null;
+        SwsHttpServerConnector server = new(Case(Reply("connect", "HTTP/1.1 200 OK\n\n"), Reply("data", "first\n")))
+        {
+            TunnelServerForPort = port => (relayedPort = port) == 8999 ? tunnelled : null,
+        };
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+
+        await WriteAsync(proxy, Connect);
+        string connectReply = await ReadOnceAsync(proxy);
+        string tunnelReply = await ExchangeAsync(proxy, Get);
+        await proxy.DisposeAsync();
+
+        Assert.AreEqual("HTTP/1.1 200 OK\n\n", Observe("CONNECT reply", "HTTP/1.1 200 OK\n\n", connectReply));
+        Assert.AreEqual("tunnelled\n", Observe("tunnelled reply", "tunnelled\n", tunnelReply));
+        Assert.AreEqual(8999, relayedPort);
+        Assert.AreEqual(Get, Text(tunnelled.ReceivedBytes));
+        Assert.AreEqual(Connect, Text(server.ProxyReceivedBytes));
+        Assert.IsEmpty(Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToTheProxyPortWhenTheTunnelServerRefuses_ReadsAClosedTunnel()
+    {
+        SwsHttpServerConnector tunnelled = new(Case(Reply("data", "tunnelled\n")));
+        SwsHttpServerConnector server = new(Case(Reply("connect", "HTTP/1.1 200 OK\n\n")))
+        {
+            TunnelServerForPort = _ => new NoListenPortConnector(tunnelled),
+        };
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+
+        await WriteAsync(proxy, $"CONNECT a:{NoListenPortConnector.NoListenPort} HTTP/1.1\r\n\r\n");
+        await ReadOnceAsync(proxy);
+        string tunnelReply = await ExchangeAsync(proxy, Get);
+        await proxy.DisposeAsync();
+
+        Assert.IsEmpty(Observe("tunnelled reply", string.Empty, tunnelReply));
+        Assert.IsEmpty(Text(tunnelled.ReceivedBytes));
+        Assert.IsEmpty(Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 200 OK\nswsclose\n\n", "CONNECT a:8999 HTTP/1.1\r\n\r\n")]
+    [DataRow("HTTP/1.1 200 OK\n\n", "CONNECT a HTTP/1.1\r\n\r\n")]
+    [DataRow("HTTP/1.1 200 OK\n\n", "CONNECT a\r\n\r\n")]
+    public async Task ConnectAsync_ToTheProxyPortWithAClosingReplyOrNoPort_RelaysNothing(string connectReply, string connect)
+    {
+        Diagnostics.Arrange("CONNECT reply", connectReply);
+        Diagnostics.Arrange("CONNECT request", connect);
+        SwsHttpServerConnector tunnelled = new(Case(Reply("data", "tunnelled\n")));
+        SwsHttpServerConnector server = new(Case(Reply("connect", connectReply)))
+        {
+            TunnelServerForPort = port => port == 8999 ? tunnelled : null,
+        };
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+
+        await WriteAsync(proxy, connect);
+        await ReadAllAsync(proxy);
+        await WriteAsync(proxy, Get);
+
+        Assert.IsEmpty(Text(tunnelled.ReceivedBytes));
+        Assert.AreEqual(connect, Text(server.ProxyReceivedBytes));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TwoConnections_TakeConsecutiveLoopbackLocalPorts()
     {
         Diagnostics.Arrange("reply parts", "data=first");

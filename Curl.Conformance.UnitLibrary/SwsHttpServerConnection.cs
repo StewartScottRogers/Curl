@@ -80,6 +80,9 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     private bool disconnected;
 
+    // The connection to the server a CONNECT tunnel is relayed to; null while there is none.
+    private Task<IConnection?>? tunnelServer;
+
     public SwsHttpServerConnection(SwsHttpReplySelector replySelector, SwsServerCommands serverCommands, TimeSpan waitAfterReply, SwsServerRecording recording, TimeProvider timeProvider, SwsServerAbandonment abandonment)
     {
         this.replySelector = replySelector;
@@ -98,6 +101,13 @@ internal sealed class SwsHttpServerConnection : IConnection
     /// </summary>
     public SwsServerRecording? TunnelRecording { get; init; }
 
+    /// <summary>
+    /// Given the port a <c>CONNECT</c> on a connection with a <see cref="TunnelRecording"/> names,
+    /// the connector whose server the tunnel is relayed to, as upstream's http-proxy connects to
+    /// that port; <see langword="null"/> (or no function) to serve the tunnel from this emulation.
+    /// </summary>
+    public Func<int, IConnector?>? TunnelServerForPort { get; init; }
+
     public bool IsSecure => false;
 
     /// <summary>Whether the server still reads requests on the connection: false once a reply closed it or it started streaming or carrying upgraded traffic.</summary>
@@ -115,14 +125,24 @@ internal sealed class SwsHttpServerConnection : IConnection
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         abandonment.ThrowIfAbandoned();
-        return pendingSends.Count > 0
-            ? await ReadSentAsync(buffer, cancellationToken)
+        if (pendingSends.Count > 0)
+        {
+            return await ReadSentAsync(buffer, cancellationToken);
+        }
+
+        return tunnelServer is not null
+            ? await ReadFromTunnelServerAsync(buffer, cancellationToken)
             : await ReadWithNothingSentAsync(buffer, cancellationToken);
     }
 
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
         abandonment.ThrowIfAbandoned();
+        if (tunnelServer is not null)
+        {
+            return WriteToTunnelServerAsync(buffer, cancellationToken);
+        }
+
         if (upgradedTrafficOpen)
         {
             RecordUpgradedTraffic(buffer.Span);
@@ -143,11 +163,43 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         RecordDisconnectOnce();
-        return ValueTask.CompletedTask;
+        if (tunnelServer is not null && await tunnelServer is { } server)
+        {
+            await server.DisposeAsync();
+        }
     }
+
+    // A refused relay reads as a closed tunnel.
+    private async ValueTask<int> ReadFromTunnelServerAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+        await tunnelServer! is { } server ? await server.ReadAsync(buffer, cancellationToken) : 0;
+
+    // A refused relay drops what is written into the tunnel.
+    private async ValueTask WriteToTunnelServerAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+    {
+        if (await tunnelServer! is { } server)
+        {
+            await server.WriteAsync(buffer, cancellationToken);
+        }
+    }
+
+    // After a CONNECT reply that keeps the proxy connection open, a tunnel to a port another
+    // server stands behind is relayed to that server, which records what comes through it.
+    private void RelayTunnelToItsServer(byte[] request, SwsHttpReply reply)
+    {
+        string path = SwsHttpRequestLine.FindPath(request) ?? string.Empty;
+        int port = SwsHttpRequestLine.ConnectPort(path);
+        if (!reply.ClosesConnection && TunnelServerForPort?.Invoke(port) is { } server)
+        {
+            readsRequests = false;
+            tunnelServer = ConnectTunnelServerAsync(server, path[..Math.Max(0, path.LastIndexOf(':'))], port);
+        }
+    }
+
+    private static async Task<IConnection?> ConnectTunnelServerAsync(IConnector server, string host, int port) =>
+        (await server.ConnectAsync(new ConnectTarget(host, port, false), CancellationToken.None)).Connection;
 
     // Waits for the first send, then reads it and every later one already sent, up to a close.
     private async ValueTask<int> ReadSentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
@@ -309,6 +361,7 @@ internal sealed class SwsHttpServerConnection : IConnection
             if (TunnelRecording is not null && request.AsSpan().StartsWith("CONNECT "u8))
             {
                 recording = TunnelRecording;
+                RelayTunnelToItsServer(request, reply);
             }
         }
     }

@@ -296,6 +296,8 @@ public sealed class UpstreamCaseRunner(
         Pop3ServerConnector pop3 = new(testCase, imap);
         MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory)));
         IConnector servers = sshServer?.InFrontOf(mqtt) ?? mqtt;
+        // A CONNECT through the http-proxy to a mail port reaches that mail stand-in (test1319 to 1321, BL-2011).
+        server.TunnelServerForPort = port => port is Pop3ServerConnector.Pop3Port or ImapServerConnector.ImapPort or SmtpServerConnector.SmtpPort ? pop3 : null;
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)

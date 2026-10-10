@@ -68,6 +68,15 @@ internal static class SwsHttpRequestLine
     public static bool IsConnect(ReadOnlySpan<byte> request, string path) =>
         request.StartsWith("CONNECT "u8) && TestNumber(path) == 0 && !path.Any(char.IsWhiteSpace);
 
+    /// <summary>
+    /// The port a <c>CONNECT host:port</c> path names: the number after its last colon, or 0 when
+    /// there is none or it does not fit.
+    /// </summary>
+    /// <param name="path">The <c>CONNECT</c> request's path, <c>host:port</c>.</param>
+    /// <returns>The port, or 0.</returns>
+    public static int ConnectPort(string path) =>
+        int.TryParse(path[(path.LastIndexOf(':') + 1)..], out int port) ? port : 0;
+
     // sscanf "HTTP/%d.%d": a number, a dot, a number.
     private static bool IsVersion(string text)
     {
