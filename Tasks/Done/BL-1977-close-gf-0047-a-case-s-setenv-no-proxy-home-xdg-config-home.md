@@ -36,7 +36,7 @@ Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-
 ## Acceptance criteria
 
 - [x] `behaviour:test1249`: Curl answers what curl 8.21.0 answers, `upstream test1249 passes` (in `UpstreamConformanceTests`; the gap tool's own measurement waits on BL-2016).
-- [x] `behaviour:test433`: split to BL-2015 - the case's environment now reaches Curl and its curlrc is read, but its `Note: Read config file` line without `-v` is a separate rule (see Notes).
+- [x] `behaviour:test433`: split to BL-2017 - the case's environment now reaches Curl and its curlrc is read, but its `Note: Read config file` line without `-v` is a separate rule (see Notes).
 - [x] `behaviour:test436`: Curl answers what curl 8.21.0 answers, `upstream test436 passes` (in `UpstreamConformanceTests`; the gap tool's own measurement waits on BL-2016).
 - [x] `behaviour:test724`: Curl answers what curl 8.21.0 answers, `upstream test724 passes` (in `UpstreamConformanceTests`; the gap tool's own measurement waits on BL-2016).
 - [x] `behaviour:test725`: Curl answers what curl 8.21.0 answers, `upstream test725 passes` (in `UpstreamConformanceTests`; the gap tool's own measurement waits on BL-2016).
@@ -51,7 +51,7 @@ Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-
 - Cause found: `DefaultConfigFileSearch` and `IpfsGatewayRewriter` already read the injected environment; what was missing was the plumbing. `InProcessCurl`'s dialing overload passed no environment and no config-file search, and the dialing `CurlComposition.CreateRunner` took no search, so neither the gap tool nor `UpstreamConformanceTests` could read a case's curlrc.
 - Done: a new `InProcessCurl.RunAsync(..., Func<string, string?> readEnvironmentVariable)` overload passes the environment and a `DefaultConfigFileSearch` over it (no executable directory, no account home, so only the case's `CURL_HOME`, `XDG_CONFIG_HOME` and `HOME` are searched); the old overload still reads no environment and no curlrc. `CreateRunner` (dialing) gained an optional `defaultConfigFileSearch`. `UpstreamConformanceTests.RunCurlAsync` passes the same search, which is why `Curl.Conformance.UnitTests` was added to `touches` (no task in Doing on `origin/work/dark-factory` named it).
 - Measured through the upstream ratchet suite: 1249, 436, 724, 725, 731, 740 and 741 pass; 436, 724, 725, 731, 740 and 741 were added to `PassingUpstreamCases.txt` (1249 was there).
-- test433 now reads its curlrc, but upstream expects `Note: Read config file from '<path>'` without `-v`, which Curl writes only under `-v` or a trace (BL-243). That needs a measurement of real curl, so it is split to BL-2015.
+- test433 now reads its curlrc, but upstream expects `Note: Read config file from '<path>'` without `-v`, which Curl writes only under `-v` or a trace (BL-243). That needs a measurement of real curl, so it is split to BL-2017.
 - The gap tool itself is under `Gap/`, which a lane may not touch; switching it to the new overload is BL-2016 (interactive only). GF-0047 closes only after a gap run re-measures the items.
 - Pinned in `InProcessCurlTests`: NO_PROXY bypasses `-x`, an `XDG_CONFIG_HOME` curlrc and a `CURL_HOME` `.curlrc` are read, `HOME/.ipfs/gateway` routes an `ipfs://` URL, a gateway file with a query is exit 3, and a null environment throws. No option changed, so `--ai-help` needs nothing. Measure-CodeQuality was not run: every new line and branch is reached by these tests, and one Curl.Console run costs most of the time limit.
 
@@ -59,4 +59,4 @@ Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
-- 2026-10-10: Doing -> Done. A case's setenv reaches Curl in process: InProcessCurl's environment overload and the conformance runner read NO_PROXY, CURL_HOME, XDG_CONFIG_HOME, HOME and the IPFS gateway files from it; upstream 1249, 436, 724, 725, 731, 740, 741 pass (433 split to BL-2015, gap tool to BL-2016)
+- 2026-10-10: Doing -> Done. A case's setenv reaches Curl in process: InProcessCurl's environment overload and the conformance runner read NO_PROXY, CURL_HOME, XDG_CONFIG_HOME, HOME and the IPFS gateway files from it; upstream 1249, 436, 724, 725, 731, 740, 741 pass (433 split to BL-2017, gap tool to BL-2016)

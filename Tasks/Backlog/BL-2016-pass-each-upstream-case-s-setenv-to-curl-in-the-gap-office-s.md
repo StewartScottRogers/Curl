@@ -21,7 +21,7 @@ The gap office's upstream-case measuring tool (the file-based app GF-0047's repr
 
 - Split from BL-1977 (gap finding GF-0047). A dark factory lane may not read or change the gap office's folder (ADR-0433), so this is interactive only.
 - BL-1977 added `InProcessCurl.RunAsync(arguments, standardOutput, standardError, standardInput, tcpDialer, dnsResolver, datagramConnector, readEnvironmentVariable)`: the dialing overload with the environment the run reads - the proxy variables and `NO_PROXY`, `CURL_HOME`, `XDG_CONFIG_HOME` and `HOME` for the default config file, and the IPFS gateway variables and files. The tool calls an overload without it today and ignores `UpstreamCurlInvocation.EnvironmentVariables`.
-- Call the new overload with `name => invocation.EnvironmentVariables.GetValueOrDefault(name)`, as `Curl.Conformance.UnitTests`' `UpstreamConformanceTests.RunCurlAsync` passes it. Those seven cases pass there now (BL-1977); test433 waits on BL-2015.
+- Call the new overload with `name => invocation.EnvironmentVariables.GetValueOrDefault(name)`, as `Curl.Conformance.UnitTests`' `UpstreamConformanceTests.RunCurlAsync` passes it. Those seven cases pass there now (BL-1977); test433 waits on BL-2017.
 - Reproduce with the command in GF-0047's evidence, for cases 1249,433,436,724,725,731,740,741.
 
 ## Acceptance criteria

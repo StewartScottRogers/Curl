@@ -1,5 +1,5 @@
 ---
-id: BL-2015
+id: BL-2017
 title: Print the default config file Note without -v as curl 8.21.0 does for upstream test433 (curlrc found through XDG_CONFIG_HOME)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2015 — Print the default config file Note without -v as curl 8.21.0 does for upstream test433 (curlrc found through XDG_CONFIG_HOME)
+# BL-2017 — Print the default config file Note without -v as curl 8.21.0 does for upstream test433 (curlrc found through XDG_CONFIG_HOME)
 
 ## Goal
 
