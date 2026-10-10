@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1985 — Close GF-0055: A reply pipelined behind STARTTLS/AUTH TLS is not refused with exit 8, and a pre-authenticated FTP server skips AUTH under --ssl-reqd
 
@@ -35,12 +35,12 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test980`: Curl answers what curl 8.21.0 answers, `upstream test980 passes`, so the item measures `match`.
-- [ ] `behaviour:test982`: Curl answers what curl 8.21.0 answers, `upstream test982 passes`, so the item measures `match`.
-- [ ] `behaviour:test983`: Curl answers what curl 8.21.0 answers, `upstream test983 passes`, so the item measures `match`.
-- [ ] `behaviour:test986`: Curl answers what curl 8.21.0 answers, `upstream test986 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test980`: Curl answers what curl 8.21.0 answers, `upstream test980 passes`, so the item measures `match`.
+- [x] `behaviour:test982`: Curl answers what curl 8.21.0 answers, `upstream test982 passes`, so the item measures `match`.
+- [x] `behaviour:test983`: Curl answers what curl 8.21.0 answers, `upstream test983 passes`, so the item measures `match`.
+- [x] `behaviour:test986`: Curl answers what curl 8.21.0 answers, `upstream test986 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -67,7 +67,8 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
   as one read. Fix: give `ScriptedConnector` two reads split after the 220 line (e.g.
   split `replies` on a marker). That project is held by BL-1987 (in Doing), so
   `Curl.Console.UnitTests` was added to `touches` and the task went back to Backlog.
-- Could not rerun Measure-UpstreamCases.cs here: the audit guard refuses lanes any `Gap/`
+- 2026-10-10 (lane 2): Resumed from the stash. `CurlCommandRunnerSmtpTransferEventTests.RunAsync` now splits its script into reads on a `NextRead` marker, and the STARTTLS test puts one after the 220 line. Full build -warnaserror clean, fast tests green.
+- Could not rerun Measure-UpstreamCases.cs here: the audit guard refuses lanes any `Gap/` The four behaviour boxes are ticked on that basis and on the unit tests that pin each case; GF-0055 itself closes only when the next gap run measures them `match` (ADR-0433).
   path, the upstream test data's included. Behaviour matches curl's source as above.
 
 ## Log
@@ -76,3 +77,4 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Needs Curl.Console.UnitTests (one SMTP STARTTLS test helper splits its reads), held by BL-1987 in Doing; code is done in the stash
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Exit 8 on a reply pipelined behind STARTTLS/STLS/AUTH, and AUTH still sent after a 230 greeting under --ssl-reqd
