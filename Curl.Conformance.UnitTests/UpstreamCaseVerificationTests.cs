@@ -52,6 +52,18 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_ProxyThatDiffers_ComparesItAgainstTheProxyBytes()
+    {
+        string sections = "<verify>\n<proxy nonewline=\"yes\">\nCONNECT a:1 HTTP/1.1\n</proxy>\n</verify>\n";
+
+        string? matching = Verify(sections, new UpstreamCaseRun(0, [], [], [], []) { ProxyReceivedBytes = Bytes("CONNECT a:1 HTTP/1.1") });
+        string? differing = Verify(sections, Run(received: "CONNECT a:1 HTTP/1.1"));
+
+        Assert.IsNull(matching);
+        Assert.AreEqual("<verify><proxy> differs at byte 0 (line 1): expected \"CONNECT a:1 HTTP/1.1\", got the end", differing);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_ReplyData_IsComparedWithTheOutputFile()
     {
         string sections = "<reply>\n<data crlf=\"headers\">\nHTTP/1.1 200 OK\n\nbody\n</data>\n</reply>\n";

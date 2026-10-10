@@ -59,6 +59,38 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    public void FindSkipReason_NoListenPortGivenTheRunnersValue_IsNotTheReason()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] test19 = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test19.rawhttp"));
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["HOSTIP"] = "127.0.0.1", ["NOLISTENPORT"] = UpstreamCaseRunner.NoListenPort };
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(test19, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+
+        diagnostics.Act("skip reason", reason);
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
+    public void FindSkipReason_CertdirGivenAValue_IsNotTheReasonButTheTlsServerIs()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] file = "<testcase>\n<client>\n<server>\nhttps test-localhost.pem\n</server>\n<command>\n--cacert %CERTDIR/certs/test-ca.crt https://localhost/\n</command>\n</client>\n</testcase>\n"u8.ToArray();
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["CERTDIR"] = "/curl/tests" };
+        diagnostics.Arrange("variables", "CERTDIR=/curl/tests");
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(file, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+        diagnostics.Act("skip reason", reason);
+
+        diagnostics.Assert("skip reason does not name %CERTDIR", false, reason?.Contains("%CERTDIR", StringComparison.Ordinal) ?? false);
+        Assert.IsNotNull(reason);
+        Assert.DoesNotContain("%CERTDIR", reason);
+        Assert.Contains("https", reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_UnsupportedInstructions_AreTheReason()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -112,6 +144,9 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<command>\nhttp://127.0.0.1:8990/x file:///dir/x http://localhost/\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nhttp\n</server>\n<command>\n-x http://127.0.0.1:8990 http://www.example.com/\n</command>\n</client>\n")]
     [DataRow("<client>\n<command>\n-v%08 http://example.com\n</command>\n</client>\n<verify>\n<errorcode>\n2\n</errorcode>\n</verify>\n")]
+    [DataRow("<client>\n<server>\nhttp\nsocks4\n</server>\n<command>\n--socks4 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
+    [DataRow("<client>\n<server>\nsocks5\n</server>\n<command>\n--socks5 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
+    [DataRow("<client>\n<server>\nmqtt\n</server>\n<command>\nmqtt://127.0.0.1:8998/1190\n</command>\n</client>\n")]
     public void FindSkipReason_NoInternetHostOrAServerNamed_ReturnsNull(string sections)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -155,6 +190,36 @@ public sealed class UpstreamCaseScreeningTests
         Assert.AreEqual(expectedReason, reason);
     }
 
+    [TestMethod]
+    [DataRow("<client>\n<precheck>\n%PERL %SRCDIR/libtest/test610.pl mkdir /log/test610.dir\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\n%PERL %SRCDIR/libtest/test610.pl move /log/a /log/b rmdir /log/c rm /log/d\n</postcheck>\n</verify>\n")]
+    public void FindSkipReason_Test610ScriptLines_AreNotPerlTheHarnessDoesNotRun(string sections)
+    {
+        string? reason = Screen(RunnableClient + sections);
+
+        Assert.DoesNotContain("the harness does not run the Perl", reason ?? "");
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<precheck>\n%PERL %SRCDIR/libtest/test613.pl prepare /log/test613.dir\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\n%PERL %SRCDIR/libtest/test613.pl postprocess /log/test1445.dir /log/curl1445.out 946728000\n</postcheck>\n</verify>\n")]
+    public void FindSkipReason_Test613ScriptLines_AreNotPerlTheHarnessDoesNotRun(string sections)
+    {
+        string? reason = Screen(RunnableClient + sections);
+
+        Assert.DoesNotContain("the harness does not run the Perl", reason ?? "");
+    }
+
+    [TestMethod]
+    [DataRow("test1013.pl", "%PERL %SRCDIR/libtest/test1013.pl ../curl-config /log/stdout1014 features > /log/result1014")]
+    [DataRow("test1022.pl", "%PERL %SRCDIR/libtest/test1022.pl ../curl-config /log/stdout1023 vernum")]
+    public void FindSkipReason_CurlConfigComparisonScript_NamesCurlConfigAsTheReason(string script, string line)
+    {
+        string? reason = Screen(RunnableClient + $"<verify>\n<postcheck>\n{line}\n</postcheck>\n</verify>\n");
+
+        Assert.AreEqual($"{script} compares with ../curl-config, which Curl does not ship", reason);
+    }
+
     private static string? Screen(string sections) =>
         UpstreamCaseScreening.FindSkipReason(CleanExpansion, ParsedTestCase.From(sections), Features);
 
@@ -163,4 +228,23 @@ public sealed class UpstreamCaseScreeningTests
 
     private static string Rooted(string name) =>
         Path.Combine(Path.GetTempPath(), name).Replace('\\', '/');
+
+    [TestMethod]
+    [DataRow("<client>\n<precheck>\nperl -e 'if(\"127.0.0.1\" !~ /[.]0[.]0[.]1$/) {print \"Test only works for HOSTIPs ending with .0.0.1\"; exit(1)}'\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\nperl -e 'exit((stat(\"/log/1443\"))[9] != 960898200)'\n</postcheck>\n</verify>\n")]
+    [DataRow("<client>\n<precheck>\nresolve --ipv6 ::1\n</precheck>\n</client>\n")]
+    public void FindSkipReason_CheckOfInterpretedOneLiners_DoesNotSkip(string sections)
+    {
+        Assert.IsNull(Screen(RunnableClient + sections));
+    }
+
+    [TestMethod]
+    [DataRow("client", "precheck", "perl -e \"if('[::1]' ne '[::1]') {print 'x';} else {exec 'resolve --ipv6 ip6-localhost'; print 'Cannot run precheck resolve';}\"")]
+    [DataRow("verify", "postcheck", "sh -c true")]
+    public void FindSkipReason_CheckLineNotInterpreted_NamesTheLine(string section, string name, string line)
+    {
+        string? reason = Screen(RunnableClient + $"<{section}>\n<{name}>\n{line}\n</{name}>\n</{section}>\n");
+
+        Assert.AreEqual($"the harness does not interpret the <{section}><{name}> line {line}", reason);
+    }
 }

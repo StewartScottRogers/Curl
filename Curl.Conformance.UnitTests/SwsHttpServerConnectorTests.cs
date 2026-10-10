@@ -35,6 +35,34 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToTheProxyPort_RecordsInProxyReceivedBytesApart()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+        IConnection http = await ConnectAsync(server);
+
+        await ExchangeAsync(proxy, Get);
+        await ExchangeAsync(http, Get + "x");
+
+        Assert.AreEqual(Get, Text(server.ProxyReceivedBytes));
+        Assert.AreEqual(Get + "x", Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToTheProxyPort_RecordsTheTunnelledRequestInReceivedBytes()
+    {
+        const string Connect = "CONNECT a:1 HTTP/1.1\r\n\r\n";
+        SwsHttpServerConnector server = new(Case(Reply("connect", "HTTP/1.1 200 OK\n\n"), Reply("data", "first\n")));
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+
+        await ExchangeAsync(proxy, Connect);
+        await ExchangeAsync(proxy, Get);
+
+        Assert.AreEqual(Connect, Text(server.ProxyReceivedBytes));
+        Assert.AreEqual(Get, Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TwoConnections_TakeConsecutiveLoopbackLocalPorts()
     {
         Diagnostics.Arrange("reply parts", "data=first");
@@ -499,6 +527,36 @@ public sealed partial class SwsHttpServerConnectorTests
         Assert.IsFalse(ObserveValue("IsSecure", false, connection.IsSecure));
         Assert.AreEqual("127.0.0.1:8990", Observe("remote end point", "127.0.0.1:8990", $"{connection.RemoteEndPoint}"));
         await connection.FlushAsync(CancellationToken.None);
+        await connection.DisposeAsync();
+    }
+
+    [TestMethod]
+    [DataRow("::1")]
+    [DataRow("[::1]")]
+    public async Task ConnectAsync_IPv6Target_HasIPv6LoopbackAtBothEnds(string host)
+    {
+        Diagnostics.Arrange("target host", host);
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+
+        IConnection connection = (await server.ConnectAsync(new ConnectTarget(host, 8991, false), CancellationToken.None)).Connection!;
+
+        Assert.AreEqual("[::1]:8991", Observe("remote end point", "[::1]:8991", $"{connection.RemoteEndPoint}"));
+        Assert.AreEqual("[::1]:49152", Observe("local end point", "[::1]:49152", $"{connection.LocalEndPoint}"));
+        await connection.DisposeAsync();
+    }
+
+    [TestMethod]
+    [DataRow("localhost")]
+    [DataRow("127.0.0.1")]
+    public async Task ConnectAsync_NameOrIPv4Target_HasIPv4LoopbackAtBothEnds(string host)
+    {
+        Diagnostics.Arrange("target host", host);
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+
+        IConnection connection = (await server.ConnectAsync(new ConnectTarget(host, 8990, false), CancellationToken.None)).Connection!;
+
+        Assert.AreEqual("127.0.0.1:8990", Observe("remote end point", "127.0.0.1:8990", $"{connection.RemoteEndPoint}"));
+        Assert.AreEqual("127.0.0.1:49152", Observe("local end point", "127.0.0.1:49152", $"{connection.LocalEndPoint}"));
         await connection.DisposeAsync();
     }
 

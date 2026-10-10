@@ -266,7 +266,7 @@ internal static class CurlComposition
             diagnosticLog);
 
     /// <summary>
-    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool)" />
+    /// Creates the contexts the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?)" />
     /// uses: <see cref="CreateSecurityContextFactory(IConnector, IDatagramConnector, IDiagnosticLog?)" />'s
     /// router, with NTLM sent to the hand-built context on every platform when
     /// <paramref name="usesHandBuiltNtlm" /> is set (<see cref="HandBuiltNtlmSecurityContextFactory" />, BL-1858).
@@ -1217,6 +1217,11 @@ internal static class CurlComposition
     /// every platform, as curl's non-SSPI build answers it (BL-1858); otherwise ADR-0142's router
     /// sends it to SSPI on Windows.
     /// </param>
+    /// <param name="readEnvironmentVariable">
+    /// Reads every environment variable the run reads - the proxy variables, <c>IPFS_GATEWAY</c>,
+    /// <c>HOME</c> for the netrc file and the rest - so a test gives one run its own environment
+    /// without touching the process's (BL-1928); <see langword="null" /> for a run that reads none.
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -1227,12 +1232,14 @@ internal static class CurlComposition
         IDatagramConnector datagramConnector,
         bool writesProgressMeter = false,
         IWriteOutFileOpener? writeOutFileOpener = null,
-        bool usesHandBuiltNtlm = false)
+        bool usesHandBuiltNtlm = false,
+        Func<string, string?>? readEnvironmentVariable = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
+        Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, dnsResolver, datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -1243,15 +1250,16 @@ internal static class CurlComposition
             writeOutFileOpener: writeOutFileOpener,
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
+            readEnvironmentVariable: readEnvironmentVariable,
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog);
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
-    /// selector that reads no environment variables, and the connector's <c>--resolve</c> entries
+    /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
     /// loaded before each URL as the executable loads them.
     /// </summary>
     /// <param name="tcpDialer">Opens every plaintext TCP connection.</param>
@@ -1262,6 +1270,7 @@ internal static class CurlComposition
     /// <param name="runConnections">The run's connection cache.</param>
     /// <param name="diagnosticLog">The run's diagnostic log.</param>
     /// <param name="usesHandBuiltNtlm">Whether NTLM is answered by the hand-built context on every platform (<see cref="CreateDialingSecurityContextFactory" />).</param>
+    /// <param name="readEnvironmentVariable">Reads the proxy environment variables.</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -1271,7 +1280,8 @@ internal static class CurlComposition
         CommandLineOptions options,
         ConnectionCache runConnections,
         IDiagnosticLog diagnosticLog,
-        bool usesHandBuiltNtlm)
+        bool usesHandBuiltNtlm,
+        Func<string, string?> readEnvironmentVariable)
     {
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
@@ -1285,7 +1295,7 @@ internal static class CurlComposition
             new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.FromCommandLine(options), diagnosticLog: diagnosticLog)),
             [],
             cookies,
-            new ProxySelector(_ => null),
+            new ProxySelector(readEnvironmentVariable),
             poolingConnector,
             tcpConnector.LoadResolveEntries);
     }

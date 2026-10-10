@@ -52,6 +52,8 @@
   <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
   <Project Path="Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj" />
   <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
+  <Project Path="Curl.Conformance.SshServer.UnitLibrary/Curl.Conformance.SshServer.UnitLibrary.csproj" />
+  <Project Path="Curl.Conformance.SshServer.UnitTests/Curl.Conformance.SshServer.UnitTests.csproj" />
   <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
   <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
   <Project Path="Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj" />

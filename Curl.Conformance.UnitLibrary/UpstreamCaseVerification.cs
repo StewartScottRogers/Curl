@@ -13,7 +13,8 @@ namespace Curl.Conformance;
 /// <para>
 /// Checked in this order: <c>&lt;protocol&gt;</c> against the bytes the server received, with
 /// <c>&lt;strip&gt;</c> lines removed from both and <c>&lt;strippart&gt;</c> run on the received
-/// lines; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
+/// lines; <c>&lt;proxy&gt;</c> the same way against the bytes the http-proxy server on
+/// <c>%PROXYPORT</c> received, as <c>runtests.pl</c> compares its proxy log; the <c>--output</c> file against <c>&lt;datacheck&gt;</c> (and <c>&lt;datacheck1&gt;</c> to
 /// <c>&lt;datacheck9&gt;</c> after it), or <c>&lt;data&gt;</c> when there is none, unless
 /// <c>&lt;data&gt;</c> says <c>nocheck</c> or both are empty and it does not say <c>sendzero</c>;
 /// <c>&lt;stdout&gt;</c> and <c>&lt;stderr&gt;</c> with <c>&lt;stripfile&gt;</c> run on the output;
@@ -49,7 +50,8 @@ internal static class UpstreamCaseVerification
     {
         Func<string?>[] checks =
         [
-            () => CompareProtocol(testCase, run.ReceivedBytes, stripMatchTimeout),
+            () => CompareProtocol(testCase, "protocol", run.ReceivedBytes, stripMatchTimeout),
+            () => CompareProtocol(testCase, "proxy", run.ProxyReceivedBytes, stripMatchTimeout),
             () => CompareReplyData(testCase, run.OutputFileBytes),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
             () => CompareOutput(testCase, "stderr", "stripfile", run.StandardError),
@@ -67,9 +69,9 @@ internal static class UpstreamCaseVerification
         }
     }
 
-    private static string? CompareProtocol(UpstreamTestCase testCase, byte[] received, TimeSpan stripMatchTimeout)
+    private static string? CompareProtocol(UpstreamTestCase testCase, string partName, byte[] received, TimeSpan stripMatchTimeout)
     {
-        if (testCase.Find("verify", "protocol") is not { } part)
+        if (testCase.Find("verify", partName) is not { } part)
         {
             return null;
         }
@@ -78,7 +80,7 @@ internal static class UpstreamCaseVerification
             .Select(line => UpstreamRegex.TryCreate(line, RegexOptions.None, stripMatchTimeout)).OfType<Regex>().ToArray();
         byte[] expected = Strip(Expected(part), strips, []);
         byte[] actual = Strip(received, strips, Substitutions(testCase, "strippart"));
-        return UpstreamFirstDifference.Describe("<verify><protocol>", expected, actual);
+        return UpstreamFirstDifference.Describe($"<verify><{partName}>", expected, actual);
     }
 
     private static string? CompareReplyData(UpstreamTestCase testCase, byte[] outputFile)

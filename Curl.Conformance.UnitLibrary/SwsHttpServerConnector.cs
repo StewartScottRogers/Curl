@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -37,6 +38,13 @@ namespace Curl.Conformance;
 /// </remarks>
 public sealed class SwsHttpServerConnector : IConnector
 {
+    /// <summary>
+    /// The port of upstream's http-proxy server, <c>%PROXYPORT</c>: connections to it are served
+    /// the same way but recorded in <see cref="ProxyReceivedBytes"/> instead of <see cref="ReceivedBytes"/>,
+    /// as upstream's proxy writes its own protocol log.
+    /// </summary>
+    public const int ProxyPort = 8992;
+
     // Each connection gets the next port of the ephemeral range (49152 to 65535) as its local end point, wrapping round
     // after the last, so %{local_port} is a number however many connections a run opens.
     private const int FirstLocalPort = 49152;
@@ -44,6 +52,8 @@ public sealed class SwsHttpServerConnector : IConnector
     private const int LocalPortCount = 65536 - FirstLocalPort;
 
     private readonly SwsServerRecording recording = new();
+
+    private readonly SwsServerRecording proxyRecording = new();
 
     private readonly SwsServerAbandonment abandonment = new();
 
@@ -94,13 +104,19 @@ public sealed class SwsHttpServerConnector : IConnector
     public ReadOnlyMemory<byte> ReceivedBytes => recording.Bytes;
 
     /// <summary>
+    /// Every byte received on connections to <see cref="ProxyPort"/>, recorded as
+    /// <see cref="ReceivedBytes"/> records the rest, for <c>&lt;verify&gt;&lt;proxy&gt;</c>.
+    /// </summary>
+    public ReadOnlyMemory<byte> ProxyReceivedBytes => proxyRecording.Bytes;
+
+    /// <summary>
     /// Gives up on the server once the harness no longer waits for the run using it: from then
     /// on connecting, and reading or writing on any connection it opened, throws
     /// <see cref="IOException"/>, so a run that outlived its time limit stops at its next exchange.
     /// </summary>
     public void Abandon() => abandonment.Abandon();
 
-    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on, wrapping round after 65535, its remote end point 127.0.0.1 at the target's port; it fails only after <see cref="Abandon"/>.</summary>
+    /// <summary>Opens a new in-memory connection to the server, on the next local port from 49152 on, wrapping round after 65535, its remote end point the loopback address at the target's port, both ::1 when the target is an IPv6 address (upstream's <c>http-ipv6</c> server) and 127.0.0.1 otherwise; it fails only after <see cref="Abandon"/>.</summary>
     /// <param name="target">Gives only the remote end point's port: every host and port reaches the same server.</param>
     /// <param name="cancellationToken">Not observed; the connection opens at once.</param>
     /// <returns>A connected result.</returns>
@@ -108,12 +124,20 @@ public sealed class SwsHttpServerConnector : IConnector
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         abandonment.ThrowIfAbandoned();
-        return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, recording, timeProvider, abandonment)
+        return ValueTask.FromResult(ConnectResult.Connected(new SwsHttpServerConnection(replySelector, serverCommands, waitAfterReply, target.Port == ProxyPort ? proxyRecording : recording, timeProvider, abandonment)
         {
-            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
-            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, target.Port),
+            LocalEndPoint = new IPEndPoint(LoopbackFor(target.Host), FirstLocalPort + (int)(((uint)Interlocked.Increment(ref connectionsOpened) - 1) & (LocalPortCount - 1))),
+            RemoteEndPoint = new IPEndPoint(LoopbackFor(target.Host), target.Port),
+            TunnelRecording = target.Port == ProxyPort ? recording : null,
         }));
     }
+
+    // A connection to ::1 has ::1 at both ends, as one to upstream's http-ipv6 server does, so a
+    // HAProxy PROXY line reads TCP6 (test1456).
+    private static IPAddress LoopbackFor(string host) =>
+        IPAddress.TryParse(host.Trim('[', ']'), out IPAddress? address) && address.AddressFamily == AddressFamily.InterNetworkV6
+            ? IPAddress.IPv6Loopback
+            : IPAddress.Loopback;
 
     private static ReadOnlySpan<byte> ReplyPart(UpstreamTestCase testCase, string name) =>
         (testCase.Find("reply", name)?.Content ?? ReadOnlyMemory<byte>.Empty).Span;

@@ -349,6 +349,53 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_CertificateDirectoryWithABlank_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        diagnostics.Arrange("certificate directory", "/a b/tests");
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, CreateLogDirectory(), null, "/a b/tests"));
+        diagnostics.Act("exception parameter", exception.ParamName);
+        diagnostics.Assert("exception parameter", "certificateDirectory", exception.ParamName);
+        Assert.AreEqual("certificateDirectory", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_CertificateDirectory_IsCertdirWithForwardSlashes()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n--cacert %CERTDIR/certs/test-ca.crt\n</command>\n</client>\n</testcase>\n";
+
+        diagnostics.Arrange("certificate directory", "Z:\\curl\\tests");
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, "Z:\\curl\\tests");
+        diagnostics.Act("arguments", string.Join(" | ", arguments ?? []));
+
+        diagnostics.Assert("arguments", "--cacert | Z:/curl/tests/certs/test-ca.crt", string.Join(" | ", arguments ?? []));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "--cacert", "Z:/curl/tests/certs/test-ca.crt" }, arguments!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoCertificateDirectory_SkipsACaseUsingCertdir()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\n--cacert %CERTDIR/certs/test-ca.crt\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness has no value for %CERTDIR", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("the harness has no value for %CERTDIR", outcome.Detail);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoTestsDirectory_SkipsACaseUsingPwd()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -383,6 +430,23 @@ public sealed class UpstreamCaseRunnerTests
             + "%include %LOGDIR/missing.txt%\n%includetext %LOGDIR/code.txt%\n</errorcode>\n</verify>\n</testcase>\n";
 
         UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoListenPort_IsAPortWhoseConnectionIsRefused()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            string port = invocation.Arguments[^1].Split(':')[1];
+            ConnectResult result = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", int.Parse(port, System.Globalization.CultureInfo.InvariantCulture), false), CancellationToken.None);
+            return (int)result.ExitCode;
+        });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command>\n%HOSTIP:%NOLISTENPORT\n</command>\n</client>\n<verify>\n<errorcode>\n7\n</errorcode>\n</verify>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
@@ -475,5 +539,120 @@ public sealed class UpstreamCaseRunnerTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    [TestMethod]
+    [DataRow("%PERL -e \"print 'Test requires X' if('a' ne 'b');\"", "Test requires X")]
+    [DataRow("%PERL -e 'exit((stat(\"%LOGDIR/missing\"))[9] != 5)'", "precheck command error")]
+    [DataRow("%RESOLVE --ipv6 %HOSTIP", "Resolving IPv6 '127.0.0.1' didn't work")]
+    public async Task RunAsync_PrecheckThatPrintsOrFails_SkipsTheCaseWithoutRunningCurl(string precheck, string expectedReason)
+    {
+        bool curlRan = false;
+        UpstreamCaseRunner runner = Runner(_ =>
+        {
+            curlRan = true;
+            return Task.FromResult(0);
+        });
+        string testFile = $"<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n{precheck}\n</precheck>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expectedReason, outcome.Detail);
+        Assert.IsFalse(curlRan);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ResolvePrecheckThatSucceeds_RunsTheCase()
+    {
+        bool curlRan = false;
+        UpstreamCaseRunner runner = Runner(_ =>
+        {
+            curlRan = true;
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n%RESOLVE --ipv6 ::1\n</precheck>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.IsTrue(curlRan);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_Test1085_IsNotSkipped()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(45));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1085.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
+    [DataRow(240)]
+    [DataRow(241)]
+    [DataRow(242)]
+    [DataRow(263)]
+    [DataRow(1324)]
+    [DataRow(1408)]
+    [DataRow(1456)]
+    [DataRow(3202)]
+    public async Task RunAsync_HttpIpv6Case_RunsCurlAtHttp6Port(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("outcome", "not skipped", $"{outcome.Kind}: {outcome.Detail}");
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains(":" + UpstreamCaseRunner.Http6Port, commandLine!);
+    }
+
+    [TestMethod]
+    [DataRow(567)]
+    [DataRow(568)]
+    [DataRow(569)]
+    [DataRow(570)]
+    [DataRow(571)]
+    [DataRow(572)]
+    [DataRow(577)]
+    [DataRow(689)]
+    [DataRow(3100)]
+    public async Task RunAsync_RtspPortCase_IsSkippedForItsToolNotForRtspPort(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("skip reason", "the harness does not act on <client><tool>", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not act on <client><tool>", outcome.Detail);
+    }
+
+    [TestMethod]
+    [DataRow(5, UpstreamCaseOutcomeKind.Failed, "postcheck FAILED: exit code 1")]
+    [DataRow(0, UpstreamCaseOutcomeKind.Passed, "")]
+    public async Task RunAsync_Postcheck_FailsTheCaseWhenItExitsNonZero(int epoch, UpstreamCaseOutcomeKind expectedKind, string expectedDetail)
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string check = $"%PERL -e 'exit((stat(\"%LOGDIR/missing\"))[9] != {epoch})'";
+        string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n%PERL -e \"print 'x' if('a' ne 'a');\"\n</precheck>\n</client>\n"
+            + $"<verify>\n<postcheck>\n{check}\n</postcheck>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(expectedKind, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expectedDetail, outcome.Detail ?? "");
     }
 }

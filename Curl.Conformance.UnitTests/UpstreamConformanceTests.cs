@@ -19,6 +19,10 @@ public sealed class UpstreamConformanceTests
     // Every case passes in well under a second; the headroom is for a cold, busy CI runner
     // compiling curl's code paths for the first time while other test assemblies run (BL-1056).
     private static readonly TimeSpan TimeLimit = TimeSpan.FromSeconds(20);
+
+    // The platform the conformance run stands for, with Perl's $^O for its precheck one-liners.
+    private static readonly UpstreamCurlPlatform Platform =
+        OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : OperatingSystem.IsMacOS() ? UpstreamCurlPlatform.MacOS : UpstreamCurlPlatform.Unix;
     private const string UpstreamTestFileExtension = ".rawhttp";
 
     // The runner fails a slow curl run itself after TimeLimit; this bounds the rest of the case
@@ -31,6 +35,10 @@ public sealed class UpstreamConformanceTests
     // Beside the tests rather than under the system's temporary folder, whose path can hold a
     // space that an unquoted %LOGDIR in a command would split, as upstream's relative log/ never does.
     private static readonly string LogFolder = Path.Combine(AppContext.BaseDirectory, "log");
+
+    // The files cases read through %CERTDIR/certs/, generated once per run from the vendored
+    // .prm files as upstream's genserv.pl does at build time (BL-1923); %CERTDIR is their parent.
+    private static readonly Lazy<string> CertificateFolder = new(GenerateCertificates);
 
     private static readonly IReadOnlySet<int> PassingCases =
         UpstreamCaseRatchet.ReadPassingList(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, UpstreamCaseRatchet.PassingListFileName)));
@@ -91,8 +99,8 @@ public sealed class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeLimit);
-            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName)).WaitAsync(CaseHangLimit);
+            UpstreamCaseRunner runner = new(RunCurlAsync, Platform, TimeProvider.System, TimeLimit);
+            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
         {
@@ -126,6 +134,14 @@ public sealed class UpstreamConformanceTests
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
             usesHandBuiltNtlm: true).RunAsync(invocation.Arguments);
+
+    private static string GenerateCertificates()
+    {
+        string certificateDirectory = Path.Combine(AppContext.BaseDirectory, "UpstreamCertificates");
+        new UpstreamTestCertificateGenerator(TimeProvider.System)
+            .Generate(Path.Combine(UpstreamTestDataFolder, "certs"), Path.Combine(certificateDirectory, "certs"));
+        return certificateDirectory;
+    }
 
     // A run that timed out may still hold a file open; the temporary folder is left to the system then.
     private static void DeleteLogDirectory(DirectoryInfo logDirectory)

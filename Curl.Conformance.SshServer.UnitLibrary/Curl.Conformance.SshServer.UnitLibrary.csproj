@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Conformance.SshServer.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Protocol.Ssh.UnitLibrary\Curl.Protocol.Ssh.UnitLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

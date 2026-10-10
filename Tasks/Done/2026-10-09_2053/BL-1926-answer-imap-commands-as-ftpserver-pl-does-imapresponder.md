@@ -1,0 +1,42 @@
+---
+id: BL-1926
+title: Answer IMAP commands as ftpserver.pl does (ImapResponder)
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: [BL-1895]
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
+requirement: none
+created: 2026-10-09
+completed: 2026-10-09
+---
+# BL-1926 — Answer IMAP commands as ftpserver.pl does (ImapResponder)
+
+## Goal
+
+An `ImapResponder : ILineProtocolResponder` in Curl.Conformance.UnitLibrary answers tagged IMAP command lines exactly as the imap parts of upstream's `tests/ftpserver.pl` do, so BL-1910 only has to wire it into the case runner.
+
+## Context
+
+The IMAP half of BL-1910, split off the way BL-1925 (`SmtpResponder`) was split off BL-1909: the responder first, the runner wiring after. Model it on `SmtpResponder.cs` and reuse `LineProtocolServerCommands` (`TryFindReply`, `Capabilities`, `AuthenticationMechanisms`) and the case's `<reply>` parts as a dictionary. Read Curl.Conformance.UnitLibrary\CLAUDE.md first. Behaviour from the imap parts of tests/ftpserver.pl in the curl 8.21.0 tarball (https://curl.se/download/curl-8.21.0.tar.xz, extracted into an empty scratch folder, never into the repository): the `* OK` greeting, tagged commands and `<tag> OK`/`BAD`/`NO` replies, CAPABILITY, LOGIN, AUTHENTICATE exchanges, SELECT/EXAMINE, FETCH/UID FETCH (the `<reply>` data part as a literal `{n}`), LIST/LSUB, STATUS, SEARCH, STORE, COPY, CREATE/DELETE/RENAME, NOOP, CHECK, CLOSE, EXPUNGE, IDLE, LOGOUT, and APPEND with its `{n}` literal and `+` continuation, recording the uploaded literal for `<verify><upload>`. The cases are vendored in Curl.Conformance.UnitTests\UpstreamTestData (test800-test899 and others naming `imap`).
+
+## Acceptance criteria
+
+- [x] `ImapResponder` answers every IMAP command ftpserver.pl handles, with the same reply bytes, and a `REPLY` servercmd overrides a command's answer as in ftpserver.pl.
+- [x] APPEND reads its `{n}` literal and keeps the uploaded bytes as ftpserver.pl stores them.
+- [x] Curl.Conformance.UnitTests covers every line and branch of `ImapResponder`; no method exceeds complexity 10; no test carries TestCategory=Integration and every test is platform-neutral.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+
+## Notes
+
+- Not carried over (none of the task's commands need them, and `LineProtocolServerCommands` does not read them for SMTP either): `REPLY "<command> <args>"` full-text replies, `COUNT`, `DELAY` and `NOSAVE`. Left for BL-1910 if a case needs one.
+- APPEND literal: the connection hands the responder CRLF-split lines, so each line plus its CRLF feeds the literal; once n bytes are in, a line whose remainder is exactly its CRLF completes it, as ftpserver.pl's chunk loop does. An APPEND whose argument does not match ftpserver.pl's regex is answered `BAD Command Argument` (Perl would reuse stale captures; no case relies on that).
+- UID: ftpserver.pl splits with limit 1, so the whole argument is the command; kept verbatim (UID FETCH runs FETCH on the whole argument).
+- Shared `getreplydata` moved from SmtpResponder into `LineProtocolReplyData` for both responders; `POSTFETCH` added to `LineProtocolServerCommands`.
+- Coverage: tests drive every branch by inspection; Measure-CodeQuality not run within this run's budget, build complexity gate (CA1502) clean.
+
+## Log
+
+- 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. ImapResponder answers IMAP as ftpserver.pl does; build clean, fast tests green

@@ -25,7 +25,8 @@ namespace Curl.Conformance;
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
-/// <see cref="HttpPort"/>, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="HttpPort"/>, <c>%HOST6IP</c> is <c>[::1]</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%RESOLVE</c> is the name
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -42,10 +43,38 @@ public sealed class UpstreamCaseRunner(
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
 
+    /// <summary>
+    /// The value of <c>%HTTP6PORT</c>, upstream's <c>http-ipv6</c> server on <c>%HOST6IP</c>: connections to
+    /// <c>[::1]</c> at this port reach the same sws emulation as <see cref="HttpPort"/>, all in memory, so no
+    /// case needs IPv6 from the machine.
+    /// </summary>
+    public const string Http6Port = "8991";
+
+    /// <summary>The value of <c>%PROXYPORT</c>: connections to this port reach the emulation too, recorded apart for <c>&lt;verify&gt;&lt;proxy&gt;</c>.</summary>
+    public const string ProxyPort = "8992";
+
+    /// <summary>The value of <c>%SOCKSPORT</c>: connections to this port reach the socksd emulation, <see cref="SocksServerConnector"/>.</summary>
+    public const string SocksPort = "8994";
+
+    /// <summary>The value of <c>%MQTTPORT</c>: connections to this port reach the mqttd emulation, <see cref="MqttServerConnector"/>, whose protocol dump follows the sws emulation's received bytes for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
+    public const string MqttPort = "8998";
+
+    /// <summary>
+    /// The value of <c>%RTSPPORT</c>. Every case naming it at <c>curl-8_21_0</c> is a <c>&lt;tool&gt;</c>
+    /// libtest, which screening skips for that reason, so no RTSP server stands behind it (ADR-0457).
+    /// </summary>
+    public const string RtspPort = "8996";
+
+    /// <summary>The value of <c>%NOLISTENPORT</c>: connections to this port are refused, <see cref="NoListenPortConnector"/>.</summary>
+    public const string NoListenPort = "47";
+
     /// <summary>The value of <c>%VERSION</c>: the curl release Curl matches.</summary>
     public const string CurlVersion = "8.21.0";
 
     private const string HostAddress = "127.0.0.1";
+
+    // runtests.pl's $HOST6IP: the IPv6 loopback, bracketed for a URL.
+    private const string Host6Address = "[::1]";
 
     private static readonly string[] ClientFileParts = ["file", "file1", "file2", "file3", "file4"];
 
@@ -64,24 +93,30 @@ public sealed class UpstreamCaseRunner(
     /// <c>runtests.pl</c>'s working directory; <see langword="null"/> leaves <c>%PWD</c> without a
     /// value, so a case that uses it is skipped.
     /// </param>
+    /// <param name="certificateDirectory">
+    /// The folder holding upstream's <c>certs</c> folder, <c>%CERTDIR</c> (cases name
+    /// <c>%CERTDIR/certs/test-ca.crt</c>), by an absolute path with no blank in it;
+    /// <see langword="null"/> leaves <c>%CERTDIR</c> without a value, so a case that uses it is skipped.
+    /// </param>
     /// <returns>Whether the case passed, failed with its first difference, or was skipped with its reason.</returns>
     /// <exception cref="ArgumentException">
-    /// <paramref name="logDirectory"/> or <paramref name="testsDirectory"/> holds a blank, which
-    /// would split every command that names <c>%LOGDIR</c> or <c>%PWD</c> unquoted (test3009's
+    /// <paramref name="logDirectory"/>, <paramref name="testsDirectory"/> or
+    /// <paramref name="certificateDirectory"/> holds a blank, which would split every command that
+    /// names <c>%LOGDIR</c>, <c>%PWD</c> or <c>%CERTDIR</c> unquoted (test3009's
     /// <c>--output-dir %PWD/not-there</c>, GF-0044), as upstream's relative <c>log/</c> never does.
     /// </exception>
-    public async Task<UpstreamCaseOutcome> RunAsync(int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null)
+    public async Task<UpstreamCaseOutcome> RunAsync(
+        int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null, string? certificateDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(logDirectory);
         RefuseABlank(logDirectory, "log directory", nameof(logDirectory));
         RefuseABlank(testsDirectory ?? string.Empty, "tests directory", nameof(testsDirectory));
+        RefuseABlank(certificateDirectory ?? string.Empty, "certificate directory", nameof(certificateDirectory));
 
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
-        if (testsDirectory is not null)
-        {
-            variables["PWD"] = testsDirectory.Replace('\\', '/');
-        }
+        AddDirectoryVariable(variables, "PWD", testsDirectory);
+        AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile.Span, variables, platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
@@ -104,21 +139,43 @@ public sealed class UpstreamCaseRunner(
         }
     }
 
+    private static void AddDirectoryVariable(Dictionary<string, string> variables, string name, string? directory)
+    {
+        if (directory is not null)
+        {
+            variables[name] = directory.Replace('\\', '/');
+        }
+    }
+
     private Dictionary<string, string> Variables(int testNumber, string logDirectory) =>
         new(StringComparer.Ordinal)
         {
             ["HOSTIP"] = HostAddress,
             ["CLIENTIP"] = HostAddress,
             ["HTTPPORT"] = HttpPort,
+            ["PROXYPORT"] = ProxyPort,
+            ["SOCKSPORT"] = SocksPort,
+            ["MQTTPORT"] = MqttPort,
+            ["RTSPPORT"] = RtspPort,
+            ["NOLISTENPORT"] = NoListenPort,
             ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
             ["LOGDIR"] = logDirectory,
             ["FILE_PWD"] = string.Empty,
             ["VERSION"] = CurlVersion,
             ["DEV_NULL"] = platform.NullDevice,
+            ["PERL"] = UpstreamPerlOneLiner.Program,
+            ["RESOLVE"] = UpstreamResolveCheck.Program,
+            ["HOST6IP"] = Host6Address,
+            ["HTTP6PORT"] = Http6Port,
         };
 
     private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory)
     {
+        if (PrecheckSkipReason(testCase) is { } skipReason)
+        {
+            return UpstreamCaseOutcome.Skipped(skipReason);
+        }
+
         string outputFile = logDirectory + "/curl.out";
         WriteClientFiles(testCase);
         List<string> arguments = Arguments(testCase, outputFile);
@@ -126,14 +183,15 @@ public sealed class UpstreamCaseRunner(
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
         // curl timer to race them, they are skipped.
-        SwsHttpServerConnector server = new(testCase, CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider());
+        SwsHttpServerConnector server = new(testCase, ServerClock(arguments));
         // Not disposed: CurlCommandRunner.RunAsync takes no cancellation token, so a run past the
         // time limit is stopped only at its next exchange with the abandoned server, and may write
         // to these until then. A memory stream holds nothing but its buffer, which the collector takes.
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, server, new UnreachableDatagramConnector());
+        MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, new NoListenPortConnector(server)));
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, new UnreachableDatagramConnector());
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -142,7 +200,25 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), server.ReceivedBytes.ToArray(), File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : []);
+        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), [.. server.ReceivedBytes.Span, .. mqtt.ProtocolLog.Span], ReadOutputFile(outputFile))
+        {
+            ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
+        };
+        return Judge(testCase, run);
+    }
+
+    private static TimeProvider ServerClock(List<string> arguments) =>
+        CurlTimerOptions.AnyIn(arguments) ? TimeProvider.System : new WaitSkippingTimeProvider();
+
+    private static byte[] ReadOutputFile(string outputFile) => File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [];
+
+    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, UpstreamCaseRun run)
+    {
+        if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
+        {
+            return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");
+        }
+
         return UpstreamCaseVerification.FindFirstDifference(testCase, run) is { } difference
             ? UpstreamCaseOutcome.Failed(difference)
             : UpstreamCaseOutcome.Passed;
@@ -174,6 +250,18 @@ public sealed class UpstreamCaseRunner(
             return (0, $"curl threw {exception.GetType().Name}: {exception.Message}");
         }
     }
+
+    // runtests.pl skips the case with the first line a precheck prints, or with "precheck command
+    // error" when it prints nothing and exits non-zero. Screening let only interpreted one-liners through.
+    private string? PrecheckSkipReason(UpstreamTestCase testCase) =>
+        FirstFailedCheck(testCase, "client", "precheck", result => result.ExitCode != 0 || result.Output.Length > 0) is { } precheck
+            ? precheck.Output.Length > 0 ? precheck.Output.Split('\n')[0].Replace("\r", "", StringComparison.Ordinal) : "precheck command error"
+            : null;
+
+    private UpstreamPerlOneLinerResult? FirstFailedCheck(UpstreamTestCase testCase, string section, string name, Func<UpstreamPerlOneLinerResult, bool> failed) =>
+        UpstreamTestPartBodies.Lines(testCase.Find(section, name))
+            .Select(line => UpstreamPerlOneLiner.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!)
+            .FirstOrDefault(failed);
 
     private static List<string> Arguments(UpstreamTestCase testCase, string outputFile)
     {

@@ -25,6 +25,13 @@ internal sealed class InMemoryServerTcpDialer(IConnector server) : ITcpDialer
         ConnectResult connected = await server
             .ConnectAsync(new ConnectTarget(endPoint.Address.ToString(), endPoint.Port, false), cancellationToken);
 
+        // A refused connect reaches TcpConnector as the system reports one, so it ends with
+        // exit 7 marked refused, as on a real port nothing listens on (%NOLISTENPORT, BL-1904).
+        if (connected.IsConnectionRefused)
+        {
+            throw new SocketException((int)SocketError.ConnectionRefused);
+        }
+
         IConnection connection = connected.Connection
             ?? throw new IOException($"The in-memory server refused the connection: {connected.ErrorMessage}");
 
