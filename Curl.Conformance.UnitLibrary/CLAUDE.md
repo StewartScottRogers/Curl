@@ -70,6 +70,11 @@ unreadable `Content-Length`, which sws stops reading before the rules; after a r
 containing `swsbounce` the next request gets that part plus one; both states are kept across
 connections. A `CONNECT host:port HTTP/x.y` request with no number in its path is answered
 from `<connect>` / `<connectN>`, and the connection stays open for the tunnelled request.
+Connections to `SwsHttpServerConnector.ProxyPort` (8992, the runner's `%PROXYPORT`) stand in
+for upstream's `http-proxy` server (BL-1924): they are served the same way but recorded in
+`ProxyReceivedBytes`, compared with `<verify><proxy>` after `<strip>` / `<strippart>` as
+`<verify><protocol>` is; after a `CONNECT` such a connection records into `ReceivedBytes`, as
+upstream's HTTP server logs the tunnelled request. Screening lets `http-proxy` cases run.
 A read before the client's first write waits for that write, as sws blocks reading the
 request (a telnet `-T` session reads while its upload is on its way; BL-1853), and a read while
 an `Expect: 100-continue` request still owes its body waits for the client's next write, since

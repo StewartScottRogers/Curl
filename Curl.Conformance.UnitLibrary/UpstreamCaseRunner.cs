@@ -25,7 +25,7 @@ namespace Curl.Conformance;
 /// for the cases that verify them as files. <c>%include</c> and <c>%includetext</c> read the file
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
-/// <see cref="HttpPort"/>, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="HttpPort"/>, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -41,6 +41,9 @@ public sealed class UpstreamCaseRunner(
 {
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
+
+    /// <summary>The value of <c>%PROXYPORT</c>: connections to this port reach the emulation too, recorded apart for <c>&lt;verify&gt;&lt;proxy&gt;</c>.</summary>
+    public const string ProxyPort = "8992";
 
     /// <summary>The value of <c>%VERSION</c>: the curl release Curl matches.</summary>
     public const string CurlVersion = "8.21.0";
@@ -124,6 +127,7 @@ public sealed class UpstreamCaseRunner(
             ["HOSTIP"] = HostAddress,
             ["CLIENTIP"] = HostAddress,
             ["HTTPPORT"] = HttpPort,
+            ["PROXYPORT"] = ProxyPort,
             ["TESTNUMBER"] = testNumber.ToString(CultureInfo.InvariantCulture),
             ["LOGDIR"] = logDirectory,
             ["FILE_PWD"] = string.Empty,
@@ -156,7 +160,10 @@ public sealed class UpstreamCaseRunner(
 
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), server.ReceivedBytes.ToArray(), File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : []);
+        UpstreamCaseRun run = new(exitCode, standardOutput.ToArray(), standardError.ToArray(), server.ReceivedBytes.ToArray(), File.Exists(outputFile) ? File.ReadAllBytes(outputFile) : [])
+        {
+            ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
+        };
         return UpstreamCaseVerification.FindFirstDifference(testCase, run) is { } difference
             ? UpstreamCaseOutcome.Failed(difference)
             : UpstreamCaseOutcome.Passed;

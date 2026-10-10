@@ -35,6 +35,34 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ToTheProxyPort_RecordsInProxyReceivedBytesApart()
+    {
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+        IConnection http = await ConnectAsync(server);
+
+        await ExchangeAsync(proxy, Get);
+        await ExchangeAsync(http, Get + "x");
+
+        Assert.AreEqual(Get, Text(server.ProxyReceivedBytes));
+        Assert.AreEqual(Get + "x", Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_ToTheProxyPort_RecordsTheTunnelledRequestInReceivedBytes()
+    {
+        const string Connect = "CONNECT a:1 HTTP/1.1\r\n\r\n";
+        SwsHttpServerConnector server = new(Case(Reply("connect", "HTTP/1.1 200 OK\n\n"), Reply("data", "first\n")));
+        IConnection proxy = (await server.ConnectAsync(new ConnectTarget("127.0.0.1", SwsHttpServerConnector.ProxyPort, false), CancellationToken.None)).Connection!;
+
+        await ExchangeAsync(proxy, Connect);
+        await ExchangeAsync(proxy, Get);
+
+        Assert.AreEqual(Connect, Text(server.ProxyReceivedBytes));
+        Assert.AreEqual(Get, Text(server.ReceivedBytes));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TwoConnections_TakeConsecutiveLoopbackLocalPorts()
     {
         Diagnostics.Arrange("reply parts", "data=first");

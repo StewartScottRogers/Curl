@@ -48,7 +48,7 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     private readonly TimeSpan waitAfterReply;
 
-    private readonly SwsServerRecording recording;
+    private SwsServerRecording recording;
 
     private readonly TimeProvider timeProvider;
 
@@ -90,6 +90,13 @@ internal sealed class SwsHttpServerConnection : IConnection
         this.abandonment = abandonment;
         openedAt = timeProvider.GetTimestamp();
     }
+
+    /// <summary>
+    /// Where the connection records from the request after a <c>CONNECT</c> on: the HTTP server's
+    /// log for a connection to the http-proxy, whose tunnelled requests upstream's HTTP server logs;
+    /// <see langword="null"/> to keep recording where it started.
+    /// </summary>
+    public SwsServerRecording? TunnelRecording { get; init; }
 
     public bool IsSecure => false;
 
@@ -285,10 +292,15 @@ internal sealed class SwsHttpServerConnection : IConnection
         bool upgradesConnection = false;
         while (readsRequests && (requestLength = SwsHttpRequestFraming.FindRequestLength(unservedRequestBytes.ToArray(), serverCommands, out upgradesConnection)) >= 0)
         {
-            SwsHttpReply reply = replySelector.Select(unservedRequestBytes.GetRange(0, requestLength).ToArray());
+            byte[] request = unservedRequestBytes.GetRange(0, requestLength).ToArray();
+            SwsHttpReply reply = replySelector.Select(request);
             unservedRequestBytes.RemoveRange(0, requestLength);
             ForgetBytesPastSkippedRequest();
             Serve(reply, upgradesConnection);
+            if (TunnelRecording is not null && request.AsSpan().StartsWith("CONNECT "u8))
+            {
+                recording = TunnelRecording;
+            }
         }
     }
 

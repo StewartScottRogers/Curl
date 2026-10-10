@@ -20,6 +20,9 @@ internal sealed class UpstreamCaseRun(int exitCode, byte[] standardOutput, byte[
     /// <summary>Every byte the emulated server received.</summary>
     public byte[] ReceivedBytes { get; } = receivedBytes;
 
+    /// <summary>Every byte the emulated http-proxy server on <c>%PROXYPORT</c> received, for <c>&lt;verify&gt;&lt;proxy&gt;</c>.</summary>
+    public byte[] ProxyReceivedBytes { get; init; } = [];
+
     /// <summary>The <c>--output</c> file the harness added, empty when it was not written.</summary>
     public byte[] OutputFileBytes { get; } = outputFileBytes;
 }

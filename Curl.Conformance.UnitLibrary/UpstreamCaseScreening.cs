@@ -12,7 +12,7 @@ namespace Curl.Conformance;
 /// something unresolved; when it has a part the harness
 /// does not act on (a <c>&lt;tool&gt;</c> libtest, a <c>&lt;precheck&gt;</c>, a <c>&lt;setenv&gt;</c>,
 /// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when it needs a server other than <c>http</c> (the
-/// one emulated), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
+/// one emulated), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
 /// command is not a plain curl command line; when a file part does not name an
@@ -26,14 +26,14 @@ internal static class UpstreamCaseScreening
 
     private static readonly HashSet<string> VerifyParts =
     [
-        "protocol", "errorcode", "stdout", "stderr", "file", "file1", "file2", "file3", "file4", "notexists",
+        "protocol", "proxy", "errorcode", "stdout", "stderr", "file", "file1", "file2", "file3", "file4", "notexists",
         "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind",
     ];
 
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> Servers = ["http", "file", "none", .. LineProtocolServerConnector.EmulatedServers];
+    private static readonly HashSet<string> Servers = ["http", "http-proxy", "file", "none", .. LineProtocolServerConnector.EmulatedServers];
 
     private static readonly string[] FileParts = ["file", "file1", "file2", "file3", "file4"];
 
