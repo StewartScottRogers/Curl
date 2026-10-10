@@ -894,7 +894,8 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Sends <paramref name="plan" />, framed for HTTP/2 or HTTP/3 when <paramref name="streams" /> is set,
-    /// then each retry the response asks for while the connection stays open. After an h2c
+    /// then each retry the response asks for while the connection stays open and its peer has not
+    /// closed it (<see cref="IConnection.HasPeerClosed" />). After an h2c
     /// upgrade the retries go out on new streams of the session the connection switched to, as
     /// curl sends them (measured, BL-866 Notes), and that session is given back with the outcome.
     /// </summary>
@@ -909,7 +910,7 @@ public sealed class HttpProtocolHandler(
         HttpAttemptOutcome outcome = await ExchangeAsync(first, connect, connection, earlier, newConnection: !connect.IsReused, streams).ConfigureAwait(false);
         Http2Session? upgradedSession = outcome.UpgradedSession;
         streams ??= upgradedSession;
-        while (outcome.Retry is { } retry && outcome.KeepsAlive)
+        while (RetryOnSameConnection(outcome, connection) is { } retry)
         {
             ReportRetryOnSameConnection(retry, connect);
             HttpRequestPlan next = streams is null ? retry : retry.ForHttp2OrHttp3();
@@ -918,6 +919,16 @@ public sealed class HttpProtocolHandler(
 
         return (outcome, upgradedSession);
     }
+
+    /// <summary>
+    /// Gives the retry <paramref name="outcome" /> asks for when it can go out on the same
+    /// connection: the connection persists and its peer has not closed it. curl 8.21.0 asks a
+    /// kept connection whether it is alive before it sends on it again; one the server has
+    /// closed is left intact and the retry issued anew, so the pool reports it dead and opens a
+    /// fresh one (BL-2018, ADR-0467). Gives <see langword="null" /> otherwise.
+    /// </summary>
+    private static HttpRequestPlan? RetryOnSameConnection(HttpAttemptOutcome outcome, IConnection connection) =>
+        outcome.KeepsAlive && !connection.HasPeerClosed ? outcome.Retry : null;
 
     /// <summary>
     /// Reports what curl 8.21.0 writes between a response it answers with another request and

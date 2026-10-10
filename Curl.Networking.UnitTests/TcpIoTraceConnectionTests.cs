@@ -154,6 +154,7 @@ public sealed class TcpIoTraceConnectionTests
         Assert.AreEqual(PendingReadConnection.Local, connection.LocalEndPoint);
         Assert.AreSame(inner.HeldSession, connection.Session);
         Assert.IsTrue(connection.IsSharedWithAnotherTransfer);
+        Assert.IsTrue(connection.HasPeerClosed);
         Assert.IsTrue(held);
         Assert.AreSame(inner, cleared);
         CollectionAssert.AreEqual(new[] { "flush", "reusable", "hold", "clear True", "dispose" }, inner.Calls);
@@ -181,6 +182,8 @@ public sealed class TcpIoTraceConnectionTests
         public IConnectionSession? Session => HeldSession;
 
         public bool IsSharedWithAnotherTransfer => true;
+
+        public bool HasPeerClosed => true;
 
         public void Answer(int count) => _read.SetResult(count);
 

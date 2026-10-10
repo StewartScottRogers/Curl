@@ -57,6 +57,9 @@ internal sealed class SslStreamConnection(
     /// <summary>Gets the plaintext connection's local endpoint.</summary>
     public EndPoint? LocalEndPoint => plaintext.LocalEndPoint;
 
+    /// <summary>Asks the plaintext connection TLS runs over whether the peer has closed it.</summary>
+    public bool HasPeerClosed => plaintext.HasPeerClosed;
+
     /// <inheritdoc />
     /// <exception cref="MissingCloseNotifyException">
     /// The connection ended without <c>close_notify</c>, at a record boundary (where

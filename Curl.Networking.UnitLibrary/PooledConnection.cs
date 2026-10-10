@@ -75,6 +75,13 @@ public sealed class PooledConnection : IConnection
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// True once a read found the server's close (ADR-0112), or when the underlying connection
+    /// reports it now (ADR-0467).
+    /// </remarks>
+    public bool HasPeerClosed => _underlying.HasReadPeerClose || _underlying.Connection.HasPeerClosed;
+
+    /// <inheritdoc />
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
         _underlying.Connection.WriteAsync(buffer, cancellationToken);
 

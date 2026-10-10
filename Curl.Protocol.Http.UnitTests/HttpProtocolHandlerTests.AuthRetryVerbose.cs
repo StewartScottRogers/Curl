@@ -104,6 +104,43 @@ public sealed partial class HttpProtocolHandlerTests
             events.Events);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_DigestRetryWhenTheServerClosedTheKeptConnection_SendsTheRetryOnAFreshConnection()
+    {
+        // curl 8.21.0 --digest -u u:p -v against a 401 that half-closes after its body: the
+        // connection is left intact, then found dead, and the retry goes out on connection #1
+        // with no byte written to #0 (measured, BL-2018 Notes). The pool writes the dead lines.
+        TurnTakingConnection closed = new(65536, KeepAliveDigestChallenge) { HasPeerClosed = true };
+        TurnTakingConnection fresh = new(65536, OkHead + "ok");
+        QueueConnector connector = QueueConnector.For(closed, fresh);
+        RecordingTransferEvents events = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(AuthUrl),
+            Output = new MemoryStream(),
+            Credentials = new NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions { AuthSchemes = HttpAuthSchemes.Digest },
+            Events = events,
+        };
+        Diagnostics.Arrange("url, auth, first connection", $"{AuthUrl}, Digest, closed by the server after the 401");
+
+        TransferResult result = await NegotiateHandler(connector, new ScriptedTokenSource()).ExecuteAsync(context);
+
+        WriteResult(result);
+        WriteEvents("events", events.Events);
+        Diagnostics.Act("connects, requests on the closed connection", $"{connector.Targets.Count}, {closed.Written.Split("GET ").Length - 1}");
+        Diagnostics.Assert("connects", 2, connector.Targets.Count);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, connector.Targets);
+        Assert.AreEqual(1, closed.Written.Split("GET ").Length - 1);
+        StringAssert.Contains(fresh.Written, "Authorization: Digest");
+        Assert.IsEmpty(events.Reused);
+        CollectionAssert.IsSubsetOf(
+            new[] { "* Issue another request to this URL: 'http://127.0.0.1:18183/a'" },
+            events.Events);
+        Assert.IsFalse(events.Events.Any(line => line.StartsWith("* Connection died", StringComparison.Ordinal)));
+    }
+
     /// <summary>
     /// Gives curl 8.21.0's <c>-v</c> lines for <c>--digest</c> or <c>--ntlm -u u:p -v</c>
     /// against <paramref name="challenge" /> on a connection kept open, then a <c>200</c>, as

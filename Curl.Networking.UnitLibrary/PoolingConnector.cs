@@ -442,7 +442,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         }
 
         var match = await TakeMatchAsync(key);
-        while (match is { HasReadPeerClose: true })
+        while (match is not null && (match.HasReadPeerClose || match.Connection.HasPeerClosed))
         {
             events.ReportInfo($"Connection {match.ConnectionNumber} seems to be dead");
             events.ReportInfo($"shutting down connection #{match.ConnectionNumber}");

@@ -63,6 +63,19 @@ public sealed class StreamConnectionTests
     }
 
     [TestMethod]
+    public async Task HasPeerClosed_OverAStreamWithNoSocket_IsFalse()
+    {
+        Diagnostics.Arrange("stream", "memory stream, no socket to ask");
+
+        await using var connection = new StreamConnection(new MemoryStream(), null);
+
+        Diagnostics.Act("has peer closed", connection.HasPeerClosed);
+        Diagnostics.Assert("has peer closed", false, connection.HasPeerClosed);
+
+        Assert.IsFalse(connection.HasPeerClosed);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_ReturnsTheStreamsBytesThenZero()
     {
         await using var connection = new StreamConnection(new MemoryStream([1, 2, 3]), null);

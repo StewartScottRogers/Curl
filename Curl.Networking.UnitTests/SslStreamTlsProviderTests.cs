@@ -197,6 +197,7 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsTrue(connection.IsSecure);
         Assert.AreSame(ServerEndPoint, connection.RemoteEndPoint);
         Assert.AreSame(localEndPoint, connection.LocalEndPoint);
+        Assert.IsFalse(connection.HasPeerClosed);
 
         await connection.WriteAsync(Encoding.ASCII.GetBytes("ping"), CancellationToken.None);
         await connection.FlushAsync(CancellationToken.None);

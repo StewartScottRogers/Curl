@@ -101,6 +101,20 @@ public sealed class IConnectionTests
     }
 
     [TestMethod]
+    public void HasPeerClosed_WhenNotOverridden_ReturnsFalse()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        IConnection connection = new MinimalConnection();
+        diagnostics.Arrange("connection", nameof(MinimalConnection));
+
+        var hasPeerClosed = connection.HasPeerClosed;
+
+        diagnostics.Act("has peer closed", hasPeerClosed);
+        diagnostics.Assert("has peer closed", false, hasPeerClosed);
+        Assert.IsFalse(hasPeerClosed);
+    }
+
+    [TestMethod]
     public void ConcurrentTransferLimit_WhenNotOverridden_ReturnsNull()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

@@ -124,4 +124,13 @@ public interface IConnection : IAsyncDisposable
     /// is shared.
     /// </summary>
     bool IsSharedWithAnotherTransfer => false;
+
+    /// <summary>
+    /// Gets a value indicating whether the peer has already closed the connection, found
+    /// without blocking and without taking a byte: the socket under it is readable and has
+    /// nothing to read, as curl 8.21.0's <c>Curl_conn_is_alive</c> asks before it sends on a
+    /// kept connection (BL-2018, ADR-0467). The default is <see langword="false" />: an
+    /// implementation with no socket to ask is taken to be open.
+    /// </summary>
+    bool HasPeerClosed => false;
 }
