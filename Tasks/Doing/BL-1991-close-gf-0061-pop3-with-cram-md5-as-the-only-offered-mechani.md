@@ -44,3 +44,4 @@ In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offe
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
