@@ -39,3 +39,4 @@ Upstream runs a second `sws` with `--proxy` on %PROXYPORT and logs what it recei
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
