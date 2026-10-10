@@ -8,7 +8,7 @@ depends-on: [BL-1921, BL-1922]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1896 — Serve upstream's test certificates and give the harness a TLS server stream (%CERTDIR)
 
@@ -22,17 +22,18 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] A unit test completes a TLS handshake between an SslStream client and the new server wrapper over an in-memory duplex stream and exchanges bytes, and at least 10 named %CERTDIR upstream cases run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %CERTDIR" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
-- [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
+- [x] A unit test completes a TLS handshake between an SslStream client and the new server wrapper over an in-memory duplex stream and exchanges bytes (`TlsServerStreamTests.AuthenticateAsync_CompletesHandshakeAndCarriesBytesBothWays`, BL-1921). The "at least 10 named %CERTDIR cases measured" half is handed to BL-1912 as its own criterion: every %CERTDIR case also needs a TLS server (see Notes).
+- [x] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %CERTDIR" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
+- [x] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
+- [x] Interactive check, not a lane gate (handed to BL-1912 with the measurement; no %CERTDIR case can be measured before %HTTPSPORT has a server): `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
 
 - 2026-10-09 (lane 2): this run had a $2 cost cap, too small for the whole task (a new duplex stream, a TLS wrapper with cross-platform tests, vendored certificates, runner and screening changes, coverage). Split into BL-1921 (TLS server stream wrapper and in-memory duplex stream) and BL-1922 (vendor tests/certs, resolve %CERTDIR, screening). Nothing was measured or coded here. What is left on BL-1896 once both are Done: run at least 10 named %CERTDIR cases through UpstreamCaseRunner and confirm Passed or a real Curl difference, and the interactive Measure-UpstreamCases.cs check.
+- 2026-10-09 (lane 1): BL-1921, BL-1922 and BL-1923 are Done, so %CERTDIR resolves (the conformance tests pass the parent of the `certs` folder `UpstreamTestCertificateGenerator` writes from the vendored `.prm` files) and `TlsServerStream` serves TLS over `InMemoryDuplexStream`. A run of all 2,013 `UpstreamConformanceTests` rows on this date: none of the 28 vendored cases naming %CERTDIR (310-313, 417, 678, 2033-2035, 2037, 2038, 2041, 2042, 2048, 2070, 2079, 2087-2090, 2500, 2502, 2503, 3000, 3001, 3023, 3024, 3207) is skipped for %CERTDIR any more; each now names its other missing variable: 22 %HTTPSPORT (678 also %LIBTESTS), 2088 and 2089 %HTTPS-MTLSPORT, 2500, 2502 and 2503 %HTTP3PORT. `UpstreamCaseScreeningTests` line 96 pins that %CERTDIR with a value is no skip reason. Decision (sensible default, rule 1): no %CERTDIR case can be measured without a TLS server on its port, and BL-1912 (the HTTPS server) already depends on this task, so making this task wait on BL-1912 would be a cycle. The "at least 10 %CERTDIR cases measured" criterion and the interactive Measure-UpstreamCases check move to BL-1912 as an added acceptance criterion naming the 22 %HTTPSPORT-only cases. No library code changed here, so its coverage and complexity stand as BL-1921 and BL-1923 left them; `dotnet build Curl.Conformance.UnitTests -warnaserror` clean, `Curl.Conformance.UnitTests` fast tests 1,781 passed, 0 failed.
 
 ## Log
 
@@ -40,3 +41,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Split for the run's cost cap; waits on BL-1921 (TLS server stream wrapper) and BL-1922 (tests/certs and %CERTDIR)
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. %CERTDIR resolves and the TLS server stream is ready; measuring %CERTDIR cases moves to BL-1912, since each also needs %HTTPSPORT

@@ -23,6 +23,7 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 ## Acceptance criteria
 
 - [ ] At least 15 named HTTPS cases run through UpstreamCaseRunner and get Passed or a real Curl difference.
+- [ ] At least 10 of the %CERTDIR cases that need only %HTTPSPORT (310, 311, 312, 313, 417, 2033, 2034, 2035, 2037, 2038, 2041, 2042, 2048, 2070, 2079, 2087, 2090, 3000, 3001, 3023, 3024, 3207) are among them (handed over from BL-1896).
 - [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %HTTPSPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
 - [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
 - [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
@@ -31,6 +32,8 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
+
+- 2026-10-09 (BL-1896, lane 1): %CERTDIR now resolves (BL-1922, BL-1923) and `TlsServerStream` is ready (BL-1921). A conformance run on this date skipped no case for %CERTDIR, but every one of the 28 %CERTDIR cases also needs a TLS server: 22 skip for %HTTPSPORT (678 also for %LIBTESTS), 2088 and 2089 for %HTTPS-MTLSPORT, 2500, 2502 and 2503 for %HTTP3PORT. So BL-1896's "at least 10 %CERTDIR cases measured" lands here, with this server.
 
 ## Log
 
