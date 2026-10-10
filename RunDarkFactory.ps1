@@ -1935,6 +1935,21 @@ function Get-TaskSpentUsd {
     return $spent
 }
 
+function Close-UnfinishedRunLogs {
+    # Gives a result event to every earlier run log of a task that ends without one: a shift
+    # restart or a killed lane stops the run before Invoke-TaskRun can write its result, so
+    # the audit's unfinishedRuns listed it for good (AF-0152). Called as the task's next run
+    # starts, when no earlier run of the task can still be writing. -Except is the new log.
+    param([string]$Dir, [string]$Id, [string]$Except = '')
+    if (-not (Test-Path $Dir)) { return }
+    $pattern = '^' + [regex]::Escape($Id) + '-\d{8}-\d{6}.*\.jsonl$'
+    foreach ($log in @(Get-ChildItem $Dir -Filter "$Id-*.jsonl" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern -and $_.FullName -ne $Except })) {
+        $tail = @(Get-Content $log.FullName -Tail 3 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"type"\s*:\s*"result"' })
+        if ($tail.Count) { continue }
+        Add-Content -Path $log.FullName -Value ([pscustomobject][ordered]@{ type = 'result'; subtype = 'factory_no_result'; is_error = $true; exit_code = $null; timed_out = $false; result = 'ended with no result event: the shift or lane stopped before the run did'; total_cost_usd = 0 } | ConvertTo-Json -Compress) -Encoding UTF8
+    }
+}
+
 function Test-TaskCapSpent {
     # Whether a task's runs of the last day already cost all but $1 of its cap (AF-0096).
     # Get-RunBudgetUsd never gives a run less than $1, so without this a task requeued
@@ -3615,6 +3630,7 @@ function Invoke-TaskRun {
     # The cost cap (AF-0004, AF-0033): the run stops once it has cost 2.7 times the median
     # recent run, at most -TaskBudgetUsd, less what the task's runs of the last day cost
     # (AF-0095). Read before this run's log exists, so it never counts itself.
+    Close-UnfinishedRunLogs $LogDir $Id $raw
     $script:RunBudgetUsd = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir) (Get-TaskSpentUsd $LogDir $Id)
     $budget = if ($script:RunBudgetUsd -gt 0) { ' --max-budget-usd ' + $script:RunBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture) } else { '' }
     # The task's model (BL-1705); the resolver's, overtime and resumed runs keep it. The
