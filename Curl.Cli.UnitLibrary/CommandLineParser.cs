@@ -390,21 +390,20 @@ public static class CommandLineParser
     /// <summary>
     /// Reads a long name that is not in the table as <c>--no-&lt;name&gt;</c>: it turns off a
     /// negatable flag (any attached value ignored) unless the row refuses that, is refused as not reversible for any other row,
-    /// and, when there is no <c>no-</c> or no row after it, is refused by <see cref="RefuseUnlistedName"/>
-    /// or <see cref="RefuseUnlistedNegation"/>. Checked before a value is
+    /// and, when there is no <c>no-</c> or no row after it, is refused by <see cref="RefuseUnlistedName"/>. Checked before a value is
     /// taken, so <c>--no-output</c> as the last argument is refused as not reversible.
     /// </summary>
     private static CommandLineRefusal? ParseNegatedLong(CommandLineOptions options, string argument, string longName, ArgumentReader reader)
     {
         if (!longName.StartsWith(NegationPrefix, StringComparison.Ordinal))
         {
-            return RefuseUnlistedName(argument, longName);
+            return RefuseUnlistedName(argument);
         }
 
         string negatedName = longName[NegationPrefix.Length..];
         if (!CommandLineOptionTable.TryFindLong(negatedName, out CommandLineOption? option))
         {
-            return RefuseUnlistedNegation(argument, negatedName);
+            return RefuseUnlistedName(argument);
         }
 
         if (option.Negate is null)
@@ -416,24 +415,14 @@ public static class CommandLineParser
     }
 
     /// <summary>
-    /// Refuses a long name <see cref="CommandLineOptionTable"/> has no row for, as ADR-0137 decides: a name
-    /// curl 8.21.0 knows (<see cref="CurlOptionAliasTable"/>) is not implemented yet and gets
-    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/>; any other name is <see cref="CommandLineRefusal.UnknownOption"/>.
+    /// Refuses a long name <see cref="CommandLineOptionTable"/> has no row for as an unknown option. Every
+    /// name curl 8.21.0 knows (<see cref="CurlOptionAliasTable"/>) has a row (BL-1135, BL-1421), so such a
+    /// name is never one curl knows and ADR-0137's "installed libcurl does not support this" refusal comes
+    /// from the row, never from here; <c>CommandLineUnimplementedOptionTests</c> fails should a row for
+    /// one ever be removed.
     /// </summary>
-    private static CommandLineRefusal RefuseUnlistedName(string argument, string name) =>
-        CurlOptionAliasTable.TryFindName(name, out _)
-            ? CommandLineRefusal.InstalledLibcurlDoesNotSupport(argument)
-            : CommandLineRefusal.UnknownOption(argument);
-
-    /// <summary>
-    /// Refuses <c>--no-&lt;name&gt;</c> where <see cref="CommandLineOptionTable"/> has no row for
-    /// <paramref name="negatedName"/>, as ADR-0137 decides: not implemented yet when curl 8.21.0 knows the
-    /// name, and unknown otherwise. Every curl name that takes no <c>--no-</c> prefix has a row since BL-1135,
-    /// so its "cannot be reversed" refusal comes from the row; <c>CommandLineUnimplementedOptionTests</c>
-    /// fails should a row for such a name ever be removed.
-    /// </summary>
-    private static CommandLineRefusal RefuseUnlistedNegation(string argument, string negatedName) =>
-        RefuseUnlistedName(argument, negatedName);
+    private static CommandLineRefusal RefuseUnlistedName(string argument) =>
+        CommandLineRefusal.UnknownOption(argument);
 
     /// <summary>
     /// Refuses a short letter <see cref="CommandLineOptionTable"/> has no row for, spelled as the whole
@@ -462,7 +451,7 @@ public static class CommandLineParser
     {
         if (!CommandLineOptionTable.TryFindLong(longName, out CommandLineOption? option))
         {
-            return RefuseUnlistedName(argument, longName);
+            return RefuseUnlistedName(argument);
         }
 
         string? template = attachedValue ?? reader.PeekNext();

@@ -892,9 +892,7 @@ public static class CommandLineOptionTable
 
         foreach (string line in System.Text.Encoding.UTF8.GetString(contents).Split('\n'))
         {
-            string url = line.TrimEnd('\r');
-            string content = url.TrimStart(' ', '\t');
-            CommandLineRefusal? refusal = content.Length == 0 || content[0] == '#' ? null : options.AddUrl(url, spelledOption, readFromUrlFile: true);
+            CommandLineRefusal? refusal = AddUrlFromFileLine(options, line.TrimEnd('\r'), spelledOption);
             if (refusal is not null)
             {
                 return refusal;
@@ -902,6 +900,13 @@ public static class CommandLineOptionTable
         }
 
         return null;
+    }
+
+    /// <summary>Adds one line of a <c>--url @file</c> file as a URL unless it is blank or its first non-blank character is <c>#</c>.</summary>
+    private static CommandLineRefusal? AddUrlFromFileLine(CommandLineOptions options, string url, string spelledOption)
+    {
+        string content = url.TrimStart(' ', '\t');
+        return content.Length == 0 || content[0] == '#' ? null : options.AddUrl(url, spelledOption, readFromUrlFile: true);
     }
 
     /// <summary>
