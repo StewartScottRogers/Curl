@@ -49,6 +49,12 @@ internal static class HttpTransferMessages
     internal const string InvalidStatusLine = "Invalid status line";
 
     /// <summary>
+    /// The exit 8 message for an HTTP/0.9 answer to a HEAD (<c>-I</c>) request, upstream
+    /// test1144 (measured against curl 8.18.0 for BL-2005).
+    /// </summary>
+    internal const string WeirdServerReply = "Weird server reply";
+
+    /// <summary>
     /// The exit 8 message for a head line holding a NUL byte (curl 8.21.0, <c>lib/http.c</c>).
     /// </summary>
     internal const string NulByteInHeader = "Nul byte in header";
