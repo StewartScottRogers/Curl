@@ -35,3 +35,4 @@ Forms used: `%PERL %SRCDIR/libtest/test613.pl prepare <dir>` (five cases), `post
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
