@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1984 — Close GF-0054: When the EPSV data port cannot be connected, FTP does not fall back to PASV
 
@@ -35,13 +35,16 @@ In Curl.Protocol.Ftp.UnitLibrary's FtpSession.OpenPassiveDataConnectionAsync, wh
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test1233`: Curl answers what curl 8.21.0 answers, `upstream test1233 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test1233`: Curl answers what curl 8.21.0 answers, `upstream test1233 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- The FTP fallback itself already existed (BL-1250: `FtpSession.AnswerFailedEpsvDialAsync` sends PASV after a failed dial to the 229 port). The 20-second hang was the harness: `NoListenPortConnector` passed port 1 on to the in-memory sws stand-in, which accepts any port, so the EPSV dial succeeded and RETR waited for data that never came. Fix: `NoListenPortConnector` now refuses port 1 as well as %NOLISTENPORT (test1233 says "assuming there is nothing listening on port 1"). Chose port 1 alone over all ports below 1024 so no case that reaches the stand-in on another port changes. No FTP library change was needed. test1233 added to `PassingUpstreamCases.txt`; it passes in the ratchet.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Harness refuses port 1, so test1233's EPSV dial fails and Curl falls back to PASV; case listed in the ratchet
