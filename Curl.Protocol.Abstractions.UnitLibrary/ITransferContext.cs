@@ -380,7 +380,8 @@ public interface ITransferContext
     /// not given.
     /// </summary>
     /// <remarks>
-    /// It applies to uploads only; a download ignores it. <c>file://</c> reads it, and
+    /// It applies to uploads only; a download ignores it. <c>file://</c>, <c>ftp://</c> and
+    /// <c>smtp://</c> (before dot-stuffing, BL-1994) read it, and
     /// measured on curl 8.21.0 the conversion inserts a carriage return before a line feed
     /// only when the byte before that line feed is not already one, so <c>a\r\nb</c> is
     /// sent unchanged, a lone carriage return is left alone, and that state carries across

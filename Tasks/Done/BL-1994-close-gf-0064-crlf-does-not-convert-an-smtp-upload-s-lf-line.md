@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1994 — Close GF-0064: --crlf does not convert an SMTP upload's LF line ends to CR LF
 
@@ -35,13 +35,21 @@ Carry --crlf into MailRequestOptions (Curl.Console's MailRequestOptionsMapping, 
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test941`: Curl answers what curl 8.21.0 answers, `upstream test941 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test941`: Curl answers what curl 8.21.0 answers, `upstream test941 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- `--crlf` already reached every handler as `ITransferContext.ConvertLineEndings` (TransferContextFactory), so no Curl.Console or MailRequestOptions change was needed; only SMTP ignored it.
+- `SmtpDotStuffer` now takes `convertsLineFeeds`: under `--crlf` it inserts a CR before each LF not already after a CR, then dot-stuffs the result, so a line made by the conversion is stuffed too (`a\n.b` -> `a\r\n..b`). The CR-before state carries across reads, as curl's `cr_lc` reader and the FTP and file converters do. Conversion before stuffing follows the finding's evidence (test941 expects `From: different\r\n`) and curl's reader order (the LF->CRLF content reader sits below SMTP's end-of-body reader).
+- `%{size_upload}` and the progress count are the converted, stuffed bytes, as for FTP and file (ADR-0003); the progress total stays the file's length.
+- Upstream test941 could not be rerun here: lanes may not read `Gap/` or the gap cache (audit guard); the next gap run re-measures it.
+- `--ai-help`: no option added or changed; its `--crlf` text ("convert LF to CRLF in an upload") stays true.
+- Tests: `SmtpDotStufferTests.Encode_ConvertingLineFeeds_InsertsCrBeforeEachBareLfAcrossChunks`, `SmtpProtocolHandlerUploadTests.ExecuteAsync_UploadWithCrlf_SendsEachBareLineFeedAsCrlf`; both branches of the new condition are reached by the fast tests.
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. SMTP -T --crlf now sends each bare LF as CRLF before dot-stuffing, as curl 8.21.0 does in test941

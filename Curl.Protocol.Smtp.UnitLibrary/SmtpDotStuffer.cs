@@ -11,8 +11,15 @@ namespace Curl.Protocol.Smtp;
 /// end-of-data mark is <c>.\r\n</c> when the message ends in CRLF or is empty, and
 /// <c>\r\n.\r\n</c> otherwise. The state carries over from one chunk to the next, so the
 /// upload can be encoded as it is read.
+/// <para>
+/// Under <c>--crlf</c> (<paramref name="convertsLineFeeds" />) a carriage return is first
+/// inserted before each line feed that does not already follow one, as curl 8.21.0 converts
+/// an SMTP upload before stuffing it (upstream test941, BL-1994), so <c>a\n.b</c> goes out as
+/// <c>a\r\n..b</c>; the byte before carries across chunks here too.
+/// </para>
 /// </remarks>
-internal sealed class SmtpDotStuffer
+/// <param name="convertsLineFeeds">Whether <c>--crlf</c> converts each bare line feed to CRLF.</param>
+internal sealed class SmtpDotStuffer(bool convertsLineFeeds = false)
 {
     private const byte Dot = (byte)'.';
 
@@ -43,16 +50,27 @@ internal sealed class SmtpDotStuffer
         var encoded = new List<byte>(chunk.Length + 8);
         foreach (byte next in chunk)
         {
-            if (atLineStart && next == Dot)
+            if (convertsLineFeeds && next == LineFeed && !afterCarriageReturn)
             {
-                encoded.Add(Dot);
+                Add(encoded, CarriageReturn);
             }
 
-            atLineStart = afterCarriageReturn && next == LineFeed;
-            afterCarriageReturn = next == CarriageReturn;
-            encoded.Add(next);
+            Add(encoded, next);
         }
 
         return [.. encoded];
+    }
+
+    /// <summary>Adds one byte of the message to <paramref name="encoded" />, its dot doubled at a line start.</summary>
+    private void Add(List<byte> encoded, byte next)
+    {
+        if (atLineStart && next == Dot)
+        {
+            encoded.Add(Dot);
+        }
+
+        atLineStart = afterCarriageReturn && next == LineFeed;
+        afterCarriageReturn = next == CarriageReturn;
+        encoded.Add(next);
     }
 }

@@ -5,7 +5,8 @@ namespace Curl.Protocol.Smtp;
 
 /// <summary>
 /// Sends one message on an open SMTP session: <c>MAIL FROM</c>, one <c>RCPT TO</c> per
-/// <c>--mail-rcpt</c>, <c>DATA</c>, the dot-stuffed upload (<see cref="SmtpDotStuffer" />) and
+/// <c>--mail-rcpt</c>, <c>DATA</c>, the dot-stuffed upload (<see cref="SmtpDotStuffer" />, each bare line
+/// feed made CRLF first under <c>--crlf</c>) and
 /// <c>QUIT</c>, each step and each failure's exit code measured on curl 8.21.0 with
 /// <c>Record-CurlExchange.ps1 -Smtp</c> (BL-542).
 /// </summary>
@@ -192,7 +193,7 @@ internal sealed class SmtpMailTransaction(
         // from a read that returns nothing (BL-1198).
         SmtpStateTrace trace = channel.Trace;
         bool sendsEachRead = trace.Enabled || expected is null;
-        var stuffer = new SmtpDotStuffer();
+        var stuffer = new SmtpDotStuffer(context.ConvertLineEndings);
         byte[] buffer = new byte[ReadBufferSize];
         byte[] pending = [];
         int read;

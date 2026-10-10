@@ -241,6 +241,28 @@ public sealed class SmtpProtocolHandlerUploadTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_UploadWithCrlf_SendsEachBareLineFeedAsCrlf()
+    {
+        // upstream test941: -T with --crlf sends "From: different\r\n" for "From: different\n".
+        const string body = "From: different\n.dot\r\nend\n";
+        const string sentMessage = "From: different\r\n..dot\r\nend\r\n.\r\n";
+        var context = new TransferContext
+        {
+            Url = CurlUrl.Parse(Url),
+            Output = Stream.Null,
+            Upload = Body(body),
+            Mail = new MailRequestOptions { From = "a@b", Recipients = ["c@d"] },
+            ConvertLineEndings = true,
+        };
+
+        SmtpRun run = await SmtpRun.ExecuteAsync(Diagnostics, context, new ScriptedConnection(Encoding.Latin1.GetBytes(Accepting)));
+
+        Diagnostics.Diff("sent", Envelope + sentMessage + Quit, run.Sent);
+        Assert.AreEqual(Envelope + sentMessage + Quit, run.Sent);
+        AssertResult(run.Result, CurlExitCode.Ok, null, 250, sentMessage.Length);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_UploadWithoutMailOptions_SendsHelpInsteadOfMail()
     {
         var context = new TransferContext { Url = CurlUrl.Parse(Url), Output = Stream.Null, Upload = Body("one\r\n") };

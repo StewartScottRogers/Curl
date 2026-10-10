@@ -39,6 +39,26 @@ public sealed class SmtpDotStufferTests
     }
 
     [TestMethod]
+    public void Encode_ConvertingLineFeeds_InsertsCrBeforeEachBareLfAcrossChunks()
+    {
+        Diagnostics.Arrange("chunks", "\"From: x\\n.a\\r\", \"\\nb\\n\"");
+        var stuffer = new SmtpDotStuffer(convertsLineFeeds: true);
+
+        byte[] first = stuffer.Encode("From: x\n.a\r"u8);
+        byte[] second = stuffer.Encode("\nb\n"u8);
+        Diagnostics.Bytes("first encoded", first);
+        Diagnostics.Bytes("second encoded", second);
+        Diagnostics.Act("end of data", stuffer.EndOfData.Length + " bytes");
+
+        Diagnostics.Diff("first", "From: x\r\n..a\r"u8, first);
+        CollectionAssert.AreEqual("From: x\r\n..a\r"u8.ToArray(), first);
+        Diagnostics.Diff("second", "\nb\r\n"u8, second);
+        CollectionAssert.AreEqual("\nb\r\n"u8.ToArray(), second);
+        Diagnostics.Diff("end of data", ".\r\n"u8, stuffer.EndOfData);
+        CollectionAssert.AreEqual(".\r\n"u8.ToArray(), stuffer.EndOfData);
+    }
+
+    [TestMethod]
     public void EndOfData_ChunkEndingInCrlf_IsTheShortMark()
     {
         Diagnostics.Arrange("chunk", "\"a\\r\\n\"");
