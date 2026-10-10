@@ -147,7 +147,17 @@ conformance tests pass the parent of the `certs` folder `UpstreamTestCertificate
 holding a blank is refused, since commands name them unquoted, GF-0044), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
-the `sws` emulation and `UnreachableDatagramConnector`. The emulation's clock is the real one
+the `sws` emulation and `UnreachableDatagramConnector`. The invocation's
+`EnvironmentVariables` is the whole environment the run reads (BL-1892): each `NAME=value` line
+of `<client><setenv>`, after expansion (so `%HOSTIP` and the rest are already replaced), with an
+empty value kept as an empty variable and a line with no `=` (or a `#` comment) left out, as
+`runtests.pl` unsets such a name; nothing else is in it, so a run without `<setenv>` sees no
+variable and nothing is left to restore. The conformance tests hand it to
+`CurlComposition.CreateRunner` as its environment reader, never to the process environment, so
+parallel cases cannot race. 24 `<setenv>` cases pass (63, 288, 329, 392, 429, 449, 708, 709,
+736-738, 1101, 1136, 1143, 1249-1257, 1265); 214, 428, 448, 458 and 755 fail on a Curl
+difference (428, 448 and 458 because `--variable %NAME` reads the process environment), and the
+rest skip for another reason. The emulation's clock is the real one
 only when `CurlTimerOptions` finds a curl timer that races the server (`-m`, `-y`, `-Y`,
 `--connect-timeout`, `--expect100-timeout`); otherwise it is a `WaitSkippingTimeProvider`, which
 moves on by each wait at once, so `writedelay` and `<postcmd>` `wait` keep their order and take

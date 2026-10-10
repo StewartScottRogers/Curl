@@ -454,6 +454,29 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_Setenv_SetsTheVariablesForThatRunOnlyAndTheNextRunHasNone()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        List<IReadOnlyDictionary<string, string>> environments = [];
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            environments.Add(invocation.EnvironmentVariables);
+            return Task.FromResult(0);
+        });
+        string withSetenv = "<testcase>\n<client>\n<setenv>\nno_proxy=%HOSTIP\nEMPTY=\nUNSET\n=nameless\nA=b=c\n</setenv>\n"
+            + "<command>\na\n</command>\n</client>\n</testcase>\n";
+
+        await RunAsync(runner, withSetenv);
+        await RunAsync(runner, "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n</testcase>\n");
+
+        string first = string.Join(';', environments[0].OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}"));
+        diagnostics.Assert("first run's environment", "A=b=c;EMPTY=;no_proxy=127.0.0.1", first);
+        Assert.AreEqual("A=b=c;EMPTY=;no_proxy=127.0.0.1", first);
+        diagnostics.Assert("second run's environment size", 0, environments[1].Count);
+        Assert.IsEmpty(environments[1]);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoListenPort_IsAPortWhoseConnectionIsRefused()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

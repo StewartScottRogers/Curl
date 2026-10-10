@@ -211,7 +211,7 @@ public sealed class UpstreamCaseRunner(
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
         MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, pop3));
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, new UnreachableDatagramConnector());
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, mqtt, new UnreachableDatagramConnector(), EnvironmentVariables(testCase));
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -227,6 +227,24 @@ public sealed class UpstreamCaseRunner(
             UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span],
         };
         return Judge(testCase, run);
+    }
+
+    // runtests.pl sets each NAME=value line of <client><setenv> for the run, an empty value as an
+    // empty variable, and unsets a NAME with no '='. The run's environment holds nothing else, so
+    // nothing is left to restore after it.
+    private static Dictionary<string, string> EnvironmentVariables(UpstreamTestCase testCase)
+    {
+        Dictionary<string, string> variables = new(StringComparer.Ordinal);
+        foreach (string line in UpstreamTestPartBodies.Lines(testCase.Find("client", "setenv")))
+        {
+            int equals = line.IndexOf('=', StringComparison.Ordinal);
+            if (equals > 0)
+            {
+                variables[line[..equals]] = line[(equals + 1)..];
+            }
+        }
+
+        return variables;
     }
 
     private static TimeProvider ServerClock(List<string> arguments) =>

@@ -242,6 +242,7 @@ public sealed class UpstreamCaseScreeningTests
     [DataRow("<client>\n<server>\nhttp\nsocks4\n</server>\n<command>\n--socks4 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nsocks5\n</server>\n<command>\n--socks5 127.0.0.1:8994 http://127.0.0.1:8990/x\n</command>\n</client>\n")]
     [DataRow("<client>\n<server>\nmqtt\n</server>\n<command>\nmqtt://127.0.0.1:8998/1190\n</command>\n</client>\n")]
+    [DataRow("<client>\n<setenv>\nhttp_proxy=http://127.0.0.1:8990/\n</setenv>\n<command>\nhttp://127.0.0.1:8990/x\n</command>\n</client>\n")]
     public void FindSkipReason_NoInternetHostOrAServerNamed_ReturnsNull(string sections)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
