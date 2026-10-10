@@ -33,3 +33,4 @@ BL-1901 added `TftpServerConnector` / `TftpServerChannel` (Curl.Conformance.Unit
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
