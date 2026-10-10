@@ -92,7 +92,7 @@ public sealed class UpstreamConformanceTests
         try
         {
             UpstreamCaseRunner runner = new(RunCurlAsync, OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeLimit);
-            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName)).WaitAsync(CaseHangLimit);
+            return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)
         {

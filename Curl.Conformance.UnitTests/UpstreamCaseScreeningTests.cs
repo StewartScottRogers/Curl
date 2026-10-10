@@ -59,6 +59,24 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    public void FindSkipReason_CertdirGivenAValue_IsNotTheReasonButTheTlsServerIs()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        byte[] file = "<testcase>\n<client>\n<server>\nhttps test-localhost.pem\n</server>\n<command>\n--cacert %CERTDIR/certs/test-ca.crt https://localhost/\n</command>\n</client>\n</testcase>\n"u8.ToArray();
+        Dictionary<string, string> variables = new(StringComparer.Ordinal) { ["CERTDIR"] = "/curl/tests" };
+        diagnostics.Arrange("variables", "CERTDIR=/curl/tests");
+        UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(file, variables, Features);
+
+        string? reason = UpstreamCaseScreening.FindSkipReason(expansion, expansion.Parse().TestCase!, Features);
+        diagnostics.Act("skip reason", reason);
+
+        diagnostics.Assert("skip reason does not name %CERTDIR", false, reason?.Contains("%CERTDIR", StringComparison.Ordinal) ?? false);
+        Assert.IsNotNull(reason);
+        Assert.DoesNotContain("%CERTDIR", reason);
+        Assert.Contains("https", reason);
+    }
+
+    [TestMethod]
     public void FindSkipReason_UnsupportedInstructions_AreTheReason()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

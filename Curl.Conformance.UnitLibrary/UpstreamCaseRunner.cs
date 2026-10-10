@@ -64,24 +64,30 @@ public sealed class UpstreamCaseRunner(
     /// <c>runtests.pl</c>'s working directory; <see langword="null"/> leaves <c>%PWD</c> without a
     /// value, so a case that uses it is skipped.
     /// </param>
+    /// <param name="certificateDirectory">
+    /// The folder holding upstream's <c>certs</c> folder, <c>%CERTDIR</c> (cases name
+    /// <c>%CERTDIR/certs/test-ca.crt</c>), by an absolute path with no blank in it;
+    /// <see langword="null"/> leaves <c>%CERTDIR</c> without a value, so a case that uses it is skipped.
+    /// </param>
     /// <returns>Whether the case passed, failed with its first difference, or was skipped with its reason.</returns>
     /// <exception cref="ArgumentException">
-    /// <paramref name="logDirectory"/> or <paramref name="testsDirectory"/> holds a blank, which
-    /// would split every command that names <c>%LOGDIR</c> or <c>%PWD</c> unquoted (test3009's
+    /// <paramref name="logDirectory"/>, <paramref name="testsDirectory"/> or
+    /// <paramref name="certificateDirectory"/> holds a blank, which would split every command that
+    /// names <c>%LOGDIR</c>, <c>%PWD</c> or <c>%CERTDIR</c> unquoted (test3009's
     /// <c>--output-dir %PWD/not-there</c>, GF-0044), as upstream's relative <c>log/</c> never does.
     /// </exception>
-    public async Task<UpstreamCaseOutcome> RunAsync(int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null)
+    public async Task<UpstreamCaseOutcome> RunAsync(
+        int testNumber, ReadOnlyMemory<byte> testFile, string logDirectory, string? testsDirectory = null, string? certificateDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(logDirectory);
         RefuseABlank(logDirectory, "log directory", nameof(logDirectory));
         RefuseABlank(testsDirectory ?? string.Empty, "tests directory", nameof(testsDirectory));
+        RefuseABlank(certificateDirectory ?? string.Empty, "certificate directory", nameof(certificateDirectory));
 
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
-        if (testsDirectory is not null)
-        {
-            variables["PWD"] = testsDirectory.Replace('\\', '/');
-        }
+        AddDirectoryVariable(variables, "PWD", testsDirectory);
+        AddDirectoryVariable(variables, "CERTDIR", certificateDirectory);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(testFile.Span, variables, platform.Features, ReadIncludedFile);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
@@ -101,6 +107,14 @@ public sealed class UpstreamCaseRunner(
         if (directory.Any(char.IsWhiteSpace))
         {
             throw new ArgumentException($"The {description} {directory} holds a blank; upstream's commands name it unquoted.", parameterName);
+        }
+    }
+
+    private static void AddDirectoryVariable(Dictionary<string, string> variables, string name, string? directory)
+    {
+        if (directory is not null)
+        {
+            variables[name] = directory.Replace('\\', '/');
         }
     }
 

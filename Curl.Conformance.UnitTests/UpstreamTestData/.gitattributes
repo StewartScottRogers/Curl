@@ -1,2 +1,3 @@
 test*.rawhttp -text
 COPYING -text
+certs/* -text

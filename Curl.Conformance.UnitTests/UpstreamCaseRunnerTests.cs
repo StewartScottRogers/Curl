@@ -349,6 +349,53 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_CertificateDirectoryWithABlank_Throws()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        diagnostics.Arrange("certificate directory", "/a b/tests");
+        ArgumentException exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() => runner.RunAsync(1, ReadOnlyMemory<byte>.Empty, CreateLogDirectory(), null, "/a b/tests"));
+        diagnostics.Act("exception parameter", exception.ParamName);
+        diagnostics.Assert("exception parameter", "certificateDirectory", exception.ParamName);
+        Assert.AreEqual("certificateDirectory", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_CertificateDirectory_IsCertdirWithForwardSlashes()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyList<string>? arguments = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            arguments = invocation.Arguments;
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n--cacert %CERTDIR/certs/test-ca.crt\n</command>\n</client>\n</testcase>\n";
+
+        diagnostics.Arrange("certificate directory", "Z:\\curl\\tests");
+        UpstreamCaseOutcome outcome = await runner.RunAsync(5, Encoding.Latin1.GetBytes(testFile), CreateLogDirectory(), null, "Z:\\curl\\tests");
+        diagnostics.Act("arguments", string.Join(" | ", arguments ?? []));
+
+        diagnostics.Assert("arguments", "--cacert | Z:/curl/tests/certs/test-ca.crt", string.Join(" | ", arguments ?? []));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "--cacert", "Z:/curl/tests/certs/test-ca.crt" }, arguments!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NoCertificateDirectory_SkipsACaseUsingCertdir()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\n--cacert %CERTDIR/certs/test-ca.crt\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("skip reason", "the harness has no value for %CERTDIR", outcome.Detail);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual("the harness has no value for %CERTDIR", outcome.Detail);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoTestsDirectory_SkipsACaseUsingPwd()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

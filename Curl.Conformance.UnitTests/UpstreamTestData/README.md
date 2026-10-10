@@ -14,6 +14,18 @@ pinned; tests never download anything).
 
 Do not edit these files by hand.
 
+## certs
+
+`certs/` holds every file of `tests/certs` in the curl 8.21.0 release tarball
+(https://curl.se/download/curl-8.21.0.tar.xz) except its build files (`Makefile.*`,
+`CMakeLists.txt`): `genserv.pl`, `test-ca.cnf`, `srp-verifier-conf`, `srp-verifier-db` and the
+`test-*.prm` certificate parameters, byte for byte (BL-1922). The tarball ships no certificate
+files - upstream generates `test-ca.crt`, `test-localhost.pem` and the rest at build time with
+`genserv.pl` and OpenSSL - so `%CERTDIR/certs/<name>.crt` does not exist here yet; generating
+them is BL-1923. `UpstreamConformanceTests` passes this folder as `%CERTDIR`, and the csproj
+copies `certs/` to the test output beside the cases. `.gitattributes` marks them `-text`.
+`Update-UpstreamTestData.ps1` does not refresh this folder.
+
 ## Refresh to another tag
 
 ```

@@ -112,8 +112,10 @@ asks `UpstreamCaseScreening` whether the harness can run it (a `<tool>` case, a 
 than `http`, `file` or `none`, a missing feature, a variable with no value, an unsupported
 `<servercmd>` or strip line each skip it with a reason, and so does a file part naming a file
 outside the case's log directory; `%PWD` has a value only when the caller names a tests
-directory, and a log or tests directory holding a blank is refused, since commands name both
-unquoted, GF-0044), writes `<client><file>` parts into
+directory, and `%CERTDIR` only when it names a certificate directory: the folder holding
+upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the
+conformance tests pass the vendored `UpstreamTestData`); a log, tests or certificate directory
+holding a blank is refused, since commands name them unquoted, GF-0044), writes `<client><file>` parts into
 the case's log directory, splits `<client><command>` with `UpstreamCommandLineSplitter` as
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
 the `sws` emulation and `UnreachableDatagramConnector`. The emulation's clock is the real one
