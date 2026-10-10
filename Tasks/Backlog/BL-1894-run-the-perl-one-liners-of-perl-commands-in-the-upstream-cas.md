@@ -4,7 +4,7 @@ title: Run the Perl one-liners of %PERL commands in the upstream case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1930, BL-1931, BL-1932]
+depends-on: [BL-1930, BL-1931, BL-1932, BL-1933]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
