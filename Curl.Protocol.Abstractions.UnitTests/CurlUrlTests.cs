@@ -188,7 +188,6 @@ public sealed class CurlUrlTests
     [DataRow("tftp://[::1]:69/f", "tftp", "[::1]", "::1", 69, true, "/f")]
     [DataRow("file:///C:/x", "file", "", "", -1, true, "C:/x")]
     [DataRow("file://localhost/C:/x", "file", "", "", -1, true, "C:/x")]
-    [DataRow("foo://h\\x", "foo", "h", "h", -1, true, "/x")]
     [DataRow("foo://h:1/", "foo", "h", "h", 1, false, "/")]
     public void TryParse_ForEachScheme_ExposesTheMembersHandlersRead(
         string text,
@@ -547,14 +546,13 @@ public sealed class CurlUrlTests
     [DataRow("http://h/a/..%2f", "/a/..%2f")]
     [DataRow("http://h/a%20b", "/a%20b")]
     [DataRow("http://h/%zz", "/%zz")]
-    [DataRow("http://example.com/a\\b", "/a/b")]
-    [DataRow("http://example.com/a\\..\\b", "/b")]
-    [DataRow("http://h\\x/", "/x/")]
-    [DataRow("HTTP://h\\x", "/x")]
-    [DataRow("http://h/a\\\\b", "/a//b")]
+    [DataRow("http://example.com/a\\b", "/a\\b")]
+    [DataRow("http://example.com/a\\..\\b", "/a\\..\\b")]
+    [DataRow("http://h/{}\\/214", "/{}\\/214")]
+    [DataRow("http://h/a\\\\b", "/a\\\\b")]
     [DataRow("http:/h/a\\b", "/a\\b")]
-    [DataRow("http:///h/a\\b", "/a/b")]
-    [DataRow("http://\\h/x", "/x")]
+    [DataRow("http:///h/a\\b", "/a\\b")]
+    [DataRow("http://h/a\\b?c\\d", "/a\\b")]
     [DataRow("http:/example.com/", "/")]
     [DataRow("http:///h/", "/")]
     public void TryParse_WithAPath_RemovesDotSegmentsAsCurlDoes(string text, string path)
@@ -571,7 +569,7 @@ public sealed class CurlUrlTests
 
     [TestMethod]
     [DataRow("http://h/a/./b/../c", "/a/./b/../c")]
-    [DataRow("http://h/a\\..\\b", "/a/../b")]
+    [DataRow("http://h/a\\..\\b", "/a\\..\\b")]
     [DataRow("file:///C:/dir/../nope", "C:/dir/../nope")]
     public void TryParse_WithPathAsIs_KeepsDotSegments(string text, string path)
     {
@@ -596,7 +594,7 @@ public sealed class CurlUrlTests
     [DataRow("http://h/a?#/../b", "/a", "", "/../b")]
     [DataRow("http://h#f?q", "/", null, "f?q")]
     [DataRow("http://h:8?q", "/", "q", null)]
-    [DataRow("http://example.com/a\\b?c\\d#e\\f", "/a/b", "c\\d", "e\\f")]
+    [DataRow("http://example.com/a\\b?c\\d#e\\f", "/a\\b", "c\\d", "e\\f")]
     public void TryParse_WithAQueryOrFragment_SplitsThemAsCurlDoes(
         string text,
         string path,
@@ -673,6 +671,12 @@ public sealed class CurlUrlTests
     [DataRow("http://[::1%25abcdefghijklmnop]/")]
     [DataRow("http://[::1%abcdefghijklmnop]/")]
     [DataRow("http://[::1%25a%5D/")]
+    [DataRow("http://h\\x/")]
+    [DataRow("HTTP://h\\x")]
+    [DataRow("http://\\h/x")]
+    [DataRow("http:\\\\h/x")]
+    [DataRow("http://h:1\\x/")]
+    [DataRow("foo://h\\x")]
     public void TryParse_WithAUrlCurlRejects_ReturnsFalse(string text)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
