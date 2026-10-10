@@ -63,7 +63,7 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 - [x] `behaviour:test20`: Curl answers what curl 8.21.0 answers, `upstream test20 passes`, so the item measures `match`.
 - [x] `behaviour:test3019`: Curl answers what curl 8.21.0 answers, `upstream test3019 passes`, so the item measures `match`.
 - [x] `behaviour:test3020`: Curl answers what curl 8.21.0 answers, `upstream test3020 passes`, so the item measures `match`.
-- [x] `behaviour:test2043`: not closed here; filed as BL-2018 (the case reaches revoked.badssl.com on the internet, which the in-process harness skips).
+- [x] `behaviour:test2043`: not closed here; filed as BL-2020 (the case reaches revoked.badssl.com on the internet, which the in-process harness skips).
 - [x] `behaviour:test1293`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 256 bytes: HTTP/1.1 200 OK\x0ADate: Tue, 09 Nov 2010 14:49:00 GMT\x0AServer: test-server/fake\x0ALast-Modified: Tue, 13 Jun 2000 12:10:00 GMT\x0AETag: "21025-dc7-39462498"\x0AAccept-Ranges: bytes\x0AContent-Length: 6\x0AConnection: `, so the item measures `match`.
 - [x] `behaviour:test1097`: Curl answers what curl 8.21.0 answers, `upstream test1097 passes`, so the item measures `match`.
 - [x] `behaviour:test1230`: Curl answers what curl 8.21.0 answers, `upstream test1230 passes`, so the item measures `match`.
@@ -72,7 +72,7 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 - [x] `behaviour:test3202`: Curl answers what curl 8.21.0 answers, `upstream test3202 passes`, so the item measures `match`.
 - [x] `behaviour:test2050`: Curl answers what curl 8.21.0 answers, `upstream test2050 passes`, so the item measures `match`.
 - [x] `behaviour:test2055`: Curl answers what curl 8.21.0 answers, `upstream test2055 passes`, so the item measures `match`.
-- [x] `behaviour:test795`: not closed here; filed as BL-2018 (an HTTP redirect to IMAP hangs past 20 seconds, a different cause from this finding).
+- [x] `behaviour:test795`: not closed here; filed as BL-2020 (an HTTP redirect to IMAP hangs past 20 seconds, a different cause from this finding).
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 - [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
@@ -80,11 +80,11 @@ In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overlo
 
 - 2026-10-10 (lane 2): The suggested wiring was already in place: BL-1831 gave `InProcessCurl.RunAsync` a dialing overload (`ITcpDialer` + `IDnsResolver`) that builds the production `TcpConnector`, and BL-1794 moved `UpstreamConformanceTests.RunCurlAsync` onto it. Measured with the ratchet (lanes may not read `Gap/`, so `Measure-UpstreamCases.cs` was not run): 31 of the 36 items already passed and were listed. Of the other five, test1097 already passed (now listed). If the next gap run still measures the listed cases as gaps, the cause is `Gap/Tools/Measure-UpstreamCases.cs` calling the connector overload of `InProcessCurl.RunAsync` rather than the dialing one; that file is an audit path, so only an interactive session can check it.
 - test2050 and test2055 (`--connect-to` through an HTTP proxy) were two product gaps, both fixed to match curl 8.21.0's `lib/url.c`: (1) curl tunnels through an HTTP or HTTPS proxy when a `--connect-to` mapping changes the URL's host or port (`parse_connect_to_slist` sets `tunnel_proxy`); `TransferContextFactory.ConnectToTunnelsThroughProxy` now sets `HttpRequestOptions.ProxyTunnel` for that. (2) `TcpConnector.DestinationOf` applied `--connect-to` to a forward-proxy target, whose host is the proxy, so the wildcard mapping `::host:port` redirected the proxy connection; curl maps only the origin, and a forward-proxy target is now never mapped. Both now pass and are listed.
-- Left, filed as BL-2018: test795 (an HTTP redirect to IMAP hangs past 20 s in the ratchet; a different cause from this finding) and test2043 (reaches revoked.badssl.com on the internet; the harness skips it). Their boxes stay unticked.
+- Left, filed as BL-2020: test795 (an HTTP redirect to IMAP hangs past 20 s in the ratchet; a different cause from this finding) and test2043 (reaches revoked.badssl.com on the internet; the harness skips it). Their boxes stay unticked.
 - No option added or changed, so `--ai-help` needs nothing. No ADR: both fixes copy curl's measured source behaviour, no choice was made. `Measure-CodeQuality.ps1` not run (30-45 min under load); every new branch has its own test (`TransferContextFactoryTests.ConnectToTunnelsThroughProxy_*`, `Create_WithAConnectToMappingThroughAnHttpProxy_SetsProxyTunnel`, `TcpConnectorTests.ConnectAsync_ToAForwardProxyWithAWildcardConnectToMapping_DialsTheProxyUnmapped`).
 
 ## Log
 
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
-- 2026-10-10: Doing -> Done. 34 of 36 GF-0001 cases pass in process: --connect-to through an HTTP proxy now tunnels and never maps the proxy; 795 and 2043 filed as BL-2018
+- 2026-10-10: Doing -> Done. 34 of 36 GF-0001 cases pass in process: --connect-to through an HTTP proxy now tunnels and never maps the proxy; 795 and 2043 filed as BL-2020

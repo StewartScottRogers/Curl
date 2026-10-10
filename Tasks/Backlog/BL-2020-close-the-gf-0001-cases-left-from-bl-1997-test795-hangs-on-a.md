@@ -1,5 +1,5 @@
 ---
-id: BL-2018
+id: BL-2020
 title: Close the GF-0001 cases left from BL-1997: test795 hangs on an HTTP redirect to IMAP, test2043 needs revoked.badssl.com
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-10
 completed:
 ---
-# BL-2018 — Close the GF-0001 cases left from BL-1997: test795 hangs on an HTTP redirect to IMAP, test2043 needs revoked.badssl.com
+# BL-2020 — Close the GF-0001 cases left from BL-1997: test795 hangs on an HTTP redirect to IMAP, test2043 needs revoked.badssl.com
 
 ## Goal
 
