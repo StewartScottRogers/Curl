@@ -8,7 +8,7 @@ depends-on: [BL-1934, BL-1935]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests, Curl.Conformance.SshServer.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1899 — Emulate the SSH transport layer of upstream's test sshd in the case runner
 
@@ -38,3 +38,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Split: waits on BL-1934 (scaffold Curl.Conformance.SshServer.UnitLibrary) and BL-1935 (key exchange to the service request), per ADR-0456
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. All four criteria met by BL-1934 and BL-1935; Curl.Conformance.UnitLibrary/CLAUDE.md now points at the SSH server library
