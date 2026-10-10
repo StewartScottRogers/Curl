@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1939 — Bring the line-protocol server classes under the gates (LineProtocolReplyData, LineProtocolServerCommands, TrySplitCommand)
 
@@ -22,8 +22,8 @@ Split from BL-1936 (BL-1929's measurement, 2026-10-09). Split methods (a lookup 
 
 ## Acceptance criteria
 
-- [ ] The members named in the Goal are absent from the failing list of `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] The members named in the Goal are absent from the failing list of `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
 
@@ -31,3 +31,4 @@ Split from BL-1936 (BL-1929's measurement, 2026-10-09). Split methods (a lookup 
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. Split the three members into small methods; Measure-CodeQuality no longer lists them.
