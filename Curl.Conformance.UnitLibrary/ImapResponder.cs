@@ -292,18 +292,29 @@ internal sealed class ImapResponder : ILineProtocolResponder
     private string Append(string arguments)
     {
         int space = arguments.IndexOf(' ', StringComparison.Ordinal);
-        int open = arguments.LastIndexOf('{');
-        bool matches = space > 0 && open > space && arguments.EndsWith('}') &&
-            long.TryParse(arguments.AsSpan(open + 1, arguments.Length - open - 2), System.Globalization.NumberStyles.None, null, out literalBytesLeft) &&
-            !arguments.AsSpan(space + 1, open - space - 1).Contains('{');
-        if (!matches || Unquote(arguments[..space]).Length == 0)
+        if (space <= 0 || Unquote(arguments[..space]).Length == 0 || !TryReadLiteralSize(arguments, space, out long size))
         {
             literalBytesLeft = -1;
             return tag + BadArgument;
         }
 
+        literalBytesLeft = size;
         upload.Clear();
         return "+ Ready for literal data\r\n";
+    }
+
+    /// <summary>Reads the <c>{n}</c> that ends <c>APPEND</c>'s arguments after the mailbox ending at <paramref name="space"/>, and only when no other <c>{</c> sits between them.</summary>
+    private static bool TryReadLiteralSize(string arguments, int space, out long size)
+    {
+        int open = arguments.LastIndexOf('{');
+        if (open <= space || !arguments.EndsWith('}'))
+        {
+            size = 0;
+            return false;
+        }
+
+        return long.TryParse(arguments.AsSpan(open + 1, arguments.Length - open - 2), System.Globalization.NumberStyles.None, null, out size) &&
+            !arguments.AsSpan(space + 1, open - space - 1).Contains('{');
     }
 
     /// <summary>

@@ -148,6 +148,8 @@ public sealed class ImapResponderTests
     [TestMethod]
     [DataRow("*")]
     [DataRow("dXNlcgBzZWNyZXQ=")]
+    [DataRow("ab+cd")]
+    [DataRow("ab/cd")]
     [DataRow("")]
     public void Answer_AuthenticationResponse_IsACommandUnderTheLastTag(string line)
     {
@@ -210,6 +212,7 @@ public sealed class ImapResponderTests
     [DataRow("A1 APPEND 800")]
     [DataRow("A1 APPEND {5}")]
     [DataRow("A1 APPEND 800 {5")]
+    [DataRow("A1 APPEND 800 5")]
     [DataRow("A1 APPEND 800 {}")]
     [DataRow("A1 APPEND 800 {x}")]
     [DataRow("A1 APPEND 800 {a{5}")]

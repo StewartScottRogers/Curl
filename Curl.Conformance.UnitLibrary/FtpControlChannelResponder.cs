@@ -141,14 +141,16 @@ internal sealed class FtpControlChannelResponder : ILineProtocolResponder
 
         foreach (string segment in trimmed.Split('/'))
         {
-            targetDirectory = segment switch
-            {
-                "" => "/",
-                ".." => ParentDirectory(targetDirectory),
-                _ => targetDirectory + segment + "/",
-            };
+            targetDirectory = DirectoryAfter(segment);
         }
     }
+
+    private string DirectoryAfter(string segment) => segment switch
+    {
+        "" => "/",
+        ".." => ParentDirectory(targetDirectory),
+        _ => targetDirectory + segment + "/",
+    };
 
     /// <summary>Strips the last segment as ftpserver.pl's <c>s/[[:alnum:]]+\/$//</c> does: only an alphanumeric one.</summary>
     private static string ParentDirectory(string directory)
