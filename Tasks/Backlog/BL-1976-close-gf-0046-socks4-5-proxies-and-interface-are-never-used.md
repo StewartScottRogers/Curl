@@ -4,8 +4,8 @@ title: Close GF-0046: SOCKS4/5 proxies and --interface are never used in process
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1997]
-touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
+depends-on: [BL-1997, BL-2033]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console]
 requirement: none
 created: 2026-10-10
 completed:
@@ -62,6 +62,19 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
   `Curl.Conformance.UnitTests/UpstreamTestData`, and the gap tool lives under `Gap/`,
   which a lane may not run, so nothing can be measured here before BL-1997 lands. BL-1997
   also touches Curl.Networking.UnitLibrary, so the two could not run side by side anyway.
+- 2026-10-10 (lane 1): Measured after BL-1997 with the conformance ratchet (lanes may not run
+  `Gap/`): 702-705, 716, 728, 729, 1084 and 1085 pass. 713 writes the FTP banner as the file
+  (its data connection reaches the control port); 714 and 715 send no FTP command at all,
+  because the harness's http-proxy relays CONNECT only to the mail ports (BL-2011).
+  Decision: curl 8.21.0 applies `--connect-to` to the control connection only (the data
+  connection dials the EPSV/PASV answer), so FTP's data connector no longer maps it:
+  `TcpConnector.WithoutConnectTimeout()` became `ForFtpDataConnections()`, which also skips the
+  mapping, pinned by `ForFtpDataConnections_WithAConnectToMappingMatchingEveryHost_DialsTheTargetAsGiven`.
+  That change is uncommitted in this lane (left for the next claim, rule 6): build clean,
+  Curl.Networking.UnitTests 3153 passed. test713 still writes the banner after it, so another
+  hop is involved. Curl.Console added to touches: `CurlComposition.FtpDataConnectorOf` and its
+  CLAUDE.md name the renamed method; no task in Doing touches it. Harness work and the test713
+  diagnosis filed as BL-2033; this task waits on it.
 
 ## Log
 
@@ -69,3 +82,4 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-1997 (InProcessCurl runs TcpConnector); re-measure GF-0046 after it, then fix what still stops test713-715
 - 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Backlog. Waits on BL-2033 (harness relays CONNECT to FTP ports; diagnose test713's data connection); --connect-to fix for FTP data connections left uncommitted
