@@ -51,10 +51,10 @@ In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot rea
   stderr; BL-1848 holds). With the same file in ANSI bytes (`93 host:fake 94`) real curl sends the
   bytes raw with no warning, and Curl sent `EF BF BD` for each. The first quote byte sits at byte 77
   (0x4D) of the request, where the finding puts the difference. Fixed: on Windows a config file that
-  is not valid UTF-8 is read in the ANSI code page, with no re-spelling and no Unicode warning (ADR-0465).
+  is not valid UTF-8 is read in the ANSI code page, with no re-spelling and no Unicode warning (ADR-0466).
 - test411: `WrappedMessage` read `COLUMNS` from the process, not from the parse's injected
   environment reader, which the in-process upstream runner uses (BL-1928). The unreadable-config
-  refusal now wraps at the parse's `COLUMNS` (ADR-0465). If the runner gives no wide `COLUMNS`,
+  refusal now wraps at the parse's `COLUMNS` (ADR-0466). If the runner gives no wide `COLUMNS`,
   real curl wraps this long path too, and the next gap run will show it.
 - Tests: `CommandLineLeadingUnicodeWarningTests` (ANSI file bytes go out raw with no warning; a UTF-8
   file nested in an ANSI one), `CommandLineConfigFileTests.Parse_MissingConfigFile_WrapsItsMessageAtTheParsesColumnsVariable`.
