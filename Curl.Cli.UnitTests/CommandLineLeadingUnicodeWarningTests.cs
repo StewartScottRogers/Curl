@@ -234,6 +234,54 @@ public sealed class CommandLineLeadingUnicodeWarningTests
     }
 
     [TestMethod]
+    public void ConfigFileInTheAnsiCodePageGoesOutAsItsOwnBytesWithNoWarningOnWindows()
+    {
+        // Measured with real curl 8.21.0 (Windows, Schannel, 2026-10-10): a -K file holding
+        // "-H <93>host:fake<94>", not valid UTF-8, sends the header as 93 ... 94 and warns about
+        // nothing; read as UTF-8 it went out as EF BF BD ... EF BF BD (BL-1973, upstream test470).
+        byte[] header = [0x93, .. "host:fake"u8, 0x94];
+        byte[] userAgent = [0x93, .. "agent"u8, 0x94];
+        CommandLineParseResult result = ParseConfigFileBytes([.. "-H "u8, .. header, .. "\nuser-agent = "u8, .. userAgent, (byte)'\n']);
+        Encoding wireEncoding = result.Options!.ConfigFileWireTextEncoding!;
+        string[] sent = [.. result.Options.Headers.Select(wireEncoding.GetBytes).Select(Convert.ToHexString)];
+        string sentUserAgent = Convert.ToHexString(wireEncoding.GetBytes(result.Options.UserAgent!));
+
+        Diagnostics.Assert("header bytes", Convert.ToHexString(header), string.Join(",", sent));
+        Diagnostics.Assert("user-agent bytes", Convert.ToHexString(userAgent), sentUserAgent);
+        CollectionAssert.AreEqual(new[] { Convert.ToHexString(header) }, sent);
+        Assert.AreEqual(Convert.ToHexString(userAgent), sentUserAgent);
+        Assert.IsEmpty(result.WarningLines);
+    }
+
+    [TestMethod]
+    public void Utf8ConfigFileNestedInAnAnsiOneIsReadAsUtf8AndTheAnsiOneResumesAfterItOnWindows()
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["outer.txt"] = [.. "-K inner.txt\n-A "u8, 0x93, .. "outer"u8, 0x94, (byte)'\n'];
+        reader.Files["inner.txt"] = Encoding.UTF8.GetBytes("-H “host:fake”\n");
+        Diagnostics.Bytes("config file outer.txt", reader.Files["outer.txt"]);
+        Diagnostics.Bytes("config file inner.txt", reader.Files["inner.txt"]);
+
+        CommandLineParseResult result = CommandLineParser.Parse(["-K", "outer.txt", Url], _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: true);
+        Diagnostics.ActParse(result);
+        Encoding wireEncoding = result.Options!.ConfigFileWireTextEncoding!;
+        string header = Convert.ToHexString(wireEncoding.GetBytes(result.Options.Headers.Single()));
+        string userAgent = Convert.ToHexString(wireEncoding.GetBytes(result.Options.UserAgent!));
+
+        Diagnostics.Assert("header bytes", Convert.ToHexString(Encoding.UTF8.GetBytes("“host:fake”")), header);
+        Diagnostics.Assert("user-agent bytes", "936F7574657294", userAgent);
+        Assert.AreEqual(Convert.ToHexString(Encoding.UTF8.GetBytes("“host:fake”")), header);
+        Assert.AreEqual("936F7574657294", userAgent);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Warning: The argument '“host:fake”' starts with a Unicode character. Maybe ",
+                "Warning: ASCII was intended?",
+            },
+            result.WarningLines.ToList());
+    }
+
+    [TestMethod]
     public void CommandLineHeaderAndUserAgentAreHeldUnchangedOnWindows()
     {
         CommandLineParseResult result = Parse(["-H", "X-A: “quoted”", "-A", "x“agent”", Url], isWindows: true);
@@ -363,6 +411,17 @@ public sealed class CommandLineLeadingUnicodeWarningTests
         Diagnostics.ArrangeArguments(arguments);
         Diagnostics.Arrange("parse as Windows", true);
         CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: true);
+        Diagnostics.ActParse(result);
+        return result;
+    }
+
+    private CommandLineParseResult ParseConfigFileBytes(byte[] contents)
+    {
+        RecordingDataFileReader reader = new();
+        reader.Files["config.txt"] = contents;
+        Diagnostics.Bytes("config file config.txt", contents);
+        Diagnostics.ArrangeArguments(["-K", "config.txt", Url]);
+        CommandLineParseResult result = CommandLineParser.Parse(["-K", "config.txt", Url], _ => true, new UnexpectedPasswordPrompt(), reader, isWindows: true);
         Diagnostics.ActParse(result);
         return result;
     }

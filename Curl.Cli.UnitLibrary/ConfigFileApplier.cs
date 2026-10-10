@@ -46,7 +46,7 @@ internal static class ConfigFileApplier
         }
         else
         {
-            return CommandLineRefusal.ConfigFileUnreadable(spelledOption, path, options.ErrorsHidden);
+            return CommandLineRefusal.ConfigFileUnreadable(spelledOption, path, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
         }
 
         options.OpenConfigFileCount++;
@@ -81,23 +81,48 @@ internal static class ConfigFileApplier
 
     private static void ApplyDefaultFileLines(CommandLineOptions options, string path, byte[] contents, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        foreach (ConfigFileLine line in ConfigFileSyntax.ReadLines(path, contents))
+        options.ReadingConfigFileAsWireText = ReadsAsWireText(options, contents);
+        foreach (ConfigFileLine line in ReadLines(options, path, contents))
         {
             options.AddWarningLinesUnlessSilent(line.WarningLines);
             CommandLineRefusal? lineRefusal = CommandLineParser.ApplyConfigFileLine(options, line.Option, line.Parameter, pathExists, dataFileReader);
             if (lineRefusal is not null)
             {
                 options.AddErrorLines(CommandLineRefusal.ConfigFileLineErrorLines(path, line.Number, line.Option, lineRefusal, options.ErrorsHidden));
+                options.ReadingConfigFileAsWireText = false;
                 return;
             }
         }
 
+        options.ReadingConfigFileAsWireText = false;
         options.DefaultConfigFile = path;
     }
 
+    /// <summary>
+    /// Whether a file's bytes are read in <see cref="CommandLineOptions.ConfigFileWireTextEncoding"/>
+    /// rather than UTF-8: on Windows, when they are not valid UTF-8. curl 8.21.0's Windows build uses a
+    /// config file's bytes raw, so a file written in the ANSI code page (<c>93 host:fake 94</c>) sends
+    /// those bytes, with no leading-Unicode warning; reading the file in the code page the request side
+    /// encodes in gives them back unchanged (BL-1973, upstream test470).
+    /// </summary>
+    private static bool ReadsAsWireText(CommandLineOptions options, byte[] contents) =>
+        options.ConfigFileWireTextEncoding is not null && !System.Text.Unicode.Utf8.IsValid(contents);
+
+    private static IReadOnlyList<ConfigFileLine> ReadLines(CommandLineOptions options, string shownName, byte[] contents) =>
+        ConfigFileSyntax.ReadLines(shownName, contents, options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : System.Text.Encoding.UTF8);
+
     private static CommandLineRefusal? ApplyLines(CommandLineOptions options, string shownName, byte[] contents, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
     {
-        foreach (ConfigFileLine line in ConfigFileSyntax.ReadLines(shownName, contents))
+        bool enclosingFileAsWireText = options.ReadingConfigFileAsWireText;
+        options.ReadingConfigFileAsWireText = ReadsAsWireText(options, contents);
+        CommandLineRefusal? refusal = ApplyEachLine(options, shownName, contents, spelledOption, pathExists, dataFileReader);
+        options.ReadingConfigFileAsWireText = enclosingFileAsWireText;
+        return refusal;
+    }
+
+    private static CommandLineRefusal? ApplyEachLine(CommandLineOptions options, string shownName, byte[] contents, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        foreach (ConfigFileLine line in ReadLines(options, shownName, contents))
         {
             options.AddWarningLinesUnlessSilent(line.WarningLines);
             CommandLineRefusal? lineRefusal = CommandLineParser.ApplyConfigFileLine(options, line.Option, line.Parameter, pathExists, dataFileReader);

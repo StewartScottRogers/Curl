@@ -243,7 +243,7 @@ public sealed class CommandLineOption
     /// An applier that first adds <see cref="CommandLineWarning.ArgumentStartsWithUnicode(string)"/>, unless
     /// <c>-s</c> / <c>--silent</c> has been read already, when the value starts with a character in
     /// U+2000-U+203F and the value is read as UTF-8: the parse reads its arguments so (<see cref="CommandLineOptions.ReadsArgumentsAsUtf8"/>)
-    /// or it comes from a <c>-K</c> file, whose lines are UTF-8 bytes on every platform (BL-1438), or it
+    /// or it comes from a <c>-K</c> file read as UTF-8 (BL-1438; not one read in the ANSI code page, BL-1973), or it
     /// is an <c>--expand-</c> value led by a variable's bytes (<see cref="CommandLineOptions.ApplyingValueLedByVariableBytes"/>, BL-1814),
     /// and then runs <paramref name="apply"/>. curl 8.21.0's <c>getparameter</c> checks every option value
     /// this way before using it, except a deprecated option's, so each value row but
@@ -262,7 +262,7 @@ public sealed class CommandLineOption
 
     /// <summary>Whether the value being applied is read as UTF-8, the cases <see cref="WarnAboutLeadingUnicodeThen"/> lists.</summary>
     private static bool ReadsValueAsUtf8(CommandLineOptions options) =>
-        options.ReadsArgumentsAsUtf8 || options.ReadingConfigFile || options.ApplyingValueLedByVariableBytes;
+        options.ReadsArgumentsAsUtf8 || options.ReadingUtf8ConfigFile || options.ApplyingValueLedByVariableBytes;
 
     /// <summary>An applier that ignores its value and adds curl's no-function warning for <paramref name="longName"/>.</summary>
     private static CommandLineOptionApplier WarnDeprecatedWithNoFunction(string longName) =>

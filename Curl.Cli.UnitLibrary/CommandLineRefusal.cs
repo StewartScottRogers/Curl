@@ -402,7 +402,7 @@ public sealed class CommandLineRefusal
 
     /// <summary>
     /// Refuses a <c>-K</c> / <c>--config</c> file that cannot be opened or read, in curl's three lines:
-    /// <c>curl: cannot read config from '&lt;file&gt;'</c> (wrapped at 79 columns as curl wraps it,
+    /// <c>curl: cannot read config from '&lt;file&gt;'</c> (wrapped at <paramref name="terminalColumns"/> as curl wraps it,
     /// and hidden when <paramref name="errorsHidden"/>),
     /// <c>curl: option &lt;spelled&gt;: error encountered when reading a file</c> and the try-help line,
     /// with exit code <see cref="CurlExitCode.ReadError"/> (26).
@@ -415,11 +415,12 @@ public sealed class CommandLineRefusal
     /// <param name="spelledOption">The whole argument as typed, such as <c>-K</c> or <c>--config=</c>, or the option as written in an enclosing file.</param>
     /// <param name="file">The file name as given, possibly empty.</param>
     /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
+    /// <param name="terminalColumns">The width the first line wraps at: <see cref="WrappedMessage.TerminalColumns"/> of the parse's <c>COLUMNS</c> (BL-1973).</param>
     /// <returns>A refusal of three lines or more, or two when <paramref name="errorsHidden"/>.</returns>
-    internal static CommandLineRefusal ConfigFileUnreadable(string spelledOption, string file, bool errorsHidden) =>
+    internal static CommandLineRefusal ConfigFileUnreadable(string spelledOption, string file, bool errorsHidden, int terminalColumns) =>
         new(
             CurlExitCode.ReadError,
-            ErrorMessageLines(errorsHidden, CannotReadConfigMessage(file)),
+            errorsHidden ? [] : WrappedMessage.Lines("curl: ", CannotReadConfigMessage(file), terminalColumns),
             spelledOption,
             ReadErrorReason);
 
