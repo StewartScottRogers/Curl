@@ -56,18 +56,26 @@ public sealed class TftpServerConnector(UpstreamTestCase testCase, TimeProvider 
     /// </summary>
     internal byte[]? FindFile(string filename)
     {
-        int slash = filename.LastIndexOf('/');
-        string digits = slash < 0 ? string.Empty : new([.. filename[(slash + 1)..].SkipWhile(c => !char.IsAsciiDigit(c)).TakeWhile(char.IsAsciiDigit)]);
-        if (!int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out int number))
+        if (!int.TryParse(NumberAfterLastSlash(filename), NumberStyles.None, CultureInfo.InvariantCulture, out int number))
         {
             return null;
         }
 
-        string partName = number > 10000 && number % 10000 != 0 ? $"data{(number % 10000).ToString(CultureInfo.InvariantCulture)}" : "data";
-        return testCase.Find("reply", partName) is { } part
+        return testCase.Find("reply", DataPartName(number)) is { } part
             ? UpstreamTestPartBodies.WithoutFinalNewline(UpstreamTestPartBodies.Decoded(part), part)
             : [];
     }
+
+    // The first run of digits after the last slash, or empty when there is no slash or no digit.
+    private static string NumberAfterLastSlash(string filename)
+    {
+        int slash = filename.LastIndexOf('/');
+        return slash < 0 ? string.Empty : new([.. filename[(slash + 1)..].SkipWhile(c => !char.IsAsciiDigit(c)).TakeWhile(char.IsAsciiDigit)]);
+    }
+
+    // <dataN> for a number over 10000 whose last four digits N are not all zero, else <data>.
+    private static string DataPartName(int number) =>
+        number > 10000 && number % 10000 != 0 ? $"data{(number % 10000).ToString(CultureInfo.InvariantCulture)}" : "data";
 
     private static int ReadWriteDelay(UpstreamTestCase testCase) =>
         UpstreamTestPartBodies.Lines(testCase.Find("reply", "servercmd"))

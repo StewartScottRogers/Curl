@@ -66,11 +66,11 @@ internal sealed class TlsServerConnection : IConnection
         catch (Exception)
         {
         }
-        finally
-        {
-            await serverEnd.DisposeAsync().ConfigureAwait(false);
-            await server.DisposeAsync().ConfigureAwait(false);
-        }
+
+        // The catch takes every failure, so this runs as a finally would, without the
+        // rethrow branches an awaiting finally compiles to.
+        await serverEnd.DisposeAsync().ConfigureAwait(false);
+        await server.DisposeAsync().ConfigureAwait(false);
     }
 
     private static async Task RelayAsync(SwsHttpServerConnection server, SslStream tls, CancellationToken cancellationToken)

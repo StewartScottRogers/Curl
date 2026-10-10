@@ -98,7 +98,7 @@ internal sealed class LineProtocolServerCommands
             if (character == '\\' && index + 1 < text.Length)
             {
                 index++;
-                character = text[index] switch { 'r' => '\r', 'n' => '\n', 't' => '\t', char escaped => escaped };
+                character = PerlEscaped(text[index]);
             }
 
             value.Append(character);
@@ -106,6 +106,10 @@ internal sealed class LineProtocolServerCommands
 
         return value.ToString();
     }
+
+    /// <summary>The character a backslash before <paramref name="escaped"/> stands for in a Perl double-quoted string.</summary>
+    private static char PerlEscaped(char escaped) =>
+        escaped switch { 'r' => '\r', 'n' => '\n', 't' => '\t', _ => escaped };
 
     /// <summary>Finds the first of <c>POSTFETCH</c>, <c>CAPA</c> and <c>AUTH</c> a line holds, as the first matching branch of ftpserver.pl's chain does.</summary>
     private static (string Keyword, string Argument)? FindKeywordLine(string line)

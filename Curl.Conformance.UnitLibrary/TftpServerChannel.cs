@@ -113,7 +113,16 @@ internal sealed class TftpServerChannel(TftpServerConnector server, IPAddress ad
         {
             SendError(2, "Access violation");
         }
-        else if (opcode == 2)
+        else
+        {
+            StartTransfer(opcode, mode, file);
+        }
+    }
+
+    // A write request is acknowledged with block 0; a read request sends the first DATA block.
+    private void StartTransfer(int opcode, string mode, byte[] file)
+    {
+        if (opcode == 2)
         {
             expectedBlock = 1;
             Enqueue(Packet(4, 0, []), false);
