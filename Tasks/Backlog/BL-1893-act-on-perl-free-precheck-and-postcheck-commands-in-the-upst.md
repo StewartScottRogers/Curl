@@ -4,7 +4,7 @@ title: Act on perl-free precheck and postcheck commands in the upstream case run
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1929]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,15 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2) inventory of every `<precheck>` / `<postcheck>` in the vendored 8.21.0 tests/data (38 cases), grouped:
+  - **Perl call** (`%PERL -e ...`, `%PERL %SRCDIR/libtest/test610.pl|test613.pl ...`): test8, 1013, 1014, 1022, 1023, 1026, 1027, 1082, 1083, 1291, 1443-1446, 1583, 1683, 2072, 307, 608, 610-615, 624, 625, 627, 638, 639, 762. Left to BL-1894.
+  - **Libtest check** (`%LIBTESTS lib%TESTNUMBER check`): test518, 537, 678, 1960. These are `<tool>` cases, skipped for the libtest first; acting on the precheck measures nothing until the harness runs libtests.
+  - **runtests.pl self-test shell commands** (`mkdir ...; cp ...; echo ...` precheck, `grep -q ...` postcheck): test1182 only, whose `<command type="perl">` runs runtests.pl itself; the harness cannot run it.
+  - **Resolve check** (`%RESOLVE --ipv6 <name>`): test1085, test241 (test241 also needs the `http-ipv6` server). The only perl-free group the in-process harness can act on; filed as BL-1929.
+- Decision: the acceptance criterion "at least 5 named upstream cases" cannot be met by perl-free checks: only test1085 (and test241 after an `http-ipv6` stand-in) can become measured. The resolve group is filed as BL-1929 and this task waits on it; once BL-1929 is Done, this task closes with the inventory above (the 5-case criterion moves to BL-1894, whose Perl group holds 31 of the 38 cases).
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Waits on BL-1929 (the %RESOLVE precheck, the only perl-free check group the harness can act on); inventory in Notes
