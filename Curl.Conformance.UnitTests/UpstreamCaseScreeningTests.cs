@@ -337,6 +337,16 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("<client>\n<precheck>\nperl /tests/libtest/test613.pl prepare /log/test1445.dir\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\nperl /tests/libtest/test610.pl gone /log/upload.612\n</postcheck>\n</verify>\n")]
+    public void FindSkipReason_ExpandedEmulatedScriptCheckLine_IsNoReasonToSkip(string sections)
+    {
+        string? reason = Screen(RunnableClient + sections);
+
+        Assert.IsNull(reason);
+    }
+
+    [TestMethod]
     [DataRow("test1013.pl", "%PERL %SRCDIR/libtest/test1013.pl ../curl-config /log/stdout1014 features > /log/result1014")]
     [DataRow("test1022.pl", "%PERL %SRCDIR/libtest/test1022.pl ../curl-config /log/stdout1023 vernum")]
     public void FindSkipReason_CurlConfigComparisonScript_NamesCurlConfigAsTheReason(string script, string line)

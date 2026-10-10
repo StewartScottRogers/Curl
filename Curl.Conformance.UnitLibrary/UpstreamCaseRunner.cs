@@ -346,7 +346,7 @@ public sealed class UpstreamCaseRunner(
 
     private UpstreamPerlOneLinerResult? FirstFailedCheck(UpstreamTestCase testCase, string section, string name, Func<UpstreamPerlOneLinerResult, bool> failed) =>
         UpstreamTestPartBodies.Lines(testCase.Find(section, name))
-            .Select(line => UpstreamPerlOneLiner.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!)
+            .Select(line => UpstreamPerlCheckLine.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!)
             .FirstOrDefault(failed);
 
     private static List<string> Arguments(UpstreamTestCase testCase, string outputFile)
