@@ -39,3 +39,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Waits on BL-1927 (Pop3Responder) and BL-1905 (first line-protocol wiring in the runner)
+- 2026-10-09: Backlog -> Doing.
