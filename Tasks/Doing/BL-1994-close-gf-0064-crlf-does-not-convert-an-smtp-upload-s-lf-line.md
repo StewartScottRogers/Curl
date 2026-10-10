@@ -44,3 +44,4 @@ Carry --crlf into MailRequestOptions (Curl.Console's MailRequestOptionsMapping, 
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
