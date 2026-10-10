@@ -3521,6 +3521,7 @@ internal sealed class CurlCommandRunner(
             .BuildAsync(
                 MultipartFormPartMapping.FromCommandLine(options.FormParts),
                 MultipartFormPartMapping.NameEscapingOf(options),
+                MultipartFormPartMapping.RequestContentTypeOf(options),
                 CancellationToken.None)
             .ConfigureAwait(false);
         if (!form.IsBuilt)

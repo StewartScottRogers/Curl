@@ -120,16 +120,43 @@ public sealed class MultipartFormBodyBuilder(
     /// <param name="cancellationToken">Cancels the file opens.</param>
     /// <returns>The body or the failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives them.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="parts" /> is <see langword="null" />.</exception>
+    public ValueTask<MultipartFormBuildResult> BuildAsync(
+        IReadOnlyList<MultipartFormPart> parts,
+        MultipartNameEscaping nameEscaping,
+        CancellationToken cancellationToken) =>
+        BuildAsync(parts, nameEscaping, null, cancellationToken);
+
+    /// <summary>
+    /// Builds the body for <paramref name="parts" /> as the overload without
+    /// <paramref name="requestContentType" /> does, except that the parts' disposition follows
+    /// the request's <c>Content-Type</c> as libcurl 8.21.0's <c>Curl_mime_prepare_headers</c>
+    /// chooses it: <c>form-data</c> when <paramref name="requestContentType" /> is
+    /// <see langword="null" /> or <c>multipart/form-data</c>, otherwise each named part falls back
+    /// to <c>attachment</c> (upstream test 277, BL-1972).
+    /// </summary>
+    /// <param name="parts">The form's parts, in the order given on the command line.</param>
+    /// <param name="nameEscaping">How names and file names are escaped in <c>Content-Disposition</c>.</param>
+    /// <param name="requestContentType">
+    /// The value of the first <c>-H</c> header naming <c>Content-Type</c>, empty for
+    /// <c>-H "Content-Type:"</c>; <see langword="null" /> when no <c>-H</c> header names it.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the file opens.</param>
+    /// <returns>The body or the failure, as <see cref="BuildAsync(IReadOnlyList{MultipartFormPart}, CancellationToken)" /> gives them.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="parts" /> is <see langword="null" />.</exception>
     public async ValueTask<MultipartFormBuildResult> BuildAsync(
         IReadOnlyList<MultipartFormPart> parts,
         MultipartNameEscaping nameEscaping,
+        string? requestContentType,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(parts);
 
         using MultipartBodySegments segments = new(textEncoding);
         string boundary = createBoundary();
-        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, FormDataDisposition, nameEscaping, cancellationToken)
+        string? disposition = requestContentType is null || MultipartPartHeaders.IsContentType(requestContentType, "multipart/form-data")
+            ? FormDataDisposition
+            : null;
+        TransferResult? failure = await AddPartsAsync(segments, parts, boundary, disposition, nameEscaping, cancellationToken)
             .ConfigureAwait(false);
         if (failure is not null)
         {
