@@ -211,13 +211,24 @@ public sealed class TcpConnectionListenerTests
     [TestMethod]
     public async Task DisposeAsync_ReleasesThePortSoItCanBeBoundAgain()
     {
+        // Another test or process can take the released ephemeral port before it is bound again, so a
+        // rebind that fails is tried again with a fresh port; only a release that never works fails.
         var listener = new TcpConnectionListener();
-        var first = await ListenAsync(listener, AnyLoopbackPort);
-        var port = ((IPEndPoint)first.PendingConnection!.LocalEndPoint).Port;
-        Diagnostics.Arrange("port", "the one the first listen bound, then released");
+        var port = 0;
+        ListenResult second = null!;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var first = await ListenAsync(listener, AnyLoopbackPort);
+            port = ((IPEndPoint)first.PendingConnection!.LocalEndPoint).Port;
+            await first.PendingConnection.DisposeAsync();
+            second = await ListenAsync(listener, new ListenTarget(IPAddress.Loopback, port, port));
+            if (second.ExitCode == CurlExitCode.Ok)
+            {
+                break;
+            }
+        }
 
-        await first.PendingConnection.DisposeAsync();
-        var second = await ListenAsync(listener, new ListenTarget(IPAddress.Loopback, port, port));
+        Diagnostics.Arrange("port", "the one the first listen bound, then released");
 
         Diagnostics.Assert("exit code", CurlExitCode.Ok, second.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, second.ExitCode);
