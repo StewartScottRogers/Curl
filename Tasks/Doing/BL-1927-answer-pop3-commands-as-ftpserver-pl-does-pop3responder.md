@@ -31,3 +31,4 @@ The POP3 half of BL-1911, split off the way BL-1925 (`SmtpResponder`) and BL-192
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
