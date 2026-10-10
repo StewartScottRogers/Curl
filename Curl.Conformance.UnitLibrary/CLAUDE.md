@@ -132,7 +132,15 @@ no real time (ADR-0404, BL-1355). The run is under a time limit from an injected
 token, so the case fails and the run is abandoned). `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
 `<verify>` (protocol after `<strip>` / `<strippart>`, run as `UpstreamPerlSubstitution`s
 compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`), and
-`UpstreamFirstDifference` names the first differing byte and line. The result is an
+`UpstreamFirstDifference` names the first differing byte and line.
+`UpstreamPerlOneLiner` (BL-1930) interprets, by whole-line pattern and with no Perl, the
+`%PERL -e` one-liners the vendored cases put in a precheck or postcheck, returning an
+`UpstreamPerlOneLinerResult` (exit code and stdout), or null for any other line: the
+`stat` modification-time check, the `print ... if('A' ne 'B')` and `$^O` prechecks, test8's
+`%HOSTIP !~ /.../` precheck, the `grep` line count over a file, the `printf` loop redirected
+to a file, and test1683's numbered-file write and verify loops; `$^O` is passed in. test1083's
+`exec '%RESOLVE ...'` form is not interpreted. Nothing calls it yet: running prechecks and
+postchecks through it is BL-1933. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list.
