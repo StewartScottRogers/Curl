@@ -3,8 +3,8 @@ id: AF-0143
 title: MontgomeryModulus.MinusTwo's loop bound 'index >= 0' can become 'index > 0' with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Cryptography.UnitLibrary/MontgomeryModulus.cs:MinusTwo-ge:surviving-mutant
 reproduction: mutation Curl.Cryptography.UnitLibrary/MontgomeryModulus.cs:117:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Crypt
 ## Log
 
 - 2026-10-10: filed proposed.
+- 2026-10-10: proposed -> accepted.
