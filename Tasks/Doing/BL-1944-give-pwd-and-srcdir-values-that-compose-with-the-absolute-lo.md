@@ -34,3 +34,4 @@ What is needed, decided in an ADR (Decided by Claude under Stewart's delegation)
 ## Log
 
 - 2026-10-09: Created.
+- 2026-10-09: Backlog -> Doing.
