@@ -4,7 +4,7 @@ title: Emulate upstream's FTP control channel in the case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1895]
+depends-on: [BL-1895, BL-1920]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 1): split. This run's cost cap ($2) cannot hold the responder, the runner wiring, the %FTPPORT screening change, 15 sample cases and 100% coverage together. The ftpserver.pl control-channel responder is now BL-1920 (same touches); BL-1905 keeps the runner wiring, %FTPPORT value, screening test, sample cases and CLAUDE.md update. Nothing was measured or coded in this run.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Waits on BL-1920 (the ftpserver.pl control-channel responder), split off to fit one lane run
