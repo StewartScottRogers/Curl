@@ -35,10 +35,7 @@ internal static class UpstreamCaseScreening
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
     private static readonly Regex InternetUrlHost = new(@"\bhttps?://(?<host>[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z0-9-]+)+)", RegexOptions.CultureInvariant);
 
-    // Each SSH server name, with the task that is to serve its payload.
-    private static readonly Dictionary<string, string> SshServers = new(StringComparer.Ordinal) { ["sftp"] = "BL-1918" };
-
-    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, .. SshServers.Keys, "scp"];
+    private static readonly HashSet<string> Servers = ["http", "http-ipv6", "http-proxy", "socks4", "socks5", "mqtt", "tftp", "file", "none", .. LineProtocolServerConnector.EmulatedServers, .. MailTlsServerConnector.EmulatedServers, "sftp", "scp"];
 
     private static readonly Regex FtpDataConnectionCommand = new(@"^(?:EPSV|PASV|PORT|EPRT|LPRT)\b", RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
@@ -68,7 +65,6 @@ internal static class UpstreamCaseScreening
             () => UnsupportedServer(testCase),
             () => HttpsThroughProxy(testCase),
             () => FtpDataConnection(testCase),
-            () => SshPayload(testCase),
             () => UploadOffMailServer(testCase),
             () => UnsupportedFeature(testCase, features),
             () => UnsupportedCommand(testCase),
@@ -153,14 +149,6 @@ internal static class UpstreamCaseScreening
             ? "the http-proxy stand-in tunnels no CONNECT to the https server (BL-1915)"
             : null;
 
-    // The SSH stand-in runs scp (BL-1917) but serves no SFTP (BL-1918) payload yet, so only an SFTP a case that ends before one runs: a
-    // command-line error (2), a host key mismatch (60) or a refused login (67).
-    private static string? SshPayload(UpstreamTestCase testCase) =>
-        UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(SshServers.ContainsKey) is { } server
-            && UpstreamTestPartBodies.Text(testCase.Find("verify", "errorcode")).Trim() is not ("2" or "60" or "67")
-            ? $"the SSH stand-in serves no {server.ToUpperInvariant()} payload yet ({SshServers[server]})"
-            : null;
-
     private static string? UnsupportedServer(UpstreamTestCase testCase) =>
         UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).FirstOrDefault(server => !Servers.Contains(server) && HttpsCertificateFile(server) is null) is { } server
             ? $"the harness does not emulate the {server} server"
@@ -173,13 +161,13 @@ internal static class UpstreamCaseScreening
             ? $"the FTP stand-in serves no data connection, which the case's {command.Value} opens"
             : null;
 
-    // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1917); any other server's case
+    // Only the SMTP and IMAP stand-ins, plain or behind TLS, the tftpd stand-in and the SSH stand-in's scp and SFTP record an upload (BL-1909, BL-1910, BL-1914, BL-1952, BL-1917, BL-1918); any other server's case
     // verifying <upload> keeps a reason.
-    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "scp"];
+    private static readonly string[] UploadingServers = ["smtp", "imap", "smtps", "imaps", "tftp", "scp", "sftp"];
 
     private static string? UploadOffMailServer(UpstreamTestCase testCase) =>
         testCase.Find("verify", "upload") is not null && !UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(UploadingServers).Any()
-            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp and scp servers"
+            ? "the harness records <verify><upload> only for the smtp, imap, smtps, imaps, tftp, scp and sftp servers"
             : null;
 
     private static string? UnsupportedFeature(UpstreamTestCase testCase, IReadOnlySet<string> features)

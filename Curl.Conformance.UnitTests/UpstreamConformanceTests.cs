@@ -235,6 +235,54 @@ public sealed class UpstreamConformanceTests
         Assert.IsFalse(outcome.Detail?.Contains(CaseHangLimitMessage, StringComparison.Ordinal) ?? false, outcome.Detail);
     }
 
+    // SFTP transfers and quote commands the SSH stand-in's sftp-server serves (BL-1918).
+    [TestMethod]
+    [DataRow(600)]
+    [DataRow(602)]
+    [DataRow(604)]
+    [DataRow(608)]
+    [DataRow(609)]
+    [DataRow(611)]
+    [DataRow(612)]
+    [DataRow(614)]
+    [DataRow(615)]
+    [DataRow(616)]
+    [DataRow(618)]
+    [DataRow(620)]
+    [DataRow(622)]
+    [DataRow(624)]
+    [DataRow(625)]
+    [DataRow(626)]
+    [DataRow(627)]
+    [DataRow(633)]
+    [DataRow(634)]
+    [DataRow(635)]
+    [DataRow(636)]
+    [DataRow(637)]
+    [DataRow(638)]
+    [DataRow(639)]
+    [DataRow(640)]
+    [DataRow(642)]
+    [DataRow(664)]
+    [DataRow(1446)]
+    [DataRow(1583)]
+    [DataRow(2004)]
+    [DataRow(2007)]
+    [DataRow(3021)]
+    public async Task SftpTransferCase_RunThroughCurl_IsMeasuredNotSkipped(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("upstream case number", testNumber);
+        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
+
+        UpstreamCaseOutcome outcome = await RunCaseOnceAsync(testNumber, testFile);
+
+        diagnostics.Act("outcome kind", outcome.Kind);
+        diagnostics.Act("outcome detail", outcome.Detail);
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.IsFalse(outcome.Detail?.Contains(CaseHangLimitMessage, StringComparison.Ordinal) ?? false, outcome.Detail);
+    }
+
     // Every vendored case naming an SSH variable gets a value for it, so none skips for one (BL-1954).
     [TestMethod]
     public async Task SshVariableCases_RunThroughCurl_NoneSkipsForAnSshVariable()
