@@ -4,7 +4,7 @@ title: Emulate upstream's IMAP server in the case runner
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-1895]
+depends-on: [BL-1895, BL-1926, BL-1905]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- Split on 2026-10-09 (lane 2), following the SMTP precedent (BL-1925 responder, then BL-1909 wiring): the runner routes only to the sws HTTP stand-in today, and no IMAP responder exists. BL-1926 writes `ImapResponder`; BL-1905 (FTP control channel in the runner) is the first wiring of a `LineProtocolServerConnector` into `UpstreamCaseRunner`, which BL-1909 also waits on. This task then wires IMAP in and measures the 71 cases. Nothing was measured or written for it in this run.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Waits on BL-1926 (ImapResponder) and BL-1905 (first line-protocol wiring in the runner)
