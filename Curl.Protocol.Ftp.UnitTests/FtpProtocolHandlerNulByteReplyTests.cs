@@ -61,6 +61,22 @@ public sealed class FtpProtocolHandlerNulByteReplyTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_NulByteInTheReplyToPass_FailsWithExit8AfterPassAndSendsNoPwd()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+
+        // Upstream test2108 (curl 8.21.0): PASS answered "230 logged\0 in": exit 8, USER and PASS sent, nothing after.
+        diagnostics.ArrangeFtp(Url);
+        FtpRun run = await FtpRun.ExecuteAsync(Url, "220 hi\r\n331 pass\r\n230 logged\0 in\r\n");
+        diagnostics.ActRun(run);
+
+        diagnostics.Assert("result", NulByteFailure, run.Result);
+        Assert.AreEqual(NulByteFailure, run.Result);
+        diagnostics.DiffSent("USER anonymous\r\nPASS ftp@example.com\r\n", run.Sent);
+        Assert.AreEqual("USER anonymous\r\nPASS ftp@example.com\r\n", run.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_NulByteInAGreetingContinuationLine_FailsWithExit8()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

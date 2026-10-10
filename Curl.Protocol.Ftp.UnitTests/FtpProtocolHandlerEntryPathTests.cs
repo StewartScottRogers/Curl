@@ -30,6 +30,8 @@ public sealed class FtpProtocolHandlerEntryPathTests
     [DataRow("257 \"home\" is cwd\r\n502 Command not implemented", "home", DisplayName = "a relative directory is printed as given")]
     [DataRow("257 /home/u is cwd", null, DisplayName = "no quote prints nothing")]
     [DataRow("257 \"\"", null, DisplayName = "an empty quoted name prints nothing")]
+    [DataRow("257 \"/\u0080ÿ\" is cwd", "/\u0080ÿ", DisplayName = "bytes 0x80 and above are not control characters")]
+    [DataRow("257 \"/a\" \u0003 is cwd", "/a", DisplayName = "a control character after the closing quote is ignored")]
     [DataRow("550 no", null, DisplayName = "a refused PWD prints nothing")]
     public async Task ExecuteAsync_PwdReply_ReportsTheDirectoryItNames(string pwdReply, string? expected)
     {
@@ -51,7 +53,12 @@ public sealed class FtpProtocolHandlerEntryPathTests
     [TestMethod]
     [DataRow("257 \"/x", DisplayName = "quote never closed")]
     [DataRow("257 \"/x is cwd", DisplayName = "quote never closed before the comment")]
-    public async Task ExecuteAsync_PwdReplyWithAnUnendedQuote_FailsWithExit8AndNoQuit(string pwdReply)
+    [DataRow("257 \"/\u0003\"", DisplayName = "upstream test3217: byte 0x03 in the path")]
+    [DataRow("257 \"/\r\"", DisplayName = "upstream test3218: a CR in the path")]
+    [DataRow("257 \"/a\tb\" is cwd", DisplayName = "a tab in the path")]
+    [DataRow("257 \"/\u001f\" is cwd", DisplayName = "byte 0x1f in the path")]
+    [DataRow("257 \"/\u007f\" is cwd", DisplayName = "byte 0x7f in the path")]
+    public async Task ExecuteAsync_PwdReplyWithAnUnendedQuoteOrAControlCharacter_FailsWithExit8AndNoQuit(string pwdReply)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("pwdReply", pwdReply);
