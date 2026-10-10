@@ -310,15 +310,5 @@ internal sealed class SmtpResponder : ILineProtocolResponder
     /// any leading non-digits removed, <c>&lt;dataN&gt;</c> for a number over 10000 whose last four
     /// digits are N, else (or when that part is empty) <c>&lt;data&gt;</c>.
     /// </summary>
-    private string ClientReplyData()
-    {
-        string digits = new([.. (client ?? string.Empty).SkipWhile(character => !char.IsAsciiDigit(character)).TakeWhile(char.IsAsciiDigit)]);
-        long number = long.TryParse(digits, out long parsed) ? parsed : 0;
-        if (number > 10000 && replyParts.TryGetValue("data" + (number % 10000), out byte[]? numbered) && numbered.Length > 0)
-        {
-            return Encoding.Latin1.GetString(numbered);
-        }
-
-        return replyParts.TryGetValue("data", out byte[]? data) ? Encoding.Latin1.GetString(data) : string.Empty;
-    }
+    private string ClientReplyData() => LineProtocolReplyData.Select(replyParts, client);
 }

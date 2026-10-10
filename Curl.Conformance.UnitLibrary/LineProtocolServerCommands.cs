@@ -9,18 +9,20 @@ namespace Curl.Conformance;
 /// text and a CRLF (command names are matched without regard to case; a later line for the same
 /// command wins); <c>CAPA</c> lists the capabilities the server announces, split on spaces outside
 /// double quotes with the quotes removed; <c>AUTH</c> lists its authentication mechanisms, split on
-/// spaces. A later <c>CAPA</c> or <c>AUTH</c> line replaces an earlier one. Other lines are left for
+/// spaces; <c>POSTFETCH &lt;text&gt;</c> gives the text IMAP sends before the <c>)</c> that ends a
+/// <c>FETCH</c> response. A later <c>CAPA</c>, <c>AUTH</c> or <c>POSTFETCH</c> line replaces an earlier one. Other lines are left for
 /// the protocol stand-ins to read.
 /// </summary>
 internal sealed class LineProtocolServerCommands
 {
     private readonly Dictionary<string, byte[]> replies;
 
-    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, string[] capabilities, string[] authenticationMechanisms)
+    private LineProtocolServerCommands(Dictionary<string, byte[]> replies, string[] capabilities, string[] authenticationMechanisms, string postFetch)
     {
         this.replies = replies;
         Capabilities = capabilities;
         AuthenticationMechanisms = authenticationMechanisms;
+        PostFetch = postFetch;
     }
 
     /// <summary>Gets the capabilities a <c>CAPA</c> line lists; empty when there is none.</summary>
@@ -29,7 +31,10 @@ internal sealed class LineProtocolServerCommands
     /// <summary>Gets the authentication mechanisms an <c>AUTH</c> line lists; empty when there is none.</summary>
     public IReadOnlyList<string> AuthenticationMechanisms { get; }
 
-    /// <summary>Reads the <c>REPLY</c>, <c>CAPA</c> and <c>AUTH</c> lines of a <c>&lt;servercmd&gt;</c> body.</summary>
+    /// <summary>Gets the text a <c>POSTFETCH</c> line gives; empty when there is none.</summary>
+    public string PostFetch { get; }
+
+    /// <summary>Reads the <c>REPLY</c>, <c>CAPA</c>, <c>AUTH</c> and <c>POSTFETCH</c> lines of a <c>&lt;servercmd&gt;</c> body.</summary>
     /// <param name="serverCommands">The part's body; empty when the case has none.</param>
     /// <returns>The replies, by command name, and the capabilities and mechanisms.</returns>
     public static LineProtocolServerCommands Read(ReadOnlySpan<byte> serverCommands)
@@ -37,12 +42,17 @@ internal sealed class LineProtocolServerCommands
         Dictionary<string, byte[]> replies = new(StringComparer.OrdinalIgnoreCase);
         string[] capabilities = [];
         string[] authenticationMechanisms = [];
+        string postFetch = string.Empty;
         foreach (string rawLine in Encoding.Latin1.GetString(serverCommands).Split('\n'))
         {
             string line = rawLine.TrimEnd('\r');
             if (line.Split(' ', 3) is ["REPLY", var command, var text])
             {
                 replies[command] = Encoding.Latin1.GetBytes(text + "\r\n");
+            }
+            else if (TryFindArgument(line, "POSTFETCH ", out string postFetchText))
+            {
+                postFetch = postFetchText;
             }
             else if (TryFindArgument(line, "CAPA ", out string capabilityList))
             {
@@ -54,7 +64,7 @@ internal sealed class LineProtocolServerCommands
             }
         }
 
-        return new LineProtocolServerCommands(replies, capabilities, authenticationMechanisms);
+        return new LineProtocolServerCommands(replies, capabilities, authenticationMechanisms, postFetch);
     }
 
     /// <summary>Finds the reply <c>&lt;servercmd&gt;</c> gives for a command.</summary>
