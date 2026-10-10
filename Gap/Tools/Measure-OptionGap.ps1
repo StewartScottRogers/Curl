@@ -34,6 +34,9 @@
     records referenceFallback "docs". The unknown-option text is the reference's own,
     measured on curl 8.21.0 and pinned in Gap/Tools/Fixtures/options/reference-unknown-option.txt.
 
+    Exclusions: Gap/Baselines/option-exclusions.json lists items { key, reason } that differ on
+    purpose; a listed facet is measured as usual but recorded excluded with that reason.
+
     ASCII only; runs under Windows PowerShell 5.1 and PowerShell 7. -InventoryOnly uses
     no Windows-only API and runs under pwsh on Linux with neither curl present.
 .PARAMETER UpstreamRoot
@@ -179,7 +182,17 @@ function Get-OptionCounts($Items) {
     return [pscustomobject] $c
 }
 
-function Measure-OptionGap($Inventory, [string] $TargetVersion, [string] $CandidatePath, [string] $ProbeResultsPath, [string] $CandidateCommit) {
+function Get-OptionExclusions([string] $Path) {
+    $table = @{}
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $table }
+    foreach ($entry in @((Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json).items)) {
+        if (-not $entry.key -or -not $entry.reason) { throw "An exclusion in $Path needs a key and a reason." }
+        $table[[string] $entry.key] = [string] $entry.reason
+    }
+    return $table
+}
+
+function Measure-OptionGap($Inventory, [string] $TargetVersion, [string] $CandidatePath, [string] $ProbeResultsPath, [string] $CandidateCommit, $Exclusions = @{}) {
     $canned = $null
     $referenceLine = $null
     if ($ProbeResultsPath) {
@@ -212,7 +225,9 @@ function Measure-OptionGap($Inventory, [string] $TargetVersion, [string] $Candid
                     $toAnswer = { param($r) if ($null -eq $r) { $null } else { [pscustomobject] @{ exitCode = $r.ExitCode; stderr = $r.Stderr } } }
                     $answer = [pscustomobject] @{ reference = (& $toAnswer $run.Reference); candidate = (& $toAnswer $run.Candidate) }
                 }
-                $items[$probe.key] = Measure-OptionFacet $probe $answer $hasReference $item.introducedIn
+                $facet = Measure-OptionFacet $probe $answer $hasReference $item.introducedIn
+                if ($Exclusions.ContainsKey($probe.key)) { $facet.state = 'excluded'; $facet.reason = $Exclusions[$probe.key] }
+                $items[$probe.key] = $facet
             }
         }
     }
@@ -272,9 +287,19 @@ function Invoke-OptionGapSelfTest {
     $d = $docs.counts
     & $report 'docs fallback counts follow the same formula' ($d.x -eq $d.match -and $d.y -eq ($d.match + $d.gap + $d.unmeasured) -and $d.gap -eq 1) ($d | ConvertTo-Json -Compress)
 
+    $excludedRun = Measure-OptionGap $inventory '9.9.9' 'unused' (Join-Path $fixtures 'probe-results.json') '0000000000000000000000000000000000000000' (Get-OptionExclusions (Join-Path $fixtures 'option-exclusions.json'))
+    $excludedItem = $excludedRun.items | Where-Object { $_.key -ceq 'options:--max-time:argument' }
+    $e = $excludedRun.counts
+    $excludedOk = $excludedItem.state -ceq 'excluded' -and $excludedItem.reason -ceq 'intended-difference:ADR-0454' -and $excludedItem.expected -like 'exit 2: *requires parameter' -and
+        $e.excluded -eq 1 -and $e.gap -eq 1 -and $e.match -eq 6 -and $e.x -eq 6 -and $e.y -eq 7 -and @($excludedRun.items).Count -eq 8
+    & $report 'an excluded item keeps its answers, carries its reason and leaves X and Y' $excludedOk (($excludedItem, $e) | ConvertTo-Json -Compress -Depth 4)
+    $real = Get-OptionExclusions (Join-Path $script:OptionRepositoryRoot 'Gap/Baselines/option-exclusions.json')
+    & $report 'the shipped exclusions name the five ADR-0454 options' ($real.Count -eq 5 -and @($real.Values | Where-Object { $_ -ceq 'intended-difference:ADR-0454' }).Count -eq 5 -and $real.ContainsKey('options:--ech') -and $real.ContainsKey('options:--dns-servers')) (($real.Keys | Sort-Object) -join ',')
+    & $report 'no exclusions file means no exclusions' ((Get-OptionExclusions (Join-Path $fixtures 'no-such-file.json')).Count -eq 0) ''
+
     $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ('gap-options-test-' + [guid]::NewGuid().ToString('N'))
     try {
-        $path = Join-Path $scratch '9.9.9/options.json'
+        $path =Join-Path $scratch '9.9.9/options.json'
         Write-OptionJsonFile $path $inventory
         $bytes = [System.IO.File]::ReadAllBytes($path)
         $back = [System.Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
@@ -302,5 +327,6 @@ if ($InventoryOnly) { exit 0 }
 $commitRoot = if ($Candidate) { Split-Path -Parent $Candidate } else { $script:OptionRepositoryRoot }
 $commit = "$(& git -C $commitRoot rev-parse HEAD 2>$null)".Trim()
 if (-not $commit) { $commit = "$(& git -C (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) rev-parse HEAD)".Trim() }
-$measurement = Measure-OptionGap $inventory $Version $Candidate $ProbeResults $commit
+$exclusions = Get-OptionExclusions (Join-Path $script:OptionRepositoryRoot 'Gap/Baselines/option-exclusions.json')
+$measurement = Measure-OptionGap $inventory $Version $Candidate $ProbeResults $commit $exclusions
 if ($OutFile) { Write-OptionJsonFile $OutFile $measurement } else { $measurement | ConvertTo-Json -Depth 8 }
