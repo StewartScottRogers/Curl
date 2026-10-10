@@ -33,3 +33,4 @@ A `pop3://`, `smtp://` or `imap://` transfer with `-p -x <http proxy>` opens a C
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
