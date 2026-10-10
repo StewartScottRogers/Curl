@@ -44,3 +44,4 @@ In Curl.Protocol.Smtp.UnitLibrary's SmtpMailTransaction, send a --mail-from (and
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
