@@ -31,3 +31,4 @@ On 2026-10-10 duplicate IDs stalled every lane twice: 08:00-09:23 (BL-1959..BL-1
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
