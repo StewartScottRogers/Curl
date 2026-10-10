@@ -31,3 +31,4 @@ Left by BL-1908. `UpstreamCaseScreening.UnsupportedFtpServerCommand` skips an ft
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
