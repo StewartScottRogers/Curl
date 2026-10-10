@@ -31,3 +31,4 @@ Found by BL-1918. `UpstreamCaseRunner.SshUpload` reads `%LOGDIR/upload.%TESTNUMB
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
