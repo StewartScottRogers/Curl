@@ -31,3 +31,4 @@ BL-2022's measurement on 2026-10-10 found `NetrcTokenScanner.Peek()` at complexi
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
