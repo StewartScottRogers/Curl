@@ -73,18 +73,18 @@ internal sealed class SocksServerConnection(SocksServerConfiguration configurati
         request[0] switch
         {
             4 => AnswerSocks4Async(request, cancellationToken),
-            5 when !greeted => ValueTask.FromResult(AnswerGreeting(request)),
-            5 => AnswerSocks5RequestAsync(request, cancellationToken),
+            5 => AnswerSocks5Async(request, cancellationToken),
             1 when greeted && !authenticated => ValueTask.FromResult(AnswerCredentials(request)),
             _ => ValueTask.FromResult(Close()),
         };
 
+    private ValueTask<int> AnswerSocks5Async(byte[] request, CancellationToken cancellationToken) =>
+        greeted ? AnswerSocks5RequestAsync(request, cancellationToken) : ValueTask.FromResult(AnswerGreeting(request));
+
     // VN CD DSTPORT(2) DSTIP(4) USERID NUL, then for SOCKS4a (DSTIP 0.0.0.x, x not 0) HOST NUL.
     private async ValueTask<int> AnswerSocks4Async(byte[] request, CancellationToken cancellationToken)
     {
-        int userEnd = request.Length < 8 ? -1 : Array.IndexOf(request, (byte)0, 8);
-        bool namesHost = userEnd >= 0 && BinaryPrimitives.ReadUInt32BigEndian(request.AsSpan(4)) - 1 < 255;
-        int end = namesHost ? Array.IndexOf(request, (byte)0, userEnd + 1) : userEnd;
+        (int userEnd, bool namesHost, int end) = FindSocks4End(request);
         if (end < 0)
         {
             return 0;
@@ -96,6 +96,15 @@ internal sealed class SocksServerConnection(SocksServerConfiguration configurati
         bool connected = await ConnectBackendAsync(host, BinaryPrimitives.ReadUInt16BigEndian(request.AsSpan(2)), cancellationToken).ConfigureAwait(false);
         pendingReply = [.. pendingReply, 0, (byte)(connected ? 90 : 91), .. request.AsSpan(2, 6)];
         return end + 1;
+    }
+
+    // Where the USERID ends, whether DSTIP names a host to follow, and where the message ends (-1 when incomplete).
+    private static (int UserEnd, bool NamesHost, int End) FindSocks4End(byte[] request)
+    {
+        int userEnd = request.Length < 8 ? -1 : Array.IndexOf(request, (byte)0, 8);
+        bool namesHost = userEnd >= 0 && BinaryPrimitives.ReadUInt32BigEndian(request.AsSpan(4)) - 1 < 255;
+        int end = namesHost ? Array.IndexOf(request, (byte)0, userEnd + 1) : userEnd;
+        return (userEnd, namesHost, end);
     }
 
     // VER NMETHODS METHODS, answered with VER and the configured method.
@@ -132,34 +141,18 @@ internal sealed class SocksServerConnection(SocksServerConfiguration configurati
     // VER CMD RSV ATYP DST.ADDR DST.PORT(2), answered with the request's bytes and REP 0.
     private async ValueTask<int> AnswerSocks5RequestAsync(byte[] request, CancellationToken cancellationToken)
     {
-        if (!authenticated)
+        int end = authenticated ? Socks5RequestEnd(request) : -1;
+        if (end < 0)
         {
             return Close();
         }
 
-        if (request.Length < 5)
+        if (end == 0)
         {
             return 0;
         }
 
-        int addressLength = request[3] switch
-        {
-            1 => 4,
-            4 => 16,
-            3 => 1 + request[4],
-            _ => -2,
-        };
-        if (addressLength == -2 || request[1] != 1)
-        {
-            return Close();
-        }
-
-        int end = 4 + addressLength + 2;
-        if (request.Length < end)
-        {
-            return 0;
-        }
-
+        int addressLength = end - 6;
         string host = request[3] == 3
             ? Encoding.Latin1.GetString(request, 5, request[4])
             : new IPAddress(request.AsSpan(4, addressLength)).ToString();
@@ -167,6 +160,34 @@ internal sealed class SocksServerConnection(SocksServerConfiguration configurati
         pendingReply = [.. pendingReply, 5, (byte)(connected ? 0 : 5), .. request.AsSpan(2, end - 2)];
         return end;
     }
+
+    // Where the request ends: 0 while it is incomplete, -1 for a command or address type that is not supported.
+    private static int Socks5RequestEnd(byte[] request)
+    {
+        if (request.Length < 5)
+        {
+            return 0;
+        }
+
+        int addressLength = Socks5AddressLength(request);
+        if (addressLength == -2 || request[1] != 1)
+        {
+            return -1;
+        }
+
+        int end = 4 + addressLength + 2;
+        return request.Length < end ? 0 : end;
+    }
+
+    // ATYP's address length: 4 for IPv4, 16 for IPv6, a length byte and the name for a host, -2 for any other type.
+    private static int Socks5AddressLength(byte[] request) =>
+        request[3] switch
+        {
+            1 => 4,
+            4 => 16,
+            3 => 1 + request[4],
+            _ => -2,
+        };
 
     // A backend that refuses the connection (%NOLISTENPORT) closes this one after the failure
     // reply, as socksd answers a failed connect and hangs up.

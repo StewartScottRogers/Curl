@@ -195,6 +195,12 @@ internal sealed class SwsHttpServerConnection : IConnection
             return await ReadAsync(buffer, cancellationToken);
         }
 
+        return await ReadWithNothingOwedAsync(buffer, cancellationToken);
+    }
+
+    // Nothing is sent and no write is awaited: stream text, wait out upgraded traffic or an idle server, else end.
+    private async ValueTask<int> ReadWithNothingOwedAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+    {
         if (streaming)
         {
             return ReadStreamedText(buffer.Span);
