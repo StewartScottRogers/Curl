@@ -4,7 +4,7 @@ title: Serve upstream's test certificates and give the harness a TLS server stre
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-1921, BL-1922]
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-09
@@ -32,7 +32,10 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Notes
 
+- 2026-10-09 (lane 2): this run had a $2 cost cap, too small for the whole task (a new duplex stream, a TLS wrapper with cross-platform tests, vendored certificates, runner and screening changes, coverage). Split into BL-1921 (TLS server stream wrapper and in-memory duplex stream) and BL-1922 (vendor tests/certs, resolve %CERTDIR, screening). Nothing was measured or coded here. What is left on BL-1896 once both are Done: run at least 10 named %CERTDIR cases through UpstreamCaseRunner and confirm Passed or a real Curl difference, and the interactive Measure-UpstreamCases.cs check.
+
 ## Log
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Backlog. Split for the run's cost cap; waits on BL-1921 (TLS server stream wrapper) and BL-1922 (tests/certs and %CERTDIR)
