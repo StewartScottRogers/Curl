@@ -591,6 +591,33 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow(240)]
+    [DataRow(241)]
+    [DataRow(242)]
+    [DataRow(263)]
+    [DataRow(1324)]
+    [DataRow(1408)]
+    [DataRow(1456)]
+    [DataRow(3202)]
+    public async Task RunAsync_HttpIpv6Case_RunsCurlAtHttp6Port(int testNumber)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.rawhttp"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("outcome", "not skipped", $"{outcome.Kind}: {outcome.Detail}");
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains(":" + UpstreamCaseRunner.Http6Port, commandLine!);
+    }
+
+    [TestMethod]
     [DataRow(567)]
     [DataRow(568)]
     [DataRow(569)]

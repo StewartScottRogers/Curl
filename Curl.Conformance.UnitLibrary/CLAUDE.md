@@ -90,6 +90,8 @@ read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 `%RTSPPORT` is 8996 (`UpstreamCaseRunner.RtspPort`, BL-1902) and no `rtspd` stand-in stands behind it (ADR-0457): the 9 cases naming it at `curl-8_21_0` are all `<tool>` libtests, so they skip for their `<tool>`, not for the variable, and a connection to 8996 reaches the `sws` emulation like any other port.
 
+`%HTTP6PORT` is 8991 (`UpstreamCaseRunner.Http6Port`, BL-1903) and `%HOST6IP` is `[::1]`: upstream's `http-ipv6` server is the same `sws` emulation, all in memory, so no case needs IPv6 from the machine, and screening lets `http-ipv6` cases run. A connection whose target is an IPv6 address has `::1` at both ends (`SwsHttpServerConnector`), so a `--haproxy-protocol` line reads `PROXY TCP6 ::1 ::1` (test1456), and the conformance tests' resolver answers `ip6-localhost` with `::1`, as the `%RESOLVE` precheck says it does (test241). The 8 cases this opened (240, 241, 242, 263, 1324, 1408, 1456, 3202) pass; the other `http-ipv6` cases skip for another reason (`%CLIENT6IP`, `%CLIENT6IP-NB`, a `<tool>`, a feature).
+
 `LineProtocolServerConnector` is the shared core of the line-protocol stand-ins for upstream's
 `tests/ftpserver.pl` (BL-1895), the base that the FTP, SMTP, IMAP and POP3 stand-ins of
 BL-1905, BL-1909, BL-1910 and BL-1911 build on. Each connection (`LineProtocolServerConnection`)

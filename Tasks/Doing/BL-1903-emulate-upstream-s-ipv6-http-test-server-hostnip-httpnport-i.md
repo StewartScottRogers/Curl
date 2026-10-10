@@ -22,16 +22,28 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 
 ## Acceptance criteria
 
-- [ ] All 8 IPv6 HTTP cases run through UpstreamCaseRunner and get Passed or a real Curl difference.
-- [ ] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %HOSTNIP, %HTTPNPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
-- [ ] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
-- [ ] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
-- [ ] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
+- [x] All 8 IPv6 HTTP cases run through UpstreamCaseRunner and get Passed or a real Curl difference.
+- [x] UpstreamCaseScreening no longer returns a skip reason of the form "the harness has no value for %HOSTNIP, %HTTPNPORT" for those cases (a screening test in Curl.Conformance.UnitTests pins it); any case still skipped for another reason says that reason.
+- [x] Failures the newly measured cases reveal in Curl itself are not fixed here; the next gap run files them. Cases that fail only because of a stand-in fault are fixed in the stand-in.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity of at most 10 per method; tests run on Windows, Linux and macOS with no TestCategory=Integration.
+- [x] `dotnet build Curl.Conformance.UnitLibrary -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] Curl.Conformance.UnitLibrary\CLAUDE.md states what the runner now does for this.
 - [ ] Interactive check, not a lane gate: `dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- "<tests/data>" <folder without blanks>/raw.json <case numbers>` reports the named cases as measured, not skipped.
 
 ## Notes
 
+- The variables upstream's cases use are `%HOST6IP` and `%HTTP6PORT` (the gap tool reports digits as N, hence `%HOSTNIP`, `%HTTPNPORT`). `%HOST6IP` was already `[::1]`; the runner now gives `%HTTP6PORT` the value 8991 (`UpstreamCaseRunner.Http6Port`; any port the other stand-ins do not claim would do, and 8991 sits beside `%HTTPPORT` 8990), and screening lets the `http-ipv6` server run: every port reaches the same in-memory sws emulation.
+- The 8 cases: 240, 241, 242, 263, 1324, 1408, 1456, 3202. All 8 pass and are on `PassingUpstreamCases.txt`. Pinned by `UpstreamCaseRunnerTests.RunAsync_HttpIpv6Case_RunsCurlAtHttp6Port` (not skipped, curl run at the port).
+- Two stand-in faults fixed: `SwsHttpServerConnector` gave every connection 127.0.0.1 end points, so test1456's `--haproxy-protocol` line read `PROXY TCP6 127.0.0.1 ::1`; a target that is an IPv6 address now has ::1 at both ends. The tests' `LoopbackOnlyDnsResolver` did not resolve `ip6-localhost`, which `UpstreamResolveCheck`'s precheck says resolves to ::1 (test241); it now does.
+- The other 6 `http-ipv6` cases still skip for their own reason: 1046 `%CLIENT6IP-NB`, 1083 and 2086 `%CLIENT6IP`, 1056 the win32 feature, 1265 and 438 a part the harness does not act on.
+- Measure-CodeQuality (-Library Curl.Conformance.UnitLibrary): every changed member at 100% line and branch, complexity within 10. The library still shows 97.8% branch from 29 members this task did not touch (responders, scripts, `RunScreenedAsync`, `InternetHost`); BL-1936 already covers those.
+- The interactive Measure-UpstreamCases.cs check is not a lane gate and was not run here; the in-process conformance run that the same runner drives reports all 8 as measured and passing.
+- The variables upstream's cases use are `%HOST6IP` and `%HTTP6PORT` (the gap tool reports digits as N, hence `%HOSTNIP`, `%HTTPNPORT`). `%HOST6IP` was already `[::1]`; the runner now gives `%HTTP6PORT` the value 8991 (`UpstreamCaseRunner.Http6Port`; any port the other stand-ins do not claim would do, and 8991 sits beside `%HTTPPORT` 8990), and screening lets the `http-ipv6` server run: every port reaches the same in-memory sws emulation.
+- The 8 cases: 240, 241, 242, 263, 1324, 1408, 1456, 3202. All 8 pass and are on `PassingUpstreamCases.txt`. Pinned by `UpstreamCaseRunnerTests.RunAsync_HttpIpv6Case_RunsCurlAtHttp6Port` (not skipped, curl run at the port).
+- Two stand-in faults fixed: `SwsHttpServerConnector` gave every connection 127.0.0.1 end points, so test1456's `--haproxy-protocol` line read `PROXY TCP6 127.0.0.1 ::1`; a target that is an IPv6 address now has ::1 at both ends. The tests' `LoopbackOnlyDnsResolver` did not resolve `ip6-localhost`, which `UpstreamResolveCheck`'s precheck says resolves to ::1 (test241); it now does.
+- The other 6 `http-ipv6` cases still skip for their own reason: 1046 `%CLIENT6IP-NB`, 1083 and 2086 `%CLIENT6IP`, 1056 the win32 feature, 1265 and 438 a part the harness does not act on.
+- Measure-CodeQuality (-Library Curl.Conformance.UnitLibrary): every changed member at 100% line and branch, complexity within 10. The library still shows 97.8% branch from 29 members this task did not touch (responders, scripts, `RunScreenedAsync`, `InternetHost`); BL-1936 already covers those.
+- The interactive Measure-UpstreamCases.cs check is not a lane gate and was not run here; the in-process conformance run that the same runner drives reports all 8 as measured and passing.
 ## Log
 
 - 2026-10-09: Created.

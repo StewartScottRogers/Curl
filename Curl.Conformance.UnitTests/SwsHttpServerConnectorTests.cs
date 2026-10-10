@@ -531,6 +531,36 @@ public sealed partial class SwsHttpServerConnectorTests
     }
 
     [TestMethod]
+    [DataRow("::1")]
+    [DataRow("[::1]")]
+    public async Task ConnectAsync_IPv6Target_HasIPv6LoopbackAtBothEnds(string host)
+    {
+        Diagnostics.Arrange("target host", host);
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+
+        IConnection connection = (await server.ConnectAsync(new ConnectTarget(host, 8991, false), CancellationToken.None)).Connection!;
+
+        Assert.AreEqual("[::1]:8991", Observe("remote end point", "[::1]:8991", $"{connection.RemoteEndPoint}"));
+        Assert.AreEqual("[::1]:49152", Observe("local end point", "[::1]:49152", $"{connection.LocalEndPoint}"));
+        await connection.DisposeAsync();
+    }
+
+    [TestMethod]
+    [DataRow("localhost")]
+    [DataRow("127.0.0.1")]
+    public async Task ConnectAsync_NameOrIPv4Target_HasIPv4LoopbackAtBothEnds(string host)
+    {
+        Diagnostics.Arrange("target host", host);
+        SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
+
+        IConnection connection = (await server.ConnectAsync(new ConnectTarget(host, 8990, false), CancellationToken.None)).Connection!;
+
+        Assert.AreEqual("127.0.0.1:8990", Observe("remote end point", "127.0.0.1:8990", $"{connection.RemoteEndPoint}"));
+        Assert.AreEqual("127.0.0.1:49152", Observe("local end point", "127.0.0.1:49152", $"{connection.LocalEndPoint}"));
+        await connection.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task Abandon_MakesConnectingReadingAndWritingThrow()
     {
         Diagnostics.Arrange("action", "Abandon after one connection");
