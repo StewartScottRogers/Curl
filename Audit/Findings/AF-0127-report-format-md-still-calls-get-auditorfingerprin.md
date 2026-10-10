@@ -3,8 +3,8 @@ id: AF-0127
 title: Report-Format.md still calls Get-AuditorFingerprint.ps1 'planned BL-1002' though it exists
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).
 key: truthfulness:Audit/Instructions/Report-Format.md:Get-AuditorFingerprint:false-statement
 reproduction: none
 task: BL-1877
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-09_0647.md, 2026-10-09_1435.md
 ---
 # AF-0127 - Report-Format.md still calls Get-AuditorFingerprint.ps1 'planned BL-1002' though it exists
 
@@ -44,8 +44,10 @@ Run from the repository root:
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the reproduction. Report-Format.md line 37 still contains 'planned BL-1002', and Test-Path Audit/Tools/Get-AuditorFingerprint.ps1 returned True.
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: (Select-String ... 'planned BL-1002').LineNumber returned nothing; Test-Path Audit/Tools/Get-AuditorFingerprint.ps1 returned True. Report-Format.md now describes the fingerprint as 'from Audit/Tools/Get-AuditorFingerprint.ps1, BL-1002'.
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: Select-String for 'planned BL-1002' in Audit/Instructions/Report-Format.md returns no line number (no match), and Test-Path Audit/Tools/Get-AuditorFingerprint.ps1 is True. Report-Format.md now describes the fingerprint as coming 'from Audit/Tools/Get-AuditorFingerprint.ps1, BL-1002'.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).

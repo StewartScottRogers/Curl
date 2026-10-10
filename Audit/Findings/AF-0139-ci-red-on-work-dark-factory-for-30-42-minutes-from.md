@@ -3,8 +3,8 @@ id: AF-0139
 title: CI red on work/dark-factory for 30.42 minutes from run 37931431648 on ea846a2e: lane task BL-1876 edited the guard file .claude/skills/task-board/task-board.ps1
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: the reproduction no longer reproduces.
 key: process:logs:37931431648:ci-red
 reproduction: none
 task: BL-1891
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: reliable-reaudit
+closed-by: 2026-10-09_1435.md
 ---
 # AF-0139 - CI red on work/dark-factory for 30.42 minutes from run 37931431648 on ea846a2e: lane task BL-1876 edited the guard file .claude/skills/task-board/task-board.ps1
 
@@ -42,7 +42,11 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: yes | still reported
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction. ciRedSpells still lists 37931431648 (30.42 minutes) because -Since 2026-10-09 includes the original incident. git show --stat e34a8d5a8 still shows BL-1876 changing .claude/skills/task-board/task-board.ps1. The Select-String step could not run: DarkFactory-20261009-050349.log and DarkFactory-20261009-054609.log are not in this log copy. Re-audited by mechanism (a lane editing a guard file and turning CI red) over this window: git log 71f3acef..4653e86a over the guard paths shows only 5b389bddb (BL-1888). That commit was made by hand through the audit branch (task log: 'Interactive', 'Fixed through the audit branch, PR #94'), not by a lane. No CI run on work/dark-factory failed after the 09:39 shift, which finished 7 tasks. f38a77c90 makes the hook refuse a lane's edit of any guard file. No new case of this cause.
+
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: the reproduction no longer reproduces.

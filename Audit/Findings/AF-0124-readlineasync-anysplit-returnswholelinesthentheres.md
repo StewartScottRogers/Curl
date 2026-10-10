@@ -3,8 +3,8 @@ id: AF-0124
 title: ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest accepts an empty rest
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).
 key: quality:Curl.Protocol.Http.UnitTests/HttpLineReaderTests.cs:ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest:weak-assertion
 reproduction: none
 task: BL-1874
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-09_0647.md, 2026-10-09_1435.md
 ---
 # AF-0124 - ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest accepts an empty rest
 
@@ -44,8 +44,10 @@ Select-String -Path Curl.Protocol.Http.UnitTests/HttpLineReaderTests.cs -Pattern
 
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Select-String shows HttpLineReaderTests.cs:40 Assert.IsTrue("rest".StartsWith(Encoding.ASCII.GetString(rest), StringComparison.Ordinal)); "rest".StartsWith("") is true, so an empty rest passes.
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the Select-String reproduction: no match for 'StartsWith(Encoding'. ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest now asserts Assert.AreEqual(expectedRest, Encoding.ASCII.GetString(rest)), with each data row pinning its exact rest ("", "", "rest").
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the Select-String 'StartsWith\(Encoding' on HttpLineReaderTests.cs: no match. ReadLineAsync_AnySplit_ReturnsWholeLinesThenTheRest now asserts Assert.AreEqual(expectedRest, Encoding.ASCII.GetString(rest)), so an empty rest fails.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).

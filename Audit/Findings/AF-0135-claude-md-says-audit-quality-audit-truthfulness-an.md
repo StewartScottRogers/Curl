@@ -42,6 +42,8 @@ Select-String -Path CLAUDE.md -Pattern '`audit-(quality|truthfulness|process)` \
 
 ## Re-audits
 
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: CLAUDE.md:173, 177 and 178 now read `audit-quality` (Opus), `audit-truthfulness` (Opus) and `audit-process` (Opus); .claude/agents/audit-quality.md, audit-truthfulness.md and audit-process.md all say 'model: opus'.
+
 ## Log
 
 - 2026-10-09: filed proposed.

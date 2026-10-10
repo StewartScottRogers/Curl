@@ -3,8 +3,8 @@ id: AF-0131
 title: IKerberosFileWriter.AppendAllBytes says it returns false only when no file exists, but its implementation returns false on any I/O or access failure
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).
 key: truthfulness:Curl.Kerberos.UnitLibrary/IKerberosFileWriter.cs:AppendAllBytes:false-doc-comment
 reproduction: none
 task: BL-1881
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 64e750b3931ea71536d942080142f37bfc4c9ccf
 scorecard: 2026-10-09_0225.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-09
+closed-how: consecutive
+closed-by: 2026-10-09_0647.md, 2026-10-09_1435.md
 ---
 # AF-0131 - IKerberosFileWriter.AppendAllBytes says it returns false only when no file exists, but its implementation returns false on any I/O or access failure
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Kerberos.UnitLibrary/IKerberosFileWriter.cs -SimpleMatc
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: no | Ran the reproduction: 'when no file exists there' no longer matches IKerberosFileWriter.cs; KerberosDiskFileWriter.cs:24 still catches IOException or UnauthorizedAccessException. The interface's returns doc now says false when 'no file exists there (none is created), or the file cannot be opened or written', which matches the implementation.
+- 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction: 'when no file exists there' no longer matches in Curl.Kerberos.UnitLibrary/IKerberosFileWriter.cs. KerberosDiskFileWriter.cs:24 still catches IOException or UnauthorizedAccessException, and the doc (lines 14-16) now says false means 'no file exists there (none is created), or the file cannot be opened or written'. That agrees with the code.
 
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-09: accepted -> closed. Re-audit 2026-10-09_1435.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-09_0647.md, 2026-10-09_1435.md).
