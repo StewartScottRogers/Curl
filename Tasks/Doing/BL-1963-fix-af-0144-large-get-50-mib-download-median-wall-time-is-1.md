@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-10
 completed:
@@ -41,10 +41,25 @@ The finding closes only when a later re-audit by the performance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: the finding's candidate (`ReadAheadConnectionStream`) is HTTP/2 only; large-get is
+  HTTP/1.1, where `HttpResponseBodyReader` read a Content-Length or read-to-close body 16 KiB
+  per connection read - 3200 async socket reads for 50 MiB. The 16 KiB was curl's largest
+  client write (`passed 16384`), not its receive size: the curl tool sets a 100 KiB
+  `CURLOPT_BUFFERSIZE`. Fix: read up to `ReceiveSize` (102400) and write each read in
+  `WriteSize` (16384) pieces, so write sizes, data events and the exit-23 `passed` text are
+  unchanged. Chunked bodies keep their 16 KiB reads (each chunk run in one read is one write).
+- Added `Curl.Protocol.Http.UnitTests` to `touches` for the new test; no task in Doing on
+  `origin/work/dark-factory` names it.
+- Measured (the audit's `Measure-Performance.ps1` is an audit path a lane may not read, so a
+  loopback PowerShell server sent 50 MiB with Content-Length; `-s -o file`, 11 runs each,
+  native AOT builds, other lanes building): curl 8.21.0 min 66-67 ms; Curl before min
+  103-104 ms (1.55x); Curl after min 66-88 ms, median 72-112 ms against curl's 105-124 ms.
+  The re-audit's own reproduction decides the finding.
 
 ## Log
 

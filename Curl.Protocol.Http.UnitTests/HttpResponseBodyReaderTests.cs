@@ -432,6 +432,28 @@ public sealed class HttpResponseBodyReaderTests
         CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, output.WriteSizes);
     }
 
+    [TestMethod]
+    public async Task CopyAsync_LargeReadToCloseBody_ReadsInCurlsReceiveSizeAndWritesInPiecesOfTheWriteSize()
+    {
+        // AF-0144: a 50 MiB download read 16 KiB at a time took 1.47 times curl's wall time.
+        byte[] body = Enumerable.Range(0, 250000).Select(index => (byte)index).ToArray();
+        Diagnostics.Arrange("body length", body.Length);
+        ScriptedConnection connection = new(body, 1048576);
+        FailingWriteStream output = new();
+
+        await new HttpResponseBodyReader(connection).CopyAsync(Head(string.Empty), false, output, false, false, CancellationToken.None);
+
+        Diagnostics.Act("reads", connection.ReadCount);
+        Diagnostics.Act("write sizes", string.Join(", ", output.WriteSizes));
+        Diagnostics.Diff("body", body, output.ToArray());
+        Diagnostics.Assert("reads: 102400, 102400, 45200, then the close", 4, connection.ReadCount);
+        Diagnostics.Assert("largest write", HttpResponseBodyReader.WriteSize, output.WriteSizes.Max());
+        Assert.AreEqual(4, connection.ReadCount);
+        Assert.AreEqual(HttpResponseBodyReader.WriteSize, output.WriteSizes.Max());
+        Assert.HasCount(17, output.WriteSizes);
+        CollectionAssert.AreEqual(body, output.ToArray());
+    }
+
     private static async Task AssertReadFailsAsync(string response, IOException failure, string message, TestDiagnostics diagnostics)
     {
         diagnostics.Bytes("scripted response", Encoding.Latin1.GetBytes(response));
