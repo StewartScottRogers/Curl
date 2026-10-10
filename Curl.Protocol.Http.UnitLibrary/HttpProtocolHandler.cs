@@ -2385,12 +2385,27 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Makes the <c>Proxy-Authorization</c> value a retry that answers a 401 keeps, as
-    /// <see cref="RepeatAuthorization" /> makes the <c>Authorization</c> value a 407's retry keeps.
+    /// <see cref="RepeatAuthorization" /> makes the <c>Authorization</c> value a 407's retry keeps;
+    /// none after an NTLM Type 3 message, whose handshake authenticated the connection, as
+    /// curl 8.21.0 sends only the origin's answer after it (upstream test169, BL-2030).
     /// </summary>
     private string? RepeatProxyAuthorization(HttpRequestPlan plan) =>
-        plan.ProxyAuthRequest is { } request && plan.ProxyAuthorization is { } sent
-            ? Authenticator.RepeatAuthorization(request, sent)
-            : plan.ProxyAuthorization;
+        plan.ProxyAuthorization is { } sent && IsNtlmType3(sent)
+            ? null
+            : plan.ProxyAuthRequest is { } request && plan.ProxyAuthorization is { } kept
+                ? Authenticator.RepeatAuthorization(request, kept)
+                : plan.ProxyAuthorization;
+
+    /// <summary>
+    /// Decides whether a <c>Proxy-Authorization</c> value is an NTLM Type 3 message: <c>NTLM</c>
+    /// and the base64 of <c>NTLMSSP\0</c> followed by the message type 3, as
+    /// <see cref="IsNtlmType1" /> reads Type 1.
+    /// </summary>
+    private static bool IsNtlmType3(string value) =>
+        value.StartsWith(NtlmType3Prefix, StringComparison.Ordinal);
+
+    /// <summary>The start of every NTLM Type 3 value, as <see cref="NtlmType1Prefix" /> is of Type 1.</summary>
+    private const string NtlmType3Prefix = "NTLM TlRMTVNTUAADAAAA";
 
     /// <summary>Reports each of <paramref name="lines" /> to <paramref name="events" />, in order.</summary>
     private static void ReportInfoLines(ITransferEvents events, IReadOnlyList<string> lines)

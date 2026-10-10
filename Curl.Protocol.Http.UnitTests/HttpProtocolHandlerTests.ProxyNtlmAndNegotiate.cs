@@ -88,6 +88,33 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// <c>--proxy-ntlm</c> whose Type 3 draws the origin's Digest 401 answers it on the same
+    /// connection with <c>Authorization: Digest</c> alone: the proxy's handshake is done, so its
+    /// Type 3 is not sent again, as curl 8.21.0 does in upstream test169 (BL-2030).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_ProxyNtlmThenOriginDigest_SendsTheDigestAnswerWithoutTheProxysType3()
+    {
+        const string originDigestHead = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Digest realm=\"s\", nonce=\"xyz\"\r\nContent-Length: 3\r\n\r\n";
+        const string originDigest = "Authorization: Digest username=\"a\", realm=\"s\", nonce=\"xyz\", uri=\"/\", response=\"2e9f97d017be35671ec6474ef919f3bb\"\r\n";
+        TurnTakingConnection connection = new(65536, ProxyNtlmChallengeHead, originDigestHead + "UUU", ProxyOkHead + "ok");
+        MemoryStream output = new();
+        Diagnostics.Arrange("scripted responses", "407 NTLM type 2, 401 Digest, then 200 ok");
+        Diagnostics.Arrange("credentials", "proxy u:p NTLM, origin a:b Digest");
+
+        TransferResult result = await ProxyTokenHandler(QueueConnector.For(connection), NtlmTokens(), HttpAuthSchemes.Ntlm)
+            .ExecuteAsync(ProxyChallengeContext(output, originCredential: new NetworkCredential("a", "b"), originSchemes: HttpAuthSchemes.Digest));
+
+        WriteResult(result);
+        string expected = ProxyNtlmRequest(ProxyNtlmType1) + ProxyNtlmRequest(ProxyNtlmType3) + ProxyRequestStart + originDigest + ProxyRequestEnd;
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Diagnostics.Diff("requests written", OneLine(expected), OneLine(connection.Written));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(expected, connection.Written);
+        Assert.AreEqual("ok", Latin1(output.ToArray()));
+    }
+
+    /// <summary>
     /// A proxy handshake whose second leg draws another 407 is continued as one that answered
     /// a challenge: the retry after the first 407 tells the authenticator its value was not
     /// sent before any challenge, so a multi-leg proxy handshake is not restarted (AF-0114).
