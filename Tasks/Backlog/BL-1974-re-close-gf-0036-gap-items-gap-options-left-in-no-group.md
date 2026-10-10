@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: []
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-10
 completed:
@@ -58,6 +58,8 @@ Group these items under their causes in the next gap-options report.
 - [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- 2026-10-10 (interactive): touches set to Curl.Cli.UnitLibrary and Curl.Cli.UnitTests (where BL-1829 fixed GF-0036) so it no longer runs alone and holds other tasks back.
 
 ## Log
 
