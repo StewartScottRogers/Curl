@@ -39,3 +39,4 @@ Harness: Curl.Conformance.UnitLibrary (UpstreamCaseRunner.cs runs a case; Upstre
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
 - 2026-10-09: Doing -> Backlog. Split into BL-1930, BL-1931 and BL-1932 (one-liners, test610.pl, test613.pl); resumes once they are Done
+- 2026-10-09: Backlog -> Doing.
