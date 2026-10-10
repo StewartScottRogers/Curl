@@ -1,5 +1,8 @@
+using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
+using Curl.Protocol.Ssh.Authentication;
+using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.Transport;
 
@@ -9,48 +12,35 @@ namespace Curl.Conformance.SshServer;
 public sealed class SshServerConnectorTests
 {
     [TestMethod]
-    public async Task ConnectAsync_ClientIdentificationExchange_EachSideSeesTheOthersIdentification()
+    public async Task ConnectAsync_ClientOffersAes128CtrWithHmacSha256_KeysAreExchangedAndTheServiceAcceptedEncrypted()
     {
         SshServerConnector connector = new(new SystemSshRandomSource());
-        IConnection client = await ConnectAsync(connector);
+        SshTransport client = await ConnectAsync(connector, "aes128-ctr", "hmac-sha2-256");
 
-        string serverIdentification = await SshIdentificationExchange.ExchangeAsync(client, new SshConnectionReader(client), CancellationToken.None);
-        SshServerTransport transport = await connector.Sessions.Single();
+        SshKeyExchangeResult result = await HandshakeAsync(client);
+        SshServerTransport session = await connector.Sessions.Single();
 
-        Assert.AreEqual(SshServerTransport.ServerIdentification, serverIdentification);
-        Assert.AreEqual(SshIdentificationExchange.ClientIdentification, transport.ClientIdentification);
+        Assert.AreEqual("curve25519-sha256", result.Algorithms.KeyExchange);
+        Assert.AreEqual("aes128-ctr", result.Algorithms.CipherServerToClient);
+        Assert.AreEqual("hmac-sha2-256", result.Algorithms.MacClientToServer);
+        CollectionAssert.AreEqual(SshServerHostKey.Blob, result.HostKey);
+        CollectionAssert.AreEqual(client.SessionIdentifier, session.SessionIdentifier);
+        Assert.AreEqual(SshServerTransport.ServerIdentification, client.ServerIdentification);
+        Assert.AreEqual(SshIdentificationExchange.ClientIdentification, session.ClientIdentification);
     }
 
     [TestMethod]
-    public async Task ReadPacketAsync_ClientSendsItsKexInit_ServerReadsTheSamePayload()
+    public async Task ConnectAsync_ClientOffersChaCha20Poly1305_KeysAreExchangedAndTheServiceAcceptedEncrypted()
     {
         SshServerConnector connector = new(new SystemSshRandomSource());
-        IConnection client = await ConnectAsync(connector);
-        SshConnectionReader clientReader = new(client);
-        await SshIdentificationExchange.ExchangeAsync(client, clientReader, CancellationToken.None);
-        SshServerTransport transport = await connector.Sessions.Single();
-        byte[] kexInit = SshKexInit.ForClient(SshAlgorithmPreferences.OpenSslReference, SshAlgorithmCatalogue.Implemented, new SystemSshRandomSource()).ToPayload();
+        SshTransport client = await ConnectAsync(connector, "chacha20-poly1305@openssh.com", "hmac-sha2-256");
 
-        await new SshPacketWriter(client, new SystemSshRandomSource()).WriteAsync(kexInit, CancellationToken.None);
-        byte[] received = await transport.ReadPacketAsync(CancellationToken.None);
+        SshKeyExchangeResult result = await HandshakeAsync(client);
+        SshServerTransport session = await connector.Sessions.Single();
 
-        CollectionAssert.AreEqual(kexInit, received);
-    }
-
-    [TestMethod]
-    public async Task WritePacketAsync_ServerSendsAPayload_ClientReadsTheSamePayload()
-    {
-        SshServerConnector connector = new(new SystemSshRandomSource());
-        IConnection client = await ConnectAsync(connector);
-        SshConnectionReader clientReader = new(client);
-        await SshIdentificationExchange.ExchangeAsync(client, clientReader, CancellationToken.None);
-        SshServerTransport transport = await connector.Sessions.Single();
-        byte[] ignore = [(byte)SshMessageNumber.Ignore, 0, 0, 0, 0];
-
-        await transport.WritePacketAsync(ignore, CancellationToken.None);
-        byte[] received = await new SshPacketReader(clientReader).ReadAsync(CancellationToken.None);
-
-        CollectionAssert.AreEqual(ignore, received);
+        Assert.AreEqual("chacha20-poly1305@openssh.com", result.Algorithms.CipherClientToServer);
+        Assert.IsNull(result.Algorithms.MacServerToClient);
+        CollectionAssert.AreEqual(client.SessionIdentifier, session.SessionIdentifier);
     }
 
     [TestMethod]
@@ -58,15 +48,24 @@ public sealed class SshServerConnectorTests
     {
         SshServerConnector connector = new(new SystemSshRandomSource());
 
-        await ConnectAsync(connector);
-        await ConnectAsync(connector);
+        await ConnectAsync(connector, "aes128-ctr", "hmac-sha2-256");
+        await ConnectAsync(connector, "aes128-ctr", "hmac-sha2-256");
 
         Assert.HasCount(2, connector.Sessions);
     }
 
-    private static async Task<IConnection> ConnectAsync(SshServerConnector connector)
+    private static async Task<SshKeyExchangeResult> HandshakeAsync(SshTransport client)
+    {
+        SshNegotiatedHandshake handshake = await client.NegotiateAlgorithmsAsync(CancellationToken.None);
+        SshKeyExchangeResult result = await client.ExchangeKeysAsync(handshake, CancellationToken.None);
+        await new SshUserAuthentication(client, Encoding.UTF8).RequestServiceAsync(CancellationToken.None);
+        return result;
+    }
+
+    private static async Task<SshTransport> ConnectAsync(SshServerConnector connector, string cipher, string mac)
     {
         ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", 22, UseTls: false), CancellationToken.None);
-        return result.Connection!;
+        SshAlgorithmPreferences preferences = new(["curve25519-sha256"], ["ssh-ed25519"], [cipher], [mac], ["none"]);
+        return new SshTransport(result.Connection!, preferences, SshAlgorithmCatalogue.Implemented, new SystemSshRandomSource(), new SystemSshEphemeralKeySource());
     }
 }
