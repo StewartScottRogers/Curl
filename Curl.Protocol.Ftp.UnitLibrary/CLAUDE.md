@@ -12,7 +12,8 @@ announced, with curl's `-v` line, ADR-0107; a host name is resolved through the 
 `-r`, `-C` and `-I` (ADR-0323's BL-438 addendum), `--max-filesize` through `SIZE`, or
 part-way when the size is unknown (BL-638), `-z` and `-R` through `MDTM`
 (`FtpTimeCondition`, `FtpModificationTime`, ADR-0323's BL-637 addendum), and uploads `-T` with `STOR`, or `APPE`
-for `-C` or `-a` (ADR-0323's BL-439 addendum; `-a`, BL-633), converting LF to CRLF under `--crlf`,
+for `-C` or `-a` (ADR-0323's BL-439 addendum; `-a`, BL-633), converting LF to CRLF under `--crlf`, and for an ASCII upload off Windows
+(`FtpUploadLineEndings`, BL-1957),
 sends `TYPE A` under `-B` or a `;type=a` URL suffix (`FtpTypeCode`; an ASCII download sends no
 `SIZE` or `REST`, BL-633), and honours `--disable-epsv`,
 `--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l` and `-Q`

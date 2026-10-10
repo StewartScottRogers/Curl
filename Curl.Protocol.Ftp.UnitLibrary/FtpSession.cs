@@ -102,10 +102,11 @@ namespace Curl.Protocol.Ftp;
 /// ASCII mode and appending (BL-633): <c>-B</c> or a <c>;type=a</c> URL suffix
 /// (<see cref="FtpTypeCode" />) sends <c>TYPE A</c> instead of <c>TYPE I</c>, for a
 /// download, an upload and <c>-I</c> alike; an ASCII download sends no <c>SIZE</c> or
-/// <c>REST</c>. <c>;type=d</c> lists with <c>NLST</c> as <c>-l</c> does. The data bytes
+/// <c>REST</c>. <c>;type=d</c> lists with <c>NLST</c> as <c>-l</c> does. A download's bytes
 /// pass unchanged either way. <c>-a</c> uploads with <c>APPE</c> instead of <c>STOR</c>, and
-/// <c>--crlf</c> converts each line feed of an upload not already after a carriage return
-/// into a carriage-return line-feed pair.
+/// <c>--crlf</c>, or ASCII mode off Windows (<see cref="FtpUploadLineEndings" />), converts
+/// each line feed of an upload not already after a carriage return into a carriage-return
+/// line-feed pair.
 /// </para>
 /// <para>
 /// <c>-v</c> and <c>--trace</c> (BL-931) see curl 8.21.0's info lines about the data
@@ -161,6 +162,10 @@ internal sealed class FtpSession(
 
     /// <summary>The URL path without its <c>;type=</c> suffix, and whether it asks for ASCII or a name-only listing.</summary>
     private readonly FtpTypeCode typeCode = FtpTypeCode.Of(context);
+
+    /// <summary>Whether an upload's line feeds are sent as CRLF (<see cref="FtpUploadLineEndings" />).</summary>
+    private bool ConvertsUploadLineEndings =>
+        FtpUploadLineEndings.AreConverted(context.ConvertLineEndings, typeCode.UseAscii, OperatingSystem.IsWindows());
 
     /// <summary>The control connection's own address, which <c>-P -</c> listens on.</summary>
     private readonly EndPoint? controlLocalEndPoint = control.Connection.LocalEndPoint;
@@ -784,16 +789,16 @@ internal sealed class FtpSession(
     /// <summary>
     /// Copies the upload to the data connection and closes it, which tells the server the
     /// file has ended. A failed read ends the upload as the end of the source does, as curl
-    /// takes it; a failed write is exit 55. Under <c>--crlf</c> each chunk is converted
-    /// first, and the converted bytes are the ones sent and counted, as curl 8.21.0 was
-    /// measured to (BL-633).
+    /// takes it; a failed write is exit 55. Under <c>--crlf</c>, and for ASCII off Windows,
+    /// each chunk is converted first, and the converted bytes are the ones sent and counted,
+    /// as curl 8.21.0 was measured to (BL-633, BL-1957).
     /// </summary>
     private async ValueTask<TransferResult?> CopyUploadAsync(Stream upload)
     {
         IConnection data = dataConnection!;
         long? expected = uploadSize;
         byte[] buffer = new byte[ReadBufferSize];
-        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = context.ConvertLineEndings
+        Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>> convertChunk = ConvertsUploadLineEndings
             ? new CrlfUploadConverter(ReadBufferSize).Convert
             : static chunk => chunk;
         int read;
@@ -1823,12 +1828,13 @@ internal sealed class FtpSession(
     /// <summary>
     /// Reports curl 8.21.0's <c>Uploaded unaligned file size</c> <c>-v</c> line, which its
     /// <c>ftp_done_check_partial</c> writes for an upload of a known size whose sent bytes
-    /// differ from that size - or, under <c>--crlf</c>, which may add bytes, fall short of it
-    /// (BL-1395). Every failure that ends here is one <c>ftp_done</c> maps to OK first.
+    /// differ from that size - or, when line feeds are converted, which may add bytes, fall
+    /// short of it (BL-1395, BL-1957). Every failure that ends here is one <c>ftp_done</c>
+    /// maps to OK first.
     /// </summary>
     private void ReportUnalignedUpload()
     {
-        if (uploadSize is { } size && (context.ConvertLineEndings ? bytesTransferred < size : bytesTransferred != size))
+        if (uploadSize is { } size && (ConvertsUploadLineEndings ? bytesTransferred < size : bytesTransferred != size))
         {
             context.Events.ReportInfo(FtpTransferMessages.UploadedUnalignedFileSize(bytesTransferred, size));
         }
