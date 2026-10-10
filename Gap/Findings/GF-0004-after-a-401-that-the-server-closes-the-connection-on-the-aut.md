@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test64, behaviour:test69, behaviour:test76, behaviour:test90, behaviour:test153, behaviour:test388, behaviour:test1079, behaviour:test1095, behaviour:test1229, behaviour:test1437, behaviour:test2061, behaviour:test2062, behaviour:test2063, behaviour:test2076, behaviour:test2091]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
-task: BL-1962
-tasks: [BL-1797, BL-1962]
+task: BL-2000
+tasks: [BL-1797, BL-2000]
 ---
 # GF-0004 - After a 401 that the server closes the connection on, the authenticated retry is written to the dead connection and never resent on a fresh one
 
@@ -39,4 +39,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1797.
-- 2026-10-10_0756: Filed BL-1962.
+- 2026-10-10_0756: Filed BL-2000.
