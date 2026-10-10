@@ -43,3 +43,4 @@ This may be what GF-0004's gap harness meets (BL-2000, BL-2019); with a plain FI
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
