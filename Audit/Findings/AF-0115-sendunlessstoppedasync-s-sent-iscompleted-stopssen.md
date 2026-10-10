@@ -45,6 +45,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: yes | Ran the -Site reproduction: survived HttpContinueWaitConnection.cs:115 && [SendUnlessStoppedAsync] '!sent.IsCompleted && StopsSending' -> '||'. It survived in the seed-0 sample as well.
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction: 'survived  Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:115 &&' ('if (!sent.IsCompleted && StopsSending)' -> '||', member SendUnlessStoppedAsync, outcome survived). Runner's targeted mutation rerun on the clean audited commit: survived.
 - 2026-10-09 | 2026-10-09_1435.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command with -ExcludeBaselineFailures: HttpContinueWaitConnection.cs:115 'if (!sent.IsCompleted && StopsSending)' -> '||', outcome survived. The baseline left out the 49 tests that already fail; no remaining test killed the mutant. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: outcome survived at resolved line 115, 'if (!sent.IsCompleted && StopsSending)' mutated to 'if (!sent.IsCompleted || StopsSending)', every test passed (21 baseline-failing auth-using tests left out). Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 

@@ -3,8 +3,8 @@ id: AF-0079
 title: Four more Curl.Protocol.Http.UnitTests fail on the unmutated tree because HttpResponseBodyReader holds the body and writes it only in a finally block
 auditor: quality
 severity: High
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs:HeldBodyBaselineFailures:failing-test
 reproduction: none
 task: BL-1757
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: 043959c94f40aaf4a1c37e70d0c6d957c5f1e564
 scorecard: 2026-10-08_0748.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0079 - Four more Curl.Protocol.Http.UnitTests fail on the unmutated tree because HttpResponseBodyReader holds the body and writes it only in a finally block
 
@@ -46,8 +46,10 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "FullyQuali
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the dotnet test reproduction (after the AF-0056 build): Passed! Failed 0, Passed 8, Total 8.
 - 2026-10-09 | 2026-10-09_0647.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces no) is set aside: Ran the dotnet test reproduction: 'Passed! - Failed: 0, Passed: 8, Skipped: 0, Total: 8'.
 - 2026-10-09 | 2026-10-09_1435.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction: Failed 4, Passed 4. CopyAsync_DecodeContentAndTheOutputFails_ThrowsExit23WithTheEncodedSize got 'Failed writing received data to disk/application'. ExecuteAsync_ServerStallsPastMaxTime_ReportsTheHeadAndTheBodyWritten wrote '' instead of 'hello'. Both ExecuteAsync_ServerStallsPastMaxTime_FailsWithExit28 rows report 5 bytes transferred, expected 0.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | Ran the reproduction: Passed! - Failed: 0, Passed: 8, Total: 8. Every test the filter selects passes on the unmutated tree.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-08: proposed -> accepted. Stewart: "accept all findings".
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.

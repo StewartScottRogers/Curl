@@ -3,8 +3,8 @@ id: AF-0137
 title: FeaturesLine doc says GSS-API, HTTP2, HTTP3 and TLS-SRP are listed on every platform; the Windows line drops all four
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Cli.UnitLibrary/CurlVersionText.cs:FeaturesLine:false-doc-comment
 reproduction: none
 task: BL-1889
@@ -13,9 +13,9 @@ found: 2026-10-09
 found-at: 71f3acef7ec0d988d2d6b5d967a7b7300156cf44
 scorecard: 2026-10-09_0647.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0137 - FeaturesLine doc says GSS-API, HTTP2, HTTP3 and TLS-SRP are listed on every platform; the Windows line drops all four
 
@@ -43,8 +43,10 @@ Run from the repository root:
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_1435.md | not re-audited | Ran the reproduction: the count of 'on every platform now that' is still 1, and the WindowsFeaturesLine pattern still has no match, the same output as before. But the matching line (CurlVersionText.cs:43) is now '<c>NTLM</c> on every platform now that <c>--ntlm</c> is', which is true (both lines list NTLM). Lines 37-46 now say the Windows line drops ECH, GSS-API, HTTP2, HTTP3 and TLS-SRP, and list each of those 'off Windows'. That matches FeaturesLine (line 52) and WindowsFeaturesLine (line 66). The defect looks fixed, but the reproduction no longer discriminates.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | The reproduction's first count is still 1, but the one match is the NTLM sentence ('NTLM on every platform now that --ntlm is'), which is true: NTLM is in both FeaturesLine and WindowsFeaturesLine. The FeaturesLine doc now says HTTP2, GSS-API, HTTP3 and TLS-SRP are listed 'off Windows' and that WindowsFeaturesLine drops ECH, GSS-API, HTTP2, HTTP3 and TLS-SRP. The second Select-String finds none of the four in WindowsFeaturesLine, which agrees with the doc.
 
 ## Log
 
 - 2026-10-09: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.

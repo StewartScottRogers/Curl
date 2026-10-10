@@ -3,8 +3,8 @@ id: AF-0056
 title: Three HttpResponseBodyReaderTests fail on the unmutated tree: the length-delimited/read-to-close body is held whole and written once at the end
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.
 key: quality:Curl.Protocol.Http.UnitTests/HttpResponseBodyReaderTests.cs:HttpResponseBodyReaderTests:failing-test
 reproduction: none
 task: BL-1699
@@ -13,9 +13,9 @@ found: 2026-10-07
 found-at: 0fcb5afc262ef32bb48ad058cf1f4a2b2c68d511
 scorecard: 2026-10-07_1336.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-10
+closed-how: reliable-reaudit
+closed-by: 2026-10-10_0123.md
 ---
 # AF-0056 - Three HttpResponseBodyReaderTests fail on the unmutated tree: the length-delimited/read-to-close body is held whole and written once at the end
 
@@ -47,8 +47,10 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "Name=CopyA
 - 2026-10-09 | 2026-10-09_0225.md | reproduces: no | Ran the dotnet test reproduction: Passed! Failed 0, Passed 3, Total 3 (Curl.Protocol.Http.UnitTests). The sampled mutation baseline of Curl.Protocol.Http.UnitTests also excluded no failing tests.
 - 2026-10-09 | 2026-10-09_0647.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces no) is set aside: Ran the dotnet test reproduction: 'Passed! - Failed: 0, Passed: 3, Skipped: 0, Total: 3'. The Http mutation baseline also ran with excludedTests empty.
 - 2026-10-09 | 2026-10-09_1435.md | not re-audited | overlaps planted defect PD-203 in Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the reproduction: all three tests fail. LargeReadToClose: 'Element at index 0 do not match. Expected: 16384 Actual: 40000'. OutputFailsOnALargeBody: 'passed 20000' instead of 'passed 16384'. OutputFailsAfterAcceptingSomeBytes: 'no exception was thrown'. CopyFramedAsync still copies the body into a MemoryStream and writes it once at the end.
+- 2026-10-10 | 2026-10-10_0123.md | reproduces: no | Ran the reproduction: Passed! - Failed: 0, Passed: 3, Total: 3. The three HttpResponseBodyReaderTests now pass on the unmutated tree.
 
 ## Log
 
 - 2026-10-07: filed proposed.
 - 2026-10-07: proposed -> accepted.
+- 2026-10-10: accepted -> closed. Re-audit 2026-10-10_0123.md: the reproduction no longer reproduces.

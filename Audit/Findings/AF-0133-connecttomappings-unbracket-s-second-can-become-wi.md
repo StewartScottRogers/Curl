@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Library Curl.Ne
 ## Re-audits
 
 - 2026-10-09 | 2026-10-09_1435.md | reproduces: no | Ran the reproduction (-Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 -ExcludeBaselineFailures -TimeoutSeconds 600). The sample included ConnectToMappings.cs:153 [Unbracket] 'host.StartsWith('[') && host.EndsWith(']')' -> '||' (the second &&), outcome killed.
+- 2026-10-10 | 2026-10-10_0123.md | not re-audited | Ran the reproduction (sampled -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0): score 0.9211, but the sample held no Unbracket site at ConnectToMappings.cs:153. The only ConnectToMappings mutant was DestinationWhenMatching line 72 (killed). The old sampled command cannot tell, and -Site can only target the line's first '&&', not the second one the finding names.
 
 ## Log
 
