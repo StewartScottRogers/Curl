@@ -76,4 +76,14 @@ public sealed class UpstreamCurlPlatformTests
         Assert.IsFalse(UpstreamCurlPlatform.Windows.Features.Contains(feature));
         Assert.IsFalse(UpstreamCurlPlatform.Unix.Features.Contains(feature));
     }
+
+    [TestMethod]
+    public void OperatingSystemName_IsPerlsNameForEachPlatform()
+    {
+        Assert.AreEqual("MSWin32", UpstreamCurlPlatform.Windows.OperatingSystemName);
+        Assert.AreEqual("linux", UpstreamCurlPlatform.Unix.OperatingSystemName);
+        Assert.AreEqual("darwin", UpstreamCurlPlatform.MacOS.OperatingSystemName);
+        Assert.IsTrue(UpstreamCurlPlatform.MacOS.Features.SetEquals(UpstreamCurlPlatform.Unix.Features));
+        Assert.AreEqual("/dev/null", UpstreamCurlPlatform.MacOS.NullDevice);
+    }
 }

@@ -52,6 +52,25 @@ internal static class UpstreamPerlOneLiner
 
     private static readonly UpstreamPerlOneLinerResult Passed = new(0, "");
 
+    /// <summary>The value of <c>%PERL</c>: the Perl program's name a check line starts with.</summary>
+    public const string Program = "perl";
+
+    /// <summary>Whether a check line is <see cref="Program"/> running a form the harness interprets.</summary>
+    /// <param name="line">An expanded precheck or postcheck line.</param>
+    /// <returns><see langword="true"/> when <see cref="RunLine"/> would run it.</returns>
+    public static bool Interprets(string line) =>
+        ArgumentsOf(line) is { } arguments && Forms.Any(form => form.Pattern.IsMatch(arguments));
+
+    /// <summary>Runs a check line when it is <see cref="Program"/> running a form the harness interprets.</summary>
+    /// <param name="line">An expanded precheck or postcheck line.</param>
+    /// <param name="operatingSystemName">Perl's <c>$^O</c> for the platform the case stands for.</param>
+    /// <returns>What the one-liner did, or <see langword="null"/> when the line is not one the harness interprets.</returns>
+    public static UpstreamPerlOneLinerResult? RunLine(string line, string operatingSystemName) =>
+        ArgumentsOf(line) is { } arguments ? Run(arguments, operatingSystemName) : null;
+
+    private static string? ArgumentsOf(string line) =>
+        line.StartsWith(Program + " ", StringComparison.Ordinal) ? line[(Program.Length + 1)..].Trim() : null;
+
     /// <summary>Runs a one-liner when it is one of the forms the harness interprets.</summary>
     /// <param name="arguments">The expanded line after the Perl program's name, starting with <c>-e</c>.</param>
     /// <param name="operatingSystemName">Perl's <c>$^O</c> for the platform the case stands for, such as <c>linux</c> or <c>MSWin32</c>.</param>

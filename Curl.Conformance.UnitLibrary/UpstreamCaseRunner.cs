@@ -133,10 +133,16 @@ public sealed class UpstreamCaseRunner(
             ["FILE_PWD"] = string.Empty,
             ["VERSION"] = CurlVersion,
             ["DEV_NULL"] = platform.NullDevice,
+            ["PERL"] = UpstreamPerlOneLiner.Program,
         };
 
     private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory)
     {
+        if (PrecheckSkipReason(testCase) is { } skipReason)
+        {
+            return UpstreamCaseOutcome.Skipped(skipReason);
+        }
+
         string outputFile = logDirectory + "/curl.out";
         WriteClientFiles(testCase);
         List<string> arguments = Arguments(testCase, outputFile);
@@ -164,6 +170,11 @@ public sealed class UpstreamCaseRunner(
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
         };
+        if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
+        {
+            return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");
+        }
+
         return UpstreamCaseVerification.FindFirstDifference(testCase, run) is { } difference
             ? UpstreamCaseOutcome.Failed(difference)
             : UpstreamCaseOutcome.Passed;
@@ -195,6 +206,18 @@ public sealed class UpstreamCaseRunner(
             return (0, $"curl threw {exception.GetType().Name}: {exception.Message}");
         }
     }
+
+    // runtests.pl skips the case with the first line a precheck prints, or with "precheck command
+    // error" when it prints nothing and exits non-zero. Screening let only interpreted one-liners through.
+    private string? PrecheckSkipReason(UpstreamTestCase testCase) =>
+        FirstFailedCheck(testCase, "client", "precheck", result => result.ExitCode != 0 || result.Output.Length > 0) is { } precheck
+            ? precheck.Output.Length > 0 ? precheck.Output.Split('\n')[0].Replace("\r", "", StringComparison.Ordinal) : "precheck command error"
+            : null;
+
+    private UpstreamPerlOneLinerResult? FirstFailedCheck(UpstreamTestCase testCase, string section, string name, Func<UpstreamPerlOneLinerResult, bool> failed) =>
+        UpstreamTestPartBodies.Lines(testCase.Find(section, name))
+            .Select(line => UpstreamPerlOneLiner.RunLine(line, platform.OperatingSystemName)!)
+            .FirstOrDefault(failed);
 
     private static List<string> Arguments(UpstreamTestCase testCase, string outputFile)
     {

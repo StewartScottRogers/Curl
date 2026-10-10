@@ -171,4 +171,27 @@ public sealed class UpstreamPerlOneLinerTests
 
     private static string VerifyLoop(string prefix) =>
         $"-e 'for my $i ((1..100)) {{ my $filename = \"{prefix}.$i\"; open(FH, \"<\", $filename) or die $!; (<FH> eq \"to stay the same\" and <FH> eq \"\") or die \"incorrect $filename\" ; close(FH) }}'";
+
+    [TestMethod]
+    [DataRow("perl -e \"print 'x' if('a' ne 'b');\"", true)]
+    [DataRow("perl -e 'exec \"something\"'", false)]
+    [DataRow("-e \"print 'x' if('a' ne 'b');\"", false)]
+    public void Interprets_TellsAnInterpretedPerlLineFromAnyOther(string line, bool expected)
+    {
+        Assert.AreEqual(expected, UpstreamPerlOneLiner.Interprets(line));
+    }
+
+    [TestMethod]
+    public void RunLine_PerlLine_RunsTheOneLiner()
+    {
+        UpstreamPerlOneLinerResult? result = UpstreamPerlOneLiner.RunLine("perl -e \"print 'Test requires a Unix system' if($^O eq 'MSWin32');\"", "MSWin32");
+
+        Assert.AreEqual(new UpstreamPerlOneLinerResult(0, "Test requires a Unix system"), result);
+    }
+
+    [TestMethod]
+    public void RunLine_LineThatDoesNotStartWithThePerlProgram_IsNotRun()
+    {
+        Assert.IsNull(UpstreamPerlOneLiner.RunLine("sh -e \"print 'x' if('a' ne 'b');\"", "linux"));
+    }
 }

@@ -523,4 +523,40 @@ public sealed class UpstreamCaseRunnerTests
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
+
+    [TestMethod]
+    [DataRow("%PERL -e \"print 'Test requires X' if('a' ne 'b');\"", "Test requires X")]
+    [DataRow("%PERL -e 'exit((stat(\"%LOGDIR/missing\"))[9] != 5)'", "precheck command error")]
+    public async Task RunAsync_PrecheckThatPrintsOrFails_SkipsTheCaseWithoutRunningCurl(string precheck, string expectedReason)
+    {
+        bool curlRan = false;
+        UpstreamCaseRunner runner = Runner(_ =>
+        {
+            curlRan = true;
+            return Task.FromResult(0);
+        });
+        string testFile = $"<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n{precheck}\n</precheck>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expectedReason, outcome.Detail);
+        Assert.IsFalse(curlRan);
+    }
+
+    [TestMethod]
+    [DataRow(5, UpstreamCaseOutcomeKind.Failed, "postcheck FAILED: exit code 1")]
+    [DataRow(0, UpstreamCaseOutcomeKind.Passed, "")]
+    public async Task RunAsync_Postcheck_FailsTheCaseWhenItExitsNonZero(int epoch, UpstreamCaseOutcomeKind expectedKind, string expectedDetail)
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string check = $"%PERL -e 'exit((stat(\"%LOGDIR/missing\"))[9] != {epoch})'";
+        string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n%PERL -e \"print 'x' if('a' ne 'a');\"\n</precheck>\n</client>\n"
+            + $"<verify>\n<postcheck>\n{check}\n</postcheck>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(expectedKind, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(expectedDetail, outcome.Detail ?? "");
+    }
 }

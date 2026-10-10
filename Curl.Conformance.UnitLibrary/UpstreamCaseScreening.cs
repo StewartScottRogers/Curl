@@ -11,8 +11,9 @@ namespace Curl.Conformance;
 /// A case is skipped when its expansion stopped at a stray <c>%else</c> or <c>%endif</c> or left
 /// something unresolved; when its postcheck runs test1013.pl or test1022.pl, which compare with
 /// <c>../curl-config</c>; when it has a part the harness
-/// does not act on (a <c>&lt;tool&gt;</c> libtest, a <c>&lt;precheck&gt;</c>, a <c>&lt;setenv&gt;</c>,
-/// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when it needs a server other than <c>http</c> (the
+/// does not act on (a <c>&lt;tool&gt;</c> libtest, a <c>&lt;setenv&gt;</c>,
+/// a <c>&lt;verify&gt;&lt;upload&gt;</c>, …); when a precheck or postcheck line is not a
+/// <c>%PERL -e</c> one-liner <see cref="UpstreamPerlOneLiner"/> interprets; when it needs a server other than <c>http</c> (the
 /// one emulated), <c>http-proxy</c> (the same emulation on <c>%PROXYPORT</c>), <c>file</c> or <c>none</c>; when it needs a feature Curl lacks, or needs absent
 /// one Curl has; when its <c>&lt;servercmd&gt;</c> holds a command the sws emulation does not carry
 /// out; when it names no server and its command goes to a host name on the internet; when its
@@ -23,12 +24,12 @@ namespace Curl.Conformance;
 internal static class UpstreamCaseScreening
 {
     private static readonly HashSet<string> ClientParts =
-        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "killserver", "disable"];
+        ["name", "command", "server", "features", "file", "file1", "file2", "file3", "file4", "stdin", "killserver", "disable", "precheck"];
 
     private static readonly HashSet<string> VerifyParts =
     [
         "protocol", "proxy", "errorcode", "stdout", "stderr", "file", "file1", "file2", "file3", "file4", "notexists",
-        "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind",
+        "strip", "strippart", "stripfile", "stripfile1", "stripfile2", "stripfile3", "stripfile4", "limits", "valgrind", "postcheck",
     ];
 
     // Interpreted, not source-generated, so no generated code counts against the coverage gate.
@@ -57,6 +58,8 @@ internal static class UpstreamCaseScreening
             () => CurlConfigComparison(testCase),
             () => UnsupportedPart(testCase, "client", ClientParts),
             () => UnsupportedPart(testCase, "verify", VerifyParts),
+            () => UninterpretedCheck(testCase, "client", "precheck"),
+            () => UninterpretedCheck(testCase, "verify", "postcheck"),
             () => UnsupportedServer(testCase),
             () => UnsupportedFeature(testCase, features),
             () => UnsupportedCommand(testCase),
@@ -102,6 +105,13 @@ internal static class UpstreamCaseScreening
     private static string? UnsupportedPart(UpstreamTestCase testCase, string section, HashSet<string> supported) =>
         testCase.Sections.FirstOrDefault(part => part.Section == section && !supported.Contains(part.Name)) is { } part
             ? $"the harness does not act on <{section}><{part.Name}>"
+            : null;
+
+    // A precheck or postcheck runs only when every line is a %PERL -e one-liner that
+    // UpstreamPerlOneLiner interprets (BL-1933).
+    private static string? UninterpretedCheck(UpstreamTestCase testCase, string section, string name) =>
+        UpstreamTestPartBodies.Lines(testCase.Find(section, name)).FirstOrDefault(line => !UpstreamPerlOneLiner.Interprets(line)) is { } line
+            ? $"the harness does not interpret the <{section}><{name}> line {line}"
             : null;
 
     private static string? UnsupportedServer(UpstreamTestCase testCase) =>

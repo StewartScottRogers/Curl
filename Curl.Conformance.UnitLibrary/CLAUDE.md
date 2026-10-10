@@ -150,8 +150,12 @@ makes the listed folder (`asubdir`, `plainfile.txt` and `emptyfile.txt` last wri
 exit code when it will not go), then exits 1 unless a named file was last written at a given
 time, or rewrites a listing into test613.pl's canonical form sorted from its 57th character.
 Screening skips a case whose postcheck runs test1013.pl or test1022.pl, naming the
-`../curl-config` they compare with, which Curl does not ship. Nothing calls the three
-emulations yet: running prechecks and postchecks through them is BL-1933. The result is an
+`../curl-config` they compare with, which Curl does not ship. The runner runs a precheck or
+postcheck whose every line is a `%PERL -e` one-liner `UpstreamPerlOneLiner` interprets (`%PERL` is
+`perl`, `$^O` is the platform's `OperatingSystemName`; BL-1933): a precheck that prints skips the
+case with its first line, one that exits non-zero with `precheck command error`, and a postcheck
+that exits non-zero fails it; any other check line skips the case, naming it. Nothing calls the two script
+emulations yet: their `%SRCDIR` has no value. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list.

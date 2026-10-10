@@ -211,4 +211,22 @@ public sealed class UpstreamCaseScreeningTests
 
     private static string Rooted(string name) =>
         Path.Combine(Path.GetTempPath(), name).Replace('\\', '/');
+
+    [TestMethod]
+    [DataRow("<client>\n<precheck>\nperl -e 'if(\"127.0.0.1\" !~ /[.]0[.]0[.]1$/) {print \"Test only works for HOSTIPs ending with .0.0.1\"; exit(1)}'\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\nperl -e 'exit((stat(\"/log/1443\"))[9] != 960898200)'\n</postcheck>\n</verify>\n")]
+    public void FindSkipReason_CheckOfInterpretedOneLiners_DoesNotSkip(string sections)
+    {
+        Assert.IsNull(Screen(RunnableClient + sections));
+    }
+
+    [TestMethod]
+    [DataRow("client", "precheck", "perl -e \"if('[::1]' ne '[::1]') {print 'x';} else {exec 'resolve --ipv6 ip6-localhost'; print 'Cannot run precheck resolve';}\"")]
+    [DataRow("verify", "postcheck", "sh -c true")]
+    public void FindSkipReason_CheckLineNotInterpreted_NamesTheLine(string section, string name, string line)
+    {
+        string? reason = Screen(RunnableClient + $"<{section}>\n<{name}>\n{line}\n</{name}>\n</{section}>\n");
+
+        Assert.AreEqual($"the harness does not interpret the <{section}><{name}> line {line}", reason);
+    }
 }

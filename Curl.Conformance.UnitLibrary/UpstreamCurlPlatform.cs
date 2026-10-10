@@ -43,21 +43,28 @@ public sealed class UpstreamCurlPlatform
         "large_file", "local-http",
     ];
 
-    private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice)
+    private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice, string operatingSystemName)
     {
         Features = CommonFeatures.Concat(platformFeatures).ToHashSet(StringComparer.Ordinal);
         NullDevice = nullDevice;
+        OperatingSystemName = operatingSystemName;
     }
 
     /// <summary>Windows, where Curl matches curl's Schannel build.</summary>
-    public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL");
+    public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL", "MSWin32");
 
-    /// <summary>Linux and macOS, where Curl matches curl's OpenSSL build.</summary>
-    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr"], "/dev/null");
+    /// <summary>Linux, where Curl matches curl's OpenSSL build.</summary>
+    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "xattr"], "/dev/null", "linux");
+
+    /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
+    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "xattr"], "/dev/null", "darwin");
 
     /// <summary>The features Curl reports on this platform, case-sensitive as upstream spells them.</summary>
     public IReadOnlySet<string> Features { get; }
 
     /// <summary>The value of <c>%DEV_NULL</c>.</summary>
     public string NullDevice { get; }
+
+    /// <summary>Perl's <c>$^O</c> on this platform, which precheck one-liners such as test2072's test.</summary>
+    public string OperatingSystemName { get; }
 }

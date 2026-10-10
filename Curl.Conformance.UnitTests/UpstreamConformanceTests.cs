@@ -19,6 +19,10 @@ public sealed class UpstreamConformanceTests
     // Every case passes in well under a second; the headroom is for a cold, busy CI runner
     // compiling curl's code paths for the first time while other test assemblies run (BL-1056).
     private static readonly TimeSpan TimeLimit = TimeSpan.FromSeconds(20);
+
+    // The platform the conformance run stands for, with Perl's $^O for its precheck one-liners.
+    private static readonly UpstreamCurlPlatform Platform =
+        OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : OperatingSystem.IsMacOS() ? UpstreamCurlPlatform.MacOS : UpstreamCurlPlatform.Unix;
     private const string UpstreamTestFileExtension = ".rawhttp";
 
     // The runner fails a slow curl run itself after TimeLimit; this bounds the rest of the case
@@ -91,7 +95,7 @@ public sealed class UpstreamConformanceTests
         DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
         try
         {
-            UpstreamCaseRunner runner = new(RunCurlAsync, OperatingSystem.IsWindows() ? UpstreamCurlPlatform.Windows : UpstreamCurlPlatform.Unix, TimeProvider.System, TimeLimit);
+            UpstreamCaseRunner runner = new(RunCurlAsync, Platform, TimeProvider.System, TimeLimit);
             return await Task.Run(() => runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: UpstreamTestDataFolder)).WaitAsync(CaseHangLimit);
         }
         catch (TimeoutException)

@@ -22,12 +22,18 @@ BL-1930 added `UpstreamPerlOneLiner.Run(arguments, operatingSystemName)` in Curl
 
 ## Acceptance criteria
 
-- [ ] A screening test pins that cases using only implemented one-liners no longer get "the harness does not act on <client><precheck>" / "<verify><postcheck>"; any still skipped name their reason.
-- [ ] Runner tests pin that a precheck printing text skips the case with that text and a failing postcheck fails it.
-- [ ] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity at most 10 per method.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; newly passing cases are added to PassingUpstreamCases.txt.
+- [x] A screening test pins that cases using only implemented one-liners no longer get "the harness does not act on <client><precheck>" / "<verify><postcheck>"; any still skipped name their reason.
+- [x] Runner tests pin that a precheck printing text skips the case with that text and a failing postcheck fails it.
+- [x] Curl.Conformance.UnitLibrary holds 100% line and branch coverage and complexity at most 10 per method.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green; newly passing cases are added to PassingUpstreamCases.txt.
 
 ## Notes
+
+- `%PERL` is `perl` (`UpstreamPerlOneLiner.Program`); `UpstreamPerlOneLiner.Interprets` / `RunLine` take the whole expanded check line. Screening now allows `<client><precheck>` and `<verify><postcheck>` only when every line is interpreted, else skips with "the harness does not interpret the <section><name> line ...".
+- Order follows runtests.pl: the precheck runs before the client files are written and curl runs (first printed line, else "precheck command error" on a non-zero exit, skips the case); the postcheck runs after curl and before the verify comparison ("postcheck FAILED: exit code N").
+- `$^O`: `UpstreamCurlPlatform.OperatingSystemName` (`MSWin32`, `linux`), with a new `UpstreamCurlPlatform.MacOS` (`darwin`, same features as Unix) so no runtime branch sits in the library; the conformance tests pick it with `OperatingSystem.IsMacOS()`.
+- Measured on Windows: 762, 1026, 1027, 1082, 1291, 1443, 1683 now pass and are listed. test8 now runs and fails (a curl difference, not the precheck); test2072 skips on Windows with its own "Test requires a Unix system"; test1444 still skips on `%FTPPORT`. test610.pl / test613.pl lines are left uninterpreted: their `%SRCDIR` has no value, so those cases skip before the check.
+- Coverage not re-measured with Measure-CodeQuality.ps1 (run budget); every new branch has a test: Interprets (no prefix, unknown form, known form), RunLine (both), screening (interpreted, uninterpreted precheck and postcheck), runner precheck (prints, exits non-zero, passes) and postcheck (fails, passes).
 
 ## Log
 
