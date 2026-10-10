@@ -64,3 +64,4 @@ Group these items under their causes in the next gap-options report.
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
