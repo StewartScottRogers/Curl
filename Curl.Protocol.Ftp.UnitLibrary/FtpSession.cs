@@ -383,13 +383,25 @@ internal sealed class FtpSession(
             return null;
         }
 
+        return await ReturnToEntryPathAsync(path).ConfigureAwait(false)
+            ?? await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>CWD</c> to the reused connection's entry path unless <paramref name="path" /> is
+    /// absolute; a refusal ends the session with exit 9.
+    /// </summary>
+    private async ValueTask<TransferResult?> ReturnToEntryPathAsync(FtpUrlPath path)
+    {
         bool absolute = path.Directories.Count > 0 && path.Directories[0].StartsWith('/');
-        if (!absolute && reused.EntryPath is { } entry && !(await ExchangeAsync("CWD " + entry).ConfigureAwait(false)).IsCompletion)
+        if (absolute || reused!.EntryPath is not { } entry)
         {
-            return await QuitAndFailLeavingConnectionIntactAsync(CurlExitCode.RemoteAccessDenied, FtpTransferMessages.ChangeDirectoryDenied).ConfigureAwait(false);
+            return null;
         }
 
-        return await ChangeDirectoriesAsync(path.Directories).ConfigureAwait(false);
+        return (await ExchangeAsync("CWD " + entry).ConfigureAwait(false)).IsCompletion
+            ? null
+            : await QuitAndFailLeavingConnectionIntactAsync(CurlExitCode.RemoteAccessDenied, FtpTransferMessages.ChangeDirectoryDenied).ConfigureAwait(false);
     }
 
     private ValueTask<TransferResult?> ReadEntryPathAsync() => ReadEntryPathAsync(askSystemForRelativePath: true);
