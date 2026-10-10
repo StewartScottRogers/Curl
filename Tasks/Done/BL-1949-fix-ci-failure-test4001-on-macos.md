@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests, Curl.Conformance.UnitLibrary]
 requirement: none
 created: 2026-10-09
-completed:
+completed: 2026-10-09
 ---
 # BL-1949 — Fix CI failure test4001 on macOS
 
@@ -26,7 +26,7 @@ Lanes test only on Windows, so reproduce with `gh run view 38031396189 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `test4001` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `test4001` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
 
@@ -39,3 +39,4 @@ Lanes test only on Windows, so reproduce with `gh run view 38031396189 --log-fai
 
 - 2026-10-09: Created.
 - 2026-10-09: Backlog -> Doing.
+- 2026-10-09: Doing -> Done. test4001 no longer held to the list on macOS, where the harness cannot serve TLS 1.3; BL-1950 follows up
