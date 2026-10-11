@@ -306,7 +306,7 @@ other transfer, `ftps` through an HTTP proxy included (curl 8.21.0 tunnels it wi
 `CONNECT host:990`, BL-458), goes to `FtpProtocolHandler` over the pooling connector
 (ADR-0323, BL-434), its passive data connections over `CurlComposition.FtpDataConnectorOf`'s
 `PoolingConnector.Over(TcpConnector.ForFtpDataConnections())`, which `--connect-timeout` does not
-limit (ADR-0286, BL-797) and `--connect-to` does not map (BL-1976). `CurlComposition.CreateFtpProtocolHandler` builds it with a
+limit (ADR-0286, BL-797) and `--connect-to` maps to its host only, keeping the reply's port (BL-1976, BL-2042). `CurlComposition.CreateFtpProtocolHandler` builds it with a
 `TcpConnectionListener` for `-P`, the run's TLS provider and DNS resolver, and a
 `SystemNetworkInterfaceLookup` (ADR-0102, ADR-0108, ADR-0110), and `TransferContextFactory`
 copies `-P`, `--disable-eprt`, `--ssl`/`--ssl-reqd` and `--ftp-ssl-control` into the context.

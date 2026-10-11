@@ -54,17 +54,18 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    public async Task ForFtpDataConnections_WithAConnectToMappingMatchingEveryHost_DialsTheTargetAsGiven()
+    public async Task ForFtpDataConnections_WithAConnectToMappingMatchingEveryHost_DialsTheMappedHostOnTheTargetsPort()
     {
-        // upstream test713: --connect-to ::127.0.0.1:8993 maps the control connection only; the
-        // passive data connection still goes to the EPSV reply's port (BL-1976).
+        // upstream test713: --connect-to ::127.0.0.1:8993 gives the passive data connection its
+        // host, 127.0.0.1 in place of ftp.example.com, but it still goes to the EPSV reply's port,
+        // as curl 8.21.0 dials via_peer2 (BL-1976, BL-2042).
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
         var connector = new TcpConnector(
             new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), new ManualTimeProvider(),
             connectToMappings: new ConnectToMappings(["::127.0.0.1:8993"]));
 
         await ConnectLoggedAsync(connector, new ConnectTarget("ftp.example.com", 21, UseTls: false));
-        var data = await connector.ForFtpDataConnections().ConnectAsync(new ConnectTarget("127.0.0.1", 9005, UseTls: false), CancellationToken.None);
+        var data = await connector.ForFtpDataConnections().ConnectAsync(new ConnectTarget("ftp.example.com", 9005, UseTls: false), CancellationToken.None);
 
         Diagnostics.Assert("dialled end points", "127.0.0.1:8993 127.0.0.1:9005", string.Join(' ', dialer.DialedEndPoints));
         Assert.IsNotNull(data.Connection);

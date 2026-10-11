@@ -189,7 +189,7 @@ connect fails with exit 28 and `Connection timed out after N milliseconds`, N fr
 start, also reported as a `-v` line. A cancellation arriving once the limit has passed is that
 failure; an earlier one escapes. Per ADR-0286 (BL-797) `ForFtpDataConnections()` gives a view of
 the same connector (DNS cache, numbering, every setting) whose connects run under the longest
-timer delay instead and that applies no `--connect-to` mapping (BL-1976), FTP's passive data connector; `PoolingConnector.Over(inner)` gives a pooling
+timer delay instead and that takes a `--connect-to` mapping's host but keeps the target's port (BL-1976, BL-2042), FTP's passive data connector; `PoolingConnector.Over(inner)` gives a pooling
 connector over the same cache, configuration and numbering that opens through `inner`. A dial whose
 last attempt failed with `SocketError.TimedOut` is exit 28 with the usual `Failed to connect to`
 message, as curl 8.21.0 ends a dial the system gave up on. Tests stall through `Fakes/StallingTcpDialer`,
