@@ -48,3 +48,4 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
