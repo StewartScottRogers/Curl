@@ -36,3 +36,7 @@ Run it from an interactive session, after a gap run has written its findings:
 powershell -NoProfile -File Gap\Tools\New-TasksFromGaps.ps1 -WhatIf
 powershell -NoProfile -File Gap\Tools\New-TasksFromGaps.ps1 -BoardRoot <work/dark-factory worktree>
 ```
+
+Run it against a freshly fetched `work/dark-factory`. Before pushing, rebase onto it and run
+`task-board.ps1 dedupe -Since <the commit rebased onto>`, then rewrite any renumbered ID in the
+findings' `task:` and `tasks:` fields. A gap run's step 10 does all of this itself (BL-2013).

@@ -56,11 +56,16 @@
        worktree, git push origin gap, and, unless -NoPullRequest or one is already open
        (gh pr list --head gap --base master), gh pr create --base master --head gap with the
        scorecard's Scores table as the body. The pull request is never merged here.
-   10. Unless -NoCommit or -NoTasks: a detached worktree <stamp>\board of
-       origin/work/dark-factory; New-TasksFromGaps.ps1 -BoardRoot <that worktree>; commit
-       "chore(tasks): file gap tasks from <stamp>"; git pull --rebase and push
-       HEAD:work/dark-factory, up to three tries; remove that worktree. Then the findings'
-       new task fields are committed ("gap: task links <stamp>") and pushed to gap again.
+   10. Unless -NoCommit or -NoTasks: git fetch origin work/dark-factory, then a detached
+       worktree <stamp>\board of it, so task IDs are allocated from the board as it is now,
+       not as it was when the run started; New-TasksFromGaps.ps1 -BoardRoot <that worktree>;
+       commit "chore(tasks): file gap tasks from <stamp>"; then, up to three tries: fetch,
+       rebase onto origin/work/dark-factory, task-board.ps1 dedupe -Since <the commit
+       rebased onto> (so a task another filer pushed meanwhile keeps its ID and this run's
+       duplicate takes the next free one), amend the commit and push HEAD:work/dark-factory;
+       remove that worktree. Every ID dedupe renumbered is then rewritten in the findings
+       (Update-GapFindingTaskIds), and their new task fields are committed ("gap: task links
+       <stamp>") and pushed to gap again (BL-2013).
    11. git worktree remove --force <stamp>\tree, then a summary: each analyst's outcome,
        each area's measured X of Y, and the run folder, which is kept for reading.
 
@@ -96,8 +101,10 @@
 .PARAMETER SelfTest
     Checks the refusals on a faked process list, the area-to-tool mapping, the choice or
     creation of the gap worktree, an analyst that changes the tree, and -NoTasks and
-    -NoPullRequest, all against faked git, gh and claude commands (no network), printing a
-    PASS or FAIL line per check, and exits 1 on any FAIL.
+    -NoPullRequest, all against faked git, gh and claude commands (no network), then step
+    10's task renumbering: the dedupe map, its rewrite of the findings, and two filers
+    started from the same board, with real git on a throwaway local origin and the real
+    task-board.ps1 (BL-2013). Prints a PASS or FAIL line per check, and exits 1 on any FAIL.
 .EXAMPLE
     Gap\RunGapAnalysis.cmd -NewTab
 .EXAMPLE
@@ -330,22 +337,101 @@ function Publish-GapRun {
     Write-Host '== Step 10: file the tasks on work/dark-factory'
     if ($SkipTasks) { Write-GapLog 'Tasks skipped (-NoTasks).'; return }
     $board = Join-Path $RunDirectory 'board'
+    # Fetch right before allocating: the run started an hour or more ago, and the audit office
+    # may have filed tasks since (BL-2013).
+    Invoke-GapStep 'board-fetch' 'git' @('-C', $script:RepositoryRoot, 'fetch', 'origin', 'work/dark-factory') | Out-Null
     if ((Invoke-GapStep 'board-tree' 'git' @('-C', $script:RepositoryRoot, 'worktree', 'add', '--detach', $board, 'origin/work/dark-factory')) -ne 0) { Write-GapLog 'Could not create the board worktree; no tasks filed.' 'Red'; return }
+    $renumbered = [ordered]@{}
     if ((Invoke-GapTool 'tasks' 'New-TasksFromGaps.ps1' @('-FindingsDirectory', $FindingsDirectory, '-BoardRoot', $board, '-MeasurementsDirectory', (Join-Path $RunDirectory 'measurements'))) -eq 0) {
         Invoke-GapStep 'tasks-add' 'git' @('-C', $board, 'add', '-A', 'Tasks') | Out-Null
         if ((Invoke-GapStep 'tasks-commit' 'git' @('-C', $board, 'commit', '-m', "chore(tasks): file gap tasks from $Stamp")) -eq 0) {
             $pushed = $false
             for ($try = 1; $try -le 3 -and -not $pushed; $try++) {
-                Invoke-GapStep "tasks-pull-$try" 'git' @('-C', $board, 'pull', '--rebase', 'origin', 'work/dark-factory') | Out-Null
+                $renumbered = Join-GapRenumbering $renumbered (Sync-GapBoard $board $try)
                 $pushed = (Invoke-GapStep "tasks-push-$try" 'git' @('-C', $board, 'push', 'origin', 'HEAD:work/dark-factory')) -eq 0
             }
             if (-not $pushed) { Write-GapLog 'Could not push the gap tasks to work/dark-factory after three tries.' 'Red' }
         } else { Write-GapLog 'No new gap tasks to commit.' }
     } else { Write-GapLog 'New-TasksFromGaps.ps1 failed; no tasks filed.' 'Red' }
     Invoke-GapStep 'board-remove' 'git' @('-C', $script:RepositoryRoot, 'worktree', 'remove', '--force', $board) | Out-Null
+    if ($renumbered.Count -gt 0) {
+        Write-GapLog ('Renumbered: ' + (@($renumbered.Keys | ForEach-Object { "$_ -> $($renumbered[$_])" }) -join ', '))
+        Update-GapFindingTaskIds $FindingsDirectory $renumbered
+    }
     Invoke-GapStep 'gap-add-tasks' 'git' @('-C', $GapWorktree, 'add', '-A', 'Gap') | Out-Null
     if ((Invoke-GapStep 'gap-commit-tasks' 'git' @('-C', $GapWorktree, 'commit', '-m', "gap: task links $Stamp")) -eq 0) {
         Invoke-GapStep 'gap-push-tasks' 'git' @('-C', $GapWorktree, 'push', 'origin', 'gap') | Out-Null
+    }
+}
+
+function Sync-GapBoard {
+    # One push try's preparation in the board worktree: fetch, rebase the gap tasks onto
+    # origin/work/dark-factory, then task-board.ps1 dedupe against the commit rebased onto, so
+    # a task another filer pushed meanwhile keeps its ID and this run's takes the next free one,
+    # and amend the commit when dedupe renumbered anything. Returns dedupe's renumbering
+    # (BL-2013). CLAUDE_PROJECT_DIR names the board, or task-board.ps1 would work on the
+    # session's own checkout.
+    param([string] $Board, [int] $Try)
+    Invoke-GapStep "tasks-fetch-$Try" 'git' @('-C', $Board, 'fetch', 'origin', 'work/dark-factory') | Out-Null
+    if ((Invoke-GapStep "tasks-rebase-$Try" 'git' @('-C', $Board, 'rebase', 'origin/work/dark-factory')) -ne 0) {
+        Invoke-GapStep "tasks-rebase-abort-$Try" 'git' @('-C', $Board, 'rebase', '--abort') | Out-Null
+        Write-GapLog 'Rebasing the gap tasks onto work/dark-factory conflicted.' 'Red'
+        return [ordered]@{}
+    }
+    $upstream = @(Invoke-GapQuery 'git' @('-C', $Board, 'rev-parse', 'origin/work/dark-factory')) | Select-Object -First 1
+    if (-not $upstream) { $upstream = 'origin/work/dark-factory' }
+    $taskBoard = Join-Path $Board '.claude\skills\task-board\task-board.ps1'
+    # dedupe leaves git cat-file's exit code 1 (a file not in -Since) in $LASTEXITCODE, so the
+    # outcome is whether it threw, not that code.
+    $command = "`$env:CLAUDE_PROJECT_DIR = '" + $Board.Replace("'", "''") + "'; try { & '" + $taskBoard.Replace("'", "''") + "' dedupe -Since '" + $upstream + "'; exit 0 } catch { Write-Output `$_; exit 1 }"
+    if ((Invoke-GapStep "tasks-dedupe-$Try" 'shell' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $command)) -ne 0) {
+        Write-GapLog 'task-board.ps1 dedupe failed.' 'Red'
+        return [ordered]@{}
+    }
+    $renumbered = Get-GapRenumbering $script:LastOutput
+    if ($renumbered.Count -gt 0) {
+        Invoke-GapStep "tasks-dedupe-add-$Try" 'git' @('-C', $Board, 'add', '-A', 'Tasks') | Out-Null
+        Invoke-GapStep "tasks-dedupe-amend-$Try" 'git' @('-C', $Board, 'commit', '--amend', '--no-edit') | Out-Null
+    }
+    return $renumbered
+}
+
+function Get-GapRenumbering {
+    # dedupe's "BL-1 -> BL-2  <title>" lines as an ordered old -> new map.
+    param([string[]] $Lines)
+    $map = [ordered]@{}
+    foreach ($line in @($Lines)) {
+        if ([string]$line -match '^(BL-\d+) -> (BL-\d+)\b') { $map[$Matches[1]] = $Matches[2] }
+    }
+    return $map
+}
+
+function Join-GapRenumbering {
+    # One map from the IDs New-TasksFromGaps.ps1 wrote to their final IDs, across tries: an ID
+    # renumbered twice maps to its last number.
+    param([System.Collections.IDictionary] $First, [System.Collections.IDictionary] $Then)
+    $joined = [ordered]@{}
+    foreach ($old in @($First.Keys)) {
+        $joined[$old] = if ($Then.Contains($First[$old])) { $Then[$First[$old]] } else { $First[$old] }
+    }
+    $values = @($First.Values)
+    foreach ($old in @($Then.Keys)) {
+        if ($values -notcontains $old -and -not $joined.Contains($old)) { $joined[$old] = $Then[$old] }
+    }
+    return $joined
+}
+
+function Update-GapFindingTaskIds {
+    # Rewrites each renumbered task ID in the findings, all at once, so A -> B and B -> C never
+    # chain; each file keeps its byte-order mark, or its lack of one.
+    param([string] $FindingsDirectory, [System.Collections.IDictionary] $Renumbered)
+    if ($DryRun -or $Renumbered.Count -eq 0) { return }
+    foreach ($file in @(Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'GF-*.md' -File)) {
+        $bytes = [IO.File]::ReadAllBytes($file.FullName)
+        $bom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+        $text = [IO.File]::ReadAllText($file.FullName)
+        $updated = [regex]::Replace($text, '\bBL-\d+\b', { param($match) if ($Renumbered.Contains($match.Value)) { $Renumbered[$match.Value] } else { $match.Value } })
+        if ($updated -ne $text) { [IO.File]::WriteAllText($file.FullName, $updated, (New-Object Text.UTF8Encoding($bom))) }
     }
 }
 
@@ -422,11 +508,75 @@ function Invoke-GapSelfTest {
         Publish-GapRun $scratch 'stamp' $scratch $scratch (Join-Path $scratch 'none.md') $false $true | Out-Null
         $all = $script:FakeCalls -join "`n"
         & $report '-NoPullRequest skips the gh pr create call' ($all -notmatch 'gh pr' -and $all -match 'push origin gap')
+        $fetchAt = [array]::FindIndex([string[]]$script:FakeCalls.ToArray(), [Predicate[string]] { param($call) $call -like '*fetch origin work/dark-factory' })
+        $treeAt = [array]::FindIndex([string[]]$script:FakeCalls.ToArray(), [Predicate[string]] { param($call) $call -like '*worktree add --detach*' })
+        & $report 'step 10 fetches work/dark-factory right before it makes the board worktree' ($fetchAt -ge 0 -and $fetchAt -lt $treeAt)
+        & $report 'step 10 dedupes against the commit it rebased onto before each push' ($all -match 'rebase origin/work/dark-factory' -and $all -match 'dedupe -Since')
+
+        $map = Get-GapRenumbering @('BL-10 -> BL-20  a task', 'No duplicate IDs.', 'BL-11 -> BL-21  another')
+        & $report 'dedupe output reads as an old -> new map' ($map.Count -eq 2 -and $map['BL-10'] -eq 'BL-20' -and $map['BL-11'] -eq 'BL-21')
+        $joined = Join-GapRenumbering ([ordered]@{ 'BL-10' = 'BL-20' }) ([ordered]@{ 'BL-20' = 'BL-30'; 'BL-11' = 'BL-31' })
+        & $report 'an ID renumbered on two tries maps to its last number' ($joined.Count -eq 2 -and $joined['BL-10'] -eq 'BL-30' -and $joined['BL-11'] -eq 'BL-31')
+        $findings = Join-Path $scratch 'findings'
+        New-Item -ItemType Directory -Force -Path $findings | Out-Null
+        [IO.File]::WriteAllText((Join-Path $findings 'GF-0001-x.md'), "---`ntask: BL-10`ntasks: [BL-9, BL-10, BL-11]`n---`n", (New-Object Text.UTF8Encoding($false)))
+        Update-GapFindingTaskIds $findings ([ordered]@{ 'BL-10' = 'BL-11'; 'BL-11' = 'BL-12' })
+        $rewritten = [IO.File]::ReadAllText((Join-Path $findings 'GF-0001-x.md'))
+        & $report 'renumbered IDs are rewritten in the findings at once, never chained' ($rewritten -eq "---`ntask: BL-11`ntasks: [BL-9, BL-11, BL-12]`n---`n")
+
+        # Two filers from the same board, with real git and the real task-board.ps1: the audit
+        # office pushes BL-002 first, then the gap run's own BL-002 is renumbered on its way in.
+        & $report 'two filers started from the same board push distinct IDs and the findings follow' (Test-GapTwoFilers (Join-Path $scratch 'filers'))
     } finally {
         $script:Commands = $saved
         Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
     }
     return $results
+}
+
+function Test-GapTwoFilers {
+    # Builds a bare origin with a one-task board on work/dark-factory, clones it twice, files a
+    # BL-002 in each, pushes the first, then runs Sync-GapBoard on the second and pushes it.
+    # True when origin then holds the first's BL-002 and the second's task as BL-003, and a
+    # finding naming the second's BL-002 is rewritten to BL-003.
+    param([string] $Root)
+    $saved = $script:Commands
+    $script:Commands = @{ git = 'git'; gh = 'gh'; claude = 'claude'; shell = (Get-Process -Id $PID).Path }
+    $ErrorActionPreference = 'Continue'
+    try {
+        $origin = Join-Path $Root 'origin.git'; $seed = Join-Path $Root 'seed'
+        git init -q --bare $origin 2>$null | Out-Null
+        git init -q $seed 2>$null | Out-Null
+        $skill = Join-Path $seed '.claude\skills\task-board'
+        New-Item -ItemType Directory -Force -Path $skill, (Join-Path $seed 'Tasks\Backlog') | Out-Null
+        $source = Join-Path $script:RepositoryRoot '.claude\skills\task-board'
+        foreach ($name in 'task-board.ps1', 'TASK-TEMPLATE.md') { Copy-Item -LiteralPath (Join-Path $source $name) -Destination $skill }
+        $task = { param([string] $Folder, [string] $Id, [string] $Slug) [IO.File]::WriteAllText((Join-Path $Folder "Tasks\Backlog\$Id-$Slug.md"), "---`nid: $Id`ntitle: $Slug`n---`n# $Id - $Slug`n", (New-Object Text.UTF8Encoding($false))) }
+        & $task $seed 'BL-001' 'seed'
+        foreach ($command in @(@('add', '-A'), @('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'seed'), @('branch', '-M', 'work/dark-factory'), @('remote', 'add', 'origin', $origin), @('push', '-q', 'origin', 'work/dark-factory'))) { git -C $seed @command 2>$null | Out-Null }
+        $audit = Join-Path $Root 'audit'; $gap = Join-Path $Root 'gap'
+        foreach ($clone in $audit, $gap) {
+            git clone -q -b work/dark-factory $origin $clone 2>$null | Out-Null
+            git -C $clone config user.name t; git -C $clone config user.email t@t
+        }
+        & $task $audit 'BL-002' 'audit-task'
+        git -C $audit add -A 2>$null | Out-Null; git -C $audit commit -q -m audit 2>$null | Out-Null; git -C $audit push -q origin HEAD:work/dark-factory 2>$null | Out-Null
+        & $task $gap 'BL-002' 'gap-task'
+        git -C $gap add -A 2>$null | Out-Null; git -C $gap commit -q -m gap 2>$null | Out-Null
+        $renumbered = Sync-GapBoard $gap 1
+        git -C $gap push -q origin HEAD:work/dark-factory 2>$null | Out-Null
+        $pushed = @(git -C $origin ls-tree --name-only work/dark-factory Tasks/Backlog/ 2>$null | ForEach-Object { Split-Path $_ -Leaf })
+        $findings = Join-Path $Root 'findings'
+        New-Item -ItemType Directory -Force -Path $findings | Out-Null
+        [IO.File]::WriteAllText((Join-Path $findings 'GF-0001-x.md'), "task: BL-002`n", (New-Object Text.UTF8Encoding($false)))
+        Update-GapFindingTaskIds $findings $renumbered
+        return ($pushed -contains 'BL-002-audit-task.md') -and ($pushed -contains 'BL-003-gap-task.md') -and
+            ($renumbered['BL-002'] -eq 'BL-003') -and ([IO.File]::ReadAllText((Join-Path $findings 'GF-0001-x.md')) -eq "task: BL-003`n")
+    } catch {
+        return $false
+    } finally {
+        $script:Commands = $saved
+    }
 }
 
 if ($SelfTest) {
