@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Authentication.UnitLibrary]
+touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Console]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2048 — Fix AF-0155: HTTP Digest answer with qop sends a 16-character base64 cnonce where curl 8.21.0 sends 32 lower-case hex digits
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `DigestClientNonce.ForBuild(matchesSspiBuild)` gives `CreateRandomHex` (32 lower-case hex, SSPI) or `CreateRandom` (16 base64, curl's own code); `CurlComposition.CreateHttpAuthenticator` passes the same flag to it and to `DigestAuthenticator`, so layout and cnonce come from one build. ADR-0476.
+- Touches widened to `Curl.Authentication.UnitTests` (tests for `ForBuild`) and `Curl.Console` (one-line wiring in the composition root); no task in Doing on origin/work/dark-factory named either.
+- Reproduction rerun 2026-10-11 against a Release build: curl `0cb39fa5a27290929ac006daa46ecd63`, Curl `34d7f0e755439f092b6471c2f0adf086` - both 32 lower-case hex.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. SSPI-build Digest now sends a 32-hex cnonce; AF-0155 reproduction gives two hex values

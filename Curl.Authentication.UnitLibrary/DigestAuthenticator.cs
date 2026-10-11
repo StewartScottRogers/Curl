@@ -17,7 +17,7 @@ namespace Curl.Authentication;
 /// <see cref="CredentialEncoding.ForPlatform" />.
 /// </param>
 /// <param name="createClientNonce">
-/// Creates the <c>cnonce</c> for each answer; <see cref="DigestClientNonce.CreateRandom" />
+/// Creates the <c>cnonce</c> for each answer; <see cref="DigestClientNonce.ForBuild" />
 /// in production, a fixed value in tests.
 /// </param>
 /// <remarks>

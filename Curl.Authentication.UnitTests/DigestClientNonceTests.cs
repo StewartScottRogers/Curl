@@ -3,8 +3,8 @@ using Curl.Testing;
 namespace Curl.Authentication;
 
 /// <summary>
-/// Pins <see cref="DigestClientNonce" /> to curl 8.21.0's cnonce shape: 12 random bytes in
-/// base64.
+/// Pins <see cref="DigestClientNonce" /> to curl 8.21.0's cnonce shapes: 32 lower-case hex digits through SSPI,
+/// 12 random bytes in base64 from curl's own Digest code.
 /// </summary>
 [TestClass]
 public sealed class DigestClientNonceTests
@@ -60,5 +60,37 @@ public sealed class DigestClientNonceTests
         Assert.AreEqual(32, clientNonce.Length);
         Assert.IsTrue(allLowerHex, clientNonce);
         Assert.AreNotEqual(clientNonce, other);
+    }
+
+    [TestMethod]
+    public void ForBuild_SspiBuild_Gives32LowerCaseHexDigits()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("matches SSPI build", true);
+
+        // AF-0155, measured: curl 8.21.0 Schannel sent cnonce="889edd63675c2328372ba0489df3b38f".
+        string clientNonce = DigestClientNonce.ForBuild(matchesSspiBuild: true)();
+
+        bool allLowerHex = clientNonce.All(character => char.IsAsciiHexDigitLower(character) || char.IsAsciiDigit(character));
+        diagnostics.Act("client nonce", clientNonce);
+        diagnostics.Assert("length", 32, clientNonce.Length);
+        diagnostics.Assert("all lower-case hex", true, allLowerHex);
+        Assert.AreEqual(32, clientNonce.Length);
+        Assert.IsTrue(allLowerHex, clientNonce);
+    }
+
+    [TestMethod]
+    public void ForBuild_OwnDigestCode_Gives12BytesInBase64()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("matches SSPI build", false);
+
+        string clientNonce = DigestClientNonce.ForBuild(matchesSspiBuild: false)();
+
+        byte[] decoded = Convert.FromBase64String(clientNonce);
+        diagnostics.Act("client nonce", clientNonce);
+        diagnostics.Assert("decoded length", 12, decoded.Length);
+        Assert.HasCount(12, decoded);
+        Assert.AreEqual(16, clientNonce.Length);
     }
 }
