@@ -81,6 +81,11 @@ jobs:
     name: Quality gates (windows-latest)
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      # The test platform waits 90 s by default for each test run's coverage collector to
+      # connect. On a busy runner one run missed it and aborted, so its library measured as
+      # uncovered and the job failed with nothing wrong in the code (PR #115's first run).
+      VSTEST_CONNECTION_TIMEOUT: 600
     steps:
       - uses: actions/checkout@v4
 
