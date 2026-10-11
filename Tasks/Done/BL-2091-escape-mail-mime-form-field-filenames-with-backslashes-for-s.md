@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2091 — Escape mail MIME form field filenames with backslashes for smtp and imap (upstream test1187)
 
@@ -27,7 +27,7 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 - [x] New MSTests in Curl.Console.UnitTests (no network, platform-neutral) show the escaping is Backslash for smtp and imap URLs, Percent for http, and Backslash for http under `--form-escape`.
 - [x] A test builds test1187's form for the mail URL and shows the filename bytes real curl produces.
 - [x] The `--help` and `--ai-help` text for `--form-escape` is checked and stays true; the task Log says so.
-- [ ] Add test1187 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process. Moved to BL-2098 (see Notes).
+- [x] ~~Add test1187 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.~~ Handed to BL-2098: the case needs the harness to apply `<strippart>` to the upload first (see Notes).
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
@@ -40,3 +40,4 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: `--help` for `--form-escape` ("Escape form fields using backslash", `CurlHelpTable`) checked: still true, and `--ai-help` reads the same table, so it stays true too.
+- 2026-10-11: Doing -> Done. smtp and imap -F names escape with backslashes; test1187 ratchet listing handed to BL-2098
