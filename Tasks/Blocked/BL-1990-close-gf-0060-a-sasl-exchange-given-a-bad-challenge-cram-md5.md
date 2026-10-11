@@ -61,3 +61,4 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2026: Curl already cancels with * and downgrades to PLAIN on a loopback replay of all six cases; the 'got the end' comes from the gap harness, which only an interactive session may read
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 2.04 of its 2.00 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1990-*.jsonl
