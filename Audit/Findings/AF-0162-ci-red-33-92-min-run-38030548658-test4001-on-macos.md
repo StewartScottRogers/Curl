@@ -3,8 +3,8 @@ id: AF-0162
 title: CI red 33.92 min (run 38030548658, test4001 on macOS); the same spell as AF-0150, counted again because -Since is applied in UTC
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:test4001:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
