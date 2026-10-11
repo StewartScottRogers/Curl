@@ -427,6 +427,9 @@ param(
     # ID renumbers the later one, pushes that and claims, and that a claim the board refuses
     # for another reason is traced with the board's own words (BL-2014), and exit.
     [switch]$TestClaimDuplicates,
+    # Prove the trace labels an Edit or Write whose input names its file as path or
+    # notebook_path or not at all, as it does one naming file_path (BL-2036), and exit.
+    [switch]$TestToolLabels,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
@@ -3514,6 +3517,18 @@ $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase
 # The conflict resolver needs `git rebase --continue`, and nothing that throws work away.
 $ResolveForbidden = $Forbidden + @('git push', 'git pull', 'git rebase --abort', 'git rebase --skip', 'git checkout', 'git switch', 'git worktree', 'git stash')
 
+function Get-ToolFileName {
+    # The leaf of the file an Edit or Write call names: its file_path, else path or
+    # notebook_path, else '' (BL-2036: BL-2035's Edit named its file as path, and Split-Path
+    # of the empty file_path ended lane 1 with "Cannot bind argument to parameter 'Path'").
+    param($ToolInput)
+    foreach ($key in 'file_path', 'path', 'notebook_path') {
+        $value = if ($ToolInput -and $ToolInput.PSObject.Properties[$key]) { "$($ToolInput.$key)" } else { '' }
+        if ($value) { return Split-Path $value -Leaf }
+    }
+    return ''
+}
+
 function Get-ToolLabel {
     param($Tool)
     $in = $Tool.input
@@ -3521,8 +3536,8 @@ function Get-ToolLabel {
         'Agent' { return @('agent', "$($in.subagent_type): $($in.description)") }
         'Task' { return @('agent', "$($in.subagent_type): $($in.description)") }
         'Skill' { return @('skill', "$($in.skill) $($in.args)") }
-        'Edit' { return @('edit', (Split-Path "$($in.file_path)" -Leaf)) }
-        'Write' { return @('write', (Split-Path "$($in.file_path)" -Leaf)) }
+        'Edit' { return @('edit', (Get-ToolFileName $in)) }
+        'Write' { return @('write', (Get-ToolFileName $in)) }
         { $_ -in 'Bash', 'PowerShell' } {
             $c = "$($in.command)"
             if ($c -match 'task-board\.ps1\s+move\b.*-To\s+(\w+)') { return @('move', $Matches[1]) }
@@ -3535,6 +3550,21 @@ function Get-ToolLabel {
         }
     }
     return $null
+}
+
+if ($TestToolLabels) {
+    $failed = 0
+    $check = { param($Name, $Expected, $Got)
+        if ($Expected -ceq $Got) { Write-Host "PASS ${Name}: $Got" -ForegroundColor Green }
+        else { Write-Host "FAIL ${Name}: expected $Expected, got $Got" -ForegroundColor Red; $script:failed++ } }
+    $tool = { param($Name, $Json) "$((Get-ToolLabel ([pscustomobject]@{ name = $Name; input = ($Json | ConvertFrom-Json) }))[1])" }
+    & $check 'Edit naming file_path' 'A.cs' (& $tool 'Edit' '{"file_path":"Z:\\x\\A.cs"}')
+    & $check 'Edit naming path (BL-2035)' 'B.cs' (& $tool 'Edit' '{"path":"Z:\\x\\B.cs","old_string":"a"}')
+    & $check 'Write naming notebook_path' 'C.ipynb' (& $tool 'Write' '{"notebook_path":"/x/C.ipynb"}')
+    & $check 'Edit naming no file' '' (& $tool 'Edit' '{}')
+    & $check 'Edit with an empty file_path' '' (& $tool 'Edit' '{"file_path":""}')
+    & $check 'Edit with no input at all' '' "$((Get-ToolLabel ([pscustomobject]@{ name = 'Edit'; input = $null }))[1])"
+    exit $(if ($failed) { 1 } else { 0 })
 }
 
 function Get-ResultText {
@@ -3652,7 +3682,8 @@ function Invoke-TaskRun {
             if ($null -eq $line) { break }
             Add-Content -Path $raw -Value $line -Encoding UTF8
             try { $evt = $line | ConvertFrom-Json } catch { $evt = $null }
-            if ($evt) { Write-Event $Id $evt }
+            # Tracing a run's event never ends the run or the lane (BL-2036).
+            if ($evt) { try { Write-Event $Id $evt } catch { Write-Trace $Id 'trace' "could not trace an event: $(Get-Short $_.Exception.Message)" 'DarkYellow' } }
             $pending = $p.StandardOutput.ReadLineAsync()
         } elseif ((Get-Date) -gt $deadline) {
             & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
@@ -5001,6 +5032,8 @@ $stopWhy = ''
 $resumeId = ''
 # How many times in a row the current task's run died on the API.
 $apiRetries = 0
+# Script errors met on a task the lane still held in Doing; each is resumed, twice at most (BL-2036).
+$scriptErrorResumes = 0
 # The task whose run was killed at -TaskMinutes in Doing and now gets one overtime run of
 # $overtimeMinutes with its work in place, instead of a stash and Blocked (AF-0042).
 $overtimeId = ''
@@ -5189,6 +5222,15 @@ while ($true) {
     # the lane restarted in its place starts with no memory of it (AF-0091: BL-1850 claimed 5
     # times on lane 9 of one shift).
     if ($Lane -and $id -and (Get-TaskState $id) -in 'Backlog', 'Parked') { Add-ShiftRequeued $id }
+    # A lane whose script failed with its task still in Doing carries on with that task from
+    # the work in place, as the next shift would, instead of ending the shift with it
+    # stranded in Doing (BL-2036: BL-2035 sat there 1.5 hours).
+    if ($Lane -and $id -and $scriptErrorResumes -lt 2 -and (Get-TaskState $id) -eq 'Doing') {
+        $scriptErrorResumes++
+        Write-Trace $id 'ERROR' "$(Get-Short $_.Exception.Message); resuming the task ($scriptErrorResumes of 2)" 'Red'
+        $resumeId = $id
+        continue
+    }
     $stopWhy = 'script error'
     $stalls += "FACTORY SCRIPT ERROR  $($_.Exception.Message)"
     Write-Trace '-' 'ERROR' (Get-Short $_.Exception.Message) 'Red'
