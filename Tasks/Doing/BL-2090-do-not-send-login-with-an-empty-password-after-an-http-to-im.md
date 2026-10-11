@@ -34,3 +34,4 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
