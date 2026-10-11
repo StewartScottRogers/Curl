@@ -811,6 +811,46 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    [DataRow("http://localhost:18203/next", null, true, DisplayName = "other-host")]
+    [DataRow("http://127.0.0.1:18203/next", "s3cr3t", false, DisplayName = "same-origin")]
+    public async Task FollowAsync_MailBearerToken_IsWithheldFromAnotherHost(string target, string? bearer, bool withheld)
+    {
+        // Upstream test779: --oauth2-bearer, 302 to imap://v@host; curl 8.21.0 sends no
+        // AUTHENTICATE and no LOGIN there (BL-2090).
+        ScriptedHandler handler = new(Redirect(302, target), Ok(200, 0));
+        TransferContext first = MailContext(new MailRequestOptions { BearerToken = "s3cr3t", SaslInitialResponse = true });
+
+        await Follow(handler, first);
+
+        MailRequestOptions? mail = handler.Contexts[1].Mail;
+        Diagnostics.Assert("mail.BearerToken", bearer, mail?.BearerToken);
+        Assert.AreEqual(bearer, mail!.BearerToken);
+        Assert.AreEqual(withheld, mail.BearerTokenWithheld);
+        Assert.IsTrue(mail.SaslInitialResponse);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_MailWithoutBearerToken_IsCarriedToAnotherHostUnchanged()
+    {
+        ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/next"), Ok(200, 0));
+        MailRequestOptions mail = new() { SaslInitialResponse = true };
+
+        await Follow(handler, MailContext(mail));
+
+        Assert.AreSame(mail, handler.Contexts[1].Mail);
+    }
+
+    [TestMethod]
+    public async Task FollowAsync_NoMailOptions_HopHasNone()
+    {
+        ScriptedHandler handler = new(Redirect(302, "http://localhost:18203/next"), Ok(200, 0));
+
+        await Follow(handler, Context(Location()));
+
+        Assert.IsNull(handler.Contexts[1].Mail);
+    }
+
+    [TestMethod]
     [DataRow("http://127.0.0.1:18203/next", true)]
     [DataRow("http://localhost:18203/next", false)]
     [DataRow("http://127.0.0.1:18204/next", false)]
@@ -1689,6 +1729,16 @@ public sealed class RedirectFollowerTests
             Output = Stream.Null,
             Http = Location(),
             Credentials = credentials is null ? null : new NetworkCredential(credentials.Split(':')[0], credentials.Split(':')[1]),
+            TimeProvider = TimeProvider.System,
+        };
+
+    private static TransferContext MailContext(MailRequestOptions mail) =>
+        new()
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:18203/page/779"),
+            Output = Stream.Null,
+            Http = Location(),
+            Mail = mail,
             TimeProvider = TimeProvider.System,
         };
 

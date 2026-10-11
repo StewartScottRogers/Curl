@@ -434,6 +434,27 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    [DataRow(null, "", DisplayName = "no-login-options")]
+    [DataRow("AUTH=*", "A002 LOGIN v \r\n", DisplayName = "auth-star")]
+    public async Task ExecuteAsync_BearerTokenWithheldByRedirect_SendsNoLoginUnlessOptionsNameMechanisms(string? loginOptions, string login)
+    {
+        // Upstream test779: after an HTTP redirect to imap://v@host the bearer token is withheld,
+        // and curl 8.21.0 sends nothing after CAPABILITY and exits 67 (BL-2090).
+        var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
+        var mail = new MailRequestOptions { LoginOptions = loginOptions, BearerTokenWithheld = true };
+
+        ImapRun run = await RunAsync(Greeting + Caps("IMAP4 AUTH=XOAUTH2"), sasl, user: "v", password: "", mail: mail);
+
+        DiffSent(run, Capability + login);
+        Assert.AreEqual(Capability + login, run.Sent);
+        if (loginOptions is null)
+        {
+            AssertResult(run, TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied));
+            Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, LoginDenied), run.Result);
+        }
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_LoginDisabledButMechanismOffered_Authenticates()
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);
