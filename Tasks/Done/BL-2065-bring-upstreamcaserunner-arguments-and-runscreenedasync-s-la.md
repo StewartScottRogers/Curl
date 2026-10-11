@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2065 — Bring UpstreamCaseRunner.Arguments and RunScreenedAsync's lambda under the complexity gate
 
@@ -27,9 +27,9 @@ The build's `CA1502` passes them, because the page uses the coverage report's co
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports no member outside a gate, at 100% line and branch coverage.
-- [ ] No existing test was changed or removed to get there; any new member has its own tests.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports no member outside a gate, at 100% line and branch coverage.
+- [x] No existing test was changed or removed to get there; any new member has its own tests.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -37,3 +37,4 @@ The build's `CA1502` passes them, because the page uses the coverage report's co
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Split Arguments and the tunnel lambda under the gate; covered FtpControlChannelResponder.Answer's full-text REPLY branch. Measure-CodeQuality: 0 failing, 100/100.
