@@ -9,6 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-11
 completed:
+lane: no
 ---
 # BL-2074 — Re-close GF-0005: With --anyauth or --proxy-anyauth, a -T upload or -F form that draws a 401/407 is never resent with credentials
 
@@ -49,7 +50,26 @@ In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upl
 
 ## Notes
 
+- 2026-10-11, lane 2 (interactive only): the gap could not be reproduced from a lane.
+  BL-2001's fix (ad93ba64c) reached `master` before gap run 2026-10-11_0936, and
+  `HttpProtocolHandler.MayRetry` / `RewindForResend` already treat a seekable `-T` file
+  and `-F` form as rewindable. Measured with `Record-CurlExchange.ps1` and this tree's
+  `curl.exe`: `-T file -u testuser:testpass --anyauth` against a Digest 401
+  (Content-Length 26) resends the PUT with `Authorization: Digest ...` and the whole body,
+  exit 0 - on a closed connection, on a kept-alive one (`-HoldOpenMilliseconds 3000
+  -AnswerHeldRequests 1`), and with the 401 sent before the body was read
+  (`-RespondAfterBodyBytes 0`). So the measured failure depends on something in the
+  upstream case the lane could not see - most likely a `<servercmd>` such as
+  `auth_required` or the exact reply/body in `tests/data/test1030` and `test259` - and
+  the reproduction (`Gap/Tools/Measure-UpstreamCases.cs`) and the upstream data under
+  `%LOCALAPPDATA%\Curl\gap\` are both refused to lanes by the audit guard (ADR-0433).
+- Remove `lane: no` once an interactive session has run the finding's reproduction for
+  1030, 259 and 258 and copied under these Notes each case's `<reply>`, `<servercmd>`,
+  `<command>`, expected `<protocol>` and Curl's actual request bytes and stderr, so a
+  lane can fix the cause without reading `Gap/`.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. Interactive only: reproducing GF-0005 needs the gap office's tools and upstream data, which lanes may not read; lane measurements show the resend working (see Notes)
