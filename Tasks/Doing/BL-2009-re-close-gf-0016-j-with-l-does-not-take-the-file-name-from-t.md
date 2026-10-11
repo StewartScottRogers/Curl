@@ -86,3 +86,4 @@ In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition
 - 2026-10-10: Doing -> Backlog. Interactive only: the gap harness and upstream cache for test1642/1643/3036 are refused to lanes, and no difference reproduces with Record-CurlExchange; added lane: no
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Interactive only: test3036's retry difference (16 vs 128 bytes) appears only in the gap office's cross-check, which lanes may not read; with Record-CurlExchange, CRLF and LF-only replies, curl 8.21.0 and Curl print identical stderr; added lane: no
+- 2026-10-11: Backlog -> Doing.
