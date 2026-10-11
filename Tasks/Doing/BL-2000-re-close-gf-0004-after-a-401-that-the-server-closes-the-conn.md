@@ -70,3 +70,4 @@ In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that
 - 2026-10-10: Created.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Backlog. Waits on BL-2018 (curl's dead-connection check before a same-connection retry) and BL-2019 (interactive: reproduce GF-0004 in the guarded gap harness); BL-1797's fix already holds for FIN and RST closes on loopback
+- 2026-10-11: Backlog -> Doing.
