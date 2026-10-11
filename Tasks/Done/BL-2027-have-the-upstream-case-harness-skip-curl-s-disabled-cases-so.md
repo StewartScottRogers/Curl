@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Smtp.UnitTests]
 lane: no
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2027 — Have the upstream-case harness skip curl's DISABLED cases, so GF-0062's test938 measures excluded
 
@@ -31,11 +31,15 @@ The same check likely moves other findings' items to `excluded`: 323, 594, 836 a
 
 ## Acceptance criteria
 
-- [ ] The harness reads `tests/data/DISABLED` (lines that are not blank and do not start with `#`) and measures each listed case as `excluded` with the reason `disabled upstream`.
-- [ ] A rerun of the harness for case 938 reports it `excluded`, and GF-0062 is closed on the `gap` branch under ADR-0433's rule for `excluded` items.
+- [x] The harness reads `tests/data/DISABLED` (lines that are not blank and do not start with `#`) and measures each listed case as `excluded` with the reason `disabled upstream`.
+- [x] A rerun of the harness for case 938 reports it `excluded`, and GF-0062 is closed on the `gap` branch under ADR-0433's rule for `excluded` items.
 
 ## Notes
+
+- 2026-10-10 (interactive): the reason string is `disabled-upstream`, hyphenated like the other excluded reasons, and both format documents list it. GF-0062 closed on the 2026-10-10_2142 re-measurement (gap PR #108).
 
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. The gap tool skips upstream's DISABLED cases and measures them excluded (disabled-upstream); GF-0062 closed (gap PR #108, 9af0622a5)
