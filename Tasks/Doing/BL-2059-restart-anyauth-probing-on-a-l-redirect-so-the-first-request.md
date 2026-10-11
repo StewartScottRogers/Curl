@@ -33,3 +33,4 @@ Start in `Curl.Protocol.Http.UnitLibrary` where a followed redirect builds its n
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
