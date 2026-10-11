@@ -3,8 +3,8 @@ id: AF-0153
 title: KDC proxy reply limit `reply.Length > MaximumReplyLength` can become `>=` with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/KerberosKdcProxyHttpsTransport.cs:ReadToEndAsync-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/KerberosKdcProxyHttpsTransport.cs:133:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
