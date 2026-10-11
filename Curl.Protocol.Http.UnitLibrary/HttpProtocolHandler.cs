@@ -2340,14 +2340,14 @@ public sealed class HttpProtocolHandler(
         {
             ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
-            return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan));
+            return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan)).DowngradedAfter(head);
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
             ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
-            return authorized;
+            return authorized.DowngradedAfter(head);
         }
 
         if (plan.ProbedFraming is not null && head.StatusLine.StatusCode / 100 == 2)
@@ -2944,7 +2944,7 @@ public sealed class HttpProtocolHandler(
         public ITransferContext Context { get; } = Context;
 
         /// <summary>Gets the transfer's HTTP options, defaults when it has none.</summary>
-        public HttpRequestOptions Options { get; } = Options;
+        public HttpRequestOptions Options { get; private set; } = Options;
 
         /// <summary>Gets the request's method and body framing.</summary>
         public HttpRequestFraming Framing { get; } = Framing;
@@ -3174,6 +3174,24 @@ public sealed class HttpProtocolHandler(
             {
                 ServerCertificate = Context.Url.Scheme == "https" && connect.PeerCertificates is [var certificate, ..] ? certificate : default,
             };
+
+        /// <summary>
+        /// Marks this retry to go out as HTTP/1.0 when <paramref name="head" />, the response it
+        /// answers, was HTTP/1.0 (<see cref="HttpRequestOptions.EarlierResponseWasHttp10" />), as
+        /// curl 8.21.0 keeps the downgrade on the new connection an HTTP/1.0 server leaves it
+        /// (upstream test1071, BL-2086).
+        /// </summary>
+        /// <param name="head">The response the retry answers.</param>
+        /// <returns>This plan.</returns>
+        public HttpRequestPlan DowngradedAfter(HttpResponseHead head)
+        {
+            if (head.StatusLine.Version == HttpVersion.Version10)
+            {
+                Options = Options with { EarlierResponseWasHttp10 = true };
+            }
+
+            return this;
+        }
 
         /// <summary>
         /// Makes the retry that answers a challenge with <paramref name="authorization" /> and
