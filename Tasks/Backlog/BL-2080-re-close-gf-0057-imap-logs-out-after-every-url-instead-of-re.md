@@ -72,3 +72,4 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. requeue as interactive only; this tree keeps the IMAP connection for a test804-shaped run, so GF-0057 differs only under the gap harness, whose paths lanes cannot read
