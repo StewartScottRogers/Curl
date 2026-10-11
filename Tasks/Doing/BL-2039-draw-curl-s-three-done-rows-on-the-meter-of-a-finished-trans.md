@@ -31,3 +31,4 @@ Found while fixing BL-1964 (AF-0145). Measured 2026-10-10 with `Record-CurlExcha
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
