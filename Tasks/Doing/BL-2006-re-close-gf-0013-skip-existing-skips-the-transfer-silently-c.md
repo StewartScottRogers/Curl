@@ -48,3 +48,4 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
