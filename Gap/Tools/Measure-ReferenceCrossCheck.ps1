@@ -30,10 +30,16 @@
     Per case, both binaries run through Record-CurlExchange.ps1 with the case's <data> as
     -Response, its <stdin> as -StandardInput, and its client files written fresh into its
     %LOGDIR before each run. The binaries' exit codes, request bytes, stdout and stderr are
-    compared, in that order; the first that differs is the difference. Before comparing,
-    stderr loses its progress meter lines (the "% Total" and "Dload" header lines and the
-    lines of digits, colons and dashes), whose times differ from run to run. No <strip>
-    rule of the harness is applied: the reference's own output is the yardstick.
+    compared, in that order; the first that differs is the difference. Each read of a
+    request waits up to 3 seconds for its next byte (Record-CurlExchange.ps1
+    -RequestReadMilliseconds 3000), longer than curl's 1-second wait for 100 Continue, so
+    the server answers only once the whole request is in, as upstream's sws does. Before
+    comparing, stderr loses its progress meter lines (the "% Total" and "Dload" header lines
+    and the lines of digits, colons and dashes), whose times differ from run to run; every
+    multipart boundary= the request names is replaced by one fixed token in the request and
+    stdout; and every number from 32768 to 65535 in the request, stdout and stderr by
+    another, since each binary's source port is the system's pick. No <strip> rule of the
+    harness is applied: the reference's own output is the yardstick.
 
     The two answers combine with the in-process verdict:
       agree,  match  -> unchanged
@@ -145,14 +151,30 @@ function Remove-ProgressMeter([byte[]] $Bytes) {
     return ($kept -join '')
 }
 
-# Bytes with every occurrence of the request's random multipart boundary, read from its
-# Content-Type: multipart/...; boundary= header, replaced by a fixed token, as upstream's
-# <strip> rules do; each run of curl picks its own boundary.
+# Bytes with every occurrence of each random multipart boundary the request names, read from
+# every boundary= parameter in it (the outer Content-Type, a nested part's multipart/mixed, and
+# one a -H Content-Type such as test277's text/info carries), replaced by a fixed token, as
+# upstream's <strip> rules do; each run of curl picks its own boundaries (test1133, test1315).
 function Set-FixedMultipartBoundary([byte[]] $Bytes, [byte[]] $Request) {
     $latin1 = [System.Text.Encoding]::GetEncoding(28591)
-    $header = [regex]::Match($latin1.GetString($Request), '(?im)^Content-Type:[ \t]*multipart/[^\r\n]*?;[ \t]*boundary=("?)([^";\r\n]+)\1')
-    if (-not $header.Success) { return ,$Bytes }
-    $text = $latin1.GetString($Bytes).Replace($header.Groups[2].Value, '<multipart-boundary>')
+    $boundaries = @([regex]::Matches($latin1.GetString($Request), '(?im)^Content-Type:[^\r\n]*?;[ \t]*boundary=("?)([^";\r\n]+)\1') | ForEach-Object { $_.Groups[2].Value } | Select-Object -Unique)
+    if ($boundaries.Count -eq 0) { return ,$Bytes }
+    $text = $latin1.GetString($Bytes)
+    foreach ($boundary in $boundaries) { $text = $text.Replace($boundary, '<multipart-boundary>') }
+    return ,([byte[]]$latin1.GetBytes($text))
+}
+
+# Bytes with every number from 32768 to 65535 (the start of Linux's ephemeral port range, which
+# holds Windows' 49152 and up) replaced by a fixed token: the source port each binary's connection
+# gets is the system's pick, and curl names it in a PROXY line (test1455, test3201, test3220) and
+# in %{local_port} (test435). A difference between two numbers both in that range is not seen.
+function Set-FixedEphemeralPorts([byte[]] $Bytes) {
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    $text = [regex]::Replace($latin1.GetString($Bytes), '(?<![0-9])[0-9]{5}(?![0-9])', {
+            param($match)
+            $number = [int] $match.Value
+            if ($number -ge 32768 -and $number -le 65535) { '<ephemeral-port>' } else { $match.Value }
+        })
     return ,([byte[]]$latin1.GetBytes($text))
 }
 
@@ -160,11 +182,14 @@ function Read-Recording([string] $Folder) {
     $exit = ''
     if (Test-Path -LiteralPath (Join-Path $Folder 'exitcode.txt')) { $exit = ([System.IO.File]::ReadAllText((Join-Path $Folder 'exitcode.txt'))).Trim() }
     $request = Read-Bytes (Join-Path $Folder 'request.bin')
+    $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+    # The progress meter goes first: its lines hold numbers in the ephemeral range too.
+    $stderr = Remove-ProgressMeter (Read-Bytes (Join-Path $Folder 'stderr.txt'))
     return [pscustomobject]@{
         ExitCode = $exit
-        Request = Set-FixedMultipartBoundary $request $request
-        Stdout = Set-FixedMultipartBoundary (Read-Bytes (Join-Path $Folder 'stdout.bin')) $request
-        Stderr = Remove-ProgressMeter (Read-Bytes (Join-Path $Folder 'stderr.txt'))
+        Request = Set-FixedEphemeralPorts (Set-FixedMultipartBoundary $request $request)
+        Stdout = Set-FixedEphemeralPorts (Set-FixedMultipartBoundary (Read-Bytes (Join-Path $Folder 'stdout.bin')) $request)
+        Stderr = $latin1.GetString((Set-FixedEphemeralPorts ([byte[]]$latin1.GetBytes($stderr))))
     }
 }
 
@@ -224,7 +249,10 @@ function Invoke-Recording($Case, [string] $Curl, [string] $LogRoot, [string] $Ou
     # relative file an upstream command names (-D %, -o out) lands there; the folder is
     # deleted afterwards and nothing is written into the caller's directory (BL-1840).
     try {
-        Invoke-InScratchDirectory $logDirectory { & $recorder -Port $Port -Response $response -Connections 20 -CurlArgs $arguments -OutDirectory $Out -Curl $Curl -StandardInput $stdin | Out-Null }
+        # Each read of a request waits up to 3 seconds, so curl's 1-second wait for 100 Continue
+        # before it sends a body does not end the read early: upstream's sws reads the whole
+        # request before it answers (test60, test1068).
+        Invoke-InScratchDirectory $logDirectory { & $recorder -Port $Port -Response $response -Connections 20 -CurlArgs $arguments -OutDirectory $Out -Curl $Curl -StandardInput $stdin -RequestReadMilliseconds 3000 | Out-Null }
     }
     finally { Remove-Item -LiteralPath $logDirectory -Recurse -Force -ErrorAction SilentlyContinue }
 }
@@ -337,6 +365,10 @@ if ($SelfTest) {
         Report ($s['behaviour:test5'].state -eq 'unmeasured' -and $s['behaviour:test6'].state -eq 'match' -and $s['behaviour:test7'].state -eq 'gap' -and $s['behaviour:test7'].actual -eq 'request differs') 'left-out cases keep their in-process verdict'
         Report ($s['behaviour:test8'].state -eq 'match') 'progress meter lines in stderr are not a difference'
         Report ($s['behaviour:test9'].state -eq 'match' -and $null -eq $s['behaviour:test9'].reason) 'recordings that differ only in their multipart boundary agree'
+        $latin1 = [System.Text.Encoding]::GetEncoding(28591)
+        $nested = $latin1.GetBytes("Content-Type: text/info; boundary=---outer`r`n`r`n-----outer`r`nContent-Type: multipart/mixed; boundary=---inner`r`n`r`n-----inner--`r`n")
+        Report ($latin1.GetString((Set-FixedMultipartBoundary $nested $nested)) -eq "Content-Type: text/info; boundary=<multipart-boundary>`r`n`r`n--<multipart-boundary>`r`nContent-Type: multipart/mixed; boundary=<multipart-boundary>`r`n`r`n--<multipart-boundary>--`r`n") 'every boundary= the request names is fixed, a nested one and a non-multipart Content-Type''s too (test277, test1133)'
+        Report ($latin1.GetString((Set-FixedEphemeralPorts $latin1.GetBytes("PROXY TCP4 127.0.0.1 127.0.0.1 55052 18990`r`nlocal port == 32768 65535 32767 65536 123456`r`n"))) -eq "PROXY TCP4 127.0.0.1 127.0.0.1 <ephemeral-port> 18990`r`nlocal port == <ephemeral-port> <ephemeral-port> 32767 65536 123456`r`n") 'numbers 32768 to 65535 are fixed, as a source port; others are kept (test1455, test435)'
         $x = $r.crossCheck
         $callerDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("crosscheck-selftest-caller-{0}" -f [guid]::NewGuid())
         $caseDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("crosscheck-selftest-case-{0}" -f [guid]::NewGuid())

@@ -3,9 +3,12 @@
 // case's raw outcome as JSON - the gap analysis office's "behaviour" area (ADR-0433 decisions 2
 // and 9, BL-1728).
 //
-// Usage: dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- <tests/data folder> <out.json> [cases]
+// Usage: dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- [--keep-logs] <tests/data folder> <out.json> [cases]
 //
 // Inputs:
+//   --keep-logs          optional: keep each case's log folder (its stdout<N>, stderr<N>, curl<N>.out
+//                        and the --trace-ascii file trace<N>) instead of deleting it, to read what
+//                        Curl did in a failing case.
 //   <tests/data folder>  a release's tests/data, as Gap/Tools/Get-UpstreamRelease.ps1 caches it;
 //                        every file named test<N> in it is a case.
 //   <out.json>           the file to write; its folder must exist.
@@ -46,7 +49,7 @@
 //            (<git root>/usr/bin/perl.exe), by an absolute path with forward slashes. With no perl
 //            %PERL stays as written, so the runner skips the case for it and the converter
 //            (ConvertTo-BehaviourMeasurement.ps1) files it as unmeasured, no-perl.
-// REPLY escapes (BL-2012): \xHH and \x{H...} in a <servercmd> REPLY line are expanded to the byte
+// REPLY escapes (BL-2012): \xHH and \x{H...} in a <servercmd> REPLY or REPLYLF line are expanded to the byte
 // they name, as ftpserver.pl's eval "qq{...}" does; the runner expands \r, \n, \t and \\ itself.
 // Disabled cases (BL-2027): a case the release's tests/data/DISABLED lists (its %if blocks tested
 // against the harness platform's features) is not run; it is written Skipped with the detail
@@ -67,14 +70,18 @@ using Curl.Console;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
+const string KeepLogsOption = "--keep-logs";
+
 if (IsSelfTestRequest(args))
 {
     return RunSelfTest();
 }
 
+bool keepLogs = args.Contains(KeepLogsOption);
+args = [.. args.Where(argument => argument != KeepLogsOption)];
 if (args.Length is < 2 or > 3)
 {
-    Console.Error.WriteLine("Usage: dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- <tests/data folder> <out.json> [comma-separated case numbers]");
+    Console.Error.WriteLine("Usage: dotnet run --file Gap/Tools/Measure-UpstreamCases.cs -- [--keep-logs] <tests/data folder> <out.json> [comma-separated case numbers]");
     return 2;
 }
 
@@ -140,7 +147,7 @@ await Parallel.ForEachAsync(
         Stopwatch stopwatch = Stopwatch.StartNew();
         UpstreamCaseOutcome outcome = disabledCases.Contains(number)
             ? UpstreamCaseOutcome.Skipped(DisabledCases.Reason)
-            : await RunCaseAsync(number, testFile, Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}")), platform, timeLimit, caseHangLimit);
+            : await RunCaseAsync(number, testFile, Directory.CreateDirectory(Path.Combine(logFolder, $"test{number}-{Guid.NewGuid():N}")), platform, timeLimit, caseHangLimit, keepLogs);
         results[index] = (number, outcome, stopwatch.ElapsedMilliseconds);
         int done = Interlocked.Increment(ref finished);
         if (done % 100 == 0 || done == ordered.Length)
@@ -150,7 +157,15 @@ await Parallel.ForEachAsync(
     });
 
 Environment.CurrentDirectory = startingFolder;
-DeleteLogDirectory(new DirectoryInfo(logFolder));
+if (keepLogs)
+{
+    Console.Error.WriteLine($"Each case's log folder is kept under {logFolder}");
+}
+else
+{
+    DeleteLogDirectory(new DirectoryInfo(logFolder));
+}
+
 DeleteLogDirectory(new DirectoryInfo(releaseCopy));
 DateTimeOffset finishedAt = DateTimeOffset.Now;
 
@@ -195,8 +210,8 @@ static Task<int> RunCurlAsync(UpstreamCurlInvocation invocation)
         : InProcessCurl.RunAsync(invocation.Arguments, invocation.StandardOutput, invocation.StandardError, invocation.StandardInput, dialer, resolver, invocation.DatagramConnector, readEnvironmentVariable);
 }
 
-// Runs one case in its own log folder, which is deleted afterwards, and judges a hang or a throw failed.
-static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile, DirectoryInfo logDirectory, UpstreamCurlPlatform platform, TimeSpan timeLimit, TimeSpan caseHangLimit)
+// Runs one case in its own log folder, which is deleted afterwards unless keepLogs, and judges a hang or a throw failed.
+static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile, DirectoryInfo logDirectory, UpstreamCurlPlatform platform, TimeSpan timeLimit, TimeSpan caseHangLimit, bool keepLogs)
 {
     try
     {
@@ -213,7 +228,10 @@ static async Task<UpstreamCaseOutcome> RunCaseAsync(int number, byte[] testFile,
     }
     finally
     {
-        DeleteLogDirectory(logDirectory);
+        if (!keepLogs)
+        {
+            DeleteLogDirectory(logDirectory);
+        }
     }
 }
 
@@ -292,6 +310,7 @@ static int RunSelfTest()
     Check(Expand("<servercmd>\nREPLY USER 331 \\x41\\x{42}\\x4 \\x5c\\x0d\\x0a!\n</servercmd>") == "<servercmd>\nREPLY USER 331 AB\u0004 \\\\\\r\\n!\n</servercmd>", "\\xHH, \\x{H} and \\xH expand; a backslash, CR or LF is left for the runner as \\\\, \\r, \\n");
     Check(Expand("<servercmd>\nREPLY PASS 230 a\\\\x41\\r\\n\\t\\@\n</servercmd>") == "<servercmd>\nREPLY PASS 230 a\\\\x41\\r\\n\\t\\@\n</servercmd>", "\\\\, \\r, \\n, \\t and \\@ are left for the runner, so \\\\x41 stays");
     Check(Expand("<servercmd>\nCAPA \\x41\n</servercmd>\n<data>\\x41</data>") == "<servercmd>\nCAPA \\x41\n</servercmd>\n<data>\\x41</data>", "only REPLY lines inside <servercmd> expand");
+    Check(Expand("<servercmd>\nREPLYLF AUTH \\x2b\n</servercmd>") == "<servercmd>\nREPLYLF AUTH +\n</servercmd>", "a REPLYLF line expands as a REPLY line does (ftpserver.pl's REPLY(LF|) branch)");
 
     string[] disabledFile = ["# 1", "", "323", "  938 # SASL", "%if WinIDN", "165", "%endif", "%if win32", "%if !Unicode", "%if libidn2", "1560", "%else", "1561", "%endif", "1448", "%endif", "%endif"];
     string Disabled(params string[] features) =>
@@ -498,7 +517,7 @@ internal static class ReplyEscapes
         string[] lines = text[start..end].Split('\n');
         for (int index = 0; index < lines.Length; index++)
         {
-            if (lines[index].TrimStart().StartsWith("REPLY ", StringComparison.Ordinal))
+            if (lines[index].TrimStart().StartsWith("REPLY ", StringComparison.Ordinal) || lines[index].TrimStart().StartsWith("REPLYLF ", StringComparison.Ordinal))
             {
                 lines[index] = ExpandHexEscapes(lines[index]);
             }
