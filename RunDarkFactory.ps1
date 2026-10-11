@@ -3294,6 +3294,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
    Find every prerequisite in that one pass, not just the first: list all the work the task
    needs, file or name all of it, and requeue once (AF-0147 re-audit: BL-1976 was requeued
    for BL-1997 and, after its next claim, again for BL-2035).
+   Do that pass before the first edit: a run that edits code and then requeues leaves its
+   work in a stash, and each requeued claim spends part of the task's cost cap, so a third
+   claim can be Blocked by the cap before it lands the work (AF-0160: BL-1976 was claimed
+   3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -3402,6 +3406,10 @@ Rules for this unattended run, in addition to CLAUDE.md:
    Find every prerequisite in that one pass, not just the first: list all the work the task
    needs, file or name all of it, and requeue once (AF-0147 re-audit: BL-1976 was requeued
    for BL-1997 and, after its next claim, again for BL-2035).
+   Do that pass before the first edit: a run that edits code and then requeues leaves its
+   work in a stash, and each requeued claim spends part of the task's cost cap, so a third
+   claim can be Blocked by the cap before it lands the work (AF-0160: BL-1976 was claimed
+   3 times, requeued twice and Blocked at $3.25 of $3.93, its fix stashed until BL-2041).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And

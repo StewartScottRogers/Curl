@@ -46,6 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Cause was a lane editing code before finding every prerequisite, so each requeue stashed work and spent cap. Added a rule to both lane prompts in RunDarkFactory.ps1: do the prerequisite pass before the first edit (AF-0160). Reproduction needs the audit worktree logs, which lanes may not read; a re-audit confirms.
+
 ## Log
 
 - 2026-10-11: Created.
