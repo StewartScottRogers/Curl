@@ -121,6 +121,13 @@ internal sealed class RunningTransferState(
     internal string? OutputFileOpenWarning { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the handler's transfer succeeded and only creating
+    /// the empty <c>-o</c> file afterwards failed it with exit 23, so the progress meter finishes
+    /// with curl 8.21.0's done rows, as after a success (BL-2039).
+    /// </summary>
+    internal bool SucceededBeforeOutputFileCreationFailed { get; set; }
+
+    /// <summary>
     /// Gets or sets the <c>%{xfer_id}</c> of the latest attempt <c>--retry</c> ran, which curl
     /// 8.21.0 makes a transfer of its own; <see langword="null" /> until the first retry (task BL-799).
     /// </summary>

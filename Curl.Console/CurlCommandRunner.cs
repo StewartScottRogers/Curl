@@ -4074,7 +4074,7 @@ internal sealed class CurlCommandRunner(
 
         if (EndsWithProgressMeter(options, result, state, toStandardOutput))
         {
-            FinishTransferProgress(state.Progress, result);
+            FinishTransferProgress(state, result);
             await WriteErrorLinesAsync([.. TakeProgressMeterHeaderLines(state, resumeFrom), state.Progress.TakeUnwrittenStatusLines()])
                 .ConfigureAwait(false);
         }
@@ -4100,21 +4100,23 @@ internal sealed class CurlCommandRunner(
         && ShowsProgressMeter(options, toStandardOutput);
 
     /// <summary>
-    /// Makes the draws curl 8.21.0 makes as <paramref name="progress" />'s transfer ends: a
+    /// Makes the draws curl 8.21.0 makes as <paramref name="state" />'s transfer ends: a
     /// redirect hop's when <c>--max-redirs</c> refused to follow its redirect (exit 47), which
-    /// curl draws like a followed hop (task BL-277), and the finished transfer's otherwise.
+    /// curl draws like a followed hop (task BL-277), and the finished transfer's otherwise; a
+    /// transfer whose empty <c>-o</c> file could not be created afterwards draws a success's
+    /// done rows, as curl finishes its meter before it creates the file (BL-2039).
     /// </summary>
-    /// <param name="progress">The transfer's progress sink.</param>
+    /// <param name="state">The transfer's state, holding its progress sink.</param>
     /// <param name="result">The transfer's result.</param>
-    private static void FinishTransferProgress(TransferProgressRecorder progress, TransferResult result)
+    private static void FinishTransferProgress(RunningTransferState state, TransferResult result)
     {
         if (result.ExitCode == CurlExitCode.TooManyRedirects)
         {
-            progress.FinishRedirectHop();
+            state.Progress.FinishRedirectHop();
         }
         else
         {
-            progress.Finish(result.IsSuccess);
+            state.Progress.Finish(result.IsSuccess || state.SucceededBeforeOutputFileCreationFailed);
         }
     }
 
@@ -4565,6 +4567,7 @@ internal sealed class CurlCommandRunner(
                     output)
                 .ConfigureAwait(false);
             TransferResult completed = await output.CompleteAsync(fileResult).ConfigureAwait(false);
+            Running.SucceededBeforeOutputFileCreationFailed = fileResult.IsSuccess && !completed.IsSuccess;
 
             if (!options.Silent && output.OpenFailureWarning is { } warning)
             {

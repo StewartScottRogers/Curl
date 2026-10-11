@@ -132,6 +132,36 @@ public sealed class CurlCommandRunnerStartedTransferProgressMeterTests
         Assert.AreEqual(expected, StandardErrorText);
     }
 
+    [TestMethod]
+    public async Task RunAsync_ReportedEmptyTransferToUnopenableOutputFile_DrawsTheThreeDoneRowsBeforeTheOpenWarning()
+    {
+        // curl 8.21.0 (Schannel) for --output missing.txt/f.txt of an empty 200 drew the zero row and
+        // three done rows, as after a success, then the newline and the warning; exit 23 (BL-2039).
+        outputFiles.UnwritablePaths.Add("missing.txt/f.txt");
+        RecordingProtocolHandler handler = new("http", context =>
+        {
+            context.Progress.ReportTransferStarted();
+            context.Progress.ReportDownloaded(0, 0);
+
+            return ValueTask.FromResult(TransferResult.Success(0));
+        });
+        Diagnostics.Arrange("handler", "reports the transfer started and 0 of 0 bytes, then succeeds with no body");
+        Diagnostics.Arrange("unwritable paths", "missing.txt/f.txt");
+
+        int exitCode = await RunAsync(["--output", "missing.txt/f.txt", SourceUrl], handler);
+
+        const string Row = "\r  0      0   0      0   0      0      0      0                              0";
+        string expected =
+            "  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current" + NewLine
+            + "                                 Dload  Upload  Total   Spent   Left   Speed" + NewLine
+            + Row + Row + Row + Row + NewLine
+            + "Warning: Failed to open the file missing.txt/f.txt: No such file or directory" + NewLine;
+        Diagnostics.Assert("exit code", 23, exitCode);
+        Assert.AreEqual(23, exitCode);
+        Diagnostics.Diff("stderr", Lf(expected), Lf(StandardErrorText));
+        Assert.AreEqual(expected, StandardErrorText);
+    }
+
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static RecordingProtocolHandler StartedThenFailing() =>
