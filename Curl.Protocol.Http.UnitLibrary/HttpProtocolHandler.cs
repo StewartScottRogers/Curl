@@ -1101,7 +1101,7 @@ public sealed class HttpProtocolHandler(
         ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
-        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, Http1VersionSeen.DowngradesToHttp10(transport));
+        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, options.EarlierResponseWasHttp10 || Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = framing.AwaitsContinue
             ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
@@ -1455,7 +1455,8 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     /// <remarks>
     /// On a connection whose earlier response was HTTP/1.0 the head is formatted as for
-    /// <c>-0</c>, as curl downgrades the connection (upstream test1074).
+    /// <c>-0</c>, as curl downgrades the connection (upstream test1074), and so is a hop after an
+    /// earlier hop's HTTP/1.0 response (<see cref="HttpRequestOptions.EarlierResponseWasHttp10" />).
     /// </remarks>
     private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams, bool upgradesToH2c, bool downgradesToHttp10)
     {

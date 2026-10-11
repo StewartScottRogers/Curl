@@ -234,8 +234,15 @@ internal sealed class HttpRequestFraming
             return new HttpRequestFraming(options.CustomMethod ?? (noBody ? "HEAD" : "GET"), null, null, false, false, false);
         }
 
-        return OfBody(options.CustomMethod ?? "POST", body, customHeaders, options.Version == HttpVersionPreference.Http10, rangeText: DataRangeOf(body, rangeText), convertLineEndings: convertLineEndings);
+        return OfBody(options.CustomMethod ?? "POST", body, customHeaders, IsHttp10(options), rangeText: DataRangeOf(body, rangeText), convertLineEndings: convertLineEndings);
     }
+
+    /// <summary>
+    /// Tells whether the request goes out as HTTP/1.0: for <c>-0</c>, or after an earlier hop's
+    /// HTTP/1.0 response (<see cref="HttpRequestOptions.EarlierResponseWasHttp10" />, upstream test1073).
+    /// </summary>
+    private static bool IsHttp10(HttpRequestOptions options) =>
+        options.Version == HttpVersionPreference.Http10 || options.EarlierResponseWasHttp10;
 
     /// <summary>
     /// Gives <paramref name="body" /> read through <see cref="HttpCrlfUploadStream" />, of unknown
@@ -256,7 +263,7 @@ internal sealed class HttpRequestFraming
     private static HttpRequestFraming OfUpload(HttpRequestOptions options, HttpUploadResume resume, Stream upload, HttpCustomHeader[] customHeaders, string? rangeText, bool convertLineEndings)
     {
         StreamBody body = new(upload, resume.Length, string.Empty);
-        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, options.Version == HttpVersionPreference.Http10, resume, rangeText, convertLineEndings);
+        return OfBody(options.CustomMethod ?? "PUT", body, customHeaders, IsHttp10(options), resume, rangeText, convertLineEndings);
     }
 
     /// <summary>

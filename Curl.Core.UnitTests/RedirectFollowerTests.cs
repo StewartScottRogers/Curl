@@ -282,6 +282,25 @@ public sealed class RedirectFollowerTests
     }
 
     [TestMethod]
+    public async Task FollowAsync_AfterAnHttp10Response_SendsEveryLaterHopAsHttp10()
+    {
+        // curl sends every later request of a transfer as HTTP/1.0 once a response in it was,
+        // which fails a -T - hop with exit 25 (upstream test1073, BL-2037).
+        TransferResult http10 = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { HttpVersion = System.Net.HttpVersion.Version10 } };
+        TransferResult http11 = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { HttpVersion = System.Net.HttpVersion.Version11 } };
+        ScriptedHandler handler = new(http10, http11, Ok(200, 0));
+
+        await Follow(handler, Context(Location()));
+
+        Diagnostics.Assert("handler.Contexts[0].Http!.EarlierResponseWasHttp10", false, handler.Contexts[0].Http!.EarlierResponseWasHttp10);
+        Assert.IsFalse(handler.Contexts[0].Http!.EarlierResponseWasHttp10);
+        Diagnostics.Assert("handler.Contexts[1].Http!.EarlierResponseWasHttp10", true, handler.Contexts[1].Http!.EarlierResponseWasHttp10);
+        Assert.IsTrue(handler.Contexts[1].Http!.EarlierResponseWasHttp10);
+        Diagnostics.Assert("handler.Contexts[2].Http!.EarlierResponseWasHttp10", true, handler.Contexts[2].Http!.EarlierResponseWasHttp10);
+        Assert.IsTrue(handler.Contexts[2].Http!.EarlierResponseWasHttp10);
+    }
+
+    [TestMethod]
     public async Task FollowAsync_HopResendsReachTheLimit_Exits47BeforeTheNextHop()
     {
         TransferResult resent = Redirect(302, Next) with { Report = Redirect(302, Next).Report! with { RedirectCount = 3 } };

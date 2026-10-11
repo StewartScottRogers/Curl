@@ -116,6 +116,51 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithBodyOfUnknownLength_FailsWithExit25AndSendsNothing()
+    {
+        // A -L hop after an HTTP/1.0 3xx goes out as HTTP/1.0, which cannot carry stdin's chunks (upstream test1073, BL-2037).
+        HttpRequestOptions options = new()
+        {
+            EarlierResponseWasHttp10 = true,
+            Body = new StreamBody(new MemoryStream([1, 2, 3]), null, "application/octet-stream"),
+            CustomMethod = "PUT",
+        };
+        ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello", 65536);
+        MemoryStream output = new();
+        Diagnostics.Arrange("request", "redirect hop after an HTTP/1.0 response, PUT of a 3-byte stream of unknown length");
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EncodingContext(output, options));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
+        Assert.IsEmpty(connection.Written);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectHopAfterAnHttp10ResponseWithKnownLength_SendsAnHttp10RequestLine()
+    {
+        HttpRequestOptions options = new()
+        {
+            EarlierResponseWasHttp10 = true,
+            Body = new BytesBody("abc"u8.ToArray(), "application/octet-stream"),
+            CustomMethod = "PUT",
+        };
+        ScriptedConnection connection = Connection("HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nhello", 65536);
+        MemoryStream output = new();
+        Diagnostics.Arrange("request", "redirect hop after an HTTP/1.0 response, PUT of 3 bytes");
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(EncodingContext(output, options));
+
+        WriteResult(result);
+        string written = System.Text.Encoding.Latin1.GetString(connection.Written);
+        Diagnostics.Assert("request line ends HTTP/1.0", true, written.Contains(" HTTP/1.0\r\n", StringComparison.Ordinal));
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.Contains(" HTTP/1.0\r\n", written);
+    }
+
+    [TestMethod]
     [DataRow(
         "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n",
         "5\r\nhello\r\n0\r\n\r\n",
