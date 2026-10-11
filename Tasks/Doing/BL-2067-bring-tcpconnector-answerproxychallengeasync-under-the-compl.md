@@ -31,3 +31,4 @@ The coverage page (<https://stewartscottrogers.github.io/Curl/coverage/>, measur
 ## Log
 
 - 2026-10-11: Created.
+- 2026-10-11: Backlog -> Doing.
