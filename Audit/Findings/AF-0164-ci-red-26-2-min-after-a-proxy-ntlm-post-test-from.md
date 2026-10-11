@@ -3,8 +3,8 @@ id: AF-0164
 title: CI red 26.2 min after a proxy NTLM POST test from BL-2029 failed off Windows (run 38093700231); with the other spells, ciRedMinutes is 92.12, over 60
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Stewart rejected it on 2026-10-11: the red spell was prompt filing and claiming, not a factory defect (BL-2057).
 key: process:logs:ExecuteAsync_ProxyNtlmPostWithItsType1Message:ci-red
 reproduction: none
 task: BL-2057
@@ -13,9 +13,9 @@ found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0164 - CI red 26.2 min after a proxy NTLM POST test from BL-2029 failed off Windows (run 38093700231); with the other spells, ciRedMinutes is 92.12, over 60
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-11: filed proposed.
 - 2026-10-11: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Stewart rejected it on 2026-10-11: the red spell was prompt filing and claiming, not a factory defect (BL-2057).
