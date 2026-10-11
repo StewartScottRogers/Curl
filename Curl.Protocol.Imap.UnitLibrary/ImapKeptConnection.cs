@@ -48,13 +48,14 @@ internal sealed class ImapKeptConnection(IConnection connection, string loginKey
 
     /// <summary>
     /// The login a transfer needs, which a kept connection must have been made for, as curl
-    /// 8.21.0 reuses an IMAP connection only for the same user, password, login options and
-    /// TLS level.
+    /// 8.21.0 reuses an IMAP connection only for the same user, password and TLS level. The
+    /// <c>;AUTH=</c> login options are not part of it: curl reuses a connection whose URLs differ
+    /// only in them (upstream test1982, BL-2089).
     /// </summary>
     /// <param name="context">The transfer.</param>
     /// <returns>The key.</returns>
     public static string LoginKeyOf(ITransferContext context) =>
-        string.Join('\0', context.Credentials?.UserName, context.Credentials?.Password, context.Mail?.LoginOptions ?? context.Url.Options, context.SslLevel);
+        string.Join('\0', context.Credentials?.UserName, context.Credentials?.Password, context.SslLevel);
 
     /// <summary>Tells whether the connection was made for the login <paramref name="key" /> names.</summary>
     /// <param name="key">A transfer's <see cref="LoginKeyOf" />.</param>
