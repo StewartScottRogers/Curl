@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2046 — Fix AF-0153: KDC proxy reply limit `reply.Length > MaximumReplyLength` can become `>=` with no test failing
 
@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. A KDC proxy reply exactly at the 1 MiB limit is pinned by a test, so the >= mutant fails; build clean, fast tests green
