@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-Performance.ps1 -Iterations 20 -
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | Ran the reproduction at 20 iterations: large-get curl median 92 ms, candidate 128 ms, 1.39x, still over the 1.25x threshold (the finding recorded 1.47x). HttpResponseBodyReader.cs now receives 102400 bytes per read, but still writes in 16384-byte pieces.
+
 ## Log
 
 - 2026-10-10: filed proposed.

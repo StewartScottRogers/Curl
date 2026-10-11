@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | not re-audited | overlaps planted defect PD-503 in BL-2999-20261010-181711-L9.jsonl, so the auditor's verdict (reproduces no) is set aside: The reproduction on the 20261010-012326 logs still shows the 'Exit code 107' tool_results in BL-1953-20261010-011807-L1.jsonl. Ran the rule over this window: unfinishedRuns is BL-2035-20261010-161355-L1.jsonl (lane script error 'Cannot bind argument to parameter Path') and BL-2999-20261010-181711-L9.jsonl (no matching claim). Neither stopped after Exit code 107. The only run in this window with 'Exit code 107', BL-1970-20261010-080057-L1.jsonl, has 1 result event and reached DONE at 13:44:05. That task added a synthetic result to Invoke-TaskRun.
+
 ## Log
 
 - 2026-10-10: filed proposed.

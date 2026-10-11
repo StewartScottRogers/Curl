@@ -42,6 +42,8 @@ dotnet test Curl.Protocol.Http.UnitTests -c Release -nologo --filter "FullyQuali
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | not re-audited | overlaps planted defect PD-102 in Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs, so the auditor's verdict (reproduces yes) is set aside: Ran the dotnet test reproduction: 'Failed! - Failed: 12, Passed: 7, Total: 19' (12 failing methods/rows, e.g. AuthUsing_BearerWithoutUser_NamesNoUser, -u u:p, ExecuteAsync_ProxyNegotiateWithoutCredentials_SendsNothingAndReturnsThe407, whose info line reads "Proxy auth using Negotiate with user '' password ''"). HttpAuthUsingLines.cs:28 still appends `password '{request.Credential?.Password}'`. The Http mutation baseline left out 21 tests that fail unmutated, the same count the finding gives.
+
 ## Log
 
 - 2026-10-10: filed proposed.

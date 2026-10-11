@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: yes | Ran the reproduction on the 20261010-012326 logs: BL-1894 claim at 19:12:18 (L2), 22:47:35 and 00:44:34 (L1), and REQUEUE at 19:14:03 and 22:53:20. Then ran the rule over this window (-Since 2026-10-10): the same cause, a task claimed before its prerequisite was Done and requeued to wait, crosses again. BL-1976 was claimed 3 times (13:27:22 L3, 16:17:57 L1, 18:19:53 L1) and requeued twice ('Waits on BL-1997' at 13:36:41, 'Waits on BL-2035' at 16:26:16), then blocked by the cost cap.
+
 ## Log
 
 - 2026-10-10: filed proposed.

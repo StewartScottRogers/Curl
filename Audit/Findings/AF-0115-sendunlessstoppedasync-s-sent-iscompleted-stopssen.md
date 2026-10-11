@@ -3,8 +3,8 @@ id: AF-0115
 title: SendUnlessStoppedAsync's '!sent.IsCompleted && StopsSending' can become '||' with no test failing
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:SendUnlessStoppedAsync-and:surviving-mutant
 reproduction: mutation Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:115:&&
 task: BL-1865
@@ -13,9 +13,9 @@ found: 2026-10-08
 found-at: cddb276d1d10fbb372f36a32cc1f588fd84c58e8
 scorecard: 2026-10-08_2315.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-11
+closed-how: mechanical
+closed-by: 2026-10-11_0051.md
 ---
 # AF-0115 - SendUnlessStoppedAsync's '!sent.IsCompleted && StopsSending' can become '||' with no test failing
 
@@ -46,8 +46,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Proto
 - 2026-10-09 | 2026-10-09_0647.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction: 'survived  Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs:115 &&' ('if (!sent.IsCompleted && StopsSending)' -> '||', member SendUnlessStoppedAsync, outcome survived). Runner's targeted mutation rerun on the clean audited commit: survived.
 - 2026-10-09 | 2026-10-09_1435.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command with -ExcludeBaselineFailures: HttpContinueWaitConnection.cs:115 'if (!sent.IsCompleted && StopsSending)' -> '||', outcome survived. The baseline left out the 49 tests that already fail; no remaining test killed the mutant. Runner's targeted mutation rerun on the clean audited commit: survived.
 - 2026-10-10 | 2026-10-10_0123.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: outcome survived at resolved line 115, 'if (!sent.IsCompleted && StopsSending)' mutated to 'if (!sent.IsCompleted || StopsSending)', every test passed (21 baseline-failing auth-using tests left out). Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: no | Ran the -Site reproduction (HttpContinueWaitConnection.cs:115:&&, -Member SendUnlessStoppedAsync, -ExcludeBaselineFailures, 21 baseline failures excluded): resolvedLine 115, `if (!sent.IsCompleted && StopsSending)` -> `||`, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-10-08: filed proposed.
 - 2026-10-09: proposed -> accepted.
+- 2026-10-11: accepted -> closed. Re-audit 2026-10-11_0051.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

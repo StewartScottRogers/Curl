@@ -42,6 +42,8 @@ Select-String -Path CLAUDE.md -Pattern '\d+ projects, one flat' | ForEach-Object
 
 ## Re-audits
 
+- 2026-10-11 | 2026-10-11_0051.md | reproduces: no | Ran the reproduction from the tree root. Select-String printed '...                            73 projects, one flat alphabetical run', and the count of Curl.* directories holding a .csproj was 73. CLAUDE.md's layout count matches the root, so the finding no longer reproduces.
+
 ## Log
 
 - 2026-10-10: filed proposed.
