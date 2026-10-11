@@ -1109,61 +1109,11 @@ public sealed class HttpProtocolHandler(
         IConnection responseConnection = framing.AwaitsContinue
             ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
             : timedConnection;
-        HttpRequestBodyWriter upload = new(connection)
-        {
-            SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
-            HeldHead = request,
-            IsUpload = framing.IsUpload,
-            Progress = plan.Progress,
-            Events = context.Events,
-            EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
-            TracesReaders = TracesReadersOf(requestStream),
-        };
-        HttpExchange exchange = new(connect, connection, framing.Method, request.Length, upload, earlier, newConnection)
-        {
-            UsedProxy = options.ForwardProxy is not null,
-            Started = plan.Started,
-            TimeProvider = context.TimeProvider,
-            ResponseConnection = timedConnection,
-            RedirectCount = plan.RedirectsFollowed - options.RedirectsFollowed,
-            AuthSchemePicked = AuthSchemePickedBy(plan),
-        };
+        HttpRequestBodyWriter upload = CreateUpload(plan, connection, responseConnection, requestStream, request);
+        HttpExchange exchange = CreateExchange(plan, connect, connection, timedConnection, request.Length, upload, earlier, newConnection);
         HttpExchangeLog exchangeLog = HttpExchangeLog.For(context.DiagnosticLog, streams);
-        HttpResponseBodyReader body = new(responseConnection)
-        {
-            PassesTransferCoding = options.Raw,
-            IgnoresContentLength = options.IgnoreContentLength,
-            LimitsFileSize = HttpDownloadConditions.LimitOf(context.MaxFileSize) is not null,
-            DecodesTransferCoding = options.TransferEncoding,
-            Log = exchangeLog,
-            HeadersStoredBefore = HeadersStoredBefore(earlier, options, connect),
-        };
-        int cookiesStored = 0;
-        HttpAuthProblemLines originProblems = new();
-        HttpAuthProblemLines proxyProblems = new();
-        HttpResponseHeadReader headReader = new(responseConnection)
-        {
-            Events = context.Events,
-            HeadersStoredBefore = body.HeadersStoredBefore,
-            LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
-            LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
-            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine, upload),
-            HeaderReceived = (statusLine, header) =>
-            {
-                ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
-                cookiesStored = StoreCookie(context, options, header, cookiesStored);
-                StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
-                StoreHsts(context, options.HstsStore, header);
-            },
-            FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
-            IsHttp2OrHttp3 = requestStream is not null,
-            AcceptsHttp09 = options.AllowHttp09Reply,
-            IsHeadRequest = context.NoBody,
-            IgnoresContentLength = options.IgnoreContentLength,
-            IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
-            IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
-            DefersFrom = (statusLine, header) => framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
-        };
+        HttpResponseBodyReader body = CreateBodyReader(plan, connect, responseConnection, exchangeLog, earlier);
+        HttpResponseHeadReader headReader = CreateHeadReader(plan, responseConnection, connection, requestStream, body, upload);
         HttpRequestPlan? retry = null;
         HttpResponseHead? actedOn = null;
         HttpBodyDelivery delivery = HttpBodyDelivery.Deliver;
@@ -1208,23 +1158,11 @@ public sealed class HttpProtocolHandler(
         }
         catch (HttpTransferException failure)
         {
-            headReader.ReportHeldLines();
-            ReportReceiveFailure(context.Events, failure);
-            exchangeLog.Failed(failure.ExitCode, failure);
-            TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
-                with
-            { Report = exchange.Report(body) };
-            return FailedOutcome(plan, reusedConnection: !newConnection, upload, headReader, failure, failed);
+            return OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
-            headReader.ReportHeldLines();
-            exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
-            string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
-            TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
-                with
-            { Report = exchange.Report(body) };
-            return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
+            return OutcomeOfTimeout(plan, exchange, body, exchangeLog, headReader, canceled);
         }
 
         ReportTransferDone(requestStream, connect);
@@ -1234,6 +1172,162 @@ public sealed class HttpProtocolHandler(
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
             UpgradedSession = UpgradedSessionOf(connection),
+        };
+    }
+
+    /// <summary>
+    /// Reports a failed exchange's held header lines and the failure, and gives the attempt's
+    /// outcome carrying the failure's exit code and the report as far as the exchange got.
+    /// </summary>
+    private static HttpAttemptOutcome OutcomeOfFailure(
+        HttpRequestPlan plan,
+        HttpExchange exchange,
+        HttpResponseBodyReader body,
+        HttpExchangeLog exchangeLog,
+        HttpResponseHeadReader headReader,
+        HttpRequestBodyWriter upload,
+        bool reusedConnection,
+        HttpTransferException failure)
+    {
+        headReader.ReportHeldLines();
+        ReportReceiveFailure(plan.Context.Events, failure);
+        exchangeLog.Failed(failure.ExitCode, failure);
+        TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
+            with
+        { Report = exchange.Report(body) };
+        return FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
+    }
+
+    /// <summary>
+    /// Reports a timed-out exchange's held header lines, and gives the attempt's outcome: exit
+    /// 28 with the report as far as the exchange got, on a connection that is not kept.
+    /// </summary>
+    private static HttpAttemptOutcome OutcomeOfTimeout(
+        HttpRequestPlan plan,
+        HttpExchange exchange,
+        HttpResponseBodyReader body,
+        HttpExchangeLog exchangeLog,
+        HttpResponseHeadReader headReader,
+        OperationCanceledException canceled)
+    {
+        headReader.ReportHeldLines();
+        exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
+        string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+        TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
+            with
+        { Report = exchange.Report(body) };
+        return new HttpAttemptOutcome(timedOut, null, KeepsAlive: false);
+    }
+
+    /// <summary>
+    /// Builds the request body writer of an exchange: holding the request head back when it
+    /// awaits <c>100 Continue</c>, otherwise sharing it with the body's first write.
+    /// </summary>
+    private HttpRequestBodyWriter CreateUpload(
+        HttpRequestPlan plan,
+        IConnection connection,
+        IConnection responseConnection,
+        IHttpStreamConnection? requestStream,
+        byte[] request)
+    {
+        HttpRequestFraming framing = plan.Framing;
+        return new HttpRequestBodyWriter(connection)
+        {
+            SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
+            HeldHead = request,
+            IsUpload = framing.IsUpload,
+            Progress = plan.Progress,
+            Events = plan.Context.Events,
+            EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
+            TracesReaders = TracesReadersOf(requestStream),
+        };
+    }
+
+    /// <summary>
+    /// Builds the record of an exchange that <see cref="HttpExchange.Report" /> turns into the
+    /// transfer's report.
+    /// </summary>
+    private static HttpExchange CreateExchange(
+        HttpRequestPlan plan,
+        ConnectResult connect,
+        IConnection connection,
+        HttpFirstByteTimingConnection timedConnection,
+        int headSize,
+        HttpRequestBodyWriter upload,
+        TransferReport? earlier,
+        bool newConnection) =>
+        new(connect, connection, plan.Framing.Method, headSize, upload, earlier, newConnection)
+        {
+            UsedProxy = plan.Options.ForwardProxy is not null,
+            Started = plan.Started,
+            TimeProvider = plan.Context.TimeProvider,
+            ResponseConnection = timedConnection,
+            RedirectCount = plan.RedirectsFollowed - plan.Options.RedirectsFollowed,
+            AuthSchemePicked = AuthSchemePickedBy(plan),
+        };
+
+    /// <summary>
+    /// Builds the response body reader of an exchange from the transfer's options.
+    /// </summary>
+    private static HttpResponseBodyReader CreateBodyReader(
+        HttpRequestPlan plan,
+        ConnectResult connect,
+        IConnection responseConnection,
+        HttpExchangeLog exchangeLog,
+        TransferReport? earlier)
+    {
+        HttpRequestOptions options = plan.Options;
+        return new HttpResponseBodyReader(responseConnection)
+        {
+            PassesTransferCoding = options.Raw,
+            IgnoresContentLength = options.IgnoreContentLength,
+            LimitsFileSize = HttpDownloadConditions.LimitOf(plan.Context.MaxFileSize) is not null,
+            DecodesTransferCoding = options.TransferEncoding,
+            Log = exchangeLog,
+            HeadersStoredBefore = HeadersStoredBefore(earlier, options, connect),
+        };
+    }
+
+    /// <summary>
+    /// Builds the response head reader of an exchange, wired to report auth problems and the
+    /// upload rewind, to store cookies, Alt-Svc and HSTS from the headers it reads, and to
+    /// echo the response line on the stream it came from.
+    /// </summary>
+    private HttpResponseHeadReader CreateHeadReader(
+        HttpRequestPlan plan,
+        IConnection responseConnection,
+        IConnection connection,
+        IHttpStreamConnection? requestStream,
+        HttpResponseBodyReader body,
+        HttpRequestBodyWriter upload)
+    {
+        ITransferContext context = plan.Context;
+        HttpRequestOptions options = plan.Options;
+        int cookiesStored = 0;
+        HttpAuthProblemLines originProblems = new();
+        HttpAuthProblemLines proxyProblems = new();
+        return new HttpResponseHeadReader(responseConnection)
+        {
+            Events = context.Events,
+            HeadersStoredBefore = body.HeadersStoredBefore,
+            LineReporting = line => (requestStream as Http3StreamConnection)?.EchoResponseLineBefore(line),
+            LineReported = line => EchoResponseLineAfter(requestStream, connection, line),
+            StatusLineReported = statusLine => ReportUploadRewind(plan, statusLine, upload),
+            HeaderReceived = (statusLine, header) =>
+            {
+                ReportAuthProblemLines(plan, statusLine, header, originProblems, proxyProblems);
+                cookiesStored = StoreCookie(context, options, header, cookiesStored);
+                StoreAltSvc(context, options.AltSvcStore, statusLine.Version, header);
+                StoreHsts(context, options.HstsStore, header);
+            },
+            FindRefusal = head => body.FindHeadRefusal(head, context.NoBody, DecodesContent(options)),
+            IsHttp2OrHttp3 = requestStream is not null,
+            AcceptsHttp09 = options.AllowHttp09Reply,
+            IsHeadRequest = context.NoBody,
+            IgnoresContentLength = options.IgnoreContentLength,
+            IsThroughHttpProxy = options.ForwardProxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https },
+            IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
     }
 
@@ -1618,14 +1712,17 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportAuthRetryRewind(HttpRequestPlan plan, HttpResponseHead head, HttpRequestPlan? retry)
     {
-        if (retry is not null
-            && head.StatusLine.StatusCode is 401 or 407
-            && plan.Framing.Body is not null
-            && plan.Framing.KnownLength != 0)
+        if (retry is not null && head.StatusLine.StatusCode is 401 or 407 && SentNonEmptyBody(plan))
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NeedToRewindUpload);
         }
     }
+
+    /// <summary>
+    /// Tells whether the request carries a body that is not known to be empty.
+    /// </summary>
+    private static bool SentNonEmptyBody(HttpRequestPlan plan) =>
+        plan.Framing.Body is not null && plan.Framing.KnownLength != 0;
 
     /// <summary>
     /// Reports that a body is read only to be discarded, as curl 8.21.0 does before the
@@ -2733,12 +2830,12 @@ public sealed class HttpProtocolHandler(
             TransferReport report = new()
             {
                 Method = method,
-                RequestSize = (earlier?.RequestSize ?? 0) + headSize + upload.BytesWritten,
+                RequestSize = RequestSizeSoFar() + headSize + upload.BytesWritten,
                 UploadSize = upload.BytesWritten,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
                 HeaderSize = earlier?.HeaderSize ?? connect.ProxyConnectHeaderBytes,
-                ConnectionCount = (earlier?.ConnectionCount ?? 0) + (newConnection ? 1 : 0),
+                ConnectionCount = ConnectionCountSoFar() + (newConnection ? 1 : 0),
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
@@ -2747,16 +2844,23 @@ public sealed class HttpProtocolHandler(
                 LocalEndPoint = connect.LocalEndPoint ?? connection.LocalEndPoint as IPEndPoint,
                 PeerCertificates = connect.PeerCertificates,
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
-                Timings = new TransferTimings(
-                    Started,
-                    connect.Timings,
-                    RequestReady,
-                    RequestSent,
-                    ResponseConnection.FirstByteReceived,
-                    TimeProvider.GetTimestamp()),
+                Timings = TimingsNow(),
             };
             return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl };
         }
+
+        private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;
+
+        private int ConnectionCountSoFar() => earlier?.ConnectionCount ?? 0;
+
+        private TransferTimings TimingsNow() =>
+            new(
+                Started,
+                connect.Timings,
+                RequestReady,
+                RequestSent,
+                ResponseConnection.FirstByteReceived,
+                TimeProvider.GetTimestamp());
 
         private static TransferReport WithHead(TransferReport report, HttpResponseHead head) =>
             report with

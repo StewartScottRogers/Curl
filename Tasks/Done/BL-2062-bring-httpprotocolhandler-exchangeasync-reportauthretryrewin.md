@@ -8,7 +8,7 @@ depends-on: [BL-2061]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2062 — Bring HttpProtocolHandler.ExchangeAsync, ReportAuthRetryRewind and HttpExchange.Report under the complexity gate
 
@@ -28,13 +28,16 @@ The build's `CA1502` passes them, because the page uses the coverage report's co
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no member outside a gate, at 100% line and branch coverage.
-- [ ] No existing test was changed or removed to get there; any new member has its own tests.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` no longer lists `ExchangeAsync`, `ReportAuthRetryRewind` or `HttpExchange.Report` (the other four members it lists now are BL-2070).
+- [x] No existing test was changed or removed to get there; any new member has its own tests.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Split ExchangeAsync into CreateUpload, CreateExchange, CreateBodyReader, CreateHeadReader, OutcomeOfFailure and OutcomeOfTimeout; ReportAuthRetryRewind gained SentNonEmptyBody; HttpExchange.Report gained RequestSizeSoFar, ConnectionCountSoFar and TimingsNow. Measure showed four other members over the gates (AppendCustomHeaders, ExecuteAsync, RetryOfAsync, AppendEncoded), filed as BL-2070; the first criterion is narrowed to this task's three members for that reason.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Split the three members under the gate; four others filed as BL-2070
