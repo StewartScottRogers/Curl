@@ -1,0 +1,1116 @@
+{
+  "generated": "2026-10-11T04:47:10Z",
+  "target": "8.21.0",
+  "newest": "8.22.0",
+  "latest": {
+    "stamp": "2026-10-10_0657",
+    "commit": "124a991e4e94f00b7f2601b719f980e202d0c231",
+    "platform": "windows",
+    "targetVersion": "8.21.0",
+    "newestVersion": "8.22.0",
+    "areas": {
+      "options": {
+        "x": 568,
+        "y": 573
+      },
+      "protocols": {
+        "x": 27,
+        "y": 27
+      },
+      "features": {
+        "x": 18,
+        "y": 18
+      },
+      "writeout": {
+        "x": 138,
+        "y": 138
+      },
+      "exitcodes": {
+        "x": 259,
+        "y": 259
+      },
+      "environment": {
+        "x": 24,
+        "y": 42
+      },
+      "behaviour": {
+        "x": 1042,
+        "y": 1402
+      }
+    },
+    "overall": {
+      "x": 2076,
+      "y": 2459
+    },
+    "newest": {
+      "x": 2076,
+      "y": 2459
+    }
+  },
+  "history": [
+    {
+      "stamp": "2026-10-08_1640",
+      "commit": "0fcab8154bc9edd94631a50dfe69b45e56103d61",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.21.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 16,
+          "y": 23
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 578,
+          "y": 1326
+        }
+      },
+      "overall": {
+        "x": 1609,
+        "y": 2390
+      },
+      "newest": {
+        "x": 1609,
+        "y": 2390
+      }
+    },
+    {
+      "stamp": "2026-10-08_2029",
+      "commit": "6383c57058094f578fbb0580b9eea86f7c54cca1",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 567,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 29
+        },
+        "features": {
+          "x": 18,
+          "y": 23
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 651,
+          "y": 1327
+        }
+      },
+      "overall": {
+        "x": 1684,
+        "y": 2391
+      },
+      "newest": {
+        "x": 1684,
+        "y": 2391
+      }
+    },
+    {
+      "stamp": "2026-10-10_0657",
+      "commit": "124a991e4e94f00b7f2601b719f980e202d0c231",
+      "platform": "windows",
+      "targetVersion": "8.21.0",
+      "newestVersion": "8.22.0",
+      "areas": {
+        "options": {
+          "x": 568,
+          "y": 573
+        },
+        "protocols": {
+          "x": 27,
+          "y": 27
+        },
+        "features": {
+          "x": 18,
+          "y": 18
+        },
+        "writeout": {
+          "x": 138,
+          "y": 138
+        },
+        "exitcodes": {
+          "x": 259,
+          "y": 259
+        },
+        "environment": {
+          "x": 24,
+          "y": 42
+        },
+        "behaviour": {
+          "x": 1042,
+          "y": 1402
+        }
+      },
+      "overall": {
+        "x": 2076,
+        "y": 2459
+      },
+      "newest": {
+        "x": 2076,
+        "y": 2459
+      }
+    }
+  ],
+  "open": [
+    {
+      "id": "GF-0001",
+      "title": "In process, Curl never runs TcpConnector: no CONNECT tunnel, no HAProxy header, no .onion refusal, no name-resolution or --resolve/--connect-to failures",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console, give InProcessCurl (and the CurlComposition.CreateRunner overload it calls) a way to run over the production Curl.Networking.UnitLibrary TcpConnector: take a dialer seam (the TCP dial and the name resolver) rather than a finished IConnector, and build TcpConnector with the run's HttpProxyTunnelOptions, HaproxyProtocolHeader, --resolve/--connect-to overrides and TLS provider, exactly as CreateTcpConnector does for the executable. Then a CONNECT, a PROXY line, the .onion refusal (exit 6), an unresolvable name (exit 6) and a bad --resolve/--connect-to entry (exit 49) reach the in-process server as they reach a real one. Change UpstreamConformanceTests.RunCurlAsync the same way so the ratchet measures the same path. If, with that wiring, a case still fails, the remaining difference is a product gap in TcpConnector and should be filed from the next run.",
+      "items": 36,
+      "tasks": [
+        "BL-1794",
+        "BL-1997"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0001-in-process-curl-never-runs-tcpconnector-no-connect-tunnel-no.md"
+    },
+    {
+      "id": "GF-0002",
+      "title": "In process, Curl opens a new connection for every request, so connection-reuse cases see [DISCONNECT], local port -1 and the wrong verdict for the second response",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pass it to CurlComposition.CreateRunner (runConnections), so GroupConnectorOf wraps the connector in CreatePoolingConnector as the executable does. Report the fake connection's local end point from SwsHttpServerConnector's connections, so %{local_port} is a real number. Mirror the change in Curl.Conformance.UnitTests' RunCurlAsync. Re-measure: a case still failing after this is a product gap in PoolingConnector or HttpProtocolHandler's same-connection handling of HTTP/1.0 and HTTP/0.9 replies.",
+      "items": 10,
+      "tasks": [
+        "BL-1795",
+        "BL-1998"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0002-in-process-curl-opens-a-new-connection-for-every-request-so.md"
+    },
+    {
+      "id": "GF-0004",
+      "title": "After a 401 that the server closes the connection on, the authenticated retry is written to the dead connection and never resent on a fresh one",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's HttpProtocolHandler, treat a connection that already carried a request in this transfer as reused for the died-before-response rule (DiedBeforeResponse / FailedOutcome). Then an authentication retry, or any retry sent on the same connection, that meets a closed connection before its response begins is sent once more on a fresh connection ('Connection died, retrying a fresh connect'), as curl 8.21.0 does. Pin it with a unit test where a 401 Digest challenge is followed by the peer closing.",
+      "items": 15,
+      "tasks": [
+        "BL-1797",
+        "BL-2000"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0004-after-a-401-that-the-server-closes-the-connection-on-the-aut.md"
+    },
+    {
+      "id": "GF-0003",
+      "title": "On Windows the NTLM type-1 message is SSPI's (flags 0xa2088207 plus VERSION), but curl -V does not list SSPI, so the !SSPI cases run and differ",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Make Curl's advertised features match its behaviour. On Windows, add SSPI to the Features line that Curl.Cli.UnitLibrary's CurlVersionText writes, as the Schannel reference build lists it; then the !SSPI cases become excluded rather than run. Or, if SSPI is to stay unlisted, route NTLM through the hand-built Curl.Ntlm.UnitLibrary context on Windows too. Either way, make an over-long NTLM user name (test775) fail as curl's does, not drop the header silently. Explained by ADR-0142: NTLM, Negotiate and Kerberos answer through SSPI on Windows. The ADR does not cover the missing SSPI feature flag, and the gap stands against upstream.",
+      "items": 25,
+      "tasks": [
+        "BL-1796",
+        "BL-1999"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0003-on-windows-the-ntlm-type-1-message-is-sspi-s-flags-0xa208820.md"
+    },
+    {
+      "id": "GF-0005",
+      "title": "With --anyauth or --proxy-anyauth, a -T upload or -F form that draws a 401/407 is never resent with credentials",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary, make HttpProtocolHandler.MayRetry and the upload rewind (TryRewindUpload / HttpRequestBodyWriter) treat a -T file and a -F multipart body as rewindable. Then a 401 under --anyauth, or a 407 under --proxy-anyauth, resends the PUT or POST with the picked scheme's credentials and the whole body, as upstream tests/data/test1030 and test259 expect.",
+      "items": 7,
+      "tasks": [
+        "BL-1798",
+        "BL-2001"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0005-with-anyauth-or-proxy-anyauth-a-t-upload-or-f-form-that-draw.md"
+    },
+    {
+      "id": "GF-0006",
+      "title": "With --digest (or Digest against a proxy), the first POST/PUT sends its body instead of Content-Length: 0",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the proxy and no challenge has been answered yet, frame the first POST or PUT (HttpRequestFraming / HttpRequestBodyWriter) with an empty body and Content-Length: 0, replacing a user-supplied Content-Length. Send the real body on the retry that carries Authorization. Leave the body in place when the server answers the probe without a challenge (test175 then sends it on the next request, as upstream's <verify> shows).",
+      "items": 15,
+      "tasks": [
+        "BL-1799",
+        "BL-2002"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0006-with-digest-or-digest-against-a-proxy-the-first-post-put-sen.md"
+    },
+    {
+      "id": "GF-0007",
+      "title": "-T - (stdin) is read whole and sent with Content-Length, not chunked; no Expect: 100-continue, and no exit 25 under HTTP/1.0",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), treat a stdin upload as a body of unknown size. Over HTTP/1.1 frame it with Transfer-Encoding: chunked, even when the user gives a Content-Length header, unless the user empties Transfer-Encoding. Add Expect: 100-continue for an upload of unknown size. Over HTTP/1.0 (-0, or a 1.0 server after a redirect or auth retry) fail with exit 25, as curl's 'chunked transfer encoding not supported by HTTP/1.0'. Curl.Console's stdin reading must stream rather than buffer to give the unknown size.",
+      "items": 6,
+      "tasks": [
+        "BL-1800",
+        "BL-2003"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0007-t-stdin-is-read-whole-and-sent-with-content-length-not-chunk.md"
+    },
+    {
+      "id": "GF-0011",
+      "title": "--url @file and --url @- are taken as a literal URL instead of a list of URLs to read",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), support curl 8.21.0's '@file' and '@-' forms: read the file or stdin, add one URL per non-blank line, and pair them with -o/--output and -T in order. Keep --ai-help's url entry right.",
+      "items": 3,
+      "tasks": [
+        "BL-1804",
+        "BL-2004"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0011-url-file-and-url-are-taken-as-a-literal-url-instead-of-a-lis.md"
+    },
+    {
+      "id": "GF-0012",
+      "title": "Malformed or unusual response heads give the wrong exit code (HTTP/0.9 under -I, header starting with whitespace, 100 without a final response, NUL in a trailer)",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's HttpResponseHeadReader and HttpChunkedDecoder: (1) a HEAD (-I) answered by an HTTP/0.9 body is a weird server reply, exit 8; (2) fold, rather than reject, a first header line that starts with whitespace, as curl 8.21.0 does; (3) after a 1xx, bytes that do not start a status line are a weird server reply (8), not the HTTP/0.9 refusal (1); (4) a NUL byte in a trailer line fails with exit 8.",
+      "items": 4,
+      "tasks": [
+        "BL-1805",
+        "BL-2005"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0012-malformed-or-unusual-response-heads-give-the-wrong-exit-code.md"
+    },
+    {
+      "id": "GF-0014",
+      "title": "--max-filesize stops on a redirect body that is not kept, and does not stop a decompressed body that grows past the limit",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: apply --max-filesize only to the body that is kept, not to a redirect response -L follows. Also count the decoded bytes (HttpContentDecoder) against the limit and fail with exit 63 as soon as they pass it.",
+      "items": 2,
+      "tasks": [
+        "BL-1807",
+        "BL-2007"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0014-max-filesize-stops-on-a-redirect-body-that-is-not-kept-and-d.md"
+    },
+    {
+      "id": "GF-0015",
+      "title": "--retry does not follow a 429's Retry-After as curl does (resend, --fail, --retry-max-time warning)",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output when the retry is made (test1634 under --fail). Resend the POST and then follow -L (test1633). When Retry-After exceeds --retry-max-time, give up the retry without a message, matching the reference curl's stderr for test366.",
+      "items": 3,
+      "tasks": [
+        "BL-1808",
+        "BL-2008"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0015-retry-does-not-follow-a-429-s-retry-after-as-curl-does-resen.md"
+    },
+    {
+      "id": "GF-0016",
+      "title": "-J with -L does not take the file name from the last Location, and -OJ --no-clobber --retry differs",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console's -O/-J output naming: with -J and -L and no Content-Disposition, name the file after the last URL followed (the final Location's last path segment), as curl 8.21.0 does. With --no-clobber and --retry, fail on an existing file with exit 23 and the reference's message, as upstream test3036 expects.",
+      "items": 3,
+      "tasks": [
+        "BL-1809",
+        "BL-2009"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0016-j-with-l-does-not-take-the-file-name-from-the-last-location.md"
+    },
+    {
+      "id": "GF-0018",
+      "title": "-F multipart bodies differ: custom Content-Type, several files in one -F, quoted file names with , ; \"",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary's -F parser and the multipart writer it feeds: merge a user Content-Type into the generated one (keep the user's type, append '; boundary=...', placed after Content-Length, as curl's header order shows). Parse '@a,b,c' with per-file ';type=' as several file parts. Parse a quoted file name holding ',', ';' and '\"' and escape it in Content-Disposition as curl 8.21.0 does.",
+      "items": 4,
+      "tasks": [
+        "BL-1811",
+        "BL-1972"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0018-f-multipart-bodies-differ-custom-content-type-several-files.md"
+    },
+    {
+      "id": "GF-0020",
+      "title": "-K: a missing file's message omits the path, and a Unicode quote in a config file is read differently",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary's config-file reader: put the quoted path in 'cannot read config from '<path>''. Read a Unicode quote character (U+201C/U+201D) in a config value as curl 8.21.0 does: keep the bytes literally and write its warning, so the request matches the reference.",
+      "items": 2,
+      "tasks": [
+        "BL-1813",
+        "BL-1973"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0020-k-a-missing-file-s-message-omits-the-path-and-a-unicode-quot.md"
+    },
+    {
+      "id": "GF-0045",
+      "title": "Through -p/-x the proxy server receives nothing in process: every <verify><proxy> case records no CONNECT",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypasses-tcp-connector. Then fix whatever still differs in Curl.Networking.UnitLibrary's HttpProxyTunnel. The cases are --suppress-connect-headers with -D - -i and %{http_connect} (test1288), a CONNECT tunnel for pop3, smtp and imap URLs (test1319-1321), and exit 8 for a proxy's malformed CONNECT reply (test2107). Pin each in Curl.Networking.UnitTests.",
+      "items": 15,
+      "tasks": [
+        "BL-1975"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0045-through-p-x-the-proxy-server-receives-nothing-in-process-eve.md"
+    },
+    {
+      "id": "GF-0046",
+      "title": "SOCKS4/5 proxies and --interface are never used in process: the request goes straight to the server and their exit codes (97, 7, 45) never arise",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypasses-tcp-connector. Then fix in Curl.Networking.UnitLibrary (TcpConnector and its SOCKS5 and HTTP-tunnel chain) whatever still keeps an ftp:// transfer through --proxy socks5://, --proxytunnel or --preproxy with --connect-to (test713-715) from finishing. Include its passive data connection, which must take the same proxy path. Pin it in Curl.Networking.UnitTests.",
+      "items": 12,
+      "tasks": [
+        "BL-1976"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0046-socks4-5-proxies-and-interface-are-never-used-in-process-the.md"
+    },
+    {
+      "id": "GF-0047",
+      "title": "A case's <setenv> (NO_PROXY, HOME, XDG_CONFIG_HOME, CURL_HOME) never reaches Curl in process, so curlrc, .ipfs/gateway and NO_PROXY lookups differ",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Pass readEnvironmentVariable through InProcessCurl's new overload (behaviour:in-process-runner-bypasses-tcp-connector), so a case's environment is the whole environment Curl reads. Then, in Curl.Console and Curl.Cli.UnitLibrary, make the default config-file search read the injected environment as curl 8.21.0 does: $CURL_HOME/.curlrc and $CURL_HOME/.config/curlrc, then $XDG_CONFIG_HOME/curlrc, then $HOME. Make the IPFS gateway lookup do the same: $IPFS_GATEWAY, then $IPFS_PATH/gateway, then $HOME/.ipfs/gateway, with exit 3 for a malformed gateway line. Pin each in Curl.Console.UnitTests and Curl.Cli.UnitTests.",
+      "items": 8,
+      "tasks": [
+        "BL-1977"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0047-a-case-s-setenv-no-proxy-home-xdg-config-home-curl-home-neve.md"
+    },
+    {
+      "id": "GF-0048",
+      "title": "FTP active mode (-P) hangs in process: the FTP stand-in's PORT/EPRT cannot reach Curl's real TCP listener",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Pass the ftpListener through InProcessCurl's new overload (behaviour:in-process-runner-bypasses-tcp-connector). Re-measure. Then, in Curl.Protocol.Ftp.UnitLibrary's FtpSession active-mode path, make a 425 or 421 answer to the data connection (NODATACONN425/421) end with QUIT as curl 8.21.0 does (test1206/1207). Make --max-time end a data connection the server never opens (test1211). Pin both in Curl.Protocol.Ftp.UnitTests.",
+      "items": 8,
+      "tasks": [
+        "BL-1978"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0048-ftp-active-mode-p-hangs-in-process-the-ftp-stand-in-s-port-e.md"
+    },
+    {
+      "id": "GF-0049",
+      "title": "TFTP requests drop every leading slash of the URL path; curl drops only the first, so tftp://host//N asks for /N",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Tftp.UnitLibrary's TftpRequestFile.FromUrlPath, remove exactly one leading '/' from the URL path, not all of them. tftp://host//271 then requests '/271' as curl 8.21.0 does. Pin it in Curl.Protocol.Tftp.UnitTests for RRQ and WRQ.",
+      "items": 15,
+      "tasks": [
+        "BL-1979"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0049-tftp-requests-drop-every-leading-slash-of-the-url-path-curl.md"
+    },
+    {
+      "id": "GF-0050",
+      "title": "An over-long TFTP file name fails with exit 7 when the channel cannot open, where curl refuses it first with exit 71",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Tftp.UnitLibrary's TftpProtocolHandler, run TftpRequestFile's length checks ('TFTP filename too long', 'TFTP buffer too small for options', exit 71) before opening the datagram channel, as the 'Missing filename' check already is. Pin it with a test whose datagram connector refuses to open.",
+      "items": 1,
+      "tasks": [
+        "BL-1980"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0050-an-over-long-tftp-file-name-fails-with-exit-7-when-the-chann.md"
+    },
+    {
+      "id": "GF-0051",
+      "title": "FTP sends QUIT and closes after every URL; curl keeps the control connection for the next URL and sends QUIT only at exit",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Ftp.UnitLibrary, keep an FTP control connection open after a transfer and hand it to the run's connection cache (Curl.Networking.UnitLibrary ConnectionCache, as HTTP does under ADR-0050), keyed by host, port, user and TLS. Track its working directory, so the next URL on it sends 'CWD /' or only the CWDs that differ (singlecwd, multicwd, nocwd), as curl 8.21.0's ftp.c does. Send QUIT when the cache closes the connection at exit. Pin the sequences of test146, 215 and 1217 in Curl.Protocol.Ftp.UnitTests.",
+      "items": 12,
+      "tasks": [
+        "BL-1981"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0051-ftp-sends-quit-and-closes-after-every-url-curl-keeps-the-con.md"
+    },
+    {
+      "id": "GF-0052",
+      "title": "--ignore-content-length does not stop FTP from sending SIZE before RETR",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Carry --ignore-content-length to the FTP handler (Curl.Console's transfer-context mapping) and, in Curl.Protocol.Ftp.UnitLibrary's FtpSession download path, skip SIZE and go straight to RETR when it is set, as curl 8.21.0 does (data->set.ignorecl).",
+      "items": 2,
+      "tasks": [
+        "BL-1982"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0052-ignore-content-length-does-not-stop-ftp-from-sending-size-be.md"
+    },
+    {
+      "id": "GF-0053",
+      "title": "An FTP reply holding a NUL byte or control characters (in PWD's path) is accepted; curl ends with exit 8",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Ftp.UnitLibrary's control-reply reader, fail with exit 8 (weird server reply) on a reply line holding a NUL byte. In the PWD reply parser, refuse a path holding control characters with exit 8, sending nothing more, as curl 8.21.0 does.",
+      "items": 3,
+      "tasks": [
+        "BL-1983"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0053-an-ftp-reply-holding-a-nul-byte-or-control-characters-in-pwd.md"
+    },
+    {
+      "id": "GF-0054",
+      "title": "When the EPSV data port cannot be connected, FTP does not fall back to PASV",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Ftp.UnitLibrary's FtpSession.OpenPassiveDataConnectionAsync, when the data connection to the EPSV port fails, send PASV and use its port, as curl 8.21.0 does ('Failed EPSV attempt. Switching to PASV'). Pin it with a connector that refuses the EPSV port. If the 20-second hang comes from the harness's FTP connector never refusing port 1, fix that in Curl.Conformance.UnitLibrary as well.",
+      "items": 1,
+      "tasks": [
+        "BL-1984"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0054-when-the-epsv-data-port-cannot-be-connected-ftp-does-not-fal.md"
+    },
+    {
+      "id": "GF-0055",
+      "title": "A reply pipelined behind STARTTLS/AUTH TLS is not refused with exit 8, and a pre-authenticated FTP server skips AUTH under --ssl-reqd",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Protocol.Ftp.UnitLibrary, after sending STARTTLS/STLS/AUTH, fail with exit 8 when more bytes are already buffered behind its reply (a pipelined server response), as curl 8.21.0 does, and send nothing more. In FtpSession, when the server greets with 230 (pre-authenticated) and --ssl-reqd is set, still send AUTH SSL / AUTH TLS and fail with exit 64 when both are refused.",
+      "items": 4,
+      "tasks": [
+        "BL-1985"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0055-a-reply-pipelined-behind-starttls-auth-tls-is-not-refused-wi.md"
+    },
+    {
+      "id": "GF-0056",
+      "title": "--netrc-optional lets the netrc password override the URL's, and a .netrc holding a NUL byte stops the transfer",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console's TransferCredentialLookup, under --netrc-optional, keep a password the URL gives and take only what the URL lacks from .netrc, as curl 8.21.0 does. In Curl.Authentication.UnitLibrary's NetrcTokenScanner/NetrcFile, read a .netrc holding a NUL byte as curl does, ending the token or line there and carrying on with the quoted-token rules, rather than failing the lookup.",
+      "items": 2,
+      "tasks": [
+        "BL-1986"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0056-netrc-optional-lets-the-netrc-password-override-the-url-s-an.md"
+    },
+    {
+      "id": "GF-0057",
+      "title": "IMAP logs out after every URL instead of reusing the connection, and every connection's tags start with A where curl uses one letter per connection",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer and hand it to the run's connection cache, keyed by host, port, user and auth mechanism. A next URL on it continues the tag count (A005 ...) without a second login, and LOGOUT is sent when the cache closes it at exit. Make the tag letter 'A' plus the connection's number mod 26 (curl's imap.c), taking the number from the run's IConnectionNumbers, so a second connection's tags start B001. Pin both in Curl.Protocol.Imap.UnitTests.",
+      "items": 6,
+      "tasks": [
+        "BL-1987"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0057-imap-logs-out-after-every-url-instead-of-reusing-the-connect.md"
+    },
+    {
+      "id": "GF-0058",
+      "title": "-F to an smtp:// or imap:// URL is not sent as a MIME message: SMTP sends VRFY and IMAP sends LIST",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an smtp:// or imap:// URL as the upload, as curl 8.21.0 does. Build the MIME message (multipart/mixed with nested multipart/alternative, ;headers=, ;encoder=) with the same multipart writer HTTP uses, but with mail headers and no Content-Length. Send it through SmtpMailTransaction or ImapAppend. A part whose encoder cannot carry its bytes (7bit with 8-bit data) fails before EHLO, with curl's exit code.",
+      "items": 5,
+      "tasks": [
+        "BL-1988"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0058-f-to-an-smtp-or-imap-url-is-not-sent-as-a-mime-message-smtp.md"
+    },
+    {
+      "id": "GF-0059",
+      "title": ";AUTH=EXTERNAL with no user name skips SASL; curl sends AUTH EXTERNAL with an empty (=) response",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and the IMAP, POP3 and SMTP login decisions, let a ;AUTH=EXTERNAL login option start SASL without a user name or password. EXTERNAL's response is the (empty) user name, sent as '=' when empty, inline under SASL-IR or after the '+' / '334' continuation, as curl 8.21.0 does.",
+      "items": 6,
+      "tasks": [
+        "BL-1989"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0059-auth-external-with-no-user-name-skips-sasl-curl-sends-auth-e.md"
+    },
+    {
+      "id": "GF-0060",
+      "title": "A SASL exchange given a bad challenge (CRAM-MD5 rubbish, a broken NTLM type-2) is not cancelled with * and retried with the next mechanism",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslExchange) and the IMAP/POP3/SMTP authentication loops (ImapAuthentication, Pop3Login, SmtpSaslAuthentication), treat a challenge the mechanism cannot decode as a cancel: send '*', read the reply, and go on to the next offered mechanism (PLAIN here), as curl 8.21.0's SASL_CANCEL and downgrade do. Rather than end the session, send the NTLM type-1 after the server's '+' even when PLAIN is also offered.",
+      "items": 6,
+      "tasks": [
+        "BL-1990"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0060-a-sasl-exchange-given-a-bad-challenge-cram-md5-rubbish-a-bro.md"
+    },
+    {
+      "id": "GF-0061",
+      "title": "POP3 with CRAM-MD5 as the only offered mechanism sends no AUTH at all",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Pop3.UnitLibrary's Pop3Login, send AUTH CRAM-MD5 when CAPA offers it and credentials are given, as curl 8.21.0 does. Read a continuation that ends in a bare LF as a reply line, then fail as curl does.",
+      "items": 1,
+      "tasks": [
+        "BL-1991"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0061-pop3-with-cram-md5-as-the-only-offered-mechanism-sends-no-au.md"
+    },
+    {
+      "id": "GF-0063",
+      "title": "--mail-from '<addr> RET=HDRS' gains a trailing '>' after the parameters; curl sends an address that starts with '<' as given",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Smtp.UnitLibrary's SmtpMailTransaction, send a --mail-from (and --mail-rcpt) value that already starts with '<' as given, adding no closing '>', as curl 8.21.0's smtp.c does, so DSN parameters (RET=, NOTIFY=) survive.",
+      "items": 1,
+      "tasks": [
+        "BL-1993"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0063-mail-from-addr-ret-hdrs-gains-a-trailing-after-the-parameter.md"
+    },
+    {
+      "id": "GF-0064",
+      "title": "--crlf does not convert an SMTP upload's LF line ends to CR LF",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Carry --crlf into MailRequestOptions (Curl.Console's MailRequestOptionsMapping, Curl.Protocol.Abstractions.UnitLibrary). In Curl.Protocol.Smtp.UnitLibrary, convert each bare LF of the upload to CR LF before dot-stuffing (SmtpDotStuffer), as curl 8.21.0 does.",
+      "items": 1,
+      "tasks": [
+        "BL-1994"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0064-crlf-does-not-convert-an-smtp-upload-s-lf-line-ends-to-cr-lf.md"
+    },
+    {
+      "id": "GF-0065",
+      "title": "VRFY and EXPN replies are written to the output with LF where curl writes the server's CR LF",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Find which side drops the CR. If Curl.Protocol.Smtp.UnitLibrary's SmtpCommandTransfer writes the reply lines with LF, write each with the CR LF it arrived with. If Curl.Conformance.UnitLibrary's SmtpResponder sends a crlf=\"yes\" <data> part with bare LF, send it with CR LF, as upstream's ftpserver.pl does. Pin it in the matching .UnitTests. Explained by ADR-0135: line ends are passed through as they arrive, so the gap stands until the bytes match.",
+      "items": 4,
+      "tasks": [
+        "BL-1995"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0065-vrfy-and-expn-replies-are-written-to-the-output-with-lf-wher.md"
+    },
+    {
+      "id": "GF-0066",
+      "title": "A backslash in a URL path is sent as '/', where curl sends it as written",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary's URL globbing (ADR-0032), unescape only the glob characters (a backslash before '[', ']', '{', '}', and ',' inside a set) and keep any other backslash. In Curl.Core.UnitLibrary's URL model, send a backslash in an http path as curl 8.21.0 does: as written, not turned into '/' the WHATWG way. Pin test214's request line.",
+      "items": 1,
+      "tasks": [
+        "BL-1996"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0066-a-backslash-in-a-url-path-is-sent-as-where-curl-sends-it-as.md"
+    },
+    {
+      "id": "GF-0038",
+      "title": "Upstream curl 8.22.0 changed behaviour items",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "newest",
+      "introducedIn": "8.22.0",
+      "suggestion": "Bring these items to Curl when the target moves to 8.22.0.",
+      "items": 154,
+      "tasks": [],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0038-upstream-curl-8-22-0-changed-behaviour-items.md"
+    },
+    {
+      "id": "GF-0040",
+      "title": "Upstream curl 8.22.0 changed options items",
+      "area": "options",
+      "severity": "High",
+      "scope": "newest",
+      "introducedIn": "8.22.0",
+      "suggestion": "Bring these items to Curl when the target moves to 8.22.0.",
+      "items": 4,
+      "tasks": [],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0040-upstream-curl-8-22-0-changed-options-items.md"
+    },
+    {
+      "id": "GF-0013",
+      "title": "--skip-existing skips the transfer silently; curl writes 'Note: skips transfer, \"<file>\" exists locally'",
+      "area": "behaviour",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.21.0's note to stderr: 'Note: skips transfer, \"<output path>\" exists locally', one per skipped URL. Write it even under -s, as upstream's <verify><stderr> shows.",
+      "items": 3,
+      "tasks": [
+        "BL-1806",
+        "BL-2006"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0013-skip-existing-skips-the-transfer-silently-curl-writes-note-s.md"
+    },
+    {
+      "id": "GF-0036",
+      "title": "Gap items gap-options left in no group",
+      "area": "options",
+      "severity": "Low",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Group these items under their causes in the next gap-options report.",
+      "items": 6,
+      "tasks": [
+        "BL-1829",
+        "BL-1974"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0036-gap-items-gap-options-left-in-no-group.md"
+    }
+  ],
+  "closed": [
+    {
+      "id": "GF-0008",
+      "title": "A Location with spaces or raw UTF-8 bytes is encoded differently from curl, or rejected",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's HttpRedirectLocation (with CurlUrl in Curl.Protocol.Abstractions.UnitLibrary), resolve a Location as curl's urlapi does with CURLU_URLENCODE. Keep the header value as raw bytes, not decoded as Latin-1. Percent-encode each byte >= 0x80 as itself. Encode a space as %20 in the path and as + in the query. Accept an absolute Location that contains spaces instead of abandoning the redirect.",
+      "items": 4,
+      "tasks": [
+        "BL-1801"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0008-a-location-with-spaces-or-raw-utf-8-bytes-is-encoded-differe.md"
+    },
+    {
+      "id": "GF-0025",
+      "title": "With Expect: 100-continue, the POST body is not sent when the server answers early and closes",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's HttpContinueWaitConnection / HttpRequestBodyWriter: when the Expect wait times out or the server's final response has not yet arrived, start sending the body as curl 8.21.0 does. Then the bytes upstream's <verify><protocol> holds are written before the server's close is seen.",
+      "items": 1,
+      "tasks": [
+        "BL-1818"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0025-with-expect-100-continue-the-post-body-is-not-sent-when-the.md"
+    },
+    {
+      "id": "GF-0026",
+      "title": "--location-trusted --anyauth through a proxy does not send Basic credentials to the redirect's new host",
+      "area": "behaviour",
+      "severity": "Critical",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's redirect handling (HttpProtocolHandler with the authenticator), under --location-trusted carry the scheme --anyauth picked (Basic here) to the redirect's new host and send it pre-emptively. Do not start a new negotiation with no Authorization.",
+      "items": 1,
+      "tasks": [
+        "BL-1819"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0026-location-trusted-anyauth-through-a-proxy-does-not-send-basic.md"
+    },
+    {
+      "id": "GF-0009",
+      "title": "A user Host: header is not used for cookie matching, is kept on a redirect to another host, and a lower-case 'host:' does not remove it",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary (HttpCustomHeader, HttpRequestHeadFormatter) and the cookie lookup in Curl.Cookies.UnitLibrary: match header names case-insensitively, so '-H host:' removes Host. On the first request, use a custom Host header's name as the cookie host, as curl does. Drop the custom Host when -L follows to a different host (curl's 'this_is_a_follow' with a host change).",
+      "items": 4,
+      "tasks": [
+        "BL-1802"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0009-a-user-host-header-is-not-used-for-cookie-matching-is-kept-o.md"
+    },
+    {
+      "id": "GF-0010",
+      "title": "A cookie set for a trailing-dot public suffix is sent, and a -b name=value cookie follows a redirect to another host",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cookies.UnitLibrary: strip a trailing dot from both the Domain attribute and the request host before the PublicSuffixList check, so 'co.uk.' is refused as a public suffix. Bind a -b name=value cookie to the first URL's host, so it is not sent after a redirect to another host, as upstream test2015 expects.",
+      "items": 2,
+      "tasks": [
+        "BL-1803"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0010-a-cookie-set-for-a-trailing-dot-public-suffix-is-sent-and-a.md"
+    },
+    {
+      "id": "GF-0017",
+      "title": "--compressed mishandles 'Content-Encoding: none' and a broken deflate header",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's HttpContentCoding / HttpContentDecoder: treat 'none' (like 'identity') as no coding and pass the body through. For a deflate stream with a bad header, fail with exit 61 and curl 8.21.0's exact message ('Error while processing content unencoding: ...').",
+      "items": 2,
+      "tasks": [
+        "BL-1810"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0017-compressed-mishandles-content-encoding-none-and-a-broken-def.md"
+    },
+    {
+      "id": "GF-0019",
+      "title": "-T with a glob and several --output: stdout differs from upstream's %EMPTY expectation",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "First confirm against the reference curl what test2013/2014 write to stdout with -T '{1,2}' and --output per transfer (Curl.Console's output routing). If the reference also writes nothing, the difference is the harness not reading upstream's %EMPTY. If the reference writes something, route the upload responses that have no --output left to stdout as curl does.",
+      "items": 2,
+      "tasks": [
+        "BL-1812"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0019-t-with-a-glob-and-several-output-stdout-differs-from-upstrea.md"
+    },
+    {
+      "id": "GF-0022",
+      "title": "-D % (headers to stderr) writes nothing",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary and Curl.Console's -D target opening, accept '%' as stderr (curl 8.21.0's -D %) and write the received headers there, even under -s. Keep --ai-help's dump-header entry right.",
+      "items": 1,
+      "tasks": [
+        "BL-1815"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0022-d-headers-to-stderr-writes-nothing.md"
+    },
+    {
+      "id": "GF-0023",
+      "title": "-w '\\n' written to stdout on Windows ends in CR LF where upstream expects LF",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Output.UnitLibrary / Curl.Console's -w writer, write a -w line feed to stdout as LF, as upstream's <file2> expects. Keep CR LF only for the %output{} file targets ADR-0081 covers, unless a fresh measurement of the Windows reference curl shows CR LF on stdout too. In that case record it in the item's notes for a 'reference-diverges' cross-check.",
+      "items": 1,
+      "tasks": [
+        "BL-1816"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0023-w-n-written-to-stdout-on-windows-ends-in-cr-lf-where-upstrea.md"
+    },
+    {
+      "id": "GF-0024",
+      "title": "--url-query passes a user's lower-case %3d through instead of normalising it to %3D",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Abstractions.UnitLibrary's CurlUrl query building (used by --url-query in Curl.Cli.UnitLibrary), upper-case the hex digits of existing percent escapes when the query is appended, as curl's urlapi does with CURLU_APPENDQUERY.",
+      "items": 1,
+      "tasks": [
+        "BL-1817"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0024-url-query-passes-a-user-s-lower-case-3d-through-instead-of-n.md"
+    },
+    {
+      "id": "GF-0027",
+      "title": "-C N --fail against a 416 whose Content-Range says the file is complete exits 22 instead of 0",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentRange: treat a 416 whose 'Content-Range: bytes */<size>' equals the -C offset as 'the file is already complete'. Answer it before the -f check, with exit 0 and no body written, as curl 8.21.0 does.",
+      "items": 1,
+      "tasks": [
+        "BL-1820"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0027-c-n-fail-against-a-416-whose-content-range-says-the-file-is.md"
+    },
+    {
+      "id": "GF-0028",
+      "title": "A host of only zero-width characters is sent instead of failing with exit 3",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Abstractions.UnitLibrary's CurlUrlHost, reject a host whose IDNA mapping (UTS #46, ignored code points removed) leaves an empty name: a malformed URL, exit 3. Keep the existing acceptance of a%80b and a%FFb.",
+      "items": 1,
+      "tasks": [
+        "BL-1821"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0028-a-host-of-only-zero-width-characters-is-sent-instead-of-fail.md"
+    },
+    {
+      "id": "GF-0034",
+      "title": "Curl does not list SSPI in Features; the Windows reference build does",
+      "area": "features",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, add SSPI to the Windows FeaturesLine only once Curl's Windows NTLM and Negotiate path actually answers through SSPI, and pin it in CurlVersionTextTests in Curl.Cli.UnitTests. ADR-0142 says that path already runs through SSPI on Windows, so verify it before listing. ADR-0021 says the opposite (Curl calls no SSPI on any platform), so resolve that conflict in an ADR first.",
+      "items": 1,
+      "tasks": [
+        "BL-1827"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0034-curl-does-not-list-sspi-in-features-the-windows-reference-bu.md"
+    },
+    {
+      "id": "GF-0035",
+      "title": "Curl does not list threadsafe in Features; the Windows reference build does",
+      "area": "features",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Record in an ADR whether Curl's transfers are thread-safe in the sense curl means. If it is decided yes, add threadsafe to the FeaturesLine in Curl.Cli.UnitLibrary/CurlVersionText.cs and pin it in CurlVersionTextTests in Curl.Cli.UnitTests. ADR-0021 excludes it because Curl exposes no libcurl API for global initialisation to be thread-safe of, so the ADR must settle that first.",
+      "items": 1,
+      "tasks": [
+        "BL-1828"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0035-curl-does-not-list-threadsafe-in-features-the-windows-refere.md"
+    },
+    {
+      "id": "GF-0041",
+      "title": "On Windows a scheme-less drive-letter path (Z:/dir/file) is parsed as host and port instead of a path under --proto-default file",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Core.UnitLibrary's UrlSchemeGuesser.HasScheme, on Windows, take a single ASCII letter followed by a colon and a forward or back slash as a drive prefix, not a scheme. AddScheme then gives it the --proto-default (or guessed) scheme, and the file handler reads 'file://Z:/dir/file' as the local path Z:/dir/file, as upstream test1146 expects (exit 0, the file's bytes as output). Pin it with an [OSCondition(OperatingSystems.Windows)] test in Curl.Core.UnitTests, and pin the off-Windows answer in another.",
+      "items": 1,
+      "tasks": [
+        "BL-1851"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0041-on-windows-a-scheme-less-drive-letter-path-z-dir-file-is-par.md"
+    },
+    {
+      "id": "GF-0042",
+      "title": "--create-dirs does not create the --dump-header file's folder, so the transfer fails with exit 23 before any request",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Console's CurlCommandRunner.TransferWithHeaderFileAsync, when options.CreateDirectories is set, create the -D file's missing parent folders before fileSystem.OpenForWriteAsync. Use the creator the -o path already uses for --create-dirs, with its errno-worded failure. Then the request is sent and the headers land in the new file, as upstream test3031 expects.",
+      "items": 1,
+      "tasks": [
+        "BL-1852"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0042-create-dirs-does-not-create-the-dump-header-file-s-folder-so.md"
+    },
+    {
+      "id": "GF-0043",
+      "title": "A telnet -T upload is sometimes never sent: the upload is cancelled when the peer closes first",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Protocol.Telnet.UnitLibrary's TelnetProtocolHandler, the -T upload runs as its own task (SendUploadAsync). When ReceiveUntilClosedAsync returns on a read of 0, the finally block cancels that task, even before it has written the file. Order the upload's write with the receive loop: send what the upload file has ready before taking the peer's close as the end, as curl's telnet loop does. Pin it with a unit test whose fake connection closes at once. If Curl.Conformance.UnitLibrary's SwsHttpServerConnector closes an empty-reply connection before reading anything (the real sws reads the request first), fix that too.",
+      "items": 1,
+      "tasks": [
+        "BL-1853"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0043-a-telnet-t-upload-is-sometimes-never-sent-the-upload-is-canc.md"
+    },
+    {
+      "id": "GF-0044",
+      "title": "%PWD expands to a folder path with a blank, so the harness splits test3009's --output-dir argument and Curl fetches an extra URL",
+      "area": "behaviour",
+      "severity": "High",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Curl's behaviour needs no change: it passes test3009 once %PWD holds no blank. Make Curl.Conformance.UnitLibrary's UpstreamCaseRunner own %PWD: take it as a parameter and refuse one that holds a blank, as it already does for %LOGDIR. Pin the refusal in Curl.Conformance.UnitTests. The office's Measure-UpstreamCases.cs must then pass a tests folder with no blank, for example by copying the release under the run folder. That part is office work, filed interactively.",
+      "items": 1,
+      "tasks": [
+        "BL-1854"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0044-pwd-expands-to-a-folder-path-with-a-blank-so-the-harness-spl.md"
+    },
+    {
+      "id": "GF-0021",
+      "title": "--variable ... {{name:json}} encodes a Unicode string differently (stderr)",
+      "area": "behaviour",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary's --variable / --expand-* expansion, make the ':json' function escape a Unicode string byte for byte as curl 8.21.0 does: control characters as \\uXXXX, and bytes >= 0x80 passed through. Make the stderr match the reference for upstream tests/data/test268.",
+      "items": 1,
+      "tasks": [
+        "BL-1814"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0021-variable-name-json-encodes-a-unicode-string-differently-stde.md"
+    },
+    {
+      "id": "GF-0029",
+      "title": "Curl lists ECH in Features; the Windows reference build does not",
+      "area": "features",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific (Lines already branches on isWindows and isMacOS) and remove ECH from the Windows line, keeping it only where the matched reference lists it. Pin each platform's line in CurlVersionTextTests in Curl.Cli.UnitTests. Explained by ADR-0327 and ADR-0233: Curl hand-builds ECH in its TLS 1.3 client, which the Schannel reference does not offer; ADR-0021 says list only what Curl implements, so the line must also match the reference per platform.",
+      "items": 1,
+      "tasks": [
+        "BL-1822"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0029-curl-lists-ech-in-features-the-windows-reference-build-does.md"
+    },
+    {
+      "id": "GF-0030",
+      "title": "Curl lists GSS-API in Features; the Windows reference build does not",
+      "area": "features",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, drop GSS-API from the Windows FeaturesLine, as ADR-0021 requires for names the platform's curl does not list, and keep it on platforms whose matched reference lists it. Update CurlVersionTextTests in Curl.Cli.UnitTests. Explained by ADR-0171: Curl hand-builds the GSS-API Kerberos initiator; and by ADR-0142: on Windows Negotiate answers through SSPI, so the Windows build does not use GSS-API.",
+      "items": 1,
+      "tasks": [
+        "BL-1823"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0030-curl-lists-gss-api-in-features-the-windows-reference-build-d.md"
+    },
+    {
+      "id": "GF-0031",
+      "title": "Curl lists HTTP2 in Features; the Windows reference build does not",
+      "area": "features",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific and drop HTTP2 from the Windows line, keeping it where the matched reference lists it. Update CurlVersionTextTests in Curl.Cli.UnitTests. Explained by ADR-0141: HTTP/2 is hand-built and accepted everywhere, but offered by default only off Windows, so the Windows build does not offer it by default.",
+      "items": 1,
+      "tasks": [
+        "BL-1824"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0031-curl-lists-http2-in-features-the-windows-reference-build-doe.md"
+    },
+    {
+      "id": "GF-0032",
+      "title": "Curl lists HTTP3 in Features; the Windows reference build does not",
+      "area": "features",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific and drop HTTP3 from the Windows line, keeping it where the matched reference lists it. Update CurlVersionTextTests in Curl.Cli.UnitTests. Explained by ADR-0144: HTTP/3 is hand-built over a hand-built QUIC, which the Schannel reference build does not offer; ADR-0140 notes QUIC runs TCP-only where SslStream cannot.",
+      "items": 1,
+      "tasks": [
+        "BL-1825"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0032-curl-lists-http3-in-features-the-windows-reference-build-doe.md"
+    },
+    {
+      "id": "GF-0033",
+      "title": "Curl lists TLS-SRP in Features; the Windows reference build does not",
+      "area": "features",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific and drop TLS-SRP from the Windows line, keeping it where the matched reference lists it. Update CurlVersionTextTests in Curl.Cli.UnitTests. Explained by ADR-0328 and ADR-0229: Curl runs TLS-SRP through its hand-built TLS 1.2 client as the OpenSSL build does; the Schannel reference does not offer it.",
+      "items": 1,
+      "tasks": [
+        "BL-1826"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0033-curl-lists-tls-srp-in-features-the-windows-reference-build-d.md"
+    },
+    {
+      "id": "GF-0037",
+      "title": "Curl lists the smb and smbs schemes in curl -V, and the reference 8.21.0 Windows build does not",
+      "area": "protocols",
+      "severity": "Medium",
+      "scope": "target",
+      "introducedIn": null,
+      "suggestion": "Remove smb and smbs from the Protocols: line in CurlVersionText.ProtocolsLine (Curl.Cli.UnitLibrary/CurlVersionText.cs) so curl -V matches the reference, and update the pinning test for that line in Curl.Cli.UnitTests. Explained by ADR-0189 (one known-scheme list on every platform): CommandLineProtocolSet.KnownSchemes keeps smb and smbs accepted as options, and this group does not change that set. ADR-0021 Decision 6 keeps the -V lists current with what Curl implements, so whether to drop them is a decision for the task, not an automatic removal.",
+      "items": 2,
+      "tasks": [
+        "BL-1830"
+      ],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0037-curl-lists-the-smb-and-smbs-schemes-in-curl-v-and-the-refere.md"
+    },
+    {
+      "id": "GF-0039",
+      "title": "Upstream curl 8.22.0 changed features items",
+      "area": "features",
+      "severity": "Low",
+      "scope": "newest",
+      "introducedIn": "8.22.0",
+      "suggestion": "Bring these items to Curl when the target moves to 8.22.0.",
+      "items": 1,
+      "tasks": [],
+      "url": "https://github.com/StewartScottRogers/Curl/blob/gap/Gap/Findings/GF-0039-upstream-curl-8-22-0-changed-features-items.md"
+    }
+  ],
+  "regressions": [],
+  "release": {
+    "version": "8.22.0",
+    "newGaps": 2
+  }
+}

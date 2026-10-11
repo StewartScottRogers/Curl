@@ -1,0 +1,12 @@
+{
+  "platform": "Linux",
+  "commit": "5cdc7c23ddd0b4278a5b8ae995f5d30795586df1",
+  "runUrl": "https://github.com/StewartScottRogers/Curl/actions/runs/38112910579",
+  "measuredAt": "2026-10-11T05:13:05Z",
+  "resultFiles": 78,
+  "projects": 6,
+  "passed": 23,
+  "failed": 0,
+  "notRun": 6,
+  "failedTests": []
+}
