@@ -242,7 +242,7 @@ internal static class CurlComposition
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
-            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog),
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog, matchesSspiBuild: OperatingSystem.IsWindows()),
             new NegotiateHttpAuthenticator(securityContexts, negotiateOptions, diagnosticLog: diagnosticLog),
             new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);

@@ -199,11 +199,15 @@ public sealed class CurlCompositionHttpTests
         ]);
 
         (int exitCode, string standardOutput) = await RunAsync(server, "-sS", schemeOption, "-u", "user:pw", "http://127.0.0.1:18231/p");
+        // The Schannel build's SSPI writes a Digest value with no blank after each comma (BL-2033).
+        string sentAuthorization = OperatingSystem.IsWindows() && authorization.StartsWith("Authorization: Digest ", StringComparison.Ordinal)
+            ? authorization.Replace(", ", ",", StringComparison.Ordinal)
+            : authorization;
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         Assert.AreEqual(
-            $"GET /p HTTP/1.1\r\n{Head}\r\nGET /p HTTP/1.1\r\nHost: 127.0.0.1:18231\r\n{authorization}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
+            $"GET /p HTTP/1.1\r\n{Head}\r\nGET /p HTTP/1.1\r\nHost: 127.0.0.1:18231\r\n{sentAuthorization}\r\nUser-Agent: curl/8.21.0\r\nAccept: */*\r\n\r\n",
             Latin1(server.Written));
         Assert.AreEqual("hello", standardOutput);
     }

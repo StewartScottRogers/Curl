@@ -31,6 +31,10 @@ Measure with `Record-CurlExchange.ps1 -OutDirectory <dir> -Port <p> -HalfCloseAf
 
 ## Notes
 
+- Measured 2026-10-10 with `Record-CurlExchange.ps1` (curl 8.21.0, `C:\Program Files\Git\mingw64\bin\curl.exe`): the second request carries `Authorization: Digest username="u",realm="r",nonce="abc",uri="/64",response="fc3de222db74c3ec88aabb5510c76f80"`, the exact value in the Goal.
+- `CurlComposition.CreateHttpAuthenticator` now passes `matchesSspiBuild: OperatingSystem.IsWindows()` to `DigestAuthenticator`. `CurlCompositionHttpTests`' `--digest`/`--anyauth` rows keep the `, ` form and the test strips the blanks on Windows; no other project pins a sent Digest value (the Conformance hits are request headers a test server receives).
+- No option changes, so `--ai-help` needs nothing.
+
 ## Log
 
 - 2026-10-10: Created.
