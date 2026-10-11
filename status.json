@@ -1,0 +1,27 @@
+{
+    "schema":  1,
+    "shift":  "20261010-213213",
+    "branch":  "work/dark-factory",
+    "state":  "ended",
+    "publishedAt":  "2026-10-11T05:01:26Z",
+    "autoLanes":  {
+                      "lanes":  1,
+                      "target":  null,
+                      "binding":  "no burn rate",
+                      "reason":  "lanes auto: starting at 1 (last shift saved 1, raised to 16 by -MinStartLanes, capped at 1)",
+                      "changedAt":  "2026-10-11T04:32:23Z"
+                  },
+    "lanes":  [
+                  {
+                      "lane":  1,
+                      "task":  null,
+                      "title":  null,
+                      "model":  null,
+                      "modelWhy":  null,
+                      "phase":  "finished",
+                      "step":  "nothing ready",
+                      "taskStartedAt":  null,
+                      "heartbeatAt":  "2026-10-11T05:01:20Z"
+                  }
+              ]
+}
