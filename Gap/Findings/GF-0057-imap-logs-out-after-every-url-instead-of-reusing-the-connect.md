@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test1982, behaviour:test804, behaviour:test815, behaviour:test816, behaviour:test836, behaviour:test779]
 touches: [Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Console, Curl.Console.UnitTests]
-task: BL-1987
-tasks: [BL-1987]
+task: BL-2080
+tasks: [BL-1987, BL-2080]
 ---
 # GF-0057 - IMAP logs out after every URL instead of reusing the connection, and every connection's tags start with A where curl uses one letter per connection
 
@@ -32,8 +32,10 @@ In Curl.Protocol.Imap.UnitLibrary, keep an IMAP connection open after a transfer
 ## Measurements
 
 - 2026-10-10_0657: 6 of 6 items are gaps.
+- 2026-10-11_0936: 2 of 6 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1987.
+- 2026-10-11_1029: Filed BL-2080.

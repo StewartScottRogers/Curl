@@ -33,6 +33,7 @@ Curl's behaviour needs no change: it passes test3009 once %PWD holds no blank. M
 
 - 2026-10-08_2029: 1 of 1 items are gaps.
 - 2026-10-10_0657: 0 of 1 items are gaps.
+- 2026-10-11_0936: 0 of 1 items are gaps.
 
 ## Log
 

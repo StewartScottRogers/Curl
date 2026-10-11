@@ -4,11 +4,11 @@ title: SOCKS4/5 proxies and --interface are never used in process: the request g
 area: behaviour
 key: behaviour:in-process-runner-bypasses-socks-and-interface-binding
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test702, behaviour:test703, behaviour:test704, behaviour:test705, behaviour:test716, behaviour:test728, behaviour:test729, behaviour:test713, behaviour:test714, behaviour:test715, behaviour:test1084, behaviour:test1085]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
@@ -32,8 +32,10 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 ## Measurements
 
 - 2026-10-10_0657: 12 of 12 items are gaps.
+- 2026-10-11_0936: 0 of 12 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1976.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

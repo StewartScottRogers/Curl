@@ -4,11 +4,11 @@ title: When the EPSV data port cannot be connected, FTP does not fall back to PA
 area: behaviour
 key: behaviour:ftp-epsv-connect-failure-no-pasv-fallback
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test1233]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Ftp.UnitLibrary's FtpSession.OpenPassiveDataConnectionAsync, wh
 ## Measurements
 
 - 2026-10-10_0657: 1 of 1 items are gaps.
+- 2026-10-11_0936: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1984.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

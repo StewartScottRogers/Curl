@@ -4,11 +4,11 @@ title: --retry does not follow a 429's Retry-After as curl does (resend, --fail,
 area: behaviour
 key: behaviour:retry-after-handling
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test366, behaviour:test1633, behaviour:test1634]
 touches: [Curl.Console, Curl.Console.UnitTests]
@@ -34,9 +34,11 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 - 2026-10-08_1640: 3 of 3 items are gaps.
 - 2026-10-08_2029: 3 of 3 items are gaps.
 - 2026-10-10_0657: 3 of 3 items are gaps.
+- 2026-10-11_0936: 0 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1808.
 - 2026-10-10_0756: Filed BL-2008.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

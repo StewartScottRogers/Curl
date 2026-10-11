@@ -4,11 +4,11 @@ title: An over-long TFTP file name fails with exit 7 when the channel cannot ope
 area: behaviour
 key: behaviour:tftp-filename-too-long-checked-after-channel-opens
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test1453]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpProtocolHandler, run TftpRequestFile's l
 ## Measurements
 
 - 2026-10-10_0657: 1 of 1 items are gaps.
+- 2026-10-11_0936: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1980.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

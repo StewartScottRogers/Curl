@@ -4,11 +4,11 @@ title: --skip-existing skips the transfer silently; curl writes 'Note: skips tra
 area: behaviour
 key: behaviour:skip-existing-note-missing
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test994, behaviour:test996, behaviour:test1491]
 touches: [Curl.Console, Curl.Console.UnitTests]
@@ -34,9 +34,11 @@ In Curl.Console, where --skip-existing decides to skip a transfer, write curl 8.
 - 2026-10-08_1640: 3 of 3 items are gaps.
 - 2026-10-08_2029: 3 of 3 items are gaps.
 - 2026-10-10_0657: 3 of 3 items are gaps.
+- 2026-10-11_0936: 0 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1806.
 - 2026-10-10_0756: Filed BL-2006.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

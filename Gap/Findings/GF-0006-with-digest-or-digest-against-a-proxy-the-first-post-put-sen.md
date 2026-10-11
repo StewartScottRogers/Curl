@@ -4,11 +4,11 @@ title: With --digest (or Digest against a proxy), the first POST/PUT sends its b
 area: behaviour
 key: behaviour:auth-probe-request-sends-body
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test88, behaviour:test175, behaviour:test177, behaviour:test245, behaviour:test246, behaviour:test1001, behaviour:test1002, behaviour:test1284, behaviour:test1285, behaviour:test2058, behaviour:test2059, behaviour:test2060, behaviour:test2067, behaviour:test2068, behaviour:test2069]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -34,9 +34,11 @@ In Curl.Protocol.Http.UnitLibrary, when --digest is chosen for the origin or the
 - 2026-10-08_1640: 15 of 15 items are gaps.
 - 2026-10-08_2029: 5 of 15 items are gaps.
 - 2026-10-10_0657: 5 of 15 items are gaps.
+- 2026-10-11_0936: 0 of 15 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1799.
 - 2026-10-10_0756: Filed BL-2002.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.
