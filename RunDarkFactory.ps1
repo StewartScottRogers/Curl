@@ -3291,6 +3291,9 @@ Rules for this unattended run, in addition to CLAUDE.md:
    no task covers yet, split it or file that work and requeue it then, not after a
    long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
    after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
+   Find every prerequisite in that one pass, not just the first: list all the work the task
+   needs, file or name all of it, and requeue once (AF-0147 re-audit: BL-1976 was requeued
+   for BL-1997 and, after its next claim, again for BL-2035).
    The board let this run claim the task only because every ID already in its
    `depends-on` is Done, so those never send it back. Before naming any other task as the
    blocker, check its folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does
@@ -3396,6 +3399,9 @@ Rules for this unattended run, in addition to CLAUDE.md:
    no task covers yet, split it or file that work and requeue it then, not after a
    long run (AF-0147: BL-1894 was requeued twice, once after 9 turns to split it and once
    after 33 turns and $1.75 to find a missing dependency, and the third claim finished it).
+   Find every prerequisite in that one pass, not just the first: list all the work the task
+   needs, file or name all of it, and requeue once (AF-0147 re-audit: BL-1976 was requeued
+   for BL-1997 and, after its next claim, again for BL-2035).
    The shift claimed the task only because every ID already in its `depends-on` is Done,
    so those never send it back. Before naming any other task as the blocker, check its
    folder (`ls Tasks/*/<ID>-* Tasks/Done/*/<ID>-*`): a task in Done does not block. And

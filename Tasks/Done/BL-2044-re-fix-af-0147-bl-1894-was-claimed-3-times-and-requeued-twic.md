@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2044 — Re-fix AF-0147: BL-1894 was claimed 3 times and requeued twice before one run finished it
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The audit finding is off-limits to lanes, so the fix follows the task text. BL-1966 told runs to check size and dependencies early; the re-audit shows BL-1976 still requeued twice, because the first requeue named only one prerequisite and the next claim found another. Both run prompts in `RunDarkFactory.ps1` now say to find every prerequisite in that one pass and requeue once. Only prompt text changed; the script parses clean.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Done. Run prompts now say to find every prerequisite in one pass and requeue once
