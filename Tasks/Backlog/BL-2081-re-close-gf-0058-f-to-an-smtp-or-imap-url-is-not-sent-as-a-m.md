@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-11
 completed:
@@ -47,7 +48,25 @@ In Curl.Console's mail mapping (MailRequestOptionsMapping), treat -F parts on an
 
 ## Notes
 
+- 2026-10-11, lane 3 (interactive only): the gap could not be reproduced from a lane.
+  BL-1988's fix (192ec6f80) reached `master` and `gap` before gap run 2026-10-11_0936.
+  Measured with `Record-CurlExchange.ps1 -Smtp` and this tree's curl
+  (`Curl.Console/bin/Debug/net10.0/curl.exe`) on test646's command line (empty-name `-F`
+  parts, `=(;type=multipart/alternative`, `;headers=@file`, `;headers=<file`, three `-H`):
+  EHLO 646, MAIL FROM:<sender@example.com> SIZE=1033, RCPT TO, DATA with the
+  multipart/mixed message, exit 0 - no VRFY. So the measured VRFY (and IMAP LIST for
+  test647) depends on how the gap harness invokes Curl or which binary it runs, as for
+  GF-0057/BL-2080 and GF-0051/BL-2079. The gap office's reproduction tool
+  (Measure-UpstreamCases.cs) and its upstream data are refused to lanes by the audit guard.
+- Remove `lane: no` once an interactive session has run Measure-UpstreamCases.cs for
+  cases 646,647,649 on the current tree, captured test646's command line as the harness
+  passes it with its protocol transcript, and written under Notes why Curl drops the `-F`
+  parts there (argument quoting, the binary used, or a difference in the case), so a lane
+  can fix it without the gap office's paths. The harness investigation BL-2079 and
+  BL-2080 wait on likely answers this one too.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. requeue as interactive only; this tree sends test646's MIME message (MAIL FROM, DATA, no VRFY), so GF-0058 differs only under the gap harness, whose paths lanes cannot read
