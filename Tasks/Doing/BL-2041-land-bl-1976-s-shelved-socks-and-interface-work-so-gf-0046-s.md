@@ -30,3 +30,4 @@ BL-1976 (now Deferred; read its Goal, Acceptance criteria and Notes first) hit t
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
