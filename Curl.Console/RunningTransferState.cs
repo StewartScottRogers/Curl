@@ -105,6 +105,14 @@ internal sealed class RunningTransferState(
     internal int RetryCount { get; set; }
 
     /// <summary>
+    /// Gets or sets the warning <c>--retry</c> gave up its retries with, such as
+    /// <see cref="TransferRetryWarning.RetryAfterExceedsMaxTime" />, which curl 8.21.0 prints
+    /// after the transfer's progress meter (upstream test366, BL-2008); <see langword="null" />
+    /// when it gave up none.
+    /// </summary>
+    internal string? AbandonedRetryWarning { get; set; }
+
+    /// <summary>
     /// Gets or sets the <c>%{xfer_id}</c> of the latest attempt <c>--retry</c> ran, which curl
     /// 8.21.0 makes a transfer of its own; <see langword="null" /> until the first retry (task BL-799).
     /// </summary>

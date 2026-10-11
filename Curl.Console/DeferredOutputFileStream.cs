@@ -70,6 +70,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     private FileWriteMode openMode = writeMode;
     private long? failedWriteLength;
     private long lengthAtAttemptStart;
+    private long bytesLeftByEarlierAttempts;
 
     /// <summary>
     /// Gets the file this stream writes: the path it was created with, until
@@ -384,13 +385,32 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// was opened, or when <see cref="KeepForRetry" /> last kept an attempt's bytes. A file not yet
     /// opened, or one that cannot seek, counts none, as curl 8.21.0 counts only a regular file.
     /// </summary>
-    internal long AttemptBytesWritten => file is { CanSeek: true } opened ? opened.Position - lengthAtAttemptStart : 0;
+    internal long AttemptBytesWritten => BytesPastAttemptStart - bytesLeftByEarlierAttempts;
+
+    /// <summary>
+    /// Gets the bytes past the length the file had when it was opened, or when
+    /// <see cref="KeepForRetry" /> last kept an attempt's bytes: the ones <see cref="TruncateForRetry" /> cuts.
+    /// </summary>
+    private long BytesPastAttemptStart => file is { CanSeek: true } opened ? opened.Position - lengthAtAttemptStart : 0;
 
     /// <summary>
     /// Keeps the bytes the current attempt wrote, before <c>--retry</c> resumes the transfer after
     /// them, so the next attempt's bytes are the ones a later <see cref="TruncateForRetry" /> cuts.
     /// </summary>
-    internal void KeepForRetry() => lengthAtAttemptStart += AttemptBytesWritten;
+    internal void KeepForRetry()
+    {
+        lengthAtAttemptStart += BytesPastAttemptStart;
+        bytesLeftByEarlierAttempts = 0;
+    }
+
+    /// <summary>
+    /// Leaves the bytes the current attempt wrote where they are, before <c>--retry</c> runs the
+    /// transfer again, without keeping them for a resume: the next attempt's
+    /// <see cref="AttemptBytesWritten" /> counts only its own, and a later
+    /// <see cref="TruncateForRetry" /> still cuts these too, as curl 8.21.0's <c>ftruncate</c> to the
+    /// length at open does for an attempt that wrote only <c>-i</c> header lines (BL-2008).
+    /// </summary>
+    internal void LeaveForRetry() => bytesLeftByEarlierAttempts = BytesPastAttemptStart;
 
     /// <summary>
     /// Cuts the file back to the length it had when it was opened, or when
@@ -408,6 +428,8 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             opened.SetLength(lengthAtAttemptStart);
             opened.Position = lengthAtAttemptStart;
         }
+
+        bytesLeftByEarlierAttempts = 0;
     }
 
     /// <summary>

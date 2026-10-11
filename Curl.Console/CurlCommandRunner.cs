@@ -3791,7 +3791,7 @@ internal sealed class CurlCommandRunner(
                 ? await TransferToStandardOutputAsync(follower, options, createAttemptContext).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, createAttemptContext, options.ResumeFrom, null).ConfigureAwait(false);
 
-            return await WriteProgressAsync(options, result, options.ResumeFrom, toStandardOutput)
+            return await WriteProgressAndAbandonedRetryWarningAsync(options, result, options.ResumeFrom, toStandardOutput)
                 .ConfigureAwait(false);
         }
 
@@ -3802,8 +3802,34 @@ internal sealed class CurlCommandRunner(
                 follower, options, url, target, range, resumeFrom, headerOutput, formBody, upload, proxy)
             .ConfigureAwait(false);
 
-        return await WriteProgressAsync(options, fileResult, resumeFrom, toStandardOutput: false)
+        return await WriteProgressAndAbandonedRetryWarningAsync(options, fileResult, resumeFrom, toStandardOutput: false)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes the transfer's progress meter (<see cref="WriteProgressAsync" />), then the warning
+    /// <c>--retry</c> gave up its retries with, if any, unless <c>-s</c>: curl 8.21.0 printed
+    /// test366's <c>Retry-After</c> warning after the meter's last line, not inside it (measured
+    /// 2026-10-10, BL-2008 Notes).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
+    /// <param name="toStandardOutput">Whether the body went to standard output.</param>
+    /// <returns><see cref="WriteProgressAsync" />'s result.</returns>
+    private async Task<TransferResult> WriteProgressAndAbandonedRetryWarningAsync(
+        CommandLineOptions options,
+        TransferResult result,
+        long? resumeFrom,
+        bool toStandardOutput)
+    {
+        TransferResult written = await WriteProgressAsync(options, result, resumeFrom, toStandardOutput).ConfigureAwait(false);
+        if (Running.AbandonedRetryWarning is { } warning)
+        {
+            await WriteWarningUnlessSilentAsync(options, warning).ConfigureAwait(false);
+        }
+
+        return written;
     }
 
     /// <summary>
@@ -4644,7 +4670,7 @@ internal sealed class CurlCommandRunner(
                     attemptResumeFrom = keptBytes > 0 ? retriedResumeFrom.GetValueOrDefault() + keptBytes : retriedResumeFrom;
                     retryLinesWritten = WriteRetryLinesAsync(options, attempt, warning, new RetriedAttemptOffsets(retriedResumeFrom, attemptResumeFrom), outputFile);
                 },
-                (_, warning) => retryLinesWritten = WriteWarningUnlessSilentAsync(options, warning))
+                (_, warning) => Running.AbandonedRetryWarning = warning)
             .ConfigureAwait(false);
         await retryLinesWritten.ConfigureAwait(false);
 
@@ -4824,7 +4850,7 @@ internal sealed class CurlCommandRunner(
         await WriteWarningUnlessSilentAsync(options, warning).ConfigureAwait(false);
         if (outputFile is not null)
         {
-            await KeepOrThrowAwayAttemptBytesAsync(options, outputFile, keeps: offsets.Next != offsets.Retried).ConfigureAwait(false);
+            await KeepOrThrowAwayAttemptBytesAsync(options, attempt, outputFile, keeps: offsets.Next != offsets.Retried).ConfigureAwait(false);
         }
     }
 
@@ -4855,22 +4881,30 @@ internal sealed class CurlCommandRunner(
     /// Keeps a retried attempt's <c>-o</c> bytes for the next attempt to resume after, or cuts the
     /// file back, as curl 8.21.0's <c>retrycheck</c> does, noting either under <c>-v</c> or a
     /// <c>--trace</c> option when the attempt wrote any: <c>Note: Keeping 5 bytes</c> or
-    /// <c>Note: Throwing away 5 bytes</c> (measured 2026-10-03, BL-1402 Context).
+    /// <c>Note: Throwing away 5 bytes</c> (measured 2026-10-03, BL-1402 Context). Only body bytes
+    /// count, as curl's <c>outs-&gt;bytes</c> does: an attempt that wrote nothing but <c>-i</c>
+    /// header lines leaves the file as it is, so test1633's and test1634's heads all stay, and
+    /// one that wrote a body is cut back, its header lines too (measured 2026-10-10, BL-2008 Notes).
     /// </summary>
     /// <param name="options">The accepted command line.</param>
+    /// <param name="attempt">The retried attempt's result.</param>
     /// <param name="outputFile">The <c>-o</c> file.</param>
     /// <param name="keeps">Whether the attempt's bytes are kept (<see cref="AttemptBytesKeptForResume" />).</param>
     /// <returns>A task that completes when the note is written.</returns>
-    private async Task KeepOrThrowAwayAttemptBytesAsync(CommandLineOptions options, DeferredOutputFileStream outputFile, bool keeps)
+    private async Task KeepOrThrowAwayAttemptBytesAsync(CommandLineOptions options, TransferResult attempt, DeferredOutputFileStream outputFile, bool keeps)
     {
-        long bytes = outputFile.AttemptBytesWritten;
+        long bytes = AttemptBodyBytesWritten(options, attempt, outputFile);
         if (keeps)
         {
             outputFile.KeepForRetry();
         }
-        else
+        else if (bytes > 0)
         {
             outputFile.TruncateForRetry();
+        }
+        else
+        {
+            outputFile.LeaveForRetry();
         }
 
         if (bytes > 0 && options.Trace != TraceKind.None)
@@ -4878,6 +4912,21 @@ internal sealed class CurlCommandRunner(
             string note = string.Create(CultureInfo.InvariantCulture, $"{(keeps ? "Keeping" : "Throwing away")} {bytes} bytes");
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText(note, terminalColumns)).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Works out how many body bytes the <c>-o</c> file holds past where a retry would cut it back:
+    /// <see cref="DeferredOutputFileStream.AttemptBytesWritten" /> less the header lines <c>-i</c>
+    /// or <c>-I</c> wrote there, which <see cref="TransferReport.HeaderSize" /> counts.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="attempt">The retried attempt's result.</param>
+    /// <param name="outputFile">The <c>-o</c> file.</param>
+    /// <returns>The body bytes, never below zero.</returns>
+    private static long AttemptBodyBytesWritten(CommandLineOptions options, TransferResult attempt, DeferredOutputFileStream outputFile)
+    {
+        long headerLines = options.ShowHeaders || options.NoBody ? attempt.Report?.HeaderSize ?? 0 : 0;
+        return Math.Max(0, outputFile.AttemptBytesWritten - headerLines);
     }
 
     /// <summary>
