@@ -44,6 +44,7 @@ public static class InProcessCurl
             standardInput,
             connector,
             datagramConnector,
+            securityContexts: CurlComposition.CreateDialingSecurityContextFactory(connector, datagramConnector, null, usesHandBuiltNtlm: true),
             runConnections: new ConnectionCache(TimeProvider.System),
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows())).RunAsync(arguments);
@@ -207,6 +208,7 @@ public static class InProcessCurl
             datagramConnector,
             writesProgressMeter: true,
             writeOutFileOpener: new DiskWriteOutFileOpener(writesLineFeedAsCrLf: OperatingSystem.IsWindows()),
+            usesHandBuiltNtlm: true,
             readEnvironmentVariable: readEnvironmentVariable,
             defaultConfigFileSearch: defaultConfigFileSearch,
             ftpListener: ftpListener);

@@ -12,6 +12,10 @@ internal sealed class LateBoundSecurityContextFactory : ISecurityContextFactory
 {
     private ISecurityContextFactory? bound;
 
+    /// <summary>Whether the factory this one is bound to is the hand-built NTLM one, so the contexts, and Digest's header form, are the non-SSPI build's.</summary>
+    public bool UsesHandBuiltNtlm { get; init; }
+
+
     /// <summary>Gives the factory every later <see cref="Create" /> call goes to.</summary>
     /// <param name="factory">The factory that makes the contexts.</param>
     public void Bind(ISecurityContextFactory factory) => bound = factory;

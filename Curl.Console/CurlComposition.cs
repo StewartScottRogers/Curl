@@ -242,11 +242,20 @@ internal static class CurlComposition
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
-            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog, matchesSspiBuild: OperatingSystem.IsWindows()),
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog, matchesSspiBuild: MatchesSspiBuild(securityContexts)),
             new NegotiateHttpAuthenticator(securityContexts, negotiateOptions, diagnosticLog: diagnosticLog),
             new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);
     }
+
+    /// <summary>
+    /// Whether Digest sends its header in the Schannel build's SSPI form: on Windows, unless the contexts
+    /// are the hand-built ones that curl's non-SSPI build is matched with (the upstream conformance runner's).
+    /// </summary>
+    /// <param name="securityContexts">The contexts the authenticator is made over.</param>
+    /// <returns><see langword="true" /> for the SSPI form.</returns>
+    private static bool MatchesSspiBuild(ISecurityContextFactory securityContexts) =>
+        OperatingSystem.IsWindows() && securityContexts is not HandBuiltNtlmSecurityContextFactory and not LateBoundSecurityContextFactory { UsesHandBuiltNtlm: true };
 
     /// <summary>
     /// Creates ADR-0142's router for NTLM, Negotiate and Kerberos contexts: SSPI on Windows,
@@ -1297,7 +1306,7 @@ internal static class CurlComposition
     {
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
-        LateBoundSecurityContextFactory proxyContexts = new();
+        LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, socks5SecurityContexts: proxyContexts);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, TimeProvider.System, runConnections);
