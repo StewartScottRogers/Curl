@@ -4,11 +4,11 @@ title: VRFY and EXPN replies are written to the output with LF where curl writes
 area: behaviour
 key: behaviour:smtp-command-reply-written-without-cr
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test924, behaviour:test925, behaviour:test927, behaviour:test950]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
@@ -32,8 +32,10 @@ Find which side drops the CR. If Curl.Protocol.Smtp.UnitLibrary's SmtpCommandTra
 ## Measurements
 
 - 2026-10-10_0657: 4 of 4 items are gaps.
+- 2026-10-11_0936: 0 of 4 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1995.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

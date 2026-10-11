@@ -4,11 +4,11 @@ title: ;AUTH=EXTERNAL with no user name skips SASL; curl sends AUTH EXTERNAL wit
 area: behaviour
 key: behaviour:sasl-external-without-user-skipped
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test838, behaviour:test840, behaviour:test884, behaviour:test886, behaviour:test943, behaviour:test945]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Authentication.UnitLibrary's SaslAuthenticator/SaslMechanismRanking and 
 ## Measurements
 
 - 2026-10-10_0657: 6 of 6 items are gaps.
+- 2026-10-11_0936: 0 of 6 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1989.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

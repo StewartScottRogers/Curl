@@ -4,11 +4,11 @@ title: --crlf does not convert an SMTP upload's LF line ends to CR LF
 area: behaviour
 key: behaviour:smtp-upload-ignores-crlf
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test941]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Abstractions.UnitLibrary, Curl.Protocol.Abstractions.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -32,8 +32,10 @@ Carry --crlf into MailRequestOptions (Curl.Console's MailRequestOptionsMapping, 
 ## Measurements
 
 - 2026-10-10_0657: 1 of 1 items are gaps.
+- 2026-10-11_0936: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1994.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

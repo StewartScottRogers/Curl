@@ -4,11 +4,11 @@ title: Through -p/-x the proxy server receives nothing in process: every <verify
 area: behaviour
 key: behaviour:in-process-runner-never-reaches-proxy-server
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test80, behaviour:test83, behaviour:test95, behaviour:test275, behaviour:test744, behaviour:test1078, behaviour:test1184, behaviour:test1288, behaviour:test1297, behaviour:test1428, behaviour:test1904, behaviour:test1319, behaviour:test1320, behaviour:test1321, behaviour:test2107]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -32,8 +32,10 @@ Re-measure after the InProcessCurl rewiring of behaviour:in-process-runner-bypas
 ## Measurements
 
 - 2026-10-10_0657: 15 of 15 items are gaps.
+- 2026-10-11_0936: 0 of 15 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1975.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

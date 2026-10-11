@@ -4,11 +4,11 @@ title: --ignore-content-length does not stop FTP from sending SIZE before RETR
 area: behaviour
 key: behaviour:ftp-ignore-content-length-still-sends-size
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test1137, behaviour:test416]
 touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests, Curl.Console, Curl.Console.UnitTests]
@@ -32,8 +32,10 @@ Carry --ignore-content-length to the FTP handler (Curl.Console's transfer-contex
 ## Measurements
 
 - 2026-10-10_0657: 2 of 2 items are gaps.
+- 2026-10-11_0936: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1982.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

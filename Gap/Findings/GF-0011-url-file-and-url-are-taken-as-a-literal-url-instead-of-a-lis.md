@@ -12,8 +12,8 @@ closed:
 regression: false
 items: [behaviour:test488, behaviour:test489, behaviour:test2012]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task: BL-2004
-tasks: [BL-1804, BL-2004]
+task: BL-2076
+tasks: [BL-1804, BL-2004, BL-2076]
 ---
 # GF-0011 - --url @file and --url @- are taken as a literal URL instead of a list of URLs to read
 
@@ -34,9 +34,11 @@ In Curl.Cli.UnitLibrary's --url option (CommandLineOptionTable / its applier), s
 - 2026-10-08_1640: 3 of 3 items are gaps.
 - 2026-10-08_2029: 3 of 3 items are gaps.
 - 2026-10-10_0657: 2 of 3 items are gaps.
+- 2026-10-11_0936: 2 of 3 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1804.
 - 2026-10-10_0756: Filed BL-2004.
+- 2026-10-11_1029: Filed BL-2076.

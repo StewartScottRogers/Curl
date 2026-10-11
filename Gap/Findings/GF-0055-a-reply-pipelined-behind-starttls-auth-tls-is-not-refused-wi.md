@@ -4,11 +4,11 @@ title: A reply pipelined behind STARTTLS/AUTH TLS is not refused with exit 8, an
 area: behaviour
 key: behaviour:starttls-pipelined-reply-and-preauth
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test980, behaviour:test982, behaviour:test983, behaviour:test986]
 touches: [Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Pop3.UnitLibrary and Curl.Proto
 ## Measurements
 
 - 2026-10-10_0657: 4 of 4 items are gaps.
+- 2026-10-11_0936: 0 of 4 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1985.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

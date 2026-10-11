@@ -4,11 +4,11 @@ title: TFTP requests drop every leading slash of the URL path; curl drops only t
 area: behaviour
 key: behaviour:tftp-path-loses-every-leading-slash
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-10_0657
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test1007, behaviour:test1009, behaviour:test1049, behaviour:test1093, behaviour:test1094, behaviour:test1099, behaviour:test1238, behaviour:test1242, behaviour:test1243, behaviour:test271, behaviour:test283, behaviour:test284, behaviour:test285, behaviour:test286, behaviour:test332]
 touches: [Curl.Protocol.Tftp.UnitLibrary, Curl.Protocol.Tftp.UnitTests]
@@ -32,8 +32,10 @@ In Curl.Protocol.Tftp.UnitLibrary's TftpRequestFile.FromUrlPath, remove exactly 
 ## Measurements
 
 - 2026-10-10_0657: 15 of 15 items are gaps.
+- 2026-10-11_0936: 0 of 15 items are gaps.
 
 ## Log
 
 - 2026-10-10_0657: Opened by gap-behaviour.
 - 2026-10-10_0756: Filed BL-1979.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

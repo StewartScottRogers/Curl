@@ -4,11 +4,11 @@ title: Gap items gap-options left in no group
 area: options
 key: options:ungrouped
 severity: Low
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [options:--dns-interface, options:--dns-ipv4-addr, options:--dns-ipv6-addr, options:--dns-servers, options:--ech, options:--proxy-http3:no-form]
 touches: []
@@ -39,9 +39,11 @@ Group these items under their causes in the next gap-options report.
 - 2026-10-08_1640: 6 of 6 items are gaps.
 - 2026-10-08_2029: 6 of 6 items are gaps.
 - 2026-10-10_0657: 5 of 6 items are gaps.
+- 2026-10-11_0936: 0 of 6 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened for items gap-options left in no group.
 - 2026-10-08_1731: Filed BL-1829.
 - 2026-10-10_0756: Filed BL-1974.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.

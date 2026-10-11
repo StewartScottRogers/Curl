@@ -4,11 +4,11 @@ title: --max-filesize stops on a redirect body that is not kept, and does not st
 area: behaviour
 key: behaviour:max-filesize-on-redirect-and-decoded-body
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-11_0936
 regression: false
 items: [behaviour:test477, behaviour:test1618]
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests]
@@ -34,9 +34,11 @@ In Curl.Protocol.Http.UnitLibrary's HttpDownloadConditions / HttpContentLength: 
 - 2026-10-08_1640: 2 of 2 items are gaps.
 - 2026-10-08_2029: 1 of 2 items are gaps.
 - 2026-10-10_0657: 1 of 2 items are gaps.
+- 2026-10-11_0936: 0 of 2 items are gaps.
 
 ## Log
 
 - 2026-10-08_1640: Opened by gap-behaviour.
 - 2026-10-08_1731: Filed BL-1807.
 - 2026-10-10_0756: Filed BL-2007.
+- 2026-10-11_0936: Closed: run 2026-10-11_0936 measured every item as match or excluded.
