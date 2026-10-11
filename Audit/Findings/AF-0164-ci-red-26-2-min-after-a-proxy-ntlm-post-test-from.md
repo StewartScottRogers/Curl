@@ -3,8 +3,8 @@ id: AF-0164
 title: CI red 26.2 min after a proxy NTLM POST test from BL-2029 failed off Windows (run 38093700231); with the other spells, ciRedMinutes is 92.12, over 60
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:ExecuteAsync_ProxyNtlmPostWithItsType1Message:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-11: filed proposed.
+- 2026-10-11: proposed -> accepted.
