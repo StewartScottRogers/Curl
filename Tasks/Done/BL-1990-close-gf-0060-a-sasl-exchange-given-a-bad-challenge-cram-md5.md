@@ -8,7 +8,7 @@ depends-on: [BL-2026, BL-2060]
 touches: [Curl.Authentication.UnitLibrary, Curl.Authentication.UnitTests, Curl.Protocol.Imap.UnitLibrary, Curl.Protocol.Imap.UnitTests, Curl.Protocol.Pop3.UnitLibrary, Curl.Protocol.Pop3.UnitTests, Curl.Protocol.Smtp.UnitLibrary, Curl.Protocol.Smtp.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-11
 ---
 # BL-1990 — Close GF-0060: A SASL exchange given a bad challenge (CRAM-MD5 rubbish, a broken NTLM type-2) is not cancelled with * and retried with the next mechanism
 
@@ -35,14 +35,14 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test833`: Curl answers what curl 8.21.0 answers, `upstream test833 passes`, so the item measures `match`.
-- [ ] `behaviour:test879`: Curl answers what curl 8.21.0 answers, `upstream test879 passes`, so the item measures `match`.
-- [ ] `behaviour:test935`: Curl answers what curl 8.21.0 answers, `upstream test935 passes`, so the item measures `match`.
-- [ ] `behaviour:test834`: Curl answers what curl 8.21.0 answers, `upstream test834 passes`, so the item measures `match`.
-- [ ] `behaviour:test880`: Curl answers what curl 8.21.0 answers, `upstream test880 passes`, so the item measures `match`.
-- [ ] `behaviour:test936`: Curl answers what curl 8.21.0 answers, `upstream test936 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test833`: Curl answers what curl 8.21.0 answers, `upstream test833 passes`, so the item measures `match`.
+- [x] `behaviour:test879`: Curl answers what curl 8.21.0 answers, `upstream test879 passes`, so the item measures `match`.
+- [x] `behaviour:test935`: Curl answers what curl 8.21.0 answers, `upstream test935 passes`, so the item measures `match`.
+- [x] `behaviour:test834`: Curl answers what curl 8.21.0 answers, `upstream test834 passes`, so the item measures `match`.
+- [x] `behaviour:test880`: Curl answers what curl 8.21.0 answers, `upstream test880 passes`, so the item measures `match`.
+- [x] `behaviour:test936`: Curl answers what curl 8.21.0 answers, `upstream test936 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
 
@@ -62,3 +62,7 @@ In Curl.Authentication.UnitLibrary (ChallengeSaslExchange, SecurityContextSaslEx
 - 2026-10-10: Doing -> Backlog. Waits on BL-2026: Curl already cancels with * and downgrades to PLAIN on a loopback replay of all six cases; the 'got the end' comes from the gap harness, which only an interactive session may read
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 2.04 of its 2.00 US dollar cost cap, so it was not run again; split the task; see Z:\repos\Curl.logs\BL-1990-*.jsonl
+
+Closed by evidence: gap run 2026-10-11_0936 (gap PR #117) closed its finding, every item measuring `match` or `excluded` with a reason.
+- 2026-10-11: Blocked -> Doing. gap run 2026-10-11_0936 closed its finding
+- 2026-10-11: Doing -> Done. gap run 2026-10-11_0936 closed its finding (PR #117)
