@@ -301,9 +301,10 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Gets what reads the config files, every file an option names, and the IPFS gateway file:
-    /// the reader the runner was given, else the disk.
+    /// the reader the runner was given, else the disk, with <c>@-</c> read from the runner's own
+    /// standard input rather than the process's (BL-2076).
     /// </summary>
-    private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess;
+    private IDataFileReader DataFileReader => configFileReader ?? DiskDataFileReader.ForProcess.WithStandardInput(() => standardInput);
 
     /// <summary>
     /// Gets what chooses each transfer's credentials from the URL and the netrc file, reading it with

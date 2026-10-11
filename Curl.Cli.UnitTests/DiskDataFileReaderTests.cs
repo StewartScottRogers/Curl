@@ -67,6 +67,26 @@ public sealed class DiskDataFileReaderTests
     }
 
     [TestMethod]
+    public void WithStandardInput_Replacement_ReadsTheReplacementAndKeepsTheFileReader()
+    {
+        MemoryStream replacement = new([0x2F, 0x61, 0x0A]);
+        Diagnostics.Arrange("replacement", Convert.ToHexString(replacement.ToArray()));
+        DiskDataFileReader reader = new DiskDataFileReader(_ => [0x7A], () => new MemoryStream([0x71]), NoModificationTime, true)
+            .WithStandardInput(() => replacement);
+
+        byte[] standardInput = reader.ReadStandardInput();
+        bool read = reader.TryReadFile("f", out byte[] file);
+        Diagnostics.Bytes("standard input", standardInput);
+        Diagnostics.Act("file read", read);
+
+        Diagnostics.Diff("standard input", new byte[] { 0x2F, 0x61, 0x0A }, standardInput);
+        Diagnostics.Assert("file read", true, read);
+        CollectionAssert.AreEqual(new byte[] { 0x2F, 0x61, 0x0A }, standardInput);
+        CollectionAssert.AreEqual(new byte[] { 0x7A }, file);
+        Assert.IsTrue(read);
+    }
+
+    [TestMethod]
     public void ReadStandardInput_Always_ReturnsEveryByteAndClosesTheStream()
     {
         MemoryStream standardInput = new([0x71, 0x20, 0x72, 0x0A]);

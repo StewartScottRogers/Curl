@@ -70,6 +70,15 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
     public static DiskDataFileReader ForStatFollowingLinksWith(Func<string, FileSystemInfo?> resolveFinalLinkTarget) =>
         new(ReadAllBytesFromDisk, OpenProcessStandardInput, path => ReadLastWriteTimeUtcByStat(path, resolveFinalLinkTarget), false);
 
+    /// <summary>
+    /// This reader with standard input opened through <paramref name="openReplacementStandardInput"/>
+    /// instead, so a runner given its own standard input reads <c>@-</c> from it, not the process's (BL-2076).
+    /// </summary>
+    /// <param name="openReplacementStandardInput">Opens the standard input to read.</param>
+    /// <returns>The reader.</returns>
+    public DiskDataFileReader WithStandardInput(Func<Stream> openReplacementStandardInput) =>
+        new(readAllBytes, openReplacementStandardInput, readLastWriteTimeUtc, reportsWindowsErrors);
+
     /// <inheritdoc/>
     public bool TryReadFile(string path, out byte[] contents)
     {

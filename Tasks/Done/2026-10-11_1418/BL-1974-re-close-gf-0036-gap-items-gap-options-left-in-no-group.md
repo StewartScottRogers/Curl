@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-11
 ---
 # BL-1974 — Re-close GF-0036: Gap items gap-options left in no group
 
@@ -48,11 +48,11 @@ Group these items under their causes in the next gap-options report.
 
 ## Acceptance criteria
 
-- [ ] `options:--dns-interface`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-interface: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--dns-ipv4-addr`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-ipv4-addr: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--dns-ipv6-addr`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-ipv6-addr: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--dns-servers`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-servers: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
-- [ ] `options:--ech`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --ech: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] `options:--dns-interface`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-interface: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] `options:--dns-ipv4-addr`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-ipv4-addr: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] `options:--dns-ipv6-addr`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-ipv6-addr: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] `options:--dns-servers`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --dns-servers: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
+- [x] `options:--ech`: Curl answers what curl 8.21.0 answers, `exit 2: curl: option --ech: the installed libcurl version does not support this | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
 - [x] `options:--proxy-http3:no-form`: Curl answers what curl 8.21.0 answers, `exit 2: curl: (2) no URL specified | curl: try 'curl --help' or 'curl --manual' for more information`, so the item measures `match`.
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 - [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
@@ -70,3 +70,8 @@ Group these items under their causes in the next gap-options report.
 - 2026-10-10: Backlog -> Doing.
 - 2026-10-10: Doing -> Blocked. Interactive session: --no-proxy-http3 already matches; the five DNS/--ech items are intended differences (ADR-0454) and close only by an excluded entry in the gap office baseline, which lanes may not write
 - 2026-10-10: Blocked -> Deferred. Gap PR #105 marks the five ADR-0454 options excluded (Gap/Baselines/option-exclusions.json); GF-0036 closes on the next gap run, which re-measures them; look again then
+
+Closed by evidence: gap run 2026-10-11_0936 (gap PR #117) closed its finding, every item measuring `match` or `excluded` with a reason.
+- 2026-10-11: Deferred -> Backlog. gap run closed GF-0036
+- 2026-10-11: Backlog -> Doing. gap run closed GF-0036
+- 2026-10-11: Doing -> Done. gap run 2026-10-11_0936 closed GF-0036 (PR #117)

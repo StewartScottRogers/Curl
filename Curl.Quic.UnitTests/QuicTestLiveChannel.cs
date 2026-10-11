@@ -34,6 +34,11 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
 
     private TaskCompletionSource datagramTaken = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private TaskCompletionSource receiveCalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    // True while the loop is in a receive it entered with nothing queued.
+    private bool receiveWaits;
+
     private bool silent;
 
     public EndPoint ServerEndPoint => QuicTestChannel.ServerAddress;
@@ -141,10 +146,55 @@ internal sealed class QuicTestLiveChannel(QuicTestServer server) : IDatagramChan
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>
+    /// Waits until the connection's loop is in a <see cref="ReceiveAsync" /> it entered with nothing
+    /// queued, so that receive waits on its token: once the server is silenced nothing more is
+    /// queued, and only a wake, a timer or a stop ends it. Checks now and again each time the loop
+    /// calls a receive, so it never polls the clock. Fails when the loop calls no receive for <see cref="HangGuard" />.
+    /// </summary>
+    public async Task WaitUntilReceiveWaitsAsync()
+    {
+        while (true)
+        {
+            Task nextReceive;
+            lock (gate)
+            {
+                if (receiveWaits)
+                {
+                    return;
+                }
+
+                nextReceive = receiveCalled.Task;
+            }
+
+            await nextReceive.WaitAsync(HangGuard);
+        }
+    }
+
     public async ValueTask<DatagramReceived> ReceiveAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
-        // A wait that is cancelled takes no count, so the datagram stays queued for the next receive.
-        await inboundCount.WaitAsync(cancellationToken);
+        TaskCompletionSource called;
+        lock (gate)
+        {
+            receiveWaits = inboundCount.CurrentCount == 0;
+            called = receiveCalled;
+            receiveCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        called.SetResult();
+        try
+        {
+            // A wait that is cancelled takes no count, so the datagram stays queued for the next receive.
+            await inboundCount.WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            lock (gate)
+            {
+                receiveWaits = false;
+            }
+        }
+
         inbound.TryDequeue(out (byte[]? Datagram, EndPoint From, Exception? Error) next);
         (byte[]? datagram, EndPoint from, Exception? error) = next;
         if (error is not null)
