@@ -191,6 +191,29 @@ public sealed class UpstreamCaseVerificationTests
     }
 
     [TestMethod]
+    public void FindFirstDifference_StderrNamingTheLogDirectory_MatchesCurlsNoteWrappedAt79Columns()
+    {
+        // test996 with a 100-character %LOGDIR: voutf cuts after "transfer, ", then at the full width.
+        string logDirectory = "/" + new string('d', 99);
+        string sections = $"<verify>\n<stderr mode=\"text\">\nNote: skips transfer, \"{logDirectory}/there\" exists locally\n</stderr>\n</verify>\n";
+        string wrapped = "Note: skips transfer, \nNote: \"/" + new string('d', 71) + "\nNote: " + new string('d', 28) + "/there\" exists locally\n";
+
+        string? difference = Verify(sections, Run(standardError: wrapped, logDirectory: logDirectory));
+        ExpectDifference(null, difference);
+        Assert.IsNull(difference);
+    }
+
+    [TestMethod]
+    public void FindFirstDifference_StderrNotNamingTheLogDirectory_KeepsCurlsWrappedNote()
+    {
+        string sections = "<verify>\n<stderr>\nNote: skips transfer, \"there\" exists locally\n</stderr>\n</verify>\n";
+
+        string? difference = Verify(sections, Run(standardError: "Note: skips transfer, \nNote: \"there\" exists locally\n", logDirectory: "/log"));
+        ExpectDifference("<verify><stderr> differs at byte 22 (line 1): expected \"Note: skips transfer, \\\"there\\\" exists locally\\n\", got \"Note: skips transfer, \\n\"", difference);
+        Assert.IsNotNull(difference);
+    }
+
+    [TestMethod]
     public void FindFirstDifference_File_IsComparedWithItsStripfile()
     {
         string path = TemporaryFile("keep\ndrop\n");
@@ -256,8 +279,8 @@ public sealed class UpstreamCaseVerificationTests
     private static string Neutral(string? text) =>
         (text ?? "(none)").Replace(Path.GetTempPath().Replace('\\', '/'), "<temp>/");
 
-    private static UpstreamCaseRun Run(int exitCode = 0, string standardOutput = "", string standardError = "", string received = "", string outputFile = "") =>
-        new(exitCode, Bytes(standardOutput), Bytes(standardError), Bytes(received), Bytes(outputFile));
+    private static UpstreamCaseRun Run(int exitCode = 0, string standardOutput = "", string standardError = "", string received = "", string outputFile = "", string? logDirectory = null) =>
+        new(exitCode, Bytes(standardOutput), Bytes(standardError), Bytes(received), Bytes(outputFile)) { LogDirectory = logDirectory };
 
     private static string TemporaryFile(string content)
     {

@@ -225,8 +225,8 @@ no real time (ADR-0404, BL-1355). The run is under a time limit from an injected
 `TimeProvider` (a run past it cannot be stopped, since curl's runner takes no cancellation
 token, so the case fails and the run is abandoned). `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
 `<verify>` (protocol after `<strip>` / `<strippart>`, run as `UpstreamPerlSubstitution`s
-compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`), and
-`UpstreamFirstDifference` names the first differing byte and line.
+compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`).
+When the expected `<stderr>` names the case's `%LOGDIR` (`UpstreamCaseRun.LogDirectory`), both sides first have curl's 79-column-wrapped `Note:` and `Warning:` lines joined (`UpstreamWrappedMessageLines`, ADR-0475), since the absolute `%LOGDIR` wraps a note `runtests.pl`'s short `log` keeps on one line (test994, test996, test1491). `UpstreamFirstDifference` names the first differing byte and line.
 `UpstreamPerlOneLiner` (BL-1930) interprets, by whole-line pattern and with no Perl, the
 `%PERL -e` one-liners the vendored cases put in a precheck or postcheck, returning an
 `UpstreamPerlOneLinerResult` (exit code and stdout), or null for any other line: the

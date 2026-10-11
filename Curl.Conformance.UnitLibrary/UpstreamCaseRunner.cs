@@ -316,6 +316,7 @@ public sealed class UpstreamCaseRunner(
         return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutput.ToArray(), standardError.ToArray(), receivedBytes, outputFileBytes)
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
+            LogDirectory = logDirectory,
             // A case reaches one uploading server, so at most one of these holds an upload.
             UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
         });

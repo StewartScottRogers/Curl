@@ -55,7 +55,7 @@ internal static class UpstreamCaseVerification
             () => CompareUpload(testCase, run.UploadedBytes),
             () => CompareReplyData(testCase, run.OutputFileBytes),
             () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
-            () => CompareOutput(testCase, "stderr", "stripfile", run.StandardError),
+            () => CompareStandardError(testCase, run),
             .. FileSuffixes.Select<string, Func<string?>>(suffix => () => CompareFile(testCase, suffix)),
             () => CheckNotExists(testCase),
             () => CompareExitCode(testCase, run.ExitCode),
@@ -107,12 +107,31 @@ internal static class UpstreamCaseVerification
     }
 
     private static string? CompareOutput(UpstreamTestCase testCase, string name, string stripPartName, byte[] output) =>
-        testCase.Find("verify", name) is { } part
-            ? UpstreamFirstDifference.Describe(
-                $"<verify><{name}>",
-                Normalized(UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(Body(part), part), part), part),
-                Normalized(Strip(output, [], Substitutions(testCase, stripPartName)), part))
-            : null;
+        CompareOutput(testCase, name, stripPartName, output, logDirectory: null);
+
+    // The harness's %LOGDIR is absolute and about 100 characters long where runtests.pl's is "log", so
+    // curl wraps a Note: or Warning: naming it at 79 columns where upstream keeps one line. When the
+    // expected stderr names %LOGDIR, both sides are compared with those wrapped lines joined (ADR-0475).
+    private static string? CompareStandardError(UpstreamTestCase testCase, UpstreamCaseRun run) =>
+        CompareOutput(testCase, "stderr", "stripfile", run.StandardError, run.LogDirectory);
+
+    private static string? CompareOutput(UpstreamTestCase testCase, string name, string stripPartName, byte[] output, string? logDirectory)
+    {
+        if (testCase.Find("verify", name) is not { } part)
+        {
+            return null;
+        }
+
+        byte[] expected = UpstreamTestPartBodies.WithCrlf(UpstreamTestPartBodies.WithoutFinalNewline(Body(part), part), part);
+        byte[] actual = Strip(output, [], Substitutions(testCase, stripPartName));
+        if (logDirectory is not null && Encoding.Latin1.GetString(expected).Contains(logDirectory, StringComparison.Ordinal))
+        {
+            expected = UpstreamWrappedMessageLines.Unwrap(expected);
+            actual = UpstreamWrappedMessageLines.Unwrap(actual);
+        }
+
+        return UpstreamFirstDifference.Describe($"<verify><{name}>", Normalized(expected, part), Normalized(actual, part));
+    }
 
     private static string? CompareFile(UpstreamTestCase testCase, string suffix)
     {
