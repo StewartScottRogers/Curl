@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Blocked. Stewart: reject AF-0163 (the 16 min wait was the shift's only lane finishing its task, the script already files in 3 min and claims by priority), or ask for lane preemption as a feature?
