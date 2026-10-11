@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Curl.Core.UnitLibrary/CLAUDE.md:not-yet-wired-into-Curl.Console:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2050
+tasks: BL-2050
 found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md

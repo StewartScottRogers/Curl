@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:BL-1976:BL-1976:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-2053
+tasks: BL-2053
 found: 2026-10-11
 found-at: 22f394602532a6922adbc7fa91b3739b62d2112a
 scorecard: 2026-10-11_0051.md
