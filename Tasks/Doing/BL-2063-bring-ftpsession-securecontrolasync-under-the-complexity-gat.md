@@ -22,11 +22,13 @@ The coverage page (<https://stewartscottrogers.github.io/Curl/coverage/>, measur
 
 ## Acceptance criteria
 
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports no member outside a gate, at 100% line and branch coverage.
-- [ ] No existing test was changed or removed to get there; any new member has its own tests.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary` reports no member outside a gate, at 100% line and branch coverage.
+- [x] No existing test was changed or removed to get there; any new member has its own tests.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Split into TryAuthMechanismAsync and RefuseOrLeavePlaintext; Measure-CodeQuality reports 0 failing members, Ftp library 100%/100%, max complexity 10. No test changed (existing tests cover every path).
 
 ## Log
 

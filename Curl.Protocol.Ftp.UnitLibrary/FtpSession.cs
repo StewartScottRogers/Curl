@@ -481,19 +481,41 @@ internal sealed class FtpSession(
 
         foreach (string mechanism in AuthMechanisms)
         {
-            FtpReply auth = await ExchangeAsync("AUTH " + mechanism).ConfigureAwait(false);
-            if (control.HasBufferedBytes)
+            (bool settled, TransferResult? result) = await TryAuthMechanismAsync(mechanism).ConfigureAwait(false);
+            if (settled)
             {
-                // A reply pipelined behind AUTH's is exit 8 whatever AUTH's code, as curl 8.21.0 does (test983, BL-1985).
-                return TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply);
-            }
-
-            if (auth is { Code: 234 or 334 })
-            {
-                return await UpgradeControlAsync().ConfigureAwait(false);
+                return result;
             }
         }
 
+        return RefuseOrLeavePlaintext();
+    }
+
+    /// <summary>
+    /// Sends <c>AUTH</c> with one mechanism. <c>settled</c> is <see langword="true" /> when the
+    /// reply ends the search - a pipelined reply (exit 8) or an accepted mechanism (the upgrade's
+    /// outcome in <c>result</c>) - and <see langword="false" /> when the next mechanism is next.
+    /// </summary>
+    private async ValueTask<(bool settled, TransferResult? result)> TryAuthMechanismAsync(string mechanism)
+    {
+        FtpReply auth = await ExchangeAsync("AUTH " + mechanism).ConfigureAwait(false);
+        if (control.HasBufferedBytes)
+        {
+            // A reply pipelined behind AUTH's is exit 8 whatever AUTH's code, as curl 8.21.0 does (test983, BL-1985).
+            return (true, TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.WeirdServerReply));
+        }
+
+        return auth is { Code: 234 or 334 }
+            ? (true, await UpgradeControlAsync().ConfigureAwait(false))
+            : (false, null);
+    }
+
+    /// <summary>
+    /// Both <c>AUTH</c> mechanisms were refused: exit 64 unless <c>--ssl</c> only tries TLS, when
+    /// the control connection stays plaintext and the login goes on.
+    /// </summary>
+    private TransferResult? RefuseOrLeavePlaintext()
+    {
         if (tlsRequirement != FtpTlsRequirement.Try)
         {
             return TransferResult.Failure(CurlExitCode.UseSslFailed, FtpTransferMessages.RequestedSslLevelFailed);
