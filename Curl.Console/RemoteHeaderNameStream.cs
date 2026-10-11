@@ -90,21 +90,50 @@ internal sealed class RemoteHeaderNameStream(
 
     /// <inheritdoc />
     /// <exception cref="IOException">The file the header names could not be opened.</exception>
+    /// <remarks>
+    /// Once a <c>Content-Disposition</c> has named the file - in an earlier <c>--retry</c> attempt or
+    /// an earlier response - the lines go on one write each, as curl 8.21.0 writes each header line,
+    /// so a file that cannot be opened fails on the first line: under <c>-i</c> curl's retry of
+    /// upstream test 3036 reports <c>write of 16 bytes</c>, the status line, not the whole head
+    /// (measured with Record-CurlExchange.ps1 on 2026-10-11, BL-2009). Until then the lines go on
+    /// together, after the <c>Content-Disposition</c> line has opened the file they land in.
+    /// </remarks>
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        ReadOnlyMemory<byte> rest = buffer;
-        while (!rest.IsEmpty)
+        bool forwardsLineByLine = output.NamedByContentDisposition;
+        for (ReadOnlyMemory<byte> rest = buffer; !rest.IsEmpty; rest = rest[LineLength(rest.Span)..])
         {
-            int lineFeed = rest.Span.IndexOf((byte)'\n');
-            ReadOnlyMemory<byte> line = lineFeed < 0 ? rest : rest[..(lineFeed + 1)];
-            await ReadLineAsync(line.Span.ToArray(), cancellationToken).ConfigureAwait(false);
-            rest = rest[line.Length..];
+            await ReadLineAsync(rest[..LineLength(rest.Span)].ToArray(), cancellationToken).ConfigureAwait(false);
         }
 
-        if (headerOutput is not null)
+        if (headerOutput is null)
+        {
+            return;
+        }
+
+        if (!forwardsLineByLine)
         {
             await headerOutput.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return;
         }
+
+        for (ReadOnlyMemory<byte> rest = buffer; !rest.IsEmpty; rest = rest[LineLength(rest.Span)..])
+        {
+            await headerOutput.WriteAsync(rest[..LineLength(rest.Span)], cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Gives the length of the first line in <paramref name="rest" />: up to and including its line
+    /// feed, or all of it when there is none.
+    /// </summary>
+    /// <param name="rest">The header bytes not yet read, at least one.</param>
+    /// <returns>The first line's length.</returns>
+    private static int LineLength(ReadOnlySpan<byte> rest)
+    {
+        int lineFeed = rest.IndexOf((byte)'\n');
+
+        return lineFeed < 0 ? rest.Length : lineFeed + 1;
     }
 
     /// <summary>
