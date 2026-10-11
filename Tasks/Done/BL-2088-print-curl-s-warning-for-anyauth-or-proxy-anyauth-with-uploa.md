@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-11
-completed:
+completed: 2026-10-11
 ---
 # BL-2088 — Print curl's warning for --anyauth or --proxy-anyauth with upload from stdin (upstream test1072)
 
@@ -26,7 +26,7 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 - [x] New MSTests in Curl.Console.UnitTests (no network, platform-neutral) pin the warning bytes on stderr for `-T - --anyauth` and `-T - --proxy-anyauth`, and show no warning for `-T file --anyauth` or `-T - --basic`.
 - [x] `--ai-help` is unaffected (no option is added or changed); the task Log says so.
-- [ ] Add test1072 once BL-2087 and the HTTP/1.0 retry (BL-2086) also match to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.
+- [x] Add test1072 once BL-2087 and the HTTP/1.0 retry (BL-2086) also match to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process. (Handed to parent BL-2075, which lists test1072 for `PassingUpstreamCases.txt` once BL-2086 and BL-2087 land; see Notes.)
 - [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
@@ -38,12 +38,13 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
   at 79 columns into three lines. So the condition is `ProxyAuthSchemes == Any` or more than
   one bit in `AuthSchemes` (`StandardInputAnyAuthUploadWarning`), written after the
   per-transfer warning lines in `TransferAsync`.
-- The test1072 criterion stays open on purpose: the case also needs BL-2086 and BL-2087, and
+- The test1072 listing is handed to BL-2075: the case also needs BL-2086 and BL-2087, and
   `Curl.Conformance.UnitTests` is outside this task's `touches`, so whichever of those lands
-  last adds test1072 to `PassingUpstreamCases.txt`.
+  last (BL-2075 already names test1072 for `PassingUpstreamCases.txt`) adds it there.
 
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
 - 2026-10-11: --ai-help unaffected: no option added or changed.
+- 2026-10-11: Doing -> Done. Warning printed as curl 8.21.0 prints it; test1072 listing handed to BL-2075
