@@ -24,12 +24,17 @@ Source: re-measurement of the gap findings with the fixed gap harness (PR #119, 
 
 ## Acceptance criteria
 
-- [ ] A new MSTest in Curl.Protocol.Http.UnitTests (no network) shows that after an HTTP/1.0 response to the first request, the authentication retry's request line ends `HTTP/1.0`, with the request bytes test1071 expects.
-- [ ] A neighbouring test shows a retry after an HTTP/1.1 response still goes out as HTTP/1.1.
-- [ ] Add test1071 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] A new MSTest in Curl.Protocol.Http.UnitTests (no network) shows that after an HTTP/1.0 response to the first request, the authentication retry's request line ends `HTTP/1.0`, with the request bytes test1071 expects.
+- [x] A neighbouring test shows a retry after an HTTP/1.1 response still goes out as HTTP/1.1.
+- [x] Add test1071 to `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` once it passes in process (moved to BL-2098; see Notes).
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
 
 ## Notes
+
+- Cause: the downgrade lived only on the connection (`Http1VersionSeen`), and test1071's HTTP/1.0 server closes it, so the retry's new connection had none. Fix: `RetryOfAsync` passes both auth retry plans (401 and 407) through `HttpRequestPlan.DowngradedAfter(head)`, which sets `HttpRequestOptions.EarlierResponseWasHttp10` when the challenge was HTTP/1.0 - the flag redirect hops already use for the same downgrade. The 417 resend is left as it was (outside this task).
+- Not re-measured with Record-CurlExchange.ps1: the gap harness's re-measurement (PR #119) already pinned real curl 8.21.0 sending the retry PUT as HTTP/1.0, and test1071's expected protocol says the same; the default taken was to trust that measurement rather than spend the run on it again.
+- The `PassingUpstreamCases.txt` criterion moved to BL-2098: `Curl.Conformance.UnitTests` is outside this task's `touches`, and BL-2097 held it in Doing on `origin/work/dark-factory`.
+- Tests: `ExecuteAsync_Http10ChallengeToASeekableStreamBody_SendsTheRetryAsHttp10` and `ExecuteAsync_Http11ChallengeToASeekableStreamBody_SendsTheRetryAsHttp11` in `HttpProtocolHandlerTests.Authentication.cs`.
 
 ## Log
 
