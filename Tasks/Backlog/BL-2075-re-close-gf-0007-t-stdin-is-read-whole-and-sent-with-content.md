@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests, Curl.Console, Curl.Console.UnitTests]
+lane: no
 requirement: none
 created: 2026-10-11
 completed:
@@ -48,7 +49,23 @@ In Curl.Protocol.Http.UnitLibrary (HttpRequestFraming, HttpRequestBodyWriter), t
 
 ## Notes
 
+- 2026-10-11, lane 2 (interactive only): the gap could not be reproduced from a lane. All six
+  cases (60, 98, 1068, 1069, 1072, 1073) are listed in
+  `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`, which the in-repo upstream ratchet
+  (`UpstreamCase_RunThroughCurl_HoldsTheRatchet`) holds. BL-2003 and BL-2037 (archived in
+  bf68ab5ce, 2026-10-10 19:34) reached `master` before the 2026-10-11 gap run, and
+  `Curl.Console/StandardInputUploadStream` already hides standard input's size, so `-T -` is
+  chunked with `Expect: 100-continue` and refused with exit 25 under HTTP/1.0. The evidence
+  (`Content-Length: 19` for test1068) says the gap tool's run of Curl sized standard input -
+  most likely it runs another binary or build, or feeds `<stdin>` another way - which only
+  `Gap/Tools/Measure-UpstreamCases.cs` shows, and lanes may not read `Gap/` (ADR-0433).
+- Remove `lane: no` once an interactive session has run the finding's reproduction for 1068, 98
+  and 1069 and copied under these Notes the exact Curl binary, command line and stdin the gap
+  tool used, with Curl's actual request bytes and exit code, so a lane can fix the cause without
+  reading `Gap/`.
+
 ## Log
 
 - 2026-10-11: Created.
 - 2026-10-11: Backlog -> Doing.
+- 2026-10-11: Doing -> Backlog. Interactive only: all six cases pass the in-repo upstream ratchet; the gap differs only under the gap tool, which lanes may not read (see Notes)
