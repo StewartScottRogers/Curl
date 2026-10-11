@@ -34,3 +34,4 @@ BL-1997 made the other 34 GF-0001 cases pass the ratchet (`Curl.Conformance.Unit
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
