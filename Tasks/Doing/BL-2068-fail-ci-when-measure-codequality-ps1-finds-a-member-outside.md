@@ -36,6 +36,8 @@ Lanes don't run the script either. Add a Windows job to `.github/workflows/ci.ym
 
 ## Notes
 
+- 2026-10-11 (interactive): on master 9db3133d4, which has BL-2061 to BL-2067, `Measure-CodeQuality.ps1` exits 0: 0 failing members across 34 assemblies, in 152 s locally. The `quality` job and the CLAUDE.md wording are on the `audit` branch in commit 5ebb3b8c1, in PR #115. Tick criteria 1 and 3 once #115 merges, and criterion 2 once the job passes on master.
+
 ## Log
 
 - 2026-10-11: Created.
