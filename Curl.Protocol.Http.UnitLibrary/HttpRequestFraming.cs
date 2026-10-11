@@ -11,14 +11,16 @@ namespace Curl.Protocol.Http;
 /// <remarks>
 /// A request with a <c>-d</c> or <c>-F</c> body is a POST, and one with a <c>-T</c> upload a
 /// PUT, unless <c>-X</c> names another method; one without is a GET, or a HEAD for <c>-I</c>. The body is sent
-/// chunked when its length is unknown or an <c>-H</c> value asks for
-/// <c>Transfer-Encoding: chunked</c>, and with <c>Content-Length</c> otherwise. curl adds
+/// chunked when an <c>-H</c> value asks for <c>Transfer-Encoding: chunked</c>, or when its
+/// length is unknown and no <c>-H</c> value names <c>Transfer-Encoding</c> - an emptied
+/// <c>-H "Transfer-Encoding:"</c> sends it as it comes, and an <c>-H</c> <c>Content-Length</c>
+/// changes nothing (upstream test60, test98) - and with <c>Content-Length</c> otherwise. curl adds
 /// <c>Expect: 100-continue</c> when the length is unknown or above
 /// <see cref="ExpectContinueThreshold" />, unless an <c>-H</c> value names <c>Expect</c>; the
 /// request waits for <c>100 Continue</c> whenever it carries <c>Expect: 100-continue</c>,
 /// its own or an <c>-H</c> one. An HTTP/1.0 request (<c>-0</c>) never gets curl's own
-/// <c>Expect</c>, and one whose body length is unknown with no <c>-H</c> value asking for
-/// chunked is refused (<see cref="RefusesUnknownLength" />; measured, BL-180 Notes).
+/// <c>Expect</c>, and one whose body length is unknown with no <c>-H</c> value naming
+/// <c>Transfer-Encoding</c> is refused (<see cref="RefusesUnknownLength" />; measured, BL-180 Notes).
 /// </remarks>
 internal sealed class HttpRequestFraming
 {
@@ -26,6 +28,8 @@ internal sealed class HttpRequestFraming
     /// The largest body length curl 8.21.0 sends without <c>Expect: 100-continue</c>: 1 MiB.
     /// </summary>
     internal const long ExpectContinueThreshold = 1048576;
+
+    private const string TransferEncodingName = "Transfer-Encoding";
 
     private HttpRequestFraming(
         string method,
@@ -37,9 +41,11 @@ internal sealed class HttpRequestFraming
         bool refusesUnknownLength = false,
         HttpUploadResume? upload = null,
         string? contentRange = null,
-        bool isAuthProbe = false)
+        bool isAuthProbe = false,
+        bool chunksForUnknownLength = false)
     {
         Method = method;
+        ChunksForUnknownLength = chunksForUnknownLength;
         IsAuthProbe = isAuthProbe;
         Body = body;
         KnownLength = knownLength;
@@ -86,11 +92,19 @@ internal sealed class HttpRequestFraming
 
     /// <summary>
     /// Gets a value indicating whether curl 8.21.0 refuses to send the request: an HTTP/1.0
-    /// request whose body length is unknown, with no <c>-H</c> value asking for
-    /// <c>Transfer-Encoding: chunked</c>. curl connects, sends nothing and fails with exit 25
+    /// request whose body length is unknown, with no <c>-H</c> value naming
+    /// <c>Transfer-Encoding</c>. curl connects, sends nothing and fails with exit 25
     /// <c>Chunky upload is not supported by HTTP 1.0</c> (measured, BL-180 Notes).
     /// </summary>
     internal bool RefusesUnknownLength { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the body is sent chunked because its length is unknown and
+    /// no <c>-H</c> value names <c>Transfer-Encoding</c>: curl 8.21.0's own chunking, which it
+    /// refuses with exit 25 for a request it would send as HTTP/1.0, as after an HTTP/1.0
+    /// server's 401 (upstream test1072; <c>http_req_set_reader</c>).
+    /// </summary>
+    internal bool ChunksForUnknownLength { get; }
 
     /// <summary>
     /// Gets a value indicating whether the body is the <c>-T</c>/<c>--upload-file</c> source on
@@ -145,7 +159,7 @@ internal sealed class HttpRequestFraming
     /// </param>
     /// <returns>The framing of the resent request.</returns>
     internal HttpRequestFraming WithoutExpect(HttpRequestBody? body, bool keepsCustomWait = false) =>
-        new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: keepsCustomWait && AwaitsContinue && !AddsExpect, RefusesUnknownLength, Upload, ContentRange);
+        new(Method, body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: keepsCustomWait && AwaitsContinue && !AddsExpect, RefusesUnknownLength, Upload, ContentRange, chunksForUnknownLength: ChunksForUnknownLength);
 
     /// <summary>
     /// Makes the same request with an empty body and <c>Content-Length: 0</c>: the probe curl
@@ -274,8 +288,9 @@ internal sealed class HttpRequestFraming
         body = convertLineEndings ? WithCrlfLineEndings(body) : body;
         bool wantsExpect = WantsExpect(unconvertedLength, isHttp10);
         bool namesExpect = customHeaders.Any(header => header.Names("Expect"));
+        bool namesTransferEncoding = customHeaders.Any(header => header.Names(TransferEncodingName));
         bool asksForChunked = AsksForChunked(customHeaders);
-        bool isChunked = length is null || asksForChunked;
+        bool isChunked = namesTransferEncoding ? asksForChunked : length is null;
         bool awaitsContinue = namesExpect ? AsksForContinue(customHeaders) : wantsExpect;
         return new HttpRequestFraming(
             method,
@@ -284,9 +299,10 @@ internal sealed class HttpRequestFraming
             isChunked,
             wantsExpect && !namesExpect,
             awaitsContinue,
-            RefusesUnknownLengthOf(length, asksForChunked, isHttp10),
+            isHttp10 && length is null && !namesTransferEncoding,
             upload,
-            ContentRangeOf(upload, rangeText, length));
+            ContentRangeOf(upload, rangeText, length),
+            chunksForUnknownLength: length is null && !namesTransferEncoding);
     }
 
     /// <summary>
@@ -314,19 +330,13 @@ internal sealed class HttpRequestFraming
     private static bool WantsExpect(long? length, bool isHttp10) =>
         !isHttp10 && length.GetValueOrDefault(long.MaxValue) > ExpectContinueThreshold;
 
-    /// <summary>
-    /// Tells whether curl refuses the request: over HTTP/1.0, for a body of unknown length that
-    /// no <c>-H</c> value asks to send chunked.
-    /// </summary>
-    private static bool RefusesUnknownLengthOf(long? length, bool asksForChunked, bool isHttp10) =>
-        isHttp10 && length is null && !asksForChunked;
 
     /// <summary>
     /// Tells whether the first <c>-H</c> value naming <c>Transfer-Encoding</c> lists
     /// <c>chunked</c>.
     /// </summary>
     private static bool AsksForChunked(HttpCustomHeader[] customHeaders) =>
-        FirstValueOf(customHeaders, "Transfer-Encoding")?.Contains("chunked", StringComparison.OrdinalIgnoreCase) == true;
+        FirstValueOf(customHeaders, TransferEncodingName)?.Contains("chunked", StringComparison.OrdinalIgnoreCase) == true;
 
     /// <summary>
     /// Tells whether the first <c>-H</c> value naming <c>Expect</c> is

@@ -352,6 +352,30 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.HasCount(1, authenticator.Calls);
     }
 
+    /// <summary>
+    /// A body chunked for its unknown length, as stdin's is, drawing a 401 from an HTTP/1.0
+    /// server: curl 8.21.0 would send the answer as HTTP/1.0, which cannot carry it, and fails
+    /// with exit 25 before sending anything more (upstream test1072).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10ChallengeToABodyOfUnknownLength_ReturnsUploadFailed()
+    {
+        string http10Challenge = ChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection connection = new(65536, http10Challenge + "nope", OkHead + "ok");
+        ScriptedAuthenticator authenticator = new(null, DigestValue);
+        MemoryStream output = new();
+        TransferContext context = AuthContext(output, null, new HttpRequestOptions { Body = new StreamBody(new UnseekableStream("hello"u8.ToArray()), null, "application/octet-stream") });
+        Diagnostics.Arrange("url, body, response", $"{AuthUrl}, an unseekable stream body of unknown length, {OneLine(http10Challenge)}");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual("Chunky upload is not supported by HTTP 1.0", result.ErrorMessage);
+        Assert.AreEqual(string.Empty, Latin1(output.ToArray()));
+    }
+
     [TestMethod]
     public async Task ExecuteAsync_ReconnectFails_ReturnsTheConnectFailure()
     {
