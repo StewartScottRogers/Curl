@@ -359,6 +359,54 @@ public sealed class UpstreamConformanceTests
         outcome.Kind == UpstreamCaseOutcomeKind.Failed
         && (outcome.Detail == CaseHangLimitMessage || outcome.Detail.StartsWith("curl did not finish within ", StringComparison.Ordinal));
 
+    // GF-0002 (BL-1998): a tool outside the test projects, such as the gap office's, reaches Curl only
+    // through the public InProcessCurl, over the in-memory connector or the production TcpConnector with
+    // only the dial replaced, so the connection-reuse cases must pass both ways too.
+    [TestMethod]
+    [DataRow(48, false)]
+    [DataRow(48, true)]
+    [DataRow(338, false)]
+    [DataRow(338, true)]
+    [DataRow(435, false)]
+    [DataRow(435, true)]
+    [DataRow(471, false)]
+    [DataRow(471, true)]
+    [DataRow(1074, false)]
+    [DataRow(1074, true)]
+    [DataRow(1134, false)]
+    [DataRow(1134, true)]
+    [DataRow(1418, false)]
+    [DataRow(1418, true)]
+    [DataRow(1419, false)]
+    [DataRow(1419, true)]
+    [DataRow(1421, false)]
+    [DataRow(1421, true)]
+    [DataRow(1479, false)]
+    [DataRow(1479, true)]
+    public async Task InProcessCurl_ConnectionReuseCase_Passes(int testNumber, bool dialsThroughTheTcpConnector)
+    {
+        byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
+        DirectoryInfo logDirectory = Directory.CreateDirectory(Path.Combine(LogFolder, $"test{testNumber}-{Guid.NewGuid():N}"));
+        try
+        {
+            UpstreamCaseRunner runner = new(
+                invocation => dialsThroughTheTcpConnector
+                    ? InProcessCurl.RunAsync(invocation.Arguments, invocation.StandardOutput, invocation.StandardError, invocation.StandardInput, new InMemoryServerTcpDialer(invocation.Connector), new LoopbackOnlyDnsResolver(), invocation.DatagramConnector)
+                    : InProcessCurl.RunAsync(invocation.Arguments, invocation.StandardOutput, invocation.StandardError, invocation.StandardInput, invocation.Connector, invocation.DatagramConnector),
+                Platform,
+                TimeProvider.System,
+                TimeLimit,
+                SshServer);
+            UpstreamCaseOutcome outcome = await runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value);
+
+            Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        }
+        finally
+        {
+            DeleteLogDirectory(logDirectory);
+        }
+    }
+
     // Curl as the command composes it, every TCP dial reaching the case's in-memory servers through
     // InMemoryServerTcpDialer, so TcpConnector's proxy tunnel and PROXY-line code stays in the path (ADR-0460).
     // The default config file is looked for only where the case's <setenv> points CURL_HOME, XDG_CONFIG_HOME or HOME (BL-1977).

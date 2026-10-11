@@ -33,6 +33,21 @@ public sealed class SmtpServerConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_VrfyWithCrlfReplyData_SendsTheReplyLinesWithCrlf()
+    {
+        SmtpServerConnector connector = new(
+            ParsedTestCase.From("<reply>\n<data crlf=\"yes\">\n553-Ambiguous; Possibilities are:\n553 <smith@example.com>\n</data>\n</reply>\n"),
+            new NoListenPortConnector(new SwsHttpServerConnector(ParsedTestCase.From(string.Empty), TimeProvider.System)));
+
+        await using IConnection connection = (await connector.ConnectAsync(new ConnectTarget("127.0.0.1", SmtpServerConnector.SmtpPort, false), TestContext.CancellationToken)).Connection!;
+        await ReadTextAsync(connection);
+        await connection.WriteAsync(Encoding.Latin1.GetBytes("VRFY smith\r\n"), TestContext.CancellationToken);
+        string reply = await ReadTextAsync(connection);
+
+        Assert.AreEqual("553-Ambiguous; Possibilities are:\r\n553 <smith@example.com>\r\n", reply);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_OtherPort_ReachesTheWrappedServerAndRecordsNothing()
     {
         SmtpServerConnector connector = new(

@@ -15,8 +15,10 @@ namespace Curl.Conformance;
 /// The command gets the arguments <c>runtests.pl</c> puts before it: <c>--output
 /// %LOGDIR/curl%TESTNUMBER.out</c> unless the command's <c>option</c> says <c>no-output</c> or the case
 /// verifies <c>&lt;stdout&gt;</c> without <c>force-output</c>, then <c>--include</c> unless it says
-/// <c>no-include</c>. Upstream's <c>--trace-ascii</c>, <c>--trace-config</c> and <c>--trace-time</c>
-/// are left out: Curl has no trace output and no case compares the trace (ADR-0029).
+/// <c>no-include</c>, then <c>--trace-ascii %LOGDIR/trace%TESTNUMBER</c> (<c>--trace</c> when it says
+/// <c>binary-trace</c>), <c>--trace-config all</c> and <c>--trace-time</c>, as upstream's do: no case
+/// compares the trace file, but a trace option makes curl print the default config file's
+/// <c>Note: Read config file from</c> line that test433 verifies (BL-2017).
 /// </para>
 /// <para>
 /// <c>%LOGDIR</c> is the absolute log directory with forward slashes, so cases can run in
@@ -276,7 +278,7 @@ public sealed class UpstreamCaseRunner(
         string outputFile = $"{logDirectory}/curl{testNumber.ToString(CultureInfo.InvariantCulture)}.out";
         WriteSshClientKeyFiles(logDirectory);
         WriteClientFiles(testCase);
-        List<string> arguments = Arguments(testCase, outputFile);
+        List<string> arguments = Arguments(testCase, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
 
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
@@ -296,8 +298,9 @@ public sealed class UpstreamCaseRunner(
         Pop3ServerConnector pop3 = new(testCase, imap);
         MqttServerConnector mqtt = new(testCase, new SocksServerConnector(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory)));
         IConnector servers = sshServer?.InFrontOf(mqtt) ?? mqtt;
-        // A CONNECT through the http-proxy to a mail port reaches that mail stand-in (test1319 to 1321, BL-2011).
-        server.TunnelServerForPort = port => port is Pop3ServerConnector.Pop3Port or ImapServerConnector.ImapPort or SmtpServerConnector.SmtpPort ? pop3 : null;
+        // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
+        // (test1319 to 1321, BL-2011; test714 and test715, BL-2035).
+        server.TunnelServerForPort = port => port is Pop3ServerConnector.Pop3Port or ImapServerConnector.ImapPort or SmtpServerConnector.SmtpPort or FtpServerConnector.FtpPort or FtpServerConnector.PassivePort ? pop3 : null;
         UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, tftp, EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(invocation, server).ConfigureAwait(false);
         if (failure is not null)
@@ -313,6 +316,7 @@ public sealed class UpstreamCaseRunner(
         return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutput.ToArray(), standardError.ToArray(), receivedBytes, outputFileBytes)
         {
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
+            LogDirectory = logDirectory,
             // A case reaches one uploading server, so at most one of these holds an upload.
             UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
         });
@@ -332,13 +336,14 @@ public sealed class UpstreamCaseRunner(
             : UpstreamCaseOutcome.Passed;
     }
 
-    // runtests.pl sets each NAME=value line of <client><setenv> for the run, an empty value as an
+    // runtests.pl sets each NAME=value line of every <client><setenv> part (getpart joins parts of one
+    // name, as test433 has two) for the run, an empty value as an
     // empty variable, and unsets a NAME with no '='. The run's environment holds nothing else, so
     // nothing is left to restore after it.
     private static Dictionary<string, string> EnvironmentVariables(UpstreamTestCase testCase)
     {
         Dictionary<string, string> variables = new(StringComparer.Ordinal);
-        foreach (string line in UpstreamTestPartBodies.Lines(testCase.Find("client", "setenv")))
+        foreach (string line in testCase.FindAll("client", "setenv").SelectMany(UpstreamTestPartBodies.Lines))
         {
             int equals = line.IndexOf('=', StringComparison.Ordinal);
             if (equals > 0)
@@ -412,7 +417,7 @@ public sealed class UpstreamCaseRunner(
             .Select(line => UpstreamPerlCheckLine.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!)
             .FirstOrDefault(failed);
 
-    private static List<string> Arguments(UpstreamTestCase testCase, string outputFile)
+    private static List<string> Arguments(UpstreamTestCase testCase, string outputFile, string traceFile)
     {
         UpstreamTestSection command = testCase.Find("client", "command")!;
         string option = command.GetAttribute("option") ?? string.Empty;
@@ -420,6 +425,7 @@ public sealed class UpstreamCaseRunner(
             && (testCase.Find("verify", "stdout") is null || option.Contains("force-output", StringComparison.Ordinal));
         List<string> arguments = writesOutputFile ? ["--output", outputFile] : [];
         arguments.AddRange(option.Contains("no-include", StringComparison.Ordinal) ? [] : ["--include"]);
+        arguments.AddRange([option.Contains("binary-trace", StringComparison.Ordinal) ? "--trace" : "--trace-ascii", traceFile, "--trace-config", "all", "--trace-time"]);
         arguments.AddRange(UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(command)).Arguments);
         return arguments;
     }

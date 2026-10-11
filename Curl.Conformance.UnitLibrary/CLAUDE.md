@@ -74,7 +74,7 @@ Connections to `SwsHttpServerConnector.ProxyPort` (8992, the runner's `%PROXYPOR
 for upstream's `http-proxy` server (BL-1924): they are served the same way but recorded in
 `ProxyReceivedBytes`, compared with `<verify><proxy>` after `<strip>` / `<strippart>` as
 `<verify><protocol>` is; after a `CONNECT` such a connection records into `ReceivedBytes`, as
-upstream's HTTP server logs the tunnelled request. A `CONNECT` to `%POP3PORT`, `%IMAPPORT` or `%SMTPPORT` is relayed instead, once its `<connect>` reply keeps the connection open, to that mail stand-in (`SwsHttpServerConnector.TunnelServerForPort`, which the runner sets; BL-2011), as upstream's http-proxy connects to the named port, so the tunnelled commands land in its `ProtocolLog` (test1319, test1320, test1321 pass). Screening lets `http-proxy` cases run.
+upstream's HTTP server logs the tunnelled request. A `CONNECT` to `%POP3PORT`, `%IMAPPORT` or `%SMTPPORT` is relayed instead, once its `<connect>` reply keeps the connection open, to that mail stand-in (`SwsHttpServerConnector.TunnelServerForPort`, which the runner sets; BL-2011), as upstream's http-proxy connects to the named port, so the tunnelled commands land in its `ProtocolLog` (test1319, test1320, test1321 pass). A `CONNECT` to `%FTPPORT` or the FTP stand-in's passive port (`FtpServerConnector.FtpPort`, `PassivePort`) is relayed the same way, so FTP's control and data connections through the proxy reach the FTP stand-in (test714, test715 pass; BL-2035). Screening lets `http-proxy` cases run.
 No case is skipped for `%PROXYPORT` any more (BL-1897): 17 proxy cases are measured (80, 83, 95,
 150, 184, 194, 275, 744, 1078, 1184, 1288, 1297, 1428, 1904, 2050, 2107, 3028), and the other
 `%PROXYPORT` cases skip for another reason (a `<tool>`, `<setenv>`, a feature or another server's port).
@@ -199,7 +199,7 @@ outside the case's log directory; before expansion `UpstreamTestDirectoryComposi
 `%PWD/%LOGDIR` to `%LOGDIR` (the absolute log directory, so the composition names the file there on
 every platform) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
 `runtests.pl`'s default `$srcdir` names them; any other `%SRCDIR` has no value and skips the case
-(ADR-0458, BL-1944); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it;
+(ADR-0458, BL-1944); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);
 `%PWD` elsewhere has a value only when the caller names a tests
 directory, and `%CERTDIR` only when it names a certificate directory: the folder holding
 upstream's `certs` folder, since cases name `%CERTDIR/certs/test-ca.crt` (BL-1922; the
@@ -209,7 +209,7 @@ the case's log directory, splits `<client><command>` with `UpstreamCommandLineSp
 the shell `runtests.pl` uses would, and runs curl through an `UpstreamCurlInvocation` against
 the `sws` emulation and `TftpServerConnector`. The invocation's
 `EnvironmentVariables` is the whole environment the run reads (BL-1892): each `NAME=value` line
-of `<client><setenv>`, after expansion (so `%HOSTIP` and the rest are already replaced), with an
+of every `<client><setenv>` part (`getpart` joins them; BL-2017), after expansion (so `%HOSTIP` and the rest are already replaced), with an
 empty value kept as an empty variable and a line with no `=` (or a `#` comment) left out, as
 `runtests.pl` unsets such a name; nothing else is in it, so a run without `<setenv>` sees no
 variable and nothing is left to restore. The conformance tests hand it to
@@ -225,8 +225,8 @@ no real time (ADR-0404, BL-1355). The run is under a time limit from an injected
 `TimeProvider` (a run past it cannot be stopped, since curl's runner takes no cancellation
 token, so the case fails and the run is abandoned). `UpstreamCaseVerification` compares the `UpstreamCaseRun` against
 `<verify>` (protocol after `<strip>` / `<strippart>`, run as `UpstreamPerlSubstitution`s
-compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`), and
-`UpstreamFirstDifference` names the first differing byte and line.
+compiled by `UpstreamRegex`; stdout; stderr; exit code; `<verify><file>`).
+When the expected `<stderr>` names the case's `%LOGDIR` (`UpstreamCaseRun.LogDirectory`), both sides first have curl's 79-column-wrapped `Note:` and `Warning:` lines joined (`UpstreamWrappedMessageLines`, ADR-0475), since the absolute `%LOGDIR` wraps a note `runtests.pl`'s short `log` keeps on one line (test994, test996, test1491). `UpstreamFirstDifference` names the first differing byte and line.
 `UpstreamPerlOneLiner` (BL-1930) interprets, by whole-line pattern and with no Perl, the
 `%PERL -e` one-liners the vendored cases put in a precheck or postcheck, returning an
 `UpstreamPerlOneLinerResult` (exit code and stdout), or null for any other line: the

@@ -42,8 +42,8 @@ public sealed class UpstreamCaseRunnerTests
         Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
         diagnostics.Assert("first argument", "--output", arguments![0]);
         Assert.AreEqual("--output", arguments![0]);
-        diagnostics.Assert("arguments after the output file", "--include http://127.0.0.1:8990/5", string.Join(' ', arguments.Skip(2)));
-        CollectionAssert.AreEqual(new[] { "--include", "http://127.0.0.1:8990/5" }, arguments.Skip(2).ToArray());
+        diagnostics.Assert("arguments after the output file", "--include --trace-ascii --trace-config all --trace-time http://127.0.0.1:8990/5", string.Join(' ', arguments.Skip(2).Where((_, index) => index != 2)));
+        CollectionAssert.AreEqual(new[] { "--include", "--trace-ascii", "--trace-config", "all", "--trace-time", "http://127.0.0.1:8990/5" }, arguments.Skip(2).Where((_, index) => index != 2).ToArray());
     }
 
     [TestMethod]
@@ -61,11 +61,12 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
-    [DataRow("", "", new[] { "--output", "*", "--include", "a" })]
-    [DataRow(" option=\"no-include\"", "", new[] { "--output", "*", "a" })]
-    [DataRow(" option=\"no-output,no-include\"", "", new[] { "a" })]
-    [DataRow("", "<verify>\n<stdout>\n</stdout>\n</verify>\n", new[] { "--include", "a" })]
-    [DataRow(" option=\"force-output\"", "<verify>\n<stdout>\n</stdout>\n</verify>\n", new[] { "--output", "*", "--include", "a" })]
+    [DataRow("", "", new[] { "--output", "*", "--include", "--trace-ascii", "#", "--trace-config", "all", "--trace-time", "a" })]
+    [DataRow(" option=\"no-include\"", "", new[] { "--output", "*", "--trace-ascii", "#", "--trace-config", "all", "--trace-time", "a" })]
+    [DataRow(" option=\"no-output,no-include\"", "", new[] { "--trace-ascii", "#", "--trace-config", "all", "--trace-time", "a" })]
+    [DataRow("", "<verify>\n<stdout>\n</stdout>\n</verify>\n", new[] { "--include", "--trace-ascii", "#", "--trace-config", "all", "--trace-time", "a" })]
+    [DataRow(" option=\"force-output\"", "<verify>\n<stdout>\n</stdout>\n</verify>\n", new[] { "--output", "*", "--include", "--trace-ascii", "#", "--trace-config", "all", "--trace-time", "a" })]
+    [DataRow(" option=\"binary-trace\"", "", new[] { "--output", "*", "--include", "--trace", "#", "--trace-config", "all", "--trace-time", "a" })]
     public async Task RunAsync_PutsRuntestsArgumentsBeforeTheCommand(string commandAttributes, string verify, string[] expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -79,8 +80,8 @@ public sealed class UpstreamCaseRunnerTests
         await RunAsync(runner, $"<testcase>\n<client>\n<command{commandAttributes}>\na\n</command>\n</client>\n{verify}</testcase>\n");
 
         diagnostics.Arrange("expected arguments", string.Join(' ', expected));
-        diagnostics.Assert("arguments", string.Join(' ', expected), string.Join(' ', arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument).ToArray()));
-        CollectionAssert.AreEqual(expected, arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument).ToArray());
+        diagnostics.Assert("arguments", string.Join(' ', expected), string.Join(' ', arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument.EndsWith("/trace5", StringComparison.Ordinal) ? "#" : argument).ToArray()));
+        CollectionAssert.AreEqual(expected, arguments!.Select(argument => argument.EndsWith("/curl5.out", StringComparison.Ordinal) ? "*" : argument.EndsWith("/trace5", StringComparison.Ordinal) ? "#" : argument).ToArray());
     }
 
     [TestMethod]
@@ -353,7 +354,7 @@ public sealed class UpstreamCaseRunnerTests
         IReadOnlyList<string>? arguments = null;
         UpstreamCaseRunner runner = Runner(invocation =>
         {
-            arguments = invocation.Arguments;
+            arguments = CommandArguments(invocation);
             return Task.FromResult(0);
         });
         string testFile = "<testcase>\n<client>\n<command option=\"no-output,no-include\">\n--output-dir %PWD/not-there\n</command>\n</client>\n</testcase>\n";
@@ -387,7 +388,7 @@ public sealed class UpstreamCaseRunnerTests
         IReadOnlyList<string>? arguments = null;
         UpstreamCaseRunner runner = Runner(invocation =>
         {
-            arguments = invocation.Arguments;
+            arguments = CommandArguments(invocation);
             return Task.FromResult(0);
         });
         string testFile = "<testcase>\n<client>\n<server>\nnone\n</server>\n<command option=\"no-output,no-include\">\n--cacert %CERTDIR/certs/test-ca.crt\n</command>\n</client>\n</testcase>\n";
@@ -408,7 +409,7 @@ public sealed class UpstreamCaseRunnerTests
         string[]? arguments = null;
         UpstreamCaseRunner runner = Runner(invocation =>
         {
-            arguments = [.. invocation.Arguments];
+            arguments = [.. CommandArguments(invocation)];
             return Task.FromResult(0);
         });
 
@@ -452,7 +453,7 @@ public sealed class UpstreamCaseRunnerTests
         IReadOnlyList<string>? arguments = null;
         UpstreamCaseRunner runner = Runner(invocation =>
         {
-            arguments = invocation.Arguments;
+            arguments = CommandArguments(invocation);
             return Task.FromResult(0);
         });
 
@@ -548,6 +549,25 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_TwoSetenvParts_SetsTheVariablesOfBoth()
+    {
+        // getpart joins every part of one name in a section; test433 sets COLUMNS in a second <setenv> (BL-2017).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyDictionary<string, string>? environment = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            environment = invocation.EnvironmentVariables;
+            return Task.FromResult(0);
+        });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<setenv>\nA=1\n</setenv>\n<setenv>\nCOLUMNS=300\n</setenv>\n<command>\na\n</command>\n</client>\n</testcase>\n");
+
+        string actual = string.Join(';', environment!.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}"));
+        diagnostics.Assert("environment", "A=1;COLUMNS=300", actual);
+        Assert.AreEqual("A=1;COLUMNS=300", actual);
+    }
+
+    [TestMethod]
     public async Task RunAsync_NoListenPort_IsAPortWhoseConnectionIsRefused()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -581,7 +601,7 @@ public sealed class UpstreamCaseRunnerTests
         UpstreamCaseRunner runner = new(
             async invocation =>
             {
-                arguments = [.. invocation.Arguments];
+                arguments = [.. CommandArguments(invocation)];
                 ConnectResult result = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", UpstreamSshServer.SshPort, false), CancellationToken.None);
                 sshServerReached = result.ErrorMessage;
                 return 0;
@@ -609,7 +629,7 @@ public sealed class UpstreamCaseRunnerTests
         UpstreamCaseRunner runner = new(
             invocation =>
             {
-                string uploaded = invocation.Arguments[0];
+                string uploaded = CommandArguments(invocation)[0];
                 Directory.CreateDirectory(Path.GetDirectoryName(uploaded)!);
                 File.WriteAllText(uploaded, "payload\n");
                 return Task.FromResult(0);
@@ -633,6 +653,10 @@ public sealed class UpstreamCaseRunnerTests
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ConnectResult.Refused(name));
     }
+
+    // The case's own command: what follows the --trace-time runtests.pl ends its arguments with.
+    private static string[] CommandArguments(UpstreamCurlInvocation invocation) =>
+        [.. invocation.Arguments.SkipWhile(argument => argument != "--trace-time").Skip(1)];
 
     private static UpstreamCaseRunner Runner(Func<UpstreamCurlInvocation, Task<int>> runCurl) =>
         Runner(runCurl, TimeSpan.FromSeconds(10));
@@ -856,7 +880,7 @@ public sealed class UpstreamCaseRunnerTests
         int read = -1;
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
-            arguments = [.. invocation.Arguments];
+            arguments = [.. CommandArguments(invocation)];
             ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", HttpsServerConnector.HttpsPort, false), CancellationToken.None);
             await using IConnection connection = connected.Connection!;
             await connection.WriteAsync("GET / HTTP/1.1\r\n\r\n"u8.ToArray(), CancellationToken.None);
@@ -890,7 +914,7 @@ public sealed class UpstreamCaseRunnerTests
         int read = -1;
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
-            arguments = [.. invocation.Arguments];
+            arguments = [.. CommandArguments(invocation)];
             ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", MailTlsServerConnector.SmtpsPort, false), CancellationToken.None);
             await using IConnection connection = connected.Connection!;
             await connection.WriteAsync("EHLO x\r\n"u8.ToArray(), CancellationToken.None);
@@ -933,7 +957,7 @@ public sealed class UpstreamCaseRunnerTests
         int read = -1;
         UpstreamCaseRunner runner = Runner(async invocation =>
         {
-            arguments = [.. invocation.Arguments];
+            arguments = [.. CommandArguments(invocation)];
             ConnectResult connected = await invocation.Connector.ConnectAsync(new ConnectTarget("127.0.0.1", FtpsServerConnector.FtpsPort, false), CancellationToken.None);
             await using IConnection connection = connected.Connection!;
             await connection.WriteAsync("USER x\r\n"u8.ToArray(), CancellationToken.None);

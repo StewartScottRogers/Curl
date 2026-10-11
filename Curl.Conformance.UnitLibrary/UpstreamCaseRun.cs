@@ -26,6 +26,13 @@ internal sealed class UpstreamCaseRun(int exitCode, byte[] standardOutput, byte[
     /// <summary>The last message the emulated SMTP server on <c>%SMTPPORT</c> received, for <c>&lt;verify&gt;&lt;upload&gt;</c>.</summary>
     public byte[] UploadedBytes { get; init; } = [];
 
+    /// <summary>
+    /// The case's <c>%LOGDIR</c>, or <see langword="null"/> when unknown: an expected <c>&lt;stderr&gt;</c>
+    /// naming it is compared with curl's wrapped <c>Note:</c> and <c>Warning:</c> lines joined
+    /// (<see cref="UpstreamWrappedMessageLines"/>).
+    /// </summary>
+    public string? LogDirectory { get; init; }
+
     /// <summary>The <c>--output</c> file the harness added, empty when it was not written.</summary>
     public byte[] OutputFileBytes { get; } = outputFileBytes;
 }

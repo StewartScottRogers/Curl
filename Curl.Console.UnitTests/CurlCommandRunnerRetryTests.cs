@@ -151,6 +151,86 @@ public sealed class CurlCommandRunnerRetryTests
         Assert.IsEmpty(clock.Waits);
     }
 
+    /// <summary>
+    /// Upstream test366 as runtests runs it, with the meter drawn: curl 8.21.0 wrote the whole
+    /// progress meter and its newline before the <c>Retry-After</c> warning (measured with
+    /// Record-CurlExchange.ps1 on 2026-10-10, BL-2008).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryAfterLongerThanRetryMaxTimeWithTheMeter_WarnsAfterTheMeter()
+    {
+        const string busy = "HTTP/1.1 503 BAD\r\nContent-Length: 21\r\nRetry-After: 200\r\n\r\nserver not available\n";
+        string warning =
+            "Warning: The Retry-After: time would make this command line exceed the maximum " + NewLine
+            + "Warning: allowed time for retries." + NewLine;
+
+        int exitCode = await RunAsync([busy], writesProgressMeter: true, "--retry", "2", "--retry-max-time", "10", "-o", "out.txt", Url);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("stderr ends with the meter's newline and the warning", true, Lf(StandardErrorText).EndsWith("0\n" + Lf(warning), StringComparison.Ordinal));
+        Assert.AreEqual(0, exitCode);
+        Assert.EndsWith(Lf("0" + NewLine + warning), Lf(StandardErrorText));
+        Assert.AreEqual(1, StandardErrorText.Split("Warning:").Length - 2);
+    }
+
+    /// <summary>
+    /// Upstream test1634 as runtests runs it, into an <c>--output</c> file: the <c>429</c>'s
+    /// attempt wrote only <c>-i</c> header lines, so curl 8.21.0 left them in the file rather than
+    /// cutting it back, and the file holds both heads and <c>hey</c> (measured with
+    /// Record-CurlExchange.ps1 on 2026-10-10, BL-2008).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryUnderFailOfA429IntoOutputFile_KeepsThe429sHeadInTheFile()
+    {
+        const string tooManyHead = "HTTP/1.1 429 too many requests swsbounce\r\nRetry-After: 1\r\nContent-Length: 4\r\n\r\n";
+        const string okHead = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n";
+
+        int exitCode = await RunAsync([tooManyHead + "moo\n", okHead + "hey\n"], "--retry", "1", "--fail", "-i", "-v", "-o", "out.txt", Url);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("out.txt content", tooManyHead + okHead + "hey\n", WrittenText("out.txt"));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(tooManyHead + okHead + "hey\n", WrittenText("out.txt"));
+        Assert.DoesNotContain("Throwing away", StandardErrorText);
+    }
+
+    /// <summary>
+    /// Upstream test1633 as runtests runs it, into an <c>--output</c> file: neither attempt wrote a
+    /// body, so the file keeps all four heads (measured with Record-CurlExchange.ps1 on 2026-10-10, BL-2008).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryOfARedirectedPostAnswered429IntoOutputFile_KeepsAllFourHeads()
+    {
+        const string moved = "HTTP/1.1 301 OK\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\nConnection: close\r\nLocation: /16330002\r\n\r\n";
+        const string tooMany = "HTTP/1.1 429 too many requests\r\nRetry-After: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+
+        int exitCode = await RunAsync([moved, tooMany, moved, tooMany], "-d", "moo", "--retry", "1", "-L", "-i", "-o", "out.txt", "http://127.0.0.1:18241/1633");
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("out.txt content", moved + tooMany + moved + tooMany, WrittenText("out.txt"));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(moved + tooMany + moved + tooMany, WrittenText("out.txt"));
+    }
+
+    /// <summary>
+    /// A retried attempt that wrote a body after an earlier one wrote only <c>-i</c> header lines
+    /// cuts the file back past both, as curl 8.21.0's <c>ftruncate</c> to the length at open does,
+    /// and counts only its own body in the note (BL-2008).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RetryWithABodyAfterAHeadOnlyAttempt_CutsBothAndNotesTheBodyBytes()
+    {
+        const string tooMany = "HTTP/1.1 429 too many requests\r\nRetry-After: 1\r\nContent-Length: 0\r\n\r\n";
+
+        int exitCode = await RunAsync([tooMany, Busy, Ok], "--retry", "2", "-i", "-v", "-o", "out.txt", Url);
+
+        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Diff("out.txt content", Ok, WrittenText("out.txt"));
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(Ok, WrittenText("out.txt"));
+        Assert.AreEqual(1, StandardErrorText.Split("Note: Throwing away 4 bytes").Length - 1);
+    }
+
     [TestMethod]
     public async Task RunAsync_RetryIntoOutputFile_KeepsOnlyTheLastAttemptsBody()
     {

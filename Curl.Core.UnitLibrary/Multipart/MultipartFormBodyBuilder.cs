@@ -222,7 +222,9 @@ public sealed class MultipartFormBodyBuilder(
             return new MultipartFormBuildResult(null, TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage));
         }
 
-        Stream content = segments.ToStream();
+        // A mail message of unknown size, as a quoted-printable part makes it, cannot seek, so
+        // SMTP sends no SIZE= and IMAP refuses to APPEND it, as curl 8.21.0 does (BL-2025).
+        Stream content = segments.ToStream(allowsSeeking: !forMail || segments.Length is not null);
         StreamBody body = new(content, segments.Length, labelledContentType);
         return new MultipartFormBuildResult(body, null);
     }
@@ -408,7 +410,7 @@ public sealed class MultipartFormBodyBuilder(
         }
 
         segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
-        AddData(segments, copy.ToArray(), encoder);
+        AddData(segments, copy.ToArray(), encoder, forMail);
         return null;
     }
 
@@ -421,11 +423,11 @@ public sealed class MultipartFormBodyBuilder(
             return;
         }
 
-        AddEncodedData(segments, textEncoding.GetBytes(part.Content), encoder);
+        AddEncodedData(segments, textEncoding.GetBytes(part.Content), encoder, forMail);
     }
 
     /// <summary>Adds <paramref name="data" />, whose length is known, encoded when there is an encoder.</summary>
-    private static void AddData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder? encoder)
+    private static void AddData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder? encoder, bool forMail)
     {
         if (encoder is null)
         {
@@ -433,11 +435,23 @@ public sealed class MultipartFormBodyBuilder(
             return;
         }
 
-        AddEncodedData(segments, data, encoder);
+        AddEncodedData(segments, data, encoder, forMail);
     }
 
-    private static void AddEncodedData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder encoder)
+    /// <summary>
+    /// Adds <paramref name="data" /> encoded; in a mail message a <c>7bit</c> part is encoded as
+    /// it is sent, so the bytes before a byte above 127 go out after <c>DATA</c> and the read
+    /// that reaches it fails, as curl 8.21.0 sends it (measured, BL-2025), while a form's
+    /// refused data fails the body before it connects.
+    /// </summary>
+    private static void AddEncodedData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder encoder, bool forMail)
     {
+        if (forMail && encoder.CanRefuseData)
+        {
+            segments.AddStream(encoder.EncodeWhileReading(new MemoryStream(data, writable: false), data.Length), data.Length);
+            return;
+        }
+
         byte[]? encoded = encoder.Encode(data);
         if (encoded is null)
         {

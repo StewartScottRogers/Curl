@@ -304,9 +304,11 @@ public sealed class CommandLineDefaultConfigFileTests
     [DataRow(new[] { "-v", Url })]
     [DataRow(new[] { "-v", "--bogus", Url })]
     [DataRow(new[] { "-v" })]
+    [DataRow(new[] { "--trace-ascii", "trace433", "--trace-config", "all", "--trace-time", Url, "--no-progress-meter" })]
     public void Parse_VerboseReadWithDefaultConfigFile_NotesTheFile(string[] arguments)
     {
         // BL-352: curl -v --bogus and curl -v (no URL) print the note, as an accepted -v does.
+        // BL-2017: --trace-ascii, as runtests.pl passes it to upstream test433, prints it with no -v (measured on curl 8.21.0).
         CommandLineParseResult result = Parse(arguments, "silent\n");
 
         TestDiagnostics.For(TestContext).Assert("noted default config file", Curlrc, result.NotedDefaultConfigFile);
@@ -316,12 +318,26 @@ public sealed class CommandLineDefaultConfigFileTests
     [TestMethod]
     [DataRow(new[] { Url })]
     [DataRow(new[] { "--bogus", "-v", Url })]
+    [DataRow(new[] { "--trace-time", Url, "--no-progress-meter" })]
     public void Parse_NoVerboseReadWithDefaultConfigFile_NotesNoFile(string[] arguments)
     {
         // BL-352: curl --bogus -v prints no note; the -v was never read.
+        // BL-2017: nor does a curlrc found through XDG_CONFIG_HOME without -v or a trace file, --next in it or not, nor --trace-time alone (measured on curl 8.21.0).
         CommandLineParseResult result = Parse(arguments, "silent\n");
 
         TestDiagnostics.For(TestContext).Assert("noted default config file", null, result.NotedDefaultConfigFile);
+        Assert.IsNull(result.NotedDefaultConfigFile);
+    }
+
+    [TestMethod]
+    public void Parse_DefaultConfigFileStartingWithNextWithoutVerbose_NotesNoFile()
+    {
+        // BL-2017: upstream test433's curlrc; curl 8.21.0 sent its header and data and printed no note.
+        CommandLineParseResult result = Parse([Url, "--no-progress-meter"], "--next\nheader = \"a: a\"\ndata = \"curlrc read\"\n");
+
+        TestDiagnostics.For(TestContext).Assert("accepted", true, result.IsAccepted);
+        TestDiagnostics.For(TestContext).Assert("noted default config file", null, result.NotedDefaultConfigFile);
+        Assert.IsTrue(result.IsAccepted);
         Assert.IsNull(result.NotedDefaultConfigFile);
     }
 

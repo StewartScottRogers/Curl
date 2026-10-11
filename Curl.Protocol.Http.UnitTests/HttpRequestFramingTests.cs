@@ -307,6 +307,34 @@ public sealed class HttpRequestFramingTests
         Assert.AreEqual(refused, framing.RefusesUnknownLength);
         Diagnostics.Assert("framing.IsChunked", true, framing.IsChunked);
         Assert.IsTrue(framing.IsChunked);
+        Diagnostics.Assert("framing.ChunksForUnknownLength", header is null, framing.ChunksForUnknownLength);
+        Assert.AreEqual(header is null, framing.ChunksForUnknownLength);
+    }
+
+    // Upstream test98: an emptied or non-chunked -H Transfer-Encoding sends a body of unknown length
+    // as it comes, unchunked, and -0 then refuses nothing; an -H Content-Length changes nothing (test60).
+    [TestMethod]
+    [DataRow(HttpVersionPreference.Http11, "Transfer-Encoding:", false, DisplayName = "emptied Transfer-Encoding sends it unchunked")]
+    [DataRow(HttpVersionPreference.Http10, "Transfer-Encoding:", false, DisplayName = "-0 with emptied Transfer-Encoding is not refused")]
+    [DataRow(HttpVersionPreference.Http11, "Transfer-Encoding: gzip", false, DisplayName = "-H gzip Transfer-Encoding sends it unchunked")]
+    [DataRow(HttpVersionPreference.Http11, "Content-Length: 1", true, DisplayName = "-H Content-Length still sends it chunked")]
+    public void Of_BodyOfUnknownLengthWithTransferEncodingHeader_ChunksAsTheHeaderSays(HttpVersionPreference version, string header, bool chunked)
+    {
+        HttpRequestOptions options = new()
+        {
+            Version = version,
+            Headers = [header],
+            Body = new StreamBody(Stream.Null, null, "a/b"),
+        };
+
+        HttpRequestFraming framing = Of(options);
+
+        Diagnostics.Assert("framing.IsChunked", chunked, framing.IsChunked);
+        Assert.AreEqual(chunked, framing.IsChunked);
+        Diagnostics.Assert("framing.ChunksForUnknownLength", chunked, framing.ChunksForUnknownLength);
+        Assert.AreEqual(chunked, framing.ChunksForUnknownLength);
+        Diagnostics.Assert("framing.RefusesUnknownLength", false, framing.RefusesUnknownLength);
+        Assert.IsFalse(framing.RefusesUnknownLength);
     }
 
     [TestMethod]

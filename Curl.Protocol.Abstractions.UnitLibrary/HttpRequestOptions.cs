@@ -126,6 +126,15 @@ public sealed record HttpRequestOptions
     public HttpAuthSchemes AuthSchemePicked { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a response of an earlier hop of the transfer was
+    /// HTTP/1.0, which sends this request as HTTP/1.0, as for <c>-0</c>, since curl 8.21.0 sends
+    /// every later request of a transfer as HTTP/1.0 once a response in it was: a <c>-T -</c>
+    /// upload <c>-L</c> follows from an HTTP/1.0 3xx fails with exit 25 before the hop is sent
+    /// (upstream test1073, BL-2037).
+    /// </summary>
+    public bool EarlierResponseWasHttp10 { get; init; }
+
+    /// <summary>
     /// Gets how a status of 400 or above ends the transfer; <see cref="HttpFailMode.None" />
     /// when neither <c>-f</c> nor <c>--fail-with-body</c> was given.
     /// </summary>

@@ -242,11 +242,20 @@ internal static class CurlComposition
 
         return new RankedHttpAuthenticator(
             new BasicAndBearerAuthenticator(credentialEncoding),
-            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog),
+            new DigestAuthenticator(credentialEncoding, DigestClientNonce.CreateRandom, diagnosticLog, matchesSspiBuild: MatchesSspiBuild(securityContexts)),
             new NegotiateHttpAuthenticator(securityContexts, negotiateOptions, diagnosticLog: diagnosticLog),
             new NtlmHttpAuthenticator(securityContexts, matchesSspiBuild: OperatingSystem.IsWindows(), diagnosticLog),
             diagnosticLog);
     }
+
+    /// <summary>
+    /// Whether Digest sends its header in the Schannel build's SSPI form: on Windows, unless the contexts
+    /// are the hand-built ones that curl's non-SSPI build is matched with (the upstream conformance runner's).
+    /// </summary>
+    /// <param name="securityContexts">The contexts the authenticator is made over.</param>
+    /// <returns><see langword="true" /> for the SSPI form.</returns>
+    private static bool MatchesSspiBuild(ISecurityContextFactory securityContexts) =>
+        OperatingSystem.IsWindows() && securityContexts is not HandBuiltNtlmSecurityContextFactory and not LateBoundSecurityContextFactory { UsesHandBuiltNtlm: true };
 
     /// <summary>
     /// Creates ADR-0142's router for NTLM, Negotiate and Kerberos contexts: SSPI on Windows,
@@ -1222,7 +1231,8 @@ internal static class CurlComposition
     /// </param>
     /// <param name="readEnvironmentVariable">
     /// Reads every environment variable the run reads - the proxy variables, <c>IPFS_GATEWAY</c>,
-    /// <c>HOME</c> for the netrc file and the rest - so a test gives one run its own environment
+    /// <c>HOME</c> for the netrc file, <c>COLUMNS</c> for the width warnings and notes wrap at
+    /// (<see cref="TerminalColumns" />, no console consulted; BL-2017) and the rest - so a test gives one run its own environment
     /// without touching the process's (BL-1928); <see langword="null" /> for a run that reads none.
     /// </param>
     /// <param name="ftpListener">Listens for FTP's active-mode (<c>-P</c>) data connections; a <see cref="TcpConnectionListener" /> when <see langword="null" /> (BL-1907).</param>
@@ -1253,6 +1263,7 @@ internal static class CurlComposition
             standardError,
             standardInput,
             OperatingSystem.IsWindows(),
+            terminalColumns: TerminalColumns.Resolve(environment(TerminalColumns.ColumnsVariableName), () => null),
             writesProgressMeter: writesProgressMeter,
             writeOutFileOpener: writeOutFileOpener,
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
@@ -1295,7 +1306,7 @@ internal static class CurlComposition
     {
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(TlsClientOptionsMapping.FromCommandLine(options), TimeProvider.System);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(TlsClientOptionsMapping.ProxyFromCommandLine(options), TimeProvider.System);
-        LateBoundSecurityContextFactory proxyContexts = new();
+        LateBoundSecurityContextFactory proxyContexts = new() { UsesHandBuiltNtlm = usesHandBuiltNtlm };
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(options, proxyContexts, diagnosticLog);
         TcpConnector tcpConnector = CreateTcpConnector(options, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, socks5SecurityContexts: proxyContexts);
         PoolingConnector poolingConnector = CreatePoolingConnector(options, tcpConnector, TimeProvider.System, runConnections);

@@ -26,8 +26,10 @@ namespace Curl.Protocol.Http;
 /// value names them. Through a forward proxy the request target is the absolute form,
 /// <c>http://host[:port]/path?query</c>, with no user information or fragment. The <c>-H</c> values follow in
 /// command-line order, then, through a forward proxy only, the <c>--proxy-header</c> values under the
-/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A request with a body ends with <c>Content-Length</c> (or
-/// <c>Transfer-Encoding: chunked</c> when the length is unknown), <c>Content-Type</c> and
+/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A body of unknown length gets
+/// <c>Transfer-Encoding: chunked</c> just after <c>Proxy-Connection</c>, ahead of the <c>Cookie</c> and the
+/// <c>-H</c> values, as curl 8.21.0 places it (upstream test60). A request with a body ends with
+/// <c>Content-Length</c> when its length is known, <c>Content-Type</c> and
 /// <c>Expect: 100-continue</c> as <see cref="HttpRequestFraming" /> decides, each again left
 /// out when an <c>-H</c> value names it. The <c>Connection</c> lines come last of all
 /// (<see cref="AppendConnection" />), with <c>TE</c> added for <c>--tr-encoding</c>. The <c>-H</c>, <c>--proxy-header</c>, <c>-A</c> and
@@ -133,6 +135,7 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
         AppendUnlessOverridden(head, [.. customHeaders, .. proxyHeaders], "Proxy-Connection", forwardProxy ? "Keep-Alive" : null);
+        AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.Body is not null && framing.KnownLength is null ? "chunked" : null);
         AppendUnlessOverridden(head, customHeaders, "Alt-Used", AltUsedOf(options.AltSvcRoute));
         AppendH2cUpgrade(head, upgradesToH2c);
         AppendAlways(head, "Cookie", cookie);
@@ -359,8 +362,7 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Appends the body's framing headers: <c>Content-Length</c> as
-    /// <see cref="ContentLengthOf" /> gives it, <c>Transfer-Encoding: chunked</c> when its
-    /// length is unknown, its <c>Content-Type</c> as <see cref="BodyContentTypeOf" /> gives it, and curl's
+    /// <see cref="ContentLengthOf" /> gives it, its <c>Content-Type</c> as <see cref="BodyContentTypeOf" /> gives it, and curl's
     /// own <c>Expect: 100-continue</c>. A <c>-F</c> form's <c>Content-Type</c> is
     /// <paramref name="formContentType" /> when an <c>-H</c> value names one.
     /// </summary>
@@ -372,7 +374,6 @@ internal static class HttpRequestHeadFormatter
         }
 
         AppendUnlessOverridden(head, framing.IsAuthProbe ? [] : customHeaders, ContentLengthName, ContentLengthOf(framing));
-        AppendUnlessOverridden(head, customHeaders, "Transfer-Encoding", framing.KnownLength is null ? "chunked" : null);
         AppendAlways(head, ContentTypeName, formContentType);
         AppendUnlessOverridden(head, customHeaders, ContentTypeName, BodyContentTypeOf(framing, body));
         AppendUnlessOverridden(head, customHeaders, "Expect", framing.AddsExpect ? "100-continue" : null);

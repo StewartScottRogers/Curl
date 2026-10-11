@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2008 — Re-close GF-0015: --retry does not follow a 429's Retry-After as curl does (resend, --fail, --retry-max-time warning)
 
@@ -37,14 +37,33 @@ In Curl.Console's retry loop: on a 429 with Retry-After, keep the 429's output w
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test366`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
-- [ ] `behaviour:test1633`: Curl answers what curl 8.21.0 answers, `upstream test1633 passes`, so the item measures `match`.
-- [ ] `behaviour:test1634`: Curl answers what curl 8.21.0 answers, `upstream test1634 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test366`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 0 bytes: `, so the item measures `match`.
+- [x] `behaviour:test1633`: Curl answers what curl 8.21.0 answers, `upstream test1633 passes`, so the item measures `match`.
+- [x] `behaviour:test1634`: Curl answers what curl 8.21.0 answers, `upstream test1634 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- 2026-10-10 (lane 1): Why BL-1842..1844 did not hold: their tests wrote to standard output
+  without the meter, but runtests adds `--include --output <file>`. Measured curl 8.21.0
+  (mingw, Schannel) with Record-CurlExchange.ps1 under `-i -o file`:
+  - test1634/test1633: curl keeps every attempt's `-i` heads in the file; it cuts the file back
+    (to its length at open, heads too) only when the attempt wrote body bytes, and
+    `Note: Throwing away N` counts body bytes only (a 503 `abc\n` under `-i -v` noted 4).
+    Curl cut back header-only attempts, leaving only the last attempt's heads.
+  - test366: curl writes the whole meter and its newline, then the Retry-After warning; Curl
+    wrote the warning inside the meter.
+- Fix (Curl.Console only): `KeepOrThrowAwayAttemptBytesAsync` counts body bytes as the file's
+  attempt bytes less the report's `HeaderSize` under `-i`/`-I`, cuts only when that is positive
+  and otherwise `DeferredOutputFileStream.LeaveForRetry()`s the heads so the next attempt counts
+  only its own; the abandoned-retry warning is held in `RunningTransferState.AbandonedRetryWarning`
+  and written after the progress meter. After the fix Curl's file is byte-identical to curl's for
+  1633 and 1634, and 366's stderr has the same order. No option changed, so `--ai-help` needs no change.
+- The gap tool itself (Gap/) is out of a lane's reach, so the items close on the next gap run.
 
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. --retry keeps -i heads in the -o file as curl does (test1633, test1634) and warns about a too-long Retry-After after the meter (test366)

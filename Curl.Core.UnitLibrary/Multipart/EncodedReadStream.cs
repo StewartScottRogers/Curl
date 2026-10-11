@@ -12,7 +12,7 @@ namespace Curl.Core.Multipart;
 /// It seeks when its source seeks, by starting the encoding again from where the source stood
 /// when the stream was made and reading forward, which is what lets
 /// <see cref="ConcatenatedReadStream" /> send a body again after a 307 or 308. A read that
-/// reaches data the encoder refuses throws <see cref="RequestBodyReadFailedException" />.
+/// reaches data the encoder refuses gives the bytes before it, and the read after them throws <see cref="RequestBodyReadFailedException" />.
 /// </remarks>
 internal sealed class EncodedReadStream : Stream
 {
@@ -39,6 +39,8 @@ internal sealed class EncodedReadStream : Stream
     private int outputOffset;
 
     private bool sourceEnded;
+
+    private bool refused;
 
     private long position;
 
@@ -81,7 +83,7 @@ internal sealed class EncodedReadStream : Stream
     /// <inheritdoc />
     public override int Read(Span<byte> buffer)
     {
-        while (OutputIsEmpty && !sourceEnded)
+        while (NeedsInput)
         {
             EncodeInput(source.Read(input.AsSpan(inputCount)));
         }
@@ -96,7 +98,7 @@ internal sealed class EncodedReadStream : Stream
     /// <inheritdoc />
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        while (OutputIsEmpty && !sourceEnded)
+        while (NeedsInput)
         {
             EncodeInput(await source.ReadAsync(input.AsMemory(inputCount), cancellationToken).ConfigureAwait(false));
         }
@@ -142,8 +144,27 @@ internal sealed class EncodedReadStream : Stream
     private bool OutputIsEmpty => outputOffset == output.WrittenCount;
 
     /// <summary>
+    /// Gets a value indicating whether a read must take more of the source before it can give
+    /// anything: once the bytes encoded before refused data are all read, the next read throws
+    /// <see cref="RequestBodyReadFailedException" />, as curl sends them and then fails (BL-2025).
+    /// </summary>
+    private bool NeedsInput
+    {
+        get
+        {
+            if (refused && OutputIsEmpty)
+            {
+                throw new RequestBodyReadFailedException(MultipartFormBodyBuilder.ReadFailedMessage);
+            }
+
+            return OutputIsEmpty && !sourceEnded;
+        }
+    }
+
+    /// <summary>
     /// Takes the <paramref name="read" /> bytes just read into the input, where a read of none
-    /// is the end of the data, and encodes what the encoding can, keeping the rest for the next read.
+    /// is the end of the data, and encodes what the encoding can, keeping the rest for the next
+    /// read; data the encoding refuses is remembered, to fail the read after the bytes before it.
     /// </summary>
     private void EncodeInput(int read)
     {
@@ -151,11 +172,7 @@ internal sealed class EncodedReadStream : Stream
         sourceEnded = read == 0;
         output.ResetWrittenCount();
         outputOffset = 0;
-        if (!encoding.TryEncode(input.AsSpan(0, inputCount), sourceEnded, output, out int consumed))
-        {
-            throw new RequestBodyReadFailedException(MultipartFormBodyBuilder.ReadFailedMessage);
-        }
-
+        refused = !encoding.TryEncode(input.AsSpan(0, inputCount), sourceEnded, output, out int consumed);
         inputCount -= consumed;
         input.AsSpan(consumed, inputCount).CopyTo(input);
     }
@@ -182,6 +199,7 @@ internal sealed class EncodedReadStream : Stream
         output.ResetWrittenCount();
         outputOffset = 0;
         sourceEnded = false;
+        refused = false;
         position = 0;
 
         byte[] skipped = new byte[SkipBufferSize];

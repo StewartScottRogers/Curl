@@ -86,6 +86,12 @@ namespace Curl.Core;
 /// is sent to the next hop before any challenge, as libcurl 8.21.0 does (upstream test1088, BL-1819).
 /// </para>
 /// <para>
+/// Every hop after one whose response was HTTP/1.0 is sent
+/// <see cref="HttpRequestOptions.EarlierResponseWasHttp10" />, so it goes out as HTTP/1.0, as
+/// curl 8.21.0 sends every later request of a transfer once a response in it was HTTP/1.0: a
+/// <c>-T -</c> upload then fails the hop with exit 25 before sending it (upstream test1073, BL-2037).
+/// </para>
+/// <para>
 /// Every hop after the first carries the chain's start as
 /// <see cref="ITransferContext.OperationStarted" />, so <c>-m</c> limits the whole chain, as
 /// curl's does, rather than each hop (measured, BL-299 Notes).
@@ -198,6 +204,7 @@ public sealed class RedirectFollower(
         ITransferContext hop = context;
         bool bodyDropped = false;
         bool methodDropped = false;
+        bool receivedHttp10 = false;
         while (true)
         {
             TransferResult result = await DispatchAsync(hop, policy);
@@ -208,6 +215,7 @@ public sealed class RedirectFollower(
             }
 
             int responseCode = result.Report!.ResponseCode;
+            receivedHttp10 |= result.Report.HttpVersion == HttpVersion.Version10;
             string? methodSwitchMessage = MethodSwitchMessage(responseCode, hop, http.CustomMethod, policy);
             bodyDropped |= DropsBody(responseCode, hop, policy);
             methodDropped |= DropsCustomMethod(responseCode, hop, policy, bodyDropped);
@@ -224,7 +232,7 @@ public sealed class RedirectFollower(
             log.Followed(responseCode, target, bodyDropped, methodDropped);
             chain.Followed(target);
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 

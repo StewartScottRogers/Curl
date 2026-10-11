@@ -105,6 +105,29 @@ internal sealed class RunningTransferState(
     internal int RetryCount { get; set; }
 
     /// <summary>
+    /// Gets or sets the warning <c>--retry</c> gave up its retries with, such as
+    /// <see cref="TransferRetryWarning.RetryAfterExceedsMaxTime" />, which curl 8.21.0 prints
+    /// after the transfer's progress meter (upstream test366, BL-2008); <see langword="null" />
+    /// when it gave up none.
+    /// </summary>
+    internal string? AbandonedRetryWarning { get; set; }
+
+    /// <summary>
+    /// Gets or sets curl's <c>Warning: Failed to open the file</c> line for an <c>-o</c> file the
+    /// transfer could not open, held back so it is printed after the progress meter's closing
+    /// newline as curl 8.21.0 does (AF-0145, BL-1964); <see langword="null" /> when there is none
+    /// or it was already printed.
+    /// </summary>
+    internal string? OutputFileOpenWarning { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the handler's transfer succeeded and only creating
+    /// the empty <c>-o</c> file afterwards failed it with exit 23, so the progress meter finishes
+    /// with curl 8.21.0's done rows, as after a success (BL-2039).
+    /// </summary>
+    internal bool SucceededBeforeOutputFileCreationFailed { get; set; }
+
+    /// <summary>
     /// Gets or sets the <c>%{xfer_id}</c> of the latest attempt <c>--retry</c> ran, which curl
     /// 8.21.0 makes a transfer of its own; <see langword="null" /> until the first retry (task BL-799).
     /// </summary>

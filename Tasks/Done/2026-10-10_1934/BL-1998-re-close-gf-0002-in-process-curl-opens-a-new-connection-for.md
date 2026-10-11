@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests, Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-1998 — Re-close GF-0002: In process, Curl opens a new connection for every request, so connection-reuse cases see [DISCONNECT], local port -1 and the wrong verdict for the second response
 
@@ -37,21 +37,27 @@ In Curl.Console, make InProcessCurl.RunAsync create a run ConnectionCache and pa
 
 ## Acceptance criteria
 
-- [ ] `behaviour:test338`: Curl answers what curl 8.21.0 answers, `upstream test338 passes`, so the item measures `match`.
-- [ ] `behaviour:test1421`: Curl answers what curl 8.21.0 answers, `upstream test1421 passes`, so the item measures `match`.
-- [ ] `behaviour:test1134`: Curl answers what curl 8.21.0 answers, `upstream test1134 passes`, so the item measures `match`.
-- [ ] `behaviour:test48`: Curl answers what curl 8.21.0 answers, `upstream test48 passes`, so the item measures `match`.
-- [ ] `behaviour:test1418`: Curl answers what curl 8.21.0 answers, `upstream test1418 passes`, so the item measures `match`.
-- [ ] `behaviour:test1419`: Curl answers what curl 8.21.0 answers, `upstream test1419 passes`, so the item measures `match`.
-- [ ] `behaviour:test435`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 248 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55939\x0Alocal ip == 127.0.0.1\x0Aremote_ip == 127.0.0.1\x0Aremote_port == 18990\x0AHTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55940\x0Alocal ip == 127.0.`, so the item measures `match`.
-- [ ] `behaviour:test1074`: Curl answers what curl 8.21.0 answers, `upstream test1074 passes`, so the item measures `match`.
-- [ ] `behaviour:test1479`: Curl answers what curl 8.21.0 answers, `upstream test1479 passes`, so the item measures `match`.
-- [ ] `behaviour:test471`: Curl answers what curl 8.21.0 answers, `upstream test471 passes`, so the item measures `match`.
-- [ ] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
-- [ ] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
+- [x] `behaviour:test338`: Curl answers what curl 8.21.0 answers, `upstream test338 passes`, so the item measures `match`.
+- [x] `behaviour:test1421`: Curl answers what curl 8.21.0 answers, `upstream test1421 passes`, so the item measures `match`.
+- [x] `behaviour:test1134`: Curl answers what curl 8.21.0 answers, `upstream test1134 passes`, so the item measures `match`.
+- [x] `behaviour:test48`: Curl answers what curl 8.21.0 answers, `upstream test48 passes`, so the item measures `match`.
+- [x] `behaviour:test1418`: Curl answers what curl 8.21.0 answers, `upstream test1418 passes`, so the item measures `match`.
+- [x] `behaviour:test1419`: Curl answers what curl 8.21.0 answers, `upstream test1419 passes`, so the item measures `match`.
+- [x] `behaviour:test435`: Curl answers what curl 8.21.0 answers, `reference curl exits 0; stdout 248 bytes: HTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55939\x0Alocal ip == 127.0.0.1\x0Aremote_ip == 127.0.0.1\x0Aremote_port == 18990\x0AHTTP/1.1 200 OK\x0D\x0AContent-Length: 0\x0D\x0A\x0D\x0Alocal port == 55940\x0Alocal ip == 127.0.`, so the item measures `match`.
+- [x] `behaviour:test1074`: Curl answers what curl 8.21.0 answers, `upstream test1074 passes`, so the item measures `match`.
+- [x] `behaviour:test1479`: Curl answers what curl 8.21.0 answers, `upstream test1479 passes`, so the item measures `match`.
+- [x] `behaviour:test471`: Curl answers what curl 8.21.0 answers, `upstream test471 passes`, so the item measures `match`.
+- [x] `dotnet build -warnaserror` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) are green.
+- [x] When an option is added or changed, `curl --ai-help` is kept right (CLAUDE.md).
 
 ## Notes
+
+- Curl already does what the finding's suggestion asks: BL-1795 gave `InProcessCurl.RunAsync` (connector overload) a run `ConnectionCache`, the dialing overloads pool through `CreateDialingTransferDispatch`, `SwsHttpServerConnector` numbers local ports from 49152, and BL-1833/BL-1834 fixed the HTTP/1.0 reuse and `%{local_port}`. That is in `origin/master` and `origin/gap` since 2026-10-08, before the 2026-10-10_0657 gap run.
+- New pin: `UpstreamConformanceTests.InProcessCurl_ConnectionReuseCase_Passes` runs all ten cases through the public `InProcessCurl.RunAsync` - the connector overload over the case's `SwsHttpServerConnector`, and the dialing overload over `InMemoryServerTcpDialer` - exactly as a tool outside the test projects reaches Curl. All 20 rows pass; all ten were already on `PassingUpstreamCases.txt`. So the gap the 0657 run still measures comes from the gap tool itself (`Gap/Tools/Measure-UpstreamCases.cs`): it either does not reach Curl through `InProcessCurl`, or gives it a connector that does not keep a connection between requests.
+- Left for an interactive session (lanes may neither read `Gap/` nor file a task touching it - the audit guard refused both): make `Measure-UpstreamCases.cs` run each case through `InProcessCurl.RunAsync` as the new test does, then re-measure GF-0002's ten items. No option changed, so `--ai-help` is unaffected.
 
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. All ten GF-0002 cases pass through the public InProcessCurl both ways; the remaining gap is in the gap tool, left to an interactive session

@@ -8,7 +8,7 @@ depends-on: [BL-2022]
 touches: [Curl.Console, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-10
-completed:
+completed: 2026-10-10
 ---
 # BL-2033 — Send a Digest Authorization header in curl's Schannel-build form on Windows
 
@@ -24,13 +24,19 @@ Measure with `Record-CurlExchange.ps1 -OutDirectory <dir> -Port <p> -HalfCloseAf
 
 ## Acceptance criteria
 
-- [ ] On Windows the Digest `Authorization` value `Curl.Console` sends matches curl 8.21.0's bytes for the command above (measured, recorded under Notes).
-- [ ] Off Windows the value keeps the `, ` form (no test on Windows changes it).
-- [ ] `dotnet build -warnaserror` is clean and the fast tests are green; Curl.Console keeps 100% line and branch coverage.
-- [ ] No option changes, so `--ai-help` needs nothing; say so under Notes.
+- [x] On Windows the Digest `Authorization` value `Curl.Console` sends matches curl 8.21.0's bytes for the command above (measured, recorded under Notes).
+- [x] Off Windows the value keeps the `, ` form (no test on Windows changes it).
+- [x] `dotnet build -warnaserror` is clean and the fast tests are green; Curl.Console keeps 100% line and branch coverage.
+- [x] No option changes, so `--ai-help` needs nothing; say so under Notes.
 
 ## Notes
+
+- Measured 2026-10-10 with `Record-CurlExchange.ps1` (curl 8.21.0, `C:\Program Files\Git\mingw64\bin\curl.exe`): the second request carries `Authorization: Digest username="u",realm="r",nonce="abc",uri="/64",response="fc3de222db74c3ec88aabb5510c76f80"`, the exact value in the Goal.
+- `CurlComposition.CreateHttpAuthenticator` now passes `matchesSspiBuild: OperatingSystem.IsWindows()` to `DigestAuthenticator`. `CurlCompositionHttpTests`' `--digest`/`--anyauth` rows keep the `, ` form and the test strips the blanks on Windows; no other project pins a sent Digest value (the Conformance hits are request headers a test server receives).
+- No option changes, so `--ai-help` needs nothing.
 
 ## Log
 
 - 2026-10-10: Created.
+- 2026-10-10: Backlog -> Doing.
+- 2026-10-10: Doing -> Done. Digest header matches the Schannel build on Windows

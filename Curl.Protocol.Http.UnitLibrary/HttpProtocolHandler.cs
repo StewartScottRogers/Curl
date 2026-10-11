@@ -1101,7 +1101,7 @@ public sealed class HttpProtocolHandler(
         ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
-        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, Http1VersionSeen.DowngradesToHttp10(transport));
+        byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, options.EarlierResponseWasHttp10 || Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = framing.AwaitsContinue
             ? new HttpContinueWaitConnection(timedConnection) { ContinueWait = options.ContinueWait }
@@ -1455,7 +1455,8 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     /// <remarks>
     /// On a connection whose earlier response was HTTP/1.0 the head is formatted as for
-    /// <c>-0</c>, as curl downgrades the connection (upstream test1074).
+    /// <c>-0</c>, as curl downgrades the connection (upstream test1074), and so is a hop after an
+    /// earlier hop's HTTP/1.0 response (<see cref="HttpRequestOptions.EarlierResponseWasHttp10" />).
     /// </remarks>
     private byte[] FormatRequestHead(HttpRequestPlan plan, IHttpStreamSession? streams, bool upgradesToH2c, bool downgradesToHttp10)
     {
@@ -2211,12 +2212,14 @@ public sealed class HttpProtocolHandler(
         EndUnchallengedAuthorizations(plan, head.StatusLine.StatusCode);
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
+            ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
             return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan));
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
+            ThrowIfChunkedResendToHttp10(plan, head);
             RewindForResend(plan, upload);
             return authorized;
         }
@@ -2474,10 +2477,35 @@ public sealed class HttpProtocolHandler(
     /// <paramref name="statusCode" /> response to a request whose body can be sent again: bytes,
     /// none, or a stream that can seek back to its start, as a <c>-T</c> file or a <c>-F</c> form
     /// of files can, which curl 8.21.0 rewinds and resends whole (upstream test1030, test259); not
-    /// a stream that cannot, such as stdin (ADR-0034).
+    /// a stream that cannot, such as stdin (ADR-0034), unless the response came from an HTTP/1.0
+    /// server, when the retry fails before rewinding (<see cref="ThrowIfChunkedResendToHttp10" />).
     /// </summary>
     private static bool MayRetry(HttpRequestPlan plan, HttpResponseHead head, int statusCode) =>
-        head.StatusLine.StatusCode == statusCode && (plan.Framing.Body is not StreamBody stream || stream.Content.CanSeek);
+        head.StatusLine.StatusCode == statusCode
+            && (plan.Framing.Body is not StreamBody stream || stream.Content.CanSeek || ResendsChunkedToHttp10(plan, head));
+
+    /// <summary>
+    /// Tells whether answering <paramref name="head" /> would resend a body curl chunks for its
+    /// unknown length (<see cref="HttpRequestFraming.ChunksForUnknownLength" />) to a server that
+    /// answered HTTP/1.0.
+    /// </summary>
+    private static bool ResendsChunkedToHttp10(HttpRequestPlan plan, HttpResponseHead head) =>
+        plan.Framing.ChunksForUnknownLength && head.StatusLine.Version == HttpVersion.Version10;
+
+    /// <summary>
+    /// Fails the retry that answers <paramref name="head" /> before it rewinds or sends anything when
+    /// it would resend a body chunked for its unknown length to a server that answered HTTP/1.0, as
+    /// curl 8.21.0 sends that retry as HTTP/1.0 and fails it with exit 25
+    /// <c>Chunky upload is not supported by HTTP 1.0</c> (upstream test1072).
+    /// </summary>
+    /// <exception cref="HttpTransferException">The retry would be such a resend (exit 25).</exception>
+    private static void ThrowIfChunkedResendToHttp10(HttpRequestPlan plan, HttpResponseHead head)
+    {
+        if (ResendsChunkedToHttp10(plan, head))
+        {
+            throw new HttpTransferException(CurlExitCode.UploadFailed, HttpTransferMessages.ChunkedUploadNeedsHttp11);
+        }
+    }
 
     /// <summary>
     /// Gets the values of every <paramref name="name" /> header of <paramref name="head" />,

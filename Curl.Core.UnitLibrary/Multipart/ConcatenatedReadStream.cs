@@ -21,10 +21,14 @@ internal sealed class ConcatenatedReadStream : Stream
 
     /// <summary>Initialises a stream over <paramref name="segments" />, which it now owns.</summary>
     /// <param name="segments">The streams to read, in order.</param>
-    internal ConcatenatedReadStream(IReadOnlyList<Stream> segments)
+    /// <param name="allowsSeeking">
+    /// Whether it seeks when every segment seeks; a mail message of unknown size does not, so
+    /// its sender knows neither its size nor how to measure it, as curl does not (BL-2025).
+    /// </param>
+    internal ConcatenatedReadStream(IReadOnlyList<Stream> segments, bool allowsSeeking = true)
     {
         this.segments = segments;
-        starts = segments.All(segment => segment.CanSeek) ? [.. segments.Select(segment => segment.Position)] : null;
+        starts = allowsSeeking && segments.All(segment => segment.CanSeek) ? [.. segments.Select(segment => segment.Position)] : null;
     }
 
     /// <inheritdoc />

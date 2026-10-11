@@ -498,6 +498,33 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
+    /// A 407 from an HTTP/1.0 proxy to a body chunked for its unknown length fails with exit 25,
+    /// as the answering request would go out as HTTP/1.0 (upstream test1072's proxy twin).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_Http10407ToABodyOfUnknownLength_ReturnsUploadFailed()
+    {
+        string http10Challenge = ProxyBasicChallengeHead.Replace("HTTP/1.1", "HTTP/1.0", StringComparison.Ordinal);
+        TurnTakingConnection connection = new(65536, http10Challenge + "PPP");
+        MemoryStream output = new();
+        TransferContext context = new()
+        {
+            Url = CurlUrl.Parse(ProxyAuthUrl),
+            Output = output,
+            Http = new HttpRequestOptions { ForwardProxy = ChallengingProxy, Body = new StreamBody(new UnseekableStream("hi"u8.ToArray()), null, "application/octet-stream") },
+        };
+        Diagnostics.Arrange("scripted response", OneLine(http10Challenge + "PPP"));
+        Diagnostics.Arrange("request body", "unseekable stream of unknown length");
+
+        TransferResult result = await ProxyChallengeHandler(QueueConnector.For(connection), HttpAuthSchemes.Any).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.UploadFailed, result.ExitCode);
+        Assert.AreEqual(string.Empty, Latin1(output.ToArray()));
+    }
+
+    /// <summary>
     /// The handler keeps the proxy schemes it was given, Basic when given none.
     /// </summary>
     [TestMethod]

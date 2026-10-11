@@ -525,6 +525,8 @@ public sealed class FtpProtocolHandlerActiveModeTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // Upstream tests 1206 and 1207 (NODATACONN425 and NODATACONN421): the server answers RETR
         // with 150 and at once a refusal, and never connects; curl 8.21.0 sends QUIT and ends with exit 10.
+        // It does so without --max-time too, as no transfer time is set here: upstream test1211 expects
+        // exit 28 there, but upstream disables that case and real curl measures 10 (ADR-0474, BL-2021).
         var clock = new ImmediateTimerTimeProvider();
         var pending = new ScriptedPendingConnection(new IPEndPoint(IPAddress.Loopback, 52273), null);
         ActiveRun run = await RunAsync(diagnostics,
